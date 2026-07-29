@@ -47,6 +47,27 @@ return [
             'report' => false,
         ],
 
+        // ID documents & member photos ONLY. Separate from general uploads:
+        // private, never publicly served, accessed only via short-lived signed
+        // URLs, and encrypted at the model layer before write (prompt 04).
+        // Local dev uses the local driver; production sets DOCUMENTS_DRIVER=s3
+        // with a dedicated private bucket (AWS_DOCUMENTS_BUCKET). `throw => true`
+        // so a lost/failed ID-scan write fails loud, never silently.
+        'documents' => [
+            'driver' => env('DOCUMENTS_DRIVER', 'local'),
+            'root' => storage_path('app/private/documents'),
+            'visibility' => 'private',
+            'serve' => false,
+            'throw' => true,
+            'report' => false,
+            'key' => env('AWS_ACCESS_KEY_ID'),
+            'secret' => env('AWS_SECRET_ACCESS_KEY'),
+            'region' => env('AWS_DEFAULT_REGION'),
+            'bucket' => env('AWS_DOCUMENTS_BUCKET'),
+            'endpoint' => env('AWS_ENDPOINT'),
+            'use_path_style_endpoint' => env('AWS_USE_PATH_STYLE_ENDPOINT', false),
+        ],
+
         's3' => [
             'driver' => 's3',
             'key' => env('AWS_ACCESS_KEY_ID'),

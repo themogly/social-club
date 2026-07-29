@@ -18,6 +18,12 @@
 /public/fonts-manifest.dev.json
 /public/hot
 /public/storage
+# Published vendor assets — regenerated on composer install (post-autoload-dump
+# runs filament:upgrade) / vendor:publish, so not committed.
+/public/css/filament
+/public/js/filament
+/public/fonts/filament
+/public/vendor
 /storage/*.key
 /storage/pail
 /vendor
