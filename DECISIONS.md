@@ -82,9 +82,10 @@ chosen for robustness in an *unattended* run (no binary that could silently be m
 - **Spreadsheet → `openspout/openspout`.** Low-dependency, memory-efficient streaming reader/writer
   for XLSX + CSV — good for large report exports and the member CSV import. A thin
   `App\Support\Spreadsheet` wrapper gives an ergonomic API.
-- **Image → `intervention/image` v3 (+ `intervention/image-laravel`) on the gd driver.** Handles
+- **Image → `intervention/image` v4 (+ `intervention/image-laravel`) on the gd driver.** Handles
   crop-at-upload, WebP encode, and metadata stripping (re-encode drops EXIF) with gd; no imagick or
-  media-library table imposed (ID docs/photos are custom models on a private encrypted disk).
+  media-library table imposed (ID docs/photos are custom models on a private encrypted disk). Note
+  v4 API: `ImageManager::decodePath()` (not v3's `read()`).
 - **Web Push → `laravel-notification-channels/webpush` ^11.** Required a `-W` install so composer
   could downgrade `brick/math` 0.18 → 0.17.2 (the webpush → minishlink/web-push →
   web-token/jwt-library chain caps brick/math at ≤0.17; laravel/framework and ramsey/uuid both allow
