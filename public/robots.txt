@@ -1,2 +1,6 @@
+# A Spanish cannabis social club may not advertise (NOTES §A). Nothing is public
+# or indexable — disallow every crawler from everything. The X-Robots-Tag:
+# noindex header (App\Http\Middleware\SecurityHeaders) enforces this at the HTTP
+# layer as well, in case this file is ever bypassed.
 User-agent: *
-Disallow:
+Disallow: /
