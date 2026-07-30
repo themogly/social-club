@@ -66,6 +66,9 @@ class Settings
         'pos_require_checked_in' => false,  // only dispense to members checked in at the door
         'pos_signature_required' => false,  // capture an on-screen signature per withdrawal (acta-grade)
 
+        // Governance / actas
+        'minute_quorum_fraction_bp' => 5000,  // quorum = 50% of active members (basis points)
+
         // Till / cash
         'arqueo_variance_tolerance_cents' => 500,
         'blind_count_enforced' => true,

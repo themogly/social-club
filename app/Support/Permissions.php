@@ -59,7 +59,7 @@ class Permissions
         'stock.take', 'articles.manage', 'discounts.manage',
         'wallet.adjust', 'till.open', 'till.close', 'cash.bank', 'expenses.record',
         'expenses.approve', 'purchases.manage',
-        'documents.generate', 'register.view',
+        'documents.generate', 'minutes.manage', 'register.view',
         'comms.manage',
         'settings.manage.location',
     ];

@@ -16,7 +16,7 @@ class MemberDocument extends Model
     use HasFactory, HasUlids;
 
     protected $fillable = [
-        'member_id', 'type', 'path', 'uploaded_by', 'signed_at', 'version', 'generated_from',
+        'member_id', 'type', 'path', 'uploaded_by', 'signed_at', 'version', 'generated_from', 'snapshot',
     ];
 
     protected function casts(): array
@@ -25,6 +25,7 @@ class MemberDocument extends Model
             'type' => MemberDocumentType::class,
             'signed_at' => 'datetime',
             'version' => 'integer',
+            'snapshot' => 'array',
         ];
     }
 
