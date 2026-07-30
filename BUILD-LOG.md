@@ -63,3 +63,12 @@ one branch each, `composer check` green before every merge. Prompt 18 is deliber
   middleware). Grams shown at the edge, stored as centigrams.
 - Needs Ben's confirmation: none new (all thresholds carry the NOTES §A / prompt-01 defaults already
   flagged; enforcement matrix defaults are sensible — door lets debt in (WARN), counter blocks it).
+
+## Prompt 04 — Member directory, applications, avalador, ID & RGPD
+- Status: merged
+- Defaults chosen: anonymise-not-delete erasure (keeps ledger); retention 1825d via nightly
+  members:purge; encrypted document_number + document_hash blind index for dedup; QR = random token
+  (not derived from id), only hash stored; signed-URL document vault (TTL from settings) with access
+  logging on every attempt; consent = versioned per-purpose rows (Article 9 special-category noted);
+  CSV import idempotent + audited. Removed WithoutModelEvents from DatabaseSeeder so saving hooks run.
+- Needs Ben's confirmation: none new (retention/consent/erasure defaults already flagged in prompt 01/03).
