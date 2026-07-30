@@ -157,6 +157,13 @@ vocabulary above is Spanish even in the English locale where it is a term of art
   `items` snapshot, `SALE` unit stock, `PURCHASE` wallet spend, cash to the shared till) — articles
   only, so a genetic can never appear; bar cash stays out of `cash_contributions`. Screen
   `app/Livewire/Counter/BarPos.php`; sale-worded receipt `resources/views/receipts/bar-receipt.blade.php`.
+- Expenses (till vs overhead kept apart): `app/Actions/Expenses/RecordTillExpense.php` posts a
+  `PETTY_CASH` cash movement (drawer reconciles); `RecordOverhead.php` NEVER touches a till;
+  `ApproveExpense.php` is a recorded approval above `Expense::requiresApproval()`. Purchases carry
+  cost/gram onto the batch: `app/Actions/Purchases/RecordPurchase.php`.
+- Scheduled idempotent job: `app/Console/Commands/MaterialiseRecurringExpenses.php` — a unique
+  per-(template, period) marker (`RecurringExpenseRun`) makes a double-fire a no-op; wired in
+  `routes/console.php`. Copy this shape for anything a scheduler/webhook can retry.
 - Contribution receipt (worded aportación, never venta): `resources/views/receipts/receipt.blade.php`
   + `app/Http/Controllers/DispensationReceiptController.php` (ULID route, authorization-checked).
 - Till / cash / arqueo: expected drawer cash is **derived from the ledger, never stored**

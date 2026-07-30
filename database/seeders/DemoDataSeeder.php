@@ -107,13 +107,9 @@ class DemoDataSeeder extends Seeder
         $catFlores = Category::create(['organisation_id' => $org->id, 'name' => 'Flores', 'applies_to' => CategoryAppliesTo::GENETIC]);
         $catBar = Category::create(['organisation_id' => $org->id, 'name' => 'Bar', 'applies_to' => CategoryAppliesTo::ARTICLE]);
 
-        foreach (['Stock', 'Consumibles', 'Pago de personal', 'Reparaciones y mantenimiento', 'Alquiler', 'Suministros', 'Otros'] as $name) {
-            ExpenseCategory::create([
-                'organisation_id' => $org->id, 'name' => $name,
-                'default_kind' => $name === 'Stock' ? ExpenseKind::TILL : ExpenseKind::OVERHEAD, 'active' => true,
-            ]);
-        }
-        $stockCat = ExpenseCategory::where('name', 'Stock')->first();
+        ExpenseCategorySeeder::seedFor($org->id);
+        // Consumibles is the petty-cash (TILL) category — the drawer buys bags, gloves, etc.
+        $pettyCashCat = ExpenseCategory::where('name', 'Consumibles')->first();
 
         Discount::create(['organisation_id' => $org->id, 'name' => 'Personal', 'kind' => DiscountKind::STAFF, 'mode' => DiscountMode::PERCENT, 'value_bp' => 1000, 'applies_to' => DiscountAppliesTo::BOTH, 'active' => true]);
         Discount::create(['organisation_id' => $org->id, 'name' => 'Terapéutico', 'kind' => DiscountKind::THERAPEUTIC, 'mode' => DiscountMode::PERCENT, 'value_bp' => 1500, 'applies_to' => DiscountAppliesTo::GENETIC, 'active' => true]);
@@ -122,7 +118,7 @@ class DemoDataSeeder extends Seeder
 
         $membersByLocation = $this->seedMembers($org->id, $locations, $tierSocio, $tierTera);
 
-        $this->seedFortnight($org->id, $locations, $staff, $batchesByLocation, $priceByBatch, $membersByLocation, $stockCat);
+        $this->seedFortnight($org->id, $locations, $staff, $batchesByLocation, $priceByBatch, $membersByLocation, $pettyCashCat);
     }
 
     private function seedSettings(string $orgId): void
@@ -300,7 +296,7 @@ class DemoDataSeeder extends Seeder
      * @param  array<string, int>  $priceByBatch
      * @param  array<string, array<int, array{member: Member, balance: int}>>  $membersByLocation
      */
-    private function seedFortnight(string $orgId, array $locations, array $staff, array $batchesByLocation, array $priceByBatch, array $membersByLocation, ?ExpenseCategory $stockCat): void
+    private function seedFortnight(string $orgId, array $locations, array $staff, array $batchesByLocation, array $priceByBatch, array $membersByLocation, ?ExpenseCategory $pettyCashCat): void
     {
         for ($daysAgo = 13; $daysAgo >= 0; $daysAgo--) {
             $day = now()->subDays($daysAgo)->startOfDay();
@@ -324,10 +320,10 @@ class DemoDataSeeder extends Seeder
                 $expectedCash += $this->seedDispensations($orgId, $location, $till, $day, $staff['staff'], $batches, $priceByBatch, $membersByLocation[$location->id]);
                 $expectedCash += $this->seedOrders($orgId, $location, $till, $day, $staff['staff']);
 
-                if ($stockCat !== null && random_int(0, 2) === 0) {
+                if ($pettyCashCat !== null && random_int(0, 2) === 0) {
                     $amount = random_int(500, 3000);
                     Expense::create([
-                        'organisation_id' => $orgId, 'location_id' => $location->id, 'category_id' => $stockCat->id,
+                        'organisation_id' => $orgId, 'location_id' => $location->id, 'category_id' => $pettyCashCat->id,
                         'amount_cents' => $amount, 'paid_from' => ExpensePaidFrom::TILL_CASH, 'kind' => ExpenseKind::TILL,
                         'till_session_id' => $till->id, 'recorded_by' => $staff['manager']->id, 'incurred_on' => $day,
                     ]);

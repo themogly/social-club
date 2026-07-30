@@ -288,6 +288,63 @@
                 </form>
             </section>
 
+            {{-- Gasto de caja (petty cash) — only staff who may record expenses.
+                 Rendered only in the open-session branch, so it never appears during the
+                 blind count (which keeps the expected figure hidden). --}}
+            @can('expenses.record')
+                <section class="rounded-2xl border border-line bg-surface p-5 dark:border-slate-800 dark:bg-slate-900 sm:p-6">
+                    <h3 class="text-base font-semibold">{{ __('Registrar gasto de caja') }}</h3>
+                    <p class="mt-0.5 text-sm text-ink-muted dark:text-slate-400">{{ __('Sale del efectivo del cajón (caja chica).') }}</p>
+                    <form wire:submit="recordExpense" class="mt-4 grid gap-3 sm:grid-cols-2">
+                        <div>
+                            <label for="expenseCategory" class="block text-sm font-medium text-ink-muted dark:text-slate-400">{{ __('Categoría') }}</label>
+                            <select
+                                id="expenseCategory"
+                                wire:model="expenseCategoryId"
+                                class="mt-2 h-12 w-full rounded-xl border border-line bg-surface px-3 text-base text-ink focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/40 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
+                            >
+                                <option value="">{{ __('Elige una categoría') }}</option>
+                                @foreach ($expenseCategories as $category)
+                                    <option value="{{ $category->id }}">{{ $category->name }}</option>
+                                @endforeach
+                            </select>
+                        </div>
+                        <div>
+                            <label for="expenseAmount" class="block text-sm font-medium text-ink-muted dark:text-slate-400">{{ __('Importe (€)') }}</label>
+                            <input
+                                id="expenseAmount"
+                                type="text"
+                                inputmode="decimal"
+                                wire:model="expenseAmount"
+                                autocomplete="off"
+                                placeholder="0,00"
+                                class="mt-2 h-12 w-full rounded-xl border border-line bg-surface px-4 text-base text-ink placeholder:text-ink-muted/60 focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/40 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
+                            >
+                        </div>
+                        <div class="sm:col-span-2">
+                            <label for="expenseNote" class="block text-sm font-medium text-ink-muted dark:text-slate-400">{{ __('Nota') }}</label>
+                            <input
+                                id="expenseNote"
+                                type="text"
+                                wire:model="expenseNote"
+                                autocomplete="off"
+                                placeholder="{{ __('Ej. bolsas, guantes…') }}"
+                                class="mt-2 h-12 w-full rounded-xl border border-line bg-surface px-4 text-base text-ink placeholder:text-ink-muted/60 focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/40 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
+                            >
+                        </div>
+                        <div class="sm:col-span-2">
+                            <button
+                                type="submit"
+                                wire:loading.attr="disabled"
+                                class="h-12 w-full rounded-xl border border-line bg-surface-alt px-6 text-base font-semibold text-ink transition hover:bg-slate-200 disabled:opacity-60 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:hover:bg-slate-700"
+                            >
+                                {{ __('Registrar gasto') }}
+                            </button>
+                        </div>
+                    </form>
+                </section>
+            @endcan
+
             {{-- Close (arqueo) — only a till.close holder may close. --}}
             @can('till.close')
                 <button
