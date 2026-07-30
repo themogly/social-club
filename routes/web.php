@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\MemberDocumentController;
 use App\Livewire\Counter\CheckInScreen;
+use App\Livewire\Counter\TillSession;
 use Illuminate\Support\Facades\Route;
 
 // Authenticated, signed, short-lived access to a member document on the private
@@ -28,3 +29,11 @@ Route::middleware(['web', 'auth', 'signed'])
 Route::middleware(['web', 'auth'])
     ->get('/counter/checkin', CheckInScreen::class)
     ->name('counter.checkin');
+
+// The till (caja) terminal — same tablet-first pattern as the door. Opening/closing a
+// session and recording cash movements all happen here (never inside Filament, which is
+// oversight-only). Closing is a BLIND arqueo: the expected figure is withheld until the
+// operator has entered their count. Gated in the component on till.open OR till.close.
+Route::middleware(['web', 'auth'])
+    ->get('/counter/till', TillSession::class)
+    ->name('counter.till');

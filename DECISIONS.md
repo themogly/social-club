@@ -365,3 +365,26 @@ and an opening till float on `TillSession`. The dev seeder uses these same paths
   unattended run has no Playwright MCP connected. The UI is built to the tablet-first constraints and
   reuses the shared layout/components; a human should run the Playwright screenshot pass
   (1440/1280/1024/390, light+dark, motion reduced+allowed) before go-live, per the kit's UI rule.
+
+---
+
+## Prompt 10 — till sessions, cash, arqueo & cierre de turno
+
+- **Expected drawer cash is derived, never stored** (`App\Support\TillSummary`): float + cash
+  contributions (dispensation.cash_cents COMPLETED) + bar cash (order.cash_cents) + cash top-ups +
+  cash fee payments + cash movements (signed) − refunds. **Wallet contributions/payments are shown
+  but EXCLUDED** — only cash counts toward the drawer. Voided transactions are excluded, so a void
+  adjusts expected automatically. (Pinned: €200 float + €150 cash + €30 bar − €25 petty − €100 banked
+  = €255, excluding €40 wallet.)
+- **One open session per terminal per location** (`OpenTill`, locked); a second open is refused. Cash
+  movements stored SIGNED (IN +, OUT/BANKED/PETTY −). `CommitDispensation` refuses to attach to a
+  missing/closed session.
+- **Blind arqueo** (`CloseTill`, `till.close` manager+): the counted figure is submitted BEFORE the
+  expected is computed/revealed; the UI keeps `expected` out of the payload until the count is
+  submitted (tested). `OVERNIGHT-DEFAULT — CONFIRM:` **arqueo variance tolerance = €5.00**
+  (`arqueo_variance_tolerance_cents = 500`); a variance beyond it requires a note. A closed session is
+  immutable (no reopen; corrections are new linked entries).
+- **Z-report** (`App\Support\ZReport`): full breakdown + counted/variance/tx-count/voids/operator;
+  feeds the dashboard + financial reports (prompt 14). Oversight via a read-only `TillSessionResource`.
+- `OVERNIGHT-DEFAULT — CONFIRM:` counter-screen visual screenshots not captured (no Playwright MCP) —
+  human screenshot pass before go-live.
