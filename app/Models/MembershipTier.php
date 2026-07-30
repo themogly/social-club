@@ -19,7 +19,8 @@ class MembershipTier extends Model
     use BelongsToOrganisation, HasFactory, HasUlids, SoftDeletes;
 
     protected $fillable = [
-        'organisation_id', 'name', 'default_fee_cents', 'default_period', 'benefits', 'active',
+        'organisation_id', 'name', 'default_fee_cents', 'default_period',
+        'daily_limit_cg', 'monthly_limit_cg', 'benefits', 'active',
     ];
 
     protected function casts(): array
@@ -27,6 +28,8 @@ class MembershipTier extends Model
         return [
             'default_fee_cents' => MoneyCast::class,
             'default_period' => MembershipPeriod::class,
+            'daily_limit_cg' => 'integer',
+            'monthly_limit_cg' => 'integer',
             'active' => 'boolean',
         ];
     }
