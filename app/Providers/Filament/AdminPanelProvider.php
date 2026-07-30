@@ -79,6 +79,11 @@ class AdminPanelProvider extends PanelProvider
                 NavigationGroup::make(fn (): string => __('Dispensario')),
                 NavigationGroup::make(fn (): string => __('Barra')),
                 NavigationGroup::make(fn (): string => __('Caja')),
+                // Informes (reports) — one page per report, each permission-gated
+                // (reports.view; the assembly pack needs reports.view.all). Discovered
+                // from App\Filament\Pages\Reports; the group renders only when the actor
+                // can see at least one report, so STAFF (no reports.view) never sees it.
+                NavigationGroup::make(fn (): string => __('Informes')),
                 NavigationGroup::make(fn (): string => __('Sistema')),
             ])
             // The counter apps run OUTSIDE the panel (tablet-first full-page Livewire),

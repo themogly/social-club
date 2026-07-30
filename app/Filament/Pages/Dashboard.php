@@ -3,6 +3,8 @@
 namespace App\Filament\Pages;
 
 use App\Enums\Role;
+use App\Filament\Pages\Reports\FinancialReportPage;
+use App\Filament\Pages\Reports\StockReportPage;
 use App\Filament\Resources\Batches\BatchResource;
 use App\Filament\Resources\MemberApplications\MemberApplicationResource;
 use App\Filament\Resources\Members\MemberResource;
@@ -210,10 +212,10 @@ class Dashboard extends BaseDashboard
 
         if ($finance) {
             $groups['finanzas'] = ['title' => __('Finanzas'), 'rows' => [
-                ['label' => __('Aportaciones'), 'value' => Money::fromCents($d->contributionsCents($period))->formatted(), 'href' => '#'],
-                ['label' => __('Saldo de monedero'), 'value' => Money::fromCents($d->walletFloatCents())->formatted(), 'href' => '#'],
-                ['label' => __('Deuda de socios'), 'value' => Money::fromCents($d->walletDebtCents())->formatted(), 'href' => '#'],
-                ['label' => __('Valor del stock'), 'value' => Money::fromCents($d->stockValueCents())->formatted(), 'href' => '#'],
+                ['label' => __('Aportaciones'), 'value' => Money::fromCents($d->contributionsCents($period))->formatted(), 'href' => FinancialReportPage::getUrl()],
+                ['label' => __('Saldo de monedero'), 'value' => Money::fromCents($d->walletFloatCents())->formatted(), 'href' => FinancialReportPage::getUrl()],
+                ['label' => __('Deuda de socios'), 'value' => Money::fromCents($d->walletDebtCents())->formatted(), 'href' => FinancialReportPage::getUrl()],
+                ['label' => __('Valor del stock'), 'value' => Money::fromCents($d->stockValueCents())->formatted(), 'href' => StockReportPage::getUrl()],
             ]];
         }
 
@@ -270,7 +272,7 @@ class Dashboard extends BaseDashboard
                 ]),
                 'delta' => $this->delta($d->contributionsCents($period), $d->contributionsCents($prev), true),
                 'spark' => $c->contributionsSeries(),
-                'href' => '#',
+                'href' => FinancialReportPage::getUrl(),
                 'finance' => true,
             ];
         }
@@ -335,7 +337,7 @@ class Dashboard extends BaseDashboard
                 'sub' => $days !== null
                     ? __(':n días de inventario', ['n' => $days])
                     : __('Sin rotación reciente'),
-                'href' => '#',
+                'href' => StockReportPage::getUrl(),
                 'finance' => true,
             ];
 
@@ -346,7 +348,7 @@ class Dashboard extends BaseDashboard
                 'value' => Money::fromCents($d->walletFloatCents())->formatted(),
                 'sub' => __('Pasivo · Deuda :d', ['d' => Money::fromCents($d->walletDebtCents())->formatted()]),
                 'tone' => 'liability',
-                'href' => '#',
+                'href' => FinancialReportPage::getUrl(),
                 'finance' => true,
             ];
 
