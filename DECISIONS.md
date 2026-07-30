@@ -871,3 +871,24 @@ Per-resource checklist (fillable fields absent from the form → why; everything
   CONCENTRATE; grams-per-unit required+shown for PREROLL/EDIBLE, entered as grams → stored centigrams like the
   thc_pct precedent; THC/mg for EDIBLE). `grams_per_unit_cg` is allowlisted in FormCompletenessTest (entered
   via the virtual grams field); `initial_units`/`remaining_units` allowlisted like their cg counterparts.
+
+---
+
+## Prompt 23 — counter screens: a way back to the dashboard
+
+- **One shared header component** `resources/views/components/counter/top-bar.blade.php` (`<x-counter.top-bar>`),
+  rendered by the counter layout so ALL four counter screens (check-in, till, dispensary POS, bar POS)
+  — and any future fifth — get it for free. It carries brand + screen title, a back-to-dashboard link,
+  and Log out (a POST to `filament.admin.auth.logout` — the counter operator can always end their
+  session). Replaces the old ambiguous single "Salir → /" link.
+- **The back-to-dashboard link reuses the EXACT sidebar gate:** `User::canAccessPanel()` (active + has a
+  role). A locked-down counter-only login (e.g. an inactive/role-less till account) sees the shared
+  header but NO dashboard link — the intended lockdown for a fixed till tablet, not a bug. Denial-tested.
+- **Confirm before leaving unsaved work:** a shared Alpine store `counter.dirty` (registered once in the
+  counter layout) is set by the stateful screens via a `@script` `$wire.$watch` — POS/bar flag a
+  non-empty `basket`, the till flags an in-progress blind count / cash entry. The header's Panel link
+  and Log out both confirm when it's true, so navigating away never silently drops a basket or count.
+- The till open/close flow already had a working `cancelClose()` + "Cancelar" control at the blind-count
+  step (verified + tested), so no new control was needed there.
+- Kiosk feel preserved: one small, consistently-placed affordance sized for the existing tablet-1024 /
+  one-handed-390 rules — not the Filament sidebar, not breadcrumbs.
