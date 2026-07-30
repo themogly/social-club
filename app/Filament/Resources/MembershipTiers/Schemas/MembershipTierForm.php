@@ -36,6 +36,23 @@ class MembershipTierForm
                         ->all())
                     ->required(),
 
+                // Virtual gram fields: the model stores integer centigrams in
+                // daily_limit_cg / monthly_limit_cg (nullable per-tier overrides of the
+                // organisation limits). The Create/Edit pages convert grams ↔ centigrams.
+                TextInput::make('daily_limit_g')
+                    ->label(__('Límite diario (g)'))
+                    ->helperText(__('Opcional. Sustituye el límite diario de la organización.'))
+                    ->numeric()
+                    ->minValue(0)
+                    ->step(0.01),
+
+                TextInput::make('monthly_limit_g')
+                    ->label(__('Techo mensual (g)'))
+                    ->helperText(__('Opcional. Sustituye el techo mensual de la organización.'))
+                    ->numeric()
+                    ->minValue(0)
+                    ->step(0.01),
+
                 Textarea::make('benefits')
                     ->label(__('Ventajas'))
                     ->columnSpanFull(),

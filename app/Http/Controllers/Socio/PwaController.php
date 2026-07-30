@@ -105,6 +105,7 @@ class PwaController extends Controller
                 'email' => $member->email,
                 'alta' => $member->joined_at,
                 'estado' => $member->status->value,
+                'declaracion_asociacion_unica' => $member->sole_association_declared_at,
             ],
             'memberships' => $member->memberships()->withoutGlobalScopes()->get(['location_id', 'tier_id', 'status', 'starts_at', 'expires_at']),
             'dispensaciones' => $member->dispensations()->withoutGlobalScopes()->with('lines:id,dispensation_id,grams_cg,line_total_cents,genetic_name_snapshot')->get(['id', 'location_id', 'total_cents', 'dispensed_at']),

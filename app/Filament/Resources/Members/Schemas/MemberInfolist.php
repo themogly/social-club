@@ -3,6 +3,7 @@
 namespace App\Filament\Resources\Members\Schemas;
 
 use App\Enums\MemberStatus;
+use App\Support\Weight;
 use Filament\Infolists\Components\IconEntry;
 use Filament\Infolists\Components\ImageEntry;
 use Filament\Infolists\Components\TextEntry;
@@ -49,7 +50,10 @@ class MemberInfolist
                             ->date(),
 
                         TextEntry::make('declared_monthly_cg')
-                            ->label(__('Previsión mensual (cg)')),
+                            ->label(__('Previsión mensual (g)'))
+                            ->formatStateUsing(fn (?int $state): ?string => filled($state)
+                                ? Weight::fromCentigrams($state)->formatted()
+                                : null),
                     ])
                     ->columns(2),
             ]);
