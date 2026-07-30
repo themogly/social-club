@@ -12,8 +12,13 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
+use RuntimeException;
 
-/** Every gram/unit movement. Opening balances enter here as INTAKE — never free-typed. */
+/**
+ * Every gram/unit movement. Opening balances enter here as INTAKE — never free-typed.
+ * Exactly ONE of qty_cg / qty_units is populated (a WEIGHT-type Batch writes qty_cg; a
+ * UNIT-type Batch or an Article writes qty_units) — enforced by the saving guard.
+ */
 class StockMovement extends Model
 {
     /** @use HasFactory<StockMovementFactory> */
@@ -31,6 +36,20 @@ class StockMovement extends Model
             'qty_units' => 'integer',
             'type' => StockMovementType::class,
         ];
+    }
+
+    protected static function booted(): void
+    {
+        // One-of-two: a movement is either in centigrams or in units, never both, never neither.
+        static::saving(function (StockMovement $movement): void {
+            $attrs = $movement->getAttributes();
+            $hasCg = ($attrs['qty_cg'] ?? null) !== null;
+            $hasUnits = ($attrs['qty_units'] ?? null) !== null;
+
+            if ($hasCg === $hasUnits) {
+                throw new RuntimeException('A stock movement must set exactly one of qty_cg or qty_units.');
+            }
+        });
     }
 
     /** @return MorphTo<Model, $this> */

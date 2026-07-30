@@ -678,6 +678,10 @@ and an opening till float on `TillSession`. The dev seeder uses these same paths
 | Merma | Wastage / Shrinkage | — |
 | Aval / Avalador | Sponsorship / Sponsor | — |
 | Caja | Till / Cash drawer | — |
+| Flor | Flower | — |
+| Extracto / Hachís | Concentrate / Hash | — |
+| Comestible | Edible | — |
+| Preliado (porro) | Preroll | — |
 
 Bar/merch wording is the deliberate exception: *venta/ticket* → *Sale/Receipt* (the bar genuinely
 sells refreshments). Everything cannabis-side stays contribution-framed in both languages.
@@ -801,3 +805,69 @@ Per-resource checklist (fillable fields absent from the form → why; everything
 - **`MembershipTier` limit fields added** rather than documented-as-excluded, because there was no other UI
   to set the per-tier overrides the pricing/limits resolver already reads (a real gap, not owner-managed
   elsewhere).
+
+---
+
+## Prompt 21 — cannabis product types (concentrates, edibles, prerolls beyond flower)
+
+- **`product_type` → derived, stored `unit_type`; everything downstream branches on `unit_type`, never
+  `product_type`** (two paths, not four). FLOWER + CONCENTRATE → WEIGHT (grams/centigrams, unchanged);
+  PREROLL + EDIBLE → UNIT (whole units). `unit_type` is set ONLY by `App\Observers\GeneticObserver`
+  (`#[ObservedBy]`), never `$fillable`, never user-entered — mirrors the qty_cg/qty_units precedent.
+  Concentrates are ONE top-level type with an optional descriptive `concentrate_subtype`
+  (hash/rosin/shatter/wax/live resin), NOT four separate types.
+- **`grams_cg` stays THE figure every limit / ceiling / dashboard / report reads.** For a UNIT line it is a
+  COMPUTED, STORED value (`units_dispensed × genetic.grams_per_unit_cg`) written at commit. Only what FEEDS
+  grams_cg changed: `ResolveMemberLimits`, `StockCeiling`, the daily/monthly ceiling and every report needed
+  ZERO arithmetic change. A dedicated test asserts `ResolveMemberLimits` references none of
+  units/UnitType/product_type/grams_per_unit — the load-bearing compatibility guarantee, proven not just
+  claimed.
+- **CORRECTED StockMovement quantity rule (supersedes the prompt-07 convention).** The old rule — "a Batch
+  writes `qty_cg`, an Article writes `qty_units`" — is now WRONG and a trap for later copiers. The quantity
+  column keys off the **stockable's `unit_type`**, not batch-vs-article: a WEIGHT-type Batch decrements
+  `remaining_cg` and writes `qty_cg`; a **UNIT-type Batch (preroll/edible) decrements `remaining_units` and
+  writes `qty_units`**; an Article stays units. So a UNIT Batch and an Article share the units path; a WEIGHT
+  Batch is the only cg path. `RecordStockMovement` (THE single writer) carries this corrected rule in its
+  docblock; a batch-linked movement writing `qty_units` is pinned by test.
+- **One-of-two, enforced at the model layer, not by convention.** Exactly one of each column pair is
+  populated per row — `price_per_gram/unit_cents`, `initial_cg/units`, `remaining_cg/units`, `qty_cg/units` —
+  validated by a `saving` guard that throws (GeneticPrice, Batch, StockMovement). To let a UNIT row leave the
+  cg/per-gram side null, the additive migration **relaxes `genetic_prices.price_per_gram_cents`,
+  `batches.initial_cg/remaining_cg` and `dispensation_lines.price_per_gram_cents` to nullable** (no existing
+  value altered; every existing FLOWER row keeps its non-null cg/per-gram). NOTE the guards read the genetic's
+  `unit_type` via `->first(['unit_type'])->unit_type` (an Eloquent `value()` returns the CAST enum, so compare
+  to `UnitType::UNIT`, never the string).
+- **Additive, never a rewrite.** New migration only (`2026_07_31_000001_add_product_types_to_catalogue`);
+  prompt-01 migrations untouched. `product_type` defaults to FLOWER and `unit_type` to WEIGHT, so existing
+  rows backfill to the flower/weight shape by the column default (proven: a row inserted without the new
+  columns reads FLOWER/WEIGHT; existing weight batches/prices/lines keep their exact values and null unit
+  columns). Full Feature suite green on **MySQL** too (production driver) since a migration was added.
+- **One resolver, one boundary, one writer — reused, not duplicated.** `ResolvePrice` branches on `unit_type`
+  to read `price_per_gram_cents` OR `price_per_unit_cents` (same tier logic, different column) and returns
+  `PriceResult` with a `perUnit` flag + `lineForUnits()`. `CommitDispensation` normalises every line to a
+  stored `grams_cg` up front (computed for UNIT), then freezes `units_dispensed` + `price_per_unit_cents` and
+  routes stock through `RecordStockMovement`. WEIGHT paths are byte-for-byte unchanged.
+- **POS unit stepper.** The dispensary POS shows the grams pad for a WEIGHT genetic and a +/− unit stepper for
+  a UNIT genetic (mode driven by the selection). A shared `activeEntryGramsCg()` computes the gram-equivalent
+  identically for both (weighed grams, or units × grams_per_unit_cg), so the compliance gauge gives the same
+  real-time ceiling feedback — pinned by a test asserting 3 prerolls (×0.70 g) and a 2.10 g flower entry read
+  the same 210 cg.
+
+### Judgment calls
+
+- **No Filament GeneticPrice surface exists in the app** (prices are seed / opening-import managed per the
+  prompt-01 opening-balance path — prompt 20's form audit did not add one). So there was nothing to make
+  type-aware; the model one-of-two guard + `ResolvePrice` branch deliver the behaviour. `GeneticPrice::factory
+  ()->perUnit()` covers UNIT pricing in tests. If a prices UI is added later it must show only the field
+  matching the genetic's `unit_type`.
+- **`batches.cost_per_gram_cents` is reused as "cost per gram-equivalent" for UNIT batches** (no
+  `cost_per_unit` column added). Valuation stays uniform: `onHandCg() × cost_per_gram_cents / 100` works for
+  both kinds. UNIT intake leaves cost optional (default 0); refine per-unit costing later if the club needs it.
+- **Reports are presentation-only** (ledger/limits/ceiling arithmetic unchanged): `product_type` added as a
+  breakdown column on the stock + consumption reports, UNIT rows show a unit count alongside the
+  gram-equivalent, and stock movements gained a `Uds` column (unit movements carry `qty_units`, not `qty_cg`).
+  The merma **weight** summary still sums `qty_cg` only; unit merma shows in the movements `Uds` column.
+- **`concentrate_subtype`, `grams_per_unit_g`, `thc_mg_per_unit`** are conditional form fields (subtype for
+  CONCENTRATE; grams-per-unit required+shown for PREROLL/EDIBLE, entered as grams → stored centigrams like the
+  thc_pct precedent; THC/mg for EDIBLE). `grams_per_unit_cg` is allowlisted in FormCompletenessTest (entered
+  via the virtual grams field); `initial_units`/`remaining_units` allowlisted like their cg counterparts.

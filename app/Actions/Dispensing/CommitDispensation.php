@@ -17,6 +17,7 @@ use App\Exceptions\LimitExceededException;
 use App\Exceptions\TillClosedException;
 use App\Models\Batch;
 use App\Models\Dispensation;
+use App\Models\Genetic;
 use App\Models\Location;
 use App\Models\Member;
 use App\Models\TillSession;
@@ -38,7 +39,12 @@ use RuntimeException;
  * rule comes from the counter enforcement matrix (Settings). Prices resolve to the
  * base per-gram price here; prompt 08 layers tier/discount resolution on top.
  *
- * @phpstan-type Line array{genetic_id: string, batch_id: string, grams_cg: int}
+ * For a WEIGHT genetic a line carries grams_cg; for a UNIT genetic (preroll/edible) it
+ * carries units, and grams_cg is COMPUTED (units × genetic.grams_per_unit_cg) and stored
+ * on every line — so limits, ceilings and reports keep reading grams_cg with zero change.
+ *
+ * @phpstan-type Line array{genetic_id: string, batch_id: string, grams_cg?: int, units?: int}
+ * @phpstan-type NormalisedLine array{genetic_id: string, batch_id: string, grams_cg: int, units: ?int}
  * @phpstan-type CommitOptions array{operator_id?: ?string, till_session_id?: ?string, cash_cents?: int, wallet_cents?: int, signature_path?: ?string, idempotency_key?: ?string, reversal_of_id?: ?string, override?: bool, override_by?: ?User, override_reason?: ?string, at?: ?\DateTimeInterface}
  */
 class CommitDispensation
@@ -76,6 +82,11 @@ class CommitDispensation
             Member::withoutGlobalScopes()->whereKey($member->id)->lockForUpdate()->first();
 
             $this->assertEligible($member, $location);
+
+            // Normalise every line to a stored grams_cg (computed for UNIT lines) BEFORE the
+            // limit check, so the daily/monthly ceiling arithmetic is fed the same figure it
+            // always was — ResolveMemberLimits itself is untouched.
+            $lines = $this->normalise($lines);
 
             $totalGrams = array_sum(array_map(fn (array $line) => (int) $line['grams_cg'], $lines));
             $snapshot = (new ResolveMemberLimits)->handle($member, $location, $options['at'] ?? null);
@@ -179,7 +190,43 @@ class CommitDispensation
     }
 
     /**
+     * Resolve each line's stored grams_cg once, up front. A UNIT line's grams_cg is
+     * COMPUTED from its unit count × the genetic's grams_per_unit_cg; a WEIGHT line's is
+     * the entered grams. Every line downstream carries a real grams_cg.
+     *
      * @param  list<Line>  $lines
+     * @return list<NormalisedLine>
+     */
+    private function normalise(array $lines): array
+    {
+        return array_map(function (array $line): array {
+            $genetic = Genetic::withoutGlobalScopes()->findOrFail($line['genetic_id']);
+
+            if ($genetic->isUnitType()) {
+                $units = (int) ($line['units'] ?? 0);
+                if ($units <= 0) {
+                    throw new RuntimeException('A unit dispensation line needs a positive unit count.');
+                }
+
+                return [
+                    'genetic_id' => $genetic->id,
+                    'batch_id' => (string) $line['batch_id'],
+                    'grams_cg' => $units * (int) $genetic->grams_per_unit_cg,
+                    'units' => $units,
+                ];
+            }
+
+            return [
+                'genetic_id' => $genetic->id,
+                'batch_id' => (string) $line['batch_id'],
+                'grams_cg' => (int) ($line['grams_cg'] ?? 0),
+                'units' => null,
+            ];
+        }, $lines);
+    }
+
+    /**
+     * @param  list<NormalisedLine>  $lines
      * @param  CommitOptions  $options
      * @return array{0: int, 1: list<array<string, mixed>>}
      */
@@ -192,29 +239,44 @@ class CommitDispensation
         foreach ($lines as $line) {
             $batch = Batch::withoutGlobalScopes()->whereKey($line['batch_id'])->firstOrFail();
             $grams = (int) $line['grams_cg'];
+            $units = $line['units'];
 
             if (! (new SelectBatch)->isDispensable($batch)) {
                 throw new RuntimeException("Batch {$batch->batch_no} is not dispensable (closed, expired or empty).");
             }
 
-            // Price/discount are resolved once and FROZEN into the line snapshot.
-            $priced = $resolver->forGenetic($batch->genetic, $location, $member)->lineFor($grams);
-            $total += $priced['total_cents'];
+            $price = $resolver->forGenetic($batch->genetic, $location, $member);
 
-            // Single stock writer — locks the batch and refuses to oversell.
-            (new RecordStockMovement)->handle($batch, StockMovementType::DISPENSE, -$grams, [
-                'operator_id' => $options['operator_id'] ?? Auth::id(),
-            ]);
+            if ($units !== null) {
+                // UNIT line: freeze the per-unit rate; grams_cg was computed in normalise().
+                $priced = $price->lineForUnits($units);
+                (new RecordStockMovement)->handle($batch, StockMovementType::DISPENSE, -$units, [
+                    'operator_id' => $options['operator_id'] ?? Auth::id(),
+                ]);
+
+                $rateFreeze = ['price_per_gram_cents' => null, 'price_per_unit_cents' => $priced['rate_cents'], 'units_dispensed' => $units];
+            } else {
+                // WEIGHT line: unchanged — freeze the per-gram rate, decrement centigrams.
+                $priced = $price->lineFor($grams);
+                (new RecordStockMovement)->handle($batch, StockMovementType::DISPENSE, -$grams, [
+                    'operator_id' => $options['operator_id'] ?? Auth::id(),
+                ]);
+
+                $rateFreeze = ['price_per_gram_cents' => $priced['rate_cents'], 'price_per_unit_cents' => null, 'units_dispensed' => null];
+            }
+
+            $total += $priced['total_cents'];
 
             $lineData[] = [
                 'genetic_id' => $batch->genetic_id,
                 'batch_id' => $batch->id,
+                // grams_cg is populated on EVERY line (computed for UNIT) — the load-bearing invariant.
                 'grams_cg' => $grams,
-                'price_per_gram_cents' => $priced['rate_cents'],
                 'discount_cents' => $priced['discount_cents'],
                 'line_total_cents' => $priced['total_cents'],
                 'genetic_name_snapshot' => $batch->genetic->name,
                 'batch_no_snapshot' => $batch->batch_no,
+                ...$rateFreeze,
             ];
         }
 

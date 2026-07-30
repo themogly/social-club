@@ -36,4 +36,18 @@ class BatchFactory extends Factory
             'status' => BatchStatus::OPEN,
         ];
     }
+
+    /**
+     * A UNIT-type batch (preroll/edible) — stock in whole units, the cg columns null
+     * (one-of-two). Attach a UNIT genetic via ['genetic_id' => ...] on the call.
+     */
+    public function units(int $remaining = 100, ?int $initial = null): static
+    {
+        return $this->state(fn (): array => [
+            'initial_units' => $initial ?? $remaining,
+            'remaining_units' => $remaining,
+            'initial_cg' => null,
+            'remaining_cg' => null,
+        ]);
+    }
 }

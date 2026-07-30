@@ -4,6 +4,7 @@ namespace App\ViewModels\Reports;
 
 use App\Enums\BatchStatus;
 use App\Enums\DispensationStatus;
+use App\Enums\ProductType;
 use App\Enums\StockMovementType;
 use App\Enums\StockTakeStatus;
 use App\Models\Batch;
@@ -65,16 +66,23 @@ class StockReport extends AbstractReport
             ->whereIn('location_id', $this->resolvedLocationIds())
             ->where('status', BatchStatus::OPEN->value)
             ->whereNull('deleted_at')
-            ->get(['id', 'batch_no', 'genetic_id', 'remaining_cg', 'cost_per_gram_cents', 'expires_on']);
+            ->get(['id', 'batch_no', 'genetic_id', 'remaining_cg', 'remaining_units', 'cost_per_gram_cents', 'expires_on']);
 
-        $names = DB::table('genetics')->whereIn('id', $batches->pluck('genetic_id')->unique()->all())->pluck('name', 'id');
+        $genetics = DB::table('genetics')
+            ->whereIn('id', $batches->pluck('genetic_id')->unique()->all())
+            ->get(['id', 'name', 'product_type', 'unit_type', 'grams_per_unit_cg'])
+            ->keyBy('id');
         $dispensed = DB::table('dispensation_lines')
             ->whereIn('batch_id', $batches->pluck('id')->all())
             ->groupBy('batch_id')
             ->pluck(DB::raw('SUM(grams_cg) as agg'), 'batch_id');
 
-        $rows = $batches->map(function (\stdClass $b) use ($names, $dispensed): array {
-            $remaining = (int) $b->remaining_cg;
+        $rows = $batches->map(function (\stdClass $b) use ($genetics, $dispensed): array {
+            $g = $genetics[$b->genetic_id] ?? null;
+            // Restante is the gram-equivalent for both kinds (UNIT: remaining_units × grams_per_unit_cg).
+            $remaining = ($g !== null && $g->unit_type === 'UNIT')
+                ? (int) $b->remaining_units * (int) ($g->grams_per_unit_cg ?? 0)
+                : (int) $b->remaining_cg;
             $rate = (int) $b->cost_per_gram_cents;
             $value = intdiv($remaining * $rate, 100);
             $this->valueCents += $value;
@@ -82,7 +90,8 @@ class StockReport extends AbstractReport
 
             return [
                 'lote' => (string) $b->batch_no,
-                'genetica' => (string) ($names[$b->genetic_id] ?? __('Sin genética')),
+                'genetica' => (string) ($g->name ?? __('Sin genética')),
+                'tipo' => $g !== null ? (ProductType::tryFrom((string) $g->product_type)?->label() ?? '—') : '—',
                 'restante' => $remaining,
                 'coste_g' => $rate,
                 'valor' => $value,
@@ -97,6 +106,7 @@ class StockReport extends AbstractReport
             columns: [
                 ReportColumn::text('lote', __('Lote')),
                 ReportColumn::text('genetica', __('Genética')),
+                ReportColumn::text('tipo', __('Tipo')),
                 ReportColumn::weight('restante', __('Restante')),
                 ReportColumn::money('coste_g', __('Coste/g'), total: false),
                 ReportColumn::money('valor', __('Valor')),
@@ -130,6 +140,7 @@ class StockReport extends AbstractReport
                 'type',
                 DB::raw('COUNT(*) as movimientos'),
                 DB::raw('SUM(qty_cg) as grams_cg'),
+                DB::raw('SUM(qty_units) as uds'),
             ]);
 
         $labels = [
@@ -151,6 +162,7 @@ class StockReport extends AbstractReport
                 'tipo' => $labels[$r->type] ?? $r->type,
                 'movimientos' => (int) $r->movimientos,
                 'grams' => (int) $r->grams_cg,
+                'uds' => (int) $r->uds,
             ];
         })->all();
 
@@ -161,11 +173,13 @@ class StockReport extends AbstractReport
                 ReportColumn::text('tipo', __('Tipo'), sortable: false),
                 ReportColumn::number('movimientos', __('Movimientos')),
                 ReportColumn::weight('grams', __('Gramos')),
+                ReportColumn::number('uds', __('Uds')),
             ],
             rows: $rows,
             totals: [
                 'movimientos' => array_sum(array_column($rows, 'movimientos')),
                 'grams' => array_sum(array_column($rows, 'grams')),
+                'uds' => array_sum(array_column($rows, 'uds')),
             ],
             empty: __('Sin movimientos de stock en este período'),
         );

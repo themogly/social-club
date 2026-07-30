@@ -30,4 +30,16 @@ class GeneticPriceFactory extends Factory
             'active' => true,
         ];
     }
+
+    /**
+     * A per-UNIT price (preroll/edible) — price_per_unit_cents set, price_per_gram_cents
+     * null (one-of-two). Attach a UNIT genetic via ['genetic_id' => ...] on the call.
+     */
+    public function perUnit(int $cents = 800): static
+    {
+        return $this->state(fn (): array => [
+            'price_per_unit_cents' => $cents,
+            'price_per_gram_cents' => null,
+        ]);
+    }
 }

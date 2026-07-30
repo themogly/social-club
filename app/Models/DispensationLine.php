@@ -17,14 +17,18 @@ class DispensationLine extends Model
 
     protected $fillable = [
         'dispensation_id', 'genetic_id', 'batch_id', 'grams_cg', 'price_per_gram_cents',
+        'units_dispensed', 'price_per_unit_cents',
         'discount_cents', 'line_total_cents', 'genetic_name_snapshot', 'batch_no_snapshot',
     ];
 
     protected function casts(): array
     {
         return [
+            // grams_cg is populated on EVERY line (computed for UNIT) — consumers never branch.
             'grams_cg' => WeightCast::class,
-            'price_per_gram_cents' => 'integer',   // frozen rate
+            'price_per_gram_cents' => 'integer',   // frozen rate (WEIGHT lines)
+            'units_dispensed' => 'integer',        // UNIT lines
+            'price_per_unit_cents' => 'integer',   // frozen rate (UNIT lines)
             'discount_cents' => MoneyCast::class,
             'line_total_cents' => MoneyCast::class,
         ];

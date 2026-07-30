@@ -35,10 +35,14 @@ class StockCeiling
         $ceilingDays = (int) Settings::get('stock_ceiling_days', 5);
         $ceilingCg = $activeMembers * $dailyLimitCg * $ceilingDays;
 
+        // On-site gram-equivalent aggregates BOTH kinds: a WEIGHT batch's remaining_cg and
+        // a UNIT batch's remaining_units × the genetic's grams_per_unit_cg — one compliance figure.
         $onSiteCg = (int) Batch::query()->withoutGlobalScopes()
-            ->where('location_id', $location->id)
-            ->where('status', BatchStatus::OPEN->value)
-            ->sum('remaining_cg');
+            ->join('genetics', 'batches.genetic_id', '=', 'genetics.id')
+            ->where('batches.location_id', $location->id)
+            ->where('batches.status', BatchStatus::OPEN->value)
+            ->selectRaw("COALESCE(SUM(CASE WHEN genetics.unit_type = 'UNIT' THEN batches.remaining_units * genetics.grams_per_unit_cg ELSE batches.remaining_cg END), 0) as cg")
+            ->value('cg');
 
         return [
             'on_site_cg' => $onSiteCg,

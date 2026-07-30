@@ -69,8 +69,10 @@ class FormCompletenessTest extends TestCase
         BatchResource::class => [
             'location_id' => 'scope: active location.',
             'batch_no' => 'system: generated batch number.',
-            'initial_cg' => 'entered as grams; converted on intake by IntakeBatch.',
+            'initial_cg' => 'entered as grams; converted on intake by IntakeBatch (WEIGHT genetics).',
             'remaining_cg' => 'system-computed: maintained by the stock-movement ledger.',
+            'initial_units' => 'entered as units; recorded on intake by IntakeBatch (UNIT genetics).',
+            'remaining_units' => 'system-computed: maintained by the stock-movement ledger.',
             'cost_per_gram_cents' => 'entered as euros via cost_per_gram_eur.',
             'status' => 'lifecycle: system-managed batch status.',
         ],
@@ -97,6 +99,7 @@ class FormCompletenessTest extends TestCase
         GeneticResource::class => [
             'thc_bp' => 'entered as percent via thc_pct (basis points at the edge).',
             'cbd_bp' => 'entered as percent via cbd_pct (basis points at the edge).',
+            'grams_per_unit_cg' => 'entered as grams via grams_per_unit_g (centigrams at the edge).',
         ],
         MemberApplicationResource::class => [
             'invite_token_hash' => 'system: set by the tokenised invite flow.',

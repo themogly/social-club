@@ -5,9 +5,12 @@ namespace App\Support;
 use App\Enums\DiscountMode;
 
 /**
- * The resolved price for a genetic for a member: the per-gram rate (base or tier)
- * plus the single best applicable discount and a human reason ("Terapéutico −20%").
- * `lineFor()` computes a line at a given weight — the one rounding rule, applied once.
+ * The resolved price for a genetic for a member: the rate (base or tier) plus the
+ * single best applicable discount and a human reason ("Terapéutico −20%"). The rate is
+ * per gram for a WEIGHT genetic and per unit for a UNIT genetic (`perUnit` says which);
+ * `ratePerGramCents` holds it in both cases. `lineFor()` computes a WEIGHT line at a
+ * given weight; `lineForUnits()` a UNIT line at a given unit count — the one rounding
+ * rule, applied once.
  *
  * @phpstan-type Discount array{mode: DiscountMode, value_bp: ?int, value_cents: ?int, label: string}
  * @phpstan-type Line array{rate_cents: int, subtotal_cents: int, discount_cents: int, total_cents: int, label: ?string}
@@ -21,14 +24,36 @@ final class PriceResult
         public readonly int $ratePerGramCents,
         public readonly ?string $rateLabel = null,
         public readonly ?array $discount = null,
+        public readonly bool $perUnit = false,
     ) {}
 
     /**
+     * A WEIGHT line: subtotal = rate/g × grams. Grams in from integer centigrams.
+     *
      * @return Line
      */
     public function lineFor(int $gramsCg): array
     {
         $subtotal = (int) round_half_up($this->ratePerGramCents * $gramsCg / 100);
+
+        return $this->line($subtotal);
+    }
+
+    /**
+     * A UNIT line: subtotal = rate/unit × units (whole units — no division).
+     *
+     * @return Line
+     */
+    public function lineForUnits(int $units): array
+    {
+        return $this->line($this->ratePerGramCents * $units);
+    }
+
+    /**
+     * @return Line
+     */
+    private function line(int $subtotal): array
+    {
         $discountCents = $this->discountAmount($subtotal);
 
         return [

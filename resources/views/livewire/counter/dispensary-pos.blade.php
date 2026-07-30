@@ -230,14 +230,18 @@
                     <section class="rounded-2xl border border-brand/40 bg-brand-tint/40 p-4 dark:border-brand/40 dark:bg-slate-900">
                         <div class="flex items-start justify-between gap-3">
                             <div>
-                                <h3 class="text-base font-semibold">{{ $activeGenetic->name }}</h3>
+                                <div class="flex flex-wrap items-center gap-2">
+                                    <h3 class="text-base font-semibold">{{ $activeGenetic->name }}</h3>
+                                    <span class="rounded-full border border-brand/30 bg-brand-tint px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-brand dark:bg-slate-800 dark:text-slate-200">{{ $activeGenetic->product_type->label() }}</span>
+                                </div>
                                 @if ($activeGeneticPriceCents !== null)
-                                    <p class="text-sm text-ink-muted dark:text-slate-400">{{ $this->money($activeGeneticPriceCents) }} / g</p>
+                                    <p class="text-sm text-ink-muted dark:text-slate-400">{{ $this->money($activeGeneticPriceCents) }} / {{ $activeGenetic->isUnitType() ? __('ud') : 'g' }}</p>
                                 @endif
                             </div>
                             <button type="button" wire:click="cancelWeightEntry" class="rounded-lg px-2 py-1 text-sm text-ink-muted hover:bg-black/5 dark:text-slate-400 dark:hover:bg-white/5">{{ __('Cancelar') }}</button>
                         </div>
 
+                        @if (! $activeGenetic->isUnitType())
                         {{-- grams vs calculator (€) toggle --}}
                         <div class="mt-3 inline-flex rounded-xl border border-line bg-surface p-0.5 text-sm dark:border-slate-700 dark:bg-slate-950">
                             <button type="button" wire:click="$set('calculatorMode', false)" @class(['rounded-lg px-3 py-1.5 font-medium', 'bg-brand text-white' => ! $calculatorMode, 'text-ink-muted dark:text-slate-400' => $calculatorMode])>{{ __('Gramos') }}</button>
@@ -259,6 +263,36 @@
                             <button type="button" wire:click="pad('0')" class="h-14 rounded-xl border border-line bg-surface text-xl font-semibold text-ink transition hover:bg-surface-alt dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:hover:bg-slate-800">0</button>
                             <button type="button" wire:click="pad('back')" class="h-14 rounded-xl border border-line bg-surface text-xl font-semibold text-ink-muted transition hover:bg-surface-alt dark:border-slate-700 dark:bg-slate-950 dark:text-slate-400 dark:hover:bg-slate-800">⌫</button>
                         </div>
+                        @else
+                            {{-- Unit stepper for a UNIT genetic (preroll/edible). The gauge feedback below
+                                 shows the gram-equivalent live as the count steps. --}}
+                            <div class="mt-3 flex items-center justify-between rounded-xl border border-line bg-surface px-4 py-3 dark:border-slate-700 dark:bg-slate-950">
+                                <span class="text-sm text-ink-muted dark:text-slate-400">{{ __('Unidades') }}</span>
+                                <div class="flex items-center gap-3">
+                                    <button type="button" wire:click="stepUnits(-1)" aria-label="{{ __('Menos una unidad') }}" class="flex h-12 w-12 items-center justify-center rounded-xl border border-line bg-surface text-2xl font-bold text-ink transition hover:bg-surface-alt dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:hover:bg-slate-800">−</button>
+                                    <span class="w-12 text-center text-3xl font-bold tabular-nums">{{ $unitQty }}</span>
+                                    <button type="button" wire:click="stepUnits(1)" aria-label="{{ __('Más una unidad') }}" class="flex h-12 w-12 items-center justify-center rounded-xl border border-line bg-surface text-2xl font-bold text-ink transition hover:bg-surface-alt dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:hover:bg-slate-800">+</button>
+                                </div>
+                            </div>
+                        @endif
+
+                        {{-- Gram-equivalent + real-time ceiling feedback — computed identically for a
+                             weighed entry and a stepped unit count (units × grams_per_unit_cg). --}}
+                        @if ($activeEntryGramsCg !== null && $activeEntryGramsCg > 0)
+                            <div class="mt-3 rounded-xl border border-line bg-surface px-4 py-2.5 text-sm dark:border-slate-700 dark:bg-slate-950">
+                                <div class="flex items-center justify-between">
+                                    <span class="text-ink-muted dark:text-slate-400">{{ __('Equivale a') }}</span>
+                                    <span class="font-semibold tabular-nums">{{ $this->grams($activeEntryGramsCg) }}</span>
+                                </div>
+                                @if ($limits)
+                                    @php $remainingAfter = $limits->dailyRemainingCg() - $activeEntryGramsCg; @endphp
+                                    <div class="mt-1 flex items-center justify-between text-xs">
+                                        <span class="text-ink-muted dark:text-slate-400">{{ __('Restante hoy tras esta entrada') }}</span>
+                                        <span class="font-medium {{ $remainingAfter < 0 ? 'text-error' : 'text-success' }}">{{ $this->grams(max(0, $remainingAfter)) }}</span>
+                                    </div>
+                                @endif
+                            </div>
+                        @endif
 
                         {{-- batch selector (FEFO default, overridable to another dispensable batch) --}}
                         <div class="mt-3">
@@ -274,7 +308,7 @@
                                             'border-line bg-surface text-ink hover:bg-surface-alt dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100' => $activeBatchId !== $batch->id,
                                         ])>
                                             {{ $batch->batch_no }}
-                                            <span class="opacity-70">· {{ $this->grams($batch->remaining_cg->centigrams) }}</span>
+                                            <span class="opacity-70">· {{ $activeGenetic->isUnitType() ? $batch->remaining_units.' '.__('uds') : $this->grams($batch->remaining_cg?->centigrams ?? 0) }}</span>
                                             @if ($i === 0)<span class="ml-1 rounded-full bg-white/20 px-1.5 py-0.5 text-[10px] font-semibold uppercase">FEFO</span>@endif
                                         </button>
                                     @endforeach
@@ -308,6 +342,15 @@
                         </div>
                     @endif
 
+                    @if (! empty($productTypes))
+                        <div class="mt-2 flex flex-wrap gap-2">
+                            <button type="button" wire:click="filterProductType(null)" @class(['rounded-full border px-3 py-1 text-sm', 'border-brand bg-brand text-white' => $productType === null, 'border-line text-ink-muted dark:border-slate-700 dark:text-slate-400' => $productType !== null])>{{ __('Todos los tipos') }}</button>
+                            @foreach ($productTypes as $type)
+                                <button type="button" wire:click="filterProductType('{{ $type['value'] }}')" @class(['rounded-full border px-3 py-1 text-sm', 'border-brand bg-brand text-white' => $productType === $type['value'], 'border-line text-ink-muted dark:border-slate-700 dark:text-slate-400' => $productType !== $type['value']])>{{ $type['label'] }}</button>
+                            @endforeach
+                        </div>
+                    @endif
+
                     <div class="mt-4 grid gap-3 sm:grid-cols-2">
                         @forelse ($genetics as $g)
                             @php $disabledCard = $member === null || ! $g['has_batch']; @endphp
@@ -323,15 +366,16 @@
                             >
                                 <div class="flex items-start justify-between gap-2">
                                     <span class="font-semibold">{{ $g['name'] }}</span>
-                                    <span class="shrink-0 text-sm font-semibold text-brand dark:text-slate-100">{{ $this->money($g['rate_cents']) }}/g</span>
+                                    <span class="shrink-0 text-sm font-semibold text-brand dark:text-slate-100">{{ $this->money($g['rate_cents']) }}/{{ $g['is_unit'] ? __('ud') : 'g' }}</span>
                                 </div>
                                 <div class="mt-1 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-ink-muted dark:text-slate-400">
+                                    <span class="rounded-full bg-surface-alt px-2 py-0.5 font-semibold text-ink-muted dark:bg-slate-800 dark:text-slate-300">{{ $g['product_type_label'] }}</span>
                                     <span>THC {{ number_format($g['thc_bp'] / 100, 1) }}%</span>
                                     <span>CBD {{ number_format($g['cbd_bp'] / 100, 1) }}%</span>
-                                    <span>{{ __($g['cultivation']) }}</span>
+                                    @if ($g['cultivation'])<span>{{ __($g['cultivation']) }}</span>@endif
                                 </div>
                                 <div class="mt-2 flex items-center justify-between text-xs">
-                                    <span class="text-ink-muted dark:text-slate-400">{{ __('Stock') }}: {{ $this->grams($g['remaining_cg']) }}</span>
+                                    <span class="text-ink-muted dark:text-slate-400">{{ __('Stock') }}: {{ $g['is_unit'] ? $g['remaining_units'].' '.__('uds').' ('.$this->grams($g['remaining_cg']).')' : $this->grams($g['remaining_cg']) }}</span>
                                     @if ($g['has_batch'])
                                         <span class="inline-flex items-center gap-1 text-success"><span class="h-2 w-2 rounded-full bg-success"></span>{{ __('Con lote') }}</span>
                                     @else
@@ -374,7 +418,11 @@
                                 <div class="min-w-0">
                                     <p class="truncate font-medium">{{ $line['genetic_name'] }}</p>
                                     <p class="text-xs text-ink-muted dark:text-slate-400">
-                                        {{ $this->grams($line['grams_cg']) }} × {{ $this->money($line['rate_cents']) }}/g
+                                        @if ($line['per_unit'])
+                                            {{ $line['units'] }} {{ __('uds') }} ({{ $this->grams($line['grams_cg']) }}) × {{ $this->money($line['rate_cents']) }}/{{ __('ud') }}
+                                        @else
+                                            {{ $this->grams($line['grams_cg']) }} × {{ $this->money($line['rate_cents']) }}/g
+                                        @endif
                                         @if ($line['discount_cents'] > 0)· <span class="text-success">−{{ $this->money($line['discount_cents']) }}</span>@endif
                                     </p>
                                 </div>

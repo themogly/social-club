@@ -3,6 +3,7 @@
 namespace App\ViewModels\Reports;
 
 use App\Enums\DispensationStatus;
+use App\Enums\ProductType;
 use App\Models\Member;
 use App\Support\ConsumptionForecast;
 use App\Support\Period;
@@ -122,6 +123,7 @@ class ConsumptionReport extends AbstractReport
 
         $rows = DB::table('dispensation_lines')
             ->join('dispensations', 'dispensation_lines.dispensation_id', '=', 'dispensations.id')
+            ->leftJoin('genetics', 'dispensation_lines.genetic_id', '=', 'genetics.id')
             ->whereIn('dispensations.location_id', $this->resolvedLocationIds())
             ->where('dispensations.status', DispensationStatus::COMPLETED->value)
             ->whereBetween('dispensations.dispensed_at', [$start, $end])
@@ -129,14 +131,19 @@ class ConsumptionReport extends AbstractReport
             ->orderByDesc(DB::raw('SUM(dispensation_lines.grams_cg)'))
             ->get([
                 DB::raw('MAX(dispensation_lines.genetic_name_snapshot) as genetica'),
+                DB::raw('MAX(genetics.product_type) as product_type'),
                 DB::raw('COUNT(DISTINCT dispensation_lines.dispensation_id) as tx'),
                 DB::raw('SUM(dispensation_lines.grams_cg) as grams_cg'),
+                DB::raw('SUM(dispensation_lines.units_dispensed) as uds'),
                 DB::raw('SUM(dispensation_lines.line_total_cents) as total_cents'),
             ])
             ->map(fn (\stdClass $r): array => [
                 'genetica' => (string) ($r->genetica ?? __('Sin genética')),
+                // product_type as a breakdown dimension; UNIT lines also carry a unit count.
+                'tipo' => $r->product_type !== null ? (ProductType::tryFrom((string) $r->product_type)?->label() ?? '—') : '—',
                 'tx' => (int) $r->tx,
                 'grams' => (int) $r->grams_cg,
+                'uds' => (int) $r->uds,
                 'total' => (int) $r->total_cents,
             ])->all();
 
@@ -145,14 +152,17 @@ class ConsumptionReport extends AbstractReport
             title: __('Dispensado por genética'),
             columns: [
                 ReportColumn::text('genetica', __('Genética'), sortable: false),
+                ReportColumn::text('tipo', __('Tipo'), sortable: false),
                 ReportColumn::number('tx', __('Tx')),
                 ReportColumn::weight('grams', __('Dispensado')),
+                ReportColumn::number('uds', __('Uds')),
                 ReportColumn::money('total', __('Aportación')),
             ],
             rows: $rows,
             totals: [
                 'tx' => array_sum(array_column($rows, 'tx')),
                 'grams' => array_sum(array_column($rows, 'grams')),
+                'uds' => array_sum(array_column($rows, 'uds')),
                 'total' => array_sum(array_column($rows, 'total')),
             ],
             empty: __('Nada dispensado en este período'),
