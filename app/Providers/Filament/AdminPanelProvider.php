@@ -84,6 +84,9 @@ class AdminPanelProvider extends PanelProvider
                 // from App\Filament\Pages\Reports; the group renders only when the actor
                 // can see at least one report, so STAFF (no reports.view) never sees it.
                 NavigationGroup::make(fn (): string => __('Informes')),
+                // Club communications (prompt 15): announcements + events, surfaced in the
+                // member PWA. Renders only when the actor holds comms.manage.
+                NavigationGroup::make(fn (): string => __('Comunicaciones')),
                 NavigationGroup::make(fn (): string => __('Sistema')),
             ])
             // The counter apps run OUTSIDE the panel (tablet-first full-page Livewire),

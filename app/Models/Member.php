@@ -6,6 +6,8 @@ use App\Enums\IdDocumentType;
 use App\Enums\MemberStatus;
 use App\Models\Concerns\BelongsToOrganisation;
 use Database\Factories\MemberFactory;
+use Illuminate\Auth\Authenticatable as AuthenticatableTrait;
+use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -13,15 +15,25 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Notifications\Notifiable;
+use NotificationChannels\WebPush\HasPushSubscriptions;
 
 /**
  * A socio. Org-wide (people are org-wide; membership is per location). NOT
  * location-scoped, so org-wide member search crosses locations by design.
+ *
+ * Authenticatable for the SEPARATE `member` guard (prompt 15) — passwordless, so it
+ * carries no password column; login happens through a single-use magic-link token.
+ * Notifiable + HasPushSubscriptions wire the Web Push channel (prompt 15): the member
+ * owns their subscriptions and a per-channel opt-out (`push_opt_outs`).
  */
-class Member extends Model
+class Member extends Model implements Authenticatable
 {
     /** @use HasFactory<MemberFactory> */
-    use BelongsToOrganisation, HasFactory, HasUlids, SoftDeletes;
+    use AuthenticatableTrait, BelongsToOrganisation, HasFactory, HasPushSubscriptions, HasUlids, Notifiable, SoftDeletes;
+
+    /** The push channels a member can independently opt out of (prompt 15). */
+    public const PUSH_CHANNELS = ['low_balance', 'membership_expiring', 'new_announcement', 'event_reminder'];
 
     protected $fillable = [
         'organisation_id', 'member_no', 'first_name', 'last_name', 'email', 'phone',
@@ -29,6 +41,7 @@ class Member extends Model
         'document_scan_path', 'status', 'is_therapeutic', 'avalador_member_id',
         'joined_at', 'left_at', 'carencia_ends_at', 'declared_monthly_cg',
         'daily_limit_cg', 'monthly_limit_cg', 'sole_association_declared_at', 'anonymised_at',
+        'push_opt_outs',
     ];
 
     protected static function booted(): void
@@ -63,12 +76,31 @@ class Member extends Model
             'monthly_limit_cg' => 'integer',
             'sole_association_declared_at' => 'datetime',
             'anonymised_at' => 'datetime',
+            'push_opt_outs' => 'array',
         ];
     }
 
     public function fullName(): string
     {
         return trim($this->first_name.' '.$this->last_name);
+    }
+
+    /**
+     * The channel keys this member has switched OFF (empty = opted in to all).
+     *
+     * @return list<string>
+     */
+    public function pushOptOuts(): array
+    {
+        $stored = is_array($this->push_opt_outs) ? $this->push_opt_outs : [];
+
+        return array_values(array_filter($stored, fn ($k): bool => in_array($k, self::PUSH_CHANNELS, true)));
+    }
+
+    /** Does the member still want push on this channel? Unknown/absent = yes (opted in by default). */
+    public function wantsPush(string $channel): bool
+    {
+        return ! in_array($channel, $this->pushOptOuts(), true);
     }
 
     /** @return BelongsTo<Member, $this> */

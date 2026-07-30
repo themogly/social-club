@@ -1,8 +1,14 @@
 <?php
 
+use App\Http\Controllers\ApplicationController;
 use App\Http\Controllers\BarReceiptController;
 use App\Http\Controllers\DispensationReceiptController;
+use App\Http\Controllers\Member\AnnouncementController;
+use App\Http\Controllers\Member\EventController;
+use App\Http\Controllers\Member\NotificationController;
 use App\Http\Controllers\MemberDocumentController;
+use App\Http\Controllers\Socio\AuthController as SocioAuthController;
+use App\Http\Controllers\Socio\PwaController;
 use App\Livewire\Counter\BarPos;
 use App\Livewire\Counter\CheckInScreen;
 use App\Livewire\Counter\DispensaryPos;
@@ -68,3 +74,44 @@ Route::middleware(['web', 'auth'])
 Route::middleware(['web', 'auth'])
     ->get('/counter/bar/receipt/{order}', [BarReceiptController::class, 'show'])
     ->name('counter.bar.receipt');
+
+// The member PWA (prompt 15) — the SECOND guard. Passwordless magic-link auth; every
+// area route sits behind auth:member and is scoped to the authenticated socio (there is
+// NO member id in any URL, so one member can never reach another's data). This is the
+// only member-facing surface; it is never public or indexable (noindex is global).
+Route::middleware('web')->prefix('socio')->name('socio.')->group(function () {
+    Route::get('login', [SocioAuthController::class, 'show'])->name('login');
+    Route::post('login', [SocioAuthController::class, 'sendLink'])->middleware('throttle:5,1')->name('login.send');
+    Route::get('login/verify/{token}', [SocioAuthController::class, 'verify'])->middleware('throttle:10,1')->name('login.verify');
+
+    Route::middleware('auth:member')->group(function () {
+        Route::get('/', [PwaController::class, 'home'])->name('home');
+        Route::get('menu', [PwaController::class, 'menu'])->name('menu');
+        Route::get('historial', [PwaController::class, 'history'])->name('history');
+        Route::get('mis-datos', [PwaController::class, 'export'])->name('export');
+        Route::post('logout', [SocioAuthController::class, 'logout'])->name('logout');
+    });
+});
+
+// Member PWA — club communications, push & the tokenised application (prompt 15).
+// Same guard contract as above: every authenticated route is scoped to the socio and
+// carries NO member id. The application form is the SINGLE unauthenticated member-facing
+// route, gated only by a valid invite token (a hash lookup — never a guessable id).
+Route::middleware('web')->prefix('socio')->name('socio.')->group(function () {
+    // Public: the tokenised invite opens the pre-registration form on the prospect's phone.
+    Route::get('solicitud/{token}', [ApplicationController::class, 'show'])->name('application');
+    Route::post('solicitud/{token}', [ApplicationController::class, 'store'])
+        ->middleware('throttle:10,1')->name('application.store');
+
+    Route::middleware('auth:member')->group(function () {
+        Route::get('avisos', [AnnouncementController::class, 'index'])->name('announcements');
+
+        Route::get('eventos', [EventController::class, 'index'])->name('events');
+        Route::post('eventos/{event}/rsvp', [EventController::class, 'rsvp'])->name('events.rsvp');
+
+        Route::get('notificaciones', [NotificationController::class, 'edit'])->name('notifications');
+        Route::post('notificaciones/preferencias', [NotificationController::class, 'updatePreferences'])->name('notifications.prefs');
+        Route::post('push/suscribir', [NotificationController::class, 'subscribe'])->name('push.subscribe');
+        Route::post('push/cancelar', [NotificationController::class, 'unsubscribe'])->name('push.unsubscribe');
+    });
+});

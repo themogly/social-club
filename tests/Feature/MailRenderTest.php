@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Support\DevMail;
+use Illuminate\Support\Facades\URL;
 use Tests\TestCase;
 
 /**
@@ -15,6 +16,12 @@ class MailRenderTest extends TestCase
 {
     public function test_all_registered_mailables_render_cleanly(): void
     {
+        // Render as they would send in production, so a legitimate absolute app link
+        // (e.g. the magic-link) uses the real domain. A template that HARD-CODES a dev
+        // host still trips the assertions below.
+        config(['app.url' => 'https://mi-club.example']);
+        URL::forceRootUrl('https://mi-club.example');
+
         $previews = DevMail::previews();
         $this->assertNotEmpty($previews, 'There should be at least one registered mailable.');
 

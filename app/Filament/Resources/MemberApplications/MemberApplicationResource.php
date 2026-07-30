@@ -11,6 +11,8 @@ use App\Filament\Resources\MemberApplications\Pages\ViewMemberApplication;
 use App\Filament\Resources\MemberApplications\Schemas\MemberApplicationForm;
 use App\Filament\Resources\MemberApplications\Schemas\MemberApplicationInfolist;
 use App\Filament\Resources\MemberApplications\Tables\MemberApplicationsTable;
+use App\Mail\ApplicationApprovedMail;
+use App\Mail\ApplicationRejectedMail;
 use App\Models\MemberApplication;
 use BackedEnum;
 use Filament\Actions\Action;
@@ -21,6 +23,7 @@ use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Table;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Mail;
 use RuntimeException;
 
 class MemberApplicationResource extends Resource
@@ -93,7 +96,11 @@ class MemberApplicationResource extends Resource
                 && (Auth::user()?->can('applications.review') ?? false))
             ->action(function (MemberApplication $record): void {
                 try {
-                    (new ApproveApplication)->handle($record);
+                    $member = (new ApproveApplication)->handle($record);
+
+                    if ($member->email !== null) {
+                        Mail::to($member->email)->queue(new ApplicationApprovedMail($member->fullName(), (string) $member->member_no));
+                    }
 
                     Notification::make()
                         ->title(__('Solicitud aprobada'))
@@ -123,12 +130,20 @@ class MemberApplicationResource extends Resource
                     ->required(),
             ])
             ->action(function (MemberApplication $record, array $data): void {
+                $reason = $data['reason'] ?? null;
+
                 $record->update([
                     'status' => ApplicationStatus::REJECTED,
-                    'reject_reason' => $data['reason'] ?? null,
+                    'reject_reason' => $reason,
                     'reviewed_by' => Auth::id(),
                     'reviewed_at' => now(),
                 ]);
+
+                $email = data_get($record->payload, 'email');
+                if (is_string($email) && $email !== '') {
+                    $name = trim((string) data_get($record->payload, 'first_name').' '.(string) data_get($record->payload, 'last_name'));
+                    Mail::to($email)->queue(new ApplicationRejectedMail($name !== '' ? $name : $email, is_string($reason) ? $reason : null));
+                }
 
                 Notification::make()
                     ->title(__('Solicitud rechazada'))

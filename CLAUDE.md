@@ -171,7 +171,15 @@ vocabulary above is Spanish even in the English locale where it is a term of art
   (`app/Actions/Till/OpenTill.php`), signed cash movements (`RecordCashMovement.php`), blind cierre
   (`CloseTill.php` — count submitted before expected revealed, note beyond tolerance), session Z-report
   (`app/Support/ZReport.php`). Read-only oversight `app/Filament/Resources/TillSessions/`.
-- Spreadsheet export/import: [App\Support\Spreadsheet\* — prompt 14/04]
+- Member PWA (the SECOND guard): `config/auth.php` `member` guard + `Member implements Authenticatable`;
+  passwordless magic link `app/Actions/MemberAuth/{IssueMemberLoginLink,ConsumeMemberLoginToken}.php`
+  (hash-only, single-use, rate-limited); member-scoped controllers `app/Http/Controllers/Socio/*` (NO
+  id in any URL); PWA shell `resources/views/components/layouts/socio.blade.php` + `public/sw.js`
+  (offline QR card, /socio-only caching). Guests on `/socio*` → member login via `redirectGuestsTo`.
+- Web Push: `Member` uses `HasPushSubscriptions` + `push_opt_outs` (per-channel opt-out via
+  `wantsPush()`); notifications in `app/Notifications/*` extend a VAPID-gated base; VAPID private key is
+  server-only (`config/webpush.php`).
+- Spreadsheet export/import: [App\Support\Spreadsheet\ReportExport.php — CSV (league/csv) + PDF (dompdf)]
 - PDF document: [App\Actions\Documents\* — prompt 16]
 (Add the first real example of each remaining pattern here as it's built; future work copies these.)
 
