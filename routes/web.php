@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\MemberDocumentController;
+use App\Livewire\Counter\CheckInScreen;
 use Illuminate\Support\Facades\Route;
 
 // Authenticated, signed, short-lived access to a member document on the private
@@ -18,3 +19,12 @@ Route::middleware(['web', 'auth', 'signed'])
 //
 // Local-only developer routes (e.g. /dev/mail) live in routes/dev.php, loaded only
 // in the local environment from bootstrap/app.php.
+
+// Counter apps run OUTSIDE the Filament panel on their own tablet-first authenticated
+// routes (full-page Livewire components with the shared `counter` layout). The
+// check-in "door" is the first; the dispensary + bar POS (prompts 11/12) follow the
+// same pattern. The active location comes from ActiveScope; the component resolves the
+// operator's first assigned sede when none is set, and 403s a user without checkin.manage.
+Route::middleware(['web', 'auth'])
+    ->get('/counter/checkin', CheckInScreen::class)
+    ->name('counter.checkin');

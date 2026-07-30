@@ -84,7 +84,9 @@ class Settings
          */
         'enforcement' => [
             'door' => [
-                'age' => 'BLOCK', 'membership' => 'BLOCK', 'carencia' => 'BLOCK',
+                // Carencia at the door only WARNS: a member may enter and sit down, but
+                // may not be dispensed to (counter.carencia BLOCKs that).
+                'age' => 'BLOCK', 'membership' => 'BLOCK', 'carencia' => 'WARN',
                 'sanction' => 'BLOCK', 'debt' => 'WARN', 'unpaid_fee' => 'WARN', 'aforo' => 'BLOCK',
             ],
             'counter' => [
