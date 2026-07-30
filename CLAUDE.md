@@ -141,6 +141,9 @@ vocabulary above is Spanish even in the English locale where it is a term of art
   else touches stock columns). Batch selection at the counter: `app/Actions/Stock/SelectBatch.php`
   (FEFO — oldest open, non-expired, in-stock; expired refused). Transactional compliance boundary:
   `app/Actions/Dispensing/CommitDispensation.php`.
+- Pricing: **one resolver** `app/Actions/Pricing/ResolvePrice.php` (tier price → best single discount →
+  per-member custom; no stacking by default) returning `app/Support/PriceResult.php`; POS/PWA/reports/
+  receipts all call it, and it is frozen into the dispensation line snapshot at commit.
 - Livewire counter component: [add first real one — prompt 09/11]
 - Spreadsheet export/import: [App\Support\Spreadsheet\* — prompt 14/04]
 - PDF document: [App\Actions\Documents\* — prompt 16]

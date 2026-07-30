@@ -2,6 +2,7 @@
 
 namespace App\Actions\Dispensing;
 
+use App\Actions\Pricing\ResolvePrice;
 use App\Actions\RecordAuditLog;
 use App\Actions\Stock\RecordStockMovement;
 use App\Actions\Stock\SelectBatch;
@@ -14,7 +15,6 @@ use App\Exceptions\DispensationBlockedException;
 use App\Exceptions\LimitExceededException;
 use App\Models\Batch;
 use App\Models\Dispensation;
-use App\Models\GeneticPrice;
 use App\Models\Location;
 use App\Models\Member;
 use App\Models\User;
@@ -69,7 +69,7 @@ class CommitDispensation
             $snapshot = (new ResolveMemberLimits)->handle($member, $location, $options['at'] ?? null);
             $this->assertWithinLimits($snapshot, $totalGrams, $member, $location, $options);
 
-            [$total, $lineData] = $this->buildLines($lines, $location, $options);
+            [$total, $lineData] = $this->buildLines($member, $lines, $location, $options);
 
             $cash = $options['cash_cents'] ?? $total;
             $wallet = $options['wallet_cents'] ?? 0;
@@ -170,10 +170,11 @@ class CommitDispensation
      * @param  CommitOptions  $options
      * @return array{0: int, 1: list<array<string, mixed>>}
      */
-    private function buildLines(array $lines, Location $location, array $options): array
+    private function buildLines(Member $member, array $lines, Location $location, array $options): array
     {
         $total = 0;
         $lineData = [];
+        $resolver = new ResolvePrice;
 
         foreach ($lines as $line) {
             $batch = Batch::withoutGlobalScopes()->whereKey($line['batch_id'])->firstOrFail();
@@ -183,9 +184,9 @@ class CommitDispensation
                 throw new RuntimeException("Batch {$batch->batch_no} is not dispensable (closed, expired or empty).");
             }
 
-            $pricePerGram = $this->basePrice($line['genetic_id'], $location->id);
-            $lineTotal = (int) round_half_up($pricePerGram * $grams / 100);
-            $total += $lineTotal;
+            // Price/discount are resolved once and FROZEN into the line snapshot.
+            $priced = $resolver->forGenetic($batch->genetic, $location, $member)->lineFor($grams);
+            $total += $priced['total_cents'];
 
             // Single stock writer — locks the batch and refuses to oversell.
             (new RecordStockMovement)->handle($batch, StockMovementType::DISPENSE, -$grams, [
@@ -193,33 +194,17 @@ class CommitDispensation
             ]);
 
             $lineData[] = [
-                'genetic_id' => $line['genetic_id'],
+                'genetic_id' => $batch->genetic_id,
                 'batch_id' => $batch->id,
                 'grams_cg' => $grams,
-                'price_per_gram_cents' => $pricePerGram,
-                'discount_cents' => 0,
-                'line_total_cents' => $lineTotal,
+                'price_per_gram_cents' => $priced['rate_cents'],
+                'discount_cents' => $priced['discount_cents'],
+                'line_total_cents' => $priced['total_cents'],
                 'genetic_name_snapshot' => $batch->genetic->name,
                 'batch_no_snapshot' => $batch->batch_no,
             ];
         }
 
         return [$total, $lineData];
-    }
-
-    private function basePrice(string $geneticId, string $locationId): int
-    {
-        $price = GeneticPrice::withoutGlobalScopes()
-            ->where('genetic_id', $geneticId)
-            ->where('location_id', $locationId)
-            ->whereNull('tier_id')
-            ->where('active', true)
-            ->value('price_per_gram_cents');
-
-        if ($price === null) {
-            throw new RuntimeException('No active base price for this genetic at this location.');
-        }
-
-        return (int) $price;
     }
 }
