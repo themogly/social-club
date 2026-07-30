@@ -23,3 +23,22 @@ one branch each, `composer check` green before every merge. Prompt 18 is deliber
   see DECISIONS.md "Bootstrap library choices" if you want to revisit any.)
 
 ---
+
+## Prompt 01 — Schema, identifiers, scope, money & weight
+- Status: merged
+- Defaults chosen (architecture checkpoint auto-resolved — full detail in DECISIONS.md "Prompt 01"):
+  org_id on every table + Location operational scope via `LocationScope` (not Filament tenancy);
+  ULID pks; integer cents + centigrams with one `round_half_up`; **per-location wallet balances**
+  (v1 ring-fencing carried forward); price per-gram/genetic/location + optional per-tier; members &
+  genetics org-wide, prices/batches/stock/tills/transactions/expenses per-location; **business-day
+  cutoff 06:00, timezone Europe/Madrid**; limit breach **hard-block + logged manager override**;
+  currency display es (€1.234,56); data retention 1825 days. Larastan L6 kept strict — added relation
+  generics + `parseModelCastsMethod: true` (PHPStan 2.x removed the generics opt-out).
+- Needs Ben's confirmation (grep DECISIONS.md):
+  - `OVERNIGHT-DEFAULT — CONFIRM:` wallet = per-location; business-day cutoff 06:00 / tz Europe/Madrid;
+    hard-block + manager override; currency es; retention 1825 days.
+  - `OVERNIGHT-PLACEHOLDER — CONFIRM:` Organisation legal_name `TBD-LEGAL-NAME`, CIF/NIF `TBD-CIF-NIF`,
+    address `TBD-ADDRESS`; two premises "Sede Centro"/"Sede Norte" with placeholder addresses, aforo
+    50/40, placeholder opening hours.
+
+---
