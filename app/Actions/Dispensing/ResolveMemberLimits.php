@@ -77,12 +77,22 @@ class ResolveMemberLimits
     private function monthWindow(Location $location, DateTimeInterface|string|null $at): array
     {
         $businessDate = BusinessDay::date($location, $at);
+        // Boundaries computed in the location tz, then expressed in the app (storage)
+        // timezone so the whereBetween below matches app-tz-stored dispensed_at values
+        // (same instant-preserving normalisation as BusinessDay::window()).
+        $storageTz = config('app.timezone') ?: 'UTC';
 
         if (Settings::get('monthly_window', 'calendar') === 'rolling30') {
-            return [$businessDate->copy()->subDays(29)->startOfDay(), $businessDate->copy()->addDay()->startOfDay()];
+            return [
+                $businessDate->copy()->subDays(29)->startOfDay()->setTimezone($storageTz),
+                $businessDate->copy()->addDay()->startOfDay()->setTimezone($storageTz),
+            ];
         }
 
-        return [$businessDate->copy()->startOfMonth(), $businessDate->copy()->startOfMonth()->addMonth()];
+        return [
+            $businessDate->copy()->startOfMonth()->setTimezone($storageTz),
+            $businessDate->copy()->startOfMonth()->addMonth()->setTimezone($storageTz),
+        ];
     }
 
     private function usedBetween(Member $member, CarbonInterface $start, CarbonInterface $end): int

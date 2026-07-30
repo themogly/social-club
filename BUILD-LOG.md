@@ -123,3 +123,8 @@ one branch each, `composer check` green before every merge. Prompt 18 is deliber
 - Status: merged
 - Defaults chosen: expected drawer cash DERIVED from the ledger (cash-only; wallet contributions shown but excluded); one open session per terminal per location; cash movements stored signed; blind cierre (count submitted before expected revealed); arqueo variance tolerance €5.00 (arqueo_variance_tolerance_cents=500), note required beyond it; closed sessions immutable (corrections = new linked entries); read-only Filament oversight (sessions open/close only at the counter); Z-report feeds dashboard/reports (prompt 14). No new migration (TillSession/CashMovement existed from prompt 01) so no MySQL parity run. Also merged late prompt-09 check-in polish that landed on this branch.
 - Needs Ben's confirmation: arqueo variance tolerance €5.00; counter-screen visual screenshots not captured (no Playwright MCP) — human screenshot pass before go-live.
+
+## Overnight bugfix — business-day window timezone
+- Status: merged
+- Defaults chosen: BusinessDay::window() + ResolveMemberLimits::monthWindow() now return day/month bounds in the app (storage) timezone so whereBetween matches app-tz-stored timestamps. Pre-existing bug (not prompt 10): the daily/monthly gram cap silently stopped enforcing for ~2h after the 06:00 cutoff because the window was built in the location tz vs UTC-stored dispensed_at. Pinned with a frozen-clock regression test. Assumes APP_TIMEZONE=UTC.
+- Needs Ben's confirmation: confirm APP_TIMEZONE=UTC is the deployment assumption (the fix normalises to config('app.timezone')).
