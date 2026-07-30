@@ -636,3 +636,61 @@ and an opening till float on `TillSession`. The dev seeder uses these same paths
   `composer check` gate (an upstream advisory must not block unrelated commits); operational monitoring
   (scheduler/queue heartbeats, health panel, dead-letter view) added — real backups + a tested restore
   are an ops task for go-live (documented in SETUP.md).
+
+---
+
+## Prompt 19 — localization: English default, per-user override
+
+- **Architecture (chosen deliberately, records the trade-off):** the ~1,900 `__()` call sites across
+  this build use the **Spanish source string as the key** with English overrides in `lang/en.json`.
+  Rather than rewrite every call site to English keys (huge, high error-surface), the default is
+  flipped to `en` by **completing `lang/en.json`** (every used key → English) and adding an identity
+  **`lang/es.json`** (every used key → itself, Spanish) so the two files have full key parity. A key
+  missing from `en.json` would leak Spanish into the English UI — forbidden and caught by the
+  completeness test. Spanish is never reduced; it stays first-class.
+- **Default flipped to `en`** (`APP_LOCALE` / `APP_FALLBACK_LOCALE` in config + .env + .env.example).
+  A fresh install with no org override and no user preference renders English.
+- **Per-user preference:** nullable `users.locale` (null = follow org). A topbar `LocaleSwitcher`
+  persists it to the user row AND mirrors to the session, so the change shows on the next request with
+  no re-login.
+- **One resolver:** `App\Actions\ResolveLocale` — **per-user preference → organisation default
+  (`default_locale`, new Setting, = `en`) → system default `en`** — applied in `SetLocale` middleware.
+  Only an enabled locale is honoured; a stale value degrades to the next level, never throws.
+- **Automated coverage gate:** `App\Support\LangKeys` scans the code for `__()`/`@lang()` keys;
+  `php artisan lang:sync` regenerates `es.json`; `tests/Feature/Localization/LocalizationTest` (in the
+  `composer check` suite) asserts en/es key parity, that every used key exists in both, the resolution
+  order, and that **every backed enum exposes a translated `label()`** (never a raw value). Drift now
+  fails the gate automatically.
+
+### Canonical EN↔ES glossary (one source of truth — same concept, same translation everywhere)
+
+| Español | English | NOT (commercial framing) |
+|---|---|---|
+| Socio / Socios | Member / Members | ~~Customer / Client~~ |
+| Aportación / Contribución | Contribution | ~~Sale / Payment~~ |
+| Dispensación | Dispensing / Dispensation | ~~Purchase~~ |
+| Superávit | Surplus | ~~Profit~~ |
+| Carencia | Waiting period | — |
+| Aforo | Capacity | — |
+| Arqueo | Cash count | — |
+| Cierre de turno | Till close / Shift close | — |
+| Cuota | Membership fee | — |
+| Merma | Wastage / Shrinkage | — |
+| Aval / Avalador | Sponsorship / Sponsor | — |
+| Caja | Till / Cash drawer | — |
+
+Bar/merch wording is the deliberate exception: *venta/ticket* → *Sale/Receipt* (the bar genuinely
+sells refreshments). Everything cannabis-side stays contribution-framed in both languages.
+
+- `OVERNIGHT-DEFAULT — CONFIRM:` **statutory documents currently follow the UI locale.** Flipping the
+  default to English means an English-preferring owner would generate the libro de socios, actas,
+  accounting export and RAT in English. These are Spanish legal filings (handed to a lawyer, the
+  assembly, the AEPD or a court) and should almost certainly render in a **fixed document locale
+  (Spanish), independent of the staff member's UI language** — a `document_locale` setting (default
+  `es`) wrapping the PDF/CSV renderers. NOT done here (it spans the prompt-16/17 legal module and is a
+  product decision); flagged for a focused follow-up. The localization tests pin `es` where they assert
+  Spanish-specific output, so this is documented, not hidden.
+- Five pre-existing tests were adjusted for the es→en flip (locale-aware `Money`/`Weight::formatted()`
+  — es comma vs en dot — plus Spanish document copy and the middleware default): `es` pinned where the
+  test asserts Spanish output, and the SetLocale default assertion updated es→en. No production logic
+  changed by those edits.

@@ -19,8 +19,9 @@ class Settings
     /** Final-fallback code defaults (seeded into the settings table too). NOTES §A reference table. */
     public const DEFAULTS = [
         // Identity / display
-        'currency_locale' => 'es',          // €1.234,56
+        'currency_locale' => 'es',          // €1.234,56 number formatting (Spanish convention)
         'enabled_locales' => ['es', 'en'],
+        'default_locale' => 'en',           // organisation UI default (prompt 19: system default is en)
         'member_number_prefix' => 'M-',
         'member_number_padding' => 5,
 

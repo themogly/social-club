@@ -74,11 +74,7 @@ class BreachLogResource extends Resource
 
     public static function statusLabel(BreachStatus $status): string
     {
-        return match ($status) {
-            BreachStatus::OPEN => __('Abierta'),
-            BreachStatus::NOTIFIED => __('Notificada'),
-            BreachStatus::CLOSED => __('Cerrada'),
-        };
+        return $status->label();
     }
 
     /**

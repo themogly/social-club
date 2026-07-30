@@ -84,15 +84,7 @@ class MemberDocumentResource extends Resource
 
     public static function typeLabel(MemberDocumentType $type): string
     {
-        return match ($type) {
-            MemberDocumentType::ID => __('Documento de identidad'),
-            MemberDocumentType::CONSENT => __('Consentimiento'),
-            MemberDocumentType::DECLARATION => __('Previsión de consumo'),
-            MemberDocumentType::MEDICAL => __('Documentación médica'),
-            MemberDocumentType::REGISTRATION_FORM => __('Solicitud de alta'),
-            MemberDocumentType::SANCTION_ACT => __('Acta de sanción'),
-            MemberDocumentType::OTHER => __('Otro'),
-        };
+        return $type->label();
     }
 
     public static function getPages(): array

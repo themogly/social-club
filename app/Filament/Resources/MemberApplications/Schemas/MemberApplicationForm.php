@@ -22,7 +22,7 @@ class MemberApplicationForm
                 Select::make('status')
                     ->label(__('Estado'))
                     ->options(collect(ApplicationStatus::cases())
-                        ->mapWithKeys(fn (ApplicationStatus $case): array => [$case->value => $case->value])
+                        ->mapWithKeys(fn (ApplicationStatus $case): array => [$case->value => $case->label()])
                         ->all())
                     ->required(),
 

@@ -66,6 +66,8 @@ class AccountingExportPageTest extends TestCase
             'dispensed_at' => now(),
         ]);
 
+        // The accounting export is a Spanish-format document (decimal comma, no symbol).
+        app()->setLocale('es');
         $page = new ExportacionContable;
         $page->period = 'month';
         $csv = $this->streamed($page->exportCsv());

@@ -57,7 +57,7 @@ class MemberForm
                         Select::make('document_type')
                             ->label(__('Tipo de documento'))
                             ->options(collect(IdDocumentType::cases())
-                                ->mapWithKeys(fn (IdDocumentType $type): array => [$type->value => $type->value])
+                                ->mapWithKeys(fn (IdDocumentType $type): array => [$type->value => $type->label()])
                                 ->all()),
 
                         TextInput::make('document_number')

@@ -18,7 +18,7 @@ class DiscountForm
             TextInput::make('name')->label(__('Nombre'))->required()->maxLength(255),
 
             Select::make('kind')->label(__('Tipo'))
-                ->options(collect(DiscountKind::cases())->mapWithKeys(fn (DiscountKind $c) => [$c->value => $c->value])->all())
+                ->options(collect(DiscountKind::cases())->mapWithKeys(fn (DiscountKind $c) => [$c->value => $c->label()])->all())
                 ->required(),
 
             Select::make('mode')->label(__('Modo'))

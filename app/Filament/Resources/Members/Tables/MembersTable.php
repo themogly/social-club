@@ -43,7 +43,7 @@ class MembersTable
                 SelectFilter::make('status')
                     ->label(__('Estado'))
                     ->options(collect(MemberStatus::cases())
-                        ->mapWithKeys(fn (MemberStatus $case): array => [$case->value => $case->value])
+                        ->mapWithKeys(fn (MemberStatus $case): array => [$case->value => $case->label()])
                         ->all()),
                 TernaryFilter::make('is_therapeutic')
                     ->label(__('Terapéutico')),
