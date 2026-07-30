@@ -6,13 +6,23 @@ one branch each, `composer check` green before every merge. Prompt 18 is deliber
 
 ---
 
-# ✅ FINAL SUMMARY — run completed cleanly
+# ✅ FINAL SUMMARY — run completed cleanly (+ follow-ups 19 & 20)
 
 **The unattended run reached the end.** Bootstrap + **prompts 01–17 all completed, `composer check`
-green, and merged to `main`** (prompt 18 skipped as instructed). Every prompt was one branch off latest
-`main`, merged only on a green gate, then pushed to `origin/main`. Suite at completion: **290 tests /
-1277 assertions green on BOTH SQLite and MySQL** (the full suite was verified on the production driver,
-resolving the earlier "MySQL parity deferred" note). Larastan L6 and Pint clean throughout.
+green, and merged to `main`** (prompt 18 skipped as instructed), then two requested follow-ups —
+**19 (localization: English default, per-user locale, enforced EN/ES key parity) and 20 (admin form
+completeness: the missing ID-scan upload, grams-not-centigrams, RGPD consent capture, reactive
+therapeutic toggle, sole-association declaration, + a repeatable form-audit gate)** — also merged
+green. Every prompt was one branch off latest `main`, merged only on a green gate, then pushed to
+`origin/main`. Suite at completion: **306 tests / 2029 assertions green on BOTH SQLite and MySQL**
+(the full suite verified on the production driver). Larastan L6 and Pint clean throughout.
+
+**Post-17 follow-ups flagged two things worth your attention:** (a) flipping the default to English
+means the **statutory documents (actas, libro de socios, accounting export, RAT) currently render in
+the staff member's UI language** — for Spanish legal filings these should be fixed to a
+`document_locale=es`; NOT changed (spans the legal module, a product call). (b) admin-created members
+now default to **ACTIVE** (walk-in registration) and the medical certificate is revealed-but-not-
+hard-required — both confirmable in DECISIONS.md.
 
 **Deviation from the kit (as authorised for the unattended run):** branches were self-merged to `main`
 after a green `composer check` (the normal "push, don't merge — a human reviews" rule was explicitly
