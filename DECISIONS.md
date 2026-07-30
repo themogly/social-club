@@ -245,3 +245,29 @@ and an opening till float on `TillSession`. The dev seeder uses these same paths
   import (duplicate guard skips existing), both audited.
 - **Seeder:** removed `WithoutModelEvents` from `DatabaseSeeder` so model saving hooks (document_hash
   blind index, tender-split invariant, scope auto-fill) fire during seeding.
+
+---
+
+## Prompt 05 — memberships, fees, carencia & the wallet
+
+- **Wallet model: append-only ledger, derived balance.** `WalletTransaction` is the truth;
+  `App\Support\Wallet::balance($member,$location)` sums the ledger (per-location, per prompt 01).
+  `balance_after_cents` is computed by the single writer `App\Actions\Wallet\RecordWalletTransaction`,
+  never free-typed. `Wallet::totalFloat($org)` is the reported liability figure (prompt 14).
+- **Debt policy:** off by default (`wallet_debt_allowed`), capped by `wallet_debt_limit_cents`,
+  enforced in the writer — a movement past the cap throws `DebtLimitExceededException` (surfaced as a
+  validation/denial, never a hidden button). Explicit permissioned adjustments/transfers may pass
+  `allow_debt`.
+- **Ring-fencing (carried forward from v1):** `App\Actions\Wallet\TransferCredit` records paired
+  TRANSFER_OUT/TRANSFER_IN (linked by `transfer_pair_id`). `AutoSettleDebt` uses new credit at an
+  UNFENCED location to clear debt at other UNFENCED locations; a ring-fenced location
+  (`location.settings.ring_fenced`) is excluded and settles only by explicit manual transfer.
+- **Fee-payment rule:** `MembershipFeePayment` is first-class income, reported separately from
+  consumption contributions. A CASH fee attaches to the till session (prompt 10 reconciliation); a
+  WALLET fee also posts a FEE ledger movement. Fee override needs `membership.fee.override` and
+  records `fee_override_by` + reason (audit).
+- **Carencia:** set at approval (`joined_at + carencia_days`); `MemberEligibility::carenciaPassed`
+  gates dispensing (not check-in). `WaiveCarencia` is `carencia.waive`-only and logged.
+- **Renewals/expiry:** `RenewMembership` extends from the later of today/current expiry.
+  `memberships:sweep` (nightly 05:00) flips LAPSED/EXPIRING_SOON and sends renewal reminders,
+  idempotent per member/period via the `reminder_sent_for` marker.
