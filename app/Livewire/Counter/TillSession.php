@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Counter;
 
+use App\Actions\Expenses\RecordTillExpense;
 use App\Actions\Till\CloseTill;
 use App\Actions\Till\OpenTill;
 use App\Actions\Till\RecordCashMovement;
@@ -9,6 +10,7 @@ use App\Enums\CashMovementType;
 use App\Enums\TillSessionStatus;
 use App\Exceptions\TillAlreadyOpenException;
 use App\Exceptions\TillClosedException;
+use App\Models\ExpenseCategory;
 use App\Models\Location;
 use App\Models\TillSession as TillSessionModel;
 use App\Models\User;
@@ -55,6 +57,13 @@ class TillSession extends Component
     public string $movementAmount = '';
 
     public string $movementReason = '';
+
+    /** Petty-cash (gasto de caja) form — records a PETTY_CASH movement out of the open drawer. */
+    public string $expenseAmount = '';
+
+    public ?string $expenseCategoryId = null;
+
+    public string $expenseNote = '';
 
     /** True once the operator starts the close — the live summary (incl. expected) is hidden. */
     public bool $closing = false;
@@ -202,6 +211,65 @@ class TillSession extends Component
         $this->flash(__('Movimiento registrado.'), 'success');
     }
 
+    // --- Petty cash (gasto de caja) --------------------------------------------
+
+    /**
+     * Record a petty-cash expense against the OPEN drawer. Routes through
+     * RecordTillExpense so it posts a PETTY_CASH cash movement (dropping the expected
+     * drawer cash) and is audited — the screen never writes the expense directly.
+     */
+    public function recordExpense(): void
+    {
+        $session = $this->resolveOpenSession();
+
+        if ($session === null) {
+            return;
+        }
+
+        $user = $this->currentUser();
+
+        if ($user === null || ! $user->can('expenses.record')) {
+            $this->flash(__('No tienes permiso para registrar un gasto.'), 'error');
+
+            return;
+        }
+
+        $category = $this->expenseCategoryId !== null
+            ? ExpenseCategory::query()->where('active', true)->find($this->expenseCategoryId)
+            : null;
+
+        if ($category === null) {
+            $this->flash(__('Elige una categoría de gasto.'), 'error');
+
+            return;
+        }
+
+        $cents = $this->toCents($this->expenseAmount);
+
+        if ($cents === null || $cents <= 0) {
+            $this->flash(__('El importe no es válido.'), 'error');
+
+            return;
+        }
+
+        $note = trim($this->expenseNote);
+
+        try {
+            (new RecordTillExpense)->handle($session, $category, $cents, $user, [
+                'note' => $note === '' ? null : $note,
+            ]);
+        } catch (TillClosedException) {
+            $this->flash(__('La caja está cerrada.'), 'error');
+
+            return;
+        }
+
+        $this->expenseAmount = '';
+        $this->expenseNote = '';
+        $this->expenseCategoryId = null;
+        $this->flash(__('Gasto de caja registrado.'), 'success');
+    }
+
     // --- Blind close (arqueo) --------------------------------------------------
 
     /** Enter the blind count: hide the live summary and clear any prior reveal. */
@@ -297,6 +365,7 @@ class TillSession extends Component
                 'location' => $location,
                 'session' => null,
                 'breakdown' => null,
+                'expenseCategories' => collect(),
             ]);
         }
 
@@ -309,10 +378,16 @@ class TillSession extends Component
             ? TillSummary::breakdown($session)
             : null;
 
+        // Petty-cash categories, only when the drawer is open and not being counted.
+        $expenseCategories = ($session !== null && ! $this->closing)
+            ? ExpenseCategory::query()->where('active', true)->orderBy('name')->get()
+            : collect();
+
         return view('livewire.counter.till-session', [
             'location' => $location,
             'session' => $session,
             'breakdown' => $breakdown,
+            'expenseCategories' => $expenseCategories,
         ]);
     }
 

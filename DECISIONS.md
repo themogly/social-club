@@ -475,3 +475,37 @@ and an opening till float on `TillSession`. The dev seeder uses these same paths
 - Bar receipt is worded as a normal **venta / ticket** — deliberately distinct vocabulary from the
   cannabis **aportación / contribución** receipt. UI gated by `App\Policies\OrderPolicy` (pos.bar to use,
   order.void to void); receipt at a ULID route.
+
+---
+
+## Prompt 13 — expenses, purchases & suppliers
+
+- **The classic conflation, kept apart.** Till **petty cash** (`RecordTillExpense`, expenses.record)
+  posts a `PETTY_CASH` cash movement so it hits the drawer reconciliation (TillSummary / Z-report) —
+  otherwise the drawer looks over. **Overheads** (`RecordOverhead`, expenses.overheads — owner/
+  treasurer only) NEVER set a `till_session_id` and NEVER move cash, but still count as period
+  outgoings. Both facts are explicitly tested (the overhead-touches-the-till case is the one that
+  gets wired wrong).
+- **Approval** is a recorded action (`ApproveExpense`, expenses.approve) with approver + timestamp,
+  never a silent flip. `Expense::requiresApproval()` reads `expense_approval_threshold_cents`
+  (default €100) via the Settings accessor: above it an unapproved expense still needs approval,
+  below it none is required.
+- **Recurring overheads** are `Expense` rows with a `recurrence` array (a TEMPLATE, excluded from
+  outgoings by `scopeConcrete`). `expenses:materialise-recurring` (scheduled daily 05:30) creates the
+  concrete expense for the current period and is **idempotent** via the unique
+  `recurring_expense_runs(template, period_key)` marker — a double-fire never double-charges.
+- **Purchases → stock valuation.** `RecordPurchase` links a cannabis purchase to its batch intake and
+  writes `cost_per_gram_cents = round_half_up(amount_cents × 100 ÷ grams_cg)` onto the batch, so the
+  purchase-vs-withdrawal reconciliation (prompt 14) uses a real cost, not a guess. Supplier balance
+  owing = Σ(amount − paid) is a reported figure.
+- **Schema:** added nullable `note` (the petty-cash/overhead reason) and `supplier_id` (overheads may
+  name a supplier) to `expenses` — additive migration. **MySQL parity RESOLVED:** the full suite
+  (207 tests) was run green on MySQL (`phpunit.mysql.xml`) this prompt — the first full MySQL run of
+  the build, so every prior migration (prompts 00–12) is now confirmed on the production driver too,
+  not just SQLite. Supersedes the earlier "MySQL parity deferred" note.
+- **Receipts/invoices on the PRIVATE `documents` disk**, never the public one (security requirement).
+- **Staff-payment expenses** get their own category and UI help text stating that *recording is not
+  discharging* the real PAYE/governance obligation.
+- `OVERNIGHT-DEFAULT — CONFIRM:` seeded default expense categories — Stock, Consumables (TILL), Staff
+  payment, Repairs & maintenance, Rent, Utilities, Other (OVERHEAD hints). Confirm the club's real
+  category list. Recurrence frequencies offered: MONTHLY / QUARTERLY / YEARLY.
