@@ -32,14 +32,18 @@ class ResolvePrice
         [$rate, $rateLabel] = $this->rate($genetic, $location, $member);
         $candidates = $this->applicableDiscounts($genetic, $location, $member);
 
-        return new PriceResult($rate, $rateLabel, $this->chooseDiscount($rate, $candidates));
+        return new PriceResult($rate, $rateLabel, $this->chooseDiscount($rate, $candidates), $genetic->isUnitType());
     }
 
     /**
+     * The resolved rate in cents — SAME tier resolution for both, only the column
+     * differs: per gram for a WEIGHT genetic, per unit for a UNIT genetic.
+     *
      * @return array{0: int, 1: ?string}
      */
     private function rate(Genetic $genetic, Location $location, ?Member $member): array
     {
+        $column = $genetic->isUnitType() ? 'price_per_unit_cents' : 'price_per_gram_cents';
         $tierId = $member !== null ? $this->activeTierId($member, $location) : null;
 
         if ($tierId !== null) {
@@ -48,7 +52,7 @@ class ResolvePrice
                 ->where('tier_id', $tierId)->where('active', true)->first();
 
             if ($tierPrice !== null) {
-                return [(int) $tierPrice->price_per_gram_cents, __('Tarifa')];
+                return [(int) $tierPrice->{$column}, __('Tarifa')];
             }
         }
 
@@ -60,7 +64,7 @@ class ResolvePrice
             throw new RuntimeException('No active base price for this genetic at this location.');
         }
 
-        return [(int) $base->price_per_gram_cents, null];
+        return [(int) $base->{$column}, null];
     }
 
     private function activeTierId(Member $member, Location $location): ?string

@@ -74,17 +74,30 @@
             <thead>
                 <tr>
                     <th>{{ __('Genética') }}</th>
-                    <th class="num">{{ __('Peso') }}</th>
-                    <th class="num">{{ __('€/g') }}</th>
+                    <th class="num">{{ __('Cantidad') }}</th>
+                    <th class="num">{{ __('Precio') }}</th>
                     <th class="num">{{ __('Aportación') }}</th>
                 </tr>
             </thead>
             <tbody>
                 @foreach ($dispensation->lines as $line)
+                    @php $isUnit = $line->units_dispensed !== null; @endphp
                     <tr>
                         <td>{{ $line->genetic_name_snapshot }}</td>
-                        <td class="num">{{ $line->grams_cg->formatted() }}</td>
-                        <td class="num">{{ Money::fromCents($line->price_per_gram_cents)->formatted() }}</td>
+                        <td class="num">
+                            @if ($isUnit)
+                                {{ $line->units_dispensed }} {{ __('uds') }} ({{ $line->grams_cg->formatted() }})
+                            @else
+                                {{ $line->grams_cg->formatted() }}
+                            @endif
+                        </td>
+                        <td class="num">
+                            @if ($isUnit)
+                                {{ Money::fromCents((int) $line->price_per_unit_cents)->formatted() }}/{{ __('ud') }}
+                            @else
+                                {{ Money::fromCents((int) $line->price_per_gram_cents)->formatted() }}/g
+                            @endif
+                        </td>
                         <td class="num">{{ $line->line_total_cents->formatted() }}</td>
                     </tr>
                 @endforeach

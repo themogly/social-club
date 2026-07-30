@@ -30,9 +30,18 @@ class BatchesTable
             ->columns([
                 TextColumn::make('batch_no')->label(__('Nº lote'))->searchable()->sortable(),
                 TextColumn::make('genetic.name')->label(__('Genética'))->searchable()->sortable(),
-                TextColumn::make('remaining_cg')
+                TextColumn::make('genetic.product_type')->label(__('Tipo'))->badge()->toggleable(),
+                TextColumn::make('remaining')
                     ->label(__('Restante'))
-                    ->state(fn (Batch $record): string => number_format($record->remaining_cg->centigrams / 100, 2).' g'),
+                    ->state(function (Batch $record): string {
+                        if ($record->isUnitType()) {
+                            $units = (int) ($record->remaining_units ?? 0);
+
+                            return $units.' '.__('uds').' ('.number_format($record->onHandCg() / 100, 2).' g)';
+                        }
+
+                        return number_format($record->remaining_cg->centigrams / 100, 2).' g';
+                    }),
                 TextColumn::make('status')
                     ->label(__('Estado'))
                     ->badge()
@@ -60,15 +69,15 @@ class BatchesTable
             ]);
     }
 
-    /** Ajuste — a signed correction (+/− grams) recorded through the stock ledger. */
+    /** Ajuste — a signed correction recorded through the stock ledger, in the batch's own unit. */
     protected static function adjustAction(): Action
     {
         return Action::make('adjust')
             ->label(__('Ajuste'))
             ->icon(Heroicon::OutlinedAdjustmentsHorizontal)
             ->schema([
-                TextInput::make('grams')
-                    ->label(__('Ajuste (g)'))
+                TextInput::make('quantity')
+                    ->label(fn (Batch $record): string => $record->isUnitType() ? __('Ajuste (uds)') : __('Ajuste (g)'))
                     ->numeric()
                     ->required()
                     ->helperText(__('Usa un valor negativo para restar.')),
@@ -81,7 +90,7 @@ class BatchesTable
                     (new RecordStockMovement)->handle(
                         $record,
                         StockMovementType::ADJUSTMENT,
-                        (int) round(((float) $data['grams']) * 100),
+                        self::signedDelta($record, (float) $data['quantity']),
                         ['reason' => (string) $data['reason'], 'operator_id' => self::operatorId()],
                     );
 
@@ -101,8 +110,8 @@ class BatchesTable
             ->color('danger')
             ->visible(fn (): bool => Auth::user()?->can('stock.merma') ?? false)
             ->schema([
-                TextInput::make('grams')
-                    ->label(__('Merma (g)'))
+                TextInput::make('quantity')
+                    ->label(fn (Batch $record): string => $record->isUnitType() ? __('Merma (uds)') : __('Merma (g)'))
                     ->numeric()
                     ->minValue(0)
                     ->required(),
@@ -115,7 +124,7 @@ class BatchesTable
                     (new RecordStockMovement)->handle(
                         $record,
                         StockMovementType::MERMA,
-                        -(int) round(((float) $data['grams']) * 100),
+                        -abs(self::signedDelta($record, (float) $data['quantity'])),
                         ['reason' => (string) $data['reason'], 'operator_id' => self::operatorId(), 'actor' => Auth::user()],
                     );
 
@@ -124,6 +133,12 @@ class BatchesTable
                     Notification::make()->title(__('Stock insuficiente'))->body($e->getMessage())->danger()->send();
                 }
             });
+    }
+
+    /** A stock delta in the batch's own unit: whole units for UNIT batches, centigrams for WEIGHT. */
+    protected static function signedDelta(Batch $batch, float $quantity): int
+    {
+        return $batch->isUnitType() ? (int) $quantity : (int) round($quantity * 100);
     }
 
     protected static function operatorId(): ?string

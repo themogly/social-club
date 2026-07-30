@@ -58,7 +58,7 @@ use Throwable;
  * while offline cannot be trusted, so the commit is blocked (client + server) and the
  * basket is preserved until the connection returns.
  *
- * @phpstan-type Line array{genetic_id: string, batch_id: string, grams_cg: int}
+ * @phpstan-type Line array{genetic_id: string, batch_id: string, grams_cg: int, units: ?int}
  * @phpstan-type Rule array{rule: string, satisfied: bool, mode: string, message: string}
  */
 #[Layout('components.layouts.counter')]
@@ -77,6 +77,9 @@ class DispensaryPos extends Component
 
     /** Category filter over the genetics grid (null = all). */
     public ?string $categoryId = null;
+
+    /** Product-type filter over the genetics grid (FLOWER|CONCENTRATE|PREROLL|EDIBLE, null = all). */
+    public ?string $productType = null;
 
     /** The held socio (id only — the model is resolved live, never stored on the component). */
     public ?string $memberId = null;
@@ -119,11 +122,14 @@ class DispensaryPos extends Component
     /** The chosen batch for the active genetic — defaults to FEFO, operator-overridable. */
     public ?string $activeBatchId = null;
 
-    /** The numeric-pad value: grams (2 dp) normally, euros in calculator mode. */
+    /** The numeric-pad value: grams (2 dp) normally, euros in calculator mode (WEIGHT genetics). */
     public string $weightInput = '';
 
     /** Calculator mode: the operator types euros; we back-solve grams (rounded DOWN to 0.01 g). */
     public bool $calculatorMode = false;
+
+    /** The unit-stepper value for a UNIT genetic (preroll/edible). Grams are computed from it. */
+    public int $unitQty = 1;
 
     // --- Tender -----------------------------------------------------------------
 
@@ -225,7 +231,7 @@ class DispensaryPos extends Component
     {
         $this->reset([
             'memberId', 'scanned', 'search', 'basket', 'activeGeneticId', 'activeBatchId',
-            'weightInput', 'calculatorMode', 'cashInput', 'walletInput', 'requireOverride',
+            'weightInput', 'calculatorMode', 'unitQty', 'cashInput', 'walletInput', 'requireOverride',
             'limitBreach', 'overrideReason', 'signaturePath', 'lastDispensationId', 'voidReason',
             'flashMessage',
         ]);
@@ -247,6 +253,7 @@ class DispensaryPos extends Component
         $this->activeGeneticId = $geneticId;
         $this->weightInput = '';
         $this->calculatorMode = false;
+        $this->unitQty = 1;
 
         // Default the batch to FEFO (oldest open, non-expired, in stock); overridable below.
         $location = $this->resolveLocation();
@@ -258,12 +265,23 @@ class DispensaryPos extends Component
 
     public function cancelWeightEntry(): void
     {
-        $this->reset(['activeGeneticId', 'activeBatchId', 'weightInput', 'calculatorMode']);
+        $this->reset(['activeGeneticId', 'activeBatchId', 'weightInput', 'calculatorMode', 'unitQty']);
     }
 
     public function selectBatch(string $batchId): void
     {
         $this->activeBatchId = $batchId;
+    }
+
+    /** Unit stepper for a UNIT genetic — never below one unit. */
+    public function stepUnits(int $delta): void
+    {
+        $this->unitQty = max(1, $this->unitQty + $delta);
+    }
+
+    public function filterProductType(?string $productType): void
+    {
+        $this->productType = $productType;
     }
 
     public function toggleCalculator(): void
@@ -331,26 +349,40 @@ class DispensaryPos extends Component
             return;
         }
 
-        $gramsCg = $this->resolveGramsCg($genetic, $location);
+        // UNIT genetic → the stepper drives whole units; grams_cg is computed. WEIGHT → grams pad.
+        if ($genetic->isUnitType()) {
+            $units = max(1, $this->unitQty);
+            $line = [
+                'genetic_id' => $genetic->id,
+                'batch_id' => $batch->id,
+                'grams_cg' => $units * (int) $genetic->grams_per_unit_cg,
+                'units' => $units,
+            ];
+        } else {
+            $gramsCg = $this->resolveGramsCg($genetic, $location);
 
-        if ($gramsCg === null || $gramsCg <= 0) {
-            $this->flash(__('Introduce un peso válido.'), 'error');
+            if ($gramsCg === null || $gramsCg <= 0) {
+                $this->flash(__('Introduce un peso válido.'), 'error');
 
-            return;
+                return;
+            }
+
+            $line = [
+                'genetic_id' => $genetic->id,
+                'batch_id' => $batch->id,
+                'grams_cg' => $gramsCg,
+                'units' => null,
+            ];
         }
 
-        $this->basket[] = [
-            'genetic_id' => $genetic->id,
-            'batch_id' => $batch->id,
-            'grams_cg' => $gramsCg,
-        ];
+        $this->basket[] = $line;
 
         if ($this->idempotencyKey === null) {
             $this->idempotencyKey = (string) Str::ulid();
         }
 
         // A new line invalidates any prior limit-breach state — re-evaluated on next commit.
-        $this->reset(['activeGeneticId', 'activeBatchId', 'weightInput', 'calculatorMode', 'requireOverride', 'limitBreach']);
+        $this->reset(['activeGeneticId', 'activeBatchId', 'weightInput', 'calculatorMode', 'unitQty', 'requireOverride', 'limitBreach']);
     }
 
     public function removeLine(int $index): void
@@ -364,7 +396,7 @@ class DispensaryPos extends Component
     public function clearBasket(): void
     {
         $this->reset([
-            'basket', 'activeGeneticId', 'activeBatchId', 'weightInput', 'calculatorMode',
+            'basket', 'activeGeneticId', 'activeBatchId', 'weightInput', 'calculatorMode', 'unitQty',
             'cashInput', 'walletInput', 'requireOverride', 'limitBreach', 'overrideReason',
             'signaturePath',
         ]);
@@ -516,11 +548,13 @@ class DispensaryPos extends Component
             $options['override_reason'] = $reason;
         }
 
-        /** @var list<Line> $lines */
+        // Pass units for UNIT lines and grams_cg for WEIGHT lines; CommitDispensation
+        // recomputes the stored grams_cg for UNIT lines from the genetic (authoritative).
         $lines = array_map(fn (array $line): array => [
             'genetic_id' => (string) $line['genetic_id'],
             'batch_id' => (string) $line['batch_id'],
             'grams_cg' => (int) $line['grams_cg'],
+            'units' => $line['units'] !== null ? (int) $line['units'] : null,
         ], $this->basket);
 
         try {
@@ -642,6 +676,8 @@ class DispensaryPos extends Component
             'searchResults' => $this->searchResults($location),
             'genetics' => $this->filterGenetics($allGenetics),
             'categories' => $this->deriveCategories($allGenetics),
+            'productTypes' => $this->deriveProductTypes($allGenetics),
+            'activeEntryGramsCg' => $this->activeEntryGramsCg(),
             'basketLines' => $basketLines,
             'basketTotalCents' => $total,
             'cashPreviewCents' => $cashPreview,
@@ -669,6 +705,27 @@ class DispensaryPos extends Component
     public function money(int $cents): string
     {
         return Money::fromCents($cents)->formatted();
+    }
+
+    /**
+     * The gram-equivalent (integer centigrams) of the entry in progress — the weighed
+     * grams for a WEIGHT genetic, units × grams_per_unit_cg for a UNIT genetic. Same
+     * scale for both, so the compliance gauge gets identical real-time feedback whether
+     * the operator weighs grams or steps units. Null when no valid entry is in progress.
+     */
+    public function activeEntryGramsCg(): ?int
+    {
+        $genetic = $this->activeGeneticId !== null ? Genetic::query()->find($this->activeGeneticId) : null;
+
+        if ($genetic === null) {
+            return null;
+        }
+
+        if ($genetic->isUnitType()) {
+            return max(1, $this->unitQty) * (int) $genetic->grams_per_unit_cg;
+        }
+
+        return $this->parseGramsCg($this->weightInput);
     }
 
     // --- Weight / calculator resolution -----------------------------------------
@@ -764,8 +821,13 @@ class DispensaryPos extends Component
                 continue;
             }
 
+            $units = $line['units'] ?? null;
+
             try {
-                $priced = $resolver->forGenetic($genetic, $location, $member)->lineFor((int) $line['grams_cg']);
+                $price = $resolver->forGenetic($genetic, $location, $member);
+                $priced = $units !== null
+                    ? $price->lineForUnits((int) $units)
+                    : $price->lineFor((int) $line['grams_cg']);
             } catch (RuntimeException) {
                 continue;
             }
@@ -774,6 +836,8 @@ class DispensaryPos extends Component
                 'index' => $index,
                 'genetic_name' => $genetic->name,
                 'grams_cg' => (int) $line['grams_cg'],
+                'units' => $units !== null ? (int) $units : null,
+                'per_unit' => $units !== null,
                 'rate_cents' => $priced['rate_cents'],
                 'discount_cents' => $priced['discount_cents'],
                 'total_cents' => $priced['total_cents'],
@@ -826,17 +890,25 @@ class DispensaryPos extends Component
                 continue;
             }
 
+            $isUnit = $genetic->isUnitType();
+            $remainingUnits = $isUnit ? $this->remainingUnits($genetic, $location) : null;
+
             $rows[] = [
                 'id' => $genetic->id,
                 'name' => $genetic->name,
+                'product_type' => $genetic->product_type->value,
+                'product_type_label' => $genetic->product_type->label(),
+                'is_unit' => $isUnit,
+                'grams_per_unit_cg' => (int) $genetic->grams_per_unit_cg,
                 'thc_bp' => (int) $genetic->thc_bp,
                 'cbd_bp' => (int) $genetic->cbd_bp,
-                'cultivation' => $genetic->cultivation_type->value,
+                'cultivation' => $genetic->cultivation_type?->value,
                 'category_id' => $genetic->category_id,
                 'category_name' => $genetic->category?->name,
                 'rate_cents' => $price->ratePerGramCents,
                 'price_label' => $price->label(),
-                'remaining_cg' => $this->remainingCg($genetic, $location),
+                'remaining_cg' => $isUnit ? ($remainingUnits ?? 0) * (int) $genetic->grams_per_unit_cg : $this->remainingCg($genetic, $location),
+                'remaining_units' => $remainingUnits,
                 'has_batch' => (new SelectBatch)->fefo($genetic, $location) !== null,
             ];
         }
@@ -860,8 +932,35 @@ class DispensaryPos extends Component
                 return false;
             }
 
+            if ($this->productType !== null && (string) $row['product_type'] !== $this->productType) {
+                return false;
+            }
+
             return $term === '' || str_contains(mb_strtolower((string) $row['name']), $term);
         }));
+    }
+
+    /**
+     * Distinct product types among the sellable genetics, for the grid filter chips.
+     *
+     * @param  list<array<string, mixed>>  $rows
+     * @return list<array{value: string, label: string}>
+     */
+    private function deriveProductTypes(array $rows): array
+    {
+        $seen = [];
+
+        foreach ($rows as $row) {
+            $seen[(string) $row['product_type']] = (string) $row['product_type_label'];
+        }
+
+        $types = [];
+
+        foreach ($seen as $value => $label) {
+            $types[] = ['value' => (string) $value, 'label' => $label];
+        }
+
+        return $types;
     }
 
     /**
@@ -900,6 +999,18 @@ class DispensaryPos extends Component
             ->sum('remaining_cg');
     }
 
+    /** Whole units in stock for a UNIT genetic (open, in-stock, non-expired batches at this sede). */
+    private function remainingUnits(Genetic $genetic, Location $location): int
+    {
+        return (int) Batch::query()->withoutGlobalScopes()
+            ->where('genetic_id', $genetic->id)
+            ->where('location_id', $location->id)
+            ->where('status', BatchStatus::OPEN->value)
+            ->where('remaining_units', '>', 0)
+            ->where(fn ($q) => $q->whereNull('expires_on')->orWhereDate('expires_on', '>=', today()))
+            ->sum('remaining_units');
+    }
+
     /**
      * The dispensable batches for the active genetic (FEFO first) — the operator may
      * override the default to another dispensable batch of the same genetic.
@@ -915,11 +1026,14 @@ class DispensaryPos extends Component
             return $empty;
         }
 
+        $genetic = Genetic::query()->find($this->activeGeneticId);
+        $stockColumn = ($genetic !== null && $genetic->isUnitType()) ? 'remaining_units' : 'remaining_cg';
+
         return Batch::query()->withoutGlobalScopes()
             ->where('genetic_id', $this->activeGeneticId)
             ->where('location_id', $location->id)
             ->where('status', BatchStatus::OPEN->value)
-            ->where('remaining_cg', '>', 0)
+            ->where($stockColumn, '>', 0)
             ->where(fn ($q) => $q->whereNull('expires_on')->orWhereDate('expires_on', '>=', today()))
             ->orderBy('acquired_or_harvested_on')
             ->orderBy('id')
@@ -1122,7 +1236,7 @@ class DispensaryPos extends Component
 
         // A new socio always starts a fresh basket → a fresh idempotency key.
         $this->reset([
-            'basket', 'activeGeneticId', 'activeBatchId', 'weightInput', 'calculatorMode',
+            'basket', 'activeGeneticId', 'activeBatchId', 'weightInput', 'calculatorMode', 'unitQty',
             'cashInput', 'walletInput', 'requireOverride', 'limitBreach', 'overrideReason',
             'signaturePath', 'lastDispensationId', 'voidReason', 'flashMessage',
         ]);
@@ -1133,7 +1247,7 @@ class DispensaryPos extends Component
     private function resetBasketState(): void
     {
         $this->reset([
-            'basket', 'activeGeneticId', 'activeBatchId', 'weightInput', 'calculatorMode',
+            'basket', 'activeGeneticId', 'activeBatchId', 'weightInput', 'calculatorMode', 'unitQty',
             'cashInput', 'walletInput', 'requireOverride', 'limitBreach', 'overrideReason',
             'signaturePath',
         ]);

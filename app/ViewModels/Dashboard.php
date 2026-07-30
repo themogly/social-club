@@ -130,17 +130,24 @@ class Dashboard
 
     public function stockOnHandCg(): int
     {
-        return (int) $this->scopeByLocation(Batch::query()->withoutGlobalScopes())
-            ->where('status', BatchStatus::OPEN->value)->sum('remaining_cg');
+        // Gram-equivalent across BOTH kinds: WEIGHT batches' remaining_cg + UNIT batches'
+        // remaining_units × grams_per_unit_cg — one premises-wide figure.
+        return (int) Batch::query()->withoutGlobalScopes()
+            ->join('genetics', 'batches.genetic_id', '=', 'genetics.id')
+            ->whereIn('batches.location_id', $this->resolvedLocationIds())
+            ->where('batches.status', BatchStatus::OPEN->value)
+            ->selectRaw("COALESCE(SUM(CASE WHEN genetics.unit_type = 'UNIT' THEN batches.remaining_units * genetics.grams_per_unit_cg ELSE batches.remaining_cg END), 0) as cg")
+            ->value('cg');
     }
 
     public function stockValueCents(): int
     {
-        // Σ remaining_cg × cost_per_gram_cents ÷ 100 (cg → g).
+        // Σ gram-equivalent × cost_per_gram_cents ÷ 100 (cg → g), per batch, both kinds.
         return $this->scopeByLocation(Batch::query()->withoutGlobalScopes())
             ->where('status', BatchStatus::OPEN->value)
-            ->get(['remaining_cg', 'cost_per_gram_cents'])
-            ->reduce(fn (int $carry, Batch $b): int => $carry + intdiv($b->remaining_cg->centigrams * $b->cost_per_gram_cents, 100), 0);
+            ->with('genetic')
+            ->get(['id', 'genetic_id', 'remaining_cg', 'remaining_units', 'cost_per_gram_cents'])
+            ->reduce(fn (int $carry, Batch $b): int => $carry + intdiv($b->onHandCg() * (int) $b->cost_per_gram_cents, 100), 0);
     }
 
     public function daysOfInventory(): ?int

@@ -305,7 +305,7 @@ class DashboardCharts
             ->whereIn('batches.location_id', $this->resolvedLocationIds())
             ->where('batches.status', BatchStatus::OPEN->value)
             ->groupBy('batches.genetic_id')
-            ->selectRaw('MAX(genetics.name) as genetic, SUM(batches.remaining_cg) as remaining_cg')
+            ->selectRaw("MAX(genetics.name) as genetic, COALESCE(SUM(CASE WHEN genetics.unit_type = 'UNIT' THEN batches.remaining_units * genetics.grams_per_unit_cg ELSE batches.remaining_cg END), 0) as remaining_cg")
             ->orderByDesc('remaining_cg')
             ->limit($limit)->get();
 

@@ -31,13 +31,21 @@ class CreateBatch extends CreateRecord
         /** @var Location $location */
         $location = Location::query()->findOrFail($locationId);
 
-        return (new IntakeBatch)->handle($genetic, $location, [
-            'grams' => $data['grams'],
+        $intake = [
             'cost_per_gram_cents' => (int) round(((float) ($data['cost_per_gram_eur'] ?? 0)) * 100),
             'acquired_or_harvested_on' => $data['acquired_or_harvested_on'] ?? null,
             'expires_on' => $data['expires_on'] ?? null,
             'lab_report_path' => $data['lab_report_path'] ?? null,
             'notes' => $data['notes'] ?? null,
-        ]);
+        ];
+
+        // Intake in the genetic's own unit — grams for WEIGHT, whole units for UNIT.
+        if ($genetic->isUnitType()) {
+            $intake['units'] = (int) ($data['units'] ?? 0);
+        } else {
+            $intake['grams'] = $data['grams'];
+        }
+
+        return (new IntakeBatch)->handle($genetic, $location, $intake);
     }
 }
