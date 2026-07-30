@@ -100,3 +100,11 @@ one branch each, `composer check` green before every merge. Prompt 18 is deliber
   active_members × daily_limit × stock_ceiling_days (returns the arithmetic). Genetics org-wide;
   batches/stock per-location (cross-location refused by scope). CommitDispensation now uses the one writer.
 - Needs Ben's confirmation: none new.
+
+## Prompt 08 — Pricing, tiers & discounts
+- Status: merged
+- Defaults chosen: one ResolvePrice resolver (tier price → best single discount → per-member custom;
+  no stacking by default, therapeutic auto); frozen into the dispensation line snapshot at commit;
+  AssignMemberDiscount owner-only + audited; DiscountResource (%/€ edge). CommitDispensation prices
+  via ResolvePrice. See DECISIONS.md "Prompt 08".
+- Needs Ben's confirmation: none new (tier-pricing shape confirmed at prompt-01 checkpoint).
