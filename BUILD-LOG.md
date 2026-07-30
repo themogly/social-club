@@ -53,3 +53,13 @@ one branch each, `composer check` green before every merge. Prompt 18 is deliber
 - Needs Ben's confirmation: none new. (Role→permission split is a judgment call — see DECISIONS.md
   "Prompt 02" if you want to adjust who gets what, e.g. whether MANAGER should hold member.discount.assign
   or data.request.handle.)
+
+## Prompt 03 — Organisation & location settings
+- Status: merged
+- Defaults chosen: full settings catalogue seeded (compliance/gauge/avalador/wallet/membership/stock/
+  till/retention — see DECISIONS.md "Prompt 03"); enforcement matrix per rule × door/counter (replaces
+  the prompt-01 hard-block boolean); org ManageSettings page owner-only + audited; per-location settings
+  via LocationResource + module toggles; expense categories resource; locale switching es/en (session +
+  middleware). Grams shown at the edge, stored as centigrams.
+- Needs Ben's confirmation: none new (all thresholds carry the NOTES §A / prompt-01 defaults already
+  flagged; enforcement matrix defaults are sensible — door lets debt in (WARN), counter blocks it).
