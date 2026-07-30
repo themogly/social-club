@@ -609,3 +609,30 @@ and an opening till float on `TillSession`. The dev seeder uses these same paths
   (`IssueDocumentUrl` → `DocumentAccessLog`). Nothing here is legal advice — a plain note says so.
 - `OVERNIGHT-DEFAULT — CONFIRM:` quorum fraction 50%; document letterhead/wording uses the default
   template text until the club supplies its own (editable per-org versioned templates).
+
+---
+
+## Prompt 17 — audit log, RGPD tooling & security hardening
+
+- **Retention periods:** member data `data_retention_days` = 1825 (5 years after leaving); audit entries
+  `audit_retention_days` = 3650 (10 years) — deliberately LONGER than member data, so the evidence of
+  what was done outlives the personal data itself.
+- **Anonymisation strategy (Art. 17 erasure):** anonymise-not-delete (`App\Actions\Members\AnonymiseMember`).
+  Scrubs the personal fields (name/email/phone/address/DOB/document number), deletes the ID scan + photo
+  from the private disk, revokes QR-card tokens, stamps `anonymised_at`, and audits — but KEEPS the
+  financial + consumption ledger (dispensations/wallet/till) attributed to the anonymised record, so the
+  books balance to the cent after an erasure (proven: totals identical before/after). Cannabis
+  consumption + therapeutic status are Article 9 special-category data (flagged in the RAT + DPIA note).
+- **Retention purge:** `members:purge` (scheduled) anonymises members whose `left_at` is past the window;
+  has a `--dry-run` that writes nothing and is idempotent across runs (proven).
+- **IDOR guard:** every user-addressable model is ULID-keyed (never auto-increment) and no registered
+  route exposes a bare numeric id segment — both asserted by a route-list/model walk. This is the exact
+  failure a market competitor made (≈1M records + ID scans via sequential-id IDOR, NOTES §B).
+- **Audit log is append-only** — the model throws on update/delete (proven); wired through
+  `RecordAuditLog` across consequential actions in every prompt.
+- `OVERNIGHT-PLACEHOLDER — CONFIRM:` breach runbook location = `docs/BREACH-RUNBOOK.md` (TBD — the
+  BreachLog links to it; the club must author the real 72-hour AEPD notification procedure).
+- `OVERNIGHT-DEFAULT — CONFIRM:` `composer audit` is reported by CI but NOT added to the blocking
+  `composer check` gate (an upstream advisory must not block unrelated commits); operational monitoring
+  (scheduler/queue heartbeats, health panel, dead-letter view) added — real backups + a tested restore
+  are an ops task for go-live (documented in SETUP.md).

@@ -16,7 +16,7 @@ class DataRequest extends Model
     use HasFactory, HasUlids;
 
     protected $fillable = [
-        'organisation_id', 'member_id', 'type', 'requested_at', 'completed_at', 'handled_by',
+        'organisation_id', 'member_id', 'type', 'requested_at', 'completed_at', 'handled_by', 'notes',
     ];
 
     protected function casts(): array
