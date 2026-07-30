@@ -59,7 +59,7 @@
                         class="mt-2 h-12 w-full rounded-xl border border-line bg-surface px-4 text-base text-ink placeholder:text-ink-muted/60 focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/40 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
                     >
 
-                    @if (mb_strlen(trim($search)) >= 2)
+                    @if ($searchResults !== null)
                         <ul class="mt-2 divide-y divide-line overflow-hidden rounded-xl border border-line dark:divide-slate-800 dark:border-slate-800">
                             @forelse ($searchResults as $result)
                                 <li>

@@ -69,9 +69,6 @@ class CheckInScreen extends Component
     /** @var list<string> */
     public array $blockedReasons = [];
 
-    /** Whether the override affordance (reason + authorise) is offered. */
-    public bool $overrideOpen = false;
-
     public string $overrideReason = '';
 
     public ?string $flashMessage = null;
@@ -130,7 +127,7 @@ class CheckInScreen extends Component
     {
         $this->reset([
             'memberId', 'scanned', 'blocked', 'blockedReasons',
-            'overrideOpen', 'overrideReason', 'search', 'flashMessage',
+            'overrideReason', 'search', 'flashMessage',
         ]);
     }
 
@@ -197,7 +194,6 @@ class CheckInScreen extends Component
         } catch (CheckInBlockedException $e) {
             $this->blocked = true;
             $this->blockedReasons = (new ResolveMemberEligibility)->handle($member, $location, 'door')->blockingMessages();
-            $this->overrideOpen = $this->userCan('checkin.override');
             $this->flash($e->getMessage(), 'error');
 
             return;
@@ -208,7 +204,6 @@ class CheckInScreen extends Component
         }
 
         $this->blocked = false;
-        $this->overrideOpen = false;
         $this->overrideReason = '';
         $this->flash(__(':name ha entrado.', ['name' => $member->fullName()]), 'success');
         $this->dispatch('checkins-updated');
@@ -329,18 +324,16 @@ class CheckInScreen extends Component
     /**
      * Org-wide socio search — deliberately crosses locations so the door can find a
      * member registered at another sede (Member is org-scoped, never location-scoped).
+     * Null until at least two characters are typed (nothing to look up yet).
      *
-     * @return Collection<int, Member>
+     * @return Collection<int, Member>|null
      */
-    private function searchResults(): Collection
+    private function searchResults(): ?Collection
     {
         $term = trim($this->search);
 
         if (mb_strlen($term) < 2) {
-            /** @var Collection<int, Member> $empty */
-            $empty = new Collection;
-
-            return $empty;
+            return null;
         }
 
         return Member::query()
@@ -372,7 +365,6 @@ class CheckInScreen extends Component
         $this->search = '';
         $this->blocked = false;
         $this->blockedReasons = [];
-        $this->overrideOpen = false;
         $this->overrideReason = '';
         $this->flashMessage = null;
     }
