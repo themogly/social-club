@@ -158,3 +158,35 @@ inference) and keeps level 6 fully strict. It is the house style for every model
 The schema supports a real go-live with no free-typed balances: opening stock enters as INTAKE
 `StockMovement` rows, opening wallet balances as ADJUSTMENT `WalletTransaction` rows (with a reason),
 and an opening till float on `TillSession`. The dev seeder uses these same paths.
+
+---
+
+## Prompt 02 — auth, roles, permissions, PINs, MFA
+
+- **RBAC via spatie/laravel-permission** (guard `web`), roles global for the single org (spatie
+  "teams" is the future multi-org switch, off now). Full permission catalogue + the role→permission
+  matrix live in `app/Support/Permissions.php`; seeded structurally by `RolePermissionSeeder` in
+  every environment. Roles: **OWNER** = all permissions; **MANAGER** = broad per-location operations
+  incl. `till.close`, `limits.override`, `dispensation.void`, `membership.fee.override`,
+  `settings.manage.location` — but NOT org-wide compliance/privacy (`reports.view.all`,
+  `member.limits.set`, `member.discount.assign`, `member.documents.view`, `expenses.overheads`,
+  `expenses.categories`, `settings.manage`, `locations.manage`, `staff.manage`, `audit.view`,
+  `minutes.manage`, `data.*`); **STAFF** = `pos.use`, `pos.bar`, `checkin.manage`, `members.view`,
+  `members.create`, `expenses.record`, `till.open` only.
+- **canAccessPanel = active AND has a role.** Refuses no-role and deactivated users with a 403 (a
+  distinct failure from bad credentials). Email verification is not required for panel access.
+- **MFA = Filament v5 native TOTP** (`AppAuthentication`, optional/`isRequired: false`), recoverable.
+  Secret + recovery codes stored encrypted on `users` (`mfa_secret`, `mfa_recovery_codes`).
+- **Counter PIN + operator identity:** hashed `users.pin`; `App\Actions\UnlockOperator` verifies a
+  PIN against a location's active staff (rate-limited 5/60s), and `App\Support\CounterOperator` holds
+  the unlocked operator in the session. Transactions record the unlocked operator, not the device
+  user. Counter UIs consume this in prompts 09/11/12.
+- **Location switcher:** `App\Support\LocationSwitcher` (logic, tested) + `App\Livewire\LocationSwitcher`
+  (topbar). OWNER gets "All locations" (null → LocationScope adds nothing); others only assigned
+  locations. Not Filament tenancy.
+- **Member-guard seam:** members authenticate on a SEPARATE guard built in prompt 15 (a `Member`
+  authenticatable, its own `member` guard + provider). `User` = staff/admin only. Nothing in this
+  RBAC touches members, so adding the member guard is additive — no changes to the `web` guard,
+  the panel, or these roles. The Filament panel and all policies are staff-only by construction.
+- **First Filament resource: `UserResource`** (staff admin) — establishes the v5 resource pattern
+  (form in `Schemas/`, table in `Tables/`, gated by `UserPolicy` on `staff.manage`).

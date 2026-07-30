@@ -2,6 +2,7 @@
 
 namespace Database\Seeders;
 
+use App\Enums\Role;
 use App\Models\User;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\Hash;
@@ -26,22 +27,24 @@ class DevAdminSeeder extends Seeder
         }
 
         $accounts = [
-            ['name' => 'Club Owner', 'email' => 'owner@club.test', 'pin' => '1234'],
-            ['name' => 'Club Manager', 'email' => 'manager@club.test', 'pin' => '2345'],
-            ['name' => 'Club Staff', 'email' => 'staff@club.test', 'pin' => '3456'],
+            ['name' => 'Club Owner', 'email' => 'owner@club.test', 'pin' => '1234', 'role' => Role::OWNER],
+            ['name' => 'Club Manager', 'email' => 'manager@club.test', 'pin' => '2345', 'role' => Role::MANAGER],
+            ['name' => 'Club Staff', 'email' => 'staff@club.test', 'pin' => '3456', 'role' => Role::STAFF],
         ];
 
         foreach ($accounts as $account) {
-            User::updateOrCreate(
+            $user = User::updateOrCreate(
                 ['email' => $account['email']],
                 [
                     'name' => $account['name'],
                     'password' => Hash::make('password'),
-                    'pin' => Hash::make($account['pin']),   // hashed; roles assigned in prompt 02
+                    'pin' => Hash::make($account['pin']),
                     'active' => true,
                     'email_verified_at' => now(),
                 ],
             );
+
+            $user->syncRoles([$account['role']->value]);   // locations attached by DemoDataSeeder
         }
 
         $this->command?->info('Seeded dev staff: owner@club.test / manager@club.test / staff@club.test (password: "password").');

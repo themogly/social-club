@@ -3,7 +3,10 @@
 namespace App\Models;
 
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
+use App\Enums\Role;
 use Database\Factories\UserFactory;
+use Filament\Auth\MultiFactor\App\Contracts\HasAppAuthentication;
+use Filament\Auth\MultiFactor\App\Contracts\HasAppAuthenticationRecovery;
 use Filament\Models\Contracts\FilamentUser;
 use Filament\Panel;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
@@ -14,13 +17,15 @@ use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use SensitiveParameter;
+use Spatie\Permission\Traits\HasRoles;
 
 #[Fillable(['name', 'email', 'password', 'pin', 'active'])]
-#[Hidden(['password', 'remember_token', 'pin', 'mfa_secret'])]
-class User extends Authenticatable implements FilamentUser
+#[Hidden(['password', 'remember_token', 'pin', 'mfa_secret', 'mfa_recovery_codes'])]
+class User extends Authenticatable implements FilamentUser, HasAppAuthentication, HasAppAuthenticationRecovery
 {
     /** @use HasFactory<UserFactory> */
-    use HasFactory, HasUlids, Notifiable, SoftDeletes;
+    use HasFactory, HasRoles, HasUlids, Notifiable, SoftDeletes;
 
     /** @var array<string, mixed> */
     protected $attributes = [
@@ -28,22 +33,56 @@ class User extends Authenticatable implements FilamentUser
     ];
 
     /**
-     * Gate access to the Filament admin panel.
-     *
-     * Users are staff/admin accounts (members authenticate on a separate guard,
-     * built in prompt 15 — they are not User records). Any staff account with a
-     * verified email may reach the panel; prompt 02 adds role/permission and an
-     * is-active refinement on top of this base gate.
+     * Gate access to the Filament admin panel: a staff account (has a role) that is
+     * active. Members authenticate on a separate guard (prompt 15) — they are not
+     * User records. A no-role or deactivated user is refused with a clear 403 (a
+     * distinct failure from wrong credentials, so a role problem is not mistaken for one).
      */
     public function canAccessPanel(Panel $panel): bool
     {
-        return $this->hasVerifiedEmail();
+        return $this->active && $this->hasAnyRole(array_column(Role::cases(), 'value'));
     }
 
     /** @return BelongsToMany<Location, $this> */
     public function locations(): BelongsToMany
     {
         return $this->belongsToMany(Location::class)->withTimestamps();
+    }
+
+    // --- Multi-factor (TOTP app authentication) --------------------------------
+
+    public function getAppAuthenticationSecret(): ?string
+    {
+        return $this->mfa_secret;
+    }
+
+    public function saveAppAuthenticationSecret(#[SensitiveParameter] ?string $secret): void
+    {
+        $this->mfa_secret = $secret;
+        $this->mfa_confirmed_at = $secret !== null ? now() : null;
+        $this->save();
+    }
+
+    public function getAppAuthenticationHolderName(): string
+    {
+        return $this->email;
+    }
+
+    /**
+     * @return ?array<string>
+     */
+    public function getAppAuthenticationRecoveryCodes(): ?array
+    {
+        return $this->mfa_recovery_codes;
+    }
+
+    /**
+     * @param  ?array<string>  $codes
+     */
+    public function saveAppAuthenticationRecoveryCodes(#[SensitiveParameter] ?array $codes): void
+    {
+        $this->mfa_recovery_codes = $codes;
+        $this->save();
     }
 
     /**
@@ -59,6 +98,7 @@ class User extends Authenticatable implements FilamentUser
             'pin' => 'hashed',
             'mfa_secret' => 'encrypted',
             'mfa_confirmed_at' => 'datetime',
+            'mfa_recovery_codes' => 'encrypted:array',
             'active' => 'boolean',
         ];
     }
