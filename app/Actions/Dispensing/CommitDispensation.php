@@ -3,6 +3,8 @@
 namespace App\Actions\Dispensing;
 
 use App\Actions\RecordAuditLog;
+use App\Actions\Stock\RecordStockMovement;
+use App\Actions\Stock\SelectBatch;
 use App\Actions\Wallet\RecordWalletTransaction;
 use App\Enums\DispensationStatus;
 use App\Enums\MembershipStatus;
@@ -15,12 +17,10 @@ use App\Models\Dispensation;
 use App\Models\GeneticPrice;
 use App\Models\Location;
 use App\Models\Member;
-use App\Models\StockMovement;
 use App\Models\User;
 use App\Support\LimitSnapshot;
 use App\Support\MemberEligibility;
 use App\Support\Settings;
-use App\Support\Weight;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -176,27 +176,19 @@ class CommitDispensation
         $lineData = [];
 
         foreach ($lines as $line) {
-            $batch = Batch::withoutGlobalScopes()->whereKey($line['batch_id'])->lockForUpdate()->firstOrFail();
+            $batch = Batch::withoutGlobalScopes()->whereKey($line['batch_id'])->firstOrFail();
             $grams = (int) $line['grams_cg'];
 
-            if ($batch->remaining_cg->centigrams < $grams) {
-                throw new RuntimeException("Insufficient stock in batch {$batch->batch_no}.");
+            if (! (new SelectBatch)->isDispensable($batch)) {
+                throw new RuntimeException("Batch {$batch->batch_no} is not dispensable (closed, expired or empty).");
             }
 
             $pricePerGram = $this->basePrice($line['genetic_id'], $location->id);
             $lineTotal = (int) round_half_up($pricePerGram * $grams / 100);
             $total += $lineTotal;
 
-            $batch->remaining_cg = Weight::fromCentigrams($batch->remaining_cg->centigrams - $grams);
-            $batch->save();
-
-            StockMovement::create([
-                'organisation_id' => $batch->organisation_id,
-                'location_id' => $location->id,
-                'stockable_type' => Batch::class,
-                'stockable_id' => $batch->id,
-                'qty_cg' => -$grams,
-                'type' => StockMovementType::DISPENSE,
+            // Single stock writer — locks the batch and refuses to oversell.
+            (new RecordStockMovement)->handle($batch, StockMovementType::DISPENSE, -$grams, [
                 'operator_id' => $options['operator_id'] ?? Auth::id(),
             ]);
 

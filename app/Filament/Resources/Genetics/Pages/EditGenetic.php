@@ -1,0 +1,55 @@
+<?php
+
+namespace App\Filament\Resources\Genetics\Pages;
+
+use App\Filament\Resources\Genetics\GeneticResource;
+use App\Models\Genetic;
+use Filament\Actions\DeleteAction;
+use Filament\Actions\ForceDeleteAction;
+use Filament\Actions\RestoreAction;
+use Filament\Resources\Pages\EditRecord;
+
+class EditGenetic extends EditRecord
+{
+    protected static string $resource = GeneticResource::class;
+
+    protected function getHeaderActions(): array
+    {
+        return [
+            DeleteAction::make(),
+            ForceDeleteAction::make(),
+            RestoreAction::make(),
+        ];
+    }
+
+    /**
+     * Seed the virtual percent fields from the stored basis points.
+     *
+     * @param  array<string, mixed>  $data
+     * @return array<string, mixed>
+     */
+    protected function mutateFormDataBeforeFill(array $data): array
+    {
+        /** @var Genetic $genetic */
+        $genetic = $this->getRecord();
+        $data['thc_pct'] = blank($genetic->thc_bp) ? null : $genetic->thc_bp / 100;
+        $data['cbd_pct'] = blank($genetic->cbd_bp) ? null : $genetic->cbd_bp / 100;
+
+        return $data;
+    }
+
+    /**
+     * Convert the edited percent back to integer basis points.
+     *
+     * @param  array<string, mixed>  $data
+     * @return array<string, mixed>
+     */
+    protected function mutateFormDataBeforeSave(array $data): array
+    {
+        $data['thc_bp'] = filled($data['thc_pct'] ?? null) ? (int) round(((float) $data['thc_pct']) * 100) : null;
+        $data['cbd_bp'] = filled($data['cbd_pct'] ?? null) ? (int) round(((float) $data['cbd_pct']) * 100) : null;
+        unset($data['thc_pct'], $data['cbd_pct']);
+
+        return $data;
+    }
+}
