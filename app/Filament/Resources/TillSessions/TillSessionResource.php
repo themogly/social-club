@@ -24,6 +24,8 @@ class TillSessionResource extends Resource
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedBanknotes;
 
+    protected static ?int $navigationSort = 10;
+
     public static function getNavigationLabel(): string
     {
         return __('Cajas');

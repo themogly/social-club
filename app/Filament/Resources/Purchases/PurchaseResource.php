@@ -27,6 +27,8 @@ class PurchaseResource extends Resource
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedShoppingCart;
 
+    protected static ?int $navigationSort = 40;
+
     public static function getNavigationLabel(): string
     {
         return __('Compras');
@@ -34,7 +36,7 @@ class PurchaseResource extends Resource
 
     public static function getNavigationGroup(): ?string
     {
-        return __('Compras');
+        return __('Caja');
     }
 
     public static function getModelLabel(): string

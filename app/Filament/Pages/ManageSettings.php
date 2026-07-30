@@ -29,6 +29,8 @@ class ManageSettings extends Page
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedCog6Tooth;
 
+    protected static ?int $navigationSort = 30;
+
     /** @var array<string, mixed> */
     public ?array $data = [];
 
@@ -67,7 +69,7 @@ class ManageSettings extends Page
 
     public static function getNavigationGroup(): ?string
     {
-        return __('Administración');
+        return __('Sistema');
     }
 
     public function getTitle(): string

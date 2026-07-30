@@ -26,6 +26,8 @@ class SupplierResource extends Resource
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedTruck;
 
+    protected static ?int $navigationSort = 50;
+
     public static function getNavigationLabel(): string
     {
         return __('Proveedores');
@@ -33,7 +35,7 @@ class SupplierResource extends Resource
 
     public static function getNavigationGroup(): ?string
     {
-        return __('Compras');
+        return __('Caja');
     }
 
     public static function getModelLabel(): string

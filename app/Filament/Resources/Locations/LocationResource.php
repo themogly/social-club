@@ -22,6 +22,8 @@ class LocationResource extends Resource
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedBuildingStorefront;
 
+    protected static ?int $navigationSort = 20;
+
     public static function getNavigationLabel(): string
     {
         return __('Sedes');
@@ -29,7 +31,7 @@ class LocationResource extends Resource
 
     public static function getNavigationGroup(): ?string
     {
-        return __('Administración');
+        return __('Sistema');
     }
 
     public static function getModelLabel(): string

@@ -22,6 +22,8 @@ class GeneticResource extends Resource
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedSparkles;
 
+    protected static ?int $navigationSort = 10;
+
     public static function getNavigationLabel(): string
     {
         return __('Genéticas');
@@ -29,7 +31,7 @@ class GeneticResource extends Resource
 
     public static function getNavigationGroup(): ?string
     {
-        return __('Catálogo');
+        return __('Dispensario');
     }
 
     public static function getModelLabel(): string

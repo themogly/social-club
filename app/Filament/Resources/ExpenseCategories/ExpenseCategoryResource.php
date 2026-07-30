@@ -20,6 +20,8 @@ class ExpenseCategoryResource extends Resource
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedTag;
 
+    protected static ?int $navigationSort = 30;
+
     public static function getNavigationLabel(): string
     {
         return __('Categorías de gasto');
@@ -27,7 +29,7 @@ class ExpenseCategoryResource extends Resource
 
     public static function getNavigationGroup(): ?string
     {
-        return __('Administración');
+        return __('Caja');
     }
 
     public static function getModelLabel(): string

@@ -10,18 +10,19 @@ use Filament\Http\Middleware\Authenticate;
 use Filament\Http\Middleware\AuthenticateSession;
 use Filament\Http\Middleware\DisableBladeIconComponents;
 use Filament\Http\Middleware\DispatchServingFilamentEvent;
-use Filament\Pages\Dashboard;
+use Filament\Navigation\NavigationGroup;
+use Filament\Navigation\NavigationItem;
 use Filament\Panel;
 use Filament\PanelProvider;
 use Filament\Support\Colors\Color;
+use Filament\Support\Icons\Heroicon;
 use Filament\View\PanelsRenderHook;
-use Filament\Widgets\AccountWidget;
-use Filament\Widgets\FilamentInfoWidget;
 use Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse;
 use Illuminate\Cookie\Middleware\EncryptCookies;
 use Illuminate\Foundation\Http\Middleware\PreventRequestForgery;
 use Illuminate\Routing\Middleware\SubstituteBindings;
 use Illuminate\Session\Middleware\StartSession;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Blade;
 use Illuminate\View\Middleware\ShareErrorsFromSession;
 
@@ -35,6 +36,13 @@ class AdminPanelProvider extends PanelProvider
             ->path('')
             ->brandName(config('app.name'))
             ->login()
+            // Staff/admins authenticate here and land on the club dashboard at "/".
+            // SEAM (prompt 15): members authenticate on a SEPARATE `member` guard and
+            // must be routed to the member PWA, NOT this panel. When that guard exists,
+            // the redirect for a member hitting "/" belongs here (a `->authGuard()` swap
+            // or a middleware that bounces `member`-guarded users to the PWA route). It is
+            // deliberately NOT faked now — `User` is staff-only by construction (see
+            // DECISIONS prompt 02), so nothing member-shaped can reach this panel yet.
             ->passwordReset()
             ->profile()
             // TOTP app authentication, available (not required) on any account, with
@@ -48,7 +56,8 @@ class AdminPanelProvider extends PanelProvider
                 'primary' => Color::hex('#2563eb'),
             ])
             // Custom location switcher in the topbar (we do not use Filament tenancy —
-            // the owner rollup + org-wide member search must cross locations).
+            // the owner rollup + org-wide member search must cross locations). The owner
+            // additionally gets an "All locations" rollup option (App\Support\LocationSwitcher).
             ->renderHook(
                 PanelsRenderHook::TOPBAR_START,
                 fn (): string => Blade::render('@livewire($component)', ['component' => LocationSwitcher::class]),
@@ -57,16 +66,57 @@ class AdminPanelProvider extends PanelProvider
                 PanelsRenderHook::TOPBAR_END,
                 fn (): string => Blade::render('@livewire($component)', ['component' => LocaleSwitcher::class]),
             )
+            // Grouped sidebar, in operational order. Every group is deliberate; a group
+            // renders only when the actor can see at least one item in it (so STAFF never
+            // sees Sistema, and Informes/Documentos/Audit are omitted until they exist —
+            // a shorter sidebar beats dead links).
+            // Groups carry NO icon: Filament v5 forbids a group and its items both having
+            // icons (the resources/counter items already carry theirs). Order is what we
+            // set here; every group is deliberate.
+            ->navigationGroups([
+                NavigationGroup::make(fn (): string => __('Resumen')),
+                NavigationGroup::make(fn (): string => __('Socios')),
+                NavigationGroup::make(fn (): string => __('Dispensario')),
+                NavigationGroup::make(fn (): string => __('Barra')),
+                NavigationGroup::make(fn (): string => __('Caja')),
+                NavigationGroup::make(fn (): string => __('Sistema')),
+            ])
+            // The counter apps run OUTSIDE the panel (tablet-first full-page Livewire),
+            // but each is a REAL, permission-gated route — so it earns a sidebar link into
+            // its operational group. Nothing here points at a route that does not exist.
+            ->navigationItems([
+                NavigationItem::make(fn (): string => __('Acceso / Check-in'))
+                    ->url(fn (): string => route('counter.checkin'))
+                    ->icon(Heroicon::OutlinedClipboardDocumentList)
+                    ->group(fn (): string => __('Socios'))
+                    ->sort(40)
+                    ->visible(fn (): bool => Auth::user()?->can('checkin.manage') ?? false),
+                NavigationItem::make(fn (): string => __('TPV dispensario'))
+                    ->url(fn (): string => route('counter.pos'))
+                    ->icon(Heroicon::OutlinedShoppingCart)
+                    ->group(fn (): string => __('Dispensario'))
+                    ->sort(1)
+                    ->visible(fn (): bool => Auth::user()?->can('pos.use') ?? false),
+                NavigationItem::make(fn (): string => __('TPV barra'))
+                    ->url(fn (): string => route('counter.bar'))
+                    ->icon(Heroicon::OutlinedShoppingBag)
+                    ->group(fn (): string => __('Barra'))
+                    ->sort(1)
+                    ->visible(fn (): bool => Auth::user()?->can('pos.bar') ?? false),
+                NavigationItem::make(fn (): string => __('Terminal de caja'))
+                    ->url(fn (): string => route('counter.till'))
+                    ->icon(Heroicon::OutlinedCalculator)
+                    ->group(fn (): string => __('Caja'))
+                    ->sort(1)
+                    ->visible(fn (): bool => (Auth::user()?->can('till.open') ?? false) || (Auth::user()?->can('till.close') ?? false)),
+            ])
             ->discoverResources(in: app_path('Filament/Resources'), for: 'App\Filament\Resources')
+            // App\Filament\Pages\Dashboard (our custom home) is discovered here and mounted
+            // at "/" — Filament's stock dashboard is intentionally NOT registered, and its
+            // account/version/docs furniture is gone: the club's data or nothing.
             ->discoverPages(in: app_path('Filament/Pages'), for: 'App\Filament\Pages')
-            ->pages([
-                Dashboard::class,
-            ])
             ->discoverWidgets(in: app_path('Filament/Widgets'), for: 'App\Filament\Widgets')
-            ->widgets([
-                AccountWidget::class,
-                FilamentInfoWidget::class,
-            ])
+            ->widgets([])
             ->middleware([
                 EncryptCookies::class,
                 AddQueuedCookiesToResponse::class,
