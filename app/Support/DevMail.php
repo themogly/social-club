@@ -4,6 +4,7 @@ namespace App\Support;
 
 use App\Mail\ExampleClubMail;
 use App\Mail\MemberCardMail;
+use App\Mail\MembershipReminderMail;
 use App\Models\Member;
 use Illuminate\Mail\Mailable;
 
@@ -29,6 +30,7 @@ class DevMail
                 new Member(['first_name' => 'María', 'last_name' => 'García', 'member_no' => 'M-00042']),
                 'preview-token-not-a-real-card',
             ),
+            'membership-reminder' => new MembershipReminderMail('María García', '2026-09-30'),
         ];
     }
 }

@@ -11,3 +11,6 @@ Artisan::command('inspire', function () {
 // RGPD retention purge — anonymises members past the retention period nightly.
 // (Requires the schedule:run cron in production — see SETUP.md.)
 Schedule::command('members:purge')->dailyAt('04:00');
+
+// Membership expiry sweep + renewal reminders (idempotent per member/period).
+Schedule::command('memberships:sweep')->dailyAt('05:00');

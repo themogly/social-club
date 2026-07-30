@@ -22,7 +22,7 @@ class Membership extends Model
 
     protected $fillable = [
         'organisation_id', 'member_id', 'location_id', 'tier_id',
-        'starts_at', 'expires_at', 'fee_cents', 'fee_override_by', 'status',
+        'starts_at', 'expires_at', 'fee_cents', 'fee_override_by', 'status', 'reminder_sent_for',
     ];
 
     protected function casts(): array
