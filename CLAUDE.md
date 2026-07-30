@@ -90,9 +90,18 @@ breach. Therefore, as build requirements:
 
 ## Language / i18n
 
-Ships **multilingual: Spanish default, English second.** `APP_LOCALE=es`, `APP_FALLBACK_LOCALE=es`.
-All user-facing strings go through `__()` / lang files from day one — never hardcode UI copy. Domain
-vocabulary above is Spanish even in the English locale where it is a term of art.
+Ships **multilingual. System default is now English** (`APP_LOCALE=en`, `APP_FALLBACK_LOCALE=en`);
+Spanish is fully translated and first-class (it is what club staff use daily). All user-facing strings
+go through `__()` / lang files — never hardcode UI copy. **Keys are the Spanish source string**;
+`lang/es.json` maps each to itself and `lang/en.json` to English, with enforced key parity
+(`tests/Feature/Localization`, in `composer check`; `php artisan lang:sync` regenerates es.json). A
+missing `en.json` key would leak Spanish, so completeness is gated. **Locale resolves through one
+place** — `App\Actions\ResolveLocale`: per-user `users.locale` → org `default_locale` Setting →
+system `en`; applied in `SetLocale`, switched via the topbar `LocaleSwitcher` (persists to the user
+row, effective next request, no re-login). **Every backed enum exposes a translated `label()`** — never
+render a raw enum value. Domain vocabulary (socio/aportación/dispensación…) stays Spanish where it is a
+term of art but IS translated in the English UI (Member/Contribution/Dispensing) — see the canonical
+glossary in `DECISIONS.md`; never let "translate" slip into commercial framing (customer/sale/profit).
 
 ## Design rules
 

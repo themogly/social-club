@@ -239,14 +239,7 @@ class DataRequestResource extends Resource
 
     public static function typeLabel(DataRequestType $type): string
     {
-        return match ($type) {
-            DataRequestType::ACCESS => __('Acceso'),
-            DataRequestType::RECTIFY => __('Rectificación'),
-            DataRequestType::ERASE => __('Supresión'),
-            DataRequestType::PORTABILITY => __('Portabilidad'),
-            DataRequestType::OBJECT => __('Oposición'),
-            DataRequestType::RESTRICT => __('Limitación'),
-        };
+        return $type->label();
     }
 
     /**

@@ -67,7 +67,7 @@ class GeneticForm
                         Select::make('cultivation_type')
                             ->label(__('Tipo de cultivo'))
                             ->options(collect(CultivationType::cases())
-                                ->mapWithKeys(fn (CultivationType $case): array => [$case->value => $case->value])
+                                ->mapWithKeys(fn (CultivationType $case): array => [$case->value => $case->label()])
                                 ->all()),
 
                         TagsInput::make('terpenes')

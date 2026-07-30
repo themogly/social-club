@@ -279,7 +279,10 @@ class BarPosScreenTest extends TestCase
             ['article_id' => $a->id, 'qty' => 1],
         ], ['operator_id' => $operator->id, 'member_id' => $member->id]);
 
-        $this->get(route('counter.bar.receipt', $order->id))
+        // Pin es so the sale-vs-contribution vocabulary distinction is asserted in one
+        // language (the app default is now en; the request renders es via the session locale).
+        app()->setLocale('es');
+        $this->withSession(['locale' => 'es'])->get(route('counter.bar.receipt', $order->id))
             ->assertOk()
             ->assertSee(__('Ticket de venta'))     // SALE vocabulary…
             ->assertSee('Tortilla')

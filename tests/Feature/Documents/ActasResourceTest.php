@@ -114,6 +114,8 @@ class ActasResourceTest extends TestCase
 
     public function test_the_acta_pdf_view_renders_with_signature_blocks(): void
     {
+        // The acta is an official Spanish legal record; verify its Spanish rendering.
+        app()->setLocale('es');
         $owner = $this->user(Role::OWNER);
         $minute = (new CreateMinuteAction)->handle($this->org, MinuteBook::ASSEMBLY, [
             'type' => 'asamblea_general',

@@ -20,7 +20,7 @@ use Illuminate\Notifications\Notifiable;
 use SensitiveParameter;
 use Spatie\Permission\Traits\HasRoles;
 
-#[Fillable(['name', 'email', 'password', 'pin', 'active'])]
+#[Fillable(['name', 'email', 'password', 'pin', 'active', 'locale'])]
 #[Hidden(['password', 'remember_token', 'pin', 'mfa_secret', 'mfa_recovery_codes'])]
 class User extends Authenticatable implements FilamentUser, HasAppAuthentication, HasAppAuthenticationRecovery
 {

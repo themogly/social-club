@@ -32,7 +32,7 @@ class MembershipTierForm
                 Select::make('default_period')
                     ->label(__('Periodo'))
                     ->options(collect(MembershipPeriod::cases())
-                        ->mapWithKeys(fn (MembershipPeriod $case): array => [$case->value => $case->value])
+                        ->mapWithKeys(fn (MembershipPeriod $case): array => [$case->value => $case->label()])
                         ->all())
                     ->required(),
 

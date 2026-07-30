@@ -2,7 +2,9 @@
 
 namespace App\Enums;
 
-enum WalletTransactionType: string
+use Filament\Support\Contracts\HasLabel;
+
+enum WalletTransactionType: string implements HasLabel
 {
     case TOPUP = 'TOPUP';
     case CONTRIBUTION = 'CONTRIBUTION';   // cannabis aportación (dispensary)
@@ -12,4 +14,23 @@ enum WalletTransactionType: string
     case ADJUSTMENT = 'ADJUSTMENT';
     case TRANSFER_IN = 'TRANSFER_IN';
     case TRANSFER_OUT = 'TRANSFER_OUT';
+
+    public function label(): string
+    {
+        return match ($this) {
+            self::TOPUP => __('Recarga'),
+            self::CONTRIBUTION => __('Aportación'),
+            self::PURCHASE => __('Compra'),
+            self::FEE => __('Cuota'),
+            self::REFUND => __('Reembolso'),
+            self::ADJUSTMENT => __('Ajuste'),
+            self::TRANSFER_IN => __('Transferencia entrante'),
+            self::TRANSFER_OUT => __('Transferencia saliente'),
+        };
+    }
+
+    public function getLabel(): string
+    {
+        return $this->label();
+    }
 }
