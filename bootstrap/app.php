@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Middleware\SecurityHeaders;
+use App\Http\Middleware\SetLocale;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
@@ -22,6 +23,10 @@ return Application::configure(basePath: dirname(__DIR__))
         // Baseline security + no-index headers on every response (all surfaces,
         // including the Filament panel which uses its own middleware stack).
         $middleware->append(SecurityHeaders::class);
+
+        // Apply the session locale on web routes (after StartSession). The panel
+        // adds it to its own stack in AdminPanelProvider.
+        $middleware->web(append: [SetLocale::class]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         // Report unhandled exceptions to Sentry (inert until SENTRY_LARAVEL_DSN is set).
