@@ -339,3 +339,29 @@ and an opening till float on `TillSession`. The dev seeder uses these same paths
   bp/cents). Bar-article discounts remain a separate simpler path (prompt 12).
 - Rounding: line subtotal = `round_half_up(rate × grams_cg / 100)`; percentage discount =
   `round_half_up(subtotal × value_bp / 10000)` — pinned (€7,49/g × 1.33 g − 17.5% → 996 / 174 / 822).
+
+---
+
+## Prompt 09 — check-in, attendance, aforo & door checks
+
+- **One eligibility resolver:** `App\Actions\Attendance\ResolveMemberEligibility` returns an
+  `EligibilityVerdict` (per-rule: membership, age, sanction, carencia, debt, unpaid_fee, +aforo at
+  the door), each rule carrying its enforcement mode from the matrix. The door (this prompt) and the
+  counter (prompt 11) both call it — no second copy.
+- **Door vs counter genuinely differ** (matrix defaults, editable): `door.carencia=WARN` (may enter,
+  flagged) but `counter.carencia=BLOCK` (may not be dispensed); `door.debt=WARN` (come in, sit down)
+  but `counter.debt=BLOCK` (no product). `door.aforo=BLOCK`. Override at the door needs
+  `checkin.override` (distinct from the counter's `limits.override`); always logged.
+- **Check-in:** `CheckInMember` runs the door verdict inside a transaction, prevents a double
+  concurrent check-in (locks open sessions → returns the existing one), records the PIN-identified
+  operator. `CheckOutMember` never lets check-out precede check-in. Occupancy is always live.
+- **Auto-checkout:** `checkins:auto-checkout` (nightly 06:00) closes open sessions with
+  `auto_checked_out=true`; idempotent. Entry–exit sheet (`EntryExitSheet`) + footfall-by-hour×weekday
+  (`Footfall`) for the dashboard/heatmap (prompt 14).
+- **Counter-app pattern:** the check-in screen is a Livewire full-page component on `/counter/checkin`
+  (web+auth, outside the Filament panel) with a reusable `layouts.counter` tablet layout — the shape
+  the dispensary/bar POS reuse (prompts 11/12).
+- `OVERNIGHT-DEFAULT — CONFIRM:` **Visual screenshots of the counter screens were NOT captured** — the
+  unattended run has no Playwright MCP connected. The UI is built to the tablet-first constraints and
+  reuses the shared layout/components; a human should run the Playwright screenshot pass
+  (1440/1280/1024/390, light+dark, motion reduced+allowed) before go-live, per the kit's UI rule.
