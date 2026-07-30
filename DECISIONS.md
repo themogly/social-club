@@ -408,3 +408,41 @@ and an opening till float on `TillSession`. The dev seeder uses these same paths
   instant is still the 06:00 LOCAL cutoff).
 - Compliance-critical (the cap is a legal defence). Merged to main under the overnight self-merge
   authorisation. Worth a human sanity-check that `APP_TIMEZONE=UTC` stays the deployment assumption.
+
+---
+
+## Prompt 11 — dispensary POS
+
+- **Thin shell over the domain Actions.** `App\Livewire\Counter\DispensaryPos` (route `/counter/pos`,
+  gated on `pos.use`) resolves a socio, builds a basket and calls `CommitDispensation` — THE
+  compliance boundary. It never touches stock/money/limits/pricing itself; prices resolve live
+  through `ResolvePrice`, batches through `SelectBatch` (FEFO, overridable), eligibility through the
+  SAME `ResolveMemberEligibility` the door uses (surface `counter`), the gauge through
+  `ResolveMemberLimits`. Every figure is live-queried on render (transactional data is never cached).
+- **No cannabis line without a socio.** The commit method returns before any write unless a member is
+  held and not hard-blocked; the button is disabled until then. Asserted directly in the screen tests.
+- **Weight vs calculator.** Weight is entered in grams (2 dp) on a numeric pad and stored as integer
+  centigrams. Calculator mode takes euros and back-solves grams from the per-gram rate, **floored to
+  0.01 g via integer division** (`intdiv(cents × 100, rate_cents)`), then re-prices the line from
+  those grams — grams stay authoritative and the typed euros are never stored as the total.
+- **Override.** A daily/monthly limit breach is surfaced by `CommitDispensation` (caught) and offered
+  as a `limits.override`, reasoned, audited override; OVERRIDE-mode eligibility rules are offered the
+  same way. BLOCK-mode failures hard-stop with no override. Default matrix is BLOCK for every counter
+  rule, so in practice the override path is the limit breach.
+- **Idempotency.** One `Str::ulid()` key per basket, passed to `CommitDispensation` (which no-ops a
+  repeat) and reset only after success/clear; the commit button disables on submit — a double-tap
+  cannot double-commit.
+- **Dispensary POS fails closed offline** — limits/stock/balances are live-query by mandate, so an
+  offline commit cannot be trusted; basket preserved, commit blocked until reconnected.
+- **Receipt = a CONTRIBUTION.** `resources/views/receipts/receipt.blade.php` (route
+  `counter.pos.receipt`, ULID-keyed, `DispensationReceiptController`) is worded as an *aportación /
+  contribución de costes compartidos* — never *venta / cliente / precio de venta*. Authorization runs
+  through `DispensationPolicy@view` (permission + same org + own-location or org-wide reports); the
+  ULID lookup lifts global scopes so a just-committed ticket resolves across a location switch, but the
+  policy is the real gate. `dispensation.void` from the screen calls `VoidDispensation` (manager+).
+- `OVERNIGHT-DEFAULT — CONFIRM:` two new POS settings, now added to `Settings::DEFAULTS` with a safe
+  default of **off**: `pos_require_checked_in` (restrict dispensing to socios currently checked in) and
+  `pos_signature_required` (capture an on-screen signature to the private `documents` disk and pass
+  `signature_path`). Confirm the real club policy for each.
+- `OVERNIGHT-DEFAULT — CONFIRM:` counter-screen visual screenshots not captured (no Playwright MCP) —
+  human screenshot pass (1440/1280/1024/390, light+dark, motion reduced+allowed) before go-live.

@@ -1,7 +1,9 @@
 <?php
 
+use App\Http\Controllers\DispensationReceiptController;
 use App\Http\Controllers\MemberDocumentController;
 use App\Livewire\Counter\CheckInScreen;
+use App\Livewire\Counter\DispensaryPos;
 use App\Livewire\Counter\TillSession;
 use Illuminate\Support\Facades\Route;
 
@@ -37,3 +39,16 @@ Route::middleware(['web', 'auth'])
 Route::middleware(['web', 'auth'])
     ->get('/counter/till', TillSession::class)
     ->name('counter.till');
+
+// The dispensary POS — the same tablet-first pattern. A THIN shell over the domain
+// Actions: CommitDispensation is the compliance boundary (membership/carencia/limits/
+// stock/pricing enforced atomically). Gated in the component on pos.use; contributions
+// attach to the open till session. The printable contribution ticket is served by a
+// ULID route and authorization-checked through DispensationPolicy (never a guessable id).
+Route::middleware(['web', 'auth'])
+    ->get('/counter/pos', DispensaryPos::class)
+    ->name('counter.pos');
+
+Route::middleware(['web', 'auth'])
+    ->get('/counter/pos/receipt/{dispensation}', [DispensationReceiptController::class, 'show'])
+    ->name('counter.pos.receipt');
