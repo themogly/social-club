@@ -72,3 +72,13 @@ one branch each, `composer check` green before every merge. Prompt 18 is deliber
   logging on every attempt; consent = versioned per-purpose rows (Article 9 special-category noted);
   CSV import idempotent + audited. Removed WithoutModelEvents from DatabaseSeeder so saving hooks run.
 - Needs Ben's confirmation: none new (retention/consent/erasure defaults already flagged in prompt 01/03).
+
+## Prompt 05 — Memberships, tiers, fees, carencia & the wallet
+- Status: merged
+- Defaults chosen: wallet = append-only ledger with derived balance (per-location); debt off by
+  default, capped, enforced in the writer (DebtLimitExceededException); ring-fencing carried forward
+  (auto-settle across unfenced sites, skip fenced via location.settings.ring_fenced); fee payments
+  first-class income; carencia gate + carencia.waive waiver; nightly memberships:sweep with idempotent
+  reminders (reminder_sent_for marker). See DECISIONS.md "Prompt 05".
+- Needs Ben's confirmation: none new (wallet per-location + ring-fencing already flagged OVERNIGHT-DEFAULT
+  in prompt 01; debt limit default 0/off is a safe default to confirm with the club).
