@@ -6,7 +6,12 @@ one branch each, `composer check` green before every merge. Prompt 18 is deliber
 
 ---
 
-# ✅ FINAL SUMMARY — run completed cleanly (+ follow-ups 19, 20, 21)
+# ✅ FINAL SUMMARY — run completed cleanly (+ follow-ups 19, 20, 21, 23)
+
+_Latest: prompt 23 (a shared, permission-gated back-to-dashboard header on the four counter screens,
+with confirm-before-leaving unsaved work) merged green — suite now **335 tests / 2203 assertions** on
+both drivers. Prompt 22 was not part of this sequence. The narrative below predates 23; per-prompt
+entries are appended in order._
 
 **The unattended run reached the end.** Bootstrap + **prompts 01–17 all completed, `composer check`
 green, and merged to `main`** (prompt 18 skipped as instructed), then three requested follow-ups —
