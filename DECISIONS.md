@@ -319,3 +319,23 @@ and an opening till float on `TillSession`. The dev seeder uses these same paths
   (NOTES §A). A compliance signal for the dashboard (prompt 14).
 - Stock is per-location; cross-location is refused by the LocationScope (a transfer is an explicit
   permissioned movement pair). Genetics org-wide; batches/stock/prices per-location.
+
+---
+
+## Prompt 08 — pricing, tiers & discounts
+
+- **One resolver:** `App\Actions\Pricing\ResolvePrice` → `App\Support\PriceResult`. Resolution order:
+  **tier price (per genetic/location) → best single applicable discount → per-member custom (if it
+  saves more)**. Discounts do **not** stack unless `discounts_stack` is on (then percentage discounts
+  combine, capped at 100%). Therapeutic members get the therapeutic discount automatically (no
+  assignment). The result carries a human reason ("Terapéutico −20%") for the counter/receipt.
+- **Frozen snapshot:** CommitDispensation resolves price+discount once and freezes
+  `price_per_gram_cents`/`discount_cents`/`line_total_cents` into the `dispensation_lines` row — a
+  later price change never rewrites history (tested).
+- **Per-member discounts:** `AssignMemberDiscount` (owner-only `member.discount.assign`, audited) —
+  a linked standard Discount or an inline custom value with optional expiry. `MemberDiscount.value_cents`
+  is a plain int; `Discount.value_cents` uses MoneyCast.
+- **UI:** `DiscountResource` (org-wide templates, gated `discounts.manage`, %/€ virtual fields ↔
+  bp/cents). Bar-article discounts remain a separate simpler path (prompt 12).
+- Rounding: line subtotal = `round_half_up(rate × grams_cg / 100)`; percentage discount =
+  `round_half_up(subtotal × value_bp / 10000)` — pinned (€7,49/g × 1.33 g − 17.5% → 996 / 174 / 822).
