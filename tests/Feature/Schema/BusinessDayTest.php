@@ -53,7 +53,14 @@ class BusinessDayTest extends TestCase
 
         [$start, $end] = BusinessDay::window($location, CarbonImmutable::parse('2026-03-15 09:00', 'Europe/Madrid'));
 
-        $this->assertSame('2026-03-15 06:00', $start->format('Y-m-d H:i'));
-        $this->assertSame('2026-03-16 06:00', $end->format('Y-m-d H:i'));
+        // Returned in the app (storage) timezone so a whereBetween compares
+        // like-for-like against app-tz-stored timestamps.
+        $appTz = config('app.timezone');
+        $this->assertSame($appTz, $start->timezoneName);
+        $this->assertSame($appTz, $end->timezoneName);
+
+        // …and that instant IS the 06:00 local cutoff, cutoff-to-cutoff.
+        $this->assertSame('2026-03-15 06:00', $start->setTimezone('Europe/Madrid')->format('Y-m-d H:i'));
+        $this->assertSame('2026-03-16 06:00', $end->setTimezone('Europe/Madrid')->format('Y-m-d H:i'));
     }
 }

@@ -20,6 +20,7 @@ use App\Models\MembershipTier;
 use App\Models\Organisation;
 use App\Models\User;
 use App\Support\ActiveScope;
+use Carbon\CarbonImmutable;
 use Database\Seeders\RolePermissionSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -140,6 +141,21 @@ class CommitDispensationTest extends TestCase
         ]);
 
         $this->assertDatabaseHas('audit_logs', ['action' => 'dispensation.limit.override']);
+    }
+
+    public function test_the_daily_cap_still_bites_just_after_the_cutoff_in_utc(): void
+    {
+        // Regression: the day window was built in the location tz (Madrid 06:00) but
+        // dispensed_at is stored in the app tz (UTC). In the ~2h after the cutoff's
+        // UTC instant (06:00 Madrid = 04:00 UTC) the day's own dispensations fell
+        // outside "today", so `used` read 0 and the cap silently stopped enforcing.
+        // Freeze the clock squarely in that danger window; the cap must still bite.
+        $this->travelTo(CarbonImmutable::parse('2026-07-30 04:30:00', 'UTC'));
+
+        $member = $this->member();
+        $this->commit($member, 340);            // 3.4 g used today
+        $this->expectException(LimitExceededException::class);
+        $this->commit($member, 20);             // 3.6 g — must still be blocked
     }
 
     public function test_a_member_within_carencia_is_blocked(): void

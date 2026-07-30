@@ -40,8 +40,12 @@ class BusinessDay
     }
 
     /**
-     * The [start, end) instants of the business day containing $at, as UTC-safe
-     * CarbonImmutable in the location timezone. Use for `whereBetween` queries.
+     * The [start, end) instants of the business day containing $at, returned in the
+     * app (storage) timezone so a `whereBetween` string-compares like-for-like
+     * against timestamps stored in that timezone. The boundary is an INSTANT — a
+     * Madrid 06:00 cutoff is the same moment as 04:00 UTC, so if we returned it as
+     * a location-tz Carbon the query would wrongly compare its "06:00" wall clock
+     * against UTC-stored "04:xx" values and drop the first two hours of the day.
      *
      * @return array{0: CarbonImmutable, 1: CarbonImmutable}
      */
@@ -53,7 +57,9 @@ class BusinessDay
         $start = $date->setTime($hour, $minute, 0);
         $end = $start->addDay();
 
-        return [$start, $end];
+        $storageTz = config('app.timezone') ?: 'UTC';
+
+        return [$start->setTimezone($storageTz), $end->setTimezone($storageTz)];
     }
 
     /**

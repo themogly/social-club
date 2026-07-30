@@ -388,3 +388,23 @@ and an opening till float on `TillSession`. The dev seeder uses these same paths
   feeds the dashboard + financial reports (prompt 14). Oversight via a read-only `TillSessionResource`.
 - `OVERNIGHT-DEFAULT — CONFIRM:` counter-screen visual screenshots not captured (no Playwright MCP) —
   human screenshot pass before go-live.
+
+---
+
+## Overnight bugfix — business-day window timezone (surfaced during the prompt-10 merge)
+
+- The full suite went red on `main` right after the prompt-10 merge — on a **pre-existing** bug, not
+  prompt 10. `BusinessDay::window()` built the day boundaries in the LOCATION timezone (Europe/Madrid)
+  while `dispensed_at` / `checked_in_at` are stored in the APP timezone (UTC). A `whereBetween`
+  string-compares wall-clock times WITHOUT converting, so for the ~2h after the cutoff's UTC instant
+  (06:00 Madrid = 04:00 UTC) the day's own rows fell outside "today": the **daily/monthly gram cap
+  silently stopped enforcing** and the entry–exit sheet came up empty. Masked until now because it
+  only manifests in that wall-clock window — the clock rolled into it overnight, which is exactly why
+  the time-sensitive tests caught it.
+- **Fix:** `BusinessDay::window()` and `ResolveMemberLimits::monthWindow()` now return their bounds in
+  the app (storage) timezone (instant-preserving `setTimezone`), so `whereBetween` compares
+  like-for-like. Pinned with a frozen-clock regression test (`04:30 UTC`) proving the cap still bites
+  in the danger window; `BusinessDayTest` updated to assert the storage-tz contract (and that the
+  instant is still the 06:00 LOCAL cutoff).
+- Compliance-critical (the cap is a legal defence). Merged to main under the overnight self-merge
+  authorisation. Worth a human sanity-check that `APP_TIMEZONE=UTC` stays the deployment assumption.
