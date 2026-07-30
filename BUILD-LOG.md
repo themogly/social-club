@@ -91,3 +91,12 @@ one branch each, `composer check` green before every merge. Prompt 18 is deliber
   commits); hard-block + permissioned audited limits.override; used computed live (voids release grams);
   aggregate 100g ceiling self-declared (UI states so). Base price now, ResolvePrice in prompt 08.
 - Needs Ben's confirmation: none new (limit defaults + enforcement matrix already flagged prompt 01/03).
+
+## Prompt 07 — Genetics, batches, weight-based stock, merma & the bar catalogue
+- Status: merged
+- Defaults chosen: single RecordStockMovement writer (row lock, signed delta, no-negative);
+  IntakeBatch grams→cg; FEFO batch selection (expired refused); stock-take variances → ADJUSTMENT
+  movements reconciling to count; merma its own permissioned type; premises stock ceiling =
+  active_members × daily_limit × stock_ceiling_days (returns the arithmetic). Genetics org-wide;
+  batches/stock per-location (cross-location refused by scope). CommitDispensation now uses the one writer.
+- Needs Ben's confirmation: none new.
