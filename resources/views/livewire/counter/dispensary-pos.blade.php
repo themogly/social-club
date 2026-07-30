@@ -557,3 +557,12 @@
         </div>
     @endif
 </div>
+
+{{-- Prompt 23: flag unsaved counter work so the header's Panel/Log out confirm before leaving. --}}
+@script
+<script>
+    const sync = () => { if (window.Alpine?.store('counter')) window.Alpine.store('counter').dirty = (($wire.basket?.length ?? 0) > 0); };
+    $wire.$watch('basket', sync);
+    sync();
+</script>
+@endscript

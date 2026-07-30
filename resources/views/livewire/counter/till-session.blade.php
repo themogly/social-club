@@ -362,3 +362,12 @@
         @endif
     @endif
 </div>
+
+{{-- Prompt 23: flag an in-progress blind count / cash entry as unsaved work. --}}
+@script
+<script>
+    const sync = () => { if (window.Alpine?.store('counter')) window.Alpine.store('counter').dirty = ((($wire.countInput ?? '') !== '') || (($wire.movementAmount ?? '') !== '') || (($wire.expenseAmount ?? '') !== '')); };
+    ['countInput', 'movementAmount', 'expenseAmount'].forEach((p) => $wire.$watch(p, sync));
+    sync();
+</script>
+@endscript

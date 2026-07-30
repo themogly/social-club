@@ -20,30 +20,23 @@
             @vite(['resources/css/app.css', 'resources/js/app.js'])
         @endif
 
+        {{-- Shared "unsaved counter work" flag; the POS/till screens set it, the header's
+             Panel/Log out controls confirm before leaving when it is true. --}}
+        <script>
+            document.addEventListener('alpine:init', () => {
+                if (! window.Alpine.store('counter')) {
+                    window.Alpine.store('counter', { dirty: false });
+                }
+            });
+        </script>
+
         @livewireStyles
     </head>
     <body class="min-h-full bg-surface-alt text-ink antialiased dark:bg-slate-950 dark:text-slate-100">
         <div class="mx-auto flex min-h-screen w-full max-w-6xl flex-col">
-            {{-- Slim brand bar — generic across every counter terminal. --}}
-            <header class="flex items-center justify-between border-b border-line px-4 py-3 dark:border-slate-800 sm:px-6">
-                <div class="flex items-center gap-3">
-                    <span class="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-brand text-base font-bold text-white">
-                        {{ mb_substr(config('app.name', 'C'), 0, 1) }}
-                    </span>
-                    <div class="leading-tight">
-                        <p class="text-sm font-semibold">{{ config('app.name') }}</p>
-                        <p class="text-xs text-ink-muted dark:text-slate-400">{{ $title ?? __('Contador') }}</p>
-                    </div>
-                </div>
-
-                <a
-                    href="{{ url('/') }}"
-                    wire:navigate.ignore
-                    class="rounded-lg px-4 py-2 text-sm font-medium text-ink-muted transition hover:bg-black/5 dark:text-slate-400 dark:hover:bg-white/5"
-                >
-                    {{ __('Salir') }}
-                </a>
-            </header>
+            {{-- One shared header for every counter terminal (brand + title + a
+                 permission-filtered Panel link + Log out). See x-counter.top-bar. --}}
+            <x-counter.top-bar :title="$title ?? null" />
 
             <main class="flex-1 px-4 py-5 sm:px-6">
                 {{ $slot }}
