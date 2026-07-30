@@ -57,7 +57,8 @@ class UserForm
                     ->label(__('Sedes asignadas'))
                     ->relationship('locations', 'name')
                     ->multiple()
-                    ->preload(),
+                    ->preload()
+                    ->helperText(__('Asigna una o varias sedes. El propietario ve todas las sedes de todos modos, así que aquí es opcional. Sin ninguna sede, un gestor o personal puede iniciar sesión pero no tendrá sede activa (sin acceso hasta que se le asigne una).')),
 
                 Toggle::make('active')
                     ->label(__('Activo'))

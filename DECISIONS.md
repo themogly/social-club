@@ -892,3 +892,38 @@ Per-resource checklist (fillable fields absent from the form → why; everything
   step (verified + tested), so no new control was needed there.
 - Kiosk feel preserved: one small, consistently-placed affordance sized for the existing tablet-1024 /
   one-handed-390 rules — not the Filament sidebar, not breadcrumbs.
+
+---
+
+## Prompt 24 — admin panel gaps: debt/credit settings & multi-location staff assignment
+
+**Settings-completeness audit** (repeatable gate: `DebtAndLocationSettingsTest::test_the_settings_page_covers_every_org_configurable_setting`). Compared every `Settings::DEFAULTS` key against the org form:
+- **Added (confirmed gaps — enforcement already read them, no form to set them):**
+  - `wallet_door_debt_threshold_cents` — the DOOR debt threshold (euros at the edge). Distinct field
+    from the hard limit; `ResolveMemberEligibility` reads it for the `door` surface, `RecordWalletTransaction`
+    reads `wallet_debt_limit_cents` for the counter. **Never merged — two fields, two enforcement points**
+    (tested: door reacts at the threshold, counter blocks at the limit, changing one doesn't move the other).
+  - `wallet_ring_fence` (toggle) — per-location wallet ring-fencing.
+  - `limit_override_requires_manager` (toggle) — found in the same pass; `CommitDispensation` reads it.
+  - `avalador_therapeutic_exempt` (toggle) — found in the same pass; the avalador logic reads it.
+- **Deliberately excluded (documented):** the `enforcement` matrix (its own door/counter editor); per-location
+  settings (`aforo_default`, `aforo_enforcement`); locale settings (own switcher); system/compliance constants
+  (`data_retention_days`, `audit_retention_days`, `signed_url_ttl_seconds`, `consent_text_version`, retention/
+  heartbeat); `blind_count_enforced`, `minute_quorum_fraction_bp`; `pos_*`. `forecast_options_g` is a preset
+  ARRAY (a tags/repeater input is a later enhancement); `low_stock_threshold_cg` is a fallback — the operative
+  low-stock threshold is set per-article on the Article resource.
+- **Debt is what enforcement reads (tested e2e):** toggling debt-allowed + a limit through the form is exactly
+  what `RecordWalletTransaction` enforces at the counter — the configured value, never a hardcode.
+
+**Multi-location staff assignment** — the Users form ALREADY had a `->multiple()` `locations` relationship
+select backed by `location_user`; it was not a missing field but an under-documented one. Decisions recorded:
+- `OVERNIGHT-DEFAULT — CONFIRM:` **OWNER picker = allowed-but-irrelevant.** An owner sees ALL org locations via
+  `LocationSwitcher` (and the "All locations" rollup) regardless of the picker, consistent with how OWNER scope
+  is special-cased elsewhere — so the picker is left enabled but optional for owners.
+- `OVERNIGHT-DEFAULT — CONFIRM:` **A MANAGER/STAFF saved with ZERO locations is a deliberate "no access yet"
+  state** (not blocked at save): they can log in but `LocationSwitcher::available()` is empty and `canAccess()`
+  is false for every sede until one is assigned. Helper text on the field says so. Tested explicitly.
+- **Timing = immediate (next request), no re-login:** `LocationSwitcher` reads `user->locations()` live each
+  request, so a re-synced assignment takes effect on the next request; a currently-active location that is
+  revoked fails the next `canAccess` scope check. The prompt-02 single-location denial test still passes, plus a
+  new multi-location positive case (A and B reachable, C not).

@@ -50,6 +50,9 @@ class ManageSettings extends Page
         'avalador_max_sponsees' => SettingType::INT,
         'wallet_debt_allowed' => SettingType::BOOL,
         'fees_to_wallet_allowed' => SettingType::BOOL,
+        'wallet_ring_fence' => SettingType::BOOL,
+        'limit_override_requires_manager' => SettingType::BOOL,
+        'avalador_therapeutic_exempt' => SettingType::BOOL,
         'expiring_soon_days' => SettingType::INT,
         'renewal_reminder_lead_days' => SettingType::INT,
         'batch_expiry_window_days' => SettingType::INT,
@@ -118,6 +121,8 @@ class ManageSettings extends Page
                             ->helperText(__('Aviso en el panel al acercarse a este número.')),
                         TextInput::make('stock_ceiling_days')->label(__('Días para techo de stock'))->numeric()->required()
                             ->helperText(__('socios × límite diario × estos días = stock máximo recomendado en sede.')),
+                        Toggle::make('limit_override_requires_manager')->label(__('El override de límite requiere gerente'))
+                            ->helperText(__('Si se activa, solo un gerente puede forzar una dispensación que supere el límite.')),
                     ])->columns(3),
 
                 Section::make(__('Indicador de consumo'))
@@ -135,13 +140,22 @@ class ManageSettings extends Page
                                 'not_required' => __('No requerido'),
                             ])->required(),
                         TextInput::make('avalador_max_sponsees')->label(__('Máx. avalados por socio'))->numeric()->required(),
+                        Toggle::make('avalador_therapeutic_exempt')->label(__('Socios terapéuticos exentos de aval'))
+                            ->helperText(__('Los socios terapéuticos pueden sustituir el aval por un certificado médico.')),
                     ])->columns(2),
 
                 Section::make(__('Cartera y deuda'))
                     ->schema([
-                        Toggle::make('wallet_debt_allowed')->label(__('Permitir deuda')),
-                        TextInput::make('wallet_debt_limit_eur')->label(__('Límite de deuda (€)'))->numeric()->minValue(0)->required(),
-                        Toggle::make('fees_to_wallet_allowed')->label(__('Cobrar cuotas a la cartera')),
+                        Toggle::make('wallet_debt_allowed')->label(__('Permitir deuda'))
+                            ->helperText(__('Si se desactiva, ninguna aportación puede dejar el monedero en negativo.')),
+                        TextInput::make('wallet_debt_limit_eur')->label(__('Límite de deuda (€)'))->numeric()->minValue(0)->required()
+                            ->helperText(__('Tope duro: el mostrador BLOQUEA una aportación que dejaría la deuda por encima de esta cifra.')),
+                        TextInput::make('wallet_door_debt_threshold_eur')->label(__('Umbral de deuda en la puerta (€)'))->numeric()->minValue(0)->required()
+                            ->helperText(__('Cifra DISTINTA del tope duro: la puerta reacciona (avisa/bloquea según la matriz) al llegar a esta deuda en el check-in.')),
+                        Toggle::make('fees_to_wallet_allowed')->label(__('Cobrar cuotas a la cartera'))
+                            ->helperText(__('Permite pagar la cuota de socio con saldo del monedero.')),
+                        Toggle::make('wallet_ring_fence')->label(__('Monedero por sede'))
+                            ->helperText(__('El saldo del monedero es específico de cada sede y no se comparte entre sedes.')),
                     ])->columns(3),
 
                 Section::make(__('Membresía'))
@@ -190,6 +204,8 @@ class ManageSettings extends Page
 
         // Euros shown at the edge, stored as integer cents.
         Settings::set('wallet_debt_limit_cents', (int) round_half_up(((float) ($state['wallet_debt_limit_eur'] ?? 0)) * 100), SettingType::CENTS);
+        // The door threshold is a SEPARATE figure from the hard limit — never derived from it.
+        Settings::set('wallet_door_debt_threshold_cents', (int) round_half_up(((float) ($state['wallet_door_debt_threshold_eur'] ?? 0)) * 100), SettingType::CENTS);
         Settings::set('arqueo_variance_tolerance_cents', (int) round_half_up(((float) ($state['arqueo_variance_tolerance_eur'] ?? 0)) * 100), SettingType::CENTS);
         Settings::set('expense_approval_threshold_cents', (int) round_half_up(((float) ($state['expense_approval_threshold_eur'] ?? 0)) * 100), SettingType::CENTS);
 
@@ -210,6 +226,7 @@ class ManageSettings extends Page
         $values['daily_limit_g'] = ((int) Settings::get('daily_limit_cg')) / 100;
         $values['monthly_limit_g'] = ((int) Settings::get('monthly_limit_cg')) / 100;
         $values['wallet_debt_limit_eur'] = ((int) Settings::get('wallet_debt_limit_cents')) / 100;
+        $values['wallet_door_debt_threshold_eur'] = ((int) Settings::get('wallet_door_debt_threshold_cents')) / 100;
         $values['arqueo_variance_tolerance_eur'] = ((int) Settings::get('arqueo_variance_tolerance_cents')) / 100;
         $values['expense_approval_threshold_eur'] = ((int) Settings::get('expense_approval_threshold_cents')) / 100;
 
