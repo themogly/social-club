@@ -20,3 +20,8 @@ Schedule::command('checkins:auto-checkout')->dailyAt('06:00');
 
 // Materialise due recurring overheads (rent, utilities). Idempotent per template/period.
 Schedule::command('expenses:materialise-recurring')->dailyAt('05:30');
+
+// Operational liveness — the scheduler stamps a heartbeat the health panel reads to
+// prove the cron is alive. The failure mode of a broken scheduler is silence; this
+// makes that silence visible (a stale heartbeat) instead of unnoticed.
+Schedule::command('system:heartbeat')->everyFiveMinutes();
