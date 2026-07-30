@@ -10,6 +10,8 @@ use App\Filament\Resources\Members\Pages\CreateMember;
 use App\Filament\Resources\Members\Pages\EditMember;
 use App\Filament\Resources\Members\Pages\ListMembers;
 use App\Filament\Resources\Members\Pages\ViewMember;
+use App\Filament\Resources\Members\RelationManagers\MembershipsRelationManager;
+use App\Filament\Resources\Members\RelationManagers\WalletTransactionsRelationManager;
 use App\Filament\Resources\Members\Schemas\MemberForm;
 use App\Filament\Resources\Members\Schemas\MemberInfolist;
 use App\Filament\Resources\Members\Tables\MembersTable;
@@ -186,7 +188,8 @@ class MemberResource extends Resource
     public static function getRelations(): array
     {
         return [
-            //
+            MembershipsRelationManager::class,
+            WalletTransactionsRelationManager::class,
         ];
     }
 

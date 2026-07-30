@@ -271,3 +271,28 @@ and an opening till float on `TillSession`. The dev seeder uses these same paths
 - **Renewals/expiry:** `RenewMembership` extends from the later of today/current expiry.
   `memberships:sweep` (nightly 05:00) flips LAPSED/EXPIRING_SOON and sends renewal reminders,
   idempotent per member/period via the `reminder_sent_for` marker.
+
+---
+
+## Prompt 06 — consumption model, limits & enforcement
+
+- **One resolver:** `App\Actions\Dispensing\ResolveMemberLimits` returns a `LimitSnapshot`
+  (daily/monthly limit + used + remaining). Precedence: per-member override → active-membership tier
+  (`membership_tiers.daily/monthly_limit_cg`, added this prompt) → location → org (Settings). "Today"/
+  "this month" from `BusinessDay`. Used is LIVE from the ledger (COMPLETED only → voids release grams).
+  POS/check-in/PWA/dashboard all read this — no duplicated limit arithmetic.
+- **Monthly window:** calendar month by default; `monthly_window=rolling30` optional (both tested).
+- **Enforcement:** `App\Actions\Dispensing\CommitDispensation` checks membership + carencia + daily +
+  monthly INSIDE one DB transaction with the member row `lockForUpdate` (so concurrent tills can't
+  jointly breach — exactly one commits). Per-rule mode from the counter enforcement matrix
+  (BLOCK/WARN/OVERRIDE). Limit breach hard-blocks; a `limits.override` holder may force it with a
+  reason → audited (`dispensation.limit.override`), a first-class report figure (prompt 14).
+- **Prices:** CommitDispensation uses the base per-gram GeneticPrice for now; prompt 08 layers
+  tier/discount `ResolvePrice` on top.
+- **Aggregate-ceiling honesty:** the 100 g/month ceiling is an aggregate across ALL associations a
+  member belongs to, which no single club can verify. We record the member's self-declaration
+  (consent-style), enforce THIS club's ceiling, and the UI states the aggregate is self-declared —
+  we do not pretend to verify what cannot be verified.
+- **Concurrency-test note:** the joint-breach test is sequential (proves the live-ledger check);
+  true parallel-transaction testing needs integration tooling, but the `lockForUpdate` serialises in
+  production.
