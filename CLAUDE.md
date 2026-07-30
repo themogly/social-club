@@ -145,8 +145,15 @@ vocabulary above is Spanish even in the English locale where it is a term of art
   per-member custom; no stacking by default) returning `app/Support/PriceResult.php`; POS/PWA/reports/
   receipts all call it, and it is frozen into the dispensation line snapshot at commit.
 - Livewire counter component (tablet-first, own auth route + `layouts/counter`, gated in `mount()`,
-  all figures queried live): `app/Livewire/Counter/CheckInScreen.php` (door) and
-  `app/Livewire/Counter/TillSession.php` (till open + cash movements + BLIND close).
+  all figures queried live): `app/Livewire/Counter/CheckInScreen.php` (door),
+  `app/Livewire/Counter/TillSession.php` (till open + cash movements + BLIND close), and
+  `app/Livewire/Counter/DispensaryPos.php` (member-first weight POS — a THIN shell that only resolves
+  + calls the Actions; idempotency key per basket, fail-closed offline, no member ⇒ no commit).
+- Void / correct (never a silent edit): `app/Actions/Dispensing/VoidDispensation.php` — returns stock
+  to the originating batch and reverses the wallet; grams/cash release automatically (COMPLETED-only
+  arithmetic). A correction is a void + a fresh dispensation linked via `reversal_of_id`.
+- Contribution receipt (worded aportación, never venta): `resources/views/receipts/receipt.blade.php`
+  + `app/Http/Controllers/DispensationReceiptController.php` (ULID route, authorization-checked).
 - Till / cash / arqueo: expected drawer cash is **derived from the ledger, never stored**
   (`app/Support/TillSummary.php`, cash-only — wallet excluded); one open session per terminal
   (`app/Actions/Till/OpenTill.php`), signed cash movements (`RecordCashMovement.php`), blind cierre

@@ -1,0 +1,511 @@
+{{-- Dispensary POS — tablet-first, dark-mode first-class. Three panels: the socio
+     (left), the genetics grid (centre) and the basket + contribution (right). Every
+     figure is live (limits, stock, prices, balances). A THIN shell: CommitDispensation
+     is the compliance boundary — this screen only assembles the call. Fail-closed
+     offline: the commit is disabled and the basket preserved until reconnection. --}}
+<div
+    x-data="{
+        online: true,
+        init() {
+            this.online = navigator.onLine;
+            window.addEventListener('online', () => { this.online = true; $wire.set('offline', false); });
+            window.addEventListener('offline', () => { this.online = false; $wire.set('offline', true); });
+            if (! this.online) { $wire.set('offline', true); }
+            this.$watch(() => JSON.stringify($wire.basket), value => { try { localStorage.setItem('pos.basket', value); } catch (e) {} });
+        },
+    }"
+>
+    @if ($noLocation)
+        {{-- Intentional empty state: an operator with no assigned sede. Still a 200. --}}
+        <div class="rounded-2xl border border-line bg-surface p-8 text-center dark:border-slate-800 dark:bg-slate-900">
+            <div class="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-surface-alt text-2xl dark:bg-slate-800">📍</div>
+            <h2 class="mt-4 text-lg font-semibold">{{ __('Sin sede asignada') }}</h2>
+            <p class="mt-1 text-sm text-ink-muted dark:text-slate-400">
+                {{ __('No tienes ninguna sede activa. Pide a un responsable que te asigne una para dispensar.') }}
+            </p>
+        </div>
+    @else
+        {{-- Offline banner — unmistakable, fail closed. --}}
+        <div x-show="! online" x-cloak class="mb-4 flex items-center gap-3 rounded-xl border border-error/40 bg-error/10 px-4 py-3 text-sm font-semibold text-error">
+            <span class="text-lg">⚠️</span>
+            <span>{{ __('Sin conexión. No se puede registrar ninguna dispensación; la cesta se conserva y se reactivará al reconectar.') }}</span>
+        </div>
+
+        {{-- Flash --}}
+        @if ($flashMessage)
+            <div
+                wire:key="flash"
+                @class([
+                    'mb-4 flex items-center justify-between gap-3 rounded-xl border px-4 py-3 text-sm font-medium',
+                    'border-success/30 bg-success/10 text-success' => $flashType === 'success',
+                    'border-warning/30 bg-warning/10 text-warning' => $flashType === 'warning',
+                    'border-error/30 bg-error/10 text-error' => $flashType === 'error',
+                ])
+            >
+                <span>{{ $flashMessage }}</span>
+                <button type="button" wire:click="$set('flashMessage', null)" class="shrink-0 rounded-md px-2 py-1 opacity-70 hover:opacity-100">✕</button>
+            </div>
+        @endif
+
+        <div class="grid gap-4 lg:grid-cols-2 xl:grid-cols-[19rem_minmax(0,1fr)_21rem] xl:items-start">
+
+            {{-- ================= LEFT: the socio ================= --}}
+            <div class="flex flex-col gap-4">
+                {{-- Identify --}}
+                <section class="rounded-2xl border border-line bg-surface p-4 dark:border-slate-800 dark:bg-slate-900">
+                    <form wire:submit="submitScan">
+                        <label for="scan" class="block text-sm font-medium text-ink-muted dark:text-slate-400">{{ __('Escanear tarjeta de socio') }}</label>
+                        <input
+                            id="scan"
+                            type="text"
+                            wire:model="scan"
+                            autofocus
+                            autocomplete="off"
+                            spellcheck="false"
+                            placeholder="{{ __('Escanea o escribe el código y pulsa Enter') }}"
+                            class="mt-2 h-12 w-full rounded-xl border border-line bg-surface px-4 text-base text-ink placeholder:text-ink-muted/60 focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/40 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
+                        >
+                    </form>
+
+                    <div class="mt-3">
+                        <label for="member-search" class="block text-sm font-medium text-ink-muted dark:text-slate-400">{{ __('o busca por nombre / nº de socio') }}</label>
+                        <input
+                            id="member-search"
+                            type="text"
+                            wire:model.live.debounce.300ms="search"
+                            autocomplete="off"
+                            placeholder="{{ __('Ej. García o M-00042') }}"
+                            class="mt-2 h-11 w-full rounded-xl border border-line bg-surface px-4 text-base text-ink placeholder:text-ink-muted/60 focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/40 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
+                        >
+
+                        @if ($searchResults !== null)
+                            <ul class="mt-2 divide-y divide-line overflow-hidden rounded-xl border border-line dark:divide-slate-800 dark:border-slate-800">
+                                @forelse ($searchResults as $result)
+                                    <li>
+                                        <button type="button" wire:click="selectMember('{{ $result->id }}')" class="flex w-full items-center justify-between gap-3 bg-surface px-4 py-3 text-left transition hover:bg-surface-alt dark:bg-slate-900 dark:hover:bg-slate-800">
+                                            <span class="font-medium">{{ $result->fullName() }}</span>
+                                            <span class="text-sm text-ink-muted dark:text-slate-400">{{ $result->member_no }}</span>
+                                        </button>
+                                    </li>
+                                @empty
+                                    <li class="bg-surface px-4 py-3 text-sm text-ink-muted dark:bg-slate-900 dark:text-slate-400">{{ __('Sin resultados.') }}</li>
+                                @endforelse
+                            </ul>
+                        @endif
+
+                        @if ($requireCheckedIn)
+                            <p class="mt-2 text-xs text-ink-muted dark:text-slate-500">{{ __('Esta sede solo permite dispensar a socios que han registrado su entrada.') }}</p>
+                        @endif
+                    </div>
+                </section>
+
+                {{-- Member card OR prompt --}}
+                @if ($member)
+                    @php
+                        $inCarencia = $member->carencia_ends_at !== null && $member->carencia_ends_at->isFuture();
+                        $statusColour = match ($member->status) {
+                            \App\Enums\MemberStatus::ACTIVE => 'border-success/30 bg-success/10 text-success',
+                            \App\Enums\MemberStatus::APPLICANT => 'border-warning/30 bg-warning/10 text-warning',
+                            \App\Enums\MemberStatus::SUSPENDED, \App\Enums\MemberStatus::EXPELLED => 'border-error/30 bg-error/10 text-error',
+                            default => 'border-line bg-surface-alt text-ink-muted dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300',
+                        };
+                    @endphp
+
+                    <section class="rounded-2xl border border-line bg-surface p-4 dark:border-slate-800 dark:bg-slate-900">
+                        <div class="flex items-start gap-3">
+                            @if ($photoUrl)
+                                <img src="{{ $photoUrl }}" alt="" class="h-20 w-20 shrink-0 rounded-2xl object-cover">
+                            @else
+                                <div class="flex h-20 w-20 shrink-0 items-center justify-center rounded-2xl bg-brand-tint text-2xl font-bold text-brand dark:bg-slate-800 dark:text-slate-200">
+                                    {{ mb_strtoupper(mb_substr($member->first_name, 0, 1).mb_substr($member->last_name, 0, 1)) }}
+                                </div>
+                            @endif
+
+                            <div class="min-w-0 flex-1">
+                                <div class="flex flex-wrap items-center gap-2">
+                                    <h2 class="truncate text-lg font-bold">{{ $member->fullName() }}</h2>
+                                    <span class="rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide {{ $statusColour }}">{{ __($member->status->value) }}</span>
+                                </div>
+                                <p class="mt-0.5 text-sm text-ink-muted dark:text-slate-400">{{ $member->member_no }}</p>
+                                <p class="mt-1 text-sm">
+                                    <span class="text-ink-muted dark:text-slate-400">{{ __('Cuota / tier') }}:</span>
+                                    <span class="font-medium">{{ $membership?->tier?->name ?? '—' }}</span>
+                                </p>
+                            </div>
+
+                            <button type="button" wire:click="clearMember" class="shrink-0 rounded-lg px-2 py-1.5 text-sm text-ink-muted transition hover:bg-black/5 dark:text-slate-400 dark:hover:bg-white/5">{{ __('Cerrar') }}</button>
+                        </div>
+
+                        {{-- Wallet + carencia --}}
+                        <dl class="mt-3 grid grid-cols-2 gap-x-4 gap-y-1.5 text-sm">
+                            <div>
+                                <dt class="text-ink-muted dark:text-slate-400">{{ __('Monedero') }}</dt>
+                                <dd class="font-semibold {{ $walletCents < 0 ? 'text-error' : '' }}">{{ $this->money($walletCents) }}</dd>
+                            </div>
+                            <div>
+                                <dt class="text-ink-muted dark:text-slate-400">{{ __('Carencia') }}</dt>
+                                <dd class="font-medium">
+                                    @if ($inCarencia)
+                                        <span class="text-warning">{{ __('Hasta') }} {{ $member->carencia_ends_at->format('d/m/Y') }}</span>
+                                    @else
+                                        {{ __('Cumplida') }}
+                                    @endif
+                                </dd>
+                            </div>
+                        </dl>
+
+                        {{-- Consumption gauge (MTD grams / monthly limit) — colour + numbers, never colour alone. --}}
+                        @if ($limits)
+                            @php
+                                $pct = $limits->monthlyPercent();
+                                $gaugeState = $limits->gaugeState();
+                                $gaugeBar = match ($gaugeState) { 'alert' => 'bg-error', 'warning' => 'bg-warning', default => 'bg-success' };
+                                $gaugeText = match ($gaugeState) { 'alert' => 'text-error', 'warning' => 'text-warning', default => 'text-success' };
+                            @endphp
+                            <div class="mt-4">
+                                <div class="flex items-baseline justify-between text-sm">
+                                    <span class="font-medium">{{ __('Consumo del mes') }}</span>
+                                    <span class="font-semibold {{ $gaugeText }}">{{ $this->grams($limits->monthlyUsedCg) }} / {{ $this->grams($limits->monthlyLimitCg) }} · {{ $pct }}%</span>
+                                </div>
+                                <div class="mt-1.5 h-3 w-full overflow-hidden rounded-full bg-slate-200 dark:bg-slate-700">
+                                    <div class="h-full rounded-full {{ $gaugeBar }}" style="width: {{ min($pct, 100) }}%"></div>
+                                </div>
+                                <p class="mt-1 text-xs text-ink-muted dark:text-slate-400">
+                                    {{ __('Hoy') }}: {{ $this->grams($limits->dailyUsedCg) }} / {{ $this->grams($limits->dailyLimitCg) }}
+                                    · {{ __('Restante hoy') }}: <span class="font-medium">{{ $this->grams($limits->dailyRemainingCg()) }}</span>
+                                </p>
+                            </div>
+                        @endif
+
+                        {{-- Active sanction --}}
+                        @if ($sanction)
+                            <div class="mt-3 rounded-xl border border-error/30 bg-error/10 px-3 py-2 text-sm text-error">
+                                <p class="font-semibold">{{ __('Sanción activa') }} · {{ __($sanction->type->value) }}</p>
+                                @if ($sanction->reason)<p class="mt-0.5">{{ $sanction->reason }}</p>@endif
+                            </div>
+                        @endif
+
+                        {{-- Counter verdict (same shared resolver as the door). --}}
+                        @if ($verdict)
+                            <div class="mt-4 border-t border-line pt-3 dark:border-slate-800">
+                                @if ($verdict->isClear())
+                                    <div class="flex items-center gap-2 rounded-xl border border-success/30 bg-success/10 px-3 py-2 text-sm font-semibold text-success">
+                                        <span>✓</span><span>{{ __('Apto para dispensar.') }}</span>
+                                    </div>
+                                @else
+                                    <div class="space-y-2">
+                                        @foreach ($verdict->rules as $rule)
+                                            @continue($rule['satisfied'])
+                                            @php $isBlock = in_array($rule['mode'], ['BLOCK', 'OVERRIDE'], true); @endphp
+                                            <div @class([
+                                                'flex items-center justify-between gap-3 rounded-xl border px-3 py-2 text-sm',
+                                                'border-error/30 bg-error/10 text-error' => $isBlock,
+                                                'border-warning/30 bg-warning/10 text-warning' => ! $isBlock,
+                                            ])>
+                                                <span>{{ $rule['message'] }}</span>
+                                                <span class="shrink-0 rounded-full border border-current px-2 py-0.5 text-[10px] font-semibold uppercase">{{ $isBlock ? __('Bloquea') : __('Aviso') }}</span>
+                                            </div>
+                                        @endforeach
+                                        @if (! empty($hardBlockRules))
+                                            <p class="text-sm font-medium text-error">{{ __('No se puede dispensar a este socio.') }}</p>
+                                        @endif
+                                    </div>
+                                @endif
+                            </div>
+                        @endif
+                    </section>
+                @else
+                    <div class="rounded-2xl border border-dashed border-line bg-surface p-8 text-center dark:border-slate-700 dark:bg-slate-900">
+                        <div class="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-surface-alt text-xl dark:bg-slate-800">🪪</div>
+                        <p class="mt-3 font-medium">{{ __('Identifica a un socio') }}</p>
+                        <p class="mt-1 text-sm text-ink-muted dark:text-slate-400">{{ __('Sin socio no se puede registrar ninguna dispensación.') }}</p>
+                    </div>
+                @endif
+            </div>
+
+            {{-- ================= CENTRE: weight entry + genetics grid ================= --}}
+            <div class="flex flex-col gap-4">
+                {{-- Weight entry panel (opens when a genetic is chosen). --}}
+                @if ($activeGenetic)
+                    <section class="rounded-2xl border border-brand/40 bg-brand-tint/40 p-4 dark:border-brand/40 dark:bg-slate-900">
+                        <div class="flex items-start justify-between gap-3">
+                            <div>
+                                <h3 class="text-base font-semibold">{{ $activeGenetic->name }}</h3>
+                                @if ($activeGeneticPriceCents !== null)
+                                    <p class="text-sm text-ink-muted dark:text-slate-400">{{ $this->money($activeGeneticPriceCents) }} / g</p>
+                                @endif
+                            </div>
+                            <button type="button" wire:click="cancelWeightEntry" class="rounded-lg px-2 py-1 text-sm text-ink-muted hover:bg-black/5 dark:text-slate-400 dark:hover:bg-white/5">{{ __('Cancelar') }}</button>
+                        </div>
+
+                        {{-- grams vs calculator (€) toggle --}}
+                        <div class="mt-3 inline-flex rounded-xl border border-line bg-surface p-0.5 text-sm dark:border-slate-700 dark:bg-slate-950">
+                            <button type="button" wire:click="$set('calculatorMode', false)" @class(['rounded-lg px-3 py-1.5 font-medium', 'bg-brand text-white' => ! $calculatorMode, 'text-ink-muted dark:text-slate-400' => $calculatorMode])>{{ __('Gramos') }}</button>
+                            <button type="button" wire:click="toggleCalculator" @class(['rounded-lg px-3 py-1.5 font-medium', 'bg-brand text-white' => $calculatorMode, 'text-ink-muted dark:text-slate-400' => ! $calculatorMode])>{{ __('Calculadora €') }}</button>
+                        </div>
+
+                        {{-- display --}}
+                        <div class="mt-3 flex items-center justify-between rounded-xl border border-line bg-surface px-4 py-3 dark:border-slate-700 dark:bg-slate-950">
+                            <span class="text-sm text-ink-muted dark:text-slate-400">{{ $calculatorMode ? __('Aportación (€)') : __('Peso (g)') }}</span>
+                            <span class="text-2xl font-bold tabular-nums">{{ $weightInput === '' ? '0' : $weightInput }}{{ $calculatorMode ? ' €' : ' g' }}</span>
+                        </div>
+
+                        {{-- numeric pad --}}
+                        <div class="mt-3 grid grid-cols-3 gap-2">
+                            @foreach (['1','2','3','4','5','6','7','8','9'] as $digit)
+                                <button type="button" wire:click="pad('{{ $digit }}')" class="h-14 rounded-xl border border-line bg-surface text-xl font-semibold text-ink transition hover:bg-surface-alt dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:hover:bg-slate-800">{{ $digit }}</button>
+                            @endforeach
+                            <button type="button" wire:click="pad(',')" class="h-14 rounded-xl border border-line bg-surface text-xl font-semibold text-ink transition hover:bg-surface-alt dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:hover:bg-slate-800">,</button>
+                            <button type="button" wire:click="pad('0')" class="h-14 rounded-xl border border-line bg-surface text-xl font-semibold text-ink transition hover:bg-surface-alt dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:hover:bg-slate-800">0</button>
+                            <button type="button" wire:click="pad('back')" class="h-14 rounded-xl border border-line bg-surface text-xl font-semibold text-ink-muted transition hover:bg-surface-alt dark:border-slate-700 dark:bg-slate-950 dark:text-slate-400 dark:hover:bg-slate-800">⌫</button>
+                        </div>
+
+                        {{-- batch selector (FEFO default, overridable to another dispensable batch) --}}
+                        <div class="mt-3">
+                            <p class="text-sm font-medium text-ink-muted dark:text-slate-400">{{ __('Lote') }}</p>
+                            @if ($activeGeneticBatches->isEmpty())
+                                <p class="mt-1 rounded-lg border border-error/30 bg-error/10 px-3 py-2 text-sm text-error">{{ __('Sin lote disponible (agotado o caducado).') }}</p>
+                            @else
+                                <div class="mt-1 flex flex-wrap gap-2">
+                                    @foreach ($activeGeneticBatches as $i => $batch)
+                                        <button type="button" wire:click="selectBatch('{{ $batch->id }}')" @class([
+                                            'rounded-lg border px-3 py-1.5 text-sm transition',
+                                            'border-brand bg-brand text-white' => $activeBatchId === $batch->id,
+                                            'border-line bg-surface text-ink hover:bg-surface-alt dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100' => $activeBatchId !== $batch->id,
+                                        ])>
+                                            {{ $batch->batch_no }}
+                                            <span class="opacity-70">· {{ $this->grams($batch->remaining_cg->centigrams) }}</span>
+                                            @if ($i === 0)<span class="ml-1 rounded-full bg-white/20 px-1.5 py-0.5 text-[10px] font-semibold uppercase">FEFO</span>@endif
+                                        </button>
+                                    @endforeach
+                                </div>
+                            @endif
+                        </div>
+
+                        <button type="button" wire:click="addLine" wire:loading.attr="disabled" wire:target="addLine" class="mt-4 h-14 w-full rounded-xl bg-brand text-base font-semibold text-white transition hover:bg-brand-dark focus:outline-none focus:ring-2 focus:ring-brand/40 disabled:opacity-60">{{ __('Añadir a la cesta') }}</button>
+                    </section>
+                @endif
+
+                {{-- Genetics grid --}}
+                <section class="rounded-2xl border border-line bg-surface p-4 dark:border-slate-800 dark:bg-slate-900">
+                    <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                        <h2 class="text-base font-semibold">{{ __('Genéticas') }}</h2>
+                        <input
+                            type="text"
+                            wire:model.live.debounce.300ms="geneticSearch"
+                            autocomplete="off"
+                            placeholder="{{ __('Buscar genética…') }}"
+                            class="h-10 w-full rounded-xl border border-line bg-surface px-4 text-sm text-ink placeholder:text-ink-muted/60 focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/40 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 sm:w-56"
+                        >
+                    </div>
+
+                    @if (! empty($categories))
+                        <div class="mt-3 flex flex-wrap gap-2">
+                            <button type="button" wire:click="filterCategory(null)" @class(['rounded-full border px-3 py-1 text-sm', 'border-brand bg-brand text-white' => $categoryId === null, 'border-line text-ink-muted dark:border-slate-700 dark:text-slate-400' => $categoryId !== null])>{{ __('Todas') }}</button>
+                            @foreach ($categories as $category)
+                                <button type="button" wire:click="filterCategory('{{ $category['id'] }}')" @class(['rounded-full border px-3 py-1 text-sm', 'border-brand bg-brand text-white' => $categoryId === $category['id'], 'border-line text-ink-muted dark:border-slate-700 dark:text-slate-400' => $categoryId !== $category['id']])>{{ $category['name'] }}</button>
+                            @endforeach
+                        </div>
+                    @endif
+
+                    <div class="mt-4 grid gap-3 sm:grid-cols-2">
+                        @forelse ($genetics as $g)
+                            @php $disabledCard = $member === null || ! $g['has_batch']; @endphp
+                            <button
+                                type="button"
+                                @if (! $disabledCard) wire:click="chooseGenetic('{{ $g['id'] }}')" @endif
+                                @disabled($disabledCard)
+                                @class([
+                                    'flex flex-col rounded-xl border p-3 text-left transition',
+                                    'border-line bg-surface hover:border-brand hover:bg-brand-tint/40 dark:border-slate-700 dark:bg-slate-950 dark:hover:border-brand' => ! $disabledCard,
+                                    'cursor-not-allowed border-dashed border-line bg-surface-alt opacity-60 dark:border-slate-800 dark:bg-slate-900' => $disabledCard,
+                                ])
+                            >
+                                <div class="flex items-start justify-between gap-2">
+                                    <span class="font-semibold">{{ $g['name'] }}</span>
+                                    <span class="shrink-0 text-sm font-semibold text-brand dark:text-slate-100">{{ $this->money($g['rate_cents']) }}/g</span>
+                                </div>
+                                <div class="mt-1 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-ink-muted dark:text-slate-400">
+                                    <span>THC {{ number_format($g['thc_bp'] / 100, 1) }}%</span>
+                                    <span>CBD {{ number_format($g['cbd_bp'] / 100, 1) }}%</span>
+                                    <span>{{ __($g['cultivation']) }}</span>
+                                </div>
+                                <div class="mt-2 flex items-center justify-between text-xs">
+                                    <span class="text-ink-muted dark:text-slate-400">{{ __('Stock') }}: {{ $this->grams($g['remaining_cg']) }}</span>
+                                    @if ($g['has_batch'])
+                                        <span class="inline-flex items-center gap-1 text-success"><span class="h-2 w-2 rounded-full bg-success"></span>{{ __('Con lote') }}</span>
+                                    @else
+                                        <span class="inline-flex items-center gap-1 text-ink-muted dark:text-slate-500"><span class="h-2 w-2 rounded-full bg-slate-400"></span>{{ __('Sin lote') }}</span>
+                                    @endif
+                                </div>
+                                @if ($g['price_label'])
+                                    <p class="mt-1 text-[11px] font-medium text-brand dark:text-slate-300">{{ $g['price_label'] }}</p>
+                                @endif
+                            </button>
+                        @empty
+                            <p class="col-span-full rounded-xl border border-dashed border-line px-4 py-8 text-center text-sm text-ink-muted dark:border-slate-700 dark:text-slate-400">{{ __('No hay genéticas con precio activo en esta sede.') }}</p>
+                        @endforelse
+                    </div>
+                </section>
+            </div>
+
+            {{-- ================= RIGHT: the basket + contribution ================= --}}
+            <div class="flex flex-col gap-4">
+                {{-- No open till → unmistakable, blocks commit. --}}
+                @unless ($openTill)
+                    <div class="rounded-2xl border border-error/40 bg-error/10 p-4 text-sm">
+                        <p class="font-semibold text-error">{{ __('No hay caja abierta') }}</p>
+                        <p class="mt-1 text-error/90">{{ __('Abre una caja en este terminal antes de dispensar.') }}</p>
+                        <a href="{{ route('counter.till') }}" wire:navigate class="mt-3 inline-flex h-10 items-center rounded-lg bg-error px-4 text-sm font-semibold text-white transition hover:opacity-90">{{ __('Ir a la caja') }}</a>
+                    </div>
+                @endunless
+
+                <section class="rounded-2xl border border-line bg-surface p-4 dark:border-slate-800 dark:bg-slate-900">
+                    <div class="flex items-center justify-between">
+                        <h2 class="text-base font-semibold">{{ __('Cesta') }}</h2>
+                        @if (! empty($basketLines))
+                            <button type="button" wire:click="clearBasket" class="rounded-lg px-2 py-1 text-sm text-ink-muted hover:bg-black/5 dark:text-slate-400 dark:hover:bg-white/5">{{ __('Vaciar') }}</button>
+                        @endif
+                    </div>
+
+                    <ul class="mt-3 divide-y divide-line dark:divide-slate-800">
+                        @forelse ($basketLines as $line)
+                            <li wire:key="line-{{ $line['index'] }}" class="flex items-start justify-between gap-3 py-2.5">
+                                <div class="min-w-0">
+                                    <p class="truncate font-medium">{{ $line['genetic_name'] }}</p>
+                                    <p class="text-xs text-ink-muted dark:text-slate-400">
+                                        {{ $this->grams($line['grams_cg']) }} × {{ $this->money($line['rate_cents']) }}/g
+                                        @if ($line['discount_cents'] > 0)· <span class="text-success">−{{ $this->money($line['discount_cents']) }}</span>@endif
+                                    </p>
+                                </div>
+                                <div class="flex shrink-0 items-center gap-2">
+                                    <span class="font-semibold tabular-nums">{{ $this->money($line['total_cents']) }}</span>
+                                    <button type="button" wire:click="removeLine({{ $line['index'] }})" class="rounded-md px-2 py-1 text-ink-muted hover:bg-black/5 dark:text-slate-400 dark:hover:bg-white/5">✕</button>
+                                </div>
+                            </li>
+                        @empty
+                            <li class="py-6 text-center text-sm text-ink-muted dark:text-slate-400">{{ __('Cesta vacía. Elige una genética e introduce el peso.') }}</li>
+                        @endforelse
+                    </ul>
+
+                    {{-- Total --}}
+                    <div class="mt-3 flex items-center justify-between rounded-xl bg-surface-alt px-4 py-3 dark:bg-slate-800">
+                        <span class="font-semibold">{{ __('Total aportación') }}</span>
+                        <span class="text-lg font-bold tabular-nums">{{ $this->money($basketTotalCents) }}</span>
+                    </div>
+
+                    {{-- Tender split --}}
+                    <div class="mt-4 grid grid-cols-2 gap-3">
+                        <div>
+                            <label for="cash" class="block text-xs font-medium text-ink-muted dark:text-slate-400">{{ __('Efectivo (€)') }}</label>
+                            <input id="cash" type="text" inputmode="decimal" wire:model.live.debounce.400ms="cashInput" autocomplete="off" placeholder="{{ __('Resto') }}" class="mt-1 h-11 w-full rounded-xl border border-line bg-surface px-3 text-base text-ink placeholder:text-ink-muted/60 focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/40 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100">
+                        </div>
+                        <div>
+                            <label for="wallet" class="block text-xs font-medium text-ink-muted dark:text-slate-400">{{ __('Monedero (€)') }}</label>
+                            <input id="wallet" type="text" inputmode="decimal" wire:model.live.debounce.400ms="walletInput" autocomplete="off" placeholder="0,00" class="mt-1 h-11 w-full rounded-xl border border-line bg-surface px-3 text-base text-ink placeholder:text-ink-muted/60 focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/40 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100">
+                        </div>
+                    </div>
+                    <div class="mt-2 flex items-center justify-between text-xs text-ink-muted dark:text-slate-400">
+                        <span>{{ __('Efectivo') }}: {{ $this->money($cashPreviewCents) }} · {{ __('Monedero') }}: {{ $this->money($walletPreviewCents) }}</span>
+                        <span>{{ __('Monedero tras aportación') }}: <span class="font-medium {{ $projectedWalletCents < 0 ? 'text-error' : '' }}">{{ $this->money($projectedWalletCents) }}</span></span>
+                    </div>
+
+                    {{-- Signature (only when the sede requires it). --}}
+                    @if ($requireSignature)
+                        <div class="mt-4 border-t border-line pt-4 dark:border-slate-800">
+                            <p class="text-sm font-medium">{{ __('Firma del socio') }}</p>
+                            @if ($signaturePath)
+                                <div class="mt-2 flex items-center justify-between rounded-xl border border-success/30 bg-success/10 px-3 py-2 text-sm text-success">
+                                    <span>✓ {{ __('Firma capturada') }}</span>
+                                    <button type="button" wire:click="clearSignature" class="rounded-md px-2 py-0.5 text-success/80 hover:text-success">{{ __('Rehacer') }}</button>
+                                </div>
+                            @else
+                                <div
+                                    x-data="{
+                                        drawing: false, ctx: null,
+                                        init() {
+                                            const c = this.$refs.pad; c.width = c.offsetWidth; c.height = 150;
+                                            this.ctx = c.getContext('2d'); this.ctx.lineWidth = 2; this.ctx.lineCap = 'round'; this.ctx.strokeStyle = '#2563eb';
+                                        },
+                                        point(e) { const r = this.$refs.pad.getBoundingClientRect(); const t = e.touches ? e.touches[0] : e; return { x: t.clientX - r.left, y: t.clientY - r.top }; },
+                                        start(e) { this.drawing = true; const p = this.point(e); this.ctx.beginPath(); this.ctx.moveTo(p.x, p.y); },
+                                        move(e) { if (! this.drawing) return; const p = this.point(e); this.ctx.lineTo(p.x, p.y); this.ctx.stroke(); },
+                                        stop() { this.drawing = false; },
+                                        wipe() { this.ctx.clearRect(0, 0, this.$refs.pad.width, this.$refs.pad.height); },
+                                        save() { $wire.saveSignature(this.$refs.pad.toDataURL('image/png')); },
+                                    }"
+                                    class="mt-2"
+                                >
+                                    <canvas
+                                        x-ref="pad"
+                                        class="w-full touch-none rounded-xl border border-line bg-white dark:border-slate-700"
+                                        @mousedown="start($event)" @mousemove="move($event)" @mouseup="stop()" @mouseleave="stop()"
+                                        @touchstart.prevent="start($event)" @touchmove.prevent="move($event)" @touchend="stop()"
+                                    ></canvas>
+                                    <div class="mt-2 flex gap-2">
+                                        <button type="button" @click="wipe()" class="h-10 flex-1 rounded-lg border border-line bg-surface-alt text-sm font-medium text-ink-muted dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300">{{ __('Borrar') }}</button>
+                                        <button type="button" @click="save()" class="h-10 flex-1 rounded-lg bg-brand text-sm font-semibold text-white hover:bg-brand-dark">{{ __('Guardar firma') }}</button>
+                                    </div>
+                                </div>
+                            @endif
+                        </div>
+                    @endif
+
+                    {{-- Override (permissioned + reasoned). --}}
+                    @if ($requireOverride)
+                        <div class="mt-4 rounded-xl border border-warning/40 bg-warning/5 p-3">
+                            <p class="text-sm font-semibold text-warning">{{ $limitBreach ? __('Supera el límite de consumo') : __('Requiere autorización') }}</p>
+                            @if ($canOverride)
+                                <textarea wire:model="overrideReason" rows="2" placeholder="{{ __('Motivo de la excepción (queda registrado)') }}" class="mt-2 w-full rounded-xl border border-warning/40 bg-surface px-3 py-2 text-sm focus:border-warning focus:outline-none focus:ring-2 focus:ring-warning/40 dark:bg-slate-950"></textarea>
+                                <button type="button" wire:click="commitWithOverride" wire:loading.attr="disabled" wire:target="commitWithOverride" x-bind:disabled="! online" class="mt-2 h-12 w-full rounded-xl bg-warning px-4 text-base font-semibold text-white transition hover:opacity-90 disabled:opacity-60">{{ __('Autorizar y registrar') }}</button>
+                            @else
+                                <p class="mt-2 text-sm text-ink-muted dark:text-slate-400">{{ __('Un responsable con permiso (limits.override) debe autorizar esta excepción.') }}</p>
+                            @endif
+                        </div>
+                    @endif
+
+                    {{-- Commit --}}
+                    @php
+                        $commitDisabled = $member === null
+                            || $openTill === null
+                            || empty($basketLines)
+                            || ! empty($hardBlockRules)
+                            || ($requireSignature && $signaturePath === null);
+                    @endphp
+                    <button
+                        type="button"
+                        wire:click="commit"
+                        wire:loading.attr="disabled"
+                        wire:target="commit"
+                        x-bind:disabled="! online || @js($commitDisabled)"
+                        class="mt-4 h-16 w-full rounded-xl bg-brand text-lg font-bold text-white transition hover:bg-brand-dark focus:outline-none focus:ring-2 focus:ring-brand/40 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                        <span wire:loading.remove wire:target="commit">{{ __('Registrar aportación') }}</span>
+                        <span wire:loading wire:target="commit">{{ __('Registrando…') }}</span>
+                    </button>
+                    @if ($member === null)
+                        <p class="mt-2 text-center text-xs text-ink-muted dark:text-slate-500">{{ __('Identifica a un socio para poder registrar.') }}</p>
+                    @endif
+                </section>
+
+                {{-- Just committed → receipt + void affordance. --}}
+                @if ($lastDispensationId)
+                    <section class="rounded-2xl border border-success/30 bg-success/5 p-4">
+                        <p class="text-sm font-semibold text-success">{{ __('Última dispensación registrada') }}</p>
+                        <div class="mt-3 flex flex-col gap-2">
+                            <a href="{{ route('counter.pos.receipt', $lastDispensationId) }}" target="_blank" rel="noopener" class="inline-flex h-11 items-center justify-center rounded-xl border border-line bg-surface px-4 text-sm font-semibold text-ink transition hover:bg-surface-alt dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100">{{ __('Ver / imprimir recibo') }}</a>
+
+                            @if ($canVoid)
+                                <div class="rounded-xl border border-line bg-surface p-3 dark:border-slate-700 dark:bg-slate-900">
+                                    <label class="block text-xs font-medium text-ink-muted dark:text-slate-400">{{ __('Anular esta dispensación') }}</label>
+                                    <textarea wire:model="voidReason" rows="2" placeholder="{{ __('Motivo de la anulación (queda registrado)') }}" class="mt-1 w-full rounded-lg border border-line bg-surface px-3 py-2 text-sm focus:border-error focus:outline-none focus:ring-2 focus:ring-error/30 dark:border-slate-700 dark:bg-slate-950"></textarea>
+                                    <button type="button" wire:click="voidLast" wire:confirm="{{ __('¿Anular la dispensación? Se revertirán stock y monedero.') }}" class="mt-2 h-10 w-full rounded-lg border border-error/40 bg-error/10 text-sm font-semibold text-error transition hover:bg-error/20">{{ __('Anular') }}</button>
+                                </div>
+                            @endif
+                        </div>
+                    </section>
+                @endif
+            </div>
+        </div>
+    @endif
+</div>
