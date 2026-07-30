@@ -34,6 +34,10 @@ requirements (§B), and the client decisions (§C). Read `DECISIONS.md` before e
 - Pages render as plain Blade by default. Livewire ONLY for server-driven interactivity (POS,
   check-in, forms, multi-step, live data). A static page MAY embed a Livewire island.
 - No `declare(strict_types=1)` (enforced via pint.json). Type-hint all params and returns instead.
+- **Larastan L6 requires relation/scope generics** (PHPStan 2.x removed the opt-out; `laravel/pao`
+  silently swallows the config error). House style: relation methods carry
+  `@return <Relation><RelatedModel, $this>` PHPDoc and scopes carry `@param`/`@return
+  \Illuminate\Database\Eloquent\Builder<Model>`. Write them on every model from the start.
 - **Money is stored as integer cents (EUR).** Euros only at the input/display edge via a cast.
   **Weight is stored as integer centigrams (1 g = 100 cg, 0.01 g precision).** Grams (2 dp) only at
   the edge via a matching cast. A float in either is a bug. One shared `round_half_up` helper.
@@ -116,14 +120,24 @@ vocabulary above is Spanish even in the English locale where it is a term of art
 
 ## Reference implementations (imitate these — keep updated as the canon)
 
-- Action class: [App\Actions\Example — add first real one]
-- View model / page class: [App\ViewModels\Example]
-- Filament resource (scoped + policy): [add first real one]
-- Livewire counter component: [add first real one]
-- Money/weight cast usage: `app/Casts/MoneyCast.php`, `app/Casts/WeightCast.php`
-- Spreadsheet export/import: [App\Support\Spreadsheet\* — add first real one]
-- PDF document: [App\Actions\Documents\* — add first real one]
-(Add the first real example of each pattern here as it's built; future work copies these.)
+- Action class: `app/Actions/RecordAuditLog.php`
+- Money/weight value objects + casts: `app/Support/Money.php`, `app/Support/Weight.php`,
+  `app/Casts/MoneyCast.php`, `app/Casts/WeightCast.php`; one rounding rule `round_half_up()`
+  (`app/Support/helpers.php`). Amount `*_cents` and weight-of-goods `*_cg` columns use the casts;
+  per-gram RATE columns (`price_per_gram_cents`) and config/limit integers stay plain int.
+- Scope: `app/Support/ActiveScope.php` (session contract) + `app/Models/Scopes/{Organisation,Location}Scope.php`
+  + traits `app/Models/Concerns/{BelongsToOrganisation,ScopedToLocation}.php`. Per-location models use
+  both traits; org-wide models use `BelongsToOrganisation`; children derive scope from their parent.
+- Settings accessor: `app/Support/Settings.php` (`Settings::get('key', $default)` — location → org →
+  code default, never throws). `app/Support/BusinessDay.php` for day boundaries.
+- Fat model with enum casts + scopes + relations: `app/Models/Member.php`, `app/Models/Dispensation.php`
+  (the tender-split invariant lives in its `booted()`), `app/Models/AuditLog.php` / `Minute.php`
+  (append-only / immutable-once-signed).
+- Filament resource (scoped + policy): [add first real one — prompt 04]
+- Livewire counter component: [add first real one — prompt 09/11]
+- Spreadsheet export/import: [App\Support\Spreadsheet\* — prompt 14/04]
+- PDF document: [App\Actions\Documents\* — prompt 16]
+(Add the first real example of each remaining pattern here as it's built; future work copies these.)
 
 ## Testing & verification rules (non-negotiable)
 

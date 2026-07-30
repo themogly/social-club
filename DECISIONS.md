@@ -96,3 +96,65 @@ chosen for robustness in an *unattended* run (no binary that could silently be m
 - **Static analysis → `larastan/larastan` at level 6** (raise later), `--memory-limit=2G` in the
   check script so it won't OOM as Filament resources accumulate.
 - **Tests: PHPUnit** (the skeleton ships PHPUnit, not Pest).
+
+---
+
+## Prompt 01 — schema, identifiers, scope, money & weight (architecture checkpoint)
+
+The prompt-01 checkpoint was auto-resolved for the overnight run. Each answer below:
+
+1. **Scope (recommended — adopted).** `organisation_id` on every domain table (one seeded org).
+   **Location is the operational scope** via a custom session switcher + a `LocationScope` global
+   scope — NOT Filament tenancy, because the owner's "All locations" rollup and org-wide member
+   search must cross the boundary. Trade-off: we hand-apply the scope + write denial tests instead
+   of getting it free from tenancy.
+2. **Identifiers (recommended — adopted).** ULID primary keys on every user-addressable model.
+   Internal-only pivots (`location_user`, discount-location enablement) stay auto-increment.
+3. **Money & weight (recommended — adopted).** Integer `_cents` + `MoneyCast`; integer `_cg`
+   (centigrams, 0.01 g) + `WeightCast`. Percentages stored as integer basis points (`_bp`).
+4. `OVERNIGHT-DEFAULT — CONFIRM:` **Wallet shape = per-location balances** (WalletTransaction carries
+   `location_id`), carrying forward v1's model: an org-wide debt limit + ring-fencing, with
+   cross-location credit transfers recorded as paired TRANSFER_OUT/TRANSFER_IN rows
+   (`transfer_pair_id`). Alternative (pooled org-wide balance) was NOT chosen. Confirm this is still
+   what the club wants (NOTES §C item 5).
+5. **Pricing shape (recommended — adopted).** Price is **per gram, per genetic, per location**, with
+   optional **per-tier** prices (`GeneticPrice.tier_id` null = base price). Discounts resolve on top.
+6. **Per-location vs org-wide (recommended — adopted).** Org-wide: member *people*, genetic
+   *definitions*, membership tiers, standard discounts (templates). Per-location: prices, batches,
+   stock, tills, transactions, expenses, staff assignment.
+7. `OVERNIGHT-DEFAULT — CONFIRM:` **Business-day cutoff = 06:00**, **timezone = Europe/Madrid** as the
+   seeded default per location. The daily gram cap, monthly reset, auto-checkout, entry–exit sheet
+   and every Z-report resolve "today" through `BusinessDay` against these. Confirm the real cutoff.
+
+### Seeded threshold defaults (NOTES §A reference table — all editable via Settings in prompt 03)
+
+Seeded as `Setting` defaults, not hardcoded: min age 18, carencia 15 days, daily cap 350 cg (3.5 g),
+monthly ceiling 10000 cg (100 g), declared-forecast options 30/50/60/90 g, active-member soft cap
+750, premises stock ceiling = active members × daily cap × 5 days (computed live).
+`OVERNIGHT-DEFAULT — CONFIRM:` a limit breach **hard-blocks** at the counter, with a **logged
+manager override** permitted (NOTES §C item 3 recommended). `OVERNIGHT-DEFAULT — CONFIRM:` currency
+display **€1.234,56** (Spanish convention, NOTES §C item 10). `OVERNIGHT-DEFAULT — CONFIRM:` member
+data retention default **1825 days (5 years)** after `left_at` before anonymisation (NOTES §C item 13).
+
+### Client-only facts stubbed (grep `OVERNIGHT-PLACEHOLDER`)
+
+- `OVERNIGHT-PLACEHOLDER — CONFIRM:` Organisation legal_name `TBD-LEGAL-NAME`, tax_id (CIF/NIF)
+  `TBD-CIF-NIF`, registered address `TBD-ADDRESS`, board/owners — seeded as placeholders.
+- `OVERNIGHT-PLACEHOLDER — CONFIRM:` Two premises seeded ("Sede Centro", "Sede Norte") with
+  placeholder addresses, aforo (capacity) **50**, opening 12:00 / closing 00:00 — all placeholders.
+
+### Larastan level-6 + relation generics (house style)
+
+PHPStan 2.x (2.2.7 here) **removed** the `checkGenericClassInNonGenericObjectType` toggle, and
+`laravel/pao` swallows the resulting config error (0 output, exit 1 — a silent gate failure). So the
+generics requirement cannot be turned off cleanly. Rather than suppress it (no baseline / no
+ignore comments — kit rule), the project ADDS the generics: relation methods carry
+`@return <Relation><Related, $this>` and scopes carry `@param/@return
+\Illuminate\Database\Eloquent\Builder<Model>` PHPDoc. This is real type information (better IDE +
+inference) and keeps level 6 fully strict. It is the house style for every model from prompt 01 on.
+
+### Opening-balance import path (required note)
+
+The schema supports a real go-live with no free-typed balances: opening stock enters as INTAKE
+`StockMovement` rows, opening wallet balances as ADJUSTMENT `WalletTransaction` rows (with a reason),
+and an opening till float on `TillSession`. The dev seeder uses these same paths.
