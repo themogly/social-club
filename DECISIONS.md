@@ -214,3 +214,34 @@ and an opening till float on `TillSession`. The dev seeder uses these same paths
   holds the English overrides (Spanish strings are the source keys).
 - **Not retroactive:** changing a threshold affects future checks only (Settings is read live at
   check time; already-committed rows/documents are untouched by construction).
+
+---
+
+## Prompt 04 — members, onboarding, avalador, ID & RGPD
+
+- **Consent model:** explicit, versioned, per-purpose. `ConsentRecord` rows captured at approval
+  (`ApproveApplication`) with `consent_text_version` (from the `consent_text_version` setting),
+  `granted_at` and IP. Tacit consent is not valid; one row per consent per version (history is never
+  a scalar). Withdrawal sets `withdrawn_at` on a new row.
+- **Article 9 special-category data:** cannabis consumption + medicinal/therapeutic flag are treated
+  as health data. `document_number` is encrypted at rest; a deterministic `document_hash` blind index
+  enables dedup/uniqueness without exposing the value. ID scans/photos live on the private `documents`
+  disk, served only via short-lived signed URLs (`IssueDocumentUrl`, TTL = `signed_url_ttl_seconds`),
+  and **every access attempt (allowed or denied) writes a `DocumentAccessLog`**. Only
+  `member.documents.view` may open one.
+- **Erasure strategy: anonymise-not-delete** (`AnonymiseMember`). Scrubs personal fields + deletes
+  ID/photo files, sets `anonymised_at`, revokes tokens — but KEEPS dispensations, wallet and till
+  ledger intact and attributed to the anonymised record, so the books stay whole and balanced.
+- **Retention:** `data_retention_days` (default 1825 = 5 years after `left_at`). Scheduled
+  `members:purge` command (nightly 04:00) anonymises members past retention. Audit-log retention is
+  deliberately longer (`audit_retention_days`, 3650).
+- **QR card:** `MemberToken` — a random 48-char token (NOT derived from the id), only the SHA-256
+  hash stored; `IssueMemberToken` revokes the prior card on regenerate; `ResolveMemberByToken` is the
+  scan lookup. Emailed via `MemberCardMail` with the QR embedded inline (CID/data-URI), in the
+  render test + `/dev/mail`.
+- **Member numbers:** `MemberNumber::next()` — prefix+padding from settings, unique per org, never
+  reused (counts soft-deleted). Distinct from the ULID and the QR token.
+- **CSV import** (`ImportMembers`): dry-run preview (validate + dedup, no writes) and idempotent real
+  import (duplicate guard skips existing), both audited.
+- **Seeder:** removed `WithoutModelEvents` from `DatabaseSeeder` so model saving hooks (document_hash
+  blind index, tender-split invariant, scope auto-fill) fire during seeding.
