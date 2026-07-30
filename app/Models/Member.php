@@ -25,11 +25,27 @@ class Member extends Model
 
     protected $fillable = [
         'organisation_id', 'member_no', 'first_name', 'last_name', 'email', 'phone',
-        'date_of_birth', 'address', 'photo_path', 'document_type', 'document_number',
+        'date_of_birth', 'address', 'photo_path', 'document_type', 'document_number', 'document_hash',
         'document_scan_path', 'status', 'is_therapeutic', 'avalador_member_id',
         'joined_at', 'left_at', 'carencia_ends_at', 'declared_monthly_cg',
         'daily_limit_cg', 'monthly_limit_cg', 'sole_association_declared_at', 'anonymised_at',
     ];
+
+    protected static function booted(): void
+    {
+        // Keep the blind index in sync with the (encrypted) document number.
+        static::saving(function (Member $member): void {
+            $member->document_hash = self::hashDocument($member->document_number);
+        });
+    }
+
+    /** Deterministic blind index of a normalised document number, for dedup/uniqueness. */
+    public static function hashDocument(?string $number): ?string
+    {
+        $normalised = strtoupper(preg_replace('/[^A-Za-z0-9]/', '', (string) $number));
+
+        return $normalised === '' ? null : hash('sha256', $normalised);
+    }
 
     protected function casts(): array
     {

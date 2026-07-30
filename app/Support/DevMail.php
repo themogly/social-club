@@ -3,6 +3,8 @@
 namespace App\Support;
 
 use App\Mail\ExampleClubMail;
+use App\Mail\MemberCardMail;
+use App\Models\Member;
 use Illuminate\Mail\Mailable;
 
 /**
@@ -23,6 +25,10 @@ class DevMail
     {
         return [
             'example-club-mail' => new ExampleClubMail(memberName: 'María García'),
+            'member-card' => new MemberCardMail(
+                new Member(['first_name' => 'María', 'last_name' => 'García', 'member_no' => 'M-00042']),
+                'preview-token-not-a-real-card',
+            ),
         ];
     }
 }

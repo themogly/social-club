@@ -2,12 +2,12 @@
 
 namespace Database\Seeders;
 
-use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
 
 class DatabaseSeeder extends Seeder
 {
-    use WithoutModelEvents;
+    // NB: deliberately NOT WithoutModelEvents — model saving hooks (document_hash
+    // blind index, tender-split invariant, scope auto-fill) must fire while seeding.
 
     /**
      * Seed the application's database.
