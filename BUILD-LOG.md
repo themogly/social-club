@@ -4,7 +4,59 @@ Unattended overnight build of the CSC platform: bootstrap, then prompts 01–17 
 one branch each, `composer check` green before every merge. Prompt 18 is deliberately skipped
 (optional extras menu). One entry is appended below after each prompt completes.
 
-<!-- FINAL SUMMARY will be inserted here once the run reaches the end (or halts). -->
+---
+
+# ✅ FINAL SUMMARY — run completed cleanly
+
+**The unattended run reached the end.** Bootstrap + **prompts 01–17 all completed, `composer check`
+green, and merged to `main`** (prompt 18 skipped as instructed). Every prompt was one branch off latest
+`main`, merged only on a green gate, then pushed to `origin/main`. Suite at completion: **290 tests /
+1277 assertions green on BOTH SQLite and MySQL** (the full suite was verified on the production driver,
+resolving the earlier "MySQL parity deferred" note). Larastan L6 and Pint clean throughout.
+
+**Deviation from the kit (as authorised for the unattended run):** branches were self-merged to `main`
+after a green `composer check` (the normal "push, don't merge — a human reviews" rule was explicitly
+overridden for the overnight run). Logged in `DECISIONS.md`.
+
+**Two subagents hit the account session-limit / a connection drop mid-verification** (report suite in
+prompt 14, and the audit UI in prompt 17). Both were salvaged by hand — 9 latent `pluck(DB::raw)` bugs
+fixed + tests written for the reports; 12 mechanical PHPStan issues fixed for the audit UI — and both
+ended green. No work was lost.
+
+**One compliance-critical bug was found and fixed mid-run** (not from any single prompt): the
+business-day window was built in the location timezone while timestamps store in UTC, so the daily/
+monthly gram cap silently stopped enforcing for ~2h after the 06:00 cutoff. Fixed, pinned with a
+frozen-clock regression test.
+
+## ⚠️ Everything needing Ben's confirmation (grep `CONFIRM:` in DECISIONS.md for full context)
+
+**Client facts still stubbed (PLACEHOLDER — must replace before go-live):**
+- Organisation `legal_name` = `TBD-LEGAL-NAME`, `tax_id` (CIF/NIF) = `TBD-CIF-NIF`, address = `TBD-ADDRESS`.
+- Two premises seeded as "Sede Centro" / "Sede Norte" (aforo 50 / 40) — replace with real sedes.
+- Real **VAPID keys** for Web Push (`php artisan webpush:vapid` → env) — push cannot send until set.
+- **Breach runbook** `docs/BREACH-RUNBOOK.md` to be authored (the 72h AEPD procedure).
+
+**Auto-chosen defaults to confirm (DEFAULT):**
+- Wallet = per-location balances, ring-fenced; business day cutoff **06:00 Europe/Madrid**.
+- Limit breach **hard-blocks** at the counter with a permissioned, logged manager override.
+- Currency format **es** (€1.234,56); data retention 1825d, audit retention 3650d (longer, deliberate).
+- Arqueo variance tolerance **€5.00**; POS `pos_require_checked_in` / `pos_signature_required` default OFF.
+- **Bar articles use a single flat price** (no per-tier bar pricing modelled).
+- Seeded default **expense categories** (Stock/Consumables/Staff payment/Repairs/Rent/Utilities/Other)
+  and recurrence frequencies (monthly/quarterly/yearly).
+- Member auth = **passwordless magic link** (not OTP); quorum fraction **50%**.
+- Three push notifications (low_balance / membership_expiring / event_reminder) built + tested but not
+  yet wired to their triggers — one dispatch line each (natural fit with prompt-17 monitoring).
+- Dashboard delta+sparkline design costs ~85 bounded (non-N+1) queries — optimise later if heavy.
+- `composer audit` / `npm audit` reported by CI, NOT added to the blocking `composer check` gate.
+- Real backups + a tested restore are a go-live ops task (SETUP.md); MFA enablement — see DECISIONS.
+
+**Not captured (no Playwright MCP in the unattended env) — the one thing a human must still do:**
+- **Visual/screenshot pass** on every counter screen, the dashboard, the reports and the PWA
+  (1440 / 1280 / 1024 / 390 + short height, light AND dark, motion reduced AND allowed), and a real
+  iOS/Android PWA install check. The build is functionally green and tested, but has not been *looked at*.
+
+<!-- Per-prompt entries follow below. -->
 
 ---
 
