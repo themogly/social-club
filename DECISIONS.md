@@ -694,3 +694,110 @@ sells refreshments). Everything cannabis-side stays contribution-framed in both 
   — es comma vs en dot — plus Spanish document copy and the middleware default): `es` pinned where the
   test asserts Spanish output, and the SetLocale default assertion updated es→en. No production logic
   changed by those edits.
+
+---
+
+## Prompt 20 — admin form completeness (member form + systematic audit)
+
+The member create/edit form was missing five things; all fixed on BOTH create and edit, grouped where
+the owner expects them (never bolted on the end). Every new label/helper/validation string shipped in
+`lang/en.json` + `lang/es.json` together (`lang:sync --check` green, key order identical).
+
+1. **ID document scan** (`document_scan_path`) — a `FileUpload` in the **Identificación** section on the
+   PRIVATE `documents` disk (`->disk('documents')->visibility('private')->directory('member-id-scans')`,
+   pdf/image, `->previewable(false)` so the private-disk file never emits an un-logged temporary URL). It
+   is NOT viewable like the portrait: a `->hintAction('Ver documento')` routes through `IssueDocumentUrl`
+   (short-lived signed URL + `DocumentAccessLog`, 403 without `member.documents.view`). On save the page
+   mirrors the path into a `MemberDocument` (type ID) via `SyncMemberScanDocuments`, so the existing
+   signed-URL machinery serves it.
+2. **Monthly forecast in grams** — `declared_monthly_cg` now labelled "Previsión mensual (g)", entered in
+   grams (2 dp) and converted at the edge (`formatStateUsing` = `state/100`; `dehydrateStateUsing` =
+   `Weight::fromGrams()->centigrams`). `50.00 g → 5000 cg`, round-trips to `50.00`. Infolist display also
+   switched to grams.
+3. **RGPD consent** — a required (`->accepted()`) consent checkbox referencing `consent_text_version`, in a
+   new **Declaraciones** section by the submit buttons; on create the page writes a real `ConsentRecord`
+   (`App\Actions\Members\RecordMemberConsent`, purpose `membership`) — not a flag. The invite path
+   (`ApproveApplication`) already writes one; not duplicated.
+4. **Therapeutic toggle is `->live()`** — ON reveals a **medical certificate** `FileUpload` (private disk,
+   same signed-URL + access-log treatment; new nullable `medical_cert_path` column, mirrored to a
+   `MemberDocument` type MEDICAL) and makes the avalador optional (`avalador_therapeutic_exempt`). OFF
+   enforces the avalador per `avalador_policy`: `required` → required; `waivable` → required unless the
+   actor holds `carencia.waive`; `not_required` → optional. Reactivity via `Get`.
+5. **Sole-association declaration** — a checkbox in Declaraciones stamping `sole_association_declared_at`
+   (keeps the ORIGINAL date on re-save, stamps `now()` the first time). Added to the admin RGPD export
+   (`ExportMemberData`) and the member PWA export (`PwaController@export`).
+
+**Create flow was actually broken before this prompt** and is now fixed: the admin CreateMember page never
+generated `member_no` (NOT NULL) — members could only be created via the application/import paths.
+`CreateMember::mutateFormDataBeforeCreate` now system-sets `member_no` (`MemberNumber::next`), `status`
+(ACTIVE — a staff-created walk-in is active, mirrors `ApproveApplication`), `joined_at`, and
+`carencia_ends_at`. These stay system-managed, never form fields.
+
+**Exclusion list confirmed** — `member_no`, `carencia_ends_at`, `status`, `document_hash`, `anonymised_at`,
+`joined_at`/`left_at` are NOT editable on the form (verified by a denial test + the completeness allowlist).
+
+### Raw `_cg` / `_cents` entered-directly audit (fixed everywhere, not just the member form)
+
+Only two surfaces entered a raw minor unit into an input (tables/infolists that merely DISPLAY casts are
+fine):
+- **`MemberForm.declared_monthly_cg`** — fixed to grams (item 2).
+- **`ManageSettings`** three cents settings (`wallet_debt_limit_cents`, `arqueo_variance_tolerance_cents`,
+  `expense_approval_threshold_cents`) were typed directly in *céntimos*. Fixed to euros-at-the-edge
+  (`*_eur` virtual fields + convert in `save()`/`currentValues()`), mirroring the grams pattern the page
+  already used for `daily/monthly_limit`.
+
+Also closed a genuine gap surfaced by the audit: **`MembershipTier` per-tier `daily_limit_cg`/
+`monthly_limit_cg`** had no form field anywhere — added as grams-at-edge (`daily_limit_g`/`monthly_limit_g`,
+nullable overrides) with page conversion.
+
+### Systematic form-completeness audit + repeatable gate
+
+`tests/Feature/Forms/FormCompletenessTest.php` diffs every Filament resource's create/edit form fields
+against the model's `$fillable` (a Livewire stub container + recursive field walk — no per-resource page
+mount). Every fillable field must be PRESENT in the form OR in a documented per-resource allowlist with a
+reason; a future column that forgets its form field fails CI. A second test keeps the allowlist honest (no
+stale/typo entries, none actually present in the form, every entry has a reason). `organisation_id` is
+excluded globally (scope-filled). Zero unexplained gaps.
+
+Per-resource checklist (fillable fields absent from the form → why; everything else is IN the form):
+- **Member** — added: document_scan_path, medical_cert_path, declared_monthly_cg (g), consent, sole-assoc.
+  Excluded: member_no/status/joined_at/left_at/carencia_ends_at/document_hash/anonymised_at (system/
+  lifecycle), daily/monthly_limit_cg (per-member override via `member.limits.set`), push_opt_outs (PWA
+  self-service).
+- **MembershipTier** — added daily/monthly_limit_g. Excluded default_fee_cents (→ default_fee_eur),
+  daily/monthly_limit_cg (→ _g).
+- **Announcement** — author_id (system: authenticated author).
+- **Article** — location_id (scope); price_cents (→ price_eur).
+- **Batch** — location_id (scope); batch_no (generated); initial_cg (→ grams via IntakeBatch); remaining_cg
+  (ledger-computed); cost_per_gram_cents (→ cost_per_gram_eur); status (lifecycle).
+- **BreachLog / Event / ExpenseCategory / Supplier** — nothing beyond `organisation_id`.
+- **DataRequest** — completed_at, handled_by (set on fulfilment).
+- **Discount** — value_bp (→ value_pct); value_cents (→ value_eur).
+- **DocumentTemplate** — version (auto-incremented per version).
+- **Expense** — amount_cents (→ amount_eur); kind (derived); till_session_id (petty-cash till);
+  recurrence (from recurrence_frequency); recorded_by/approved_by/approved_at (actions).
+- **Genetic** — thc_bp/cbd_bp (→ thc_pct/cbd_pct).
+- **Location** — `settings` JSON is edited via its expanded `settings.*` keys (covered by the nested-key
+  matcher, not the allowlist).
+- **MemberApplication** — invite_token_hash/payload/reviewed_by/reviewed_at/resulting_member_id (invite +
+  review actions).
+- **Minute** — number (sequential under lock); quorum_present/quorum_required (computed); signed_at
+  (SignMinute).
+- **Purchase** — amount_cents/paid_cents (→ _eur); batch_id (linked by RecordPurchase).
+- **User** — locale (per-user self-service preference; null follows the org).
+- **AuditLog / MemberDocument / TillSession** — read-only oversight resources, no create/edit form by
+  design (documented in the test's FORMLESS set; the test asserts they still have no create page).
+
+### Judgment calls
+
+- **Admin-created members default to ACTIVE** (not APPLICANT) — a staff/counter walk-in registration is a
+  real member, mirroring `ApproveApplication`. If the club wants admin-created members to enter the
+  approval queue instead, flip the `status` default in `CreateMember`.
+- **Medical certificate is revealed but not hard-required** when therapeutic — a legitimate cert may arrive
+  after onboarding; requiring it would block valid creates. Tighten to `->required()` if the club mandates
+  it up front.
+- **Sole-association re-save keeps the original date** (only stamps `now()` when previously null), so the
+  legal declaration date isn't overwritten by an unrelated later edit.
+- **`MembershipTier` limit fields added** rather than documented-as-excluded, because there was no other UI
+  to set the per-tier overrides the pricing/limits resolver already reads (a real gap, not owner-managed
+  elsewhere).

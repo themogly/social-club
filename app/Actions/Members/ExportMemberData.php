@@ -21,7 +21,7 @@ class ExportMemberData
             'member' => $member->only([
                 'id', 'member_no', 'first_name', 'last_name', 'email', 'phone',
                 'date_of_birth', 'address', 'document_type', 'status', 'is_therapeutic',
-                'joined_at', 'left_at', 'declared_monthly_cg',
+                'joined_at', 'left_at', 'declared_monthly_cg', 'sole_association_declared_at',
             ]),
             'memberships' => $member->memberships()->withoutGlobalScopes()->get()->toArray(),
             'consumption' => $member->dispensations()->withoutGlobalScopes()->get()

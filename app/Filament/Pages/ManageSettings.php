@@ -49,14 +49,11 @@ class ManageSettings extends Page
         'avalador_policy' => SettingType::STRING,
         'avalador_max_sponsees' => SettingType::INT,
         'wallet_debt_allowed' => SettingType::BOOL,
-        'wallet_debt_limit_cents' => SettingType::CENTS,
         'fees_to_wallet_allowed' => SettingType::BOOL,
         'expiring_soon_days' => SettingType::INT,
         'renewal_reminder_lead_days' => SettingType::INT,
         'batch_expiry_window_days' => SettingType::INT,
         'discounts_stack' => SettingType::BOOL,
-        'arqueo_variance_tolerance_cents' => SettingType::CENTS,
-        'expense_approval_threshold_cents' => SettingType::CENTS,
         'data_retention_days' => SettingType::INT,
         'audit_retention_days' => SettingType::INT,
         'signed_url_ttl_seconds' => SettingType::INT,
@@ -143,7 +140,7 @@ class ManageSettings extends Page
                 Section::make(__('Cartera y deuda'))
                     ->schema([
                         Toggle::make('wallet_debt_allowed')->label(__('Permitir deuda')),
-                        TextInput::make('wallet_debt_limit_cents')->label(__('Límite de deuda (céntimos)'))->numeric()->required(),
+                        TextInput::make('wallet_debt_limit_eur')->label(__('Límite de deuda (€)'))->numeric()->minValue(0)->required(),
                         Toggle::make('fees_to_wallet_allowed')->label(__('Cobrar cuotas a la cartera')),
                     ])->columns(3),
 
@@ -161,8 +158,8 @@ class ManageSettings extends Page
 
                 Section::make(__('Caja'))
                     ->schema([
-                        TextInput::make('arqueo_variance_tolerance_cents')->label(__('Tolerancia de descuadre (céntimos)'))->numeric()->required(),
-                        TextInput::make('expense_approval_threshold_cents')->label(__('Umbral de aprobación de gasto (céntimos)'))->numeric()->required(),
+                        TextInput::make('arqueo_variance_tolerance_eur')->label(__('Tolerancia de descuadre (€)'))->numeric()->minValue(0)->required(),
+                        TextInput::make('expense_approval_threshold_eur')->label(__('Umbral de aprobación de gasto (€)'))->numeric()->minValue(0)->required(),
                     ])->columns(2),
 
                 Section::make(__('Privacidad y datos'))
@@ -191,6 +188,11 @@ class ManageSettings extends Page
         Settings::set('daily_limit_cg', (int) round(((float) $state['daily_limit_g']) * 100), SettingType::CG);
         Settings::set('monthly_limit_cg', (int) round(((float) $state['monthly_limit_g']) * 100), SettingType::CG);
 
+        // Euros shown at the edge, stored as integer cents.
+        Settings::set('wallet_debt_limit_cents', (int) round_half_up(((float) ($state['wallet_debt_limit_eur'] ?? 0)) * 100), SettingType::CENTS);
+        Settings::set('arqueo_variance_tolerance_cents', (int) round_half_up(((float) ($state['arqueo_variance_tolerance_eur'] ?? 0)) * 100), SettingType::CENTS);
+        Settings::set('expense_approval_threshold_cents', (int) round_half_up(((float) ($state['expense_approval_threshold_eur'] ?? 0)) * 100), SettingType::CENTS);
+
         (new RecordAuditLog)->handle('settings.updated', null, $before, $this->currentValues());
 
         Notification::make()->title(__('Ajustes guardados'))->success()->send();
@@ -207,6 +209,9 @@ class ManageSettings extends Page
         }
         $values['daily_limit_g'] = ((int) Settings::get('daily_limit_cg')) / 100;
         $values['monthly_limit_g'] = ((int) Settings::get('monthly_limit_cg')) / 100;
+        $values['wallet_debt_limit_eur'] = ((int) Settings::get('wallet_debt_limit_cents')) / 100;
+        $values['arqueo_variance_tolerance_eur'] = ((int) Settings::get('arqueo_variance_tolerance_cents')) / 100;
+        $values['expense_approval_threshold_eur'] = ((int) Settings::get('expense_approval_threshold_cents')) / 100;
 
         return $values;
     }

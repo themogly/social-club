@@ -38,7 +38,7 @@ class Member extends Model implements Authenticatable
     protected $fillable = [
         'organisation_id', 'member_no', 'first_name', 'last_name', 'email', 'phone',
         'date_of_birth', 'address', 'photo_path', 'document_type', 'document_number', 'document_hash',
-        'document_scan_path', 'status', 'is_therapeutic', 'avalador_member_id',
+        'document_scan_path', 'medical_cert_path', 'status', 'is_therapeutic', 'avalador_member_id',
         'joined_at', 'left_at', 'carencia_ends_at', 'declared_monthly_cg',
         'daily_limit_cg', 'monthly_limit_cg', 'sole_association_declared_at', 'anonymised_at',
         'push_opt_outs',
