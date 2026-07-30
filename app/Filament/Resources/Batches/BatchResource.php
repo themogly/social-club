@@ -22,6 +22,8 @@ class BatchResource extends Resource
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedArchiveBox;
 
+    protected static ?int $navigationSort = 20;
+
     public static function getNavigationLabel(): string
     {
         return __('Lotes');
@@ -29,7 +31,7 @@ class BatchResource extends Resource
 
     public static function getNavigationGroup(): ?string
     {
-        return __('Catálogo');
+        return __('Dispensario');
     }
 
     public static function getModelLabel(): string

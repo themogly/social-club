@@ -22,6 +22,8 @@ class MembershipTierResource extends Resource
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedTicket;
 
+    protected static ?int $navigationSort = 30;
+
     public static function getNavigationLabel(): string
     {
         return __('Tarifas');
@@ -29,7 +31,7 @@ class MembershipTierResource extends Resource
 
     public static function getNavigationGroup(): ?string
     {
-        return __('Administración');
+        return __('Socios');
     }
 
     public static function getModelLabel(): string

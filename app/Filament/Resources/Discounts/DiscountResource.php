@@ -22,6 +22,8 @@ class DiscountResource extends Resource
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedReceiptPercent;
 
+    protected static ?int $navigationSort = 30;
+
     public static function getNavigationLabel(): string
     {
         return __('Descuentos');
@@ -29,7 +31,7 @@ class DiscountResource extends Resource
 
     public static function getNavigationGroup(): ?string
     {
-        return __('Catálogo');
+        return __('Dispensario');
     }
 
     public static function getModelLabel(): string

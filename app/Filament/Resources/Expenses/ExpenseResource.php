@@ -32,6 +32,8 @@ class ExpenseResource extends Resource
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedBanknotes;
 
+    protected static ?int $navigationSort = 20;
+
     public static function getNavigationLabel(): string
     {
         return __('Gastos');

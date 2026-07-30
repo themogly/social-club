@@ -509,3 +509,37 @@ and an opening till float on `TillSession`. The dev seeder uses these same paths
 - `OVERNIGHT-DEFAULT — CONFIRM:` seeded default expense categories — Stock, Consumables (TILL), Staff
   payment, Repairs & maintenance, Rent, Utilities, Other (OVERHEAD hints). Confirm the club's real
   category list. Recurrence frequencies offered: MONTHLY / QUARTERLY / YEARLY.
+
+---
+
+## Prompt 14 — dashboard, navigation & reports
+
+- **Aggregation is a tested ViewModel, not widget code.** `App\ViewModels\Dashboard` (+ `DashboardCharts`)
+  computes every figure as a LIVE, org+location+period-scoped SQL aggregate (transactional data is never
+  cached); the Filament widgets are a thin render. Each stat figure has a control-query test — a
+  plausible-but-wrong dashboard number is the worst bug. `App\Support\Period` (today/week/month/custom +
+  previous-equivalent for deltas) is expressed in the app timezone, same normalisation as the
+  BusinessDay fix, so whereBetween matches stored timestamps.
+- **Dashboard composition:** one period toggle drives all widgets; a wide main column (8 delta+sparkline
+  stat cards → charts → top/recent tables) + a right rail (grouped Finanzas/Socios/Dispensario readouts
+  + a severity-coded alerts panel). Charts: income-by-type (Aportaciones/Barra/Cuotas never merged),
+  income-vs-expenses with a superávit line, dispensed-by-genetic, consumption distribution, stock levels,
+  and a CSS footfall heatmap (Chart.js has no native heatmap).
+- **Role-view differences:** OWNER = everything + org rollup (no active location) + per-location
+  comparison; MANAGER = their location only, no rollup; STAFF = operational only (who's inside, aforo
+  ring, grams dispensed, tx count, active members) with NO finance figures — euro columns and finance
+  cards are withheld (`canSeeFinance` gate + the required "staff sees no finance" test), and the open
+  till is surfaced via the alerts rail rather than a takings figure.
+- **Navigation:** grouped, permission-filtered (Resumen · Socios · Dispensario · Barra · Caja · Informes
+  · Sistema). Items register ONLY when their resource/page exists — Documentos (16) and Audit log (17)
+  are omitted for now (a shorter sidebar beats dead links); the member-PWA routing seam (15) is a
+  commented hook, not faked.
+- **Exports:** CSV via `league/csv`, PDF via `barryvdh/laravel-dompdf`; "Excel" is a CSV that opens in
+  Excel unless PhpSpreadsheet is added. Exported totals share the report's own total method (never
+  re-derived) so they equal the on-screen totals to the cent.
+- `OVERNIGHT-DEFAULT — CONFIRM:` the delta+sparkline-per-card design costs ~85 bounded (non-N+1) queries
+  per dashboard load; acceptable and tested, but a later optimisation could batch the per-card
+  current/previous/trend aggregates into fewer round-trips if the page feels heavy in production.
+- `OVERNIGHT-DEFAULT — CONFIRM:` dashboard + report visual pass (Playwright screenshots at
+  1440/1280/1024/390 + short height, light+dark, motion reduced+allowed) NOT captured (no Playwright
+  MCP) — a human must look before go-live; this is the prompt that most needs it.
