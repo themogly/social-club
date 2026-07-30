@@ -42,3 +42,14 @@ one branch each, `composer check` green before every merge. Prompt 18 is deliber
     50/40, placeholder opening hours.
 
 ---
+
+## Prompt 02 — Auth, roles, permissions, location assignment & counter PINs
+- Status: merged
+- Defaults chosen: RBAC via spatie (OWNER/MANAGER/STAFF, full permission catalogue + matrix in
+  App\Support\Permissions — see DECISIONS.md for the exact split); spatie "teams" OFF (single-org);
+  canAccessPanel = active + role; MFA = Filament v5 native TOTP (optional, recoverable); counter PIN
+  rate-limit 5/60s; location switcher (not Filament tenancy). First Filament resource pattern set
+  (UserResource, form in Schemas/ + table in Tables/, gated by policy).
+- Needs Ben's confirmation: none new. (Role→permission split is a judgment call — see DECISIONS.md
+  "Prompt 02" if you want to adjust who gets what, e.g. whether MANAGER should hold member.discount.assign
+  or data.request.handle.)
