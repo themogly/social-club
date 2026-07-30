@@ -6,15 +6,19 @@ one branch each, `composer check` green before every merge. Prompt 18 is deliber
 
 ---
 
-# ✅ FINAL SUMMARY — run completed cleanly (+ follow-ups 19 & 20)
+# ✅ FINAL SUMMARY — run completed cleanly (+ follow-ups 19, 20, 21)
 
 **The unattended run reached the end.** Bootstrap + **prompts 01–17 all completed, `composer check`
-green, and merged to `main`** (prompt 18 skipped as instructed), then two requested follow-ups —
-**19 (localization: English default, per-user locale, enforced EN/ES key parity) and 20 (admin form
-completeness: the missing ID-scan upload, grams-not-centigrams, RGPD consent capture, reactive
-therapeutic toggle, sole-association declaration, + a repeatable form-audit gate)** — also merged
-green. Every prompt was one branch off latest `main`, merged only on a green gate, then pushed to
-`origin/main`. Suite at completion: **306 tests / 2029 assertions green on BOTH SQLite and MySQL**
+green, and merged to `main`** (prompt 18 skipped as instructed), then three requested follow-ups —
+**19 (localization: English default, per-user locale, enforced EN/ES key parity), 20 (admin form
+completeness: ID-scan upload, grams-not-centigrams, RGPD consent capture, reactive therapeutic toggle,
+sole-association declaration + a repeatable form-audit gate), and 21 (cannabis product types beyond
+flower: concentrates/hash, edibles, prerolls — `product_type` → derived `unit_type`, with `grams_cg`
+kept as the one figure every limit/ceiling/report reads, computed at write time for unit lines so the
+limit arithmetic needed zero change)** — also merged green. A systemic Filament edit-page bug (a Money
+cast leaking into Livewire form state on 5 resources) was found and fixed with a class-wide regression
+test. Every prompt was one branch off latest `main`, merged only on a green gate, then pushed to
+`origin/main`. Suite at completion: **331 tests / 2167 assertions green on BOTH SQLite and MySQL**
 (the full suite verified on the production driver). Larastan L6 and Pint clean throughout.
 
 **Post-17 follow-ups flagged two things worth your attention:** (a) flipping the default to English
