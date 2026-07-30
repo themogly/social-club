@@ -39,6 +39,8 @@ class Permissions
         'expenses.approve', 'expenses.overheads', 'expenses.categories', 'purchases.manage',
         // Governance
         'documents.generate', 'minutes.manage', 'register.view',
+        // Communications (announcements + events, member PWA)
+        'comms.manage',
         // Privacy
         'data.request.handle', 'data.erase',
         // System
@@ -58,6 +60,7 @@ class Permissions
         'wallet.adjust', 'till.open', 'till.close', 'cash.bank', 'expenses.record',
         'expenses.approve', 'purchases.manage',
         'documents.generate', 'register.view',
+        'comms.manage',
         'settings.manage.location',
     ];
 

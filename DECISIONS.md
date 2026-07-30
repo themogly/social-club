@@ -543,3 +543,41 @@ and an opening till float on `TillSession`. The dev seeder uses these same paths
 - `OVERNIGHT-DEFAULT — CONFIRM:` dashboard + report visual pass (Playwright screenshots at
   1440/1280/1024/390 + short height, light+dark, motion reduced+allowed) NOT captured (no Playwright
   MCP) — a human must look before go-live; this is the prompt that most needs it.
+
+---
+
+## Prompt 15 — member PWA & club communications
+
+- **Second guard.** A separate `member` guard + `members` provider (config/auth.php); `Member` is now
+  `Authenticatable`. Staff (`web`) and socios (`member`) NEVER share a session or a panel — a guest on
+  `/socio*` redirects to the member login, everyone else to the Filament panel (`redirectGuestsTo` in
+  bootstrap/app.php). This realises the clean seam left in prompts 02–03.
+- `OVERNIGHT-DEFAULT — CONFIRM:` **auth method = passwordless magic link by email** (not OTP). A random
+  64-char token, only its SHA-256 hash stored, single-use (`used_at`, consumed in a locked transaction),
+  short-lived (`member_login_link_ttl_minutes`, default 15), and the request endpoint is rate-limited
+  (`throttle:5,1`). The response never reveals whether an email is a member. Sessions are long-lived on a
+  trusted device via remember-me (added `remember_token` to `members`). Chosen over OTP for lower
+  friction and no shared-secret entry; confirm if the club prefers a numeric code.
+- **Everything is scoped to the authenticated socio** — there is NO member id in any member URL, so one
+  member can never reach another's card, allowance, wallet, history or export (a structural guarantee,
+  denial-tested). Limits/prices/balances come from the SAME resolvers the counter uses (no second
+  arithmetic). The QR card reuses the prompt-04 `MemberToken` (issuing rotates + revokes the previous
+  card, so the emailed and PWA cards are one active token).
+- Read-mostly this phase: a member views and identifies; reservations/top-ups are prompt 18.
+- `MemberLoginLinkMail` joined the mail inventory; `MailRenderTest` now renders under a production
+  `app.url` so a legitimate absolute app link (the magic link) passes while a hard-coded dev host still
+  trips the guard.
+- `OVERNIGHT-DEFAULT — CONFIRM:` PWA visual pass (390 + 1024, light + dark) and real installability on
+  iOS/Android not captured (no Playwright) — human check before go-live.
+
+- **Communications (both sides) + Web Push** shipped: Filament `Comunicaciones` (Announcement/Event +
+  RSVP, `comms.manage` owner/manager), member Avisos/Eventos feeds, and queued webpush notifications
+  with a member-controlled **per-channel opt-out** (`push_opt_outs` JSON on members; channels
+  low_balance / membership_expiring / new_announcement / event_reminder). VAPID private key stays
+  server-side (config/webpush.php); only the public key reaches the client (asserted).
+- `OVERNIGHT-DEFAULT — CONFIRM:` three push notifications (low_balance, membership_expiring,
+  event_reminder) are built, tested and opt-out-gated but NOT yet wired to their triggers (the wallet
+  writer, `memberships:sweep`, an event-reminder scheduler) — one dispatch line each; `new_announcement`
+  IS wired. Revisit alongside the prompt-17 operational-monitoring work ("the failure mode is silence").
+- `OVERNIGHT-PLACEHOLDER — CONFIRM:` real VAPID keys must be generated (`php artisan webpush:vapid`) and
+  set as VAPID_PUBLIC_KEY / VAPID_PRIVATE_KEY / VAPID_SUBJECT before push can send.
