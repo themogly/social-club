@@ -17,7 +17,8 @@
         "laravel/tinker": "^3.0",
         "openspout/openspout": "^4.32",
         "predis/predis": "^3.5",
-        "sentry/sentry-laravel": "^4.27"
+        "sentry/sentry-laravel": "^4.27",
+        "spatie/laravel-permission": "^8.3"
     },
     "require-dev": {
         "fakerphp/faker": "^1.23",
