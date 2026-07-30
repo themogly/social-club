@@ -6,6 +6,8 @@ use App\Enums\IdDocumentType;
 use App\Enums\MemberStatus;
 use App\Models\Concerns\BelongsToOrganisation;
 use Database\Factories\MemberFactory;
+use Illuminate\Auth\Authenticatable as AuthenticatableTrait;
+use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -17,11 +19,14 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 /**
  * A socio. Org-wide (people are org-wide; membership is per location). NOT
  * location-scoped, so org-wide member search crosses locations by design.
+ *
+ * Authenticatable for the SEPARATE `member` guard (prompt 15) — passwordless, so it
+ * carries no password column; login happens through a single-use magic-link token.
  */
-class Member extends Model
+class Member extends Model implements Authenticatable
 {
     /** @use HasFactory<MemberFactory> */
-    use BelongsToOrganisation, HasFactory, HasUlids, SoftDeletes;
+    use AuthenticatableTrait, BelongsToOrganisation, HasFactory, HasUlids, SoftDeletes;
 
     protected $fillable = [
         'organisation_id', 'member_no', 'first_name', 'last_name', 'email', 'phone',

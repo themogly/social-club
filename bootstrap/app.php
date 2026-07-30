@@ -27,6 +27,12 @@ return Application::configure(basePath: dirname(__DIR__))
         // Apply the session locale on web routes (after StartSession). The panel
         // adds it to its own stack in AdminPanelProvider.
         $middleware->web(append: [SetLocale::class]);
+
+        // Guests are sent to the guard's OWN login: members to the PWA login, staff to
+        // the Filament panel (which handles its own auth). The two guards never cross.
+        $middleware->redirectGuestsTo(
+            fn (Request $request) => $request->is('socio*') ? route('socio.login') : '/'
+        );
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         // Report unhandled exceptions to Sentry (inert until SENTRY_LARAVEL_DSN is set).

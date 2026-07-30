@@ -3,6 +3,8 @@
 use App\Http\Controllers\BarReceiptController;
 use App\Http\Controllers\DispensationReceiptController;
 use App\Http\Controllers\MemberDocumentController;
+use App\Http\Controllers\Socio\AuthController as SocioAuthController;
+use App\Http\Controllers\Socio\PwaController;
 use App\Livewire\Counter\BarPos;
 use App\Livewire\Counter\CheckInScreen;
 use App\Livewire\Counter\DispensaryPos;
@@ -68,3 +70,21 @@ Route::middleware(['web', 'auth'])
 Route::middleware(['web', 'auth'])
     ->get('/counter/bar/receipt/{order}', [BarReceiptController::class, 'show'])
     ->name('counter.bar.receipt');
+
+// The member PWA (prompt 15) — the SECOND guard. Passwordless magic-link auth; every
+// area route sits behind auth:member and is scoped to the authenticated socio (there is
+// NO member id in any URL, so one member can never reach another's data). This is the
+// only member-facing surface; it is never public or indexable (noindex is global).
+Route::middleware('web')->prefix('socio')->name('socio.')->group(function () {
+    Route::get('login', [SocioAuthController::class, 'show'])->name('login');
+    Route::post('login', [SocioAuthController::class, 'sendLink'])->middleware('throttle:5,1')->name('login.send');
+    Route::get('login/verify/{token}', [SocioAuthController::class, 'verify'])->middleware('throttle:10,1')->name('login.verify');
+
+    Route::middleware('auth:member')->group(function () {
+        Route::get('/', [PwaController::class, 'home'])->name('home');
+        Route::get('menu', [PwaController::class, 'menu'])->name('menu');
+        Route::get('historial', [PwaController::class, 'history'])->name('history');
+        Route::get('mis-datos', [PwaController::class, 'export'])->name('export');
+        Route::post('logout', [SocioAuthController::class, 'logout'])->name('logout');
+    });
+});
