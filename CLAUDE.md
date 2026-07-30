@@ -149,9 +149,14 @@ vocabulary above is Spanish even in the English locale where it is a term of art
   `app/Livewire/Counter/TillSession.php` (till open + cash movements + BLIND close), and
   `app/Livewire/Counter/DispensaryPos.php` (member-first weight POS — a THIN shell that only resolves
   + calls the Actions; idempotency key per basket, fail-closed offline, no member ⇒ no commit).
-- Void / correct (never a silent edit): `app/Actions/Dispensing/VoidDispensation.php` — returns stock
-  to the originating batch and reverses the wallet; grams/cash release automatically (COMPLETED-only
-  arithmetic). A correction is a void + a fresh dispensation linked via `reversal_of_id`.
+- Void / correct (never a silent edit): `app/Actions/Dispensing/VoidDispensation.php` and
+  `app/Actions/Bar/VoidOrder.php` — return stock to the originating batch/article and reverse the
+  wallet (off-till); grams/cash release automatically (COMPLETED-only arithmetic). A correction is a
+  void + a fresh row linked via `reversal_of_id`.
+- Bar / merch (separate ledger, one drawer): `app/Actions/Bar/CommitOrder.php` writes an `Order` (own
+  `items` snapshot, `SALE` unit stock, `PURCHASE` wallet spend, cash to the shared till) — articles
+  only, so a genetic can never appear; bar cash stays out of `cash_contributions`. Screen
+  `app/Livewire/Counter/BarPos.php`; sale-worded receipt `resources/views/receipts/bar-receipt.blade.php`.
 - Contribution receipt (worded aportación, never venta): `resources/views/receipts/receipt.blade.php`
   + `app/Http/Controllers/DispensationReceiptController.php` (ULID route, authorization-checked).
 - Till / cash / arqueo: expected drawer cash is **derived from the ledger, never stored**

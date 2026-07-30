@@ -446,3 +446,32 @@ and an opening till float on `TillSession`. The dev seeder uses these same paths
   `signature_path`). Confirm the real club policy for each.
 - `OVERNIGHT-DEFAULT — CONFIRM:` counter-screen visual screenshots not captured (no Playwright MCP) —
   human screenshot pass (1440/1280/1024/390, light+dark, motion reduced+allowed) before go-live.
+
+---
+
+## Prompt 12 — bar / merch POS (separate catalogue, separate ledger)
+
+- **Separate ledger, one drawer.** Bar/merch sales are `App\Models\Order` rows (own `items` snapshot,
+  own status), committed by `App\Actions\Bar\CommitOrder` — never `Dispensation`. They share ONE open
+  `TillSession` with the dispensary so the arqueo covers the whole drawer, but bar cash lands in
+  `TillSummary`'s `bar_cash` and never in `cash_contributions` (tested). Stock moves as `SALE` on
+  `Article` units; cannabis moves as `DISPENSE` on batch centigrams — the two never mix.
+- **A genetic can never appear on a bar order.** A catalogue line must resolve to an `Article` at the
+  location; a genetic id does not, so `CommitOrder` refuses it (tested at the model boundary). The bar
+  grid only ever lists articles.
+- **Member optional.** Cash orders may be unattributed (guest/rollout) with an optional free-text
+  reference; a wallet payment REQUIRES an attached member (enforced). Miscellaneous/quick-amount lines
+  require a reference and move no stock.
+- **Wallet spend type.** A bar wallet payment records a new `WalletTransactionType::PURCHASE` — never
+  `CONTRIBUTION` (reserved for the cannabis aportación) — so wallet-ledger reporting keeps bar spend
+  distinct from contributions.
+- `OVERNIGHT-DEFAULT — CONFIRM:` **bar articles use a single flat `price_cents`** — no per-membership-
+  tier bar pricing is modelled (the prompt floats "tier pricing" for members, but `Article` carries one
+  price and there is no article-tier table). If the club wants tiered bar prices, that is a later schema
+  addition; flat pricing is the default.
+- **Void** = `App\Actions\Bar\VoidOrder` (order.void, manager+): returns units, refunds the wallet
+  (off-till — a wallet credit is not a drawer movement), cash releases via the COMPLETED-only till
+  arithmetic. Never a silent edit; a correction is a void plus a fresh linked order.
+- Bar receipt is worded as a normal **venta / ticket** — deliberately distinct vocabulary from the
+  cannabis **aportación / contribución** receipt. UI gated by `App\Policies\OrderPolicy` (pos.bar to use,
+  order.void to void); receipt at a ULID route.

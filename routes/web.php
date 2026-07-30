@@ -1,7 +1,9 @@
 <?php
 
+use App\Http\Controllers\BarReceiptController;
 use App\Http\Controllers\DispensationReceiptController;
 use App\Http\Controllers\MemberDocumentController;
+use App\Livewire\Counter\BarPos;
 use App\Livewire\Counter\CheckInScreen;
 use App\Livewire\Counter\DispensaryPos;
 use App\Livewire\Counter\TillSession;
@@ -52,3 +54,17 @@ Route::middleware(['web', 'auth'])
 Route::middleware(['web', 'auth'])
     ->get('/counter/pos/receipt/{dispensation}', [DispensationReceiptController::class, 'show'])
     ->name('counter.pos.receipt');
+
+// The bar / merch POS — the auxiliary-income counterpart, same tablet-first pattern. A
+// THIN shell over CommitOrder (freezes the item snapshot, depletes UNIT stock, optionally
+// charges a member wallet, posts cash to the SHARED till). Gated in the component on
+// pos.bar. The socio is OPTIONAL (cash guests are fine); wallet payment requires one.
+// The printable SALE ticket (venta / ticket — distinct from the contribution vocabulary)
+// is served by a ULID route and authorization-checked through OrderPolicy.
+Route::middleware(['web', 'auth'])
+    ->get('/counter/bar', BarPos::class)
+    ->name('counter.bar');
+
+Route::middleware(['web', 'auth'])
+    ->get('/counter/bar/receipt/{order}', [BarReceiptController::class, 'show'])
+    ->name('counter.bar.receipt');
