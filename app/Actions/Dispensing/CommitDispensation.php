@@ -39,7 +39,7 @@ use RuntimeException;
  * base per-gram price here; prompt 08 layers tier/discount resolution on top.
  *
  * @phpstan-type Line array{genetic_id: string, batch_id: string, grams_cg: int}
- * @phpstan-type CommitOptions array{operator_id?: ?string, till_session_id?: ?string, cash_cents?: int, wallet_cents?: int, signature_path?: ?string, idempotency_key?: ?string, override?: bool, override_by?: ?User, override_reason?: ?string, at?: ?\DateTimeInterface}
+ * @phpstan-type CommitOptions array{operator_id?: ?string, till_session_id?: ?string, cash_cents?: int, wallet_cents?: int, signature_path?: ?string, idempotency_key?: ?string, reversal_of_id?: ?string, override?: bool, override_by?: ?User, override_reason?: ?string, at?: ?\DateTimeInterface}
  */
 class CommitDispensation
 {
@@ -96,6 +96,7 @@ class CommitDispensation
                 'cash_cents' => $cash,
                 'wallet_cents' => $wallet,
                 'status' => DispensationStatus::COMPLETED,
+                'reversal_of_id' => $options['reversal_of_id'] ?? null,
                 'signature_path' => $options['signature_path'] ?? null,
                 'idempotency_key' => $key,
                 'dispensed_at' => $options['at'] ?? now(),
