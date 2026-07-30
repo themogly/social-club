@@ -190,3 +190,27 @@ and an opening till float on `TillSession`. The dev seeder uses these same paths
   the panel, or these roles. The Filament panel and all policies are staff-only by construction.
 - **First Filament resource: `UserResource`** (staff admin) — establishes the v5 resource pattern
   (form in `Schemas/`, table in `Tables/`, gated by `UserPolicy` on `staff.manage`).
+
+---
+
+## Prompt 03 — organisation & location settings
+
+- **Full settings catalogue** in `App\Support\Settings::DEFAULTS` (identity/display, compliance,
+  consumption gauge, avalador, wallet/debt, membership, stock, discounts, till, data retention,
+  per-location defaults). Everything read through `Settings::get()` (safe default, never throws).
+- **Enforcement matrix** (`enforcement` setting, JSON): each check is independently BLOCK/WARN/OVERRIDE
+  at the **door** and the **counter** (`Settings::enforcement($surface, $rule)`, fail-safe BLOCK).
+  This supersedes the prompt-01 `limit_breach_hard_block` boolean (removed); the manager-override gate
+  remains `limit_override_requires_manager`. Consumed by prompts 06/09/11/12.
+- **Org settings surface:** `App\Filament\Pages\ManageSettings` (owner-only, `settings.manage`) —
+  sectioned form with help text, loads on mount, validates, persists via `Settings::set`, writes an
+  `audit_logs` `settings.updated` entry, and notifies. Grams shown at the edge, stored as centigrams.
+- **Per-location settings:** `LocationResource` (`settings.manage.location`) with aforo/timezone/cutoff/
+  hours/accent + module toggles in the `settings` JSON (bar, signature-on-dispensation, restrict-POS-
+  to-checked-in, camera scan) + `aforo_enforcement`. **Expense categories:** `ExpenseCategoryResource`
+  (`expenses.categories`).
+- **Locale switching:** `SetLocale` middleware applies the session locale (validated against
+  `enabled_locales`) on web + panel; `App\Livewire\LocaleSwitcher` in the topbar. `lang/en.json`
+  holds the English overrides (Spanish strings are the source keys).
+- **Not retroactive:** changing a threshold affects future checks only (Settings is read live at
+  check time; already-committed rows/documents are untouched by construction).

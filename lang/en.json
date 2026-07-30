@@ -2,5 +2,46 @@
     "Ejemplo de comunicación del club": "Example club communication",
     "Hola :name,": "Hi :name,",
     "Esta es una plantilla de referencia. Las comunicaciones reales del club (bienvenida, renovación, avisos) reutilizan este diseño.": "This is a reference template. The club's real communications (welcome, renewal, notices) reuse this design.",
-    "Un saludo,": "Kind regards,"
+    "Un saludo,": "Kind regards,",
+
+    "Administración": "Administration",
+    "Personal": "Staff",
+    "usuario": "user",
+    "usuarios": "users",
+    "Nombre": "Name",
+    "Correo electrónico": "Email address",
+    "Correo": "Email",
+    "Contraseña": "Password",
+    "PIN de mostrador": "Counter PIN",
+    "4–8 dígitos. Identifica al operador en el mostrador.": "4–8 digits. Identifies the operator at the counter.",
+    "Roles": "Roles",
+    "Sedes asignadas": "Assigned locations",
+    "Sedes": "Locations",
+    "Activo": "Active",
+    "Alta": "Joined",
+
+    "Todas las sedes": "All locations",
+    "Sede activa": "Active location",
+
+    "sede": "location",
+    "Aforo": "Capacity",
+    "Bloquear": "Block",
+    "Avisar": "Warn",
+    "Bar activado": "Bar enabled",
+
+    "Categorías de gasto": "Expense categories",
+    "categoría de gasto": "expense category",
+    "categorías de gasto": "expense categories",
+    "Caja": "Till",
+    "Gasto general": "Overhead",
+
+    "Ajustes": "Settings",
+    "Ajustes de la organización": "Organisation settings",
+    "Ajustes guardados": "Settings saved",
+    "Identidad": "Identity",
+    "Cumplimiento": "Compliance",
+    "Cartera y deuda": "Wallet & debt",
+    "Membresía": "Membership",
+    "Existencias": "Stock",
+    "Privacidad y datos": "Privacy & data"
 }
