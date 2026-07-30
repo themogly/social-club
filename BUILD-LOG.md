@@ -82,3 +82,12 @@ one branch each, `composer check` green before every merge. Prompt 18 is deliber
   reminders (reminder_sent_for marker). See DECISIONS.md "Prompt 05".
 - Needs Ben's confirmation: none new (wallet per-location + ring-fencing already flagged OVERNIGHT-DEFAULT
   in prompt 01; debt limit default 0/off is a safe default to confirm with the club).
+
+## Prompt 06 — Consumption model: declared forecast, limits & enforcement
+- Status: merged
+- Defaults chosen: single ResolveMemberLimits (member→tier→location→org precedence; tier limit columns
+  added to membership_tiers); monthly window = calendar (rolling30 optional); CommitDispensation
+  enforces membership/carencia/daily/monthly in one locked transaction (concurrent joint-breach → one
+  commits); hard-block + permissioned audited limits.override; used computed live (voids release grams);
+  aggregate 100g ceiling self-declared (UI states so). Base price now, ResolvePrice in prompt 08.
+- Needs Ben's confirmation: none new (limit defaults + enforcement matrix already flagged prompt 01/03).
