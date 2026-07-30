@@ -296,3 +296,26 @@ and an opening till float on `TillSession`. The dev seeder uses these same paths
 - **Concurrency-test note:** the joint-breach test is sequential (proves the live-ledger check);
   true parallel-transaction testing needs integration tooling, but the `lockForUpdate` serialises in
   production.
+
+---
+
+## Prompt 07 — genetics, batches, weight-based stock, merma & the bar catalogue
+
+- **Modelling:** Genetic (org-wide strain definition, priced per gram) → Batch (per-location lot,
+  stock in integer centigrams, cost/harvest/expiry/lab) → StockMovement ledger. Articles (bar/food/
+  merch) are plain-unit items with a SEPARATE ledger — never collapsed into one products table.
+- **One stock writer:** `App\Actions\Stock\RecordStockMovement` — locks the batch/article row FOR
+  UPDATE, applies a signed delta, refuses to go negative, appends one movement. `IntakeBatch`
+  (grams→cg, opening stock as an INTAKE movement), `CommitStockTake` (variances → ADJUSTMENT
+  movements, reconciling to the count). CommitDispensation (prompt 06) now routes its DISPENSE
+  through this writer. Nothing else mutates stock columns.
+- **Merma** is its own movement type, permissioned (`stock.merma`) with a reason — never hidden
+  inside ADJUSTMENT. Stock-take variances are recorded as ADJUSTMENT (the take itself is permissioned/
+  audited).
+- **FEFO batch selection** (`SelectBatch::fefo`): oldest open, non-expired, in-stock; expired batches
+  refused from dispensing. CommitDispensation asserts `isDispensable` per line.
+- **Premises stock ceiling** (`StockCeiling::forLocation`): `active_members × daily_limit_cg ×
+  stock_ceiling_days`; returns the arithmetic (not a bare number) since day-count sources vary
+  (NOTES §A). A compliance signal for the dashboard (prompt 14).
+- Stock is per-location; cross-location is refused by the LocationScope (a transfer is an explicit
+  permissioned movement pair). Genetics org-wide; batches/stock/prices per-location.

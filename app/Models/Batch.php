@@ -12,6 +12,8 @@ use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\MorphMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Batch extends Model
@@ -41,6 +43,22 @@ class Batch extends Model
     public function genetic(): BelongsTo
     {
         return $this->belongsTo(Genetic::class);
+    }
+
+    /** @return MorphMany<StockMovement, $this> */
+    public function movements(): MorphMany
+    {
+        return $this->morphMany(StockMovement::class, 'stockable');
+    }
+
+    /**
+     * Everything dispensed from this batch — the traceability spine.
+     *
+     * @return HasMany<DispensationLine, $this>
+     */
+    public function dispensationLines(): HasMany
+    {
+        return $this->hasMany(DispensationLine::class);
     }
 
     /**

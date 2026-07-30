@@ -133,7 +133,14 @@ vocabulary above is Spanish even in the English locale where it is a term of art
 - Fat model with enum casts + scopes + relations: `app/Models/Member.php`, `app/Models/Dispensation.php`
   (the tender-split invariant lives in its `booted()`), `app/Models/AuditLog.php` / `Minute.php`
   (append-only / immutable-once-signed).
-- Filament resource (scoped + policy): [add first real one — prompt 04]
+- Filament resource (scoped + policy): `app/Filament/Resources/Users/UserResource.php`,
+  `app/Filament/Resources/Members/MemberResource.php` (form in `Schemas/`, table in `Tables/`,
+  relation managers, gated by a matching `app/Policies/*Policy.php`).
+- Stock: **one writer** `app/Actions/Stock/RecordStockMovement.php` (locks the batch/article row,
+  signed delta, refuses negative, appends a movement — the POS and every UI action call it, nothing
+  else touches stock columns). Batch selection at the counter: `app/Actions/Stock/SelectBatch.php`
+  (FEFO — oldest open, non-expired, in-stock; expired refused). Transactional compliance boundary:
+  `app/Actions/Dispensing/CommitDispensation.php`.
 - Livewire counter component: [add first real one — prompt 09/11]
 - Spreadsheet export/import: [App\Support\Spreadsheet\* — prompt 14/04]
 - PDF document: [App\Actions\Documents\* — prompt 16]
