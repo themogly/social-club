@@ -5,3 +5,7 @@ parameters:
     paths:
         - app
     # add more paths (config, database, routes) once level 6 is green on app/
+    # This codebase declares casts via the Laravel 11 casts() METHOD; tell Larastan
+    # to read it so custom casts (MoneyCast->Money, WeightCast->Weight, enum casts)
+    # are understood instead of falling back to the raw column type.
+    parseModelCastsMethod: true

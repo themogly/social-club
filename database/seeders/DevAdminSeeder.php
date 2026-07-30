@@ -26,9 +26,9 @@ class DevAdminSeeder extends Seeder
         }
 
         $accounts = [
-            ['name' => 'Club Owner', 'email' => 'owner@club.test'],
-            ['name' => 'Club Manager', 'email' => 'manager@club.test'],
-            ['name' => 'Club Staff', 'email' => 'staff@club.test'],
+            ['name' => 'Club Owner', 'email' => 'owner@club.test', 'pin' => '1234'],
+            ['name' => 'Club Manager', 'email' => 'manager@club.test', 'pin' => '2345'],
+            ['name' => 'Club Staff', 'email' => 'staff@club.test', 'pin' => '3456'],
         ];
 
         foreach ($accounts as $account) {
@@ -37,6 +37,8 @@ class DevAdminSeeder extends Seeder
                 [
                     'name' => $account['name'],
                     'password' => Hash::make('password'),
+                    'pin' => Hash::make($account['pin']),   // hashed; roles assigned in prompt 02
+                    'active' => true,
                     'email_verified_at' => now(),
                 ],
             );

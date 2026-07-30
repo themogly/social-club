@@ -8,16 +8,24 @@ use Filament\Models\Contracts\FilamentUser;
 use Filament\Panel;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
+use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 
-#[Fillable(['name', 'email', 'password'])]
-#[Hidden(['password', 'remember_token'])]
+#[Fillable(['name', 'email', 'password', 'pin', 'active'])]
+#[Hidden(['password', 'remember_token', 'pin', 'mfa_secret'])]
 class User extends Authenticatable implements FilamentUser
 {
     /** @use HasFactory<UserFactory> */
-    use HasFactory, Notifiable;
+    use HasFactory, HasUlids, Notifiable, SoftDeletes;
+
+    /** @var array<string, mixed> */
+    protected $attributes = [
+        'active' => true,
+    ];
 
     /**
      * Gate access to the Filament admin panel.
@@ -32,6 +40,12 @@ class User extends Authenticatable implements FilamentUser
         return $this->hasVerifiedEmail();
     }
 
+    /** @return BelongsToMany<Location, $this> */
+    public function locations(): BelongsToMany
+    {
+        return $this->belongsToMany(Location::class)->withTimestamps();
+    }
+
     /**
      * Get the attributes that should be cast.
      *
@@ -42,6 +56,10 @@ class User extends Authenticatable implements FilamentUser
         return [
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
+            'pin' => 'hashed',
+            'mfa_secret' => 'encrypted',
+            'mfa_confirmed_at' => 'datetime',
+            'active' => 'boolean',
         ];
     }
 }

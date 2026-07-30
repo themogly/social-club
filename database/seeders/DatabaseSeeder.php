@@ -14,10 +14,13 @@ class DatabaseSeeder extends Seeder
      */
     public function run(): void
     {
-        // Local-only seeded staff logins (owner/manager/staff). Guarded inside
-        // the seeder too, and only ever called here in the local environment.
+        // Local-only. Staff logins first (owner/manager/staff), then the demo
+        // organisation, premises, catalogue, members and a fortnight of activity.
         if (app()->environment('local')) {
-            $this->call(DevAdminSeeder::class);
+            $this->call([
+                DevAdminSeeder::class,
+                DemoDataSeeder::class,
+            ]);
         }
     }
 }
