@@ -34,6 +34,10 @@ class EditPurchase extends EditRecord
         $data['amount_eur'] = $purchase->amount_cents->cents / 100;
         $data['paid_eur'] = $purchase->paid_cents->cents / 100;
 
+        // Money cast objects cannot live in Livewire form state — the virtual euro
+        // fields carry these values instead.
+        unset($data['amount_cents'], $data['paid_cents']);
+
         return $data;
     }
 
