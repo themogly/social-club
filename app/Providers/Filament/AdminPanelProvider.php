@@ -84,6 +84,13 @@ class AdminPanelProvider extends PanelProvider
                 // from App\Filament\Pages\Reports; the group renders only when the actor
                 // can see at least one report, so STAFF (no reports.view) never sees it.
                 NavigationGroup::make(fn (): string => __('Informes')),
+                // Documentos (prompt 16): the legal-documents module — libro de socios,
+                // actas, plantillas, registro de dispensación, exportación contable and the
+                // generated-documents vault. Each item is permission-gated (register.view /
+                // minutes.manage / documents.generate / reports.view / reports.export /
+                // member.documents.view), so the group renders only when the actor can see
+                // at least one — STAFF never sees it.
+                NavigationGroup::make(fn (): string => __('Documentos')),
                 // Club communications (prompt 15): announcements + events, surfaced in the
                 // member PWA. Renders only when the actor holds comms.manage.
                 NavigationGroup::make(fn (): string => __('Comunicaciones')),

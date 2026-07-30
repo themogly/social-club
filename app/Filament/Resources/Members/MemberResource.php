@@ -2,14 +2,17 @@
 
 namespace App\Filament\Resources\Members;
 
+use App\Actions\Documents\GenerateMemberDocument;
 use App\Actions\Members\ExportMemberData;
 use App\Actions\Members\IssueMemberToken;
 use App\Actions\Members\TransitionMemberStatus;
+use App\Enums\MemberDocumentType;
 use App\Enums\MemberStatus;
 use App\Filament\Resources\Members\Pages\CreateMember;
 use App\Filament\Resources\Members\Pages\EditMember;
 use App\Filament\Resources\Members\Pages\ListMembers;
 use App\Filament\Resources\Members\Pages\ViewMember;
+use App\Filament\Resources\Members\RelationManagers\DocumentsRelationManager;
 use App\Filament\Resources\Members\RelationManagers\MembershipsRelationManager;
 use App\Filament\Resources\Members\RelationManagers\WalletTransactionsRelationManager;
 use App\Filament\Resources\Members\Schemas\MemberForm;
@@ -17,8 +20,10 @@ use App\Filament\Resources\Members\Schemas\MemberInfolist;
 use App\Filament\Resources\Members\Tables\MembersTable;
 use App\Mail\MemberCardMail;
 use App\Models\Member;
+use App\Models\User;
 use BackedEnum;
 use Filament\Actions\Action;
+use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
 use Filament\Notifications\Notification;
 use Filament\Resources\Resource;
@@ -85,11 +90,43 @@ class MemberResource extends Resource
     {
         return [
             self::resendQrAction(),
+            self::generateDocumentAction(),
             self::suspendAction(),
             self::expelAction(),
             self::reactivateAction(),
             self::exportDataAction(),
         ];
+    }
+
+    /**
+     * Generar documento — produce an immutable, versioned member document (Solicitud de
+     * alta / Previsión de consumo / Acta de sanción) through the domain action, which
+     * renders the PDF to the private disk and freezes a snapshot. Gated on
+     * `documents.generate`.
+     */
+    public static function generateDocumentAction(): Action
+    {
+        return Action::make('generateDocument')
+            ->label(__('Generar documento'))
+            ->icon(Heroicon::OutlinedDocumentPlus)
+            ->visible(fn (): bool => Auth::user()?->can('documents.generate') ?? false)
+            ->schema([
+                Select::make('type')
+                    ->label(__('Tipo de documento'))
+                    ->options([
+                        MemberDocumentType::REGISTRATION_FORM->value => __('Solicitud de alta'),
+                        MemberDocumentType::DECLARATION->value => __('Previsión de consumo'),
+                        MemberDocumentType::SANCTION_ACT->value => __('Acta de sanción'),
+                    ])
+                    ->required(),
+            ])
+            ->action(function (Member $record, array $data): void {
+                /** @var User $actor */
+                $actor = Auth::user();
+                (new GenerateMemberDocument)->handle($record, MemberDocumentType::from((string) $data['type']), $actor);
+
+                Notification::make()->title(__('Documento generado'))->success()->send();
+            });
     }
 
     public static function resendQrAction(): Action
@@ -192,6 +229,7 @@ class MemberResource extends Resource
         return [
             MembershipsRelationManager::class,
             WalletTransactionsRelationManager::class,
+            DocumentsRelationManager::class,
         ];
     }
 

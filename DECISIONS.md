@@ -581,3 +581,31 @@ and an opening till float on `TillSession`. The dev seeder uses these same paths
   IS wired. Revisit alongside the prompt-17 operational-monitoring work ("the failure mode is silence").
 - `OVERNIGHT-PLACEHOLDER — CONFIRM:` real VAPID keys must be generated (`php artisan webpush:vapid`) and
   set as VAPID_PUBLIC_KEY / VAPID_PRIVATE_KEY / VAPID_SUBJECT before push can send.
+
+---
+
+## Prompt 16 — legal documents: libro de socios, actas & generated forms
+
+- **The books generate themselves from the data.** `App\Support\MembersRegister::asAt($orgId, $date)`
+  is the statutory libro de socios for any point in time — it KEEPS departed members (with leave
+  dates) and excludes later joiners (filter `joined_at <= date`), because a register that drops
+  leavers is not a register.
+- **Actas** (`App\Actions\Documents\{CreateMinute,SignMinute}`): numbering is SEQUENTIAL per
+  (organisation, book) with no gaps — the next number is taken under a row lock and the
+  unique(organisation, book, number) index is the concurrency backstop (a losing racer retries).
+  **Quorum is computed against members active AT the meeting date** (`minute_quorum_fraction_bp`,
+  default 5000 = 50%), never today's roll. A signed acta is IMMUTABLE (`Minute::booted` refuses
+  update/delete once `signed_at` is set); a correction is a NEW minute linked by `supersedes_id`.
+  Granted MANAGER `minutes.manage` so actas are owner/manager per the prompt.
+- **Generated documents** (`GenerateMemberDocument`): the rendered PDF is written to the PRIVATE
+  `documents` disk and the row carries a FROZEN `snapshot` (name, doc number, consent version in
+  force, template version) — later edits to the member or the template never change an issued
+  document; regeneration produces a NEW version. Added a nullable `snapshot` JSON to
+  `member_documents`.
+- **Accounting export** (`App\Support\Spreadsheet\AccountingExport`) is DERIVED from the same
+  `FinancialReport` shown on screen, so its totals reconcile to the cent by construction (the
+  *libros contables* obligation is met by the club's accountant, not reinvented in-app).
+- Documents are served ONLY via short-lived signed URLs and every view is access-logged
+  (`IssueDocumentUrl` → `DocumentAccessLog`). Nothing here is legal advice — a plain note says so.
+- `OVERNIGHT-DEFAULT — CONFIRM:` quorum fraction 50%; document letterhead/wording uses the default
+  template text until the club supplies its own (editable per-org versioned templates).
