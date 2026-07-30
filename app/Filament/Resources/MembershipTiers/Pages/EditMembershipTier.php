@@ -36,6 +36,11 @@ class EditMembershipTier extends EditRecord
         $data['daily_limit_g'] = $tier->daily_limit_cg !== null ? $tier->daily_limit_cg / 100 : null;
         $data['monthly_limit_g'] = $tier->monthly_limit_cg !== null ? $tier->monthly_limit_cg / 100 : null;
 
+        // The raw cast keys must NOT reach the form: default_fee_cents is a Money value
+        // object, which Livewire cannot hold as component state ("Property type not
+        // supported"). The virtual euro/gram fields above carry these values instead.
+        unset($data['default_fee_cents'], $data['daily_limit_cg'], $data['monthly_limit_cg']);
+
         return $data;
     }
 

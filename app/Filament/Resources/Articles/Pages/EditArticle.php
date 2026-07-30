@@ -34,6 +34,10 @@ class EditArticle extends EditRecord
         $article = $this->getRecord();
         $data['price_eur'] = $article->price_cents->cents / 100;
 
+        // A Money cast object cannot live in Livewire form state — the virtual euro
+        // field carries the value instead.
+        unset($data['price_cents']);
+
         return $data;
     }
 

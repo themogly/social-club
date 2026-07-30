@@ -34,6 +34,10 @@ class EditDiscount extends EditRecord
             $data['value_eur'] = $record->value_cents !== null ? $record->value_cents->cents / 100 : null;
         }
 
+        // value_cents is a Money cast object — it cannot live in Livewire form state
+        // (the virtual value_eur field carries it).
+        unset($data['value_cents']);
+
         return $data;
     }
 
