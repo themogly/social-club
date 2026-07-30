@@ -65,18 +65,18 @@ class AgmPackReport extends AbstractReport
         $disp = DB::table('dispensations')->whereIn('location_id', $ids)
             ->where('status', DispensationStatus::COMPLETED->value)
             ->whereBetween('dispensed_at', [$start, $end])
-            ->groupBy('location_id')->pluck(DB::raw('SUM(total_cents)'), 'location_id');
+            ->groupBy('location_id')->pluck(DB::raw('SUM(total_cents) as agg'), 'location_id');
         $ord = DB::table('orders')->whereIn('location_id', $ids)
             ->where('status', OrderStatus::COMPLETED->value)
             ->whereBetween('created_at', [$start, $end])
-            ->groupBy('location_id')->pluck(DB::raw('SUM(total_cents)'), 'location_id');
+            ->groupBy('location_id')->pluck(DB::raw('SUM(total_cents) as agg'), 'location_id');
         $fees = DB::table('membership_fee_payments')
             ->join('memberships', 'membership_fee_payments.membership_id', '=', 'memberships.id')
             ->whereIn('memberships.location_id', $ids)
             ->whereBetween('membership_fee_payments.paid_at', [$start, $end])
-            ->groupBy('memberships.location_id')->pluck(DB::raw('SUM(membership_fee_payments.amount_cents)'), 'memberships.location_id');
+            ->groupBy('memberships.location_id')->pluck(DB::raw('SUM(membership_fee_payments.amount_cents) as agg'), 'memberships.location_id');
         $exp = $this->expensesInPeriod()->whereIn('location_id', $ids)
-            ->groupBy('location_id')->pluck(DB::raw('SUM(amount_cents)'), 'location_id');
+            ->groupBy('location_id')->pluck(DB::raw('SUM(amount_cents) as agg'), 'location_id');
         $overheads = (int) $this->expensesInPeriod()->whereNull('location_id')->sum('amount_cents');
 
         $rows = [];
@@ -139,7 +139,7 @@ class AgmPackReport extends AbstractReport
         $counts = DB::table('members')
             ->where('organisation_id', $this->organisationId)
             ->whereNull('deleted_at')
-            ->groupBy('status')->pluck(DB::raw('COUNT(*)'), 'status');
+            ->groupBy('status')->pluck(DB::raw('COUNT(*) as agg'), 'status');
 
         $this->figures['active_members'] = (int) ($counts[MemberStatus::ACTIVE->value] ?? 0);
 

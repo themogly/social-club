@@ -71,7 +71,7 @@ class StockReport extends AbstractReport
         $dispensed = DB::table('dispensation_lines')
             ->whereIn('batch_id', $batches->pluck('id')->all())
             ->groupBy('batch_id')
-            ->pluck(DB::raw('SUM(grams_cg)'), 'batch_id');
+            ->pluck(DB::raw('SUM(grams_cg) as agg'), 'batch_id');
 
         $rows = $batches->map(function (\stdClass $b) use ($names, $dispensed): array {
             $remaining = (int) $b->remaining_cg;

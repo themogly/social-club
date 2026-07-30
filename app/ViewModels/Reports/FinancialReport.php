@@ -155,7 +155,7 @@ class FinancialReport extends AbstractReport
             ->whereIn('memberships.location_id', $ids)
             ->whereBetween('membership_fee_payments.paid_at', [$start, $end])
             ->groupBy('membership_fee_payments.method')
-            ->pluck(DB::raw('SUM(membership_fee_payments.amount_cents)'), 'membership_fee_payments.method');
+            ->pluck(DB::raw('SUM(membership_fee_payments.amount_cents) as agg'), 'membership_fee_payments.method');
 
         $fee = fn (FeePaymentMethod $m): int => (int) ($feesByMethod[$m->value] ?? 0);
 
@@ -293,7 +293,7 @@ class FinancialReport extends AbstractReport
             ->where('dispensations.status', DispensationStatus::COMPLETED->value)
             ->whereBetween('dispensations.dispensed_at', [$start, $end])
             ->groupBy('dispensation_lines.genetic_id')
-            ->pluck(DB::raw('SUM(dispensation_lines.grams_cg)'), 'dispensation_lines.genetic_id');
+            ->pluck(DB::raw('SUM(dispensation_lines.grams_cg) as agg'), 'dispensation_lines.genetic_id');
 
         $geneticIds = array_values(array_unique([...array_keys($intake), ...$dispensed->keys()->map(fn ($k) => (string) $k)->all()]));
         $names = DB::table('genetics')->whereIn('id', $geneticIds)->pluck('name', 'id');

@@ -172,7 +172,7 @@ class ConsumptionReport extends AbstractReport
             ->where('dispensations.status', DispensationStatus::COMPLETED->value)
             ->whereBetween('dispensations.dispensed_at', [$start, $end])
             ->groupBy('dispensations.member_id')
-            ->pluck(DB::raw('SUM(dispensation_lines.grams_cg)'), 'dispensations.member_id');
+            ->pluck(DB::raw('SUM(dispensation_lines.grams_cg) as agg'), 'dispensations.member_id');
 
         $members = Member::query()->withoutGlobalScopes()
             ->where('organisation_id', $this->organisationId)
