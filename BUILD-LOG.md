@@ -108,3 +108,13 @@ one branch each, `composer check` green before every merge. Prompt 18 is deliber
   AssignMemberDiscount owner-only + audited; DiscountResource (%/€ edge). CommitDispensation prices
   via ResolvePrice. See DECISIONS.md "Prompt 08".
 - Needs Ben's confirmation: none new (tier-pricing shape confirmed at prompt-01 checkpoint).
+
+## Prompt 09 — Check-in, attendance, aforo & door checks
+- Status: merged
+- Defaults chosen: one ResolveMemberEligibility shared by door + counter (per-rule verdict from the
+  enforcement matrix); door.carencia/debt = WARN (may enter) vs counter = BLOCK; aforo blocks at
+  capacity; checkin.override (manager) logged; auto-checkout nightly 06:00 (idempotent); entry-exit
+  sheet + footfall for the dashboard. First counter app (Livewire /counter/checkin + reusable layout).
+- Needs Ben's confirmation: `OVERNIGHT-DEFAULT — CONFIRM:` visual screenshots of counter screens NOT
+  captured (no Playwright MCP in the unattended run) — a human should run the screenshot pass before
+  go-live (see DECISIONS.md "Prompt 09").
