@@ -10,13 +10,16 @@ use App\Actions\Wallet\RecordWalletTransaction;
 use App\Enums\DispensationStatus;
 use App\Enums\MembershipStatus;
 use App\Enums\StockMovementType;
+use App\Enums\TillSessionStatus;
 use App\Enums\WalletTransactionType;
 use App\Exceptions\DispensationBlockedException;
 use App\Exceptions\LimitExceededException;
+use App\Exceptions\TillClosedException;
 use App\Models\Batch;
 use App\Models\Dispensation;
 use App\Models\Location;
 use App\Models\Member;
+use App\Models\TillSession;
 use App\Models\User;
 use App\Support\LimitSnapshot;
 use App\Support\MemberEligibility;
@@ -57,6 +60,15 @@ class CommitDispensation
                 $existing = Dispensation::withoutGlobalScopes()->where('idempotency_key', $key)->first();
                 if ($existing !== null) {
                     return $existing;
+                }
+            }
+
+            // A dispensation may only attach to an OPEN till session.
+            $tillSessionId = $options['till_session_id'] ?? null;
+            if ($tillSessionId !== null) {
+                $till = TillSession::withoutGlobalScopes()->find($tillSessionId);
+                if ($till === null || $till->status !== TillSessionStatus::OPEN) {
+                    throw new TillClosedException('The dispensation must attach to an open till session.');
                 }
             }
 

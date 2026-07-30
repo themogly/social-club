@@ -118,3 +118,8 @@ one branch each, `composer check` green before every merge. Prompt 18 is deliber
 - Needs Ben's confirmation: `OVERNIGHT-DEFAULT — CONFIRM:` visual screenshots of counter screens NOT
   captured (no Playwright MCP in the unattended run) — a human should run the screenshot pass before
   go-live (see DECISIONS.md "Prompt 09").
+
+## Prompt 10 — till sessions, cash & arqueo
+- Status: merged
+- Defaults chosen: expected drawer cash DERIVED from the ledger (cash-only; wallet contributions shown but excluded); one open session per terminal per location; cash movements stored signed; blind cierre (count submitted before expected revealed); arqueo variance tolerance €5.00 (arqueo_variance_tolerance_cents=500), note required beyond it; closed sessions immutable (corrections = new linked entries); read-only Filament oversight (sessions open/close only at the counter); Z-report feeds dashboard/reports (prompt 14). No new migration (TillSession/CashMovement existed from prompt 01) so no MySQL parity run. Also merged late prompt-09 check-in polish that landed on this branch.
+- Needs Ben's confirmation: arqueo variance tolerance €5.00; counter-screen visual screenshots not captured (no Playwright MCP) — human screenshot pass before go-live.

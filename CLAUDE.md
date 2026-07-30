@@ -144,7 +144,14 @@ vocabulary above is Spanish even in the English locale where it is a term of art
 - Pricing: **one resolver** `app/Actions/Pricing/ResolvePrice.php` (tier price → best single discount →
   per-member custom; no stacking by default) returning `app/Support/PriceResult.php`; POS/PWA/reports/
   receipts all call it, and it is frozen into the dispensation line snapshot at commit.
-- Livewire counter component: [add first real one — prompt 09/11]
+- Livewire counter component (tablet-first, own auth route + `layouts/counter`, gated in `mount()`,
+  all figures queried live): `app/Livewire/Counter/CheckInScreen.php` (door) and
+  `app/Livewire/Counter/TillSession.php` (till open + cash movements + BLIND close).
+- Till / cash / arqueo: expected drawer cash is **derived from the ledger, never stored**
+  (`app/Support/TillSummary.php`, cash-only — wallet excluded); one open session per terminal
+  (`app/Actions/Till/OpenTill.php`), signed cash movements (`RecordCashMovement.php`), blind cierre
+  (`CloseTill.php` — count submitted before expected revealed, note beyond tolerance), session Z-report
+  (`app/Support/ZReport.php`). Read-only oversight `app/Filament/Resources/TillSessions/`.
 - Spreadsheet export/import: [App\Support\Spreadsheet\* — prompt 14/04]
 - PDF document: [App\Actions\Documents\* — prompt 16]
 (Add the first real example of each remaining pattern here as it's built; future work copies these.)

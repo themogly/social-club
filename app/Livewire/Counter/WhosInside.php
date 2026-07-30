@@ -93,16 +93,9 @@ class WhosInside extends Component
     /** @return Collection<int, CheckIn> */
     private function openCheckIns(?Location $location): Collection
     {
-        if ($location === null) {
-            /** @var Collection<int, CheckIn> $empty */
-            $empty = new Collection;
-
-            return $empty;
-        }
-
         return CheckIn::query()->withoutGlobalScopes()
             ->with('member')
-            ->where('location_id', $location->id)
+            ->where('location_id', $location?->id)
             ->whereNull('checked_out_at')
             ->orderByDesc('checked_in_at')
             ->get();
