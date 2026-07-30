@@ -17,3 +17,6 @@ Schedule::command('memberships:sweep')->dailyAt('05:00');
 
 // Close check-ins left open at closing time (business-day cutoff). Idempotent.
 Schedule::command('checkins:auto-checkout')->dailyAt('06:00');
+
+// Materialise due recurring overheads (rent, utilities). Idempotent per template/period.
+Schedule::command('expenses:materialise-recurring')->dailyAt('05:30');
