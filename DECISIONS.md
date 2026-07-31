@@ -1156,3 +1156,44 @@ Tests added: lapsed→blocked-at-counter-and-door chain; expiring-soon flagged (
 registration asserted via `schedule:list` (inspecting the real schedule, not just manual invocation);
 health panel reflects a stale sweep specifically + the per-job heartbeat freshness. No migration →
 MySQL parity N/A. 378 tests green.
+
+---
+
+## Prompt 31 — temporary / short-stay members
+
+**Legal-sensitivity note (front and centre).** Spanish CSC case law is built around genuine, stable
+association membership; "temporary member for people passing through" is a real operational need but is
+NOT explicitly settled in that case law. The build does NOT present this as a guaranteed-compliant
+shortcut anywhere — the settings section carries a plain "the legal standing of this figure is unsettled;
+use it with judgement" note, and the feature is OFF by default (`temporary_members_enabled = false`).
+
+**Design — the load-bearing rule holds.** A `kind` (STANDARD|TEMPORARY) + `temporary_expires_at` were
+added additively (every existing member backfills to STANDARD). Temporary status changes **list
+visibility and retention timing ONLY**. It never loosens age, avalador, carencia or the gram limits —
+proven structurally by a test asserting the shared compliance resolvers (`ResolveMemberEligibility`,
+`CommitDispensation`, `ResolveMemberLimits`) contain NO reference to the temporary concept at all, so
+there is nowhere a shortcut could hide.
+
+**Decisions (documented).**
+- `OVERNIGHT-DEFAULT — CONFIRM:` **temporary members DO count toward the active-member soft cap**
+  (`temporary_count_toward_cap = true`). Conservative: they are real members using the club, so excluding
+  them could let the association silently exceed its real active load. A setting, flippable.
+- `OVERNIGHT-DEFAULT — CONFIRM:` default window **30 days** (`temporary_window_days`); pre-removal
+  reminder lead **3 days** (`temporary_reminder_lead_days`). Both settings, on the settings page.
+- **Auto-removal = the existing erasure Action.** `members:remove-temporary` (mirrors the retention purge)
+  routes every past-window temporary through `AnonymiseMember` — anonymise-not-delete, never a bespoke
+  deletion — so financial + consumption ledger totals stay intact in anonymised form (tested identical
+  before/after). Idempotent (skips already-anonymised), dry-run capable, audited, scheduled daily 04:15,
+  and its per-job heartbeat is surfaced on the health panel (only when the feature is enabled).
+- **Convert / extend** = `ManageTemporaryMember` action (reuses the person record, audited who/from→to),
+  gated `members.create` (manager+). Convert clears the expiry (sweep then skips them); extend pushes it out.
+- **Directory:** the everyday list excludes temporary members by default (a `kind` filter defaulting to
+  STANDARD); a Temporal filter returns exactly them; a "Temporal" badge marks them in the table.
+
+**DEFERRED (documented):** the OPTIONAL pre-removal **email reminder**. The setting
+(`temporary_reminder_lead_days`) and the sweep exist, but wiring an actual email needs a dedicated
+`TemporaryRemovalReminder` mailable with the full mailable ceremony (permanent render test + `/dev/mail`
+preview + inline CID logo, per CLAUDE.md). That is a focused follow-up (pattern: `MembershipReminderMail`);
+its required test is deferred with it. The removal itself (the load-bearing part) is fully built + tested.
+
+Migration verified on MySQL. 386 tests green (8 new).

@@ -94,3 +94,10 @@ hash-only → unrecoverable (reported bug). Built re-copyable link (encrypted to
 critical hash-verification path unchanged (signed-URL refactor deferred for human review). Single-use;
 blank New-application create removed; resend-email deferred (no mailable). Migration verified on MySQL.
 Merged to main, composer check green (374 tests). Next: prompt 30 (verify the expiry sweep runs).
+
+**2026-07-31 — Prompt 30 DONE.** Verify expiry sweep. Verdict: the sweep was correct + registered +
+idempotent all along (NOT broken). Fixed 2 real gaps: generic heartbeat → per-job 'memberships-sweep'
+heartbeat + health-panel section (red if the sweep stalls even when the scheduler is green); thin docs
+→ SETUP.md Scheduled-jobs section (cron + local dev + how-you-know). Confirmed: lapsed blocked at
+counter+door; unpaid≠lapsed (date-driven). Merged to main, composer check green (378 tests). No
+migration → MySQL N/A. Next: prompt 31 (temporary members) — the last feature prompt.

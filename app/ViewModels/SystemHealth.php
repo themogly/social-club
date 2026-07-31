@@ -44,6 +44,17 @@ class SystemHealth
     }
 
     /**
+     * The temporary-member auto-removal sweep (members:remove-temporary). Same per-job
+     * heartbeat discipline as the expiry sweep — only surfaced when the feature is on.
+     *
+     * @return array{last_at: ?CarbonInterface, age_seconds: ?int, stale: bool, threshold_seconds: int}
+     */
+    public function temporarySweep(): array
+    {
+        return $this->component('temporary-sweep', self::DAILY_STALE_SECONDS);
+    }
+
+    /**
      * @return array{last_at: ?CarbonInterface, age_seconds: ?int, stale: bool, threshold_seconds: int}
      */
     private function component(string $component, int $threshold): array
