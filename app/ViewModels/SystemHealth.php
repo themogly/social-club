@@ -18,22 +18,44 @@ class SystemHealth
     /** Default staleness window if unset — the heartbeat runs every 5 min, so 15 min = 3 missed. */
     public const DEFAULT_STALE_SECONDS = 900;
 
+    /** A daily job (05:00) is stale if unseen within ~26h — one missed run plus grace. */
+    public const DAILY_STALE_SECONDS = 93600;
+
     /**
+     * The generic scheduler heartbeat (system:heartbeat every 5 min) — proves the cron is alive.
+     *
      * @return array{last_at: ?CarbonInterface, age_seconds: ?int, stale: bool, threshold_seconds: int}
      */
     public function scheduler(): array
     {
-        $threshold = (int) Settings::get('heartbeat_stale_seconds', self::DEFAULT_STALE_SECONDS);
-        $last = HeartbeatLog::query()->component('scheduler')->latest('ran_at')->first();
-        $ranAt = $last?->ran_at;
+        return $this->component('scheduler', (int) Settings::get('heartbeat_stale_seconds', self::DEFAULT_STALE_SECONDS));
+    }
 
+    /**
+     * The nightly membership expiry sweep SPECIFICALLY (memberships:sweep). It stamps its own
+     * heartbeat on success, so this goes stale — red — if the sweep silently stops running even
+     * while the generic scheduler heartbeat above stays fresh. That gap is the whole point.
+     *
+     * @return array{last_at: ?CarbonInterface, age_seconds: ?int, stale: bool, threshold_seconds: int}
+     */
+    public function expirySweep(): array
+    {
+        return $this->component('memberships-sweep', self::DAILY_STALE_SECONDS);
+    }
+
+    /**
+     * @return array{last_at: ?CarbonInterface, age_seconds: ?int, stale: bool, threshold_seconds: int}
+     */
+    private function component(string $component, int $threshold): array
+    {
+        $last = HeartbeatLog::query()->component($component)->latest('ran_at')->first();
+        $ranAt = $last?->ran_at;
         $age = $ranAt !== null ? max(0, now()->getTimestamp() - $ranAt->getTimestamp()) : null;
-        $stale = $age === null || $age > $threshold;
 
         return [
             'last_at' => $ranAt,
             'age_seconds' => $age,
-            'stale' => $stale,
+            'stale' => $age === null || $age > $threshold,
             'threshold_seconds' => $threshold,
         ];
     }

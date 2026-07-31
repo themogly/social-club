@@ -1121,3 +1121,38 @@ mailables but **no invite mailable** → resend-by-email was never in scope.
 - Expiry duration is the `invite_expiry_days` setting (default 14), on the settings page.
 
 Migration verified on MySQL (encrypted-token column + FK + invite flow). 374 tests green (5 new).
+
+---
+
+## Prompt 30 — verify the membership expiry sweep actually runs
+
+**Audit verdict: mostly FINE, with two real gaps found and fixed.** The sweep itself was correct all
+along — it exists (`memberships:sweep`), flips ACTIVE/EXPIRING_SOON → LAPSED by `expires_at`, flags the
+expiring-soon window, sends renewal reminders once per member per period (`reminder_sent_for` marker,
+idempotent), reads windows through Settings — AND it is genuinely registered with the scheduler
+(`Schedule::command('memberships:sweep')->dailyAt('05:00')`). Existing tests already covered the flip +
+idempotency + reminder-once. So this was NOT "never fired"; the worry was warranted but the code is sound.
+
+**Gap 1 — heartbeat was GENERIC (fixed).** `SystemHealth` only read the `scheduler` component heartbeat
+(the every-5-min `system:heartbeat`). So a silently-broken sweep — with an otherwise-healthy scheduler —
+would show GREEN. Fixed: `memberships:sweep` now stamps its OWN `HeartbeatLog::beat('memberships-sweep')`
+on success; `SystemHealth::expirySweep()` checks it against a **26 h daily threshold** (vs the 15-min
+scheduler threshold); the health page shows a dedicated "Barrido de caducidades" section and a red alert
+when the sweep is stale even if the scheduler is fresh.
+
+**Gap 2 — deployment story under-documented (fixed).** `SETUP.md` only mentioned `schedule:run` in
+passing. Added a "Scheduled jobs" section: the production crontab line, the full scheduled-command table,
+LOCAL-dev instructions (`schedule:work` / manual `php artisan memberships:sweep`) so "nothing happened
+overnight" isn't mistaken for a working feature, and how-you-know-it-ran via the health panel.
+
+**Confirmed, no change needed:**
+- A lapsed member IS blocked at the counter and flagged at the door — `membership` is `BLOCK` on both
+  surfaces and `hasActiveMembership` requires ACTIVE (tested as a chain now, not assumed).
+- **Unpaid vs lapsed is NOT conflated.** The sweep is purely date-driven on `expires_at`; there is no
+  "unpaid forces early expiry" path. The `unpaid_fee` eligibility rule is a SEPARATE door/counter check
+  and never lapses a membership. No accidental coupling — confirmed, no deliberate policy to add one.
+
+Tests added: lapsed→blocked-at-counter-and-door chain; expiring-soon flagged (not lapsed); scheduler
+registration asserted via `schedule:list` (inspecting the real schedule, not just manual invocation);
+health panel reflects a stale sweep specifically + the per-job heartbeat freshness. No migration →
+MySQL parity N/A. 378 tests green.

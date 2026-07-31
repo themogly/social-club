@@ -105,3 +105,34 @@ Everything used in code/config appears in `.env.example`. Highlights:
 Also required in production: automated **daily DB backups with a tested restore**; a monitored
 `schedule:run` cron once anything is scheduled; Horizon and the cron as monitored must-be-running
 services; Sentry wired. See `verification/CHECKLIST.md` (gates launch) and `gates/pre-staging-gate.md`.
+
+### Scheduled jobs — the nightly expiry sweep depends on this
+
+The membership expiry sweep (and every other scheduled job) runs **only if `schedule:run` fires every
+minute**. On the server, add ONE cron entry (the code being perfect does not matter if this is missing):
+
+```cron
+* * * * * cd /var/www/csc-platform && php artisan schedule:run >> /dev/null 2>&1
+```
+
+Scheduled commands (`routes/console.php`):
+
+| Command | When | What |
+|---|---|---|
+| `memberships:sweep` | daily 05:00 | flip lapsed / expiring-soon memberships; send renewal reminders |
+| `members:purge` | daily 04:00 | anonymise members past the retention window |
+| `checkins:auto-checkout` | daily 06:00 | close forgotten check-ins |
+| `expenses:materialise-recurring` | daily 05:30 | post recurring overheads |
+| `system:heartbeat` | every 5 min | stamp the scheduler-liveness the health panel reads |
+
+**Locally / during testing** the cron is NOT running, so "nothing happened overnight" is expected and
+does not mean the feature is broken. To exercise it during development:
+
+```bash
+php artisan schedule:work        # run the scheduler in the foreground (leave it running), OR
+php artisan memberships:sweep    # run the expiry sweep once, right now
+```
+
+**How you know it actually ran:** `memberships:sweep` stamps its own heartbeat, so **Sistema ▸ Salud
+del sistema** shows the sweep's last-run time and turns **red if it has not run in ~26 h — even when
+the generic scheduler heartbeat is green.** A silently-broken sweep is therefore visible, not silent.

@@ -4,6 +4,7 @@ namespace App\Console\Commands;
 
 use App\Enums\MembershipStatus;
 use App\Mail\MembershipReminderMail;
+use App\Models\HeartbeatLog;
 use App\Models\Membership;
 use App\Support\Settings;
 use Illuminate\Console\Command;
@@ -61,6 +62,10 @@ class SweepMembershipExpiry extends Command
                 $membership->update(['reminder_sent_for' => $period]);
                 $reminders++;
             });
+
+        // Per-job heartbeat: proves THIS sweep completed, so the health panel goes red on a
+        // silently-broken sweep even while the generic scheduler heartbeat stays green.
+        HeartbeatLog::beat('memberships-sweep');
 
         $this->info("Lapsed: {$lapsed}. Reminders sent: {$reminders}.");
 

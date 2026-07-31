@@ -60,6 +60,7 @@ class SystemHealth extends Page
 
         return [
             'scheduler' => $health->scheduler(),
+            'expirySweep' => $health->expirySweep(),
             'queue' => $health->queue(),
             'backups' => $health->backups(),
             'auditRetentionDays' => $health->auditRetentionDays(),
