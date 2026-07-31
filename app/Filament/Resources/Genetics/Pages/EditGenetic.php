@@ -24,8 +24,9 @@ class EditGenetic extends EditRecord
         ];
     }
 
-    // A genetic-definition change is audited (prompt 48). NOTE: genetic PRICES live in GeneticPrice
-    // rows, which have no edit surface (see prompt 54) — so this audits the definition, not a price.
+    // A genetic-definition change is audited (prompt 48). Genetic PRICES live in GeneticPrice rows,
+    // edited via the GeneticPricesRelationManager and audited separately as genetic.price.updated
+    // (prompt 63) — so this audits the definition, not a price.
     protected function beforeSave(): void
     {
         $this->captureAuditDiff();
