@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\Members\Pages;
 
+use App\Actions\Members\FindDuplicateMembers;
 use App\Actions\Members\RecordMemberConsent;
 use App\Actions\Members\SyncMemberScanDocuments;
 use App\Enums\MemberKind;
@@ -11,6 +12,7 @@ use App\Models\User;
 use App\Support\ActiveScope;
 use App\Support\MemberEnrolment;
 use App\Support\Settings;
+use Filament\Notifications\Notification;
 use Filament\Resources\Pages\CreateRecord;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Auth;
@@ -27,6 +29,43 @@ class CreateMember extends CreateRecord
      * @param  array<string, mixed>  $data
      * @return array<string, mixed>
      */
+    /**
+     * Search-before-create: block the save when the entered details match an existing member (name+DOB,
+     * email, phone or document) unless the operator has explicitly acknowledged it — enrolling a person
+     * twice would split their balance and consumption history. The `acknowledge_duplicate` toggle
+     * (create-only, virtual) is the deliberate override for a genuine same-name other person.
+     */
+    protected function beforeCreate(): void
+    {
+        if ($this->data['acknowledge_duplicate'] ?? false) {
+            return;
+        }
+
+        $duplicates = (new FindDuplicateMembers)->handle([
+            'first_name' => $this->data['first_name'] ?? null,
+            'last_name' => $this->data['last_name'] ?? null,
+            'date_of_birth' => $this->data['date_of_birth'] ?? null,
+            'email' => $this->data['email'] ?? null,
+            'phone' => $this->data['phone'] ?? null,
+            'document_number' => $this->data['document_number'] ?? null,
+        ]);
+
+        if ($duplicates->isEmpty()) {
+            return;
+        }
+
+        Notification::make()
+            ->title(__('Posible socio duplicado'))
+            ->body(__('Ya existe un socio que coincide: :names. Marca «crear de todas formas» si es una persona distinta.', [
+                'names' => $duplicates->map(fn (Member $m): string => $m->fullName().' ('.$m->member_no.')')->implode(', '),
+            ]))
+            ->warning()
+            ->persistent()
+            ->send();
+
+        $this->halt();
+    }
+
     protected function mutateFormDataBeforeCreate(array $data): array
     {
         $organisationId = app(ActiveScope::class)->organisationId();

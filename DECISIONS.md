@@ -1842,3 +1842,32 @@ which is correct, not a leak: a visit by "ANONIMIZADO Socio ab12cd34" reveals no
 `AnonymiseMember`'s docblock and pinned it with a test. **So: an export missing a record type ≠ erasure
 missing it; here only the export was wrong.** (The ID/photo FILES, which ARE PII, were already deleted by
 erasure — that path is untouched and still correct.) 495 green. Self-merge on green (batch 2 authorisation).
+
+---
+
+## Batch 2·4 — Prompt 50: CSV import UI + duplicate detection on the real creation paths
+
+`ImportMembers` (preview + import + audit) was fully built with ZERO callers, and `FindDuplicateMembers`
+ran only inside it — so `CreateMember` and `ApproveApplication`, the two real ways a member is enrolled,
+never checked for duplicates. Enrolling one person twice splits their balance + consumption history.
+
+**Wired all three:**
+- **CSV import UI** — an `Importar CSV` header action on `ListMembers`, gated on `members.import`
+  (OWNER+MANAGER, first real use of the permission), uploading to a `TemporaryUploadedFile` and calling
+  `ImportMembers::import()` (which already validates, skips duplicates idempotently, and audits). The
+  result surfaces created / skipped / errored counts. `preview()` remains available for a future
+  two-step wizard; I kept the UI to one step.
+- **`CreateMember`** — a `beforeCreate()` runs `FindDuplicateMembers` on the entered details and HALTS
+  with a persistent warning listing the matches, unless a create-only virtual toggle
+  `acknowledge_duplicate` is ticked (the deliberate override for a genuine same-name other person).
+- **`ApproveApplication`** — a new `bool $allowDuplicate = false` param; it throws a new
+  `DuplicateMemberException` (extends `RuntimeException`, so the approve action's existing
+  `catch (RuntimeException)` shows the message unchanged) unless the reviewer ticks a confirmation-modal
+  toggle.
+
+**Decision — WARN + override, not hard block.** The import path silently *skips* duplicates (idempotent
+re-import), but the two interactive paths *warn and allow override*: an operator has context the system
+doesn't (two real people can share a name+DOB). The override is server-enforced (a param / a form flag
+read in `beforeCreate`), not merely UI-hidden, and each override is still fully audited via the normal
+create/approve audit entries. Denial + both override paths are tested. 499 green. Self-merge on green
+(batch 2 authorisation). **Batch 2 complete.**

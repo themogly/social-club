@@ -64,6 +64,14 @@ class MemberForm
                         TextInput::make('address')
                             ->label(__('Dirección'))
                             ->maxLength(255),
+
+                        Toggle::make('acknowledge_duplicate')
+                            ->label(__('Crear aunque haya un posible duplicado'))
+                            ->helperText(__('Sólo necesario si el sistema detecta un socio que coincide.'))
+                            ->visibleOn('create')
+                            ->dehydrated(false)
+                            ->default(false)
+                            ->columnSpanFull(),
                     ])
                     ->columns(2),
 

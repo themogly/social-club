@@ -4,6 +4,7 @@ namespace App\Actions\Members;
 
 use App\Actions\RecordAuditLog;
 use App\Enums\ApplicationStatus;
+use App\Exceptions\DuplicateMemberException;
 use App\Models\Member;
 use App\Models\MemberApplication;
 use App\Support\ActiveScope;
@@ -19,7 +20,7 @@ use RuntimeException;
  */
 class ApproveApplication
 {
-    public function handle(MemberApplication $application, ?string $actorId = null): Member
+    public function handle(MemberApplication $application, ?string $actorId = null, bool $allowDuplicate = false): Member
     {
         app(ActiveScope::class)->setOrganisation($application->organisation_id);
         $payload = $application->payload ?? [];
@@ -27,6 +28,15 @@ class ApproveApplication
 
         if (! MemberEligibility::isOldEnough($payload['date_of_birth'] ?? null)) {
             throw new RuntimeException(__('El solicitante es menor de la edad mínima configurada.'));
+        }
+
+        // Search-before-create — approving into an existing member would split their balance and
+        // history. Blocked unless the reviewer explicitly overrides (a genuine same-name other person).
+        if (! $allowDuplicate) {
+            $duplicates = (new FindDuplicateMembers)->handle($payload);
+            if ($duplicates->isNotEmpty()) {
+                throw DuplicateMemberException::forMatches($duplicates);
+            }
         }
 
         $member = new Member([

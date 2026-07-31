@@ -17,6 +17,7 @@ use App\Models\MemberApplication;
 use BackedEnum;
 use Filament\Actions\Action;
 use Filament\Forms\Components\Textarea;
+use Filament\Forms\Components\Toggle;
 use Filament\Notifications\Notification;
 use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
@@ -92,11 +93,17 @@ class MemberApplicationResource extends Resource
             ->icon(Heroicon::OutlinedCheckCircle)
             ->color('success')
             ->requiresConfirmation()
+            ->schema([
+                Toggle::make('allow_duplicate')
+                    ->label(__('Aprobar aunque haya un posible duplicado'))
+                    ->helperText(__('Sólo si has verificado que es una persona distinta.'))
+                    ->default(false),
+            ])
             ->visible(fn (MemberApplication $record): bool => $record->status === ApplicationStatus::PENDING
                 && (Auth::user()?->can('applications.review') ?? false))
-            ->action(function (MemberApplication $record): void {
+            ->action(function (array $data, MemberApplication $record): void {
                 try {
-                    $member = (new ApproveApplication)->handle($record);
+                    $member = (new ApproveApplication)->handle($record, allowDuplicate: (bool) ($data['allow_duplicate'] ?? false));
 
                     if ($member->email !== null) {
                         Mail::to($member->email)->queue(new ApplicationApprovedMail($member->fullName(), (string) $member->member_no));
