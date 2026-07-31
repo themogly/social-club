@@ -71,6 +71,13 @@ abstract class ReportPage extends Page
         return static::getNavigationLabel();
     }
 
+    public function getTitle(): string
+    {
+        // Browser <title>: the (translated) navigation label — same source as the on-page heading —
+        // never Filament's class-derived default ("Bar Sales Report Page"). Fixes every report tab.
+        return static::getNavigationLabel();
+    }
+
     public function mount(): void
     {
         abort_unless(static::canAccess(), 403);

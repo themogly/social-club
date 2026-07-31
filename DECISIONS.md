@@ -1753,3 +1753,37 @@ here. **Not an `OVERNIGHT-DEFAULT — CONFIRM`: this is a reasoned, reversible c
 shape already matches the writer's columns.**
 
 Self-merge on green (batch 2 authorisation).
+
+---
+
+## Batch 2·1 — Bar POS layout (the half of prompt 41 that needed a browser)
+
+Two confirmed layout defects (from real captures) + one tab-title fix. No browser here, so guarded at
+the render level (assert the fix classes are present) in the house style of `ChargeAlwaysObservableTest`.
+
+**1440 — long article name clipped the price.** The name/price row is `flex justify-between`; the name
+`<span>` had no `min-w-0`, so its default `min-width:auto` refused to shrink, the row overran the card's
+`overflow-hidden` edge, and the `shrink-0` price fell off the right ("Mechero €1,00" → "€1,0"). Fix:
+name span → `min-w-0 … line-clamp-2` — it now wraps and clamps to two lines; the price is always fully
+visible. Chose WRAP+clamp over truncate-with-ellipsis because on a POS the operator must be able to read
+the whole product name, and a touch screen has no hover title to recover it.
+
+**1024 (tablet-first, the counter's primary width) — basket + Charge buried behind a void.** The grid
+was `lg:grid-cols-2`; auto-placement put the three panels Left→(r1c1), Centre→(r1c2), Right→(r2c1), so
+the basket+Charge landed in column 1 BELOW the tall articles column, behind the empty space under the
+short socio card — the operator scrolled past dead space to reach the primary action. Fix:
+`lg:grid-cols-[minmax(0,1fr)_22rem]` + the RIGHT div explicitly placed `lg:col-start-2 lg:row-start-1
+lg:row-span-2` (reset `xl:col-auto xl:row-auto` so the working 3-column xl sidebar is untouched). Now
+socio+articles stack in column 1 with no gap and the basket+Charge sit at top-right, visible on load.
+Chose column-placement over "stack everything at lg" so the primary action stays on-screen rather than
+below the full article list. No `sticky` — it can't be visually verified here and behaves badly when the
+basket exceeds the viewport; the placement fix alone removes the void.
+
+**Tab title.** `BasePage::getTitle()` headlines the class name ("Bar Sales Report Page") and no report
+overrode it — so EVERY Informes tab had the bug, not just Bar sales. Fixed once on the shared
+`ReportPage` base: `getTitle()` now returns the (translated) `getNavigationLabel()`, same source as the
+on-page H1. All seven report tabs corrected in one place.
+
+**Left untouched (per prompt):** the broken avatar image beside the ES/EN switcher — that is prompt 61's
+(the ui-avatars.com outbound call), not a cosmetic patch. 484 green. Screenshots pending — no browser.
+Self-merge on green (batch 2 authorisation).

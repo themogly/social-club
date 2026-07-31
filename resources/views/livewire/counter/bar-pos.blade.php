@@ -61,7 +61,11 @@
             </div>
         @endif
 
-        <div class="grid gap-4 lg:grid-cols-2 xl:grid-cols-[19rem_minmax(0,1fr)_21rem] xl:items-start">
+        {{-- At lg (1024, the counter's tablet-first width) the basket+Charge (RIGHT) is pinned to a
+             dedicated column 2 spanning both rows, so socio (LEFT) + articles (CENTRE) stack in column 1
+             with no dead space and the primary action stays top-right. At xl the RIGHT div resets to
+             auto-placement for the 3-column sidebar layout. --}}
+        <div class="grid gap-4 lg:grid-cols-[minmax(0,1fr)_22rem] lg:items-start xl:grid-cols-[19rem_minmax(0,1fr)_21rem]">
 
             {{-- ================= LEFT: the socio (OPTIONAL) ================= --}}
             <div class="flex flex-col gap-4">
@@ -173,7 +177,9 @@
                                 </div>
                                 <div class="flex flex-1 flex-col p-3">
                                     <div class="flex items-start justify-between gap-2">
-                                        <span class="font-semibold leading-tight">{{ $a['name'] }}</span>
+                                        {{-- min-w-0 lets a long name wrap/clamp instead of forcing the row past the
+                                             card's overflow-hidden edge and clipping the shrink-0 price (e.g. "Mechero €1,00"). --}}
+                                        <span class="min-w-0 font-semibold leading-tight line-clamp-2">{{ $a['name'] }}</span>
                                         <span class="shrink-0 text-sm font-semibold text-brand dark:text-slate-100">{{ $this->money($a['price_cents']) }}</span>
                                     </div>
                                     <div class="mt-2 flex items-center justify-between text-xs">
@@ -215,7 +221,7 @@
             </div>
 
             {{-- ================= RIGHT: the basket + payment ================= --}}
-            <div class="flex flex-col gap-4">
+            <div class="flex flex-col gap-4 lg:col-start-2 lg:row-start-1 lg:row-span-2 xl:col-auto xl:row-auto">
                 {{-- No open till → unmistakable, blocks commit (the bar shares the one drawer). --}}
                 @unless ($openTill)
                     <div class="rounded-2xl border border-error/40 bg-error/10 p-4 text-sm">
