@@ -1955,3 +1955,29 @@ scope so it's the cross-location total), NOT a per-row `Wallet::balance()` call 
 query regardless of row count. Tested that the aggregate returns the correct across-location total.
 PHPStan needed `getAttribute('wallet_transactions_sum_amount_cents')` (the dynamic aggregate attribute
 isn't a declared model property). 516 green. Self-merge on green (batch 3 authorisation).
+
+---
+
+## Batch 3·MUST — Prompt 53: enforcement matrix editor
+
+The highest-stakes setting — BLOCK/WARN/OVERRIDE per rule, at the DOOR and the COUNTER — could only be
+changed via tinker. Built `ManageEnforcement`, a Filament page (nav group "Sistema") that reads/writes
+the single `enforcement` Setting `Settings::enforcement()` already consumes, gated on `settings.manage`
+(owner only), every change audited as `settings.enforcement.updated`. A Select per (surface, rule) with
+BLOCK / WARN / OVERRIDE.
+
+**Locked cells — `aforo` AND `age`, both fixed to BLOCK, not editable:**
+- `aforo` was already documented as deliberately BLOCK — you can't "warn" a room over capacity and still
+  admit people; capacity is a hard cap.
+- **`age` — DECISION (the one the prompt asked me to take): age is LOCKED to BLOCK too, i.e. removed from
+  the editable set.** A Spanish CSC legally cannot admit or dispense to a minor; letting `age` be set to
+  WARN (admit a minor with a warning) or OVERRIDE (a permissioned override past the age gate) would be
+  legally indefensible and is exactly the kind of thing that sinks the club's judicial-tolerance posture.
+  Age is a hard legal floor, not a club-configurable policy. So the editable rules are carencia,
+  membership, sanction, debt, unpaid_fee, daily_limit, monthly_limit; age + aforo render disabled at BLOCK.
+
+The lock is enforced SERVER-SIDE in `save()` (a disabled field isn't submitted, and even a tampered
+submit for age/aforo is forced to BLOCK), and unknown modes fail safe to BLOCK — tested with a tampered
+submit. `OVERRIDE` is offered where it's legitimate (a manager+ permissioned override of carencia/limits/
+debt), matching the existing override affordances at the counter. 519 green. Self-merge on green
+(batch 3 authorisation).
