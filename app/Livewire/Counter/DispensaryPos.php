@@ -33,6 +33,7 @@ use App\Support\CounterOperator;
 use App\Support\EligibilityVerdict;
 use App\Support\Money;
 use App\Support\Settings;
+use App\Support\TerminalName;
 use App\Support\Wallet;
 use App\Support\Weight;
 use Illuminate\Auth\Access\AuthorizationException;
@@ -536,7 +537,10 @@ class DispensaryPos extends Component
         $till = $this->openTillSession($location);
 
         if ($till === null) {
-            $this->flash(__('No hay caja abierta en este terminal.'), 'error');
+            $open = $this->openTerminalNames($location);
+            $this->flash($open === ''
+                ? __('No hay caja abierta en este terminal.')
+                : __('No hay caja abierta en este terminal. Con caja abierta: :terminals', ['terminals' => $open]), 'error');
 
             return;
         }
@@ -1222,15 +1226,31 @@ class DispensaryPos extends Component
 
     private function openTillSession(Location $location): ?TillSession
     {
-        $query = TillSession::query()->withoutGlobalScopes()
-            ->where('location_id', $location->id)
-            ->where('status', TillSessionStatus::OPEN->value);
+        $sessions = $this->openSessionsAt($location);
 
-        if ($this->terminal !== '') {
-            $query->where('terminal', $this->terminal);
+        if ($this->terminal === '') {
+            return $sessions->first();
         }
 
-        return $query->orderBy('opened_at')->first();
+        // Match by normalised KEY, not the raw string, so a spelling variant still resolves (prompt 84).
+        $key = TerminalName::key($this->terminal);
+
+        return $sessions->first(fn (TillSession $s): bool => TerminalName::key((string) $s->terminal) === $key);
+    }
+
+    /** @return \Illuminate\Support\Collection<int, TillSession> */
+    private function openSessionsAt(Location $location): \Illuminate\Support\Collection
+    {
+        return TillSession::query()->withoutGlobalScopes()
+            ->where('location_id', $location->id)
+            ->where('status', TillSessionStatus::OPEN->value)
+            ->orderBy('opened_at')->get();
+    }
+
+    /** The names of terminals with an OPEN till here — turns a "no till" dead end into a one-click fix. */
+    private function openTerminalNames(Location $location): string
+    {
+        return $this->openSessionsAt($location)->pluck('terminal')->filter()->unique()->implode(', ');
     }
 
     private function activeMembership(Member $member, Location $location): ?Membership

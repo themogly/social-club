@@ -24,6 +24,7 @@ class Location extends Model
     protected $fillable = [
         'organisation_id', 'name', 'address', 'capacity', 'timezone',
         'business_day_cutoff', 'opening_time', 'closing_time', 'accent', 'active',
+        'terminals',
     ];
 
     protected function casts(): array
@@ -31,6 +32,7 @@ class Location extends Model
         return [
             'capacity' => 'integer',
             'active' => 'boolean',
+            'terminals' => 'array',
         ];
     }
 
@@ -38,6 +40,16 @@ class Location extends Model
     public function users(): BelongsToMany
     {
         return $this->belongsToMany(User::class)->withTimestamps();
+    }
+
+    /**
+     * The configured till terminals for this location (prompt 84) — the picker's options.
+     *
+     * @return list<string>
+     */
+    public function terminalNames(): array
+    {
+        return array_values(array_filter((array) ($this->terminals ?? []), 'is_string'));
     }
 
     /** @return HasMany<Membership, $this> */

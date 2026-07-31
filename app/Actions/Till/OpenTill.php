@@ -7,6 +7,7 @@ use App\Exceptions\TillAlreadyOpenException;
 use App\Models\Location;
 use App\Models\TillSession;
 use App\Support\CounterOperator;
+use App\Support\TerminalName;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 
@@ -18,14 +19,24 @@ class OpenTill
      */
     public function handle(Location $location, string $terminal, int $floatCents, array $options = []): TillSession
     {
-        return DB::transaction(function () use ($location, $terminal, $floatCents, $options): TillSession {
+        // Normalise so "POS 1"/"POS-1"/"pos-1" are one terminal, and register it on the location (prompt 84).
+        $terminal = TerminalName::clean($terminal);
+        $key = TerminalName::key($terminal);
+
+        return DB::transaction(function () use ($location, $terminal, $key, $floatCents, $options): TillSession {
+            // Match by KEY, not the raw string, so a spelling variant cannot open a SECOND till.
             $open = TillSession::query()->withoutGlobalScopes()
-                ->where('location_id', $location->id)->where('terminal', $terminal)
-                ->where('status', TillSessionStatus::OPEN->value)->lockForUpdate()->first();
+                ->where('location_id', $location->id)
+                ->where('status', TillSessionStatus::OPEN->value)->lockForUpdate()->get()
+                ->first(fn (TillSession $s): bool => TerminalName::key((string) $s->terminal) === $key);
 
             if ($open !== null) {
                 throw new TillAlreadyOpenException("Terminal {$terminal} already has an open till session.");
             }
+
+            // Register the terminal on the location's configured list (idempotent by key).
+            $located = Location::withoutGlobalScopes()->lockForUpdate()->findOrFail($location->id);
+            $located->update(['terminals' => TerminalName::register($located->terminalNames(), $terminal)]);
 
             return TillSession::create([
                 'organisation_id' => $location->organisation_id,

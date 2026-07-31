@@ -2661,3 +2661,38 @@ writer) and audited.
 **Screenshots:** the POS cross-strain eighth with the explanation + the receipt (light+dark) could not be
 produced — no browser here; covered by `EighthPricingTest` (9 tests). Owner-authorised merge (standing "merge
 everything to main"). 617 green.
+
+---
+
+## Prompt 84 — the till terminal is free text, and a typo silently hides the till from the POS
+
+The terminal string KEYS a till session and was a free-text `<input>`, so "POS-1", "POS 1" and "pos-1" were
+three terminals: open a till as one, and the POS looking for another said "no hay caja abierta" while a till
+was open and money was going somewhere.
+
+**Where the list comes from — DECISION: configured terminals per Location**, not derive-from-history. A
+`terminals` JSON array on `locations` (the prompt's better long-term shape): the club names its tills once
+and staff only ever pick, it gives reports a stable thing to group by, and it does not enshrine an existing
+typo as a legitimate option. The migration BACKFILLS each location's list from the distinct terminals already
+in `till_sessions` (normalised), so historical sessions still resolve and staff immediately see their real
+tills. The list is grown automatically: `OpenTill` registers a genuinely-new terminal on the location as the
+till opens (idempotent by key), so there is no separate admin chore — but it is a location-scoped record,
+permissioned like other location data (only someone opening a till there can add one).
+
+**Normalisation — the fix that makes it reliable.** `App\Support\TerminalName`: `key()` = lower-case,
+alphanumeric-only (so "POS 1"/"POS-1"/"pos-1" collapse to `pos1`), `clean()` = trimmed, whitespace-collapsed
+(the stored/display form). Applied in THREE places so the raw-string comparison can no longer miss: `OpenTill`
+normalises the name, checks "already open" by KEY (a variant cannot open a SECOND till), and stores the clean
+form; and BOTH POS lookups (`DispensaryPos`/`BarPos::openTillSession`) match the session by key, so a legacy
+or variant string still resolves. The picker is a `<select>` over the location's terminals plus a "new
+terminal" field (used in preference when filled).
+
+**Better not-found message.** When a POS finds no session for its terminal, the flash now lists the terminals
+that DO have an open till here ("No hay caja abierta en este terminal. Con caja abierta: POS-1") — a dead end
+becomes a one-click fix, extending the bar POS's existing "go to the till" idea. The existing auto-adopt
+(single open session → adopt) and disambiguation (several open → operator picks) are unchanged. The terminal
+remains the key linking a session to its POS screens — this branch only makes choosing it reliable.
+
+**Screenshots:** the open-flow picker + the POS not-found state listing terminals (light+dark, 1024/1440)
+could not be produced — no browser here; covered by `TillTerminalPickerTest` (8 tests). Owner-authorised merge
+(standing "merge everything to main"). 625 green.

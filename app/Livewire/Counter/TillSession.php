@@ -32,6 +32,7 @@ use App\Models\User;
 use App\Support\ActiveScope;
 use App\Support\CounterOperator;
 use App\Support\Money;
+use App\Support\TerminalName;
 use App\Support\TillSummary;
 use App\Support\Weight;
 use Illuminate\Auth\Access\AuthorizationException;
@@ -67,6 +68,9 @@ class TillSession extends Component
 
     /** The terminal this screen manages — the open form binds it; it then keys the session. */
     public string $terminal = '';
+
+    /** A brand-new terminal name typed at open (prompt 84) — used in preference to the picked one when filled. */
+    public string $newTerminal = '';
 
     /** Open form: the float in euros (converted to cents at the edge). */
     public string $floatInput = '';
@@ -192,10 +196,11 @@ class TillSession extends Component
             return;
         }
 
-        $terminal = trim($this->terminal);
+        // Prefer a newly-typed terminal over the picked one; OpenTill normalises + registers it (prompt 84).
+        $terminal = TerminalName::clean($this->newTerminal !== '' ? $this->newTerminal : $this->terminal);
 
         if ($terminal === '') {
-            $this->flash(__('Indica el terminal.'), 'error');
+            $this->flash(__('Elige un terminal o escribe uno nuevo.'), 'error');
 
             return;
         }
@@ -217,6 +222,7 @@ class TillSession extends Component
         }
 
         $this->terminal = $terminal;
+        $this->newTerminal = '';
         $this->floatInput = '';
         $this->flash(__('Caja abierta.'), 'success');
     }
@@ -734,6 +740,8 @@ class TillSession extends Component
             'feeOwedCents' => $feeMembership !== null ? $this->owedCents($feeMembership) : null,
             // EOD flower reweigh (prompt 47) — the in-scope batches, only while in that step.
             'reweighBatches' => $this->reweighing ? $this->reweighBatches() : collect(),
+            // Configured terminals for the open-form picker (prompt 84).
+            'terminals' => $location?->terminalNames() ?? [],
         ]);
     }
 

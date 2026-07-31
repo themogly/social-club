@@ -80,15 +80,28 @@
                 <p class="mt-0.5 text-sm text-ink-muted dark:text-slate-400">{{ __('No hay ninguna caja abierta en este terminal.') }}</p>
 
                 <form wire:submit="open" class="mt-5 space-y-4">
+                    {{-- Prompt 84: pick a configured terminal (no more free-text typos opening a phantom till),
+                         or name a genuinely new one — OpenTill normalises + registers it. --}}
                     <div>
                         <label for="terminal" class="block text-sm font-medium text-ink-muted dark:text-slate-400">{{ __('Terminal') }}</label>
+                        @if (! empty($terminals))
+                            <select
+                                id="terminal"
+                                wire:model="terminal"
+                                class="mt-2 h-12 w-full rounded-xl border border-line bg-surface px-4 text-base text-ink focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/40 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
+                            >
+                                <option value="">{{ __('Elige un terminal…') }}</option>
+                                @foreach ($terminals as $t)
+                                    <option value="{{ $t }}">{{ $t }}</option>
+                                @endforeach
+                            </select>
+                        @endif
                         <input
-                            id="terminal"
                             type="text"
-                            wire:model="terminal"
+                            wire:model="newTerminal"
                             autocomplete="off"
                             spellcheck="false"
-                            placeholder="{{ __('Ej. POS-1') }}"
+                            placeholder="{{ empty($terminals) ? __('Ej. POS-1') : __('… o añade un terminal nuevo') }}"
                             class="mt-2 h-12 w-full rounded-xl border border-line bg-surface px-4 text-base text-ink placeholder:text-ink-muted focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/40 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
                         >
                     </div>

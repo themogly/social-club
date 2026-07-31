@@ -542,6 +542,8 @@
     "El tipo determina cómo se dispensa: por peso (flor/extracto) o por unidad (preliado/comestible).": "El tipo determina cómo se dispensa: por peso (flor/extracto) o por unidad (preliado/comestible).",
     "El/La Presidente/a": "El/La Presidente/a",
     "El/La Secretario/a": "El/La Secretario/a",
+    "Elige un terminal o escribe uno nuevo.": "Elige un terminal o escribe uno nuevo.",
+    "Elige un terminal…": "Elige un terminal…",
     "Elige una categoría": "Elige una categoría",
     "Elige una categoría de gasto.": "Elige una categoría de gasto.",
     "En contra": "En contra",
@@ -880,6 +882,7 @@
     "No hay avisos por ahora.": "No hay avisos por ahora.",
     "No hay caja abierta": "No hay caja abierta",
     "No hay caja abierta en este terminal.": "No hay caja abierta en este terminal.",
+    "No hay caja abierta en este terminal. Con caja abierta: :terminals": "No hay caja abierta en este terminal. Con caja abierta: :terminals",
     "No hay eventos próximos.": "No hay eventos próximos.",
     "No hay genéticas con precio activo en esta sede.": "No hay genéticas con precio activo en esta sede.",
     "No hay lote disponible para dispensar (agotado o caducado).": "No hay lote disponible para dispensar (agotado o caducado).",
@@ -1567,5 +1570,6 @@
     "Último descuadre": "Último descuadre",
     "Último latido": "Último latido",
     "…": "…",
+    "… o añade un terminal nuevo": "… o añade un terminal nuevo",
     "€/g": "€/g"
 }
