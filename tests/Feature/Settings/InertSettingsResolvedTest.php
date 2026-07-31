@@ -90,11 +90,12 @@ class InertSettingsResolvedTest extends TestCase
     {
         $this->assertArrayNotHasKey('wallet_ring_fence', Settings::DEFAULTS);   // the inert org toggle is cut
 
-        $fenced = Location::factory()->create(['organisation_id' => $this->org->id, 'settings' => ['ring_fenced' => true]]);
-        $unfenced = Location::factory()->create(['organisation_id' => $this->org->id, 'settings' => ['ring_fenced' => false]]);
+        $fenced = Location::factory()->create(['organisation_id' => $this->org->id]);
+        $unfenced = Location::factory()->create(['organisation_id' => $this->org->id]);
+        Settings::set('ring_fenced', true, SettingType::BOOL, $fenced->id); // location-scoped Setting row (prompt 59)
 
         $this->assertTrue(AutoSettleDebt::isRingFenced($fenced));
-        $this->assertFalse(AutoSettleDebt::isRingFenced($unfenced));
+        $this->assertFalse(AutoSettleDebt::isRingFenced($unfenced)); // no override → org/default false
     }
 
     // 4,5,6,7,8 — CUT: gone from DEFAULTS and (where applicable) the form

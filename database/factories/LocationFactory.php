@@ -28,7 +28,6 @@ class LocationFactory extends Factory
             'opening_time' => '09:00',
             'closing_time' => '22:00',
             'accent' => fake()->hexColor(),
-            'settings' => [],
             'active' => true,
         ];
     }

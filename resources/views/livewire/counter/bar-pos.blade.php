@@ -27,6 +27,15 @@
                 {{ __('No tienes ninguna sede activa. Pide a un responsable que te asigne una para vender en barra.') }}
             </p>
         </div>
+    @elseif ($barDisabled)
+        {{-- The bar is turned off for this sede (per-location bar_enabled, prompt 59). Still a 200. --}}
+        <div class="rounded-2xl border border-line bg-surface p-8 text-center dark:border-slate-800 dark:bg-slate-900">
+            <div class="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-surface-alt text-2xl dark:bg-slate-800">🚫</div>
+            <h2 class="mt-4 text-lg font-semibold">{{ __('Barra desactivada en esta sede') }}</h2>
+            <p class="mt-1 text-sm text-ink-muted dark:text-slate-400">
+                {{ __('Un responsable puede activarla desde la ficha de la sede.') }}
+            </p>
+        </div>
     @else
         {{-- Offline banner — unmistakable, fail closed. --}}
         <div x-show="! online" x-cloak role="alert" aria-live="assertive" class="mb-4 flex items-center gap-3 rounded-xl border border-error/40 bg-error/10 px-4 py-3 text-sm font-semibold text-error">

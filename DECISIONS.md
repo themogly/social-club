@@ -1582,6 +1582,15 @@ relation-manager/report, light+dark) pending — no browser.
 
 Owner-authorised merge. 447 green. Screenshots (global settings + Location form, light/dark) pending — no browser.
 
+**FOLLOW-UP CORRECTION (prompt 59).** This entry's claim that toggling the LocationForm control flips POS
+behaviour was only half true: `Settings::get` (which the enforcement reads) resolves `Setting` ROWS, but the
+LocationForm `Toggle::make('settings.*')` controls wrote the `locations.settings` JSON COLUMN — a
+disconnected store. The prompt-44 test passed because it wrote a `Setting` row DIRECTLY (`Settings::set(...,
+$location->id)`), so the enforcement flipped, but the ADMIN toggle wouldn't have. This also means the
+prompt-44/35 claim that `camera_scan_enabled` was "correctly wired end-to-end" was wrong. Prompt 59
+reconciled the two stores to one (Setting rows) and re-tests through the LocationForm save path — see below.
+The Option-A per-location resolution itself STANDS; only the storage plumbing under it was fixed.
+
 ## Prompt 46 — membership fee collection at the till
 
 `RecordFeePayment` had zero callers, so `feesPaid()` always compared a nonzero `fee_cents` against €0 of
@@ -1612,3 +1621,37 @@ no contradiction found.)
 Transaction boundary: `RecordFeePayment` writes the payment (and, for WALLET, the ledger movement via the
 single wallet writer) after the session/permission guards — matching the other till actions. Owner-authorised
 (batch) merge. 455 green. Screenshots pending — no browser.
+
+## Prompt 59 — one per-location settings store (corrects prompts 44 + 34)
+
+**Root cause behind prompt 44's instance:** two disconnected per-location stores. (1) `Setting` rows carrying
+a `location_id` — what `Settings::get()` resolves, and what all enforcement reads through. (2) a `settings`
+JSON column on `locations` — what the LocationForm's `Toggle::make('settings.*')` controls wrote, read by
+exactly one function (`AutoSettleDebt::isRingFenced`, itself never called — prompt 49). Zero location-scoped
+`Setting` rows had ever been written; every per-location toggle was dead or read-only-by-dead-code.
+
+**Decision — keep the `Setting`-row store, RETIRE the JSON column** (prompt 59's preferred): it's what the
+resolver already uses, has `SettingType` casting and a clean org fallback, and a single flag change doesn't
+re-save a whole model.
+
+- `Settings::get($key, $default, ?$locationId)` gained an explicit-location param (backward compatible —
+  null = active location) so the Location edit form can read a SPECIFIC sede's override.
+- LocationForm's five toggles (`bar_enabled`, `signature_on_dispensation`, `restrict_pos_to_checked_in`,
+  `camera_scan_enabled`, `ring_fenced`) are now VIRTUAL fields (a `SETTING_TOGGLES` const), loaded in
+  `EditLocation::mutateFormDataBeforeFill` from `Settings::get(key, default, record)` and persisted as
+  location-scoped `Setting` rows in `mutateFormDataBeforeSave` / `CreateLocation::afterCreate` — never a model
+  column. `AutoSettleDebt::isRingFenced` reads `Settings::get('ring_fenced', false, $location->id)`.
+- **Migration** copies every `locations.settings` JSON value into location-scoped `Setting` rows (BOOL) then
+  drops the column (down re-adds it nullable). `ring_fenced` data survives (tested via the row → isRingFenced).
+- **`bar_enabled` given a real consumer** (was dead): BarPos refuses with a friendly "Barra desactivada"
+  state when off, and the counter screen switcher (prompt 42) hides the Barra link at a sede where it's off.
+  Default true.
+- **Corrections filed:** the `camera_scan_enabled` line in BUILD-LOG + an appended note on prompt 44's
+  DECISIONS entry (Option A stands; only the storage under it was broken).
+
+Tests: a location override overrides at A and not B; no override falls back to the ORG value not DEFAULTS;
+**toggling through the EditLocation form flips the POS end-to-end** (the path the prompt-44 test masked);
+ring_fenced survives as a row; the JSON store is gone (no column, no cast); and a GENERIC dead-key guard walks
+`LocationForm::SETTING_TOGGLES` and fails if any toggle has no `Settings::get` reader (an enumerated test would
+have passed while four were dead). Owner-authorised (batch) merge. 461 green. MySQL parity for the migration
+PENDING — MySQL wouldn't start in this environment (SQLite parity holds). Screenshots pending — no browser.

@@ -16,6 +16,7 @@ use App\Models\User;
 use App\Support\ActiveScope;
 use App\Support\CounterOperator;
 use App\Support\Money;
+use App\Support\Settings;
 use App\Support\Wallet;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Contracts\View\View;
@@ -81,6 +82,9 @@ class BarPos extends Component
 
     /** Friendly state when the operator has no location at all (still a 200). */
     public bool $noLocation = false;
+
+    /** True when the active sede has the bar turned off (per-location bar_enabled, prompt 59). */
+    public bool $barDisabled = false;
 
     // --- Offline (fail-closed) --------------------------------------------------
 
@@ -152,6 +156,9 @@ class BarPos extends Component
         }
 
         $this->noLocation = $this->locationId === null;
+
+        // The bar can be turned off per sede (prompt 59) — refuse the POS with a friendly state.
+        $this->barDisabled = $this->locationId !== null && ! (bool) Settings::get('bar_enabled', true);
 
         // Adopt the single open till at this sede so cash lands on the shared drawer.
         if ($this->terminal === '' && $this->locationId !== null) {

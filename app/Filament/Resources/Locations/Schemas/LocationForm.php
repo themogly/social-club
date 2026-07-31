@@ -11,6 +11,20 @@ use Filament\Schemas\Schema;
 
 class LocationForm
 {
+    /**
+     * Per-location boolean settings — stored as location-scoped Setting rows (prompt 59), each read by
+     * real enforcement code. Filled/persisted by CreateLocation/EditLocation, never a model column.
+     *
+     * @var list<string>
+     */
+    public const SETTING_TOGGLES = [
+        'bar_enabled',
+        'signature_on_dispensation',
+        'restrict_pos_to_checked_in',
+        'camera_scan_enabled',
+        'ring_fenced',
+    ];
+
     public static function configure(Schema $schema): Schema
     {
         return $schema
@@ -57,25 +71,23 @@ class LocationForm
                     ->label(__('Activo'))
                     ->default(true),
 
-                // The following bind into the model's `settings` array cast via dot paths.
-                // (No aforo-enforcement control: aforo is a legal capacity limit and is enforced as a
-                // fixed BLOCK via the enforcement matrix — prompt 34 removed the inert warn/block dropdown.)
-                Toggle::make('settings.bar_enabled')
-                    ->label(__('Bar activado')),
+                // Per-location settings (prompt 59): these five are stored as LOCATION-SCOPED Setting
+                // rows — the one mechanism Settings::get reads — loaded + saved by the Edit/Create pages,
+                // NOT bound to a model column. (No aforo control: aforo is a fixed BLOCK via the matrix.)
+                Toggle::make('bar_enabled')
+                    ->label(__('Bar activado'))
+                    ->default(true), // a new sede runs a bar unless turned off
 
-                Toggle::make('settings.signature_on_dispensation')
-                    ->label(__('Firma en dispensación'))
-                    ->default(true),
+                Toggle::make('signature_on_dispensation')
+                    ->label(__('Firma en dispensación')),
 
-                Toggle::make('settings.restrict_pos_to_checked_in')
+                Toggle::make('restrict_pos_to_checked_in')
                     ->label(__('Restringir TPV a socios con check-in')),
 
-                Toggle::make('settings.camera_scan_enabled')
+                Toggle::make('camera_scan_enabled')
                     ->label(__('Escaneo con cámara')),
 
-                // The REAL ring-fence control (prompt 34) — read by AutoSettleDebt::isRingFenced.
-                // Replaces the inert org-level wallet_ring_fence toggle that was removed.
-                Toggle::make('settings.ring_fenced')
+                Toggle::make('ring_fenced')
                     ->label(__('Monedero por sede (ring-fence)'))
                     ->helperText(__('Si se activa, el crédito de esta sede no salda automáticamente deudas en otras sedes.')),
             ]);

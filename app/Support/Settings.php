@@ -81,6 +81,12 @@ class Settings
         // search always remain, so this only ADDS an input, never gates one (prompt 35).
         'camera_scan_enabled' => false,
 
+        // Per-location (prompt 59): whether this sede runs a bar (a multi-site club may have one
+        // premises with a bar and one without), and whether its wallet is ring-fenced from
+        // cross-location auto-settlement. Both are location-scoped Setting rows written by LocationForm.
+        'bar_enabled' => true,
+        'ring_fenced' => false,
+
         // Governance / actas
         'minute_quorum_fraction_bp' => 5000,  // quorum = 50% of active members (basis points)
 
@@ -118,7 +124,12 @@ class Settings
         ],
     ];
 
-    public static function get(string $key, mixed $default = null): mixed
+    /**
+     * Resolve a setting: location override → org value → code default. When $locationId is null the
+     * ACTIVE location is used (the normal enforcement path); pass an explicit id to read a SPECIFIC
+     * location's override (e.g. the Location edit form, which edits a sede that isn't the active one).
+     */
+    public static function get(string $key, mixed $default = null, ?string $locationId = null): mixed
     {
         try {
             $scope = app(ActiveScope::class);
@@ -130,7 +141,7 @@ class Settings
                     ->where('key', $key)
                     ->get();
 
-                $locationId = $scope->locationId();
+                $locationId ??= $scope->locationId();
                 $row = ($locationId !== null ? $rows->firstWhere('location_id', $locationId) : null)
                     ?? $rows->firstWhere('location_id', null);
 
