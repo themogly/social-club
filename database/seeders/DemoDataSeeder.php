@@ -2,6 +2,7 @@
 
 namespace Database\Seeders;
 
+use App\Actions\Bar\CommitOrder;
 use App\Enums\BatchStatus;
 use App\Enums\CategoryAppliesTo;
 use App\Enums\CheckInMethod;
@@ -16,7 +17,6 @@ use App\Enums\IdDocumentType;
 use App\Enums\MembershipPeriod;
 use App\Enums\MembershipStatus;
 use App\Enums\MemberStatus;
-use App\Enums\OrderStatus;
 use App\Enums\SettingType;
 use App\Enums\StockMovementType;
 use App\Enums\TillSessionStatus;
@@ -36,7 +36,6 @@ use App\Models\Location;
 use App\Models\Member;
 use App\Models\Membership;
 use App\Models\MembershipTier;
-use App\Models\Order;
 use App\Models\Organisation;
 use App\Models\Setting;
 use App\Models\StockMovement;
@@ -428,25 +427,20 @@ class DemoDataSeeder extends Seeder
         for ($i = 0; $i < random_int(1, 3); $i++) {
             $article = $articles->random();
             $qty = random_int(1, 3);
-            $total = $article->price_cents->cents * $qty;
 
-            Order::create([
-                'organisation_id' => $orgId, 'location_id' => $location->id, 'operator_id' => $operator->id,
+            // Through the REAL writer (never hand-build a shape a domain action owns — see CLAUDE.md).
+            // CommitOrder builds the item snapshot (article_id + unit_price_cents + line_total_cents that
+            // BarSalesReport reads), depletes UNIT stock via a SALE movement, and posts cash. Hand-building
+            // the JSON `items` as {name, qty, price_cents} was why the Bar sales report read €0 on seeded data.
+            $order = (new CommitOrder)->handle($location, [
+                ['article_id' => $article->id, 'qty' => $qty],
+            ], [
+                'operator_id' => $operator->id,
                 'till_session_id' => $till->id,
-                'items' => [['name' => $article->name, 'qty' => $qty, 'price_cents' => $article->price_cents->cents]],
-                'total_cents' => $total, 'cash_cents' => $total, 'wallet_cents' => 0,
-                'status' => OrderStatus::COMPLETED, 'idempotency_key' => (string) Str::ulid(),
+                'idempotency_key' => (string) Str::ulid(),
             ]);
 
-            $article->decrement('stock', $qty);
-
-            StockMovement::create([
-                'organisation_id' => $orgId, 'location_id' => $location->id,
-                'stockable_type' => Article::class, 'stockable_id' => $article->id,
-                'qty_units' => -$qty, 'type' => StockMovementType::SALE, 'operator_id' => $operator->id,
-            ]);
-
-            $cashTaken += $total;
+            $cashTaken += $order->cash_cents->cents;
         }
 
         return $cashTaken;

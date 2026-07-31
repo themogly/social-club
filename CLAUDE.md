@@ -216,6 +216,17 @@ glossary in `DECISIONS.md`; never let "translate" slip into commercial framing (
   changes get no screenshot ceremony. Motion-gated UI screenshotted with motion both reduced and
   allowed (reduced-motion resets hide gated-visibility bugs).
 - Migrations that touch existing data are tested against a seeded copy, not just a fresh DB.
+- **Fixtures and seeds go through the domain action that owns the write — never hand-build a persisted
+  shape a writer owns.** A seeder/factory that assembles a row by hand drifts from the real writer the
+  moment either side changes, and the drift is INVISIBLE: a green test and a working-looking screen
+  both certify a shape production never produces. This actually shipped — `DemoDataSeeder` wrote order
+  `items` as `{name, qty, price_cents}` while `CommitOrder` writes `{article_id, unit_price_cents,
+  line_total_cents}`, so the Bar sales report read €0,00 against 100+ seeded units and a hand-built
+  test "passed" while disagreeing with both. Route the seed through the Action (`CommitOrder`,
+  `CommitDispensation`, `RecordStockMovement`, …); reserve a raw `Model::create` for shapes no Action
+  owns. Carve-out: a compliance-boundary writer that would reject demo data (e.g. `CommitDispensation`
+  gating on fees/carencia/limits) may stay relational-with-full-snapshot IF every column the real
+  writer sets is populated — but say so in `DECISIONS.md`, because it is exactly the drift risk above.
 - Idempotency: anything triggered by schedulers/webhooks must not double-fire (tested under retry).
 - **Tests prove CORRECTNESS, not COMPLETENESS.** No test catches a feature quietly shipped as a
   placeholder/stub. Periodically run the completeness check (grep TODO/FIXME/placeholder; walk pages

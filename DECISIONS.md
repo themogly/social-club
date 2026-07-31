@@ -1714,3 +1714,42 @@ scrolling to the page-top banner. Prompt 41's bar block is untouched and now rel
 Tests: one per blocked state asserting commit() surfaces a stated reason (the regression guard); a valid charge
 commits + confirms; both buttons' disabled binding is `! online` only. 479 green. Screenshots pending — no
 browser. Owner-authorised merge (the prompt's default "do not merge" overridden by the owner, who is the reviewer).
+
+---
+
+## Batch 2·0 — fixture-drift: seeds go through the domain writer (new; not a numbered prompt)
+
+**Root cause (confirmed on a freshly seeded DB).** `DemoDataSeeder::seedOrders` hand-built the order
+`items` JSON as `{name, qty, price_cents}`, but `CommitOrder` (the real writer) writes `{article_id,
+name, unit_price_cents, qty, line_total_cents}`. `BarSalesReport` sums `line_total_cents` grouped by
+`article_id` — both keys the seeder omitted — so **the Bar sales report read €0,00 against ~100 seeded
+units** (units half-worked because `qty` exists in both shapes). `BarSalesReportTest` hand-built items
+*with* `line_total_cents`, so it stayed green while disagreeing with the seeder and with reality — the
+classic "green test certifies a shape production never produces."
+
+**Fix.** `seedOrders` now calls `CommitOrder::handle($location, [['article_id', 'qty']], [...])` — the
+writer builds the item snapshot, depletes UNIT stock via a SALE movement, and posts cash. Nothing
+hand-built. Verified on a fresh `migrate:fresh --seed`: BarSales `importe` = FinancialReport `barra` =
+€141,90 across 102 units (reconciles + non-zero; was €0,00). New standing test
+`SeededOrderShapeReconcilesTest` asserts an order written the seeder's way carries the real keys AND
+reconciles — the regression guard.
+
+**Standing rule added to `CLAUDE.md`** (Testing section): *fixtures and seeds go through the domain
+action that owns the write; never hand-build a persisted shape a writer owns.*
+
+**Dispensations — deliberately LEFT relational, not routed through `CommitDispensation`.** The prompt
+named dispensations "the obvious next candidate." I checked: `seedDispensations` writes real
+`DispensationLine` **rows** (not a JSON blob) carrying the FULL snapshot the writer produces —
+`price_per_gram_cents`, `line_total_cents`, `discount_cents`, `genetic_name_snapshot`,
+`batch_no_snapshot` — so there is no shape-drift bug there (a schema-enforced table can't silently
+grow a wrong key the way `items` JSON did). Routing it through `CommitDispensation` would run every
+seeded basket through the compliance boundary (membership/carencia/daily+monthly limits/eligibility/
+pricing, and now prompt 46's unpaid-fee BLOCK), which arbitrary demo members won't reliably pass —
+seeding would start failing on eligibility. Per the carve-out I added to the CLAUDE.md rule, a
+compliance-boundary writer may stay relational-with-full-snapshot; this is that case. If a future
+prompt wants demo dispensations to exercise the real enforcement path, it must first make the seeded
+members eligible (fees paid, past carencia, under limits) — that is its own branch, not a sub-bullet
+here. **Not an `OVERNIGHT-DEFAULT — CONFIRM`: this is a reasoned, reversible choice, and the seeded
+shape already matches the writer's columns.**
+
+Self-merge on green (batch 2 authorisation).
