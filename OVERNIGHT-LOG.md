@@ -62,3 +62,28 @@ built/tested but the UI was never wired (CounterOperator never set → everythin
 device login). Built one shared IdentifiesOperator trait + operator-strip PIN-pad partial across all
 4 counter screens + a requireOperator() guard on every commit. 10 new end-to-end tests. Merged to
 main, composer check green (363 tests). No migration → MySQL parity N/A. Next: prompt 27 (discounts UI).
+
+**2026-07-31 — Prompt 27 DONE.** Discounts admin UI. Audit: org-wide DiscountResource + AssignMemberDiscount
++ ResolvePrice already existed; only the per-member UI was missing. Built a Descuentos relation-manager tab
+(gated member.discount.assign) delegating to AssignMemberDiscount + new Update/RemoveMemberDiscount actions
+(audited who/from→to+reason). Per-member custom = global; reason→audit (no column, migration-free). Merged
+to main (689ce0c), composer check green (369 tests). Next: prompt 28 (POS camera QR) — depends on prompt 22.
+
+**2026-07-31 — Prompt 28 SKIPPED (blocked, logged, not built).** Prompt 28 (dispensary POS camera QR
+scan) requires prompt 22 (check-in camera QR scan) merged, and its whole point is to REUSE the
+camera-scan component prompt 22 built ("extract and reuse, not rebuild"; "do not fork a second
+QR-camera implementation"). Verified prompt 22 was NEVER built: no `getUserMedia` / `BarcodeDetector`
+/ camera decode anywhere in the repo; the check-in screen has only the keyboard-wedge scanner +
+name-search. Prompt 03 left a `settings.camera_scan_enabled` toggle on the Location form, but nothing
+reads it and there's no such key in Settings::DEFAULTS.
+- **Decision:** do NOT build the camera scanner from scratch under prompt 28's branch. That would be
+  building prompt 22 (a JS-heavy getUserMedia + BarcodeDetector + bundled-fallback decoder + camera
+  permission flow), which the user did not queue, contradicts prompt 28's "reuse not rebuild" mandate
+  and the one-prompt-one-task rule, and — critically — cannot be verified unattended (no camera, no
+  Playwright MCP in this env). Per the overnight rule, camera/interactive UI is exactly the "log it,
+  don't guess overnight" case.
+- **To resume (human):** build prompt 22 first (a shared camera-scan Livewire component: BarcodeDetector
+  with a bundled fallback, gated on `camera_scan_enabled`, graceful degradation to manual entry, feeding
+  the existing `ResolveMemberByToken` lookup), then prompt 28 reuses it on the dispensary POS Identify
+  step. main is green; nothing was left half-built (no branch created for 28).
+Continuing to prompt 29 (application invite links UI).

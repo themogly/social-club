@@ -103,6 +103,12 @@ class FormCompletenessTest extends TestCase
         ],
         MemberApplicationResource::class => [
             'invite_token_hash' => 'system: set by the tokenised invite flow.',
+            'invite_token' => 'system: the encrypted raw token, set at invite generation for re-copy (prompt 29).',
+            'invited_by' => 'system: set to the issuing user at invite generation.',
+            'invite_expires_at' => 'system: computed from the invite_expiry_days setting at generation.',
+            'opened_at' => 'system: stamped when the prospect first opens the form.',
+            'submitted_at' => 'system: stamped when the prospect submits the application.',
+            'revoked_at' => 'system: set by the Revoke invite action.',
             'payload' => 'system: the applicant-submitted data (public pre-registration form).',
             'reviewed_by' => 'system: set by the approve/reject review action.',
             'reviewed_at' => 'system: set by the approve/reject review action.',
