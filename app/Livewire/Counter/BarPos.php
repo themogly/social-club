@@ -19,6 +19,7 @@ use App\Support\ActiveScope;
 use App\Support\CounterOperator;
 use App\Support\Money;
 use App\Support\Settings;
+use App\Support\TerminalName;
 use App\Support\Wallet;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Contracts\View\View;
@@ -761,15 +762,19 @@ class BarPos extends Component
 
     private function openTillSession(Location $location): ?TillSession
     {
-        $query = TillSession::query()->withoutGlobalScopes()
+        $sessions = TillSession::query()->withoutGlobalScopes()
             ->where('location_id', $location->id)
-            ->where('status', TillSessionStatus::OPEN->value);
+            ->where('status', TillSessionStatus::OPEN->value)
+            ->orderBy('opened_at')->get();
 
-        if ($this->terminal !== '') {
-            $query->where('terminal', $this->terminal);
+        if ($this->terminal === '') {
+            return $sessions->first();
         }
 
-        return $query->orderBy('opened_at')->first();
+        // Match by normalised KEY, not the raw string, so a spelling variant still resolves (prompt 84).
+        $key = TerminalName::key($this->terminal);
+
+        return $sessions->first(fn (TillSession $s): bool => TerminalName::key((string) $s->terminal) === $key);
     }
 
     // --- Small helpers ----------------------------------------------------------
