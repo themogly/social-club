@@ -1197,3 +1197,19 @@ preview + inline CID logo, per CLAUDE.md). That is a focused follow-up (pattern:
 its required test is deferred with it. The removal itself (the load-bearing part) is fully built + tested.
 
 Migration verified on MySQL. 386 tests green (8 new).
+
+---
+
+## CORRECTION (2026-07-31 completeness-check) — prompt 24 inert-settings claim was WRONG
+
+The prompt-24 entry above states `wallet_ring_fence` and `limit_override_requires_manager` were "confirmed
+gaps — enforcement already read them, no form to set them." **That is incorrect.** The overnight
+completeness-check (grep of the literal keys across `app/ config/ database/`) found BOTH are read by NO
+enforcement code — they are inert toggles the settings-completeness test happily accepts (it proves a field
+renders, not that it's consumed). Reality:
+- `limit_override_requires_manager` — overrides are gated by the FIXED `limits.override` permission
+  (`CommitDispensation`); the manager-vs-not toggle changes nothing. INERT.
+- `wallet_ring_fence` (org) — read nowhere; the real ring-fence logic reads a per-location
+  `ring_fenced` setting (default false) that no form exposes. INERT + the org toggle is a no-op.
+`avalador_therapeutic_exempt` IS genuinely consumed (the avalador logic reads it), so that part stands.
+Full inert-settings inventory + recommended wire-or-cut decisions: see `AUDIT-FINDINGS.md` (Step 3).

@@ -112,3 +112,49 @@ re-applies explicit scoping); no secrets in the client bundle (VAPID stays serve
 bcrypt + rate-limited + never logged), 27 (discount action defense-in-depth), 29 (invite_token encrypted for
 display, hash for verification), 31 (temporary convert/extend gated + audited) all solid. Dark-mode + palette
 tokenisation essentially complete on custom surfaces; socio PWA + dashboard/report markup a11y-clean.
+
+---
+
+# Step 3 — completeness-check findings (2026-07-31)
+
+Ran `gates/completeness-check.md` across every surface. **The compliance-critical core is REAL and
+wired** — all hard blocks (age, carencia, active-membership, sanction, daily/monthly gram caps, debt
+threshold, aforo capacity, override permissions) genuinely enforce and read their settings; POS, till/
+arqueo (blind close + Z-report), expenses/purchases, the 8 report ViewModels, the member PWA (push IS
+wired end-to-end for announcements), actas/legal docs, and the audit/RGPD surfaces are all real, not
+stubs. Marker grep clean (no dd/dump/TODO/"coming soon" in live code).
+
+## 🟠 The one real theme — INERT SETTINGS (render in the admin UI, read by no enforcement code)
+Each verified by grepping the literal key across `app/ config/ database/` — appears only in
+`Settings::DEFAULTS` and/or a Filament form, never in enforcement/model code. These need a per-setting
+decision: **wire the one-line read at its enforcement point, or cut the control** (a setting that does
+nothing is worse than no setting — the admin thinks it's in effect).
+
+| # | Setting | Reality | Severity |
+|---|---------|---------|----------|
+| 1 | `active_member_cap` (+ `temporary_count_toward_cap`) | club active-member soft cap is never enforced OR warned (`membersOverLimit()` is per-member GRAMS, not head-count) → the count-toward-cap toggle is doubly inert | MEDIUM |
+| 2 | `avalador_max_sponsees` | never checked — an avalador can back UNLIMITED members (the aval *requirement* is enforced; the *max* is not) | MEDIUM |
+| 3 | `wallet_ring_fence` (org) vs `ring_fenced` (per-location) | the org toggle is read nowhere; the real logic (`AutoSettleDebt::isRingFenced`) reads `location.settings.ring_fenced` (default false) which NO form exposes → cross-location auto-settle is always on, the admin toggle is a no-op | MEDIUM |
+| 4 | `aforo_enforcement` / `aforo_default` | a live dropdown on `LocationForm`, but aforo mode is fixed BLOCK via the enforcement matrix; the flat key is read nowhere; `aforo_default` has no fallback use → a misleading "lying" admin control | MED-LOW |
+| 5 | `limit_override_requires_manager` | read nowhere; overrides ARE gated by the fixed `limits.override` permission (safe) but the manager-vs-not toggle is inert | LOW |
+| 6 | `fees_to_wallet_allowed` | read nowhere; `RecordFeePayment` posts a wallet fee unconditionally | LOW |
+| 7 | `currency_locale` | read nowhere; `Money::formatted()` uses `app()->getLocale()`, so the setting can't lock the es €1.234,56 format | LOW (cosmetic) |
+| 8 | `blind_count_enforced` | read nowhere; `CloseTill` is always blind (safe default, dead constant) | INFO |
+
+**Recommended:** build the two small checks the settings already invite — `active_member_cap`
+enforcement/alert (#1) and `avalador_max_sponsees` (#2); resolve the ring-fence wiring (#3) and the
+`aforo_enforcement` control (#4) so the admin UI stops lying; wire-or-cut #5–#7.
+
+## Meta-finding (important — corrects my own DECISIONS.md)
+The settings-completeness test (`DebtAndLocationSettingsTest`) asserts every DEFAULT is *on the form or
+excluded* — it proves a field RENDERS, not that anything READS it. That produced false confidence in the
+**prompt-24 DECISIONS.md claim that `wallet_ring_fence` and `limit_override_requires_manager` were
+"already consumed by enforcement." They are NOT** — both are inert (#3, #5 above). DECISIONS.md corrected.
+
+## Dead code (INFO): `app/Support/SiteContent.php` (referenced nowhere, superseded by `Settings`);
+`resources/views/welcome.blade.php` (Laravel default, `/` is the Filament dashboard — unrouted).
+
+## Correctly deferred (documented — not re-flagged)
+Push triggers for low-balance/expiring/event-reminder (only NewAnnouncement wired); temporary-member
+email reminder; camera scan (prompt 22/28 skipped); forecast_options_g + per-article low_stock fallback;
+signed-URL invite refactor; seed placeholders; backup placeholders; and the HIGH security items above.

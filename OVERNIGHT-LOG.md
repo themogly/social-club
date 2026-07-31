@@ -137,3 +137,42 @@ security (seo skipped — no public site) as read-only passes. **Full prioritize
   member-relation-manager empty states.
 - **ui-passes 01–04:** deferred — visual/screenshot passes, no browser/Playwright in this env.
 Beginning Step 3 (completeness-check) as a background verification pass.
+
+---
+
+# ✅ OVERNIGHT RUN COMPLETE — read this first
+
+**Ran cleanly through all three steps.** `main` is green (386 tests / 2448 assertions on SQLite; MySQL
+parity verified on every migration) and pushed to origin. No step hit a hard stop.
+
+## What got MERGED (7 feature branches + 3 audit-fix branches, each green before merge)
+- **25** dashboard alerts leaked Spanish → fixed the `trans_choice` keys + added a 2nd static-scan i18n gate.
+- **26** PIN operator switching → wired the missing unlock UI on all counter screens (backend already existed).
+- **27** discounts → per-member discount tab + Update/Remove actions (org templates already existed).
+- **28** POS camera QR → **SKIPPED** (depends on prompt 22's camera component, which was never built —
+  logged, not guessed; rebuilding it = a JS/camera feature that can't be verified without a browser).
+- **29** invite links → re-copyable (encrypted token), status board, expiry, revoke; kept the security-
+  critical hash-verification path unchanged (signed-URL refactor deferred for human review).
+- **30** expiry sweep → it was already correct + scheduled; added the missing per-job health heartbeat + docs.
+- **31** temporary members → kind + auto-removal via the existing anonymise Action; OFF by default; legal
+  note in the UI; the compliance resolvers provably don't branch on it.
+- **Audit fixes:** a11y accessible-names; the mandated `round_half_up()` everywhere; socio palette/enum-labels.
+
+## What needs a HUMAN (nothing auto-fixed here — all in AUDIT-FINDINGS.md)
+- 🔴 **Security (verify + fix by hand):** ID scans/certs appear **plaintext at rest** (S1); the document
+  streaming endpoint has **no authz / per-view access-log / ownership check** (S2); finance widgets lack
+  `canView()` (A1). Both S1/S2 sit on the Article-9 ID-document path — the single most sensitive surface.
+- 🟠 **~7 inert settings** (render in admin, enforced nowhere): `active_member_cap`, `avalador_max_sponsees`,
+  `wallet_ring_fence`/`ring_fenced`, `aforo_enforcement`, `limit_override_requires_manager`,
+  `fees_to_wallet_allowed`, `currency_locale`. Each needs a wire-or-cut decision (full table in AUDIT-FINDINGS.md).
+  **This also corrected a wrong prompt-24 claim in DECISIONS.md** (two of those toggles were said to be enforced; they aren't).
+- 🟡 Remaining SAFE-FIX polish (empty states, `RecordMemberConsent`/`scopeDispensable` extractions,
+  ForceDelete-UI-vs-policy, confirmations on wallet-adjust/merma), CSP/HSTS, and the deeper a11y/design items.
+
+## Explicitly NOT done (per the overnight brief)
+- **ui-passes 01–04** and all screenshots — no browser/Playwright in this env; visual verification is a human task.
+- `pre-staging-gate` / the human launch checklist — reserved for the project owner, not an unattended run.
+
+## Where to pick up
+1. Read `AUDIT-FINDINGS.md` top-to-bottom (🔴 first). 2. Decide the ~7 inert settings (wire or cut).
+3. Do a visual/screenshot pass on the counter screens, dashboard, and the new prompt-25→31 UI.
