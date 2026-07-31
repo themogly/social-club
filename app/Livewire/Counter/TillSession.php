@@ -4,28 +4,36 @@ namespace App\Livewire\Counter;
 
 use App\Actions\Expenses\RecordTillExpense;
 use App\Actions\Memberships\RecordFeePayment;
+use App\Actions\Stock\CommitStockTake;
 use App\Actions\Till\CloseTill;
 use App\Actions\Till\OpenTill;
 use App\Actions\Till\RecordCashMovement;
+use App\Enums\BatchStatus;
 use App\Enums\CashMovementType;
 use App\Enums\FeePaymentMethod;
 use App\Enums\MembershipStatus;
+use App\Enums\StockTakeStatus;
 use App\Enums\TillSessionStatus;
+use App\Enums\UnitType;
 use App\Exceptions\DebtLimitExceededException;
 use App\Exceptions\TillAlreadyOpenException;
 use App\Exceptions\TillClosedException;
 use App\Livewire\Counter\Concerns\IdentifiesOperator;
+use App\Models\Batch;
 use App\Models\ExpenseCategory;
 use App\Models\Location;
 use App\Models\Member;
 use App\Models\Membership;
 use App\Models\MembershipFeePayment;
+use App\Models\StockTake;
+use App\Models\StockTakeLine;
 use App\Models\TillSession as TillSessionModel;
 use App\Models\User;
 use App\Support\ActiveScope;
 use App\Support\CounterOperator;
 use App\Support\Money;
 use App\Support\TillSummary;
+use App\Support\Weight;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Collection;
@@ -93,6 +101,20 @@ class TillSession extends Component
     public bool $needsNote = false;
 
     public string $closeNote = '';
+
+    // --- EOD flower reweigh (prompt 47) — a step inside the close ritual, before the cash count ---
+
+    /** In the flower-reweigh step (blind: no expected weight shown while entering). */
+    public bool $reweighing = false;
+
+    /** The reweigh has been committed this close, so the cash count may proceed. */
+    public bool $reweighDone = false;
+
+    /** @var array<string, string> batch id => counted grams (blind entry). */
+    public array $reweighCounts = [];
+
+    /** @var list<array{name: string, counted: string, variance: string, adjusted: bool}>|null Revealed after commit. */
+    public ?array $reweighResult = null;
 
     /**
      * Revealed ONLY after a successful blind close (read from the closed session).
@@ -452,6 +474,11 @@ class TillSession extends Component
     {
         $this->closing = true;
         $this->resetCloseState();
+
+        // One end-of-day ritual: weigh the touched flower FIRST, then count the cash (prompt 47).
+        if ($this->reweighRequired()) {
+            $this->reweighing = true;
+        }
     }
 
     public function cancelClose(): void
@@ -460,11 +487,144 @@ class TillSession extends Component
         $this->resetCloseState();
     }
 
+    /**
+     * The flower batches to reweigh: OPEN, WEIGHT-type genetic, and actually TOUCHED since intake
+     * (remaining_cg <> initial_cg). A never-dispensed batch (remaining === initial) is simply excluded —
+     * nothing for staff to do. UNIT genetics (prerolls/edibles) and CLOSED/QUARANTINED batches never appear.
+     *
+     * @return \Illuminate\Support\Collection<int, Batch>
+     */
+    public function reweighBatches(): \Illuminate\Support\Collection
+    {
+        if ($this->locationId === null) {
+            return collect();
+        }
+
+        return Batch::query()->withoutGlobalScopes()
+            ->where('location_id', $this->locationId)
+            ->where('status', BatchStatus::OPEN->value)
+            ->whereColumn('remaining_cg', '<>', 'initial_cg')
+            ->whereHas('genetic', fn ($q) => $q->where('unit_type', UnitType::WEIGHT->value))
+            ->with('genetic')
+            ->orderBy('batch_no')
+            ->get();
+    }
+
+    /**
+     * Exposed to the view. The reweigh is required when closing the LAST open till at the location (so it
+     * fires once per location per evening, not at every terminal and never at a bar-only terminal that closes
+     * first), there are touched flower batches, and no count has been committed for the location today yet.
+     */
+    public function reweighRequired(): bool
+    {
+        if ($this->reweighDone || $this->locationId === null) {
+            return false;
+        }
+
+        $session = $this->resolveOpenSession();
+        if ($session === null) {
+            return false;
+        }
+
+        $othersOpen = TillSessionModel::query()->withoutGlobalScopes()
+            ->where('location_id', $this->locationId)
+            ->where('status', TillSessionStatus::OPEN->value)
+            ->whereKeyNot($session->id)->exists();
+        if ($othersOpen) {
+            return false;
+        }
+
+        $countedToday = StockTake::query()->withoutGlobalScopes()
+            ->where('location_id', $this->locationId)
+            ->where('status', StockTakeStatus::COMMITTED->value)
+            ->whereDate('committed_at', now())->exists();
+        if ($countedToday) {
+            return false;
+        }
+
+        return $this->reweighBatches()->isNotEmpty();
+    }
+
+    /**
+     * Commit the blind flower count through CommitStockTake (the ONLY writer of the count + its ADJUSTMENT
+     * movements). Blind, like the cash arqueo: expected weights are never shown while entering; the variances
+     * are revealed only after commit. Gated on `stock.take`.
+     */
+    public function submitReweigh(): void
+    {
+        $session = $this->resolveOpenSession();
+        if ($session === null) {
+            return;
+        }
+
+        $user = $this->currentUser();
+        if ($user === null || ! $user->can('stock.take')) {
+            $this->flash(__('No tienes permiso para recontar el inventario.'), 'error');
+
+            return;
+        }
+
+        $batches = $this->reweighBatches();
+        $counts = [];
+
+        foreach ($batches as $batch) {
+            $raw = trim($this->reweighCounts[$batch->id] ?? '');
+            if ($raw === '' || ! is_numeric($raw) || (float) $raw < 0) {
+                $this->flash(__('Introduce el peso contado de cada lote de flor.'), 'error');
+
+                return;
+            }
+            $counts[] = ['type' => 'batch', 'id' => $batch->id, 'counted' => Weight::fromGrams($raw)->centigrams];
+        }
+
+        $stockTake = StockTake::create([
+            'organisation_id' => $session->organisation_id,
+            'location_id' => $this->locationId,
+            'opened_by' => $user->id,
+            'opened_at' => now(),
+            'status' => StockTakeStatus::OPEN,
+        ]);
+
+        $committed = (new CommitStockTake)->handle($stockTake, $counts, $user);
+
+        // Reveal the variances (blind entry, reveal after — like the cash arqueo), read back from the
+        // committed lines and matched to the batches we counted (a morph column, so via getAttribute()).
+        $linesByBatch = $committed->lines()->get()
+            ->keyBy(fn (StockTakeLine $line): string => (string) $line->getAttribute('countable_id'));
+
+        $this->reweighResult = $batches->map(function (Batch $batch) use ($linesByBatch): array {
+            $line = $linesByBatch->get($batch->id);
+            $variance = $line?->variance_cg->centigrams ?? 0;
+            $counted = $line?->counted_cg->centigrams ?? 0;
+
+            return [
+                'name' => trim($batch->genetic->name.' · '.$batch->batch_no),
+                'counted' => Weight::fromCentigrams($counted)->formatted(),
+                'variance' => Weight::fromCentigrams($variance)->formatted(),
+                'adjusted' => $variance !== 0,
+            ];
+        })->all();
+
+        $this->reweighDone = true;
+        $this->reweighing = false;
+        $this->reweighCounts = [];
+        $this->flash(__('Recuento de flor registrado.'), 'success');
+    }
+
     public function submitCount(): void
     {
         $session = $this->resolveOpenSession();
 
         if ($session === null) {
+            return;
+        }
+
+        // The flower reweigh is a required step before the cash count can close (prompt 47). Explicit +
+        // recoverable — bounce back to the reweigh step with a clear reason, never a silent hang (mirror needsNote).
+        if ($this->reweighRequired()) {
+            $this->reweighing = true;
+            $this->flash(__('Primero hay que recontar la flor.'), 'warning');
+
             return;
         }
 
@@ -572,6 +732,8 @@ class TillSession extends Component
             'feeResults' => $this->feeSearchResults(),
             'feeMember' => $feeMember,
             'feeOwedCents' => $feeMembership !== null ? $this->owedCents($feeMembership) : null,
+            // EOD flower reweigh (prompt 47) — the in-scope batches, only while in that step.
+            'reweighBatches' => $this->reweighing ? $this->reweighBatches() : collect(),
         ]);
     }
 
@@ -627,6 +789,10 @@ class TillSession extends Component
         $this->closeNote = '';
         $this->expected = null;
         $this->variance = null;
+        $this->reweighing = false;
+        $this->reweighDone = false;
+        $this->reweighCounts = [];
+        $this->reweighResult = null;
     }
 
     private function userCan(string $permission): bool

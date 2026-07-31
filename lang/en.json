@@ -1,4 +1,13 @@
 {
+    "Recuento de flor registrado.": "Flower count recorded.",
+    "Recuento de flor · fin de día": "Flower reweigh · end of day",
+    "Pesa la flor de la que se ha dispensado hoy e introduce los gramos contados. El peso esperado se revela solo después de confirmar (recuento a ciegas).": "Weigh the flower dispensed from today and enter the counted grams. The expected weight is revealed only after you confirm (blind count).",
+    "Recuento de flor registrado": "Flower count recorded",
+    "ajuste": "adjustment",
+    "sin diferencia": "no difference",
+    "No tienes permiso para recontar el inventario.": "You do not have permission to recount the inventory.",
+    "Introduce el peso contado de cada lote de flor.": "Enter the counted weight of each flower batch.",
+    "Primero hay que recontar la flor.": "The flower must be recounted first.",
     "% alerta": "% alert",
     "% aviso": "% warning",
     "% previsión": "% of forecast",

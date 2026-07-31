@@ -2526,3 +2526,45 @@ the audit log.
 in this environment; the flows are covered by `RefundUiTest` (9 tests, incl. the action-parity, remaining,
 merma-not-offered, cash-not-offered, over-refund/window refusals, member-visibility and cross-location
 denial). Owner-authorised merge (standing "merge everything to main"). 593 green.
+
+---
+
+## Prompt 47 — end-of-day: close the till AND reweigh only the touched flower
+
+The cash-count half of the ask (blind arqueo) existed; the flower-reweigh half was a real gap —
+`StockTake`/`StockTakeLine`/`CommitStockTake` were fully built and `stock.take` declared and role-assigned,
+but nothing ever called any of it (same shape as the `RecordFeePayment` gap). This wires it in.
+
+**Where the counting screen lives — DECISION: a STEP inside the till close flow**, not a separate screen.
+The ask was literally "an end-of-day function ON THE TILL", so the reweigh is a phase in
+`TillSession`'s existing close sequence: `startClose()` lands on the flower reweigh first (when required),
+and only once it is committed does the blind cash count proceed — one end-of-day ritual, not two
+disconnected screens. `CommitStockTake` remains the ONLY writer of the count + its ADJUSTMENT movements;
+the component opens a `StockTake` header and hands the counted figures to the action, building no variance
+logic of its own.
+
+**Blind vs visible — DECISION: BLIND, mirroring the cash arqueo.** The operator enters counted grams per
+batch with NO expected weight shown; the variances are revealed only AFTER commit (read back from the
+committed `StockTakeLine`s). Same integrity rationale as the cash count: staff should record what the scale
+says, not weigh-to-target. This is a deliberate reading of prompt 07's "review variances before commit" —
+prompt 47 explicitly allowed the choice, and blind-then-reveal matches the screen it lives on.
+
+**Terminal-granularity — DECISION: prompt only when closing the LAST open till at the location** (there are
+touched flower batches, and no count has been committed for the location today). Till sessions are
+per-terminal and a location can run several at once (a dispensary and a bar terminal); flower stock is
+per-location. Prompting at every terminal would nag twice or fire at a bar terminal that never touches
+flower. Gating on "last open till for this location" fires it exactly once per location per evening, at the
+final lock-up, whichever terminal that is. A batch never touched (`remaining_cg === initial_cg`) is simply
+excluded — nothing for staff to do. UNIT genetics (prerolls/edibles, exactly countable from
+`remaining_units`) and CLOSED/QUARANTINED batches never appear (all tested).
+
+**Blocked close is explicit + recoverable.** If an operator tries to count cash while the flower reweigh is
+still pending, `submitCount()` bounces back to the reweigh step with a stated warning ("Primero hay que
+recontar la flor") — never a silent hang, mirroring how the blind-arqueo `needsNote` variance flow already
+handles "can't finish yet, here's why". Gated on `stock.take` (its first real enforcement anywhere).
+
+**Screenshots:** the reweigh step (filtered batch list, a variance on a line, the committed state) light+dark
+could not be produced — no browser here; the flows are covered by `EodStockTakeTest` (8 tests: the three
+exclusion rules, variance→one ADJUSTMENT + reconciled `remaining_cg`, zero-variance→line-but-no-adjustment,
+the close-gating, the terminal rule, and the `stock.take` denial). Owner-authorised merge (standing "merge
+everything to main"). 601 green.
