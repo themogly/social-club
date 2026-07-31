@@ -2473,3 +2473,56 @@ repurposed to exercise the new action; and a latent flaky assertion in prompt 70
 dispense-regression could pick a seeded member who had already consumed toward the daily cap during the
 fortnight) was tightened to exclude members who dispensed today — a daily-limit concern, not the fee block
 under test. Owner-authorised merge (standing "merge everything to main"). 584 green.
+
+---
+
+## Prompt 71 — refunds work perfectly and there was no way to trigger one
+
+Prompt 65 shipped `RefundDispensation` complete, correct and tested, with (honestly, deliberately) no UI —
+zero callers. This branch builds only the surface that calls it; it re-implements nothing (no over-refund
+check, no stock branch, no window check — all already in the action).
+
+**Surface — DECISION: a read-only Filament `DispensationResource` (oversight) with a refund action, not a
+POS flow.** Chosen for the reasons the prompt lays out: it is far cheaper, it unblocks refunds immediately,
+it keeps a money-out control off the busy counter until the club decides who holds it, and — the deciding
+factor — **dispensations had no oversight surface at all**, exactly the gap `OrderResource` was added to
+close for bar sales in prompt 43. So this closes a real second gap. The resource mirrors
+`OrderResource`/`TillSessionResource`: `canCreate() = false`, a filterable list (the "which dispensation?"
+lookup — by member, reference, status, location, date) and a View page whose only header action is the
+refund. The POS-side refund (member standing at the counter) remains a legitimate future addition; the admin
+surface is the right first one.
+
+**The cash / open-till tension — RESOLVED, not dodged.** A cash refund needs a drawer to come out of (an
+open till), which is a counter-side constraint on an admin surface. Resolution: the refund offers **wallet
+always; cash only when an open till exists at the row's location** (found the same way `DispensaryPos` finds
+it), and when a cash refund is chosen it attaches to that session so `TillSummary` reconciles. With no open
+till, the method field offers wallet only and states why ("Sin caja abierta… solo se puede reembolsar al
+monedero"). So the admin surface is NOT wallet-only in general — it does cash whenever a till is open — and
+it never offers a cash refund that would have nowhere to come from.
+
+**Every refusal is surfaced, never a silent dead end (prompt 60).** Missing permission → the action is
+hidden (the `refund` policy ability). No open till for cash → cash is not offered, with the reason in the
+field's helper text. Over-refund / outside `refund_window_days` → the action closure catches
+`RefundDispensation`'s exception and raises a danger notification carrying its message. Crucially the UI adds
+**no second source of truth**: the amount/weight fields show the remaining figure as guidance but do not
+hard-validate; the ACTION decides what is refundable and the UI surfaces its verdict. The stock destination
+is an explicit choice with **no default**, and the merma option is offered only with `stock.merma`.
+
+**Remaining-refundable is shown.** `Dispensation::refundedAmountCents()`/`remainingRefundableCents()` (and
+the weight equivalents) are queried live (never cached — a money/stock figure) and drive the modal heading,
+the field helpers and a "Reembolsos" infolist section (refunded so far · available), so the operator is
+never guessing.
+
+**Permission — kept `dispensation.void`.** Added a `refund` ability to `DispensationPolicy` that delegates
+to `dispensation.void` + the same per-row org/location visibility check (a manager cannot refund another
+sede's row — denial-tested with a tampered `{record}` id). Not split from void: consistent with prompt 65's
+deliberate, reversible choice; splitting would be its own DECISIONS entry, not a silent change.
+
+**On the member record.** A `RefundsRelationManager` tab (prompt 51's member tabs) shows the member's
+refunds — amount, weight, destination, method, reason — org-wide, so a refund is visible there, not only in
+the audit log.
+
+**Screenshots:** the lookup / refund modal / refusal states (light+dark) could not be produced — no browser
+in this environment; the flows are covered by `RefundUiTest` (9 tests, incl. the action-parity, remaining,
+merma-not-offered, cash-not-offered, over-refund/window refusals, member-visibility and cross-location
+denial). Owner-authorised merge (standing "merge everything to main"). 593 green.
