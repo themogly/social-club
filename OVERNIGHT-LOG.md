@@ -119,3 +119,21 @@ code-style, security; skip seo) as read-only passes, then applying SAFE fixes as
 LOGGING anything ambiguous/high-risk (compliance/money/security) for human review per the overnight rules.
 Note: "ui-passes 01–04" are visual/screenshot passes — the unattended env has no Playwright MCP, so those
 are deferred to a human (consistent with the original run's visual-pass deferral).
+
+**2026-07-31 — Step 2 (Phase C) audits COMPLETE.** Ran accessibility, admin, design, code-style,
+security (seo skipped — no public site) as read-only passes. **Full prioritized results in
+`AUDIT-FINDINGS.md` — READ THE 🔴 HIGH SECURITY ITEMS FIRST.** Summary:
+- **Applied as SAFE-FIX commits (merged green):** a11y accessible-names + aria-hidden; the mandated
+  `round_half_up()` at all money/weight edge conversions.
+- **🔴 HIGH, logged NOT auto-fixed (per the overnight security/compliance rule):** (S1) member ID
+  scans/certs/photos appear stored PLAINTEXT at rest — the Article-9 data the competitor leaked;
+  (S2) `MemberDocumentController::show()` has no authorization / per-view access-log / ownership check;
+  (A1) finance chart widgets lack `canView()` so a STAFF panel user may mount them and read org-wide
+  income/expense. All three need human verification + a careful fix — exactly the "don't guess overnight"
+  category. Everything else the audits checked came back CLEAN (ULIDs, resource policies, counter gating,
+  scoping, no client secrets, prompts 26/27/29/31 solid).
+- **Remaining SAFE-FIX (small, deferred to a quick morning follow-up — listed in AUDIT-FINDINGS.md):**
+  a few socio palette/enum/empty-state polishes, `RecordMemberConsent`/`Batch::scopeDispensable` extractions,
+  member-relation-manager empty states.
+- **ui-passes 01–04:** deferred — visual/screenshot passes, no browser/Playwright in this env.
+Beginning Step 3 (completeness-check) as a background verification pass.
