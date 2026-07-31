@@ -418,6 +418,7 @@
     "Deuda": "Debt",
     "Retención MÍNIMA. El registro de auditoría es inalterable y no se purga automáticamente; esta cifra se comunica (panel, RAT), no borra nada.": "MINIMUM retention. The audit log is immutable and is never auto-purged; this figure is disclosed (panel, RAT), it deletes nothing.",
     "Edad": "Age",
+    "Efectivo (fuera de caja)": "Cash (not from till)",
     "Matriz de cumplimiento": "Enforcement matrix",
     "Máx. escaneos fallidos por minuto": "Max failed scans per minute",
     "Tras tantos escaneos de tarjeta fallidos por operador en un minuto, se bloquea temporalmente (anti fuerza bruta).": "After this many failed card scans per operator in a minute, it's temporarily blocked (anti brute-force).",
