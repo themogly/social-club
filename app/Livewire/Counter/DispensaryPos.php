@@ -16,6 +16,7 @@ use App\Exceptions\LimitExceededException;
 use App\Exceptions\ScanRateLimitedException;
 use App\Exceptions\TillClosedException;
 use App\Livewire\Counter\Concerns\IdentifiesOperator;
+use App\Mail\DispensationReceiptMail;
 use App\Models\Batch;
 use App\Models\CheckIn;
 use App\Models\Dispensation;
@@ -37,6 +38,7 @@ use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use InvalidArgumentException;
@@ -657,6 +659,26 @@ class DispensaryPos extends Component
         $this->voidReason = '';
         $this->lastDispensationId = null;
         $this->flash(__('Dispensación anulada. Stock y monedero revertidos.'), 'success');
+    }
+
+    /** Email the just-committed receipt to the socio (prompt 56) — worded as an aportación. */
+    public function emailReceipt(): void
+    {
+        if ($this->lastDispensationId === null) {
+            return;
+        }
+
+        $dispensation = Dispensation::query()->withoutGlobalScopes()->with(['member', 'lines'])->find($this->lastDispensationId);
+        $email = $dispensation?->member?->email;
+
+        if ($dispensation === null || $email === null) {
+            $this->flash(__('El socio no tiene correo electrónico.'), 'error');
+
+            return;
+        }
+
+        Mail::to($email)->send(DispensationReceiptMail::fromDispensation($dispensation));
+        $this->flash(__('Comprobante enviado al socio.'), 'success');
     }
 
     // --- View data (assembled here; the view stays declarative) -----------------

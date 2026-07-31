@@ -2027,3 +2027,24 @@ genetics. That let me remove the weight-only restriction prompt 63 put on the th
 noted "per-unit is prompt 54") — the `low_stock_threshold_cg` is now settable for every genetic as a
 gram-equivalent, with a per-type helper text. Resolver precedence + the POS flag are tested. 526 green.
 Self-merge on green (batch 3 authorisation).
+
+---
+
+## Batch 3·TIME — Prompt 56: emailable receipts + three unwired push notifications
+
+Three fully-built notifications had ZERO dispatch sites; receipts couldn't be emailed. Wired all four:
+- **MembershipExpiringNotification** → the EXISTING `memberships:sweep` (no second sweep), alongside the
+  email, under the SAME `reminder_sent_for` marker so both channels send once per period. The email is
+  still skipped for an email-less socio, but the push now reaches them.
+- **EventReminderNotification** → a new nightly `events:remind` command (`RemindUpcomingEvents`) calling
+  the notification's existing `dispatchFor()`. Idempotent via a new per-event `reminder_sent_at` marker
+  (migration; MySQL parity PENDING — MySQL won't start in this env), tunable lead via
+  `event_reminder_lead_hours` (a scheduler constant, excluded from the settings-form completeness gate).
+- **LowBalanceNotification** → dispatched from `RecordWalletTransaction`, AFTER commit, only when a DEBIT
+  CROSSES from at-or-above to below `low_balance_threshold_cents` (a new €-edge setting on the wallet
+  form) — so it warns once on the drop, never repeatedly while already low. Tested both the crossing and
+  the no-re-push.
+- **Emailable receipt** → `DispensationReceiptMail` (scalar-data mailable, worded aportación not venta;
+  CID logo via `$message->embed`), registered in `DevMail` so it rides the existing `MailRenderTest`
+  (render + inline-logo assertion) and the `/dev/mail` preview; sent by a new `emailReceipt()` action on
+  the dispensary POS's last-dispensation block. 530 green. Self-merge on green (batch 3 authorisation).

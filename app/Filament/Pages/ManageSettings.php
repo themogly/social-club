@@ -175,6 +175,8 @@ class ManageSettings extends Page
                             ->helperText(__('Tope duro: el mostrador BLOQUEA una aportación que dejaría la deuda por encima de esta cifra.')),
                         TextInput::make('wallet_door_debt_threshold_eur')->label(__('Umbral de deuda en la puerta (€)'))->numeric()->minValue(0)->required()
                             ->helperText(__('Cifra DISTINTA del tope duro: la puerta reacciona (avisa/bloquea según la matriz) al llegar a esta deuda en el check-in.')),
+                        TextInput::make('low_balance_threshold_eur')->label(__('Aviso de saldo bajo (€)'))->numeric()->minValue(0)->required()
+                            ->helperText(__('Cuando una aportación deja el saldo por debajo de esta cifra, se envía un aviso push al socio.')),
                     ])->columns(3),
 
                 Section::make(__('Membresía'))
@@ -243,6 +245,7 @@ class ManageSettings extends Page
         Settings::set('wallet_debt_limit_cents', (int) round_half_up(((float) ($state['wallet_debt_limit_eur'] ?? 0)) * 100), SettingType::CENTS);
         // The door threshold is a SEPARATE figure from the hard limit — never derived from it.
         Settings::set('wallet_door_debt_threshold_cents', (int) round_half_up(((float) ($state['wallet_door_debt_threshold_eur'] ?? 0)) * 100), SettingType::CENTS);
+        Settings::set('low_balance_threshold_cents', (int) round_half_up(((float) ($state['low_balance_threshold_eur'] ?? 0)) * 100), SettingType::CENTS);
         Settings::set('arqueo_variance_tolerance_cents', (int) round_half_up(((float) ($state['arqueo_variance_tolerance_eur'] ?? 0)) * 100), SettingType::CENTS);
         Settings::set('expense_approval_threshold_cents', (int) round_half_up(((float) ($state['expense_approval_threshold_eur'] ?? 0)) * 100), SettingType::CENTS);
 
@@ -267,6 +270,7 @@ class ManageSettings extends Page
         $values['monthly_limit_g'] = ((int) Settings::get('monthly_limit_cg')) / 100;
         $values['wallet_debt_limit_eur'] = ((int) Settings::get('wallet_debt_limit_cents')) / 100;
         $values['wallet_door_debt_threshold_eur'] = ((int) Settings::get('wallet_door_debt_threshold_cents')) / 100;
+        $values['low_balance_threshold_eur'] = ((int) Settings::get('low_balance_threshold_cents')) / 100;
         $values['arqueo_variance_tolerance_eur'] = ((int) Settings::get('arqueo_variance_tolerance_cents')) / 100;
         $values['expense_approval_threshold_eur'] = ((int) Settings::get('expense_approval_threshold_cents')) / 100;
         $values['minute_quorum_fraction_pct'] = ((int) Settings::get('minute_quorum_fraction_bp')) / 100;

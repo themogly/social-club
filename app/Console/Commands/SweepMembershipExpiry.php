@@ -6,6 +6,7 @@ use App\Enums\MembershipStatus;
 use App\Mail\MembershipReminderMail;
 use App\Models\HeartbeatLog;
 use App\Models\Membership;
+use App\Notifications\MembershipExpiringNotification;
 use App\Support\Settings;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Mail;
@@ -50,15 +51,22 @@ class SweepMembershipExpiry extends Command
             ->whereBetween('expires_at', [$now, $now->copy()->addDays($reminderLead)])
             ->whereIn('status', [MembershipStatus::ACTIVE->value, MembershipStatus::EXPIRING_SOON->value])
             ->each(function (Membership $membership) use (&$reminders): void {
+                $member = $membership->member;
                 $period = $membership->expires_at?->toDateString() ?? '';
 
-                if ($membership->reminder_sent_for === $period || blank($membership->member?->email)) {
+                if ($member === null || $membership->reminder_sent_for === $period) {
                     return;
                 }
 
-                Mail::to($membership->member->email)->send(
-                    new MembershipReminderMail($membership->member->fullName(), $period),
-                );
+                if (filled($member->email)) {
+                    Mail::to($member->email)->send(new MembershipReminderMail($member->fullName(), $period));
+                }
+
+                // Push reminder too (prompt 56) — same once-per-period marker, no second sweep. The
+                // per-channel opt-out is applied in the notification's via(), so a no-subscription /
+                // opted-out socio is a silent no-op.
+                $member->notify(new MembershipExpiringNotification($period));
+
                 $membership->update(['reminder_sent_for' => $period]);
                 $reminders++;
             });

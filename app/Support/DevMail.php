@@ -4,6 +4,7 @@ namespace App\Support;
 
 use App\Mail\ApplicationApprovedMail;
 use App\Mail\ApplicationRejectedMail;
+use App\Mail\DispensationReceiptMail;
 use App\Mail\ExampleClubMail;
 use App\Mail\MemberCardMail;
 use App\Mail\MemberLoginLinkMail;
@@ -34,6 +35,7 @@ class DevMail
                 'preview-token-not-a-real-card',
             ),
             'membership-reminder' => new MembershipReminderMail('María García', '2026-09-30'),
+            'dispensation-receipt' => new DispensationReceiptMail('María García', '2026-08-02 20:15', '3,50 g', '26,25 €'),
             'member-login-link' => new MemberLoginLinkMail(
                 new Member(['first_name' => 'María', 'last_name' => 'García', 'member_no' => 'M-00042']),
                 'preview-token-not-a-real-link',

@@ -19,6 +19,10 @@ Schedule::command('members:remove-temporary')->dailyAt('04:15');
 // Membership expiry sweep + renewal reminders (idempotent per member/period).
 Schedule::command('memberships:sweep')->dailyAt('05:00');
 
+// Event reminders — push attendees who RSVP'd GOING for events starting within the lead window.
+// Idempotent per event (reminder_sent_at). (prompt 56)
+Schedule::command('events:remind')->dailyAt('08:00');
+
 // Close check-ins left open at closing time (business-day cutoff). Idempotent.
 Schedule::command('checkins:auto-checkout')->dailyAt('06:00');
 

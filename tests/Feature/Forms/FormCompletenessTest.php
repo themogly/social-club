@@ -9,6 +9,7 @@ use App\Filament\Resources\Batches\BatchResource;
 use App\Filament\Resources\DataRequests\DataRequestResource;
 use App\Filament\Resources\Discounts\DiscountResource;
 use App\Filament\Resources\DocumentTemplates\DocumentTemplateResource;
+use App\Filament\Resources\Events\EventResource;
 use App\Filament\Resources\Expenses\ExpenseResource;
 use App\Filament\Resources\Genetics\GeneticResource;
 use App\Filament\Resources\MemberApplications\MemberApplicationResource;
@@ -88,6 +89,9 @@ class FormCompletenessTest extends TestCase
         ],
         DocumentTemplateResource::class => [
             'version' => 'system: auto-incremented per generated template version.',
+        ],
+        EventResource::class => [
+            'reminder_sent_at' => 'system: per-event marker set by the events:remind sweep (prompt 56).',
         ],
         ExpenseResource::class => [
             'amount_cents' => 'entered as euros via amount_eur.',
