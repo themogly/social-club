@@ -1713,4 +1713,4 @@ scrolling to the page-top banner. Prompt 41's bar block is untouched and now rel
 
 Tests: one per blocked state asserting commit() surfaces a stated reason (the regression guard); a valid charge
 commits + confirms; both buttons' disabled binding is `! online` only. 479 green. Screenshots pending — no
-browser. Branch pushed, NOT merged (per prompt).
+browser. Owner-authorised merge (the prompt's default "do not merge" overridden by the owner, who is the reviewer).
