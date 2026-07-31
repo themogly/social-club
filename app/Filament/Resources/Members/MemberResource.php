@@ -7,17 +7,22 @@ use App\Actions\Members\ExportMemberData;
 use App\Actions\Members\IssueMemberToken;
 use App\Actions\Members\ManageTemporaryMember;
 use App\Actions\Members\TransitionMemberStatus;
+use App\Actions\Members\WaiveCarencia;
 use App\Enums\MemberDocumentType;
 use App\Enums\MemberStatus;
 use App\Filament\Resources\Members\Pages\CreateMember;
 use App\Filament\Resources\Members\Pages\EditMember;
 use App\Filament\Resources\Members\Pages\ListMembers;
 use App\Filament\Resources\Members\Pages\ViewMember;
+use App\Filament\Resources\Members\RelationManagers\AvaladosRelationManager;
 use App\Filament\Resources\Members\RelationManagers\ConsentsRelationManager;
+use App\Filament\Resources\Members\RelationManagers\ConsumptionRelationManager;
 use App\Filament\Resources\Members\RelationManagers\DiscountsRelationManager;
 use App\Filament\Resources\Members\RelationManagers\DocumentsRelationManager;
 use App\Filament\Resources\Members\RelationManagers\MembershipsRelationManager;
 use App\Filament\Resources\Members\RelationManagers\OrdersRelationManager;
+use App\Filament\Resources\Members\RelationManagers\SanctionsRelationManager;
+use App\Filament\Resources\Members\RelationManagers\VisitsRelationManager;
 use App\Filament\Resources\Members\RelationManagers\WalletTransactionsRelationManager;
 use App\Filament\Resources\Members\Schemas\MemberForm;
 use App\Filament\Resources\Members\Schemas\MemberInfolist;
@@ -97,6 +102,7 @@ class MemberResource extends Resource
         return [
             self::resendQrAction(),
             self::generateDocumentAction(),
+            self::waiveCarenciaAction(),
             self::suspendAction(),
             self::expelAction(),
             self::reactivateAction(),
@@ -199,6 +205,38 @@ class MemberResource extends Resource
             });
     }
 
+    /**
+     * Levantar carencia — end the member's waiting period early (manager+, `carencia.waive`), reasoned
+     * and audited. Only offered while the member is actually IN carencia; wires up the previously
+     * caller-less WaiveCarencia action (prompt 51).
+     */
+    public static function waiveCarenciaAction(): Action
+    {
+        return Action::make('waiveCarencia')
+            ->label(__('Levantar carencia'))
+            ->icon(Heroicon::OutlinedClock)
+            ->color('warning')
+            ->visible(fn (Member $record): bool => (Auth::user()?->can('carencia.waive') ?? false)
+                && $record->carencia_ends_at !== null && $record->carencia_ends_at->isFuture())
+            ->requiresConfirmation()
+            ->schema([
+                Textarea::make('reason')
+                    ->label(__('Motivo'))
+                    ->required()
+                    ->helperText(__('Queda registrado en la auditoría.')),
+            ])
+            ->action(function (Member $record, array $data): void {
+                $actor = Auth::user();
+                if (! $actor instanceof User) {
+                    return;
+                }
+
+                (new WaiveCarencia)->handle($record, $actor, $data['reason'] ?? null);
+
+                Notification::make()->title(__('Carencia levantada'))->success()->send();
+            });
+    }
+
     public static function reactivateAction(): Action
     {
         return Action::make('reactivate')
@@ -270,9 +308,13 @@ class MemberResource extends Resource
     {
         return [
             MembershipsRelationManager::class,
-            DiscountsRelationManager::class,
+            ConsumptionRelationManager::class,
+            VisitsRelationManager::class,
             WalletTransactionsRelationManager::class,
             OrdersRelationManager::class,
+            DiscountsRelationManager::class,
+            SanctionsRelationManager::class,
+            AvaladosRelationManager::class,
             DocumentsRelationManager::class,
             ConsentsRelationManager::class,
         ];

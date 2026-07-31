@@ -1932,3 +1932,26 @@ comment named (comment now updated). **Gated on `prices.manage`** — declared s
 enforced anywhere; this is its first real use (like `stock.take` in prompt 47). Snapshot integrity tested:
 editing a price never changes a past dispensation's frozen total. 510 green. Owner-authorised merge
 (batch 3 depends on this being merged so prompt 54 can build on it).
+
+---
+
+## Batch 3·MUST — Prompt 51: member resource completeness (the biggest single item)
+
+Filled the gaps the audit named:
+- **Four missing relation tabs** — `Consumption` (dispensations), `Visits` (check-ins), `Sanctions`,
+  `Avalados` — all read-only, org-wide (drop the location scope so a socio's whole history shows),
+  registered in `MemberResource::getRelations()`.
+- **Carencia waive wired up** — `WaiveCarencia` existed with ZERO callers; added a `Levantar carencia`
+  header action, gated on `carencia.waive` and only offered while the member is actually in carencia,
+  reasoned + audited (`member.carencia.waived`). Denial tested.
+- **Resumen** — added the wallet balance (live from the ledger, summed across locations) and the
+  consumption-limits gauge (the SAME `ResolveMemberLimits` figures the POS/PWA show, resolved against
+  the active sede or the member's latest active membership).
+- **List** — a wallet balance column + a sede filter (members with an ACTIVE membership there).
+
+**N+1 (the Rules-section risk):** the wallet balance list column is a DERIVED value on a table that can
+hold thousands of rows. It is computed with a single `withSum` aggregate subquery (dropping the location
+scope so it's the cross-location total), NOT a per-row `Wallet::balance()` call — so the list stays one
+query regardless of row count. Tested that the aggregate returns the correct across-location total.
+PHPStan needed `getAttribute('wallet_transactions_sum_amount_cents')` (the dynamic aggregate attribute
+isn't a declared model property). 516 green. Self-merge on green (batch 3 authorisation).
