@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\Locations\Schemas;
 
+use App\Support\Settings;
 use Filament\Forms\Components\ColorPicker;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
@@ -26,6 +27,9 @@ class LocationForm
                 TextInput::make('capacity')
                     ->label(__('Aforo'))
                     ->numeric()
+                    // A new sede pre-fills from the org-wide aforo_default (prompt 44 — previously a
+                    // dead setting nothing read); editable per location, so it's only a starting point.
+                    ->default(fn (): int => (int) Settings::get('aforo_default', 50))
                     ->helperText(__('Ocupación máxima simultánea permitida en la sede.')),
 
                 Select::make('timezone')

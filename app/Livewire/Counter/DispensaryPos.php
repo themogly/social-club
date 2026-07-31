@@ -1208,12 +1208,15 @@ class DispensaryPos extends Component
 
     private function signatureRequired(): bool
     {
-        return (bool) Settings::get('pos_signature_required', false);
+        // Per-location (prompt 44): the LocationForm's "Firma en dispensación" toggle now genuinely
+        // drives this — Settings::get resolves the ACTIVE location first (location → org → default).
+        return (bool) Settings::get('signature_on_dispensation', false);
     }
 
     private function checkedInRequired(): bool
     {
-        return (bool) Settings::get('pos_require_checked_in', false);
+        // Per-location (prompt 44): the LocationForm's "Restringir TPV a socios con check-in" toggle.
+        return (bool) Settings::get('restrict_pos_to_checked_in', false);
     }
 
     // --- Small helpers ----------------------------------------------------------
