@@ -219,8 +219,8 @@ class ManageSettings extends Page
         }
 
         // Grams shown at the edge, stored as centigrams.
-        Settings::set('daily_limit_cg', (int) round(((float) $state['daily_limit_g']) * 100), SettingType::CG);
-        Settings::set('monthly_limit_cg', (int) round(((float) $state['monthly_limit_g']) * 100), SettingType::CG);
+        Settings::set('daily_limit_cg', (int) round_half_up(((float) $state['daily_limit_g']) * 100), SettingType::CG);
+        Settings::set('monthly_limit_cg', (int) round_half_up(((float) $state['monthly_limit_g']) * 100), SettingType::CG);
 
         // Euros shown at the edge, stored as integer cents.
         Settings::set('wallet_debt_limit_cents', (int) round_half_up(((float) ($state['wallet_debt_limit_eur'] ?? 0)) * 100), SettingType::CENTS);

@@ -92,7 +92,7 @@ class ImportMembers
                         'date_of_birth' => $data['date_of_birth'] ?: null,
                         'document_type' => $data['document_type'] ?: null,
                         'document_number' => $data['document_number'] ?: null,
-                        'declared_monthly_cg' => is_numeric($declaredG) ? (int) round(((float) $declaredG) * 100) : null,
+                        'declared_monthly_cg' => is_numeric($declaredG) ? (int) round_half_up(((float) $declaredG) * 100) : null,
                         'status' => MemberStatus::ACTIVE,
                         'joined_at' => now(),
                         'carencia_ends_at' => now()->subDay(), // existing members: carencia already served

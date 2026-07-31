@@ -77,7 +77,7 @@ class WalletTransactionsRelationManager extends RelationManager
                 /** @var Member $member */
                 $member = $this->getOwnerRecord();
                 $location = Location::query()->whereKey($data['location_id'])->firstOrFail();
-                $cents = (int) round(((float) $data['amount_eur']) * 100);
+                $cents = (int) round_half_up(((float) $data['amount_eur']) * 100);
 
                 (new RecordWalletTransaction)->handle($member, $location, $cents, WalletTransactionType::TOPUP, [
                     'operator_id' => $this->operatorId(),
@@ -106,7 +106,7 @@ class WalletTransactionsRelationManager extends RelationManager
                 /** @var Member $member */
                 $member = $this->getOwnerRecord();
                 $location = Location::query()->whereKey($data['location_id'])->firstOrFail();
-                $cents = (int) round(((float) $data['amount_eur']) * 100);
+                $cents = (int) round_half_up(((float) $data['amount_eur']) * 100);
 
                 try {
                     (new RecordWalletTransaction)->handle($member, $location, -$cents, WalletTransactionType::REFUND, [
@@ -143,7 +143,7 @@ class WalletTransactionsRelationManager extends RelationManager
                 /** @var Member $member */
                 $member = $this->getOwnerRecord();
                 $location = Location::query()->whereKey($data['location_id'])->firstOrFail();
-                $cents = (int) round(((float) $data['amount_eur']) * 100);
+                $cents = (int) round_half_up(((float) $data['amount_eur']) * 100);
 
                 try {
                     (new RecordWalletTransaction)->handle($member, $location, $cents, WalletTransactionType::ADJUSTMENT, [

@@ -49,7 +49,7 @@ class EditArticle extends EditRecord
      */
     protected function mutateFormDataBeforeSave(array $data): array
     {
-        $data['price_cents'] = (int) round(((float) ($data['price_eur'] ?? 0)) * 100);
+        $data['price_cents'] = (int) round_half_up(((float) ($data['price_eur'] ?? 0)) * 100);
         unset($data['price_eur']);
 
         return $data;

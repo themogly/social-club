@@ -32,7 +32,7 @@ class CreateBatch extends CreateRecord
         $location = Location::query()->findOrFail($locationId);
 
         $intake = [
-            'cost_per_gram_cents' => (int) round(((float) ($data['cost_per_gram_eur'] ?? 0)) * 100),
+            'cost_per_gram_cents' => (int) round_half_up(((float) ($data['cost_per_gram_eur'] ?? 0)) * 100),
             'acquired_or_harvested_on' => $data['acquired_or_harvested_on'] ?? null,
             'expires_on' => $data['expires_on'] ?? null,
             'lab_report_path' => $data['lab_report_path'] ?? null,

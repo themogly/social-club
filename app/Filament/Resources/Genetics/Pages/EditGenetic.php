@@ -48,8 +48,8 @@ class EditGenetic extends EditRecord
      */
     protected function mutateFormDataBeforeSave(array $data): array
     {
-        $data['thc_bp'] = filled($data['thc_pct'] ?? null) ? (int) round(((float) $data['thc_pct']) * 100) : null;
-        $data['cbd_bp'] = filled($data['cbd_pct'] ?? null) ? (int) round(((float) $data['cbd_pct']) * 100) : null;
+        $data['thc_bp'] = filled($data['thc_pct'] ?? null) ? (int) round_half_up(((float) $data['thc_pct']) * 100) : null;
+        $data['cbd_bp'] = filled($data['cbd_pct'] ?? null) ? (int) round_half_up(((float) $data['cbd_pct']) * 100) : null;
         $data['grams_per_unit_cg'] = filled($data['grams_per_unit_g'] ?? null) ? Weight::fromGrams($data['grams_per_unit_g'])->centigrams : null;
         unset($data['thc_pct'], $data['cbd_pct'], $data['grams_per_unit_g']);
 
