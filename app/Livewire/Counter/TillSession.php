@@ -10,6 +10,7 @@ use App\Enums\CashMovementType;
 use App\Enums\TillSessionStatus;
 use App\Exceptions\TillAlreadyOpenException;
 use App\Exceptions\TillClosedException;
+use App\Livewire\Counter\Concerns\IdentifiesOperator;
 use App\Models\ExpenseCategory;
 use App\Models\Location;
 use App\Models\TillSession as TillSessionModel;
@@ -39,6 +40,8 @@ use RuntimeException;
 #[Layout('components.layouts.counter')]
 class TillSession extends Component
 {
+    use IdentifiesOperator;
+
     /** The active location id, resolved in mount(). */
     public ?string $locationId = null;
 
@@ -139,6 +142,11 @@ class TillSession extends Component
             return;
         }
 
+        // Attribution: whoever opens the drawer is PIN-identified, never the device session user.
+        if (! $this->requireOperator()) {
+            return;
+        }
+
         $terminal = trim($this->terminal);
 
         if ($terminal === '') {
@@ -175,6 +183,11 @@ class TillSession extends Component
         $session = $this->resolveOpenSession();
 
         if ($session === null) {
+            return;
+        }
+
+        // Attribution: a PIN-identified operator is required — never the device session user.
+        if (! $this->requireOperator()) {
             return;
         }
 
@@ -223,6 +236,11 @@ class TillSession extends Component
         $session = $this->resolveOpenSession();
 
         if ($session === null) {
+            return;
+        }
+
+        // Attribution: a PIN-identified operator is required — never the device session user.
+        if (! $this->requireOperator()) {
             return;
         }
 

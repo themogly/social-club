@@ -994,3 +994,47 @@ localization project):**
 through the full dashboard request; a sample toast from each area (settings/members/POS/till) in both
 locales; the scanner regression test; prompt 19's parity test still green. No migration / no
 driver-sensitive change → MySQL parity N/A.
+
+---
+
+## Prompt 26 — PIN operator switching: audit & complete the missing UI
+
+**Audit (recorded before building).** The backend was fully built AND tested, but entirely inert:
+- **EXISTS + correct:** `User.pin` cast `hashed`; `App\Actions\UnlockOperator` (matches a PIN against the
+  location's active staff, **rate-limited** 5 attempts / 60s, a correct PIN refused while locked out);
+  `App\Support\CounterOperator` session store; all 5 write paths (dispensation, bar order, cash
+  movement, check-in, till open) already attribute `CounterOperator::id() ?? Auth::id()`; the Users
+  admin form already has a set/reset-PIN control (`UserForm` pin field, 4–8 digits, dehydrated-when-filled).
+- **MISSING:** the UI + wiring. Nothing called `UnlockOperator` or `CounterOperator::set()` outside the
+  test file, so `CounterOperator::id()` was **always null** and every transaction silently fell back to
+  the device session login (`Auth::id()`). No current-operator indicator, no PIN pad, no block-on-missing.
+- **Verdict:** the smaller "missing UI on a working backend" fix — NOT a missing feature. An independent
+  audit-agent sweep corroborated line-by-line.
+
+**Build.**
+- One shared trait `App\Livewire\Counter\Concerns\IdentifiesOperator` (single implementation) mixed into
+  all four counter screens — `unlockOperator`/`switchOperator`/`openOperatorPanel`/`closeOperatorPanel`,
+  the `requireOperator()` transaction guard, and `currentOperatorName`/`hasOperator`/`operatorLockedOut`.
+  Reuses the existing rate-limited `UnlockOperator` + `CounterOperator` verbatim (no second code path).
+- One shared Blade partial `livewire/counter/partials/operator-strip.blade.php` (@include'd in all four
+  views) — "Trabajando: [name]" indicator + tablet-first numeric PIN pad + switch + wrong/rate-limited
+  feedback. The PIN is cleared after every attempt and never rendered back.
+- Every counter commit now calls `requireOperator()` first: with no operator identified it refuses with a
+  clear prompt (the pad opens) — never a silent fail, never the device user attributed.
+
+**Decisions (documented).**
+- `OVERNIGHT-DEFAULT — CONFIRM:` the operator strip is on **all FOUR** counter screens (check-in,
+  dispensary POS, bar POS **and till**). The prompt names three, but the till open + cash-movement writes
+  attribute an operator and the required cash-movement attribution test needs one identified there —
+  consistent and safer than leaving the till able to write with only the device login.
+- The write-path Actions keep their defensive `?? Auth::id()` fallback for **non-counter callers**
+  (Filament admin stock adjust/wallet actions, where the logged-in admin legitimately IS the operator);
+  the counter components guard so that fallback can never fire for a counter transaction.
+- Existing counter tests: each `operator()`/`staff()` fixture now calls `CounterOperator::set($actingUser)`
+  — it records the SAME id the `Auth::id()` fallback used to, so no assertion changed; it just satisfies
+  the new guard. The one shadowed petty-cash permission-denial test was given an operator so it still
+  tests the PERMISSION path, not the operator guard.
+
+No migration / no driver-sensitive change → MySQL parity N/A. 363 tests green (10 new UI-flow +
+attribution tests, incl. one per transaction type asserting the stored operator is the PIN identity,
+not the device login).

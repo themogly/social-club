@@ -10,6 +10,7 @@ use App\Actions\Members\ResolveMemberByToken;
 use App\Enums\CheckInMethod;
 use App\Enums\MembershipStatus;
 use App\Exceptions\CheckInBlockedException;
+use App\Livewire\Counter\Concerns\IdentifiesOperator;
 use App\Models\CheckIn;
 use App\Models\Location;
 use App\Models\Member;
@@ -45,6 +46,8 @@ use Throwable;
 #[Layout('components.layouts.counter')]
 class CheckInScreen extends Component
 {
+    use IdentifiesOperator;
+
     /** Bound to the scan input — a keyboard-wedge scanner types the token then hits Enter. */
     public string $scan = '';
 
@@ -169,6 +172,11 @@ class CheckInScreen extends Component
         $location = $this->resolveLocation();
 
         if ($member === null || $location === null) {
+            return;
+        }
+
+        // Attribution: a PIN-identified operator is required — never the device session user.
+        if (! $this->requireOperator()) {
             return;
         }
 
