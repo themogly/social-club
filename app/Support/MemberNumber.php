@@ -2,25 +2,25 @@
 
 namespace App\Support;
 
-use App\Models\Member;
+use App\Models\Organisation;
+use Illuminate\Support\Facades\DB;
 
 /** Generates the next human-friendly member number for an org: unique, never reused. */
 class MemberNumber
 {
     public static function next(string $organisationId): string
     {
-        // Count includes soft-deleted so numbers are never reused.
-        $sequence = Member::withoutGlobalScopes()->withTrashed()
-            ->where('organisation_id', $organisationId)->count() + 1;
+        // Allocate from a durable, monotonic per-org counter under a ROW LOCK (prompt 77): the old
+        // COUNT(*) + 1 raced (concurrent enrolments collided on the unique index) AND reissued a number
+        // after a purge/soft-delete. Locking the org row serialises allocation; the counter only increases,
+        // so a number is never handed out twice — even after rows are deleted.
+        return DB::transaction(function () use ($organisationId): string {
+            $org = Organisation::withoutGlobalScopes()->whereKey($organisationId)->lockForUpdate()->firstOrFail();
 
-        do {
-            $candidate = Settings::formatMemberNumber($sequence);
-            $sequence++;
-        } while (Member::withoutGlobalScopes()
-            ->where('organisation_id', $organisationId)
-            ->where('member_no', $candidate)
-            ->exists());
+            $sequence = (int) $org->member_no_sequence + 1;
+            $org->update(['member_no_sequence' => $sequence]);
 
-        return $candidate;
+            return Settings::formatMemberNumber($sequence);
+        });
     }
 }

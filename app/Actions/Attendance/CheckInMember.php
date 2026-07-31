@@ -29,6 +29,11 @@ class CheckInMember
     public function handle(Member $member, Location $location, array $options = []): CheckIn
     {
         return DB::transaction(function () use ($member, $location, $options): CheckIn {
+            // Serialise check-ins at this LOCATION (prompt 77 sweep): the door verdict reads the aforo
+            // occupancy with a COUNT, then admits — two concurrent scans could each see occupancy < capacity
+            // and both pass, overshooting the limit. Locking the location row first makes the count accurate.
+            Location::withoutGlobalScopes()->whereKey($location->id)->lockForUpdate()->first();
+
             // Idempotent + concurrency-safe: one open check-in per member per location.
             $open = CheckIn::query()->withoutGlobalScopes()
                 ->where('member_id', $member->id)->where('location_id', $location->id)

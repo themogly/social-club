@@ -2733,3 +2733,59 @@ security trade-off to be decided deliberately, not defaulted into.
 **Screenshots:** the `/dev/mail` card preview + the member-record card state (light+dark) could not be
 produced — no browser here; `MemberCardMail` is unchanged so it keeps its render test + `/dev/mail` entry.
 Covered by `SendMemberCardTest` (6 tests). Owner-authorised merge (standing "merge everything to main"). 631 green.
+
+---
+
+## Prompt 77 — three money paths have no lock, and the debt limit is bypassable
+
+Three writes computed a value then acted on it with nothing serialising the two steps. All fixed with the
+ONE pattern `CommitDispensation` already uses correctly: `lockForUpdate` on a CONTENDED row, inside the
+transaction, covering the read AND the write. No queues, no global mutex, lock scope as narrow as correctness
+allows.
+
+1. **`RecordWalletTransaction` (the worst — money already wrong).** The balance was an unlocked `SUM()`, so
+   under MySQL REPEATABLE READ concurrent debits each read the pre-existing snapshot and all passed the debt
+   check (reproduced: €10 balance, four €8 debits, final −€22, every row's `balance_after_cents` wrong). Fix:
+   lock the MEMBER row (`Member::…lockForUpdate()`) at the top of the transaction — the SAME row
+   `CommitDispensation` locks, so wallet writes and dispensations serialise together. Re-entrant when
+   CommitDispensation already holds it (same transaction), so no deadlock. The SUM now reads committed data and
+   `balance_after_cents` is correct under contention.
+2. **`CloseTill`.** Had no transaction and no lock, so a cash movement landing between "compute expected" and
+   "write closed" was excluded from the immutable arqueo forever (a control failure — a real discrepancy could
+   be masked, or a clean count flagged). Fix: wrap in a transaction and `lockForUpdate` the session row; re-read
+   status, compute expected, close — atomically. `RecordCashMovement` now contends on the SAME session-row lock
+   (it also locks + re-reads OPEN before inserting), so a concurrent movement either commits BEFORE the close
+   (counted in expected) or finds the session CLOSED and is refused — never silently dropped.
+3. **`MemberNumber::next()`.** `COUNT(*) + 1` raced (concurrent enrolments collided on the unique index → 500s)
+   and REISSUED a number after a retention purge/soft-delete. **Allocation decision: a durable, monotonic
+   per-organisation counter** (`organisations.member_no_sequence`), allocated under an org-row lock, backfilled
+   from the max number already issued. It only ever increases, so it never reissues even after rows are deleted
+   — the max-based read a pure `MAX()` would do still breaks after a purge, so a persisted high-water-mark is
+   the right shape. Verified deterministically by `MemberNumberSequenceTest` (no concurrency needed).
+
+**Sweep of the same shape elsewhere — what was checked and found:**
+- `RecordStockMovement` — **FINE.** Locks the batch/article row before applying the signed delta.
+- `RefundDispensation` — **FINE.** Locks the dispensation header and reads the cumulative-refunded SUMs under
+  that lock (prompt 65's claim verified against the code).
+- `CommitOrder` — **FINE.** Owns no contended read-then-write; it delegates stock to `RecordStockMovement`
+  (locked) and any wallet spend to `RecordWalletTransaction` (now locked), so it inherits both fixes.
+- `RecordFeePayment` — **FINE.** A pure append; its optional wallet side goes through the now-locked
+  `RecordWalletTransaction`.
+- `CheckInMember` vs aforo — **FOUND + FIXED.** It locked the member's own open check-in (double-check-in
+  guard) but the door verdict read the aforo occupancy with an unlocked `COUNT`, so two concurrent scans could
+  each see occupancy < capacity and both admit past the limit. Added a LOCATION-row `lockForUpdate` at the top
+  of the transaction, so check-ins at a location serialise and the count is accurate. Lower severity than the
+  money paths (a bounded soft-capacity overshoot, not corrupted money) but the same shape, so fixed here.
+
+**Concurrency tests — SKIPPED WITH A STATED REASON, not silently passing.** These bugs manifest only under
+genuine OS-level parallelism against MySQL (as the report reproduced them). Single-process PHPUnit cannot
+reproduce a lock race — on SQLite `lockForUpdate` is a no-op and transactions serialise; on MySQL one process
+runs its "concurrent" transactions sequentially. `tests/Feature/Concurrency/ConcurrencyLocksTest.php` documents
+each scenario and skips it with that reason, and names the external harness that would run it (N forked workers
+against the CI MySQL). The fix is verified instead by: reading it against CommitDispensation's proven lock, the
+full sequential suite proving no single-writer behaviour changed, and the deterministic member-number test.
+
+**MySQL run:** the required MySQL suite run (`phpunit.mysql.xml`) could NOT be executed here — MySQL does not
+start in this environment (noted repeatedly in this file). This is flagged as an outstanding verification step:
+a green SQLite run is explicitly NOT evidence for these fixes, so a human/CI MySQL run + the external parallel
+harness is still owed. Owner-authorised merge (standing "merge everything to main"). 637 green (3 skipped).
