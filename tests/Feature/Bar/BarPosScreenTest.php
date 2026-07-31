@@ -270,6 +270,49 @@ class BarPosScreenTest extends TestCase
         $this->assertSame(5, $a->fresh()->stock); // units returned
     }
 
+    public function test_a_successful_charge_shows_a_colocated_confirmation_and_receipt_link(): void
+    {
+        // Prompt 41: the state survives commit (candidate #2 ruled out) AND the success flash renders
+        // colocated in the basket column, not only in the page-top banner an operator scrolled past.
+        $this->openTill();
+        $this->operator();
+        $a = $this->article('Cerveza', 250, 10);
+
+        $component = Livewire::test(BarPos::class)
+            ->call('addArticle', $a->id)
+            ->call('commit')
+            ->assertSet('flashType', 'success')
+            ->assertSee(__('Última venta registrada')); // colocated "last sale" block under Cobrar
+
+        $order = Order::query()->withoutGlobalScopes()->firstOrFail();
+        $component->assertSet('lastOrderId', $order->id); // lastOrderId is retained through the render
+
+        // The success flash appears BOTH at the page top and colocated in the basket column.
+        $this->assertGreaterThanOrEqual(2, substr_count($component->html(), __('Pedido registrado.')),
+            'The success confirmation must render colocated in the basket column, not only page-top.');
+
+        // The receipt link resolves to the correct order via counter.bar.receipt.
+        $component->assertSee(route('counter.bar.receipt', $order->id), false);
+    }
+
+    public function test_a_failed_charge_shows_the_error_equally_colocated(): void
+    {
+        // The same discoverability guarantee must cover errors (a silent failure is worse).
+        $this->openTill();
+        $this->operator();
+        $a = $this->article('Zumo', 500, 10);
+
+        $component = Livewire::test(BarPos::class)
+            ->call('addArticle', $a->id)
+            ->set('walletInput', '5,00') // wallet with no socio → refused
+            ->call('commit')
+            ->assertSet('flashType', 'error');
+
+        $this->assertGreaterThanOrEqual(2, substr_count($component->html(), __('El pago con monedero requiere un socio.')),
+            'The error must be equally visible colocated in the basket column.');
+        $this->assertSame(0, Order::query()->withoutGlobalScopes()->count());
+    }
+
     public function test_the_bar_ticket_renders_with_sale_wording_and_never_contribution_wording(): void
     {
         $this->openTill();

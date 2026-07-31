@@ -316,6 +316,26 @@
                         </dl>
                     </div>
 
+                    {{-- Colocated confirmation (prompt 41): the same flash ALSO renders here, in the
+                         basket column at the point of action, so a charge (success OR error) is
+                         unmistakable without scrolling back up to the page-top banner. Same
+                         $flashMessage/$flashType mechanism, so it covers cash, wallet and every error. --}}
+                    @if ($flashMessage)
+                        <div
+                            wire:key="flash-basket"
+                            role="{{ $flashType === 'error' ? 'alert' : 'status' }}"
+                            aria-live="{{ $flashType === 'error' ? 'assertive' : 'polite' }}"
+                            @class([
+                                'mt-4 rounded-xl border px-4 py-3 text-sm font-semibold',
+                                'border-success/30 bg-success/10 text-success' => $flashType === 'success',
+                                'border-warning/30 bg-warning/10 text-warning' => $flashType === 'warning',
+                                'border-error/30 bg-error/10 text-error' => $flashType === 'error',
+                            ])
+                        >
+                            {{ $flashMessage }}
+                        </div>
+                    @endif
+
                     {{-- Commit --}}
                     @php $commitDisabled = $openTill === null || empty($basketLines); @endphp
                     <button
