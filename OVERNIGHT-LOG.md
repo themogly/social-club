@@ -197,3 +197,22 @@ finished" (overriding each prompt's default "wait for review" — the owner is t
   admin empty states.
 - **37 — structural cleanup (ForceDelete/EnrolMember/confirmations/dead code/CS5):** queued.
 - **38 — low-severity hardening (honeypot + CSP/HSTS):** queued.
+
+**2026-07-31 — session practical limit reached after a very long run.** Merged so far in the follow-up
+batch: **32 (doc security S1+S2)**, **33 (finance authz A1)** — the two 🔴 HIGH security fixes — and
+**34 item 2 (avalador_max_sponsees cap wired)**. main @ d795f28, 398 tests green, pushed. STILL OPEN
+(each has a concrete, decided plan already written in DECISIONS.md / AUDIT-FINDINGS.md — pick up there):
+- **34 items 1,3–8:** 5 CUTS (limit_override_requires_manager, fees_to_wallet_allowed, currency_locale,
+  blind_count_enforced from DEFAULTS, the aforo_enforcement dropdown) + 2 WIRES (active_member_cap
+  dashboard alert; expose per-location `ring_fenced` on LocationForm and cut the org `wallet_ring_fence`).
+  All decided in DECISIONS.md "Prompt 34" — mechanical to apply + test.
+- **35 camera QR (both screens):** large JS/camera build; needs a browser for visual verification (defer
+  the screenshot step). Build the shared component + settings gate + the same-lookup-handler wiring + tests.
+- **36 UI/a11y:** the palette/enum/border SAFE-FIX subset already landed (38c0e40); remaining = shared
+  <x-button> extraction (~17 sites), a11y (h1 per counter screen, aria-live on flash/offline, heatmap text
+  alt, placeholder-contrast token decision), admin empty states, RecordMemberConsent + Batch::scopeDispensable.
+- **37 structural:** remove ForceDelete controls (no policy grants them), extract a shared EnrolMember
+  action, requiresConfirmation() on wallet-adjust + batch-merma, delete dead SiteContent.php + welcome.blade,
+  document the grams_per_unit_cg cast carve-out.
+- **38 hardening:** honeypot + min-submit-time on ApplicationController::store; report-only CSP then enforced
+  + production-only HSTS in SecurityHeaders.
