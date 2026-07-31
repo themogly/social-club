@@ -87,3 +87,10 @@ reads it and there's no such key in Settings::DEFAULTS.
   the existing `ResolveMemberByToken` lookup), then prompt 28 reuses it on the dispensary POS Identify
   step. main is green; nothing was left half-built (no branch created for 28).
 Continuing to prompt 29 (application invite links UI).
+
+**2026-07-31 — Prompt 29 DONE.** Invite links management. Audit: invites persisted but the raw link was
+hash-only → unrecoverable (reported bug). Built re-copyable link (encrypted token) + Invitations view
+(status board, expiry, revoke, Copy/Revoke actions) + invite_expiry_days setting. Kept the security-
+critical hash-verification path unchanged (signed-URL refactor deferred for human review). Single-use;
+blank New-application create removed; resend-email deferred (no mailable). Migration verified on MySQL.
+Merged to main, composer check green (374 tests). Next: prompt 30 (verify the expiry sweep runs).

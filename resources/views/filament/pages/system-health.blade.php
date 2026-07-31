@@ -1,10 +1,11 @@
 {{-- Salud del sistema — liveness at a glance. Alert style when the heartbeat is stale. --}}
 <x-filament-panels::page>
     @php
-        $ageSeconds = $scheduler['age_seconds'];
-        $ageText = $ageSeconds === null
+        $fmtAge = fn (?int $s): string => $s === null
             ? __('Sin datos')
-            : ($ageSeconds < 60 ? $ageSeconds.' s' : ($ageSeconds < 3600 ? intdiv($ageSeconds, 60).' min' : intdiv($ageSeconds, 3600).' h'));
+            : ($s < 60 ? $s.' s' : ($s < 3600 ? intdiv($s, 60).' min' : intdiv($s, 3600).' h'));
+        $ageText = $fmtAge($scheduler['age_seconds']);
+        $sweepAgeText = $fmtAge($expirySweep['age_seconds']);
     @endphp
 
     @if ($scheduler['stale'])
@@ -13,6 +14,16 @@
             <div style="font-size:.875rem;">
                 <strong>{{ __('Latido obsoleto — el planificador podría estar caído.') }}</strong>
                 {{ __('No se recibe una señal reciente del planificador. Comprueba que el cron (schedule:run) y el worker de colas están en marcha.') }}
+            </div>
+        </div>
+    @endif
+
+    @if ($expirySweep['stale'])
+        <div role="alert" style="border:1px solid #dc2626;background:rgba(220,38,38,.06);border-radius:.75rem;padding:.75rem 1rem;margin-bottom:1rem;display:flex;gap:.6rem;align-items:flex-start;">
+            <x-filament::icon icon="heroicon-o-exclamation-triangle" style="width:1.25rem;height:1.25rem;color:#dc2626;flex:none;margin-top:.1rem;" />
+            <div style="font-size:.875rem;">
+                <strong>{{ __('El barrido de caducidades no se ha ejecutado.') }}</strong>
+                {{ __('Aunque el planificador esté vivo, el barrido nocturno de membresías (memberships:sweep) no ha dejado señal reciente. Las membresías caducadas podrían no estar bloqueándose.') }}
             </div>
         </div>
     @endif
@@ -36,6 +47,28 @@
                 <div style="display:flex;justify-content:space-between;gap:1rem;">
                     <dt style="opacity:.65;">{{ __('Umbral') }}</dt>
                     <dd>{{ intdiv($scheduler['threshold_seconds'], 60) }} min</dd>
+                </div>
+            </dl>
+        </x-filament::section>
+
+        <x-filament::section :heading="__('Barrido de caducidades')" icon="heroicon-o-arrow-path">
+            <div style="display:flex;align-items:center;gap:.5rem;margin-bottom:.5rem;">
+                <x-filament::badge :color="$expirySweep['stale'] ? 'danger' : 'success'">
+                    {{ $expirySweep['stale'] ? __('Sin ejecución reciente') : __('Al día') }}
+                </x-filament::badge>
+            </div>
+            <dl style="font-size:.875rem;display:grid;gap:.35rem;">
+                <div style="display:flex;justify-content:space-between;gap:1rem;">
+                    <dt style="opacity:.65;">{{ __('Última ejecución') }}</dt>
+                    <dd>{{ $expirySweep['last_at']?->format('d/m/Y H:i:s') ?? '—' }}</dd>
+                </div>
+                <div style="display:flex;justify-content:space-between;gap:1rem;">
+                    <dt style="opacity:.65;">{{ __('Antigüedad') }}</dt>
+                    <dd>{{ $sweepAgeText }}</dd>
+                </div>
+                <div style="display:flex;justify-content:space-between;gap:1rem;">
+                    <dt style="opacity:.65;">{{ __('Umbral') }}</dt>
+                    <dd>{{ intdiv($expirySweep['threshold_seconds'], 3600) }} h</dd>
                 </div>
             </dl>
         </x-filament::section>
