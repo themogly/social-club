@@ -12,6 +12,10 @@ Artisan::command('inspire', function () {
 // (Requires the schedule:run cron in production — see SETUP.md.)
 Schedule::command('members:purge')->dailyAt('04:00');
 
+// Temporary / short-stay members past their window — anonymised via the SAME erasure
+// Action as the purge (never a bespoke deletion). Idempotent. (prompt 31)
+Schedule::command('members:remove-temporary')->dailyAt('04:15');
+
 // Membership expiry sweep + renewal reminders (idempotent per member/period).
 Schedule::command('memberships:sweep')->dailyAt('05:00');
 

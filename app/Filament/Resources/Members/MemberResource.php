@@ -5,6 +5,7 @@ namespace App\Filament\Resources\Members;
 use App\Actions\Documents\GenerateMemberDocument;
 use App\Actions\Members\ExportMemberData;
 use App\Actions\Members\IssueMemberToken;
+use App\Actions\Members\ManageTemporaryMember;
 use App\Actions\Members\TransitionMemberStatus;
 use App\Enums\MemberDocumentType;
 use App\Enums\MemberStatus;
@@ -23,10 +24,12 @@ use App\Filament\Resources\Members\Tables\MembersTable;
 use App\Mail\MemberCardMail;
 use App\Models\Member;
 use App\Models\User;
+use App\Support\Settings;
 use BackedEnum;
 use Filament\Actions\Action;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
+use Filament\Forms\Components\TextInput;
 use Filament\Notifications\Notification;
 use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
@@ -96,6 +99,8 @@ class MemberResource extends Resource
             self::suspendAction(),
             self::expelAction(),
             self::reactivateAction(),
+            self::convertTemporaryAction(),
+            self::extendTemporaryAction(),
             self::exportDataAction(),
         ];
     }
@@ -223,6 +228,40 @@ class MemberResource extends Resource
                     fn () => print ((string) json_encode($data, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE)),
                     'member-'.$record->member_no.'.json',
                 );
+            });
+    }
+
+    /** Manager action: make a temporary member permanent — reuses the record, audited. */
+    public static function convertTemporaryAction(): Action
+    {
+        return Action::make('convertTemporary')
+            ->label(__('Convertir a socio estándar'))
+            ->icon(Heroicon::OutlinedArrowUpCircle)
+            ->color('success')
+            ->requiresConfirmation()
+            ->visible(fn (Member $record): bool => $record->isTemporary() && (Auth::user()?->can('members.create') ?? false))
+            ->action(function (Member $record): void {
+                (new ManageTemporaryMember)->convertToStandard($record);
+
+                Notification::make()->title(__('Socio convertido a estándar'))->success()->send();
+            });
+    }
+
+    /** Manager action: push a temporary member's window out — audited. */
+    public static function extendTemporaryAction(): Action
+    {
+        return Action::make('extendTemporary')
+            ->label(__('Ampliar estancia temporal'))
+            ->icon(Heroicon::OutlinedCalendarDays)
+            ->visible(fn (Member $record): bool => $record->isTemporary() && (Auth::user()?->can('members.create') ?? false))
+            ->schema([
+                TextInput::make('days')->label(__('Días adicionales'))->numeric()->minValue(1)->required()
+                    ->default(fn (): int => (int) Settings::get('temporary_window_days', 30)),
+            ])
+            ->action(function (Member $record, array $data): void {
+                (new ManageTemporaryMember)->extend($record, (int) $data['days']);
+
+                Notification::make()->title(__('Estancia temporal ampliada'))->success()->send();
             });
     }
 

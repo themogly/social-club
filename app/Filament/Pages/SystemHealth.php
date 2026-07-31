@@ -3,6 +3,7 @@
 namespace App\Filament\Pages;
 
 use App\Enums\Role;
+use App\Support\Settings;
 use App\ViewModels\SystemHealth as HealthSnapshot;
 use BackedEnum;
 use Filament\Pages\Page;
@@ -61,6 +62,8 @@ class SystemHealth extends Page
         return [
             'scheduler' => $health->scheduler(),
             'expirySweep' => $health->expirySweep(),
+            // Only surfaced when temporary members are enabled — otherwise the sweep is idle by design.
+            'temporarySweep' => (bool) Settings::get('temporary_members_enabled', false) ? $health->temporarySweep() : null,
             'queue' => $health->queue(),
             'backups' => $health->backups(),
             'auditRetentionDays' => $health->auditRetentionDays(),

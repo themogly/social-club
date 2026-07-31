@@ -4,6 +4,7 @@ namespace App\Filament\Resources\Members\Pages;
 
 use App\Actions\Members\RecordMemberConsent;
 use App\Actions\Members\SyncMemberScanDocuments;
+use App\Enums\MemberKind;
 use App\Enums\MemberStatus;
 use App\Filament\Resources\Members\MemberResource;
 use App\Models\Member;
@@ -12,6 +13,7 @@ use App\Support\ActiveScope;
 use App\Support\MemberNumber;
 use App\Support\Settings;
 use Filament\Resources\Pages\CreateRecord;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Auth;
 
 class CreateMember extends CreateRecord
@@ -35,6 +37,16 @@ class CreateMember extends CreateRecord
         $data['status'] ??= MemberStatus::ACTIVE->value;
         $data['joined_at'] ??= now();
         $data['carencia_ends_at'] ??= now()->addDays((int) Settings::get('carencia_days', 15));
+
+        // Temporary members: same onboarding, plus an auto-expiry computed from the window.
+        // Marking someone temporary NEVER shortens any compliance check — only list visibility
+        // and retention timing (prompt 31). The toggle is a virtual field, mapped then dropped.
+        if (! empty($data['is_temporary'])) {
+            $data['kind'] = MemberKind::TEMPORARY->value;
+            $data['temporary_expires_at'] = Carbon::parse($data['joined_at'])
+                ->addDays((int) Settings::get('temporary_window_days', 30));
+        }
+        unset($data['is_temporary']);
 
         return $data;
     }

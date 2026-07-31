@@ -56,6 +56,10 @@ class ManageSettings extends Page
         'expiring_soon_days' => SettingType::INT,
         'renewal_reminder_lead_days' => SettingType::INT,
         'invite_expiry_days' => SettingType::INT,
+        'temporary_members_enabled' => SettingType::BOOL,
+        'temporary_window_days' => SettingType::INT,
+        'temporary_reminder_lead_days' => SettingType::INT,
+        'temporary_count_toward_cap' => SettingType::BOOL,
         'batch_expiry_window_days' => SettingType::INT,
         'discounts_stack' => SettingType::BOOL,
         'data_retention_days' => SettingType::INT,
@@ -166,6 +170,19 @@ class ManageSettings extends Page
                         TextInput::make('invite_expiry_days')->label(__('Caducidad de invitación (días)'))->numeric()->minValue(1)->required()
                             ->helperText(__('Una invitación de alta sin usar caduca tras estos días.')),
                     ])->columns(3),
+
+                Section::make(__('Socios temporales'))
+                    ->description(__('Socios de corta estancia que caducan automáticamente. NOTA: el encaje legal de esta figura no está resuelto en la jurisprudencia de CSC — úsala con criterio.'))
+                    ->schema([
+                        Toggle::make('temporary_members_enabled')->label(__('Permitir socios temporales'))
+                            ->helperText(__('Si se desactiva, no aparece la opción de socio temporal en el alta.')),
+                        TextInput::make('temporary_window_days')->label(__('Ventana temporal (días)'))->numeric()->minValue(1)->required()
+                            ->helperText(__('Un socio temporal caduca a los tantos días de su alta.')),
+                        TextInput::make('temporary_reminder_lead_days')->label(__('Aviso previo a la baja (días)'))->numeric()->minValue(0)->required()
+                            ->helperText(__('Días antes de la baja para avisar (0 = sin aviso).')),
+                        Toggle::make('temporary_count_toward_cap')->label(__('Cuentan para el tope de socios'))
+                            ->helperText(__('Si se activa, los socios temporales cuentan para el tope de socios activos.')),
+                    ])->columns(2),
 
                 Section::make(__('Existencias'))
                     ->schema([

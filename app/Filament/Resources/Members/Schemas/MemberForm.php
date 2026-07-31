@@ -91,6 +91,12 @@ class MemberForm
 
                 Section::make(__('Membresía'))
                     ->schema([
+                        Toggle::make('is_temporary')
+                            ->label(__('Socio temporal'))
+                            ->visible(fn (string $operation): bool => $operation === 'create'
+                                && (bool) Settings::get('temporary_members_enabled', false))
+                            ->helperText(__('Caduca automáticamente tras la ventana configurada. No relaja ninguna verificación (edad, aval, carencia, límites).')),
+
                         Toggle::make('is_therapeutic')
                             ->label(__('Terapéutico'))
                             ->helperText(__('Activa el certificado médico y exime del avalador según la política.'))

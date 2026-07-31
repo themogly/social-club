@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Enums\IdDocumentType;
+use App\Enums\MemberKind;
 use App\Enums\MemberStatus;
 use App\Models\Concerns\BelongsToOrganisation;
 use Database\Factories\MemberFactory;
@@ -41,7 +42,7 @@ class Member extends Model implements Authenticatable
         'document_scan_path', 'medical_cert_path', 'status', 'is_therapeutic', 'avalador_member_id',
         'joined_at', 'left_at', 'carencia_ends_at', 'declared_monthly_cg',
         'daily_limit_cg', 'monthly_limit_cg', 'sole_association_declared_at', 'anonymised_at',
-        'push_opt_outs',
+        'kind', 'temporary_expires_at', 'push_opt_outs',
     ];
 
     protected static function booted(): void
@@ -67,6 +68,8 @@ class Member extends Model implements Authenticatable
             'document_type' => IdDocumentType::class,
             'document_number' => 'encrypted',        // special-category data, encrypted at rest
             'status' => MemberStatus::class,
+            'kind' => MemberKind::class,
+            'temporary_expires_at' => 'datetime',
             'is_therapeutic' => 'boolean',
             'joined_at' => 'datetime',
             'left_at' => 'datetime',
@@ -167,6 +170,29 @@ class Member extends Model implements Authenticatable
     public function memberDiscounts(): HasMany
     {
         return $this->hasMany(MemberDiscount::class);
+    }
+
+    public function isTemporary(): bool
+    {
+        return $this->kind === MemberKind::TEMPORARY;
+    }
+
+    /**
+     * @param  Builder<Member>  $query
+     * @return Builder<Member>
+     */
+    public function scopeStandard(Builder $query): Builder
+    {
+        return $query->where('kind', MemberKind::STANDARD->value);
+    }
+
+    /**
+     * @param  Builder<Member>  $query
+     * @return Builder<Member>
+     */
+    public function scopeTemporary(Builder $query): Builder
+    {
+        return $query->where('kind', MemberKind::TEMPORARY->value);
     }
 
     /**
