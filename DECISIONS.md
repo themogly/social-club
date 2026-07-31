@@ -1900,3 +1900,35 @@ safeguards) rather than the previous blanket "Sin transferencias." ui-avatars wa
 truly gone, so no removal was needed there — the fix makes the "no undeclared outbound" claim true again. A
 test asserts the RAT names Resend and never ui-avatars. 504 green. Owner-authorised merge (wrapper: "merge to
 main and run this").
+
+---
+
+## Prompt 63 — genetic price editing surface (closes the hole prompt 48 documented)
+
+`GeneticPrice` rows — the single most important money figure in the product — had NO edit surface
+anywhere; they could only be set by the seeder or a factory. This blocked prompt 48 (no price changes to
+audit) and prompt 54 (no way to expose the per-price low-stock threshold).
+
+**Surface: a relation manager on the Genetic resource** (`GeneticPricesRelationManager`), NOT a dedicated
+resource. Rationale: a price is an attribute OF a genetic and is managed in its context — the tab shows
+that one genetic's prices across every location and tier, which is the question an admin actually asks
+("what does THIS strain cost?"), and it scopes each list to one genetic instead of a giant flat org-wide
+table. Recorded here as the deliberate pick.
+
+**One writer: `App\Actions\Pricing\SaveGeneticPrice`** — the counterpart to `ResolvePrice` (which stays
+the single READER; this branch adds a way to WRITE, not a second way to read). It sets the ONE price
+column `unit_type` allows (per gram for WEIGHT, per unit for UNIT) and nulls the other, so the wrong
+column can't be set by construction — the model's existing saving guard then enforces it. Tier → base
+precedence is untouched: a tier row (tier_id set) wins for that tier's members, everyone else and a
+deleted tier row fall back to the base (tier_id null) — tested including the delete-fallback.
+
+**Money at the edge:** virtual `price_eur` field, converted with `round_half_up($eur * 100)` (the tier-form
+pattern). `low_stock_threshold` is exposed as grams only for WEIGHT genetics — the column is `*_cg`
+(centigrams = a weight); a per-UNIT low-stock threshold is left to prompt 54, which owns the consumer.
+
+**Audit:** every write is `genetic.price.updated` inside `SaveGeneticPrice`'s transaction (prompt 48
+placement), before/after carrying the real cents — filling exactly the hole prompt 48's `EditGenetic`
+comment named (comment now updated). **Gated on `prices.manage`** — declared since the start but never
+enforced anywhere; this is its first real use (like `stock.take` in prompt 47). Snapshot integrity tested:
+editing a price never changes a past dispensation's frozen total. 510 green. Owner-authorised merge
+(batch 3 depends on this being merged so prompt 54 can build on it).
