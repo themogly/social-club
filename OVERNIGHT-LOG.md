@@ -101,3 +101,21 @@ heartbeat + health-panel section (red if the sweep stalls even when the schedule
 → SETUP.md Scheduled-jobs section (cron + local dev + how-you-know). Confirmed: lapsed blocked at
 counter+door; unpaid≠lapsed (date-driven). Merged to main, composer check green (378 tests). No
 migration → MySQL N/A. Next: prompt 31 (temporary members) — the last feature prompt.
+
+**2026-07-31 — Prompt 31 DONE.** Temporary/short-stay members. Added kind + temporary_expires_at
+(additive); load-bearing rule proven (compliance resolvers never reference temporary → checked
+identically); OFF by default + legally-unsettled note in settings; enrolment toggle + directory
+exclusion/filter/badge; auto-removal sweep via the existing AnonymiseMember (ledger intact, idempotent,
+dry-run, audited, health-panel heartbeat); convert/extend audited action. Count-toward-cap=true; window
+30d. DEFERRED: optional pre-removal EMAIL reminder (setting+sweep exist; needs a dedicated mailable —
+documented). Migration verified on MySQL. Merged to main, composer check green (386 tests).
+
+=== ALL FEATURE PROMPTS (25–31, skip 28) DONE. Beginning overnight Step 2 (Phase C quality passes). ===
+
+**2026-07-31 — Step 1 CONFIRMED complete.** `git branch --no-merged main` is empty — every feature
+branch (25,26,27,29,30,31) is merged. Prompt 28 skipped (documented above). main @ c855ac9, composer
+check green (386 tests). Beginning Step 2 (Phase C). Running the audits (accessibility, admin, design,
+code-style, security; skip seo) as read-only passes, then applying SAFE fixes as per-audit commits and
+LOGGING anything ambiguous/high-risk (compliance/money/security) for human review per the overnight rules.
+Note: "ui-passes 01–04" are visual/screenshot passes — the unattended env has no Playwright MCP, so those
+are deferred to a human (consistent with the original run's visual-pass deferral).

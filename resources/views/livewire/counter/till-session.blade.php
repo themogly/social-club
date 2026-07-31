@@ -23,7 +23,7 @@
                 ])
             >
                 <span>{{ $flashMessage }}</span>
-                <button type="button" wire:click="$set('flashMessage', null)" class="shrink-0 rounded-md px-2 py-1 opacity-70 hover:opacity-100">✕</button>
+                <button type="button" wire:click="$set('flashMessage', null)" aria-label="{{ __('Descartar aviso') }}" class="shrink-0 rounded-md px-2 py-1 opacity-70 hover:opacity-100">✕</button>
             </div>
         @endif
 
