@@ -1486,3 +1486,26 @@ generalises across TillSession/Member/Expense; unlabeled field → headline + lo
 Owner-authorised merge (the prompt's default "do not merge" overridden by the owner, who is the reviewer).
 **VISUAL VERIFICATION STILL PENDING** (no browser here): before/after screenshots of an audit entry across
 two model types, light + dark.
+
+## Prompt 41 — bar POS: charge confirmation not visible without scrolling
+
+Root cause (determined from the Livewire request cycle, not template-guessing): **candidate #2 (state
+bug) ruled out; candidate #1 (scroll/position) confirmed.** `BarPos::commit()` sets `$lastOrderId` AND
+the success flash, and `resetBasketState()` clears neither — the state DOES survive the render (a
+Livewire test asserts `lastOrderId` retained + the "Última venta registrada" block present). The real
+problem is discoverability: the prominent success/error flash rendered ONLY in the page-top banner
+(above the 3-column grid), off-screen when the operator has scrolled to the basket to press Cobrar; the
+colocated "last sale" block is a subtle receipt link, not an unmistakable "charged".
+
+Fix: render the SAME `$flashMessage`/`$flashType` flash a second time COLOCATED in the basket column,
+directly above the Cobrar button (reusing the existing mechanism + tokens, `wire:key="flash-basket"`,
+role/aria-live). A successful charge — and equally an error — is now unmistakable at the point of action
+regardless of scroll, covering the cash, wallet and every error path. The page-top banner stays.
+
+Layout: the manual-amount section is structurally sound (standard `grid gap-3 sm:grid-cols-2`, token
+spacing, `h-11` inputs — no positioning hacks or overflow), so no DOM overlap to fix; per the prompt's
+own note the reported overlap was very likely the OS launcher/Spotlight in the screenshot, not the app.
+
+Tests: success flash renders colocated (asserted via 2× occurrence in the rendered HTML) + `lastOrderId`
+retained + receipt link resolves; error flash equally colocated. Owner-authorised merge. 430 green.
+VISUAL VERIFICATION PENDING (no browser): before/after screenshots at the standard widths, light/dark.
