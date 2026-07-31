@@ -19,6 +19,7 @@ use App\Models\MemberDocument;
 use App\Models\Organisation;
 use App\Models\User;
 use App\Support\ActiveScope;
+use App\Support\DocumentVault;
 use App\Support\MembersRegister;
 use App\Support\Period;
 use App\Support\Spreadsheet\AccountingExport;
@@ -147,13 +148,17 @@ class LegalDocumentsTest extends TestCase
 
     public function test_document_access_is_permissioned_signed_and_logged(): void
     {
+        Storage::fake('documents');
         $owner = $this->user(Role::OWNER); // has member.documents.view
         $member = Member::factory()->create(['organisation_id' => $this->org->id]);
         $document = MemberDocument::factory()->create(['member_id' => $member->id]);
+        DocumentVault::put($document->path, '%PDF fake');
 
         $url = (new IssueDocumentUrl)->handle($document, $owner);
-
         $this->assertStringContainsString('signature=', $url); // short-lived signed URL, unguessable ULID path
+
+        // The access log is written on the VIEW itself (prompt 32 / audit S2), not at issuance.
+        $this->actingAs($owner)->withSession(['scope.organisation_id' => $this->org->id])->get($url)->assertOk();
         $this->assertDatabaseHas('document_access_logs', ['member_document_id' => $document->id, 'actor_id' => $owner->id]);
         $this->assertSame(1, DocumentAccessLog::query()->count());
     }

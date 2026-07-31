@@ -47,9 +47,13 @@ return [
             'report' => false,
         ],
 
-        // ID documents & member photos ONLY. Separate from general uploads:
-        // private, never publicly served, accessed only via short-lived signed
-        // URLs, and encrypted at the model layer before write (prompt 04).
+        // Sensitive member documents (Article 9). Separate from general uploads:
+        // private, never publicly served, accessed only via short-lived, user-bound,
+        // access-logged signed URLs. The ID scans / medical certs / generated PDFs are
+        // ENCRYPTED at rest via App\Support\DocumentVault (Crypt, AES-256) before write
+        // and decrypted only at the streaming endpoint (prompt 32). NOTE: the member
+        // photo, POS signature and non-member uploads on this disk read inline through
+        // other paths and are a tracked follow-up (see DECISIONS.md) — not yet encrypted.
         // Local dev uses the local driver; production sets DOCUMENTS_DRIVER=s3
         // with a dedicated private bucket (AWS_DOCUMENTS_BUCKET). `throw => true`
         // so a lost/failed ID-scan write fails loud, never silently.
@@ -66,6 +70,13 @@ return [
             'bucket' => env('AWS_DOCUMENTS_BUCKET'),
             'endpoint' => env('AWS_ENDPOINT'),
             'use_path_style_endpoint' => env('AWS_USE_PATH_STYLE_ENDPOINT', false),
+            // S3 server-side encryption (SSE-KMS) — defence in depth ON TOP OF the app-layer
+            // DocumentVault encryption; both matter (prompt 32). Set AWS_DOCUMENTS_SSE=aws:kms
+            // + a key id in production. No-op for the local driver / when unset.
+            'options' => array_filter([
+                'ServerSideEncryption' => env('AWS_DOCUMENTS_SSE'),
+                'SSEKMSKeyId' => env('AWS_DOCUMENTS_SSE_KMS_KEY_ID'),
+            ]),
         ],
 
         's3' => [

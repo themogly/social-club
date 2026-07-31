@@ -9,10 +9,10 @@ use App\Models\DocumentTemplate;
 use App\Models\Member;
 use App\Models\MemberDocument;
 use App\Models\User;
+use App\Support\DocumentVault;
 use App\Support\Settings;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Auth\Access\AuthorizationException;
-use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 
 /**
@@ -59,7 +59,9 @@ class GenerateMemberDocument
         ])->render();
 
         $path = 'generated/'.Str::ulid().'.pdf';
-        Storage::disk('documents')->put($path, Pdf::loadHTML($html)->output());
+        // Encrypted at rest (prompt 32) — the PDF embeds the ID number; decrypted only when
+        // streamed through the authorised, access-logged signed-URL endpoint.
+        DocumentVault::put($path, Pdf::loadHTML($html)->output());
 
         $version = (int) MemberDocument::query()
             ->where('member_id', $member->id)->where('type', $type->value)->max('version') + 1;

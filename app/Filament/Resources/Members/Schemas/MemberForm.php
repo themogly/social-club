@@ -7,6 +7,7 @@ use App\Enums\IdDocumentType;
 use App\Enums\MemberDocumentType;
 use App\Models\Member;
 use App\Models\User;
+use App\Support\DocumentVault;
 use App\Support\MemberEligibility;
 use App\Support\Settings;
 use App\Support\Weight;
@@ -23,6 +24,7 @@ use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
 use Illuminate\Support\Facades\Auth;
 use Livewire\Component;
+use Livewire\Features\SupportFileUploads\TemporaryUploadedFile;
 
 class MemberForm
 {
@@ -81,6 +83,7 @@ class MemberForm
                             ->disk('documents')
                             ->visibility('private')
                             ->directory('member-id-scans')
+                            ->saveUploadedFileUsing(fn (TemporaryUploadedFile $file): string => DocumentVault::storeUpload($file, 'member-id-scans'))
                             ->acceptedFileTypes(['application/pdf', 'image/*'])
                             ->previewable(false)
                             ->helperText(__('PDF o imagen. Se guarda cifrado y solo se puede ver mediante un enlace firmado y registrado.'))
@@ -128,6 +131,7 @@ class MemberForm
                             ->disk('documents')
                             ->visibility('private')
                             ->directory('member-medical-certs')
+                            ->saveUploadedFileUsing(fn (TemporaryUploadedFile $file): string => DocumentVault::storeUpload($file, 'member-medical-certs'))
                             ->acceptedFileTypes(['application/pdf', 'image/*'])
                             ->previewable(false)
                             ->helperText(__('Solo socios terapéuticos. PDF o imagen; mismo tratamiento seguro que el escaneo del documento.'))

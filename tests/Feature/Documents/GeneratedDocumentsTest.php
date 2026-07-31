@@ -2,10 +2,10 @@
 
 namespace Tests\Feature\Documents;
 
+use App\Actions\Members\IssueDocumentUrl;
 use App\Enums\MemberDocumentType;
 use App\Enums\Role;
 use App\Filament\Resources\MemberDocuments\MemberDocumentResource;
-use App\Filament\Resources\MemberDocuments\Pages\ListMemberDocuments;
 use App\Filament\Resources\Members\Pages\ViewMember;
 use App\Models\ConsentRecord;
 use App\Models\Location;
@@ -14,6 +14,7 @@ use App\Models\MemberDocument;
 use App\Models\Organisation;
 use App\Models\User;
 use App\Support\ActiveScope;
+use App\Support\DocumentVault;
 use Carbon\CarbonImmutable;
 use Database\Seeders\RolePermissionSeeder;
 use Filament\Facades\Filament;
@@ -72,11 +73,15 @@ class GeneratedDocumentsTest extends TestCase
         $owner = $this->user(Role::OWNER);
         $this->actingAs($owner);
 
+        Storage::fake('documents');
         $member = Member::factory()->create(['organisation_id' => $this->org->id]);
         $document = MemberDocument::factory()->create(['member_id' => $member->id]);
+        DocumentVault::put($document->path, '%PDF-1.4 fake');
 
-        Livewire::test(ListMemberDocuments::class)
-            ->callTableAction('view', $document);
+        // The access log is written on the VIEW itself (prompt 32 / audit S2) — a signed URL
+        // reloaded/leaked/replayed no longer streams without a log entry.
+        $url = (new IssueDocumentUrl)->handle($document, $owner);
+        $this->get($url)->assertOk();
 
         $this->assertDatabaseHas('document_access_logs', [
             'member_document_id' => $document->id,
