@@ -1038,3 +1038,43 @@ driver-sensitive change → MySQL parity N/A.
 No migration / no driver-sensitive change → MySQL parity N/A. 363 tests green (10 new UI-flow +
 attribution tests, incl. one per transaction type asserting the stored operator is the PIN identity,
 not the device login).
+
+---
+
+## Prompt 27 — discounts have no admin UI (per-member + org-wide templates)
+
+**Audit.** Most of this was already built:
+- The **org-wide discount TEMPLATES resource EXISTS** — `DiscountResource` (form/table/pages), in the
+  **Dispensario** nav group, gated by `DiscountPolicy` on `discounts.manage`. Not missing.
+- `App\Actions\Members\AssignMemberDiscount` EXISTS (owner-only, audited) and `ResolvePrice` already
+  reads per-member `memberDiscounts` (linked template OR inline custom, with expiry). `PricingTest`
+  covers the arithmetic.
+- **The one real gap:** no per-member UI. `MemberResource::getRelations()` had Memberships/Wallet/
+  Documents/Consents but **no Discounts** — so there was no way to attach a discount to a member (the
+  reported bug).
+
+**Build.**
+- New `DiscountsRelationManager` — a **"Descuentos" tab** on the member detail page (its own tab, matching
+  the existing relation-manager tabs; chosen over an Overview block for consistency). Shows the assigned
+  discount(s): type (Personalizado / template), value (−15% / −€5,00), expiry, who assigned it, and an
+  Activo/**Caducado** status badge. Assign / edit / remove actions, all gated `member.discount.assign`
+  (`canViewForRecord` hides the whole tab from managers/staff).
+- The relation manager **delegates to Actions, not a second code path**: `AssignMemberDiscount` (extended
+  to capture the reason in its audit), plus new `UpdateMemberDiscount` and `RemoveMemberDiscount` mirroring
+  it (owner-only, audited who/what/from → to + reason). `ResolvePrice` stays the ONE resolver.
+
+**Decisions (documented).**
+- `OVERNIGHT-DEFAULT — CONFIRM:` per-member CUSTOM discounts are **GLOBAL** (they apply to every genetic
+  for that member). This matches `ResolvePrice`'s existing evaluation of an inline member discount (it does
+  NOT check `appliesToGenetic` for a custom value — only linked templates carry a scope). Category-scoping
+  stays a property of the org templates. Simplest interpretation, and it matches the resolver rather than
+  forcing the resolver to change.
+- **Reason → audit log, no new column.** Prompt 08 frames the reason as feeding the audit trail (who / what
+  / when / from → to); it is captured in the form and written to the audit entry, so no schema change is
+  needed. Keeps the branch migration-free → MySQL parity N/A.
+- The counter + receipt already surface the applied discount because they render through `ResolvePrice`
+  (label "Personalizado −15%"); verified by test rather than assumed.
+
+369 tests green (6 new: assign-through-UI + resolver applies it; expired not applied + UI shows Caducado;
+denied to manager/staff at both the UI gate and the action; audit who/from → to + reason; the POS/receipt
+label; the org-template resource gated + resolving).

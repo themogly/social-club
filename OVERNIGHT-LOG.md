@@ -56,3 +56,9 @@ steps are logged as deferred-to-human rather than fabricated; `composer check` g
 
 **2026-07-31 — Prompt 25 DONE.** Merged to `main` @ 3378bfe, `composer check` green on main
 (353 tests / 2253 assertions), pushed, branch deleted. Moving to prompt 26 (PIN operator switching).
+
+**2026-07-31 — Prompt 26 DONE.** PIN operator switching. Audit: backend + Users PIN control already
+built/tested but the UI was never wired (CounterOperator never set → everything attributed to the
+device login). Built one shared IdentifiesOperator trait + operator-strip PIN-pad partial across all
+4 counter screens + a requireOperator() guard on every commit. 10 new end-to-end tests. Merged to
+main, composer check green (363 tests). No migration → MySQL parity N/A. Next: prompt 27 (discounts UI).
