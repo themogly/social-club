@@ -2283,3 +2283,68 @@ would hide exactly the thing that most needs to be visible and would make the cl
 shrinkage that didn't happen. `MERMA`/`ADJUSTMENT` stay correct only for product NO member consumes (waste,
 mould write-off, samples, destruction). Nothing extra was built for owner takings — it already works.
 Owner-authorised merge (the prompt's "do not merge" overridden by the owner's standing "merge it all").
+
+---
+
+## Prompt 65 — partial + cash refunds (money back without voiding the whole thing)
+
+A member can already be made whole by VOIDING a whole dispensation — but a void is all-or-nothing, returns
+money only to the wallet, and always puts the product back as sellable. That misses the real cases: refund
+PART of a basket, hand back CASH, and write off product that came back unsellable. Built `Refund` (model +
+`refunds` table, append-only, one dispensation → many refunds) and `App\Actions\Dispensing\RefundDispensation`,
+reusing VoidDispensation's mechanics (grams through the single stock writer, money through the wallet/till
+writers) rather than duplicating them. The original dispensation is NEVER mutated — it stays COMPLETED.
+
+**Cash vs wallet — the accounting gap a void doesn't have.** A full void is self-correcting: dropping the
+row out of the COMPLETED-only arithmetic un-takes its cash automatically. A PARTIAL refund leaves the row
+COMPLETED, so nothing self-corrects. **WALLET** refund → `RecordWalletTransaction(REFUND)`, no till session
+(a wallet credit is not a drawer movement — same as a void). **CASH** refund → `RecordCashMovement(OUT)` on
+the OPEN till, so `TillSummary` drops the expected drawer figure by exactly the refund and the arqueo still
+reconciles. **A cash refund with no open till is refused** (there is nowhere for the money to come out of).
+
+**Stock destination — the operator's explicit choice, no silent default.** `RefundDestination::STOCK` →
+good product back to its originating batch (a positive `ADJUSTMENT`, sellable again). `RefundDestination::MERMA`
+→ returned-but-unsellable: an `ADJUSTMENT` (+grams) immediately followed by a `MERMA` (−grams), so the ledger
+honestly records "came back, then written off" and the **net effect on sellable stock is zero — it never
+re-enters sellable stock**. MERMA is gated on the existing `stock.merma` permission inside `RecordStockMovement`.
+A refund can be money-only (grams 0, no stock movement) or product-inclusive.
+
+**Never over-refunds — enforced server-side, concurrency-safe.** Cumulative refunded amount AND weight can
+never exceed the original charge / dispensed grams. Both sums are read INSIDE a `lockForUpdate` on the
+dispensation header, so two genuinely concurrent partial refunds serialise — the second sees the first's
+committed row before its own guard runs (the property is asserted by the repeated-partials test; the row
+lock itself is exercised under MySQL in CI, since SQLite has no row locks).
+
+**Refund policy — DECISION: a time window Setting (`refund_window_days`, default 30; 0 = no limit).** The
+prompt asked for one real control (window OR approval threshold). Chose a window: it is the simplest concrete
+REVERSIBLE control, a stale-transaction refund is the higher-risk case, and an approval-threshold would need
+an approver-routing workflow this platform doesn't have yet. Configurable per-location (regional practice
+varies), editable in ManageSettings, resolved through `Settings::get` (degrades to 30 on a stale cache,
+never throws). A dispensation older than the window is refused at the counter.
+
+**Permission — DECISION: reuse `dispensation.void` (manager+), do NOT mint a new one.** A refund is a
+reversal act in the same risk tier as a void, and the prompt framed refunds as "reusing VoidDispensation's
+mechanics." A dedicated `dispensation.refund` would add permission surface for no distinction a club draws.
+Recorded as an OVERNIGHT-DEFAULT — CONFIRM: if a club wants staff to issue small refunds without void
+rights, split the permission (reversible, additive).
+
+**Reporting.** A period's refund total is surfaced on the ConsumptionReport summary ("Reembolsos"), so
+refunds sit alongside takings, not only in the audit log. Every refund is audited `dispensation.refunded`
+(before: refunded-so-far, after: amount + grams + destination + method + reason + authoriser + cumulative)
+inside the transaction.
+
+**Bar/merch refunds — DECISION: DEFERRED (stated, not silently skipped).** `VoidOrder` already fully
+reverses a bar order (unit stock back, wallet spend reversed, cash off the till). A PARTIAL bar refund
+would need the same Refund machinery generalised over `Order`/`items` (unit lines, not weight) — a clean,
+focused follow-up. Not built here to keep this prompt to the dispensary cannabis path the owner described
+("refund a member for mouldy flower"); documented so it is a decision, not an omission.
+
+**Counter UI — DECISION: DEFERRED, explicitly (no inert placeholder shipped).** The existing counter void
+affordance only "undoes the LAST just-committed dispensation" (`$lastDispensationId`). A refund is a LATER
+partial correction against a PRIOR dispensation — it needs a prior-dispensation lookup + a refund modal
+(amount / grams / destination / method / reason), a surface that does not exist yet (there is no Filament
+Dispensation oversight resource either). The tested Action is the reusable core; wiring the lookup+modal is
+a focused follow-up. Per the testing rule (tests prove correctness, not completeness — do not ship a dead
+button), the feature is complete and correct at the mechanic layer and the UI is a named next step, not a
+half-wired control. Owner-authorised merge (the prompt's "do not merge" overridden by the standing "merge
+it all"). 572 green.

@@ -53,6 +53,7 @@ class ManageSettings extends Page
         'expiring_soon_days' => SettingType::INT,
         'renewal_reminder_lead_days' => SettingType::INT,
         'invite_expiry_days' => SettingType::INT,
+        'refund_window_days' => SettingType::INT,
         'temporary_members_enabled' => SettingType::BOOL,
         'temporary_window_days' => SettingType::INT,
         'temporary_reminder_lead_days' => SettingType::INT,
@@ -185,6 +186,8 @@ class ManageSettings extends Page
                         TextInput::make('renewal_reminder_lead_days')->label(__('Días de aviso de renovación'))->numeric()->required(),
                         TextInput::make('invite_expiry_days')->label(__('Caducidad de invitación (días)'))->numeric()->minValue(1)->required()
                             ->helperText(__('Una invitación de alta sin usar caduca tras estos días.')),
+                        TextInput::make('refund_window_days')->label(__('Ventana de reembolso (días)'))->numeric()->minValue(0)->required()
+                            ->helperText(__('Una dispensación más antigua que esta ventana no puede reembolsarse en mostrador (0 = sin límite).')),
                     ])->columns(3),
 
                 Section::make(__('Socios temporales'))
