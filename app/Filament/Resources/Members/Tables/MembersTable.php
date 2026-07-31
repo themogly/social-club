@@ -52,6 +52,17 @@ class MembersTable
                 // Prompt 72: DERIVED — a warning badge (only) when a generated declaration no longer matches
                 // the member's declared forecast. Toggleable + hidden by default: computing it loads each
                 // member's documents, so it is opt-in for an audit rather than an N+1 on the main list.
+                // Prompt 85: DERIVED "card not sent" — no email to send to, or none issued yet. Toggleable +
+                // hidden by default (it queries each member's tokens), so staff can find cardless members.
+                TextColumn::make('card_missing')
+                    ->label(__('Carné QR'))
+                    ->badge()
+                    ->placeholder('—')
+                    ->color(fn (?string $state): string => $state === null ? 'success' : 'warning')
+                    ->state(fn (Member $record): ?string => ! $record->cardMissing()
+                        ? null
+                        : (blank($record->email) ? __('Sin correo') : __('Pendiente')))
+                    ->toggleable(isToggledHiddenByDefault: true),
                 TextColumn::make('declaration_stale')
                     ->label(__('Declaración'))
                     ->badge()
