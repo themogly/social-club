@@ -3,9 +3,11 @@
 namespace App\Models;
 
 use App\Enums\IdDocumentType;
+use App\Enums\MemberDocumentType;
 use App\Enums\MemberKind;
 use App\Enums\MemberStatus;
 use App\Models\Concerns\BelongsToOrganisation;
+use App\Support\DocumentDrift;
 use Database\Factories\MemberFactory;
 use Illuminate\Auth\Authenticatable as AuthenticatableTrait;
 use Illuminate\Contracts\Auth\Authenticatable;
@@ -17,6 +19,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Notifications\Notifiable;
+use Illuminate\Support\Collection;
 use NotificationChannels\WebPush\HasPushSubscriptions;
 
 /**
@@ -158,6 +161,27 @@ class Member extends Model implements Authenticatable
     public function documents(): HasMany
     {
         return $this->hasMany(MemberDocument::class);
+    }
+
+    /**
+     * Generated documents that have DRIFTED from the live record — derived on read, never stored (prompt
+     * 72). A change to the declared forecast (or name/document number) after a declaration/registration
+     * form was generated leaves the signed evidence disagreeing with the record; this surfaces that.
+     *
+     * @return Collection<int, MemberDocument>
+     */
+    public function driftedDocuments(): Collection
+    {
+        return $this->documents
+            ->filter(fn (MemberDocument $doc): bool => $doc->snapshot !== null && DocumentDrift::isStale($doc, $this))
+            ->values();
+    }
+
+    /** True when a generated consumption DECLARATION no longer matches the member's declared forecast. */
+    public function hasStaleDeclaration(): bool
+    {
+        return $this->driftedDocuments()
+            ->contains(fn (MemberDocument $doc): bool => $doc->type === MemberDocumentType::DECLARATION);
     }
 
     /** @return HasMany<ConsentRecord, $this> */

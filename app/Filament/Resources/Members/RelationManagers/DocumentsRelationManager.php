@@ -6,7 +6,9 @@ use App\Actions\Documents\GenerateMemberDocument;
 use App\Enums\MemberDocumentType;
 use App\Filament\Resources\MemberDocuments\MemberDocumentResource;
 use App\Models\Member;
+use App\Models\MemberDocument;
 use App\Models\User;
+use App\Support\DocumentDrift;
 use Filament\Actions\Action;
 use Filament\Forms\Components\Select;
 use Filament\Notifications\Notification;
@@ -45,6 +47,20 @@ class DocumentsRelationManager extends RelationManager
                 TextColumn::make('version')->label(__('Versión'))->sortable(),
                 TextColumn::make('created_at')->label(__('Generado'))->dateTime()->sortable(),
                 TextColumn::make('uploadedBy.name')->label(__('Por'))->placeholder('—'),
+                // Prompt 72: DERIVED drift state — a generated document whose frozen snapshot no longer
+                // matches the live member record (declared forecast / name / document number). Only the
+                // types whose substance IS member data are checked; others show "—".
+                TextColumn::make('drift')
+                    ->label(__('Estado'))
+                    ->badge()
+                    ->placeholder('—')
+                    ->state(fn (MemberDocument $record): ?string => DocumentDrift::isDriftable($record)
+                        ? (DocumentDrift::isStale($record, $record->member) ? __('Desactualizada') : __('Vigente'))
+                        : null)
+                    ->color(fn (?string $state): string => $state === __('Desactualizada') ? 'warning' : 'success')
+                    ->tooltip(fn (?string $state): ?string => $state === __('Desactualizada')
+                        ? __('El documento firmado ya no coincide con la ficha. Regenerar y volver a firmar.')
+                        : null),
             ])
             ->headerActions([
                 $this->generateAction(),

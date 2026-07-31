@@ -7,6 +7,7 @@ use App\Actions\Members\ExportMemberData;
 use App\Actions\Members\IssueMemberToken;
 use App\Actions\Members\ManageTemporaryMember;
 use App\Actions\Members\TransitionMemberStatus;
+use App\Actions\Members\UpdateDeclaredForecast;
 use App\Actions\Members\WaiveCarencia;
 use App\Enums\MemberDocumentType;
 use App\Enums\MemberStatus;
@@ -31,6 +32,7 @@ use App\Mail\MemberCardMail;
 use App\Models\Member;
 use App\Models\User;
 use App\Support\Settings;
+use App\Support\Weight;
 use BackedEnum;
 use Filament\Actions\Action;
 use Filament\Forms\Components\Select;
@@ -102,6 +104,7 @@ class MemberResource extends Resource
         return [
             self::resendQrAction(),
             self::generateDocumentAction(),
+            self::updateDeclaredForecastAction(),
             self::waiveCarenciaAction(),
             self::suspendAction(),
             self::expelAction(),
@@ -234,6 +237,39 @@ class MemberResource extends Resource
                 (new WaiveCarencia)->handle($record, $actor, $data['reason'] ?? null);
 
                 Notification::make()->title(__('Carencia levantada'))->success()->send();
+            });
+    }
+
+    /**
+     * Actualizar previsión declarada — the SINGLE writer for `declared_monthly_cg` (prompt 72). A declared
+     * legal figure, not a contact detail, so it is edited here (audited `member.forecast.updated` via the
+     * previously caller-less UpdateDeclaredForecast) rather than inline on the member form. Changing it may
+     * leave a signed declaration out of date — the drift is then flagged on the record + documents tab.
+     */
+    public static function updateDeclaredForecastAction(): Action
+    {
+        return Action::make('updateDeclaredForecast')
+            ->label(__('Actualizar previsión declarada'))
+            ->icon(Heroicon::OutlinedPencilSquare)
+            ->color('primary')
+            ->visible(fn (Member $record): bool => Auth::user()?->can('update', $record) ?? false)
+            ->schema([
+                TextInput::make('declared_monthly_g')
+                    ->label(__('Previsión mensual (g)'))
+                    ->numeric()
+                    ->minValue(0)
+                    ->step(0.01)
+                    ->suffix(__('g'))
+                    ->required()
+                    ->default(fn (Member $record): ?string => filled($record->declared_monthly_cg)
+                        ? number_format((int) $record->declared_monthly_cg / 100, 2, '.', '')
+                        : null)
+                    ->helperText(__('Al cambiarla, una declaración firmada existente quedará desactualizada y deberá regenerarse y volver a firmarse.')),
+            ])
+            ->action(function (Member $record, array $data): void {
+                (new UpdateDeclaredForecast)->handle($record, Weight::fromGrams((string) $data['declared_monthly_g'])->centigrams);
+
+                Notification::make()->title(__('Previsión declarada actualizada'))->success()->send();
             });
     }
 

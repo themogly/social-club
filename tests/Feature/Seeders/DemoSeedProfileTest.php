@@ -132,7 +132,10 @@ class DemoSeedProfileTest extends TestCase
         $member = Member::where('status', MemberStatus::ACTIVE)->get()->first(function (Member $m) use ($location): bool {
             return Wallet::balance($m->id, $location->id) >= 0
                 && $m->carencia_ends_at?->isPast()
-                && $m->memberships()->where('location_id', $location->id)->where('status', 'ACTIVE')->exists();
+                && $m->memberships()->where('location_id', $location->id)->where('status', 'ACTIVE')->exists()
+                // …who hasn't already consumed toward today's limit during the seeded fortnight (else the
+                // extra 100 cg could breach the daily cap — a limit concern, not the fee block under test).
+                && $m->dispensations()->whereDate('dispensed_at', now())->doesntExist();
         });
         $this->assertNotNull($member, 'the seed must contain a clean, dispensable active member');
 
