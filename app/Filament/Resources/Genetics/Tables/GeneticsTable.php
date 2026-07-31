@@ -4,6 +4,7 @@ namespace App\Filament\Resources\Genetics\Tables;
 
 use App\Enums\BatchStatus;
 use App\Enums\ProductType;
+use App\Enums\StrainType;
 use App\Models\Genetic;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteBulkAction;
@@ -24,6 +25,7 @@ class GeneticsTable
             ->columns([
                 TextColumn::make('name')->label(__('Nombre'))->searchable()->sortable(),
                 TextColumn::make('product_type')->label(__('Tipo'))->badge()->sortable(),
+                TextColumn::make('strain_type')->label(__('Variedad'))->badge()->placeholder('—')->toggleable(),
                 TextColumn::make('category.name')->label(__('Categoría'))->sortable()->toggleable(),
                 TextColumn::make('thc_bp')
                     ->label(__('THC'))
@@ -57,6 +59,11 @@ class GeneticsTable
                     ->label(__('Tipo de producto'))
                     ->options(collect(ProductType::cases())
                         ->mapWithKeys(fn (ProductType $case): array => [$case->value => $case->label()])
+                        ->all()),
+                SelectFilter::make('strain_type')
+                    ->label(__('Variedad'))
+                    ->options(collect(StrainType::cases())
+                        ->mapWithKeys(fn (StrainType $case): array => [$case->value => $case->label()])
                         ->all()),
                 TrashedFilter::make(),
             ])

@@ -6,6 +6,7 @@ use App\Enums\CategoryAppliesTo;
 use App\Enums\ConcentrateSubtype;
 use App\Enums\CultivationType;
 use App\Enums\ProductType;
+use App\Enums\StrainType;
 use Filament\Forms\Components\FileUpload;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TagsInput;
@@ -63,6 +64,14 @@ class GeneticForm
                             ->helperText(fn (Get $get): string => __('Se dispensa: :modo', [
                                 'modo' => (ProductType::tryFrom((string) $get('product_type')) ?? ProductType::FLOWER)->unitType()->label(),
                             ])),
+
+                        // Strain variety (prompt 66) — sativa/indica/hybrid, nullable (some products have none).
+                        Select::make('strain_type')
+                            ->label(__('Variedad'))
+                            ->options(collect(StrainType::cases())
+                                ->mapWithKeys(fn (StrainType $case): array => [$case->value => $case->label()])
+                                ->all())
+                            ->placeholder(__('Sin especificar')),
 
                         // Descriptive only, concentrates only.
                         Select::make('concentrate_subtype')

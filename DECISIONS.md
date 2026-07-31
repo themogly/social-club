@@ -2178,3 +2178,37 @@ route slug `/informes/ventas-barra` are ALL unchanged — so consumers, reconcil
 break. Tested: the report/nav use the new name, the `barra` key still exists in the totals, and "Ventas de
 barra" is gone from BOTH lang files. The existing reconciliation tests (which read the `barra` key) stayed
 green, proving the figure didn't move. Route deliberately KEPT (bookmarks) rather than renamed.
+
+---
+
+## Prompt 66 — StrainType (sativa/indica/hybrid) + POS filter labels + orthogonal seed (supersedes 62)
+
+Added a `StrainType` enum (SATIVA/INDICA/HYBRID, `HasLabel`) on `Genetic` — a user-set, fillable property
+(unlike observer-derived `unit_type`). Shows on the Genetic form + list (with a filter), the dispensary
+POS (a filter row + a card badge), and the member PWA menu.
+
+**Nullable — DECISION.** `strain_type` is nullable with a "Sin especificar" display. An edible or a
+CBD-dominant variety legitimately has no strain type; forcing one would make a club lie about a product.
+The migration + cast + all surfaces handle null (the badge/filter simply omit it; a null-strain genetic
+still shows under "Todas"). Tested.
+
+**Filter rows — DECISION: keep all three, LABELLED.** The two POS rows were unlabelled and read as one
+filter duplicated in two languages. I labelled each (Categoría / Tipo / Variedad — a visible heading +
+`role="group" aria-label` for a screen reader) and added strain as the third row. Chose labelled-3-rows
+over merging or dropping a filter because they are genuinely orthogonal axes (a FLOWER can be sativa or
+indica; a category is club grading) — now that the seed makes them orthogonal, all three earn their place.
+Strain is ALSO a chip on the card + PWA menu, so the variety is visible at a glance, not only as a filter.
+
+**Seed — DECISION: orthogonal grading + strain spread (replaces "Flores"-on-everything).** The demo
+created one genetic category, "Flores", on every (all-FLOWER) genetic — which is what made the filters look
+duplicated. Replaced it with a house GRADING (`Premium` / `Estándar`) assigned independently of strain and
+type, and gave the six genetics a strain spread (sativa×2, indica×2, hybrid×1, and a CBD variety with NO
+strain). So a Variedad selection returns a set distinct from any Categoría or Tipo selection — the
+regression guard against the axes collapsing back into duplicates (tested).
+
+**Untranslated data names — NOTE (no code, per the prompt).** Category names are club-entered DATA
+(`Premium`/`Estándar` in the seed are Spanish and show verbatim in an English UI), NOT routed through
+`__()`. This matches the existing DECISIONS precedent for stored ledger descriptors: persisted club
+vocabulary stays as entered; localizing it is a separate concern for a future prompt. **Strain type itself
+IS an enum, so it translates** — the right call for a fixed vocabulary. Supersedes prompt 62 (dropped).
+Owner-authorised merge.
