@@ -1871,3 +1871,32 @@ doesn't (two real people can share a name+DOB). The override is server-enforced 
 read in `beforeCreate`), not merely UI-hidden, and each override is still fully audited via the normal
 create/approve audit entries. Denial + both override paths are tested. 499 green. Self-merge on green
 (batch 2 authorisation). **Batch 2 complete.**
+
+---
+
+## Prompt 61 — replace the external avatar provider + outbound sweep + RAT reconciliation
+
+Filament's default `UiAvatarsProvider` built `https://ui-avatars.com/api/?name=<staff name>&…` and used it
+as the avatar `src` on every admin page — an undeclared outbound of staff names to an unvetted third party
+(Article 9 context) and a broken image on any locked-down network.
+
+**Provider chosen: local initials, data-URI SVG.** New `App\Support\InitialsAvatarProvider` renders the
+initials into an inline SVG returned as `data:image/svg+xml;base64,…` — no request leaves the server.
+Brand blue #2563eb background, white initials, self-hosted Inter with fallbacks. Multibyte-safe so
+accented Spanish names (Ángel Ñoño → ÁÑ) render correctly. Registered via
+`->defaultAvatarProvider(InitialsAvatarProvider::class)` on the admin panel. The panel now renders with
+zero external hosts — proven by a test that GETs a panel page and asserts `ui-avatars.com` never appears.
+
+**Outbound sweep — what it found: nothing else.** Grepped `resources/{views,js,css}`, `public/sw.js` and
+the panel config for any `http(s)://` host, CDN, Google Fonts, gravatar, or external API. The only hit was
+ui-avatars (now removed). Inter is already self-hosted via the build (vendored woff2). So the only outbound
+personal-data flow that genuinely remains is **Resend** (email delivery) — a legitimate processor.
+
+**RAT reconciled.** `Rat.php` claimed "Sin cesiones" on every activity, including the ones that send email —
+a drift, since email addresses + names go to Resend. Declared Resend as the email processor (encargado del
+tratamiento) on RAT-01 (transactional mail: login link, approval) and RAT-06 (member communications), with
+an honest international-transfer note (the provider may process outside the EEE, subject to its contractual
+safeguards) rather than the previous blanket "Sin transferencias." ui-avatars was never in the RAT and is now
+truly gone, so no removal was needed there — the fix makes the "no undeclared outbound" claim true again. A
+test asserts the RAT names Resend and never ui-avatars. 504 green. Owner-authorised merge (wrapper: "merge to
+main and run this").

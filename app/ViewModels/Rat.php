@@ -57,6 +57,10 @@ class Rat
         $ttl = (int) Settings::get('signed_url_ttl_seconds', 300);
         $noTransfer = __('Sin transferencias internacionales.');
         $noRecipients = __('Sin cesiones, salvo obligación legal o requerimiento judicial.');
+        // The ONE remaining outbound processor after prompt 61 removed the ui-avatars.com avatar call:
+        // Resend, the email-delivery provider (encargado del tratamiento) for transactional + notice mail.
+        $emailProcessor = __('Proveedor de envío de correo electrónico (Resend) como encargado del tratamiento, para la entrega de correos (p. ej. enlace de acceso, aprobación de alta y avisos).');
+        $emailTransfer = __('El proveedor de correo puede tratar datos fuera del EEE, sujeto a sus garantías contractuales.');
 
         return [
             [
@@ -71,8 +75,8 @@ class Rat
                     __('Fecha de nacimiento'),
                 ],
                 'article_9' => false,
-                'recipients' => $noRecipients,
-                'transfers' => $noTransfer,
+                'recipients' => $emailProcessor,
+                'transfers' => $emailTransfer,
                 'retention' => $memberRetention,
             ],
             [
@@ -140,8 +144,8 @@ class Rat
                     __('Datos de contacto y preferencias de notificación'),
                 ],
                 'article_9' => false,
-                'recipients' => $noRecipients,
-                'transfers' => $noTransfer,
+                'recipients' => $emailProcessor,
+                'transfers' => $emailTransfer,
                 'retention' => __('Hasta la retirada del consentimiento o la baja del socio.'),
             ],
             [

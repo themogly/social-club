@@ -5,6 +5,7 @@ namespace App\Providers\Filament;
 use App\Http\Middleware\SetLocale;
 use App\Livewire\LocaleSwitcher;
 use App\Livewire\LocationSwitcher;
+use App\Support\InitialsAvatarProvider;
 use Filament\Auth\MultiFactor\App\AppAuthentication;
 use Filament\Http\Middleware\Authenticate;
 use Filament\Http\Middleware\AuthenticateSession;
@@ -55,6 +56,10 @@ class AdminPanelProvider extends PanelProvider
                 // Brand blue #2563eb — set deliberately (never Filament's default amber).
                 'primary' => Color::hex('#2563eb'),
             ])
+            // Local initials avatar (prompt 61) — replaces Filament's default UiAvatarsProvider, which
+            // sent every staff name to https://ui-avatars.com on each page load (undeclared outbound
+            // personal data + a broken image on locked-down networks). No request leaves the server.
+            ->defaultAvatarProvider(InitialsAvatarProvider::class)
             // Custom location switcher in the topbar (we do not use Filament tenancy —
             // the owner rollup + org-wide member search must cross locations). The owner
             // additionally gets an "All locations" rollup option (App\Support\LocationSwitcher).
