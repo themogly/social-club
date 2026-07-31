@@ -12,7 +12,7 @@
                 <p class="mb-4 rounded-lg bg-brand-tint p-3 text-sm text-brand dark:bg-slate-800 dark:text-slate-200">{{ session('status') }}</p>
             @endif
             @error('email')
-                <p class="mb-4 rounded-lg bg-red-50 p-3 text-sm text-error dark:bg-red-950/40">{{ $message }}</p>
+                <p class="mb-4 rounded-lg bg-error/10 p-3 text-sm text-error">{{ $message }}</p>
             @enderror
 
             <form method="POST" action="{{ route('socio.login.send') }}" class="space-y-3">

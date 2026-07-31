@@ -16,7 +16,7 @@
                  width="240" height="240"
                  class="mx-auto aspect-square w-60 max-w-full rounded-xl border border-line bg-white p-2 dark:border-slate-700">
             <p class="mt-4 inline-flex items-center gap-1.5 rounded-full bg-brand-tint px-3 py-1 text-xs font-medium uppercase tracking-wide text-brand dark:bg-slate-800 dark:text-slate-200">
-                {{ __('Estado') }}: {{ $member->status->value }}
+                {{ __('Estado') }}: {{ $member->status->label() }}
             </p>
             <p class="mt-3 text-xs text-ink-muted dark:text-slate-400">{{ __('Muestra este código en la entrada y en el mostrador.') }}</p>
         </div>

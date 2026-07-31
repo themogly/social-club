@@ -16,7 +16,7 @@
             </div>
         @else
             @if ($errors->any())
-                <div class="mb-4 rounded-lg bg-red-50 p-3 text-sm text-error dark:bg-red-950/40">
+                <div class="mb-4 rounded-lg bg-error/10 p-3 text-sm text-error">
                     <ul class="list-inside list-disc space-y-0.5">
                         @foreach ($errors->all() as $error)
                             <li>{{ $error }}</li>

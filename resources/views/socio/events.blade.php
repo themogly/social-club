@@ -10,7 +10,7 @@
         <p class="mb-3 rounded-lg bg-brand-tint p-3 text-sm text-brand dark:bg-slate-800 dark:text-slate-200">{{ session('status') }}</p>
     @endif
     @error('rsvp')
-        <p class="mb-3 rounded-lg bg-amber-50 p-3 text-sm text-warning dark:bg-amber-950/40">{{ $message }}</p>
+        <p class="mb-3 rounded-lg bg-warning/10 p-3 text-sm text-warning">{{ $message }}</p>
     @enderror
 
     @forelse ($events as $event)
