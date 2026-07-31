@@ -343,6 +343,8 @@
     "Cumplida": "Completed",
     "Cumplimiento": "Compliance",
     "Cuota": "Membership fee",
+    "Barra desactivada en esta sede": "Bar disabled at this location",
+    "Un responsable puede activarla desde la ficha de la sede.": "A manager can enable it from the location's page.",
     "Cobrar cuota": "Collect fee",
     "Cuota cobrada por completo.": "Fee paid in full.",
     "Cuota parcial cobrada. Pendiente: :remaining": "Partial fee collected. Outstanding: :remaining",

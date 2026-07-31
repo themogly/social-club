@@ -23,14 +23,13 @@ class Location extends Model
 
     protected $fillable = [
         'organisation_id', 'name', 'address', 'capacity', 'timezone',
-        'business_day_cutoff', 'opening_time', 'closing_time', 'accent', 'settings', 'active',
+        'business_day_cutoff', 'opening_time', 'closing_time', 'accent', 'active',
     ];
 
     protected function casts(): array
     {
         return [
             'capacity' => 'integer',
-            'settings' => 'array',
             'active' => 'boolean',
         ];
     }

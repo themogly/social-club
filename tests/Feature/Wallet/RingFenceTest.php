@@ -56,7 +56,7 @@ class RingFenceTest extends TestCase
 
     public function test_a_ring_fenced_debt_site_does_not_auto_settle(): void
     {
-        $this->debtSite->update(['settings' => ['ring_fenced' => true]]);
+        Settings::set('ring_fenced', true, SettingType::BOOL, $this->debtSite->id);
 
         (new AutoSettleDebt)->handle($this->member, $this->creditSite);
 

@@ -4,12 +4,13 @@ namespace App\Actions\Wallet;
 
 use App\Models\Location;
 use App\Models\Member;
+use App\Support\Settings;
 use App\Support\Wallet;
 
 /**
  * Ring-fencing settlement: after a member gains credit at an UNFENCED location,
  * use it to auto-clear their debt at other UNFENCED locations (recorded via
- * TransferCredit). Ring-fenced locations (location.settings.ring_fenced) are
+ * TransferCredit). Ring-fenced locations (the per-location `ring_fenced` setting) are
  * excluded — they settle only by explicit manual transfer.
  */
 class AutoSettleDebt
@@ -53,6 +54,6 @@ class AutoSettleDebt
 
     public static function isRingFenced(Location $location): bool
     {
-        return (bool) data_get($location->settings, 'ring_fenced', false);
+        return (bool) Settings::get('ring_fenced', false, $location->id);
     }
 }
