@@ -7,6 +7,7 @@ use App\Actions\Members\IssueDocumentUrl;
 use App\Enums\IdDocumentType;
 use App\Enums\MemberDocumentType;
 use App\Enums\Role;
+use App\Enums\SettingType;
 use App\Filament\Resources\Members\Pages\CreateMember;
 use App\Filament\Resources\Members\Pages\EditMember;
 use App\Models\Member;
@@ -14,6 +15,7 @@ use App\Models\MemberDocument;
 use App\Models\Organisation;
 use App\Models\User;
 use App\Support\ActiveScope;
+use App\Support\Settings;
 use Database\Seeders\RolePermissionSeeder;
 use Filament\Facades\Filament;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -90,6 +92,34 @@ class MemberFormTest extends TestCase
             ->latest('created_at')->firstOrFail();
 
         return $member;
+    }
+
+    public function test_an_avalador_at_the_max_sponsees_cap_is_refused(): void
+    {
+        // Prompt 34: avalador_max_sponsees is now enforced — it was inert (unlimited) before.
+        Settings::set('avalador_max_sponsees', 1, SettingType::INT);
+        $this->actingAs($this->user(Role::OWNER));
+
+        // The avalador already backs one member — at the configured cap of 1.
+        Member::factory()->create(['organisation_id' => $this->org->id, 'avalador_member_id' => $this->avalador->id]);
+
+        Livewire::test(CreateMember::class)
+            ->fillForm($this->baseFormData([
+                'avalador_member_id' => $this->avalador->id,
+                'document_scan_path' => UploadedFile::fake()->create('dni.pdf', 40, 'application/pdf'),
+            ]))
+            ->call('create')
+            ->assertHasFormErrors(['avalador_member_id']);
+
+        // Raising the cap lets the same enrolment through — proving the SETTING is what gates it.
+        Settings::set('avalador_max_sponsees', 5, SettingType::INT);
+        Livewire::test(CreateMember::class)
+            ->fillForm($this->baseFormData([
+                'avalador_member_id' => $this->avalador->id,
+                'document_scan_path' => UploadedFile::fake()->create('dni.pdf', 40, 'application/pdf'),
+            ]))
+            ->call('create')
+            ->assertHasNoFormErrors();
     }
 
     public function test_the_id_scan_lands_on_the_private_disk_and_never_the_public_one(): void

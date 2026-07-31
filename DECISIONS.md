@@ -1280,3 +1280,36 @@ Reused the existing `reports.view*` permission pattern (no new scheme). Tests: S
 OWNER true; the income data layer returns empty for STAFF and real figures for the owner regardless of
 caller; DispensedByGenetic `total_cents` zeroed for STAFF, real for the owner (grams visible to both).
 No migration → MySQL parity N/A. Tests green.
+
+---
+
+## Prompt 34 — inert settings: wire the real ones, cut the dead ones (INCREMENTAL)
+
+**Merge authorization:** owner-authorised ("merge to main once finished"). Done incrementally — the
+highest-value, self-contained safety fix (item 2) is wired + merged now; the remaining wire/cut items
+are DECIDED below and implemented in follow-up commits on this line of work. Per-setting decisions:
+
+1. **`active_member_cap` (+ `temporary_count_toward_cap`) — WIRE (pending):** add a head-count-vs-cap
+   dashboard ALERT (reusing prompt 14's alerts panel + the trans_choice pattern, NOT a new mechanism);
+   `temporary_count_toward_cap` includes/excludes TEMPORARY members from the count. (Not a hard block —
+   a soft cap is a warning, matching prompt 03.)
+2. **`avalador_max_sponsees` — WIRED ✅ (this commit):** enforced via `App\Rules\AvaladorWithinSponseeCap`
+   on the member form's avalador field — an avalador at capacity is refused with a clear message. It was
+   inert before (a sponsor could back unlimited members). Tested (at-cap refused; raising the cap admits).
+3. **`wallet_ring_fence` (org) vs `ring_fenced` (per-location) — RESOLVE (pending):** the per-location
+   `ring_fenced` (read by `AutoSettleDebt`) is the REAL setting → **cut** the inert org `wallet_ring_fence`
+   toggle and **expose `ring_fenced` on `LocationForm`** (it had no control).
+4. **`aforo_enforcement` / `aforo_default` — RESOLVE (pending):** aforo mode is fixed `BLOCK` via the
+   enforcement matrix → **cut** the lying `aforo_enforcement` dropdown from `LocationForm` and document that
+   aforo enforcement is intentionally fixed BLOCK (the safe default for a legal capacity limit).
+5. **`limit_override_requires_manager` — CUT (pending):** overrides are gated by the fixed `limits.override`
+   permission (the real mechanism); remove the inert toggle + document.
+6. **`fees_to_wallet_allowed` — CUT (pending):** `RecordFeePayment` always allows a wallet-charged fee;
+   remove the inert toggle + document (a future prompt can add real enforcement if the club wants it).
+7. **`currency_locale` — CUT (pending):** `Money::formatted()` uses `app()->getLocale()`; the format is
+   governed by `ResolveLocale` (prompt 19). Remove the inert control + document.
+8. **`blind_count_enforced` — CUT (pending):** `CloseTill` is always blind (the safe default); remove the
+   dead constant from `Settings::DEFAULTS`.
+
+The prompt-24 DECISIONS error (wallet_ring_fence / limit_override_requires_manager wrongly called "consumed")
+was already corrected above (see the "CORRECTION (completeness-check)" entry). No migration in this increment.
