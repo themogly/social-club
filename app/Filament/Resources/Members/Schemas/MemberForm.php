@@ -7,6 +7,7 @@ use App\Enums\IdDocumentType;
 use App\Enums\MemberDocumentType;
 use App\Models\Member;
 use App\Models\User;
+use App\Rules\AvaladorWithinSponseeCap;
 use App\Support\DocumentVault;
 use App\Support\MemberEligibility;
 use App\Support\Settings;
@@ -110,6 +111,9 @@ class MemberForm
                             ->relationship('avalador', 'member_no')
                             ->searchable()
                             ->preload()
+                            // Enforce avalador_max_sponsees (prompt 34): an avalador cannot back more than
+                            // the configured maximum. No cap was enforced before — it was unlimited.
+                            ->rules([new AvaladorWithinSponseeCap])
                             ->required(fn (Get $get): bool => self::avaladorRequired((bool) $get('is_therapeutic')))
                             ->helperText(fn (Get $get): string => self::avaladorRequired((bool) $get('is_therapeutic'))
                                 ? __('Obligatorio según la política de aval.')
