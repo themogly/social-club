@@ -2568,3 +2568,47 @@ could not be produced — no browser here; the flows are covered by `EodStockTak
 exclusion rules, variance→one ADJUSTMENT + reconciled `remaining_cg`, zero-variance→line-but-no-adjustment,
 the close-gating, the terminal rule, and the `stock.take` denial). Owner-authorised merge (standing "merge
 everything to main"). 601 green.
+
+---
+
+## Prompt 74 — "Record contribution" refused whenever the operator typed the cash they were handed (LIVE BLOCKER)
+
+Reported from a live counter: a €8.37 basket, Cash filled in as `10`, and Record contribution did nothing.
+Cause: the dispensary POS treated its Cash field as the EXACT amount to charge, so `tenderSplit` took the
+typed value literally and the commit guard `cash + wallet !== total` refused (`1000 !== 837`). The field
+only worked if left blank (derive the remainder) or if the operator mentally computed the exact cents.
+Meanwhile the bar POS modelled tender correctly — "Cash tendered", quick buttons, a change line — so two
+same-looking fields had opposite semantics: a permanent error generator.
+
+**Shared tender model — DECISION: extract `App\Livewire\Counter\Concerns\HandlesTender`, used by BOTH
+screens.** The prompt said "do not leave two", and the bar was already right, so the bar's model became the
+shared one. The trait owns `$walletInput` + `$cashTendered`, the derived split, the change calc, the
+under-tender guard, quick-cash and the euro parse/format helpers; each screen implements only
+`tenderableTotalCents()`. The dispensary's bespoke `cashInput`/`tenderSplit`/`parseCents` are gone. They
+cannot drift again because there is one implementation.
+
+**The fix, precisely.** Cash entered is what the member HANDED (`cashTendered`); the cash APPLIED and
+recorded is always the exact remainder after wallet (`tenderSplit` derives `[$total - $wallet, $wallet]`),
+so the split can never fail to reconcile. Over-tender produces CHANGE (displayed, `changeDueCents`);
+**change is never stored and never posted to any ledger.** Under-tender (handed less than owed) is refused
+with a stated reason ("El efectivo entregado no cubre el total.") — applied to BOTH screens now, so they
+are genuinely one model. A blank cash field still means "exact" (the pre-fix regression case).
+
+**Recorded money is unchanged for a correct entry** — asserted: `cash_cents` + `wallet_cents` still sum to
+the contribution total, and `TillSummary::expectedCents` after an over-tendered dispensation equals float +
+contribution, NOT float + tendered (the arqueo does not drift by the €1.63 change — a test asserts exactly
+this). **Price override (prompt 64):** tender is measured against `$total`, which is already the OVERRIDDEN
+total when an override is applied (ordering verified by a test: €8.37 → €5.00 override, €10 handed → €5.00
+recorded, €5.00 change).
+
+**Colocated-flash investigation (prompt 60) — FINDING: the block works; the message was unhelpful, not
+absent.** `flash()` overwrites `$flashMessage`/`$flashType` and the keyed colocated block (`wire:key="flash-commit"`)
+re-renders, so a NEW flash visibly replaces a stale one (asserted: a stale "Firma capturada" success is
+replaced by the under-tender error). The old "does nothing" was the broken guard refusing a legitimate round
+note with "El desglose de pago… no cuadra con el total." — a message that makes no sense to an operator who
+just typed the value of the note in their hand. This branch removes that refusal (over-tender now succeeds),
+so the confusing dead-end is gone. No prompt-60 regression: the flash surfaced; it was just wrong to fire.
+
+**Screenshots:** dispensary over-tender-with-change and refused under-tender (light+dark, 1024/1440) could
+not be produced — no browser here; the flows are covered by `DispensaryTenderTest` (7 tests). Owner-authorised
+merge (standing "merge everything to main"). 608 green.

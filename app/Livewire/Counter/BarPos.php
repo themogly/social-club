@@ -7,6 +7,7 @@ use App\Actions\Bar\VoidOrder;
 use App\Actions\Pricing\ResolveArticleDiscount;
 use App\Enums\TillSessionStatus;
 use App\Exceptions\TillClosedException;
+use App\Livewire\Counter\Concerns\HandlesTender;
 use App\Livewire\Counter\Concerns\IdentifiesOperator;
 use App\Models\Article;
 use App\Models\Location;
@@ -26,7 +27,6 @@ use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
-use InvalidArgumentException;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
 use RuntimeException;
@@ -59,7 +59,7 @@ use Throwable;
 #[Layout('components.layouts.counter')]
 class BarPos extends Component
 {
-    use IdentifiesOperator;
+    use HandlesTender, IdentifiesOperator;
 
     // --- Identity / scope -------------------------------------------------------
 
@@ -118,13 +118,7 @@ class BarPos extends Component
     /** A miscellaneous line REQUIRES a reference (CommitOrder enforces it; so do we). */
     public string $miscReference = '';
 
-    // --- Tender -----------------------------------------------------------------
-
-    /** Wallet portion in euros (only meaningful with a socio attached). */
-    public string $walletInput = '';
-
-    /** Physical cash handed over, in euros — for the change-due display only. */
-    public string $cashTendered = '';
+    // Tender state ($walletInput, $cashTendered) + the split/change/quick-cash logic live in HandlesTender.
 
     // --- Last order (receipt + void) --------------------------------------------
 
@@ -339,18 +333,6 @@ class BarPos extends Component
         $this->idempotencyKey = (string) Str::ulid();
     }
 
-    // --- Quick cash -------------------------------------------------------------
-
-    /** Set the cash tendered to a preset (in cents) or, when null, the exact amount owed. */
-    public function quickCash(?int $cents = null): void
-    {
-        $location = $this->resolveLocation();
-        $total = $this->basketTotalCents($location);
-        [$cashPosted] = $this->tenderSplit($total);
-
-        $this->cashTendered = $this->eurosString($cents ?? $cashPosted);
-    }
-
     // --- Commit -----------------------------------------------------------------
 
     public function commit(): void
@@ -412,6 +394,13 @@ class BarPos extends Component
 
         if ($cashCents < 0 || $walletCents < 0 || ($cashCents + $walletCents) !== $total) {
             $this->flash(__('El desglose de pago (efectivo + monedero) no cuadra con el total.'), 'error');
+
+            return;
+        }
+
+        // Over-tender gives change; under-tender is refused (prompt 74). The recorded cash is $cashCents.
+        if ($this->isUnderTendered($cashCents)) {
+            $this->flash(__('El efectivo entregado no cubre el total.'), 'error');
 
             return;
         }
@@ -547,61 +536,10 @@ class BarPos extends Component
 
     // --- Tender resolution ------------------------------------------------------
 
-    /**
-     * Split the total into [cash, wallet] so cash + wallet == total (the Order model
-     * asserts this invariant). The wallet portion reflects what was entered, clamped to
-     * the total; the cash portion is the remainder. Whether a socio is present is checked
-     * at commit — here we only arithmetic.
-     *
-     * @return array{0: int, 1: int}
-     */
-    private function tenderSplit(int $total): array
+    /** The live basket total the shared HandlesTender model splits/tenders against. */
+    protected function tenderableTotalCents(): int
     {
-        $wallet = min($this->requestedWalletCents(), max(0, $total));
-        $cash = $total - $wallet;
-
-        return [$cash, $wallet];
-    }
-
-    private function requestedWalletCents(): int
-    {
-        return max(0, $this->parseCents($this->walletInput) ?? 0);
-    }
-
-    private function changeDueCents(int $cashPosted): int
-    {
-        if (trim($this->cashTendered) === '') {
-            return 0;
-        }
-
-        $tendered = $this->parseCents($this->cashTendered);
-
-        if ($tendered === null || $tendered <= $cashPosted) {
-            return 0;
-        }
-
-        return $tendered - $cashPosted;
-    }
-
-    private function parseCents(string $euros): ?int
-    {
-        if (trim($euros) === '') {
-            return null;
-        }
-
-        try {
-            return Money::fromEuros($euros)->cents;
-        } catch (InvalidArgumentException) {
-            return null;
-        }
-    }
-
-    /** Integer cents → a plain euros string ("12.50") for an input default — float-free. */
-    private function eurosString(int $cents): string
-    {
-        $cents = max(0, $cents);
-
-        return sprintf('%d.%02d', intdiv($cents, 100), $cents % 100);
+        return $this->basketTotalCents($this->resolveLocation());
     }
 
     // --- Live view assembly (nothing cached) ------------------------------------

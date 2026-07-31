@@ -15,6 +15,7 @@ use App\Exceptions\DispensationBlockedException;
 use App\Exceptions\LimitExceededException;
 use App\Exceptions\ScanRateLimitedException;
 use App\Exceptions\TillClosedException;
+use App\Livewire\Counter\Concerns\HandlesTender;
 use App\Livewire\Counter\Concerns\IdentifiesOperator;
 use App\Mail\DispensationReceiptMail;
 use App\Models\Batch;
@@ -67,7 +68,7 @@ use Throwable;
 #[Layout('components.layouts.counter')]
 class DispensaryPos extends Component
 {
-    use IdentifiesOperator;
+    use HandlesTender, IdentifiesOperator;
 
     // --- Identity ---------------------------------------------------------------
 
@@ -139,11 +140,8 @@ class DispensaryPos extends Component
     /** The unit-stepper value for a UNIT genetic (preroll/edible). Grams are computed from it. */
     public int $unitQty = 1;
 
-    // --- Tender -----------------------------------------------------------------
-
-    public string $cashInput = '';
-
-    public string $walletInput = '';
+    // Tender state ($walletInput, $cashTendered) + the split/change/quick-cash logic live in HandlesTender.
+    // Cash entered is what the member HANDED (for change), never the amount to charge (prompt 74).
 
     // --- Override (permissioned, reasoned) --------------------------------------
 
@@ -259,7 +257,7 @@ class DispensaryPos extends Component
     {
         $this->reset([
             'memberId', 'scanned', 'search', 'basket', 'activeGeneticId', 'activeBatchId',
-            'weightInput', 'calculatorMode', 'unitQty', 'cashInput', 'walletInput', 'requireOverride',
+            'weightInput', 'calculatorMode', 'unitQty', 'cashTendered', 'walletInput', 'requireOverride',
             'limitBreach', 'overrideReason', 'priceOverrideEuros', 'priceOverrideReason', 'signaturePath',
             'lastDispensationId', 'voidReason', 'flashMessage',
         ]);
@@ -430,7 +428,7 @@ class DispensaryPos extends Component
     {
         $this->reset([
             'basket', 'activeGeneticId', 'activeBatchId', 'weightInput', 'calculatorMode', 'unitQty',
-            'cashInput', 'walletInput', 'requireOverride', 'limitBreach', 'overrideReason',
+            'cashTendered', 'walletInput', 'requireOverride', 'limitBreach', 'overrideReason',
             'priceOverrideEuros', 'priceOverrideReason', 'signaturePath',
         ]);
 
@@ -573,8 +571,12 @@ class DispensaryPos extends Component
 
         [$cashCents, $walletCents] = $this->tenderSplit($total);
 
-        if ($cashCents < 0 || $walletCents < 0 || ($cashCents + $walletCents) !== $total) {
-            $this->flash(__('El desglose de pago (efectivo + monedero) no cuadra con el total.'), 'error');
+        // The split is DERIVED (cash = total − wallet) so it always reconciles — the fix for prompt 74: the
+        // Cash field is what the member HANDED, not the charge. The only tender error is an UNDER-tender
+        // (handed less cash than owed); over-tender is fine and produces change. Tender is measured against
+        // $total, which is already the OVERRIDDEN total when a price override is applied (prompt 64).
+        if ($this->isUnderTendered($cashCents)) {
+            $this->flash(__('El efectivo entregado no cubre el total.'), 'error');
 
             return;
         }
@@ -774,6 +776,7 @@ class DispensaryPos extends Component
             'basketTotalCents' => $total,
             'cashPreviewCents' => $cashPreview,
             'walletPreviewCents' => $walletPreview,
+            'changeDueCents' => $this->changeDueCents($cashPreview),
             'activeGenetic' => $this->activeGeneticId !== null ? Genetic::query()->find($this->activeGeneticId) : null,
             'activeGeneticBatches' => $this->activeGeneticBatches($location),
             'activeGeneticPriceCents' => $this->activeGeneticRateCents($location, $member),
@@ -868,26 +871,12 @@ class DispensaryPos extends Component
         }
     }
 
-    private function parseCents(string $euros): ?int
+    /** The live basket total the shared HandlesTender model splits/tenders against (pre price-override). */
+    protected function tenderableTotalCents(): int
     {
-        if (trim($euros) === '') {
-            return null;
-        }
+        $location = $this->resolveLocation();
 
-        try {
-            return Money::fromEuros($euros)->cents;
-        } catch (InvalidArgumentException) {
-            return null;
-        }
-    }
-
-    /** @return array{0: int, 1: int} [cashCents, walletCents] — the two default to a full cash contribution. */
-    private function tenderSplit(int $total): array
-    {
-        $wallet = $this->walletInput === '' ? 0 : ($this->parseCents($this->walletInput) ?? 0);
-        $cash = $this->cashInput === '' ? max(0, $total - $wallet) : ($this->parseCents($this->cashInput) ?? 0);
-
-        return [$cash, $wallet];
+        return $location === null ? 0 : $this->basketTotalCents($this->resolveMember(), $location);
     }
 
     // --- Live view assembly (nothing cached) ------------------------------------
@@ -1359,7 +1348,7 @@ class DispensaryPos extends Component
         // A new socio always starts a fresh basket → a fresh idempotency key.
         $this->reset([
             'basket', 'activeGeneticId', 'activeBatchId', 'weightInput', 'calculatorMode', 'unitQty',
-            'cashInput', 'walletInput', 'requireOverride', 'limitBreach', 'overrideReason',
+            'cashTendered', 'walletInput', 'requireOverride', 'limitBreach', 'overrideReason',
             'signaturePath', 'lastDispensationId', 'voidReason', 'flashMessage',
         ]);
         $this->idempotencyKey = (string) Str::ulid();
@@ -1370,7 +1359,7 @@ class DispensaryPos extends Component
     {
         $this->reset([
             'basket', 'activeGeneticId', 'activeBatchId', 'weightInput', 'calculatorMode', 'unitQty',
-            'cashInput', 'walletInput', 'requireOverride', 'limitBreach', 'overrideReason',
+            'cashTendered', 'walletInput', 'requireOverride', 'limitBreach', 'overrideReason',
             'priceOverrideEuros', 'priceOverrideReason', 'signaturePath',
         ]);
         $this->idempotencyKey = (string) Str::ulid();
