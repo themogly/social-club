@@ -20,6 +20,18 @@ use App\Support\ActiveScope;
  */
 class OrderPolicy
 {
+    /**
+     * List the bar/merch orders in the panel (OrderResource is oversight-only). Gated on
+     * holding EITHER the bar counter permission OR a reporting permission — mirroring the
+     * `view` gate — so both counter staff and reporting roles can review. The org is
+     * enforced by the model's global scope on the list query; per-row org/location checks
+     * live in `view`.
+     */
+    public function viewAny(User $user): bool
+    {
+        return $user->can('pos.bar') || $user->can('reports.view');
+    }
+
     public function view(User $user, Order $order): bool
     {
         if (! ($user->can('pos.bar') || $user->can('reports.view'))) {

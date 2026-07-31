@@ -17,6 +17,7 @@ use App\Filament\Resources\Members\RelationManagers\ConsentsRelationManager;
 use App\Filament\Resources\Members\RelationManagers\DiscountsRelationManager;
 use App\Filament\Resources\Members\RelationManagers\DocumentsRelationManager;
 use App\Filament\Resources\Members\RelationManagers\MembershipsRelationManager;
+use App\Filament\Resources\Members\RelationManagers\OrdersRelationManager;
 use App\Filament\Resources\Members\RelationManagers\WalletTransactionsRelationManager;
 use App\Filament\Resources\Members\Schemas\MemberForm;
 use App\Filament\Resources\Members\Schemas\MemberInfolist;
@@ -271,6 +272,7 @@ class MemberResource extends Resource
             MembershipsRelationManager::class,
             DiscountsRelationManager::class,
             WalletTransactionsRelationManager::class,
+            OrdersRelationManager::class,
             DocumentsRelationManager::class,
             ConsentsRelationManager::class,
         ];
