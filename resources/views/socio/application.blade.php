@@ -29,6 +29,16 @@
                   class="space-y-3 rounded-2xl border border-line bg-surface p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
                 @csrf
 
+                {{-- Spam mitigation (prompt 38): a honeypot hidden from people + a signed render
+                     timestamp. Both are checked server-side and, if tripped, the submission is
+                     discarded silently — see App\Support\ApplicationSpamGuard. --}}
+                <div aria-hidden="true" class="hidden">
+                    <label for="{{ \App\Support\ApplicationSpamGuard::HONEYPOT }}">{{ __('Deja este campo en blanco') }}</label>
+                    <input id="{{ \App\Support\ApplicationSpamGuard::HONEYPOT }}" name="{{ \App\Support\ApplicationSpamGuard::HONEYPOT }}"
+                           type="text" tabindex="-1" autocomplete="off" value="">
+                </div>
+                <input type="hidden" name="{{ \App\Support\ApplicationSpamGuard::TIMESTAMP }}" value="{{ $formToken }}">
+
                 <div class="grid grid-cols-2 gap-3">
                     <div>
                         <label class="mb-1 block text-sm font-medium" for="first_name">{{ __('Nombre') }}</label>

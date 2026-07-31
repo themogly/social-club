@@ -9,6 +9,7 @@ use App\Models\MemberApplication;
 use App\Models\Organisation;
 use App\Models\User;
 use App\Support\ActiveScope;
+use App\Support\ApplicationSpamGuard;
 use Database\Seeders\RolePermissionSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
@@ -105,11 +106,18 @@ class InviteManagementTest extends TestCase
         $this->get(route('socio.application', ['token' => 'status-token']))->assertOk();
         $this->assertSame('started', $application->fresh()->inviteStatus());
 
-        // Submitting marks it "submitted".
+        // Submitting marks it "submitted" — with the spam-guard fields a real form carries
+        // (empty honeypot + a render token issued a few seconds ago).
+        $this->travelTo(now()->subSeconds(ApplicationSpamGuard::MIN_SECONDS + 2));
+        $renderToken = ApplicationSpamGuard::issueToken();
+        $this->travelBack();
+
         $this->post(route('socio.application.store', ['token' => 'status-token']), [
             'first_name' => 'María', 'last_name' => 'García', 'email' => 'maria@example.es',
             'date_of_birth' => now()->subYears(30)->format('Y-m-d'),
             'document_type' => 'DNI', 'document_number' => '12345678Z', 'consent' => '1',
+            ApplicationSpamGuard::HONEYPOT => '',
+            ApplicationSpamGuard::TIMESTAMP => $renderToken,
         ])->assertRedirect();
 
         $this->assertSame('submitted', $application->fresh()->inviteStatus());

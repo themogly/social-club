@@ -6,6 +6,7 @@ use App\Enums\ApplicationStatus;
 use App\Models\MemberApplication;
 use App\Models\Organisation;
 use App\Support\ActiveScope;
+use App\Support\ApplicationSpamGuard;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -58,11 +59,16 @@ class MemberApplicationTest extends TestCase
         $this->get(route('socio.application', ['token' => 'decided-token']))->assertNotFound();
     }
 
-    public function test_submitting_the_application_stores_the_payload_and_stays_pending(): void
+    /**
+     * A valid submission from a human: every required field, an EMPTY honeypot and a
+     * render token issued a few seconds ago (past the minimum submit time).
+     *
+     * @param  array<string, mixed>  $overrides
+     * @return array<string, mixed>
+     */
+    private function humanFields(array $overrides = []): array
     {
-        $application = $this->invite('submit-token');
-
-        $this->post(route('socio.application.store', ['token' => 'submit-token']), [
+        return array_merge([
             'first_name' => 'María',
             'last_name' => 'García',
             'email' => 'maria@example.es',
@@ -72,7 +78,27 @@ class MemberApplicationTest extends TestCase
             'document_number' => '12345678Z',
             'declared_monthly_g' => '30',
             'consent' => '1',
-        ])->assertRedirect(route('socio.application', ['token' => 'submit-token']));
+            ApplicationSpamGuard::HONEYPOT => '',
+            ApplicationSpamGuard::TIMESTAMP => $this->agedToken(ApplicationSpamGuard::MIN_SECONDS + 2),
+        ], $overrides);
+    }
+
+    /** A signed render token whose embedded timestamp is $ageSeconds in the past (human-paced). */
+    private function agedToken(int $ageSeconds): string
+    {
+        $this->travelTo(now()->subSeconds($ageSeconds));
+        $token = ApplicationSpamGuard::issueToken();
+        $this->travelBack();
+
+        return $token;
+    }
+
+    public function test_submitting_the_application_stores_the_payload_and_stays_pending(): void
+    {
+        $application = $this->invite('submit-token');
+
+        $this->post(route('socio.application.store', ['token' => 'submit-token']), $this->humanFields())
+            ->assertRedirect(route('socio.application', ['token' => 'submit-token']));
 
         $application->refresh();
         $this->assertSame(ApplicationStatus::PENDING, $application->status);
@@ -80,6 +106,44 @@ class MemberApplicationTest extends TestCase
         $this->assertSame('maria@example.es', $application->payload['email']);
         // Weight is stored as integer centigrams at the edge: 30 g → 3000 cg.
         $this->assertSame(3000, $application->payload['declared_monthly_cg']);
+    }
+
+    public function test_a_filled_honeypot_is_silently_discarded(): void
+    {
+        $application = $this->invite('bot-token');
+
+        // A bot fills every field, including the hidden honeypot. It gets the SAME thank-you
+        // redirect (so it learns nothing), but nothing is written to the review queue.
+        $this->post(route('socio.application.store', ['token' => 'bot-token']),
+            $this->humanFields([ApplicationSpamGuard::HONEYPOT => 'http://spam.example']))
+            ->assertRedirect(route('socio.application', ['token' => 'bot-token']));
+
+        $application->refresh();
+        $this->assertSame([], $application->payload);
+        $this->assertNull($application->submitted_at);
+    }
+
+    public function test_an_impossibly_fast_submit_is_silently_discarded(): void
+    {
+        $application = $this->invite('fast-token');
+
+        // Token minted "now" → elapsed under the minimum submit time → scripted, dropped.
+        $this->post(route('socio.application.store', ['token' => 'fast-token']),
+            $this->humanFields([ApplicationSpamGuard::TIMESTAMP => ApplicationSpamGuard::issueToken()]))
+            ->assertRedirect(route('socio.application', ['token' => 'fast-token']));
+
+        $this->assertSame([], $application->fresh()->payload);
+    }
+
+    public function test_a_missing_or_tampered_render_token_is_silently_discarded(): void
+    {
+        $application = $this->invite('tamper-token');
+
+        $this->post(route('socio.application.store', ['token' => 'tamper-token']),
+            $this->humanFields([ApplicationSpamGuard::TIMESTAMP => 'not-a-valid-token']))
+            ->assertRedirect(route('socio.application', ['token' => 'tamper-token']));
+
+        $this->assertSame([], $application->fresh()->payload);
     }
 
     public function test_an_underage_application_is_rejected_and_not_stored(): void
