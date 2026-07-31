@@ -5,12 +5,11 @@ namespace App\Filament\Resources\Members\Pages;
 use App\Actions\Members\RecordMemberConsent;
 use App\Actions\Members\SyncMemberScanDocuments;
 use App\Enums\MemberKind;
-use App\Enums\MemberStatus;
 use App\Filament\Resources\Members\MemberResource;
 use App\Models\Member;
 use App\Models\User;
 use App\Support\ActiveScope;
-use App\Support\MemberNumber;
+use App\Support\MemberEnrolment;
 use App\Support\Settings;
 use Filament\Resources\Pages\CreateRecord;
 use Illuminate\Support\Carbon;
@@ -32,11 +31,13 @@ class CreateMember extends CreateRecord
     {
         $organisationId = app(ActiveScope::class)->organisationId();
         if ($organisationId !== null) {
-            $data['member_no'] ??= MemberNumber::next($organisationId);
+            // The SAME enrolment defaults ApproveApplication fills, from one shared source, so the
+            // carencia rule / active status / member-number generation can never drift between the
+            // two ways a member is enrolled (prompt 37). `+=` keeps anything already in $data (none
+            // of these are form fields), matching the previous `??=`. When org is null the row can't
+            // persist anyway (organisation_id is NOT NULL), so guarding all four here is equivalent.
+            $data += MemberEnrolment::defaults($organisationId);
         }
-        $data['status'] ??= MemberStatus::ACTIVE->value;
-        $data['joined_at'] ??= now();
-        $data['carencia_ends_at'] ??= now()->addDays((int) Settings::get('carencia_days', 15));
 
         // Temporary members: same onboarding, plus an auto-expiry computed from the window.
         // Marking someone temporary NEVER shortens any compliance check — only list visibility

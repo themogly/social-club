@@ -5,7 +5,6 @@ namespace App\Filament\Resources\Discounts\Pages;
 use App\Filament\Resources\Discounts\DiscountResource;
 use App\Models\Discount;
 use Filament\Actions\DeleteAction;
-use Filament\Actions\ForceDeleteAction;
 use Filament\Actions\RestoreAction;
 use Filament\Resources\Pages\EditRecord;
 
@@ -17,7 +16,6 @@ class EditDiscount extends EditRecord
     {
         return [
             DeleteAction::make(),
-            ForceDeleteAction::make(),
             RestoreAction::make(),
         ];
     }

@@ -128,6 +128,7 @@ class WalletTransactionsRelationManager extends RelationManager
             ->icon(Heroicon::OutlinedAdjustmentsHorizontal)
             ->color('danger')
             ->visible(fn (): bool => Auth::user()?->can('wallet.adjust') ?? false)
+            ->requiresConfirmation()   // a signed correction can subtract a member's balance — confirm first
             ->schema([
                 $this->locationField(),
                 TextInput::make('amount_eur')

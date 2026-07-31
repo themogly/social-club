@@ -5,7 +5,6 @@ namespace App\Filament\Resources\MembershipTiers\Pages;
 use App\Filament\Resources\MembershipTiers\MembershipTierResource;
 use App\Models\MembershipTier;
 use Filament\Actions\DeleteAction;
-use Filament\Actions\ForceDeleteAction;
 use Filament\Actions\RestoreAction;
 use Filament\Resources\Pages\EditRecord;
 
@@ -17,7 +16,6 @@ class EditMembershipTier extends EditRecord
     {
         return [
             DeleteAction::make(),
-            ForceDeleteAction::make(),
             RestoreAction::make(),
         ];
     }

@@ -1339,3 +1339,31 @@ Following the incremental start (item 2, avalador cap), the remaining seven are 
 Every cut control is REMOVED from the form (not left rendering with a note). The prompt-24 DECISIONS error
 was corrected earlier. Tests confirm the cut keys are gone from `Settings::DEFAULTS` + the form, and the
 wired ones behave. Owner-authorised merge. 402 tests green.
+
+## Prompt 37 — structural cleanup: latent hazards, duplicated logic, missing confirmations
+
+- **ForceDelete actions removed everywhere.** `ForceDeleteAction`/`ForceDeleteBulkAction` were auto-added on
+  soft-deleting Filament resources but NO policy ever granted `forceDelete` — the buttons could only 403.
+  Removed them (and the now-unused imports) rather than leave dead controls that imply a capability. Denial
+  proven: `MemberPolicy` defines no `forceDelete`, so the Gate denies it even for OWNER (test).
+- **Duplicated enrolment defaults → one source.** `ApproveApplication` and `CreateMember` each set member_no /
+  ACTIVE status / joined_at / carencia_ends_at inline — two copies of the carencia rule that could drift.
+  Extracted `App\Support\MemberEnrolment::defaults($orgId)`; approve `fill()`s it, create `+=`s it (keeps the
+  old `??=` "don't clobber an existing value" semantics; when org is null the row can't persist anyway).
+  Test proves both paths produce identical status/joined_at/carencia from one `carencia_days` fixture, with
+  sequential member numbers.
+- **Confirmations on money/stock mutations.** Wallet `adjust` (can subtract a member's balance) and batch
+  `merma` (destroys compliance-relevant stock) had form modals but no final confirm — a mistyped negative
+  committed immediately. Added `->requiresConfirmation()`; the form schema + confirmation coexist (test: the
+  confirmed adjust still writes €10.00 → 1000 cents). Batch `adjust` (a signed ledger correction, not a loss)
+  left as-is — outside the stated scope (merma + wallet adjust).
+- **Inert MemberApplications bulk-delete removed.** `MemberApplicationPolicy` grants no `delete` (applications
+  are the invite/review record, not disposable), so the `DeleteBulkAction` was inert. Removed + documented in
+  the table; denial proven for OWNER/MANAGER/STAFF (test).
+- **Dead code deleted:** `App\Support\SiteContent` (+ its test) and the default `welcome.blade.php` — both
+  unreferenced (superseded by `Settings` and the dashboard-only `/`).
+- **`grams_per_unit_cg` carve-out documented** in CLAUDE.md: a `*_cg`-named column deliberately cast plain
+  `integer` (a definitional per-genetic constant, not a live weight-of-goods figure), every use already
+  explicit `(int)` — NOT a WeightCast bug to "fix".
+
+Owner-authorised merge. 405 tests green (Pint + Larastan L6 clean).

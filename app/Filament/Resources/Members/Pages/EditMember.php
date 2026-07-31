@@ -7,7 +7,6 @@ use App\Filament\Resources\Members\MemberResource;
 use App\Models\Member;
 use App\Models\User;
 use Filament\Actions\DeleteAction;
-use Filament\Actions\ForceDeleteAction;
 use Filament\Actions\RestoreAction;
 use Filament\Actions\ViewAction;
 use Filament\Resources\Pages\EditRecord;
@@ -23,7 +22,6 @@ class EditMember extends EditRecord
             ViewAction::make(),
             ...MemberResource::recordActions(),
             DeleteAction::make(),
-            ForceDeleteAction::make(),
             RestoreAction::make(),
         ];
     }

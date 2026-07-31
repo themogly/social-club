@@ -6,8 +6,6 @@ use App\Enums\ApplicationStatus;
 use App\Filament\Resources\MemberApplications\MemberApplicationResource;
 use App\Models\MemberApplication;
 use Filament\Actions\Action;
-use Filament\Actions\BulkActionGroup;
-use Filament\Actions\DeleteBulkAction;
 use Filament\Actions\EditAction;
 use Filament\Actions\ViewAction;
 use Filament\Notifications\Notification;
@@ -74,12 +72,9 @@ class MemberApplicationsTable
                 ViewAction::make(),
                 ...MemberApplicationResource::recordActions(),
                 EditAction::make(),
-            ])
-            ->toolbarActions([
-                BulkActionGroup::make([
-                    DeleteBulkAction::make(),
-                ]),
             ]);
+        // No bulk delete: MemberApplicationPolicy grants no `delete` (applications are the
+        // invite/review record, not disposable) — the action would have been inert (prompt 37).
     }
 
     /** Re-display the shareable link (the fix: recoverable after the toast is gone). */
