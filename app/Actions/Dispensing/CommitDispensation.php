@@ -139,11 +139,11 @@ class CommitDispensation
             ->exists();
 
         if (! $hasActiveMembership && Settings::enforcement('counter', 'membership') !== 'WARN') {
-            throw new DispensationBlockedException('The member has no active membership at this location.');
+            throw new DispensationBlockedException(__('Sin membresía activa en esta sede.'));
         }
 
         if (! MemberEligibility::carenciaPassed($member) && Settings::enforcement('counter', 'carencia') !== 'WARN') {
-            throw new DispensationBlockedException('The member is still within their carencia (waiting period).');
+            throw new DispensationBlockedException(__('En periodo de carencia (puede entrar, no puede dispensarse).'));
         }
     }
 

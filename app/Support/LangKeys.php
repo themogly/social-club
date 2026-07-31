@@ -6,7 +6,9 @@ use Illuminate\Support\Facades\File;
 
 /**
  * The one source of truth for translation-key coverage (prompt 19). Scans the
- * codebase for every static `__('…')` / `@lang('…')` key, and reads the two JSON
+ * codebase for every static `__('…')` / `@lang('…')` / `trans('…')` / `trans_choice('…')`
+ * key (prompt 25 added the last two — a pluralized alert key that never reached the
+ * locale files is what leaked Spanish into the English dashboard), and reads the two JSON
  * locale files, so both the `lang:sync` command and the completeness test work off
  * identical data. Keys are the Spanish source strings; `lang/es.json` maps them to
  * Spanish (identity) and `lang/en.json` to English — the app default is `en`, so a
@@ -22,8 +24,11 @@ class LangKeys
     public static function usedInCode(): array
     {
         $keys = [];
-        // First quoted argument of __() or @lang(), single OR double quoted.
-        $pattern = '/(?:__|@lang)\(\s*([\'"])((?:\\\\.|(?!\1).)*)\1/';
+        // First quoted argument of __(), @lang(), trans() or trans_choice() — single OR
+        // double quoted. trans_choice() MUST be scanned: its pluralized keys ("…|…") are
+        // exactly the ones that silently leaked Spanish (dashboard alerts) because the old
+        // pattern ignored them. The lookbehind rejects identifier suffixes (e.g. reTRANS().
+        $pattern = '/(?<![A-Za-z0-9_])(?:__|@lang|trans_choice|trans)\(\s*([\'"])((?:\\\\.|(?!\1).)*)\1/';
 
         foreach (self::sourceFiles() as $file) {
             $contents = (string) File::get($file);

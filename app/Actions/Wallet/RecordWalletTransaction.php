@@ -37,7 +37,7 @@ class RecordWalletTransaction
                 $limit = (int) Settings::get('wallet_debt_limit_cents', 0);
 
                 if (! $debtAllowed || $newBalance < -$limit) {
-                    throw new DebtLimitExceededException('This movement would exceed the member\'s debt limit.');
+                    throw new DebtLimitExceededException(__('Este movimiento superaría el límite de deuda del socio.'));
                 }
             }
 
