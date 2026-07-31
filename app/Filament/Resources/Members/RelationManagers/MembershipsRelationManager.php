@@ -6,11 +6,15 @@ use App\Actions\Memberships\EnrolMembership;
 use App\Actions\Memberships\RenewMembership;
 use App\Actions\Memberships\TransferMembership;
 use App\Enums\MembershipStatus;
+use App\Enums\TillSessionStatus;
 use App\Models\Location;
 use App\Models\Member;
 use App\Models\Membership;
+use App\Models\MembershipFeePayment;
 use App\Models\MembershipTier;
 use App\Models\Scopes\LocationScope;
+use App\Models\TillSession;
+use App\Support\Money;
 use Filament\Actions\Action;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
@@ -51,6 +55,15 @@ class MembershipsRelationManager extends RelationManager
                     }),
                 TextColumn::make('starts_at')->label(__('Inicio'))->date()->sortable(),
                 TextColumn::make('expires_at')->label(__('Caduca'))->date()->sortable(),
+                // Outstanding fee (prompt 46) — so a member's unpaid balance is visible at a glance,
+                // not just a silent counter-side block. Same feesPaid()-style comparison.
+                TextColumn::make('outstanding')
+                    ->label(__('Cuota pendiente'))
+                    ->badge()
+                    ->state(fn (Membership $record): string => self::owedCents($record) > 0
+                        ? Money::fromCents(self::owedCents($record))->formatted()
+                        : __('Al día'))
+                    ->color(fn (Membership $record): string => self::owedCents($record) > 0 ? 'danger' : 'success'),
             ])
             ->headerActions([
                 $this->enrolAction(),
@@ -103,10 +116,56 @@ class MembershipsRelationManager extends RelationManager
                     $options['fee_cents'] = (int) round_half_up(((float) $data['fee_eur']) * 100);
                 }
 
-                (new EnrolMembership)->handle($member, $location, $tier, $options);
+                $membership = (new EnrolMembership)->handle($member, $location, $tier, $options);
 
                 Notification::make()->title(__('Membresía dada de alta'))->success()->send();
+                self::promptFeeCollection($membership);
             });
+    }
+
+    /**
+     * Point staff at the till after a membership is created/renewed with an unpaid fee. The fee
+     * field on THIS form only sets what is OWED — it is not a payment; the money is collected at
+     * the till (prompt 46), which is the only path that clears unpaid_fee at the counter.
+     */
+    /** Outstanding fee on a membership (fee owed minus payments recorded), never negative. */
+    private static function owedCents(Membership $membership): int
+    {
+        $paid = (int) MembershipFeePayment::query()->where('membership_id', $membership->id)->sum('amount_cents');
+
+        return max(0, $membership->fee_cents->cents - $paid);
+    }
+
+    private static function promptFeeCollection(Membership $membership): void
+    {
+        $owed = self::owedCents($membership);
+
+        if ($owed <= 0) {
+            return;
+        }
+
+        $tillOpen = TillSession::query()->withoutGlobalScopes()
+            ->where('location_id', $membership->location_id)
+            ->where('status', TillSessionStatus::OPEN->value)
+            ->exists();
+
+        $notification = Notification::make()
+            ->title(__('Cuota pendiente de cobro'))
+            ->body(__('Pendiente: :amount. La cuota se cobra en la sesión de caja.', ['amount' => Money::fromCents($owed)->formatted()])
+                .($tillOpen ? '' : ' '.__('No hay ninguna caja abierta en esta sede — abre una primero.')))
+            ->warning()
+            ->persistent();
+
+        if ($tillOpen) {
+            $notification->actions([
+                Action::make('goToTill')
+                    ->label(__('Ir a la caja'))
+                    ->url(route('counter.till'))
+                    ->button(),
+            ]);
+        }
+
+        $notification->send();
     }
 
     /** Renovar — extend the membership through the audited domain action. */
@@ -117,9 +176,10 @@ class MembershipsRelationManager extends RelationManager
             ->icon(Heroicon::OutlinedArrowPath)
             ->requiresConfirmation()
             ->action(function (Membership $record): void {
-                (new RenewMembership)->handle($record, ['actor' => Auth::user()]);
+                $membership = (new RenewMembership)->handle($record, ['actor' => Auth::user()]);
 
                 Notification::make()->title(__('Membresía renovada'))->success()->send();
+                self::promptFeeCollection($membership);
             });
     }
 
