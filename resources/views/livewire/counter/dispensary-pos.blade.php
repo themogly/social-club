@@ -486,20 +486,47 @@
                         </div>
                     @endcan
 
-                    {{-- Tender split --}}
-                    <div class="mt-4 grid grid-cols-2 gap-3">
-                        <div>
-                            <label for="cash" class="block text-xs font-medium text-ink-muted dark:text-slate-400">{{ __('Efectivo (€)') }}</label>
-                            <input id="cash" type="text" inputmode="decimal" wire:model.live.debounce.400ms="cashInput" autocomplete="off" placeholder="{{ __('Resto') }}" class="mt-1 h-11 w-full rounded-xl border border-line bg-surface px-3 text-base text-ink placeholder:text-ink-muted focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/40 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100">
-                        </div>
+                    {{-- Tender (prompt 74): wallet APPLIED + physical cash TENDERED → change. The cash field is
+                         what the member handed over, never the charge; the recorded contribution is the total. --}}
+                    <div class="mt-4 space-y-3">
                         <div>
                             <label for="wallet" class="block text-xs font-medium text-ink-muted dark:text-slate-400">{{ __('Monedero (€)') }}</label>
-                            <input id="wallet" type="text" inputmode="decimal" wire:model.live.debounce.400ms="walletInput" autocomplete="off" placeholder="0,00" class="mt-1 h-11 w-full rounded-xl border border-line bg-surface px-3 text-base text-ink placeholder:text-ink-muted focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/40 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100">
+                            <input id="wallet" type="text" inputmode="decimal" wire:model.live.debounce.400ms="walletInput" @disabled($member === null) autocomplete="off" placeholder="0,00" class="mt-1 h-11 w-full rounded-xl border border-line bg-surface px-3 text-base text-ink placeholder:text-ink-muted focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/40 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100">
+                            @if ($member === null)
+                                <p class="mt-1 text-[11px] text-ink-muted dark:text-slate-500">{{ __('Atribuye un socio para pagar con monedero.') }}</p>
+                            @endif
                         </div>
-                    </div>
-                    <div class="mt-2 flex items-center justify-between text-xs text-ink-muted dark:text-slate-400">
-                        <span>{{ __('Efectivo') }}: {{ $this->money($cashPreviewCents) }} · {{ __('Monedero') }}: {{ $this->money($walletPreviewCents) }}</span>
-                        <span>{{ __('Monedero tras aportación') }}: <span class="font-medium {{ $projectedWalletCents < 0 ? 'text-error' : '' }}">{{ $this->money($projectedWalletCents) }}</span></span>
+
+                        {{-- Quick cash --}}
+                        <div>
+                            <p class="text-xs font-medium text-ink-muted dark:text-slate-400">{{ __('Efectivo entregado') }}</p>
+                            <div class="mt-1 grid grid-cols-4 gap-2">
+                                <button type="button" wire:click="quickCash" class="h-11 rounded-xl border border-line bg-surface text-sm font-semibold text-ink transition hover:bg-surface-alt dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:hover:bg-slate-800">{{ __('Justo') }}</button>
+                                <button type="button" wire:click="quickCash(500)" class="h-11 rounded-xl border border-line bg-surface text-sm font-semibold text-ink transition hover:bg-surface-alt dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:hover:bg-slate-800">€5</button>
+                                <button type="button" wire:click="quickCash(1000)" class="h-11 rounded-xl border border-line bg-surface text-sm font-semibold text-ink transition hover:bg-surface-alt dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:hover:bg-slate-800">€10</button>
+                                <button type="button" wire:click="quickCash(2000)" class="h-11 rounded-xl border border-line bg-surface text-sm font-semibold text-ink transition hover:bg-surface-alt dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:hover:bg-slate-800">€20</button>
+                            </div>
+                            <input type="text" inputmode="decimal" wire:model.live.debounce.400ms="cashTendered" autocomplete="off" placeholder="{{ __('Efectivo entregado (€)') }}" class="mt-2 h-11 w-full rounded-xl border border-line bg-surface px-3 text-base text-ink placeholder:text-ink-muted focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/40 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100">
+                        </div>
+
+                        <dl class="space-y-1 rounded-xl bg-surface-alt px-4 py-3 text-sm dark:bg-slate-800">
+                            <div class="flex items-center justify-between">
+                                <dt class="text-ink-muted dark:text-slate-400">{{ __('A cobrar en efectivo') }}</dt>
+                                <dd class="font-semibold tabular-nums">{{ $this->money($cashPreviewCents) }}</dd>
+                            </div>
+                            <div class="flex items-center justify-between">
+                                <dt class="text-ink-muted dark:text-slate-400">{{ __('Monedero') }}</dt>
+                                <dd class="font-semibold tabular-nums">{{ $this->money($walletPreviewCents) }}</dd>
+                            </div>
+                            <div class="flex items-center justify-between border-t border-line pt-1 dark:border-slate-700">
+                                <dt class="font-medium">{{ __('Cambio') }}</dt>
+                                <dd class="text-base font-bold tabular-nums {{ $changeDueCents > 0 ? 'text-success' : '' }}">{{ $this->money($changeDueCents) }}</dd>
+                            </div>
+                            <div class="flex items-center justify-between text-xs text-ink-muted dark:text-slate-400">
+                                <dt>{{ __('Monedero tras aportación') }}</dt>
+                                <dd class="font-medium {{ $projectedWalletCents < 0 ? 'text-error' : '' }}">{{ $this->money($projectedWalletCents) }}</dd>
+                            </div>
+                        </dl>
                     </div>
 
                     {{-- Signature (only when the sede requires it). --}}
