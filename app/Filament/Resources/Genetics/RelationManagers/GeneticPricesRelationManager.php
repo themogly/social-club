@@ -97,6 +97,7 @@ class GeneticPricesRelationManager extends RelationManager
                     $this->priceCents($data),
                     $this->thresholdCg($data),
                     (bool) ($data['active'] ?? true),
+                    eighthCents: $this->eighthCents($data),
                 );
 
                 Notification::make()->title(__('Precio guardado'))->success()->send();
@@ -113,6 +114,7 @@ class GeneticPricesRelationManager extends RelationManager
                 'location_id' => $record->location_id,
                 'tier_id' => $record->tier_id,
                 'price_eur' => (($this->genetic()->isUnitType() ? $record->price_per_unit_cents : $record->price_per_gram_cents) ?? 0) / 100,
+                'price_per_eighth_eur' => $record->price_per_eighth_cents !== null ? $record->price_per_eighth_cents / 100 : null,
                 'low_stock_threshold_g' => $record->low_stock_threshold_cg !== null ? $record->low_stock_threshold_cg / 100 : null,
                 'active' => $record->active,
             ])
@@ -127,6 +129,7 @@ class GeneticPricesRelationManager extends RelationManager
                     $this->thresholdCg($data),
                     (bool) ($data['active'] ?? true),
                     existing: $record,
+                    eighthCents: $this->eighthCents($data),
                 );
 
                 Notification::make()->title(__('Precio actualizado'))->success()->send();
@@ -157,6 +160,12 @@ class GeneticPricesRelationManager extends RelationManager
                 ->numeric()
                 ->minValue(0)
                 ->required(),
+            TextInput::make('price_per_eighth_eur')
+                ->label(__('Precio por octavo — 3,5 g (€)'))
+                ->helperText(__('Opcional. Si dos variedades comparten este precio, un octavo (3,5 g) repartido entre ellas se cobra a este precio.'))
+                ->numeric()
+                ->minValue(0)
+                ->visible(! $perUnit), // eighth pricing is WEIGHT-only
             TextInput::make('low_stock_threshold_g')
                 ->label(__('Aviso de stock bajo (g)'))
                 ->helperText($perUnit
@@ -184,6 +193,18 @@ class GeneticPricesRelationManager extends RelationManager
     private function priceCents(array $data): int
     {
         return (int) round_half_up(((float) ($data['price_eur'] ?? 0)) * 100);
+    }
+
+    /**
+     * Optional eighth (3.5 g) price in cents, or null when the field is left blank (prompt 83).
+     *
+     * @param  array<string, mixed>  $data
+     */
+    private function eighthCents(array $data): ?int
+    {
+        return filled($data['price_per_eighth_eur'] ?? null)
+            ? (int) round_half_up(((float) $data['price_per_eighth_eur']) * 100)
+            : null;
     }
 
     /**

@@ -27,23 +27,28 @@ use RuntimeException;
  */
 class ResolvePrice
 {
+    /** One eighth = 3.5 g = 350 cg. Never a float comparison. */
+    public const EIGHTH_CG = 350;
+
     public function forGenetic(Genetic $genetic, Location $location, ?Member $member = null): PriceResult
     {
-        [$rate, $rateLabel] = $this->rate($genetic, $location, $member);
+        [$rate, $rateLabel, $eighth] = $this->rate($genetic, $location, $member);
         $candidates = $this->applicableDiscounts($genetic, $location, $member);
 
-        return new PriceResult($rate, $rateLabel, $this->chooseDiscount($rate, $candidates), $genetic->isUnitType());
+        return new PriceResult($rate, $rateLabel, $this->chooseDiscount($rate, $candidates), $genetic->isUnitType(), $eighth);
     }
 
     /**
      * The resolved rate in cents — SAME tier resolution for both, only the column
-     * differs: per gram for a WEIGHT genetic, per unit for a UNIT genetic.
+     * differs: per gram for a WEIGHT genetic, per unit for a UNIT genetic. Also returns the strain's
+     * eighth price (WEIGHT only) from the SAME resolved row, for the basket-level eighth break (prompt 83).
      *
-     * @return array{0: int, 1: ?string}
+     * @return array{0: int, 1: ?string, 2: ?int}
      */
     private function rate(Genetic $genetic, Location $location, ?Member $member): array
     {
-        $column = $genetic->isUnitType() ? 'price_per_unit_cents' : 'price_per_gram_cents';
+        $isUnit = $genetic->isUnitType();
+        $column = $isUnit ? 'price_per_unit_cents' : 'price_per_gram_cents';
         $tierId = $member !== null ? $this->activeTierId($member, $location) : null;
 
         if ($tierId !== null) {
@@ -52,7 +57,7 @@ class ResolvePrice
                 ->where('tier_id', $tierId)->where('active', true)->first();
 
             if ($tierPrice !== null) {
-                return [(int) $tierPrice->{$column}, __('Tarifa')];
+                return [(int) $tierPrice->{$column}, __('Tarifa'), $isUnit ? null : $tierPrice->price_per_eighth_cents];
             }
         }
 
@@ -64,7 +69,88 @@ class ResolvePrice
             throw new RuntimeException('No active base price for this genetic at this location.');
         }
 
-        return [(int) $base->{$column}, null];
+        return [(int) $base->{$column}, null, $isUnit ? null : $base->price_per_eighth_cents];
+    }
+
+    /**
+     * Apply eighth (3.5 g) quantity breaks across a WHOLE weight basket (prompt 83) — "calculate it in the
+     * background". Lines are GROUPED by their (identical, non-null) eighth price; a group reaching >= 350 cg
+     * is charged floor(grams / 350) eighths at that price PLUS the sub-eighth remainder per gram, and that
+     * charge is split across the group's lines proportional to grams by largest-remainder, so the per-line
+     * totals sum EXACTLY to the group charge — no lost or gained cent. Lines with no eighth price, and groups
+     * below 350 cg, keep their per-gram total unchanged. This is the ONLY place the eighth arithmetic lives.
+     *
+     * @param  list<array{grams_cg: int, rate_cents: int, per_gram_total: int, eighth_price: ?int}>  $lines
+     * @return list<array{total_cents: int, eighth_applied: bool}> in the same order
+     */
+    public function applyEighthBreaks(array $lines): array
+    {
+        $result = array_map(fn (array $l): array => ['total_cents' => $l['per_gram_total'], 'eighth_applied' => false], $lines);
+
+        // Group line indices by eighth price (only lines that HAVE one).
+        $groups = [];
+        foreach ($lines as $i => $line) {
+            if ($line['eighth_price'] !== null && $line['eighth_price'] > 0) {
+                $groups[(int) $line['eighth_price']][] = $i;
+            }
+        }
+
+        foreach ($groups as $eighthPrice => $indices) {
+            $totalCg = array_sum(array_map(fn (int $i): int => $lines[$i]['grams_cg'], $indices));
+            $eighths = intdiv($totalCg, self::EIGHTH_CG);
+
+            if ($eighths === 0) {
+                continue; // below one eighth → stays per-gram (near-miss like 3.4 g)
+            }
+
+            // Remainder above whole eighths is per-gram at the group's LOWEST effective rate (member-favourable).
+            $remainderCg = $totalCg - $eighths * self::EIGHTH_CG;
+            $minRate = min(array_map(fn (int $i): int => $lines[$i]['rate_cents'], $indices));
+            $groupTotal = $eighths * (int) $eighthPrice + (int) round_half_up($minRate * $remainderCg / 100);
+
+            $shares = $this->distribute($groupTotal, array_map(fn (int $i): int => $lines[$i]['grams_cg'], $indices));
+            foreach ($indices as $pos => $i) {
+                $result[$i] = ['total_cents' => $shares[$pos], 'eighth_applied' => true];
+            }
+        }
+
+        return $result;
+    }
+
+    /**
+     * Split $total across the given integer weights with NO lost/gained cent (largest-remainder).
+     *
+     * @param  list<int>  $weights
+     * @return list<int>
+     */
+    private function distribute(int $total, array $weights): array
+    {
+        $sumW = array_sum($weights);
+        if ($sumW <= 0) {
+            return array_fill(0, count($weights), 0);
+        }
+
+        $floors = [];
+        $fracs = [];
+        foreach ($weights as $j => $w) {
+            $numerator = $total * $w;
+            $floors[$j] = intdiv($numerator, $sumW);
+            $fracs[$j] = $numerator % $sumW;
+        }
+
+        $remaining = $total - array_sum($floors);
+        arsort($fracs); // largest fractional part first (stable enough — ties break on earlier index)
+        foreach (array_keys($fracs) as $j) {
+            if ($remaining <= 0) {
+                break;
+            }
+            $floors[$j]++;
+            $remaining--;
+        }
+
+        ksort($floors);
+
+        return array_values($floors);
     }
 
     private function activeTierId(Member $member, Location $location): ?string

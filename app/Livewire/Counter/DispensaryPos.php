@@ -894,6 +894,7 @@ class DispensaryPos extends Component
         }
 
         $rows = [];
+        $eighthInput = [];
         $resolver = new ResolvePrice;
 
         foreach ($this->basket as $index => $line) {
@@ -924,7 +925,19 @@ class DispensaryPos extends Component
                 'discount_cents' => $priced['discount_cents'],
                 'total_cents' => $priced['total_cents'],
                 'label' => $priced['label'],
+                'eighth_applied' => false,
             ];
+            $eighthInput[] = $units !== null
+                ? ['grams_cg' => (int) $line['grams_cg'], 'rate_cents' => 0, 'per_gram_total' => $priced['total_cents'], 'eighth_price' => null]
+                : ['grams_cg' => (int) $line['grams_cg'], 'rate_cents' => $price->effectiveRatePerGramCents(), 'per_gram_total' => $priced['total_cents'], 'eighth_price' => $price->eighthPriceCents];
+        }
+
+        // Basket-wide eighth (3.5 g) break (prompt 83) — the SAME resolver call CommitDispensation makes, so
+        // the shown total can never desync from the committed one.
+        $adjusted = $resolver->applyEighthBreaks($eighthInput);
+        foreach ($rows as $i => $row) {
+            $rows[$i]['total_cents'] = $adjusted[$i]['total_cents'];
+            $rows[$i]['eighth_applied'] = $adjusted[$i]['eighth_applied'];
         }
 
         return $rows;

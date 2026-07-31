@@ -447,7 +447,12 @@
                         @forelse ($basketLines as $line)
                             <li wire:key="line-{{ $line['index'] }}" class="flex items-start justify-between gap-3 py-2.5">
                                 <div class="min-w-0">
-                                    <p class="truncate font-medium">{{ $line['genetic_name'] }}</p>
+                                    <p class="truncate font-medium">
+                                        {{ $line['genetic_name'] }}
+                                        @if ($line['eighth_applied'] ?? false)
+                                            <span class="ml-1 rounded-full border border-brand/30 bg-brand-tint px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-brand dark:bg-slate-800 dark:text-slate-200">{{ __('1/8') }}</span>
+                                        @endif
+                                    </p>
                                     <p class="text-xs text-ink-muted dark:text-slate-400">
                                         @if ($line['per_unit'])
                                             {{ $line['units'] }} {{ __('uds') }} ({{ $this->grams($line['grams_cg']) }}) × {{ $this->money($line['rate_cents']) }}/{{ __('ud') }}

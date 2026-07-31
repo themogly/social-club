@@ -2612,3 +2612,52 @@ so the confusing dead-end is gone. No prompt-60 regression: the flash surfaced; 
 **Screenshots:** dispensary over-tender-with-change and refused under-tender (light+dark, 1024/1440) could
 not be produced — no browser here; the flows are covered by `DispensaryTenderTest` (7 tests). Owner-authorised
 merge (standing "merge everything to main"). 608 green.
+
+---
+
+## Prompt 83 — eighth (3.5 g) pricing, including an eighth split across two strains
+
+The owner asked for "prices on 1/8s (3.5 g) each batch — they can split it between strains, calculate it
+in the background; only if both batches [have the] same price on 1/8s." There was no quantity-break pricing
+of any kind. Built it inside `ResolvePrice` (the single resolver) so the POS, receipt and any report get
+the eighth-aware total for free. The owner was unreachable, so the six model questions were answered with
+the most conservative reading and flagged as **OVERNIGHT-DEFAULT — CONFIRM**:
+
+1. **OVERNIGHT-DEFAULT — CONFIRM: only the eighth now, not a ladder.** One `price_per_eighth_cents` column,
+   the exact ask. A 1/4/1/2/oz ladder is a clean additive follow-up (more break columns, or a small
+   `price_breaks` table keyed by cg) — the resolver's grouping generalises to it. Not built speculatively.
+2. **OVERNIGHT-DEFAULT — CONFIRM: "same price" = identical `price_per_eighth_cents` on the GeneticPrice**
+   (per-strain, per-location; the tier row's if a tier applies, else base). The eighth price is a FLAT
+   quantity-break — it is NOT discount- or tier-percentage-adjusted (a bulk deal already). Member discounts
+   still apply to any sub-eighth per-gram remainder.
+3. **OVERNIGHT-DEFAULT — CONFIRM: differing eighth prices fall back to per-gram.** Lines group by eighth
+   price; two strains with different eighth prices land in different groups, neither reaches 3.5 g alone, so
+   both are per-gram. (The alternative — charge the higher/average — is a different product decision.)
+4. **OVERNIGHT-DEFAULT — CONFIRM: "at least 3.5 g".** A group of `G` cg is charged `floor(G/350)` eighths at
+   the eighth price PLUS the remainder (`G mod 350`) per gram. So 3.4 g (340 cg) < one eighth → all per-gram;
+   3.6 g → one eighth + 0.1 g per gram; 7 g → two eighths. All tested.
+5. **OVERNIGHT-DEFAULT — CONFIRM: any number of strains** may share one eighth (two is the common case; three
+   at ~1.17 g each is the same idea). The group is "all lines with the same eighth price".
+6. **OVERNIGHT-DEFAULT — CONFIRM: the price lives on `GeneticPrice`, not `Batch`.** "Each batch" was the
+   owner's word for the strain; prices already live per-genetic/per-location, and putting price on Batch would
+   fragment pricing across two models. A genuinely per-lot price is a much bigger change and was not built.
+
+**The rounding rule (explicit, per the prompt).** The eighth charge for a group = `eighths × E + round_half_up(minRate × remainderCg / 100)`, where `minRate` is the group's LOWEST effective (post-discount) per-gram
+rate — deterministic and member-favourable for the remainder. That group total is split across the group's
+lines proportional to grams by **largest-remainder**, so the per-line `line_total_cents` sum EXACTLY to the
+charged total with no cent lost or gained (asserted with a €29.99 eighth over a 117/233 cg split).
+
+**Where it lives + interactions.** All eighth arithmetic is in `ResolvePrice::applyEighthBreaks()` — the POS
+basket assembly and `CommitDispensation::buildLines()` both call it, so the shown total can never desync from
+the committed one (asserted end-to-end). The commit freezes the eighth into the line snapshot
+(`dispensation_lines.pricing_note = "Octavo (1/8)"`), which surfaces on the POS (a `1/8` badge) and the
+receipt. The price override (prompt 64) reduces from the eighth-aware resolved total (asserted: €30 eighth →
+€25 override, original €30 kept). The **daily limit is enforced on grams and is completely untouched** — a
+member at their 350 cg limit is still blocked at 360 cg regardless of pricing (asserted); eighth pricing is
+no route around the limit. `price_per_eighth_cents` is a RATE (plain int cents, like `price_per_gram_cents`),
+entered via a `_eur` edge field on the GeneticPrice form, written through `SaveGeneticPrice` (the single
+writer) and audited.
+
+**Screenshots:** the POS cross-strain eighth with the explanation + the receipt (light+dark) could not be
+produced — no browser here; covered by `EighthPricingTest` (9 tests). Owner-authorised merge (standing "merge
+everything to main"). 617 green.

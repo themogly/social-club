@@ -26,13 +26,14 @@ class GeneticPrice extends Model
 
     protected $fillable = [
         'organisation_id', 'genetic_id', 'location_id', 'tier_id',
-        'price_per_gram_cents', 'price_per_unit_cents', 'low_stock_threshold_cg', 'active',
+        'price_per_gram_cents', 'price_per_eighth_cents', 'price_per_unit_cents', 'low_stock_threshold_cg', 'active',
     ];
 
     protected function casts(): array
     {
         return [
             'price_per_gram_cents' => 'integer',   // rate, not an amount
+            'price_per_eighth_cents' => 'integer', // rate (per 3.5 g), not an amount
             'price_per_unit_cents' => 'integer',   // rate, not an amount
             'low_stock_threshold_cg' => 'integer',
             'active' => 'boolean',
