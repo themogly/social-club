@@ -2093,3 +2093,34 @@ Done in-session, not delegated (the reason it stalled before). Five pieces:
 
 538 green. Self-merge on green (batch 3 authorisation). **Batch 3 fully built (51, 53, 58, 54, 56, 55, 45).
 Remaining in batch 3: prompt 57 = recommendation only (no build).**
+
+---
+
+## Prompt 57 — configurable per-club terminology  —  `OVERNIGHT-DEFAULT — CONFIRM:` RECOMMENDATION: DO NOT BUILD
+
+Per the batch-3 instruction, prompt 57 is owner-decision-only — a recommendation, not a build. My
+recommendation is to **CUT it** (do not add configurable per-club terminology). Reasoning:
+
+1. **The vocabulary is legally load-bearing, not cosmetic.** `socio / aportación / contribución /
+   dispensación / aval / carencia / arqueo` is the exact wording that keeps the club inside the
+   non-profit, shared-cost, judicial-tolerance model. CLAUDE.md is explicit: never let "translate" slip
+   into commercial framing (customer/sale/profit), and the bar/merch ledger is deliberately kept on
+   *venta/ticket* wording so it can NEVER bleed into the cannabis side. A free-text, per-club terminology
+   override is precisely the mechanism by which a club could rename "aportación" → "precio/venta" and
+   quietly dismantle that posture — in the software the AEPD/inspection reads as the club's own record.
+   That is a compliance regression disguised as a preference.
+
+2. **The legitimate need is already met two ways.** (a) LANGUAGE differences are handled by the i18n
+   system — English + Spanish today, and a new locale is a reviewed `lang/*.json`, centrally controlled,
+   not a per-club free-text field. (b) "Our club calls its grades/tiers X" is already **user data**
+   (Category names, MembershipTier names) that is NOT routed through `__()` and shows verbatim — so a
+   club already names its own categories without any terminology framework.
+
+3. **YAGNI + the "simplest solution wins" rule.** A configurable-terminology layer is a framework nobody
+   has asked to use in a way the two mechanisms above don't already cover, and it carries real downside
+   (compliance, translation-key parity churn, testing surface).
+
+**Proposed decision (CONFIRM):** do not build prompt 57. If a real need surfaces, meet it with a new
+reviewed LOCALE, never a per-club commercial-framing override. If the owner still wants per-club wording,
+scope it narrowly to a whitelist of non-legal labels with the cannabis/non-profit terms LOCKED (the same
+lock pattern prompt 53 used for age/aforo) — but that is a deliberate, separate prompt, not this one.
