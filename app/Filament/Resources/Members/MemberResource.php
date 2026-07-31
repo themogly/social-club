@@ -13,6 +13,7 @@ use App\Filament\Resources\Members\Pages\EditMember;
 use App\Filament\Resources\Members\Pages\ListMembers;
 use App\Filament\Resources\Members\Pages\ViewMember;
 use App\Filament\Resources\Members\RelationManagers\ConsentsRelationManager;
+use App\Filament\Resources\Members\RelationManagers\DiscountsRelationManager;
 use App\Filament\Resources\Members\RelationManagers\DocumentsRelationManager;
 use App\Filament\Resources\Members\RelationManagers\MembershipsRelationManager;
 use App\Filament\Resources\Members\RelationManagers\WalletTransactionsRelationManager;
@@ -229,6 +230,7 @@ class MemberResource extends Resource
     {
         return [
             MembershipsRelationManager::class,
+            DiscountsRelationManager::class,
             WalletTransactionsRelationManager::class,
             DocumentsRelationManager::class,
             ConsentsRelationManager::class,
