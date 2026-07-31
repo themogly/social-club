@@ -2,6 +2,7 @@
 
 namespace App\Actions\Bar;
 
+use App\Actions\Pricing\ResolveArticleDiscount;
 use App\Actions\RecordAuditLog;
 use App\Actions\Stock\RecordStockMovement;
 use App\Actions\Wallet\RecordWalletTransaction;
@@ -119,6 +120,12 @@ class CommitOrder
         $total = 0;
         $items = [];
 
+        // The member's bar/merch discount (prompt 55) — resolved ONCE via the single resolver the bar POS
+        // also uses, so the charged total matches what the operator saw. Guests (no member) get 0.
+        $discounter = new ResolveArticleDiscount;
+        $member = isset($options['member_id']) ? Member::withoutGlobalScopes()->find($options['member_id']) : null;
+        $articleDiscountBp = $member !== null ? $discounter->bpFor($member, $location) : 0;
+
         foreach ($lines as $line) {
             $qty = max(1, (int) ($line['qty'] ?? 1));
 
@@ -131,7 +138,9 @@ class CommitOrder
                     ->firstOrFail();
 
                 $unit = $article->price_cents->cents;
-                $lineTotal = $unit * $qty; // integer count × integer cents — no rounding needed
+                $gross = $unit * $qty; // integer count × integer cents — no rounding
+                $discount = $discounter->discountCents($gross, $articleDiscountBp);
+                $lineTotal = $gross - $discount;
                 $total += $lineTotal;
 
                 // Single stock writer — locks the article row and refuses to oversell.
@@ -144,6 +153,7 @@ class CommitOrder
                     'name' => $article->name,
                     'unit_price_cents' => $unit,
                     'qty' => $qty,
+                    'discount_cents' => $discount,
                     'line_total_cents' => $lineTotal,
                     'reference' => null,
                 ];

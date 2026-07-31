@@ -4,6 +4,7 @@ namespace App\Livewire\Counter;
 
 use App\Actions\Bar\CommitOrder;
 use App\Actions\Bar\VoidOrder;
+use App\Actions\Pricing\ResolveArticleDiscount;
 use App\Enums\TillSessionStatus;
 use App\Exceptions\TillClosedException;
 use App\Livewire\Counter\Concerns\IdentifiesOperator;
@@ -618,6 +619,12 @@ class BarPos extends Component
             return [];
         }
 
+        // The attached member's article discount (prompt 55) — the SAME resolver CommitOrder uses, so the
+        // shown total equals the charged total. No member ⇒ no discount.
+        $member = $this->resolveMember();
+        $discounter = new ResolveArticleDiscount;
+        $discountBp = $member !== null ? $discounter->bpFor($member, $location) : 0;
+
         $rows = [];
 
         foreach ($this->basket as $index => $line) {
@@ -631,6 +638,8 @@ class BarPos extends Component
                 }
 
                 $unit = $article->price_cents->cents;
+                $gross = $unit * $qty;
+                $discount = $discounter->discountCents($gross, $discountBp);
 
                 $rows[] = [
                     'index' => $index,
@@ -638,7 +647,8 @@ class BarPos extends Component
                     'name' => $article->name,
                     'unit_cents' => $unit,
                     'qty' => $qty,
-                    'line_total_cents' => $unit * $qty,
+                    'discount_cents' => $discount,
+                    'line_total_cents' => $gross - $discount,
                     'reference' => null,
                     'stock' => (int) $article->stock,
                 ];
@@ -654,6 +664,7 @@ class BarPos extends Component
                 'name' => (string) ($line['description'] ?? ''),
                 'unit_cents' => $unit,
                 'qty' => $qty,
+                'discount_cents' => 0, // manual lines are never member-discounted
                 'line_total_cents' => $unit * $qty,
                 'reference' => (string) ($line['reference'] ?? ''),
                 'stock' => null,

@@ -93,6 +93,8 @@
                             {{ data_get($item, 'name') }}
                             @php $itemRef = data_get($item, 'reference'); @endphp
                             @if ($itemRef)<div class="ref">{{ $itemRef }}</div>@endif
+                            @php $itemDiscount = (int) data_get($item, 'discount_cents', 0); @endphp
+                            @if ($itemDiscount > 0)<div class="ref">{{ __('Descuento socio') }}: −{{ Money::fromCents($itemDiscount)->formatted() }}</div>@endif
                         </td>
                         <td class="num">{{ (int) data_get($item, 'qty', 0) }}</td>
                         <td class="num">{{ Money::fromCents((int) data_get($item, 'unit_price_cents', 0))->formatted() }}</td>
