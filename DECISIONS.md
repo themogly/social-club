@@ -2124,3 +2124,31 @@ recommendation is to **CUT it** (do not add configurable per-club terminology). 
 reviewed LOCALE, never a per-club commercial-framing override. If the owner still wants per-club wording,
 scope it narrowly to a whitelist of non-legal labels with the cannabis/non-profit terms LOCKED (the same
 lock pattern prompt 53 used for age/aforo) — but that is a deliberate, separate prompt, not this one.
+
+---
+
+## Prompt 67 — cash (not-from-till) expense option
+
+The admin `ExpenseForm` deliberately omitted `TILL_CASH` (petty cash is counter-only so the arqueo
+reconciles) — but that left NO way to record cash that never touched the drawer (a supplier paid on
+delivery, rent, a tradesman, the owner's pocket). Those were mis-recorded as "Other" or forced through a
+till they never went through.
+
+**Two kinds of cash, kept apart:**
+- **`TILL_CASH` (petty cash)** — unchanged: recorded at the counter (`RecordTillExpense` → `PETTY_CASH`
+  cash movement, requires an OPEN session), still NOT selectable in the admin form, and `RecordOverhead`
+  still throws if handed `TILL_CASH`.
+- **`CASH` (new case)** — selectable in the admin form, flows through `RecordOverhead` which NEVER writes
+  a cash movement or attaches a till session. Money out, recorded + reported, zero drawer implication.
+
+**Default decision:** the owner said expenses *should be* cash, so `CASH` is the **default** selection in
+the admin form (a click saved on the common path; cheap + reversible). The `ExpensesTable` `paid_from`
+column now renders `->label()` (was a no-default `match` that would have thrown `UnhandledMatchError` on
+the new case). `FinancialReport`'s `gastos` sums all expenses regardless of `paid_from`, so `CASH` appears
+automatically (tested). Approval thresholds / receipts / audit apply unchanged.
+
+**`OVERNIGHT-DEFAULT — CONFIRM:` flag (not built, per the prompt):** if most club spend is cash-from-the-
+owner's-pocket-then-reimbursed, that is a **liability to the owner**, not merely an expense — a different
+accounting shape (a payable that's later settled). It's cheap to model early and expensive to reconstruct
+at the accountant's. Recommend a future prompt add an optional "reimbursable / owed to <person>" flag on
+cash expenses; do NOT infer it from `CASH` alone. Owner to confirm whether to pursue.

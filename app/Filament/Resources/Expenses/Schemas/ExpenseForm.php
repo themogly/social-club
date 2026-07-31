@@ -35,14 +35,19 @@ class ExpenseForm
                             ->preload()
                             ->required(),
 
+                        // TILL_CASH is deliberately ABSENT: drawer spend is petty cash, recorded at the
+                        // counter (RecordTillExpense → PETTY_CASH movement) so the arqueo reconciles.
+                        // CASH here is cash that NEVER touched the till (supplier on delivery, rent, a
+                        // tradesman, owner's pocket) — money out, no drawer implication (prompt 67).
                         Select::make('paid_from')
                             ->label(__('Pagado desde'))
                             ->options([
+                                ExpensePaidFrom::CASH->value => __('Efectivo (fuera de caja)'),
                                 ExpensePaidFrom::BANK->value => __('Banco'),
                                 ExpensePaidFrom::CARD->value => __('Tarjeta'),
                                 ExpensePaidFrom::OTHER->value => __('Otro'),
                             ])
-                            ->default(ExpensePaidFrom::BANK->value)
+                            ->default(ExpensePaidFrom::CASH->value) // the club's normal case is cash (owner)
                             ->required(),
 
                         TextInput::make('amount_eur')

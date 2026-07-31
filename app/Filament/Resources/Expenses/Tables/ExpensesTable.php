@@ -46,12 +46,7 @@ class ExpensesTable
                     ->label(__('Pagado desde'))
                     ->badge()
                     ->color('gray')
-                    ->formatStateUsing(fn (ExpensePaidFrom $state): string => match ($state) {
-                        ExpensePaidFrom::TILL_CASH => __('Caja'),
-                        ExpensePaidFrom::BANK => __('Banco'),
-                        ExpensePaidFrom::CARD => __('Tarjeta'),
-                        ExpensePaidFrom::OTHER => __('Otro'),
-                    }),
+                    ->formatStateUsing(fn (ExpensePaidFrom $state): string => $state->label()),
                 TextColumn::make('location.name')->label(__('Sede'))->placeholder('—')->toggleable(),
                 TextColumn::make('approval')
                     ->label(__('Aprobación'))
