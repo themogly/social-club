@@ -6,6 +6,7 @@ use App\Actions\RecordAuditLog;
 use App\Enums\SettingType;
 use App\Support\Settings;
 use BackedEnum;
+use Filament\Forms\Components\CheckboxList;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
@@ -61,7 +62,14 @@ class ManageSettings extends Page
         'data_retention_days' => SettingType::INT,
         'audit_retention_days' => SettingType::INT,
         'signed_url_ttl_seconds' => SettingType::INT,
+        // Locale (prompt 44) — actively read by ResolveLocale / LocaleSwitcher / SetLocale, but had
+        // no admin UI until now. enabled_locales is an array (JSON); default_locale a plain string.
+        'default_locale' => SettingType::STRING,
+        'enabled_locales' => SettingType::JSON,
     ];
+
+    /** The locales the platform ships translations for (prompt 19). */
+    private const LOCALE_OPTIONS = ['es' => 'Español', 'en' => 'English'];
 
     public static function getNavigationLabel(): string
     {
@@ -101,6 +109,23 @@ class ManageSettings extends Page
                         TextInput::make('member_number_prefix')->label(__('Prefijo de nº de socio'))->maxLength(8),
                         TextInput::make('member_number_padding')->label(__('Dígitos del nº de socio'))
                             ->numeric()->minValue(1)->maxValue(10)->required(),
+                    ])->columns(3),
+
+                Section::make(__('Idioma y gobernanza'))
+                    ->description(__('Idiomas disponibles y el umbral de quórum para las actas.'))
+                    ->schema([
+                        Select::make('default_locale')
+                            ->label(__('Idioma por defecto'))
+                            ->options(self::LOCALE_OPTIONS)
+                            ->required(),
+                        CheckboxList::make('enabled_locales')
+                            ->label(__('Idiomas disponibles'))
+                            ->options(self::LOCALE_OPTIONS)
+                            ->required(),
+                        TextInput::make('minute_quorum_fraction_pct')
+                            ->label(__('Quórum de actas (%)'))
+                            ->numeric()->minValue(1)->maxValue(100)->required()
+                            ->helperText(__('% de socios activos necesario para el quórum de una asamblea.')),
                     ])->columns(3),
 
                 Section::make(__('Cumplimiento'))
@@ -217,6 +242,9 @@ class ManageSettings extends Page
         Settings::set('arqueo_variance_tolerance_cents', (int) round_half_up(((float) ($state['arqueo_variance_tolerance_eur'] ?? 0)) * 100), SettingType::CENTS);
         Settings::set('expense_approval_threshold_cents', (int) round_half_up(((float) ($state['expense_approval_threshold_eur'] ?? 0)) * 100), SettingType::CENTS);
 
+        // Quórum shown as a percentage at the edge, stored as basis points (50% → 5000 bp).
+        Settings::set('minute_quorum_fraction_bp', (int) round_half_up(((float) ($state['minute_quorum_fraction_pct'] ?? 0)) * 100), SettingType::BP);
+
         (new RecordAuditLog)->handle('settings.updated', null, $before, $this->currentValues());
 
         Notification::make()->title(__('Ajustes guardados'))->success()->send();
@@ -237,6 +265,7 @@ class ManageSettings extends Page
         $values['wallet_door_debt_threshold_eur'] = ((int) Settings::get('wallet_door_debt_threshold_cents')) / 100;
         $values['arqueo_variance_tolerance_eur'] = ((int) Settings::get('arqueo_variance_tolerance_cents')) / 100;
         $values['expense_approval_threshold_eur'] = ((int) Settings::get('expense_approval_threshold_cents')) / 100;
+        $values['minute_quorum_fraction_pct'] = ((int) Settings::get('minute_quorum_fraction_bp')) / 100;
 
         return $values;
     }

@@ -68,9 +68,13 @@ class Settings
         // Discounts
         'discounts_stack' => false,
 
-        // Dispensary POS
-        'pos_require_checked_in' => false,  // only dispense to members checked in at the door
-        'pos_signature_required' => false,  // capture an on-screen signature per withdrawal (acta-grade)
+        // Dispensary POS — PER LOCATION (prompt 44). These are the keys the LocationForm toggles
+        // write, and are now what DispensaryPos actually enforces: a busy front-of-house sede can
+        // require door check-in / a signature while a small quiet one need not. `Settings::get`
+        // resolves the active location first, so a location override wins, else org, else this default.
+        // (Replaces the org-wide pos_require_checked_in / pos_signature_required, which no UI ever wrote.)
+        'restrict_pos_to_checked_in' => false,  // only dispense to members checked in at the door
+        'signature_on_dispensation' => false,   // capture an on-screen signature per withdrawal (acta-grade)
 
         // Counter scanning (per location) — opt-in camera QR at the door + POS. OFF by default:
         // camera access is a deliberate per-premises choice; the keyboard-wedge scanner + name

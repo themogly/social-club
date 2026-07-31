@@ -158,14 +158,17 @@ class DebtAndLocationSettingsTest extends TestCase
         $scalars = (new ReflectionClass(ManageSettings::class))->getConstant('SCALARS');
         $editable = array_keys(is_array($scalars) ? $scalars : []);
 
-        // Money/weight values are edited via *_eur / *_g virtual fields → cover their stored keys.
-        $edgeCovered = ['daily_limit_cg', 'monthly_limit_cg', 'wallet_debt_limit_cents', 'wallet_door_debt_threshold_cents', 'arqueo_variance_tolerance_cents', 'expense_approval_threshold_cents'];
+        // Money/weight/percent values edited via *_eur / *_g / *_pct virtual fields → cover their stored keys.
+        // minute_quorum_fraction_bp is entered as a percentage (prompt 44).
+        $edgeCovered = ['daily_limit_cg', 'monthly_limit_cg', 'wallet_debt_limit_cents', 'wallet_door_debt_threshold_cents', 'arqueo_variance_tolerance_cents', 'expense_approval_threshold_cents', 'minute_quorum_fraction_bp'];
 
         // Deliberately NOT on the org settings form (documented in DECISIONS): the enforcement
         // matrix (its own editor), per-location settings, and system/compliance constants.
-        $excluded = ['enforcement', 'aforo_default', 'aforo_enforcement', 'enabled_locales', 'default_locale', 'data_retention_days', 'audit_retention_days', 'signed_url_ttl_seconds', 'consent_text_version', 'minute_quorum_fraction_bp', 'heartbeat_stale_seconds', 'monthly_window', 'pos_require_checked_in', 'pos_signature_required',
-            // Per-location counter setting, edited on LocationForm (not the org page): opt-in camera QR (prompt 35).
-            'camera_scan_enabled',
+        // (default_locale + enabled_locales are now ON the form — prompt 44 — so they left this list.)
+        $excluded = ['enforcement', 'aforo_default', 'aforo_enforcement', 'data_retention_days', 'audit_retention_days', 'signed_url_ttl_seconds', 'consent_text_version', 'heartbeat_stale_seconds', 'monthly_window',
+            // Per-location counter settings, edited on each LocationForm (not the org page): the POS
+            // check-in / signature requirements (prompt 44 — now genuinely per-location) + camera QR (prompt 35).
+            'restrict_pos_to_checked_in', 'signature_on_dispensation', 'camera_scan_enabled',
             // Documented in DECISIONS: forecast_options_g is a preset ARRAY (a tags/repeater
             // input is a later enhancement); low_stock_threshold_cg is a fallback — the operative
             // low-stock threshold is set per-article on the Article resource.

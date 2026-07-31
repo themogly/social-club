@@ -1556,3 +1556,28 @@ Tests: list org+location scoped (wrong-sede hidden); viewAny denied without perm
 its void audit; the member tab shows only that member's orders; report aggregation + the FinancialReport
 reconciliation + voided/other-location exclusion. Owner-authorised merge. 442 green. Screenshots (resource/
 relation-manager/report, light+dark) pending — no browser.
+
+## Prompt 44 — settings coverage audit (continues prompts 24 + 34)
+
+`camera_scan_enabled` confirmed fine (per-location, on LocationForm — prompt 35). The audit surfaced real gaps:
+
+- **`pos_require_checked_in` / `pos_signature_required` — DEAD-TOGGLE bug, resolved via OPTION A
+  (per-location).** DispensaryPos read two org-wide keys no UI ever wrote; the LocationForm's
+  `restrict_pos_to_checked_in` / `signature_on_dispensation` toggles (built prompt 03) were read by nobody.
+  Chose per-location: those toggles already exist, the app already has a per-location settings pattern
+  (camera_scan_enabled, ring_fenced), and a multi-location club plausibly varies this by premises (a busy
+  front-of-house may require door check-in; a small quiet sede may not). DispensaryPos now reads
+  `signature_on_dispensation` / `restrict_pos_to_checked_in` (Settings::get resolves the active location
+  first); the two org-wide `pos_*` DEFAULTS are retired. Exactly one setting per behaviour, genuinely read
+  + editable. Tested end-to-end: toggling the location setting flips the enforced behaviour.
+- **`aforo_default` — WIRED (was zero-consumer).** Now seeds a new Location's `capacity` default on
+  CreateLocation (its evident intent); editable per sede. Tested.
+- **`enabled_locales` / `default_locale` / `minute_quorum_fraction_bp` — now admin-editable** on
+  ManageSettings (a locale multi-select + default-locale select + a quórum % edge field → basis points,
+  like the `_eur`/`_g` pattern). Already READ by ResolveLocale / CreateMinute; the UI writes the SAME keys
+  those consumers read (no second computation) — tested: saving flips ResolveLocale's result, stores 60% as 6000 bp.
+- **Left alone (correctly deferred):** `forecast_options_g` (needs a tags/repeater — later);
+  `consent_text_version` (read-only badge; bumping a legal consent version should be a deliberate audited
+  action, not a casual settings edit — recommend a dedicated action if ever needed, not built here).
+
+Owner-authorised merge. 447 green. Screenshots (global settings + Location form, light/dark) pending — no browser.
