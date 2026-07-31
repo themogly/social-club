@@ -54,6 +54,10 @@
                     </div>
                 </form>
 
+                @if ($cameraScanEnabled)
+                    <x-counter.camera-scan />
+                @endif
+
                 <div class="mt-4">
                     <label for="search" class="block text-sm font-medium text-ink-muted dark:text-slate-400">{{ __('o busca por nombre / nº de socio') }}</label>
                     <input

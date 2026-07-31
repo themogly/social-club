@@ -1421,3 +1421,30 @@ in `chore/design-audit-fixes` @ 38c0e40 — not re-done). Outstanding items buil
 Owner-authorised merge. 417 tests green (Pint + Larastan L6 clean; EN/ES parity). **VISUAL VERIFICATION
 PENDING** (built blind — no browser): the socio button restyle, counter flash/offline/heatmap a11y, and the
 empty states want a screenshot pass across widths + light/dark.
+
+## Prompt 35 — camera QR scanning: check-in + dispensary POS (built fresh)
+
+Built the shared camera scanner the prompt-22/28 skip had left absent (OVERNIGHT-LOG). Design: a
+PROGRESSIVE ENHANCEMENT over the existing wedge scanner + name search — it never gates identification, so
+a missing/denied camera can't block the counter.
+
+- **Per-location opt-in.** `camera_scan_enabled` added to `Settings::DEFAULTS` (false) — the LocationForm
+  toggle (present since prompt 03 but reading nothing) now drives it. Excluded from the org settings page
+  (it's per-location; documented in the settings completeness test).
+- **Shared component.** `resources/views/components/counter/camera-scan.blade.php` + the `cameraScan`
+  Alpine behaviour in `resources/js/app.js` (previously empty). Native **BarcodeDetector** on capable
+  browsers (Chrome/Edge/Android); where the API is absent the trigger hides itself (`supported = false`)
+  and the manual inputs remain. getUserMedia rear camera; the stream + scan loop are torn down on close,
+  decode and `livewire:navigating` (camera released, no leak). Reuses `<x-button>`.
+- **Same server lookup.** A decoded QR calls `$wire.submitCameraScan(token)` on BOTH screens, which sets
+  `$scan` and delegates to the existing `submitScan()` → `ResolveMemberByToken` (QR_CARD token, sha256
+  hash). One lookup path; no id in the payload.
+- **Wired into** the check-in door + the dispensary POS Identify step, each `@if($cameraScanEnabled)`.
+
+Verifiable here: the gate, the trigger's presence/absence, the token→member wiring (tests), and that the
+bundle compiles (`npm run build`). NOT verifiable headless (owner verifies on a device): the live camera
+decode. DEFERRED + documented: a pure-JS **jsQR bundled fallback** for Safari/Firefox/iPad (needs `npm i
+jsqr` + a browser to add & verify) — until then those browsers fall back to manual entry. Camera access
+needs a secure context (HTTPS/localhost) in production.
+
+Owner-authorised merge. 421 tests green (Pint + Larastan L6 clean; EN/ES parity; Vite build OK).
