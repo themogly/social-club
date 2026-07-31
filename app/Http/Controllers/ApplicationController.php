@@ -7,6 +7,7 @@ use App\Enums\MemberStatus;
 use App\Http\Requests\SubmitApplicationRequest;
 use App\Models\Member;
 use App\Models\MemberApplication;
+use App\Support\ApplicationSpamGuard;
 use App\Support\Weight;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\View\View;
@@ -46,6 +47,7 @@ class ApplicationController extends Controller
             'token' => $token,
             'application' => $application,
             'payload' => $application->payload ?? [],
+            'formToken' => ApplicationSpamGuard::issueToken(),
         ]);
     }
 
@@ -56,6 +58,13 @@ class ApplicationController extends Controller
         // Refuse a revoked / expired / decided invite — never write against a dead link.
         if ($application === null || ! $application->isInviteLive()) {
             abort(404);
+        }
+
+        // Spam mitigation on top of the route rate limit: a filled honeypot or an
+        // impossibly-fast submit is discarded SILENTLY (identical thank-you response),
+        // so an automated submitter never learns its rows aren't landing.
+        if (ApplicationSpamGuard::looksAutomated($request)) {
+            return $this->submittedRedirect($token);
         }
 
         $data = $request->validated();
@@ -80,6 +89,12 @@ class ApplicationController extends Controller
         // Still PENDING — it now carries the applicant's details and enters the review queue.
         $application->update(['payload' => $payload, 'submitted_at' => now()]);
 
+        return $this->submittedRedirect($token);
+    }
+
+    /** The post-submit redirect — byte-identical for a genuine submit and a silently-dropped bot. */
+    private function submittedRedirect(string $token): RedirectResponse
+    {
         return redirect()
             ->route('socio.application', ['token' => $token])
             ->with('status', __('¡Gracias! Hemos recibido tu solicitud. La asociación la revisará y te avisará por correo.'));

@@ -1367,3 +1367,25 @@ wired ones behave. Owner-authorised merge. 402 tests green.
   explicit `(int)` — NOT a WeightCast bug to "fix".
 
 Owner-authorised merge. 405 tests green (Pint + Larastan L6 clean).
+
+## Prompt 38 — low-severity hardening: application spam protection, CSP/HSTS
+
+- **Application spam mitigation (honeypot + minimum submit time), SILENT.** The one unauthenticated form
+  (invite → pre-registration) had only `throttle:10,1`. Added `App\Support\ApplicationSpamGuard`: a honeypot
+  field (`website`, hidden from humans) + a signed render timestamp (`form_started_at`, Crypt-encrypted so
+  it can't be forged). A filled honeypot, a submit faster than `MIN_SECONDS = 3`, or a missing/tampered
+  token is discarded SILENTLY — the automated client gets the byte-identical thank-you redirect and nothing
+  enters the review queue. Runs after validation, before the write. Chosen over a CAPTCHA (no third-party
+  JS/secret; the form is legally non-public) and over a visible error (which would teach a bot how to pass).
+  Tests: honeypot / too-fast / tampered all dropped; a human-paced valid submit still stores.
+- **CSP report-only by default.** `config/security.php` holds the policy; `SecurityHeaders` sends it as
+  `Content-Security-Policy-Report-Only` until `CSP_ENFORCE=true` flips it to enforcing. Permissive by
+  necessity (`script-src` allows `'unsafe-inline' 'unsafe-eval'` — Alpine/Filament need eval) but still
+  blocks external/injected scripts, framing, and base-uri / form-action hijacking. Report-only first is the
+  conservative rollout: a too-tight policy is observed, not breaking, before it is enforced. No report-uri
+  collector yet (documented follow-up).
+- **HSTS production + HTTPS only, no preload.** Sent only when `app()->environment('production')` AND
+  `$request->isSecure()`, so a dev machine can't get pinned to HTTPS. `preload` deliberately omitted (an
+  effectively irreversible public commitment). `hsts_max_age` configurable (default 1 year).
+
+Owner-authorised merge. 412 tests green (Pint + Larastan L6 clean). No migration → MySQL parity N/A.
