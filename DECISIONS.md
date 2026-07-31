@@ -1821,3 +1821,24 @@ manager-level wallet mutation, same tier as the adjust it sits beside). Mandator
 server-side guard that it never transfers more than the source credit (a "transfer of credit" must not
 manufacture debt at source). Denial test: STAFF (no `wallet.adjust`) cannot see the action. 491 green.
 Self-merge on green (batch 2 authorisation).
+
+---
+
+## Batch 2·3 — Prompt 52: member history + RGPD pack include bar orders + visits
+
+Three surfaces omitted bar/merch **orders** and check-in **visits**: the admin RGPD data pack
+(`ExportMemberData`), the member's own PWA self-export (`PwaController::export`), and the PWA history
+page. All three now include both (`Member::orders()`/`checkIns()` already existed — prompt 43/earlier —
+so nothing re-declared). History gained a **Barra** and a **Visitas** section in the existing card style.
+
+**The erasure finding (what the prompt asked me to check — and it contradicts the worry):** I verified
+`AnonymiseMember` does NOT have the same omission, and the reason is a distinction worth stating. The
+export gap was a **portability** gap (RGPD Art. 20 — giving the member their data); erasure (Art. 17) is
+a different right. `CheckIn` carries NO standalone PII (only member/location/operator refs + timestamps +
+method) and `Order` carries only a member_id reference plus operator-entered operational free-text — so
+scrubbing the member ROW, where every personal field lives, erases the member from both. They are KEPT
+attributed to the anonymised record (exactly like dispensations/wallet/till — the books stay whole),
+which is correct, not a leak: a visit by "ANONIMIZADO Socio ab12cd34" reveals nothing. Documented this in
+`AnonymiseMember`'s docblock and pinned it with a test. **So: an export missing a record type ≠ erasure
+missing it; here only the export was wrong.** (The ID/photo FILES, which ARE PII, were already deleted by
+erasure — that path is untouched and still correct.) 495 green. Self-merge on green (batch 2 authorisation).

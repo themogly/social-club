@@ -31,6 +31,23 @@ class ExportMemberData
                     'total_cents' => $d->total_cents?->cents,
                     'status' => $d->status->value,
                 ])->all(),
+            // Bar/merch purchases + attendance are data the club holds on the member — a portability
+            // pack (RGPD Art. 20) must include them, not only the cannabis ledger.
+            'orders' => $member->orders()->withoutGlobalScopes()->get()
+                ->map(fn ($o) => [
+                    'id' => $o->id,
+                    'created_at' => $o->created_at,
+                    'total_cents' => $o->total_cents?->cents,
+                    'status' => $o->status->value,
+                    'items' => $o->items,
+                ])->all(),
+            'visits' => $member->checkIns()->withoutGlobalScopes()->get()
+                ->map(fn ($c) => [
+                    'checked_in_at' => $c->checked_in_at,
+                    'checked_out_at' => $c->checked_out_at,
+                    'location_id' => $c->location_id,
+                    'method' => $c->method->value,
+                ])->all(),
             'wallet' => $member->walletTransactions()->withoutGlobalScopes()->get()
                 ->map(fn ($t) => [
                     'created_at' => $t->created_at,
