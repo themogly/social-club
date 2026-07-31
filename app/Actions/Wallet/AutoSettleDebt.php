@@ -15,18 +15,20 @@ use App\Support\Wallet;
  */
 class AutoSettleDebt
 {
-    public function handle(Member $member, Location $creditLocation): void
+    /** @return int total cents moved to clear debt (0 if nothing settled). */
+    public function handle(Member $member, Location $creditLocation): int
     {
         if (self::isRingFenced($creditLocation)) {
-            return;
+            return 0;
         }
 
         $available = Wallet::balance($member->id, $creditLocation->id);
         if ($available <= 0) {
-            return;
+            return 0;
         }
 
         $transfer = new TransferCredit;
+        $settledTotal = 0;
 
         $others = Location::query()->withoutGlobalScopes()
             ->where('organisation_id', $member->organisation_id)
@@ -49,7 +51,10 @@ class AutoSettleDebt
             $settle = min($available, -$debt);
             $transfer->handle($member, $creditLocation, $location, $settle, 'Liquidación automática de deuda');
             $available -= $settle;
+            $settledTotal += $settle;
         }
+
+        return $settledTotal;
     }
 
     public static function isRingFenced(Location $location): bool

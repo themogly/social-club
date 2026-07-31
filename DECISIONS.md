@@ -1787,3 +1787,37 @@ on-page H1. All seven report tabs corrected in one place.
 **Left untouched (per prompt):** the broken avatar image beside the ES/EN switcher — that is prompt 61's
 (the ui-avatars.com outbound call), not a cosmetic patch. 484 green. Screenshots pending — no browser.
 Self-merge on green (batch 2 authorisation).
+
+---
+
+## Batch 2·2 — Prompt 49: wallet cross-location auto-settlement (dead code wired up)
+
+`AutoSettleDebt` + `TransferCredit` existed with a ring-fence test but ZERO production callers — credit
+at one sede never cleared debt at another, and there was no manual transfer either. Wired both up.
+
+**Chose the scheduled nightly sweep over a writer-hook (per prompt).** New command
+`wallet:settle-cross-location` (`SettleCrossLocationWallets`), scheduled `dailyAt('03:30')`. Per org it
+reads a raw per-(member, location) balance aggregate and, for each member holding credit at one unfenced
+sede and debt at another, calls the existing `AutoSettleDebt`. Lower risk than a hook: no re-entrancy,
+and it reads LIVE balances so a retry/double-fire settles nothing extra (idempotent — tested).
+
+**Subtle correctness point (the "contradicts the prompt" find):** ring-fencing is a per-location
+`Setting`, and `Settings::get` resolves the location override THROUGH the active organisation scope.
+The scheduler has NO ambient scope, so the command MUST `ActiveScope::setOrganisation($org->id)` before
+any `AutoSettleDebt` call — otherwise `ring_fenced` falls back to its default (`false`) and a fenced
+sede would be wrongly auto-settled. The ring-fence test clears the org scope before invoking the command
+precisely to guard this; without the `setOrganisation` call it fails. Anyone wiring another console job
+that reads a per-location Setting must do the same.
+
+**Audit** — placed in `TransferCredit` (inside its transaction, prompt-48 style) as `wallet.transferred`
+recording from/to/amount/reason, so it covers BOTH the sweep and the manual action with the actor coming
+from the audit log's `actor_id` (null for the system sweep, the manager for a manual transfer).
+`AutoSettleDebt::handle` now returns the cents settled (was `void`) for the sweep's summary line; the
+existing ring-fence test ignores the return, so it stayed green.
+
+**Manual transfer action** — `transferAction()` on `WalletTransactionsRelationManager`, gated on
+`wallet.adjust` (manager+; reused rather than a new permission — a cross-location transfer is a
+manager-level wallet mutation, same tier as the adjust it sits beside). Mandatory reason, from≠to, and a
+server-side guard that it never transfers more than the source credit (a "transfer of credit" must not
+manufacture debt at source). Denial test: STAFF (no `wallet.adjust`) cannot see the action. 491 green.
+Self-merge on green (batch 2 authorisation).

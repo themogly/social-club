@@ -3,12 +3,14 @@
 namespace App\Filament\Resources\Members\RelationManagers;
 
 use App\Actions\Wallet\RecordWalletTransaction;
+use App\Actions\Wallet\TransferCredit;
 use App\Enums\WalletTransactionType;
 use App\Exceptions\DebtLimitExceededException;
 use App\Models\Location;
 use App\Models\Member;
 use App\Models\Scopes\LocationScope;
 use App\Models\WalletTransaction;
+use App\Support\Wallet;
 use Filament\Actions\Action;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
@@ -55,6 +57,7 @@ class WalletTransactionsRelationManager extends RelationManager
                 $this->topUpAction(),
                 $this->refundAction(),
                 $this->adjustAction(),
+                $this->transferAction(),
             ])
             ->emptyStateHeading(__('Sin movimientos'))
             ->emptyStateDescription(__('El monedero del socio no tiene movimientos. Registra un ingreso con el botón de arriba.'));
@@ -158,6 +161,57 @@ class WalletTransactionsRelationManager extends RelationManager
                 } catch (DebtLimitExceededException $e) {
                     Notification::make()->title(__('No se pudo registrar el ajuste'))->body($e->getMessage())->danger()->send();
                 }
+            });
+    }
+
+    /**
+     * Transferir saldo — move a member's credit from one sede to another (a recorded TRANSFER_OUT/IN
+     * pair via the single writer). The manual counterpart to the nightly auto-settlement sweep, and the
+     * ONLY way credit crosses a ring-fenced sede. Gated on wallet.adjust (manager+), reason mandatory.
+     */
+    protected function transferAction(): Action
+    {
+        return Action::make('transfer')
+            ->label(__('Transferir saldo'))
+            ->icon(Heroicon::OutlinedArrowsRightLeft)
+            ->color('primary')
+            ->visible(fn (): bool => Auth::user()?->can('wallet.adjust') ?? false)
+            ->schema([
+                Select::make('from_location_id')
+                    ->label(__('Desde la sede'))
+                    ->options(fn () => Location::query()->orderBy('name')->pluck('name', 'id'))
+                    ->required(),
+                Select::make('to_location_id')
+                    ->label(__('Hacia la sede'))
+                    ->options(fn () => Location::query()->orderBy('name')->pluck('name', 'id'))
+                    ->different('from_location_id')
+                    ->required(),
+                TextInput::make('amount_eur')
+                    ->label(__('Importe (€)'))
+                    ->numeric()
+                    ->minValue(0.01)
+                    ->required(),
+                Textarea::make('reason')
+                    ->label(__('Motivo'))
+                    ->required(),
+            ])
+            ->action(function (array $data): void {
+                /** @var Member $member */
+                $member = $this->getOwnerRecord();
+                $from = Location::query()->whereKey($data['from_location_id'])->firstOrFail();
+                $to = Location::query()->whereKey($data['to_location_id'])->firstOrFail();
+                $cents = (int) round_half_up(((float) $data['amount_eur']) * 100);
+
+                // A "transfer of credit" must not manufacture debt at the source — cap at available credit.
+                if ($cents > max(0, Wallet::balance($member->id, $from->id))) {
+                    Notification::make()->title(__('No hay saldo suficiente en la sede de origen.'))->danger()->send();
+
+                    return;
+                }
+
+                (new TransferCredit)->handle($member, $from, $to, $cents, (string) $data['reason']);
+
+                Notification::make()->title(__('Transferencia registrada'))->success()->send();
             });
     }
 

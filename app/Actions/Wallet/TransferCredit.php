@@ -2,6 +2,7 @@
 
 namespace App\Actions\Wallet;
 
+use App\Actions\RecordAuditLog;
 use App\Enums\WalletTransactionType;
 use App\Models\Location;
 use App\Models\Member;
@@ -35,6 +36,15 @@ class TransferCredit
             ]);
 
             $out->update(['transfer_pair_id' => $in->id]);
+
+            // Audit the cross-location move (prompt 48 placement — inside the same transaction). Covers
+            // both the nightly auto-settlement sweep and a manual transfer; the reason distinguishes them.
+            (new RecordAuditLog)->handle('wallet.transferred', $member, null, [
+                'from_location_id' => $from->id,
+                'to_location_id' => $to->id,
+                'amount_cents' => $amountCents,
+                'reason' => $reason,
+            ]);
 
             return [$out, $in];
         });
