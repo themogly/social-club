@@ -1448,3 +1448,41 @@ jsqr` + a browser to add & verify) — until then those browsers fall back to ma
 needs a secure context (HTTPS/localhost) in production.
 
 Owner-authorised merge. 421 tests green (Pint + Larastan L6 clean; EN/ES parity; Vite build OK).
+
+## Prompt 40 — audit log viewer: formatted, plain-language changes
+
+The audit entry viewer (`AuditLogInfolist::diffHtml`) rendered raw JSON cents/cg + snake_case column
+names. It now renders each changed field via two generic classes, reusing what's already defined
+elsewhere in the panel — no second labeling/formatting registry:
+
+- **`App\Support\AuditFieldFormatter::format(?model, key, value)`** — value → the same display string the
+  field shows anywhere else: money (euros), weight (grams), enum `->getLabel()`, dates (`d/m/Y`), Yes/No.
+- **`App\Support\AuditFieldLabeler::label(?model, key)`** — field → its real Filament label, searched
+  Table → Infolist → Form (first exact name match), reusing the resource's own translated labels.
+  Settings (`settings.updated`, null model) resolves from `ManageSettings::form()`. A field with no home
+  (e.g. `members.imported`'s synthetic summary keys) → `Str::headline()` + a `Log::warning` deduped per
+  (model, field) per request so a real label can be added later.
+
+**Decision — format from the column-name SUFFIX, not the Eloquent cast (cast check only as a secondary).**
+`Member::declared_monthly_cg` (and the tier limit columns) are cast plain `integer`, NOT `WeightCast` —
+grams conversion is done by hand at the page edge (`MemberInfolist` etc.). A cast-first formatter would
+print those `_cg` fields as raw integers, silently breaking the spec's own primary weight case. The
+`*_cents`/`*_cg` suffix is the reliable signal precisely because CLAUDE.md makes it a non-negotiable
+naming convention. The settings `*_eur`/`*_g` keys are ALREADY display units and DON'T end `_cents`/`_cg`,
+so the suffix rule correctly leaves them alone (re-dividing would corrupt the figure, not no-op). A
+secondary check still formats a genuine MoneyCast/WeightCast column that somehow lacked the suffix.
+
+**Label resolution needs a live owner.** `Schema::make(null)` throws in `getLivewire()`; the resource's
+own List page (both HasTable and HasSchemas, whose mount/boot never runs) is used as the owner to build
+the table/infolist/form component trees with zero DB hits. The model→resource map is built from
+`Filament::getCurrentPanel() ?? getPanel('admin')` → `getResources()` → `getModel()`, memoised per request.
+
+**Raw JSON demoted, not removed** — the before/after `<pre>` blocks (still escaped, `e()` throughout —
+audit payloads are attacker-influenced) now sit inside a native, collapsed `<details>` (no JS, no dependency).
+
+Tested: till-close cents → euros; `declared_monthly_cg` → grams (the non-WeightCast case) matching
+`MemberInfolist`; enum → label; settings null-model with `_eur`/`_g` kept as-is; collapsed `<details>`;
+generalises across TillSession/Member/Expense; unlabeled field → headline + logged once. 428 green.
+Owner-authorised merge (the prompt's default "do not merge" overridden by the owner, who is the reviewer).
+**VISUAL VERIFICATION STILL PENDING** (no browser here): before/after screenshots of an audit entry across
+two model types, light + dark.

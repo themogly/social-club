@@ -3,9 +3,12 @@
 namespace App\Filament\Resources\AuditLogs\Schemas;
 
 use App\Models\AuditLog;
+use App\Support\AuditFieldFormatter;
+use App\Support\AuditFieldLabeler;
 use Filament\Infolists\Components\TextEntry;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Schema;
+use Illuminate\Database\Eloquent\Relations\Relation;
 
 /**
  * A single audit entry, read-only, with a computed before/after diff. Changed keys are
@@ -45,22 +48,24 @@ class AuditLogInfolist
             ]);
     }
 
-    /** The computed diff plus the raw before/after payloads, as escaped HTML. */
+    /** The computed diff (plain-language labels + formatted values) plus the raw payloads, escaped. */
     private static function diffHtml(AuditLog $record): string
     {
         $before = is_array($record->before) ? $record->before : [];
         $after = is_array($record->after) ? $record->after : [];
+        $modelClass = self::modelClass($record);
 
         $keys = array_values(array_unique([...array_keys($before), ...array_keys($after)]));
         $rows = [];
         foreach ($keys as $key) {
-            $old = self::scalarise($before[$key] ?? null);
-            $new = self::scalarise($after[$key] ?? null);
+            $key = (string) $key;
+            $old = AuditFieldFormatter::format($modelClass, $key, $before[$key] ?? null);
+            $new = AuditFieldFormatter::format($modelClass, $key, $after[$key] ?? null);
             if ($old === $new) {
                 continue;
             }
             $rows[] = '<tr>'
-                .'<td style="padding:2px 10px 2px 0;font-weight:600;">'.e((string) $key).'</td>'
+                .'<td style="padding:2px 10px 2px 0;font-weight:600;">'.e(AuditFieldLabeler::label($modelClass, $key)).'</td>'
                 .'<td style="padding:2px 10px;color:#dc2626;text-decoration:line-through;">'.e($old).'</td>'
                 .'<td style="padding:2px 10px;color:#16a34a;">'.e($new).'</td>'
                 .'</tr>';
@@ -74,11 +79,28 @@ class AuditLogInfolist
                 .'<th style="text-align:left;padding:0 10px;">'.e(__('Después')).'</th>'
                 .'</tr></thead><tbody>'.implode('', $rows).'</tbody></table>';
 
+        // The raw before/after JSON is DEMOTED (not removed) into a native, collapsed <details> —
+        // available for forensics, out of the way by default. No JS/Alpine, no new dependency.
         return $diff
-            .'<div style="display:flex;gap:1rem;flex-wrap:wrap;margin-top:1rem;">'
+            .'<details style="margin-top:1rem;">'
+            .'<summary style="cursor:pointer;color:#475569;font-size:.8rem;">'.e(__('Ver datos sin procesar')).'</summary>'
+            .'<div style="display:flex;gap:1rem;flex-wrap:wrap;margin-top:.5rem;">'
             .self::payloadBlock(__('Antes'), $before)
             .self::payloadBlock(__('Después'), $after)
-            .'</div>';
+            .'</div>'
+            .'</details>';
+    }
+
+    /** The audited model's FQCN (resolving a morph alias if one is in use); null for settings/imports. */
+    private static function modelClass(AuditLog $record): ?string
+    {
+        $type = $record->auditable_type;
+
+        if ($type === null || $type === '') {
+            return null;
+        }
+
+        return class_exists($type) ? $type : (Relation::getMorphedModel($type) ?? $type);
     }
 
     /**
@@ -94,22 +116,5 @@ class AuditLogInfolist
             .'<div style="font-size:.7rem;text-transform:uppercase;letter-spacing:.04em;color:#475569;margin-bottom:.25rem;">'.e($title).'</div>'
             .'<pre style="margin:0;padding:.6rem;background:#f8fafc;border:1px solid #e2e8f0;border-radius:.5rem;overflow:auto;font-size:.75rem;color:#0f172a;">'.e($json).'</pre>'
             .'</div>';
-    }
-
-    private static function scalarise(mixed $value): string
-    {
-        if ($value === null) {
-            return '∅';
-        }
-
-        if (is_bool($value)) {
-            return $value ? 'true' : 'false';
-        }
-
-        if (is_scalar($value)) {
-            return (string) $value;
-        }
-
-        return (string) json_encode($value, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
     }
 }
