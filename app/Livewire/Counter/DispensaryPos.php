@@ -86,6 +86,9 @@ class DispensaryPos extends Component
     /** Product-type filter over the genetics grid (FLOWER|CONCENTRATE|PREROLL|EDIBLE, null = all). */
     public ?string $productType = null;
 
+    /** Strain-variety filter over the genetics grid (SATIVA|INDICA|HYBRID, null = all — prompt 66). */
+    public ?string $strainType = null;
+
     /** The held socio (id only — the model is resolved live, never stored on the component). */
     public ?string $memberId = null;
 
@@ -300,6 +303,11 @@ class DispensaryPos extends Component
     public function filterProductType(?string $productType): void
     {
         $this->productType = $productType;
+    }
+
+    public function filterStrainType(?string $strainType): void
+    {
+        $this->strainType = $strainType;
     }
 
     public function toggleCalculator(): void
@@ -720,6 +728,7 @@ class DispensaryPos extends Component
             'genetics' => $this->filterGenetics($allGenetics),
             'categories' => $this->deriveCategories($allGenetics),
             'productTypes' => $this->deriveProductTypes($allGenetics),
+            'strainTypes' => $this->deriveStrainTypes($allGenetics),
             'activeEntryGramsCg' => $this->activeEntryGramsCg(),
             'basketLines' => $basketLines,
             'basketTotalCents' => $total,
@@ -944,6 +953,8 @@ class DispensaryPos extends Component
                 'product_type' => $genetic->product_type->value,
                 'product_type_label' => $genetic->product_type->label(),
                 'is_unit' => $isUnit,
+                'strain_type' => $genetic->strain_type?->value,
+                'strain_type_label' => $genetic->strain_type?->label(),
                 'grams_per_unit_cg' => (int) $genetic->grams_per_unit_cg,
                 'thc_bp' => (int) $genetic->thc_bp,
                 'cbd_bp' => (int) $genetic->cbd_bp,
@@ -982,6 +993,10 @@ class DispensaryPos extends Component
                 return false;
             }
 
+            if ($this->strainType !== null && (string) ($row['strain_type'] ?? '') !== $this->strainType) {
+                return false;
+            }
+
             return $term === '' || str_contains(mb_strtolower((string) $row['name']), $term);
         }));
     }
@@ -998,6 +1013,33 @@ class DispensaryPos extends Component
 
         foreach ($rows as $row) {
             $seen[(string) $row['product_type']] = (string) $row['product_type_label'];
+        }
+
+        $types = [];
+
+        foreach ($seen as $value => $label) {
+            $types[] = ['value' => (string) $value, 'label' => $label];
+        }
+
+        return $types;
+    }
+
+    /**
+     * Distinct strain varieties among the sellable genetics, for the grid filter chips (prompt 66).
+     * Genetics with no strain type are simply absent from this list (they still show under "All").
+     *
+     * @param  list<array<string, mixed>>  $rows
+     * @return list<array{value: string, label: string}>
+     */
+    private function deriveStrainTypes(array $rows): array
+    {
+        $seen = [];
+
+        foreach ($rows as $row) {
+            $value = $row['strain_type'] ?? null;
+            if ($value !== null) {
+                $seen[(string) $value] = (string) $row['strain_type_label'];
+            }
         }
 
         $types = [];

@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Enums\ConcentrateSubtype;
 use App\Enums\CultivationType;
 use App\Enums\ProductType;
+use App\Enums\StrainType;
 use App\Enums\UnitType;
 use App\Models\Concerns\BelongsToOrganisation;
 use App\Observers\GeneticObserver;
@@ -34,8 +35,9 @@ class Genetic extends Model
     protected $fillable = [
         'organisation_id', 'name', 'description', 'category_id', 'thc_bp', 'cbd_bp',
         'terpenes', 'cultivation_type', 'images', 'published', 'active',
-        'product_type', 'concentrate_subtype', 'grams_per_unit_cg', 'thc_mg_per_unit',
-        // 'unit_type' is deliberately NOT fillable — GeneticObserver derives + stores it.
+        'product_type', 'concentrate_subtype', 'grams_per_unit_cg', 'thc_mg_per_unit', 'strain_type',
+        // 'unit_type' is deliberately NOT fillable — GeneticObserver derives + stores it. strain_type
+        // IS fillable (prompt 66) — a user-set property, not derived.
     ];
 
     protected function casts(): array
@@ -49,6 +51,7 @@ class Genetic extends Model
             'published' => 'boolean',
             'active' => 'boolean',
             'product_type' => ProductType::class,
+            'strain_type' => StrainType::class,
             'unit_type' => UnitType::class,
             'concentrate_subtype' => ConcentrateSubtype::class,
             'grams_per_unit_cg' => 'integer',
