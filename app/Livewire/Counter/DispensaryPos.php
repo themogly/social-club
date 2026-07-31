@@ -224,6 +224,13 @@ class DispensaryPos extends Component
         $this->holdMember($member->id, scanned: true);
     }
 
+    /** A camera-decoded QR token routes through the SAME lookup as the wedge scanner (prompt 35). */
+    public function submitCameraScan(string $token): void
+    {
+        $this->scan = $token;
+        $this->submitScan();
+    }
+
     public function selectMember(string $memberId): void
     {
         $this->holdMember($memberId, scanned: false);
@@ -695,6 +702,7 @@ class DispensaryPos extends Component
             'openTill' => $location !== null ? $this->openTillSession($location) : null,
             'requireSignature' => $this->signatureRequired(),
             'requireCheckedIn' => $this->checkedInRequired(),
+            'cameraScanEnabled' => (bool) Settings::get('camera_scan_enabled', false),
             'hardBlockRules' => $verdict !== null ? $this->hardBlockRules($verdict) : [],
             'overridableRules' => $verdict !== null ? $this->overridableRules($verdict) : [],
             'canOverride' => $this->userCan('limits.override'),

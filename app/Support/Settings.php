@@ -72,6 +72,11 @@ class Settings
         'pos_require_checked_in' => false,  // only dispense to members checked in at the door
         'pos_signature_required' => false,  // capture an on-screen signature per withdrawal (acta-grade)
 
+        // Counter scanning (per location) — opt-in camera QR at the door + POS. OFF by default:
+        // camera access is a deliberate per-premises choice; the keyboard-wedge scanner + name
+        // search always remain, so this only ADDS an input, never gates one (prompt 35).
+        'camera_scan_enabled' => false,
+
         // Governance / actas
         'minute_quorum_fraction_bp' => 5000,  // quorum = 50% of active members (basis points)
 

@@ -164,6 +164,8 @@ class DebtAndLocationSettingsTest extends TestCase
         // Deliberately NOT on the org settings form (documented in DECISIONS): the enforcement
         // matrix (its own editor), per-location settings, and system/compliance constants.
         $excluded = ['enforcement', 'aforo_default', 'aforo_enforcement', 'enabled_locales', 'default_locale', 'data_retention_days', 'audit_retention_days', 'signed_url_ttl_seconds', 'consent_text_version', 'minute_quorum_fraction_bp', 'heartbeat_stale_seconds', 'monthly_window', 'pos_require_checked_in', 'pos_signature_required',
+            // Per-location counter setting, edited on LocationForm (not the org page): opt-in camera QR (prompt 35).
+            'camera_scan_enabled',
             // Documented in DECISIONS: forecast_options_g is a preset ARRAY (a tags/repeater
             // input is a later enhancement); low_stock_threshold_cg is a fallback — the operative
             // low-stock threshold is set per-article on the Article resource.
