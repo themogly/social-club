@@ -2073,3 +2073,23 @@ the total the operator sees is exactly the total charged. The item snapshot gain
 `line_total_cents` stays the NET, so `BarSalesReport` still reconciles (tested). The bar receipt shows the
 member discount. Tests: applied, guest-none, genetic-only-excluded, and shown==charged. 534 green.
 Self-merge on green (batch 3 authorisation). **Batch 3 IF-TIME (54, 56, 55) done; 45 next.**
+
+---
+
+## Batch 3·TIME — Prompt 45: application invite email (the one that stalled when delegated)
+
+Done in-session, not delegated (the reason it stalled before). Five pieces:
+- **Nullable `applicant_email`** on `member_applications` (migration; MySQL parity PENDING) + fillable.
+- **Optional email field on the invite form** (`ListMemberApplications::inviteAction`) — if given, the
+  invite is EMAILED; if blank, it's link-only as before.
+- **`ApplicationInviteMail`** modelled on `MemberLoginLinkMail` (scalar URL + expiry, CID logo, registered
+  in `DevMail` so it rides `MailRenderTest` + `/dev/mail`). The raw link lives only in the email; the DB
+  keeps the token hash.
+- **Resend action** — re-emails the SAME token (rebuilt via `inviteUrl()` from the encrypted `invite_token`),
+  visible only when there's an applicant email + a live invite. Tested that the resent URL == the original.
+- **Real clipboard copy** — "Copiar enlace" used to just re-dump the URL in a toast. It now calls
+  `$livewire->js('navigator.clipboard.writeText(...)')` (client-side, within the click's transient
+  activation) and confirms "Enlace copiado" instead. Tested via the notification change.
+
+538 green. Self-merge on green (batch 3 authorisation). **Batch 3 fully built (51, 53, 58, 54, 56, 55, 45).
+Remaining in batch 3: prompt 57 = recommendation only (no build).**

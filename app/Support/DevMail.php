@@ -3,6 +3,7 @@
 namespace App\Support;
 
 use App\Mail\ApplicationApprovedMail;
+use App\Mail\ApplicationInviteMail;
 use App\Mail\ApplicationRejectedMail;
 use App\Mail\DispensationReceiptMail;
 use App\Mail\ExampleClubMail;
@@ -40,6 +41,7 @@ class DevMail
                 new Member(['first_name' => 'María', 'last_name' => 'García', 'member_no' => 'M-00042']),
                 'preview-token-not-a-real-link',
             ),
+            'application-invite' => new ApplicationInviteMail('https://mi-club.example/alta/preview-token', '2026-09-30'),
             'application-approved' => new ApplicationApprovedMail('María García', 'M-00042'),
             'application-rejected' => new ApplicationRejectedMail('María García', 'Falta el documento de identidad.'),
         ];
