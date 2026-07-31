@@ -147,6 +147,13 @@ class DashboardCharts
      */
     public function incomeByPeriod(?Period $period = null): array
     {
+        // Finance authorisation lives here too, not only on the widget (audit A1): a non-finance
+        // actor (STAFF) gets empty series regardless of who calls this, so a forgotten blade @if
+        // or a direct call can never leak income figures.
+        if (! $this->canSeeFinance) {
+            return ['labels' => [], 'aportaciones' => [], 'barra' => [], 'cuotas' => []];
+        }
+
         $period ??= $this->period;
         [$start, $end] = $period->bounds();
         [$labels, $bounds, $unit] = $this->periodBuckets($period);
@@ -179,6 +186,10 @@ class DashboardCharts
      */
     public function incomeVsExpenses(?Period $period = null): array
     {
+        if (! $this->canSeeFinance) {
+            return ['labels' => [], 'ingresos' => [], 'gastos' => [], 'superavit' => []];
+        }
+
         $period ??= $this->period;
         $income = $this->incomeByPeriod($period);
         [$labels, $bounds, $unit] = $this->periodBuckets($period);
@@ -231,7 +242,9 @@ class DashboardCharts
                 'genetic' => (string) ($r->genetic ?? __('Sin genética')),
                 'tx' => (int) $r->tx,
                 'grams_cg' => (int) $r->grams_cg,
-                'total_cents' => (int) $r->total_cents,
+                // The € value is a finance figure — zeroed for a non-finance actor so the chart's
+                // "Importe" mode can't leak per-genetic revenue while grams stay visible (audit A1).
+                'total_cents' => $this->canSeeFinance ? (int) $r->total_cents : 0,
             ])->all();
     }
 

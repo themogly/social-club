@@ -1255,3 +1255,28 @@ updated from issuance-logging to view-logging.
 `Gate::authorize` but do NOT per-view access-log. **Deferred as a follow-up** — receipts carry consumption
 data (Article-9-adjacent, lower sensitivity than ID scans/certs); extending the per-view access-log pattern
 to them is a smaller separate change, tracked in AUDIT-FINDINGS.md. No migration → MySQL parity N/A.
+
+---
+
+## Prompt 33 — finance dashboard widgets had no real authorization gate (A1)
+
+**Merge authorization:** merged to `main` per the owner's explicit "merge to main once finished" instruction.
+
+Audited all 6 chart widgets. Findings + fixes:
+- **`IncomeVsExpensesChart`, `IncomeByPeriodChart`** — pure finance, gated only by the dashboard blade's
+  `@if($canSeeFinance)` (presentation, not authorization). **Fixed both layers:** added
+  `canView()` (`reports.view` / `reports.view.all`) so Filament won't render them for a STAFF user, AND
+  `DashboardCharts::incomeByPeriod()` / `incomeVsExpenses()` now return empty series when `! canSeeFinance`
+  — so a forgotten `@if`, a template change, or a direct call can never leak figures.
+- **`DispensedByGeneticChart`** — MIXED: its "Importe (€)" mode rendered per-genetic `total_cents` (finance)
+  alongside the grams (operational). **Fixed at the data layer:** `dispensedByGenetic()` zeroes `total_cents`
+  for a non-finance actor, so STAFF keep the operational grams view but the € value can't leak. No `canView()`
+  on this widget — it stays visible to STAFF for the operational data.
+- **`ConsumptionDistributionChart`, `StockLevelsChart`** — operational only (member-usage histogram, stock
+  grams). No finance figures; no gate needed (verified their data methods carry no cents).
+- **`DashboardChart`** — abstract base; no data of its own.
+
+Reused the existing `reports.view*` permission pattern (no new scheme). Tests: STAFF `canView()` false /
+OWNER true; the income data layer returns empty for STAFF and real figures for the owner regardless of
+caller; DispensedByGenetic `total_cents` zeroed for STAFF, real for the owner (grams visible to both).
+No migration → MySQL parity N/A. Tests green.
