@@ -1531,3 +1531,28 @@ the prompt-23 back-link and prompt-26 operator strip.
 Tests: full-access sees all four (current active, others switch links); a `pos.bar`-only user sees only
 Barra; every switch link carries the confirm guard; the active screen is marked per screen. Owner-authorised
 merge. 434 green. Screenshots (four screens × light/dark × widths, two permission combos) pending — no browser.
+
+## Prompt 43 — bar/merch sales: itemised reporting + oversight
+
+FinancialReport already showed the "Barra" AGGREGATE; this adds the itemised/detail layer under it
+(never touching that total).
+
+- **OrderResource (read-only)** — list/view of individual sales, `canCreate() = false` (orders are
+  committed/voided at the bar POS, mirroring TillSessionResource). Filters: status, location, operator,
+  created-at range. Table + Infolist split; the Infolist's Anulación section (`->visible()` when VOIDED)
+  shows void_reason / voided-by / voided-at. Authorised through the existing OrderPolicy — added a
+  `viewAny` (pos.bar || reports.view) mirroring TillSessionPolicy; per-row org/location stays in `view`.
+  Registered via the panel's resource auto-discovery + documented in the FORMLESS allowlist.
+- **OrdersRelationManager on Member** — a member's bar-purchase history tab, `withoutGlobalScope(Location)`
+  so it spans locations like WalletTransactions. Added the missing `Member::orders()` HasMany.
+- **BarSalesReport + page** (`informes/ventas-barra`) via the existing ReportPage/AbstractReport base —
+  top-selling articles by units + revenue, aggregating the order `items` JSON in PHP (portable across the
+  SQLite/MySQL split). Off-catalogue manual lines (article_id null) group by name so every euro lands in a
+  row and the GRAND TOTAL reconciles to the cent with FinancialReport's "Barra" (both = SUM(orders.total_cents)
+  COMPLETED in scope) — a test asserts equality.
+- Vocabulary: venta/ticket/pedido (the separate bar ledger), never aportación/dispensación.
+
+Tests: list org+location scoped (wrong-sede hidden); viewAny denied without permission; voided order shows
+its void audit; the member tab shows only that member's orders; report aggregation + the FinancialReport
+reconciliation + voided/other-location exclusion. Owner-authorised merge. 442 green. Screenshots (resource/
+relation-manager/report, light+dark) pending — no browser.

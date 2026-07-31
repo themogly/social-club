@@ -16,6 +16,7 @@ use App\Filament\Resources\MemberDocuments\MemberDocumentResource;
 use App\Filament\Resources\Members\MemberResource;
 use App\Filament\Resources\MembershipTiers\MembershipTierResource;
 use App\Filament\Resources\Minutes\MinuteResource;
+use App\Filament\Resources\Orders\OrderResource;
 use App\Filament\Resources\Purchases\PurchaseResource;
 use App\Filament\Resources\TillSessions\TillSessionResource;
 use App\Filament\Resources\Users\UserResource;
@@ -50,6 +51,7 @@ class FormCompletenessTest extends TestCase
         AuditLogResource::class => 'Append-only audit trail — entries are written by RecordAuditLog, never a form.',
         MemberDocumentResource::class => 'Read-only document vault — documents are generated/uploaded via domain actions.',
         TillSessionResource::class => 'Read-only till oversight — sessions open/close at the counter terminal, not a form.',
+        OrderResource::class => 'Read-only bar-sales oversight — orders are committed/voided at the bar POS, never a form (prompt 43).',
     ];
 
     /**

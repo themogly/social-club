@@ -142,6 +142,12 @@ class Member extends Model implements Authenticatable
         return $this->hasMany(WalletTransaction::class);
     }
 
+    /** @return HasMany<Order, $this> */
+    public function orders(): HasMany
+    {
+        return $this->hasMany(Order::class);
+    }
+
     /** @return HasMany<MemberToken, $this> */
     public function tokens(): HasMany
     {
