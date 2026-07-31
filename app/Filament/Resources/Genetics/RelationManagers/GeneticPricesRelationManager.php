@@ -159,10 +159,11 @@ class GeneticPricesRelationManager extends RelationManager
                 ->required(),
             TextInput::make('low_stock_threshold_g')
                 ->label(__('Aviso de stock bajo (g)'))
-                ->helperText(__('Opcional. Nivel por debajo del cual avisar de stock bajo.'))
+                ->helperText($perUnit
+                    ? __('Opcional. Equivalente en gramos (unidades × g/unidad) por debajo del cual avisar.')
+                    : __('Opcional. Nivel por debajo del cual avisar de stock bajo.'))
                 ->numeric()
-                ->minValue(0)
-                ->visible(! $perUnit), // the threshold column is centigrams — a weight; per-unit is prompt 54
+                ->minValue(0), // prompt 54 consumes this as a gram-equivalent threshold for BOTH types
             Toggle::make('active')
                 ->label(__('Activo'))
                 ->default(true),

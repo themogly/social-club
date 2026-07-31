@@ -8,6 +8,7 @@ use App\Enums\ProductType;
 use App\Enums\UnitType;
 use App\Models\Concerns\BelongsToOrganisation;
 use App\Observers\GeneticObserver;
+use App\Support\Settings;
 use Database\Factories\GeneticFactory;
 use Illuminate\Database\Eloquent\Attributes\ObservedBy;
 use Illuminate\Database\Eloquent\Builder;
@@ -95,5 +96,30 @@ class Genetic extends Model
     public function scopePublished(Builder $query): Builder
     {
         return $query->where('published', true);
+    }
+
+    /**
+     * The low-stock threshold (gram-equivalent centigrams) for this genetic at a location (prompt 54):
+     * the base GeneticPrice row's `low_stock_threshold_cg` at that sede, else the org-wide
+     * `low_stock_threshold_cg` setting. The consumer of the threshold + fallback that had none before.
+     */
+    public function lowStockThresholdCg(?string $locationId): int
+    {
+        $perLocation = $this->prices()->withoutGlobalScopes()
+            ->where('location_id', $locationId)
+            ->whereNull('tier_id')
+            ->value('low_stock_threshold_cg');
+
+        return (int) ($perLocation ?? Settings::get('low_stock_threshold_cg', 5000));
+    }
+
+    /**
+     * Low stock when the on-hand gram-equivalent is at or below the resolved threshold (mirrors the
+     * Article `stock <= low_stock_threshold` rule). For a UNIT genetic the caller passes the gram
+     * equivalent (units × grams_per_unit_cg), so one comparison serves both weight and unit genetics.
+     */
+    public function isLowStockAt(int $remainingCg, ?string $locationId): bool
+    {
+        return $remainingCg <= $this->lowStockThresholdCg($locationId);
     }
 }

@@ -2007,3 +2007,23 @@ helper text now says so. Contrast with `data_retention_days`, which IS a real pu
 anonymises members) — the asymmetry is deliberate. Pinned with a test that deleting an audit row is
 refused (retention by construction). 523 green. Self-merge on green (batch 3 authorisation). **Batch 3
 MUST (51, 53, 58) complete.**
+
+---
+
+## Batch 3·TIME — Prompt 54: low stock per genetic (the consumer that never existed)
+
+Genetics had a `low_stock_threshold_cg` column (per `GeneticPrice`) and an org-wide `low_stock_threshold_cg`
+fallback setting, but NOTHING consumed either — only articles had working low-stock alerting. Added the
+consumer, mirroring the article pattern (`stock <= low_stock_threshold` → a POS badge):
+- `Genetic::lowStockThresholdCg(?locationId)` resolves the base `GeneticPrice` row's threshold at the sede,
+  else the org-wide setting.
+- `Genetic::isLowStockAt(remainingCg, ?locationId)` — at-or-below, matching the article rule.
+- `DispensaryPos` genetic cards carry a `low_stock` flag; the blade shows a "Stock bajo" warning badge
+  (only when a dispensable batch exists — an out-of-stock genetic shows "Sin lote", not "Stock bajo").
+
+**Reconciled prompt 63's deferral.** The card's `remaining_cg` already normalises a UNIT genetic's stock
+to a gram-equivalent (units × grams_per_unit_cg), so ONE threshold comparison serves both weight and unit
+genetics. That let me remove the weight-only restriction prompt 63 put on the threshold form field (it had
+noted "per-unit is prompt 54") — the `low_stock_threshold_cg` is now settable for every genetic as a
+gram-equivalent, with a per-type helper text. Resolver precedence + the POS flag are tested. 526 green.
+Self-merge on green (batch 3 authorisation).

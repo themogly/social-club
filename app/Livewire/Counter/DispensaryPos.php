@@ -914,6 +914,7 @@ class DispensaryPos extends Component
 
             $isUnit = $genetic->isUnitType();
             $remainingUnits = $isUnit ? $this->remainingUnits($genetic, $location) : null;
+            $remainingCg = $isUnit ? ($remainingUnits ?? 0) * (int) $genetic->grams_per_unit_cg : $this->remainingCg($genetic, $location);
 
             $rows[] = [
                 'id' => $genetic->id,
@@ -929,8 +930,9 @@ class DispensaryPos extends Component
                 'category_name' => $genetic->category?->name,
                 'rate_cents' => $price->ratePerGramCents,
                 'price_label' => $price->label(),
-                'remaining_cg' => $isUnit ? ($remainingUnits ?? 0) * (int) $genetic->grams_per_unit_cg : $this->remainingCg($genetic, $location),
+                'remaining_cg' => $remainingCg,
                 'remaining_units' => $remainingUnits,
+                'low_stock' => $genetic->isLowStockAt($remainingCg, $location->id),
                 'has_batch' => (new SelectBatch)->fefo($genetic, $location) !== null,
             ];
         }

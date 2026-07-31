@@ -982,6 +982,7 @@
     "Añade el precio base de esta genética por sede. Sin un precio base activo no se puede dispensar.": "Add this genetic's base price per location. Without an active base price it can't be dispensed.",
     "Vacío = precio base. Una tarifa concreta tiene prioridad sobre la base para sus socios.": "Empty = base price. A specific tier takes priority over the base for its members.",
     "Opcional. Nivel por debajo del cual avisar de stock bajo.": "Optional. Level below which to warn of low stock.",
+    "Opcional. Equivalente en gramos (unidades × g/unidad) por debajo del cual avisar.": "Optional. Gram equivalent (units × g/unit) below which to warn.",
     "unidad": "unit",
     "Precio (€)": "Price (€)",
     "Precios a tu tarifa. Sólo visible para socios/as.": "Prices at your tier. Visible to members only.",

@@ -909,6 +909,7 @@
     "Obligatorio según la política de aval.": "Obligatorio según la política de aval.",
     "Ocupación máxima simultánea permitida en la sede.": "Ocupación máxima simultánea permitida en la sede.",
     "Opcional según la política de aval.": "Opcional según la política de aval.",
+    "Opcional. Equivalente en gramos (unidades × g/unidad) por debajo del cual avisar.": "Opcional. Equivalente en gramos (unidades × g/unidad) por debajo del cual avisar.",
     "Opcional. Nivel por debajo del cual avisar de stock bajo.": "Opcional. Nivel por debajo del cual avisar de stock bajo.",
     "Opcional. Sustituye el límite diario de la organización.": "Opcional. Sustituye el límite diario de la organización.",
     "Opcional. Sustituye el techo mensual de la organización.": "Opcional. Sustituye el techo mensual de la organización.",
