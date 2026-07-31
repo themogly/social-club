@@ -24,7 +24,9 @@
         </span>
         <div class="leading-tight">
             <p class="text-sm font-semibold">{{ config('app.name') }}</p>
-            <p class="text-xs text-ink-muted dark:text-slate-400">{{ $title ?? __('Contador') }}</p>
+            {{-- The counter screen's one <h1> (a11y): the shared header renders it for every
+                 terminal, so headings below can start at h2 without skipping a level. --}}
+            <h1 class="text-xs text-ink-muted dark:text-slate-400">{{ $title ?? __('Contador') }}</h1>
         </div>
     </div>
 

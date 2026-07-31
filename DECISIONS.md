@@ -1389,3 +1389,35 @@ Owner-authorised merge. 405 tests green (Pint + Larastan L6 clean).
   effectively irreversible public commitment). `hsts_max_age` configurable (default 1 year).
 
 Owner-authorised merge. 412 tests green (Pint + Larastan L6 clean). No migration → MySQL parity N/A.
+
+## Prompt 36 — UI, empty-state & accessibility cleanup (Phase C leftovers)
+
+Verified each audit item against the LIVE code first (several palette/enum/border items had already landed
+in `chore/design-audit-fixes` @ 38c0e40 — not re-done). Outstanding items built:
+
+- **Shared `<x-button>`** (`resources/views/components/button.blade.php`) — primary / secondary / danger /
+  danger-soft / warning / outline × sm|md|lg|xl; renders `<a>` when `href` is set; layout + behaviour
+  attributes (w-full, wire:click, type, @click) pass through; EVERY variant carries a focus ring (a11y).
+  Adopted on the SOCIO CTAs (application, login, notifications, events) — which harmonises the main drift
+  (socio was rounded-lg + no ring; the component is the counter's rounded-xl + ring). Locked by a render
+  test. The counter screens are already internally consistent, so their adoption is a documented
+  visual-pass follow-up, not a blind 20-site edit.
+- **a11y:** one `<h1>` per counter screen via the shared top-bar (headings below start at h2 without a
+  skipped level); `role`/`aria-live` on the flash banner (error → assertive alert, else polite status) on
+  all four counter screens + on the offline banners; `role=img` + label on the footfall heatmap (a text
+  alternative for the colour grid); placeholder contrast bumped `text-ink-muted/60` → `text-ink-muted`
+  (the /60 was ≈3:1 — fails AA, near-invisible in dark) across every counter input.
+- **Empty states:** tailored heading + description on the four sibling member relation managers (Consents,
+  Documents, Memberships, Wallet) for parity with Discounts; socio `history.blade.php` empty states → the
+  designed dashed-card.
+- **code-style (behaviour-preserving, pinned by the existing suite):** `Batch::scopeDispensable()` — the ONE
+  open/in-stock/not-expired predicate the FEFO selector and all three POS stock queries now route through
+  (drops the per-type stock-column branching; the one-of-two invariant makes `remaining_cg>0 OR
+  remaining_units>0` resolve per type); `ApproveApplication` records consent through the existing
+  `RecordMemberConsent` action instead of an inline `consents()->create()`.
+- **failed-jobs page:** off-palette `#eef2f7` + light-only `#e2e8f0` borders → `border-line
+  dark:border-slate-800` (now dark-mode aware); `#16a34a`/`#dc2626` semantic hexes → `text-success`/`text-error`.
+
+Owner-authorised merge. 417 tests green (Pint + Larastan L6 clean; EN/ES parity). **VISUAL VERIFICATION
+PENDING** (built blind — no browser): the socio button restyle, counter flash/offline/heatmap a11y, and the
+empty states want a screenshot pass across widths + light/dark.

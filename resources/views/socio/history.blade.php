@@ -13,7 +13,9 @@
             <span class="font-semibold">{{ $money($d->total_cents->cents) }}</span>
         </div>
     @empty
-        <p class="mt-2 text-sm text-ink-muted dark:text-slate-400">{{ __('Sin dispensaciones.') }}</p>
+        <div class="mt-2 rounded-xl border border-dashed border-line bg-surface p-6 text-center dark:border-slate-800 dark:bg-slate-900">
+            <p class="text-sm text-ink-muted dark:text-slate-400">{{ __('Sin dispensaciones.') }}</p>
+        </div>
     @endforelse
 
     <h2 class="mt-6 text-sm font-semibold text-ink-muted dark:text-slate-300">{{ __('Monedero') }}</h2>
@@ -23,6 +25,8 @@
             <span class="font-semibold">{{ $money($w->amount_cents->cents) }}</span>
         </div>
     @empty
-        <p class="mt-2 text-sm text-ink-muted dark:text-slate-400">{{ __('Sin movimientos.') }}</p>
+        <div class="mt-2 rounded-xl border border-dashed border-line bg-surface p-6 text-center dark:border-slate-800 dark:bg-slate-900">
+            <p class="text-sm text-ink-muted dark:text-slate-400">{{ __('Sin movimientos.') }}</p>
+        </div>
     @endforelse
 </x-layouts.socio>

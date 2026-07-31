@@ -24,14 +24,8 @@
             <p class="mt-1 text-sm text-ink-muted dark:text-slate-400">{{ __('Actívalas para recibir avisos aunque no tengas la app abierta.') }}</p>
             <div id="push-controls" class="mt-3 flex flex-wrap gap-2" data-vapid="{{ $vapidPublicKey }}"
                  data-subscribe="{{ route('socio.push.subscribe') }}" data-unsubscribe="{{ route('socio.push.unsubscribe') }}">
-                <button type="button" id="push-enable"
-                        class="rounded-lg bg-brand px-4 py-2 text-sm font-semibold text-white transition hover:bg-brand-dark">
-                    {{ __('Activar en este dispositivo') }}
-                </button>
-                <button type="button" id="push-disable" hidden
-                        class="rounded-lg border border-line px-4 py-2 text-sm font-semibold text-ink-muted dark:border-slate-700 dark:text-slate-300">
-                    {{ __('Desactivar') }}
-                </button>
+                <x-button id="push-enable" size="sm">{{ __('Activar en este dispositivo') }}</x-button>
+                <x-button variant="secondary" size="sm" id="push-disable" hidden>{{ __('Desactivar') }}</x-button>
             </div>
             <p id="push-status" class="mt-2 text-xs text-ink-muted dark:text-slate-400" role="status" aria-live="polite"></p>
         @endif
@@ -52,10 +46,7 @@
                 </label>
             @endforeach
         </div>
-        <button type="submit"
-                class="mt-4 w-full rounded-lg bg-brand px-4 py-2.5 font-semibold text-white transition hover:bg-brand-dark">
-            {{ __('Guardar preferencias') }}
-        </button>
+        <x-button type="submit" size="md" class="mt-4 w-full">{{ __('Guardar preferencias') }}</x-button>
     </form>
 
     <x-slot:footer>

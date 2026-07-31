@@ -19,6 +19,8 @@
             @if ($flashMessage)
                 <div
                     wire:key="flash"
+                    role="{{ $flashType === 'error' ? 'alert' : 'status' }}"
+                    aria-live="{{ $flashType === 'error' ? 'assertive' : 'polite' }}"
                     @class([
                         'flex items-center justify-between gap-3 rounded-xl border px-4 py-3 text-sm font-medium',
                         'border-success/30 bg-success/10 text-success' => $flashType === 'success',
@@ -44,7 +46,7 @@
                             autocomplete="off"
                             spellcheck="false"
                             placeholder="{{ __('Escanea la tarjeta o escribe el código y pulsa Enter') }}"
-                            class="h-14 min-w-0 flex-1 rounded-xl border border-line bg-surface px-4 text-lg text-ink placeholder:text-ink-muted/60 focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/40 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
+                            class="h-14 min-w-0 flex-1 rounded-xl border border-line bg-surface px-4 text-lg text-ink placeholder:text-ink-muted focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/40 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
                         >
                         <button type="submit" class="h-14 shrink-0 rounded-xl bg-brand px-6 text-base font-semibold text-white transition hover:bg-brand-dark focus:outline-none focus:ring-2 focus:ring-brand/40">
                             {{ __('Buscar') }}
@@ -60,7 +62,7 @@
                         wire:model.live.debounce.300ms="search"
                         autocomplete="off"
                         placeholder="{{ __('Ej. García o M-00042') }}"
-                        class="mt-2 h-12 w-full rounded-xl border border-line bg-surface px-4 text-base text-ink placeholder:text-ink-muted/60 focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/40 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
+                        class="mt-2 h-12 w-full rounded-xl border border-line bg-surface px-4 text-base text-ink placeholder:text-ink-muted focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/40 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
                     >
 
                     @if ($searchResults !== null)

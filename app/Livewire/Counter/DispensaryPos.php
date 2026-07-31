@@ -9,7 +9,6 @@ use App\Actions\Dispensing\VoidDispensation;
 use App\Actions\Members\ResolveMemberByToken;
 use App\Actions\Pricing\ResolvePrice;
 use App\Actions\Stock\SelectBatch;
-use App\Enums\BatchStatus;
 use App\Enums\MembershipStatus;
 use App\Enums\TillSessionStatus;
 use App\Exceptions\DispensationBlockedException;
@@ -1001,9 +1000,7 @@ class DispensaryPos extends Component
         return (int) Batch::query()->withoutGlobalScopes()
             ->where('genetic_id', $genetic->id)
             ->where('location_id', $location->id)
-            ->where('status', BatchStatus::OPEN->value)
-            ->where('remaining_cg', '>', 0)
-            ->where(fn ($q) => $q->whereNull('expires_on')->orWhereDate('expires_on', '>=', today()))
+            ->dispensable()
             ->sum('remaining_cg');
     }
 
@@ -1013,9 +1010,7 @@ class DispensaryPos extends Component
         return (int) Batch::query()->withoutGlobalScopes()
             ->where('genetic_id', $genetic->id)
             ->where('location_id', $location->id)
-            ->where('status', BatchStatus::OPEN->value)
-            ->where('remaining_units', '>', 0)
-            ->where(fn ($q) => $q->whereNull('expires_on')->orWhereDate('expires_on', '>=', today()))
+            ->dispensable()
             ->sum('remaining_units');
     }
 
@@ -1034,15 +1029,10 @@ class DispensaryPos extends Component
             return $empty;
         }
 
-        $genetic = Genetic::query()->find($this->activeGeneticId);
-        $stockColumn = ($genetic !== null && $genetic->isUnitType()) ? 'remaining_units' : 'remaining_cg';
-
         return Batch::query()->withoutGlobalScopes()
             ->where('genetic_id', $this->activeGeneticId)
             ->where('location_id', $location->id)
-            ->where('status', BatchStatus::OPEN->value)
-            ->where($stockColumn, '>', 0)
-            ->where(fn ($q) => $q->whereNull('expires_on')->orWhereDate('expires_on', '>=', today()))
+            ->dispensable()
             ->orderBy('acquired_or_harvested_on')
             ->orderBy('id')
             ->get();

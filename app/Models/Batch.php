@@ -138,4 +138,20 @@ class Batch extends Model
     {
         return $query->where('status', BatchStatus::OPEN);
     }
+
+    /**
+     * Dispensable right now: OPEN, in stock, and not past expiry. "In stock" keys off
+     * whichever unit the genetic uses — the other column is null by the one-of-two
+     * invariant, so `remaining_cg > 0 OR remaining_units > 0` resolves per type without
+     * a join. The ONE predicate the FEFO selector and every POS stock query route through.
+     *
+     * @param  Builder<static>  $query
+     * @return Builder<static>
+     */
+    public function scopeDispensable(Builder $query): Builder
+    {
+        return $query->where('status', BatchStatus::OPEN)
+            ->where(fn (Builder $q): Builder => $q->where('remaining_cg', '>', 0)->orWhere('remaining_units', '>', 0))
+            ->where(fn (Builder $q): Builder => $q->whereNull('expires_on')->orWhereDate('expires_on', '>=', today()));
+    }
 }

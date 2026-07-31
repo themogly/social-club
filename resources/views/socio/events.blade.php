@@ -46,20 +46,11 @@
                 <form method="POST" action="{{ route('socio.events.rsvp', ['event' => $event->id]) }}">
                     @csrf
                     @if ($iAmGoing)
-                        <button type="submit"
-                                class="rounded-lg border border-brand bg-brand px-4 py-2 text-sm font-semibold text-white transition hover:bg-brand-dark">
-                            {{ __('Asistiré ✓') }}
-                        </button>
+                        <x-button type="submit" size="sm">{{ __('Asistiré ✓') }}</x-button>
                     @elseif ($full)
-                        <button type="button" disabled
-                                class="cursor-not-allowed rounded-lg border border-line px-4 py-2 text-sm font-semibold text-ink-muted dark:border-slate-700 dark:text-slate-500">
-                            {{ __('Aforo completo') }}
-                        </button>
+                        <x-button variant="secondary" size="sm" disabled>{{ __('Aforo completo') }}</x-button>
                     @else
-                        <button type="submit"
-                                class="rounded-lg border border-brand px-4 py-2 text-sm font-semibold text-brand transition hover:bg-brand-tint dark:text-slate-100 dark:hover:bg-slate-800">
-                            {{ __('Asistiré') }}
-                        </button>
+                        <x-button type="submit" variant="outline" size="sm">{{ __('Asistiré') }}</x-button>
                     @endif
                 </form>
             </div>

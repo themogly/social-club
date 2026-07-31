@@ -14,17 +14,13 @@ use App\Models\Location;
  */
 class SelectBatch
 {
-    /** The default batch to dispense from: oldest open, non-expired, with stock. */
+    /** The default batch to dispense from: oldest open, non-expired, with stock (FEFO). */
     public function fefo(Genetic $genetic, Location $location): ?Batch
     {
-        $stockColumn = $genetic->isUnitType() ? 'remaining_units' : 'remaining_cg';
-
         return Batch::query()->withoutGlobalScopes()
             ->where('genetic_id', $genetic->id)
             ->where('location_id', $location->id)
-            ->where('status', BatchStatus::OPEN->value)
-            ->where($stockColumn, '>', 0)
-            ->where(fn ($q) => $q->whereNull('expires_on')->orWhereDate('expires_on', '>=', today()))
+            ->dispensable()
             ->orderBy('acquired_or_harvested_on')
             ->orderBy('id')
             ->first();
