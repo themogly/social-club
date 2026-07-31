@@ -26,7 +26,7 @@ class Permissions
         'member.limits.set', 'member.discount.assign', 'member.documents.view', 'member.sanction',
         'applications.review',
         // Membership
-        'membership.fee.override', 'carencia.waive',
+        'membership.fee.override', 'membership.fee.collect', 'carencia.waive',
         // Attendance
         'checkin.manage', 'checkin.override',
         // Counter
@@ -52,7 +52,7 @@ class Permissions
         'reports.view', 'reports.export',
         'members.view', 'members.create', 'members.edit', 'members.transfer', 'members.import',
         'member.sanction', 'applications.review',
-        'membership.fee.override', 'carencia.waive',
+        'membership.fee.override', 'membership.fee.collect', 'carencia.waive',
         'checkin.manage', 'checkin.override',
         'pos.use', 'pos.bar', 'dispensation.void', 'order.void', 'limits.override',
         'genetics.manage', 'prices.manage', 'stock.manage', 'stock.merma', 'stock.transfer',
@@ -68,7 +68,7 @@ class Permissions
     private const STAFF = [
         'pos.use', 'pos.bar', 'checkin.manage',
         'members.view', 'members.create',
-        'expenses.record', 'till.open',
+        'expenses.record', 'membership.fee.collect', 'till.open',
     ];
 
     /**

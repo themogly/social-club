@@ -349,6 +349,74 @@
                 </section>
             @endcan
 
+            {{-- Cobrar cuota — record a membership fee against the open drawer. The ONLY path that
+                 clears unpaid_fee at the counter (prompt 46). Gated on membership.fee.collect. --}}
+            @can('membership.fee.collect')
+                <section class="rounded-2xl border border-line bg-surface p-5 dark:border-slate-800 dark:bg-slate-900 sm:p-6">
+                    <h3 class="text-base font-semibold">{{ __('Cobrar cuota') }}</h3>
+                    <p class="mt-0.5 text-sm text-ink-muted dark:text-slate-400">{{ __('Registra el pago de la cuota de socio.') }}</p>
+
+                    @if ($feeMember === null)
+                        <div class="mt-4">
+                            <label for="feeSearch" class="block text-sm font-medium text-ink-muted dark:text-slate-400">{{ __('Buscar socio (nombre o nº)') }}</label>
+                            <input id="feeSearch" type="text" wire:model.live.debounce.300ms="feeSearch" autocomplete="off"
+                                   placeholder="{{ __('Ej. García o M-00042') }}"
+                                   class="mt-2 h-12 w-full rounded-xl border border-line bg-surface px-4 text-base text-ink placeholder:text-ink-muted focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/40 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100">
+                            @if ($feeResults !== null)
+                                <ul class="mt-2 divide-y divide-line rounded-xl border border-line dark:divide-slate-800 dark:border-slate-800">
+                                    @forelse ($feeResults as $result)
+                                        <li>
+                                            <button type="button" wire:click="selectFeeMember('{{ $result->id }}')"
+                                                    class="flex w-full items-center justify-between px-4 py-3 text-left text-sm hover:bg-surface-alt dark:hover:bg-slate-800">
+                                                <span class="font-medium">{{ $result->fullName() }}</span>
+                                                <span class="text-ink-muted dark:text-slate-400">{{ $result->member_no }}</span>
+                                            </button>
+                                        </li>
+                                    @empty
+                                        <li class="px-4 py-3 text-sm text-ink-muted dark:text-slate-400">{{ __('Sin resultados.') }}</li>
+                                    @endforelse
+                                </ul>
+                            @endif
+                        </div>
+                    @else
+                        <div class="mt-4 flex items-center justify-between rounded-xl bg-surface-alt px-4 py-3 dark:bg-slate-800">
+                            <div>
+                                <p class="font-semibold">{{ $feeMember->fullName() }}</p>
+                                <p class="text-sm text-ink-muted dark:text-slate-400">{{ $feeMember->member_no }}</p>
+                            </div>
+                            <button type="button" wire:click="clearFeeMember" class="rounded-lg px-3 py-1.5 text-sm font-medium text-ink-muted hover:bg-black/5 dark:text-slate-400 dark:hover:bg-white/5">{{ __('Cambiar') }}</button>
+                        </div>
+
+                        @if ($feeOwedCents === null)
+                            <p class="mt-3 rounded-xl border border-warning/30 bg-warning/10 px-4 py-3 text-sm font-medium text-warning">{{ __('Este socio no tiene cuota pendiente en esta sede.') }}</p>
+                        @else
+                            <p class="mt-3 text-sm">{{ __('Cuota pendiente:') }} <span class="font-bold tabular-nums">{{ $this->money($feeOwedCents) }}</span></p>
+                            <form wire:submit="collectFee" class="mt-3 grid gap-3 sm:grid-cols-2">
+                                <div>
+                                    <label for="feeAmount" class="block text-sm font-medium text-ink-muted dark:text-slate-400">{{ __('Importe a cobrar (€)') }}</label>
+                                    <input id="feeAmount" type="text" inputmode="decimal" wire:model="feeAmount" autocomplete="off" placeholder="0,00"
+                                           class="mt-2 h-12 w-full rounded-xl border border-line bg-surface px-4 text-base text-ink placeholder:text-ink-muted focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/40 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100">
+                                </div>
+                                <div>
+                                    <label for="feeMethod" class="block text-sm font-medium text-ink-muted dark:text-slate-400">{{ __('Método') }}</label>
+                                    <select id="feeMethod" wire:model="feeMethod"
+                                            class="mt-2 h-12 w-full rounded-xl border border-line bg-surface px-3 text-base text-ink focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/40 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100">
+                                        <option value="CASH">{{ __('Efectivo') }}</option>
+                                        <option value="WALLET">{{ __('Monedero') }}</option>
+                                    </select>
+                                </div>
+                                <div class="sm:col-span-2">
+                                    <button type="submit" wire:loading.attr="disabled"
+                                            class="h-12 w-full rounded-xl bg-brand px-6 text-base font-semibold text-white transition hover:bg-brand-dark focus:outline-none focus:ring-2 focus:ring-brand/40 disabled:opacity-60">
+                                        {{ __('Cobrar cuota') }}
+                                    </button>
+                                </div>
+                            </form>
+                        @endif
+                    @endif
+                </section>
+            @endcan
+
             {{-- Close (arqueo) — only a till.close holder may close. --}}
             @can('till.close')
                 <button

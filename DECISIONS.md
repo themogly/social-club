@@ -1581,3 +1581,34 @@ relation-manager/report, light+dark) pending — no browser.
   action, not a casual settings edit — recommend a dedicated action if ever needed, not built here).
 
 Owner-authorised merge. 447 green. Screenshots (global settings + Location form, light/dark) pending — no browser.
+
+## Prompt 46 — membership fee collection at the till
+
+`RecordFeePayment` had zero callers, so `feesPaid()` always compared a nonzero `fee_cents` against €0 of
+payments, leaving `unpaid_fee` permanently unsatisfied — and it's BLOCK at the counter, so EVERY member
+with a fee was silently blocked from dispensing with no way to clear it. This builds the collection path
+the till reconciliation + eligibility check already assumed existed. (The prompt-46 file was accurate —
+no contradiction found.)
+
+- **Till action "Cobrar cuota"** on `TillSession` (mirrors `recordExpense`): open session → requireOperator
+  → gate on the NEW `membership.fee.collect` permission → org-wide member search (the SAME by-name/member_no
+  query DispensaryPos uses) → show the outstanding fee on the member's latest active membership at this sede
+  (the SAME membership `feesPaid()` checks) → collect CASH or WALLET via `RecordFeePayment` with
+  `till_session_id` + operator. Partial/instalment allowed (rejects overpayment beyond owed; shows remaining).
+  CASH flows into `TillSummary::fees_cash`; WALLET posts the FEE ledger movement and respects the debt limit
+  (a WALLET fee from an empty wallet is refused — caught + surfaced).
+- **New permission `membership.fee.collect`** (OWNER/MANAGER/STAFF), deliberately SEPARATE from
+  `membership.fee.override` (who can change the *price* vs who can *take* the payment).
+- **Members-section prompt-to-till.** Enrol/renew still ONLY set `fee_cents` (regression-tested — no payment
+  row created there). After enrol/renew with an unpaid fee, a persistent notification points staff to the
+  till (a "Ir a la caja" link when a till is open, else a note to open one). A "Cuota pendiente" badge column
+  on the Memberships tab surfaces the balance at a glance.
+- **Retroactive fix (step 3): DOCUMENTED, not synthesised.** Every membership enrolled/renewed before this
+  has a real, unpaid `fee_cents` and is currently blocked at the counter. We do NOT backdate or synthesise
+  payment rows (that would hide genuine unpaid debt). Staff clear existing balances through the new till flow
+  — the badge shows who owes, collecting at the till unblocks them. A one-off console backfill was
+  deliberately NOT built for this reason.
+
+Transaction boundary: `RecordFeePayment` writes the payment (and, for WALLET, the ledger movement via the
+single wallet writer) after the session/permission guards — matching the other till actions. Owner-authorised
+(batch) merge. 455 green. Screenshots pending — no browser.
