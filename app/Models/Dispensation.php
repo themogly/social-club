@@ -33,12 +33,14 @@ class Dispensation extends Model
         'total_cents', 'cash_cents', 'wallet_cents', 'status', 'reversal_of_id',
         'void_reason', 'voided_by', 'voided_at', 'signature_path', 'idempotency_key',
         'reference', 'dispensed_at',
+        'original_total_cents', 'price_override_reason', 'price_override_by',
     ];
 
     protected function casts(): array
     {
         return [
             'total_cents' => MoneyCast::class,
+            'original_total_cents' => MoneyCast::class,
             'cash_cents' => MoneyCast::class,
             'wallet_cents' => MoneyCast::class,
             'status' => DispensationStatus::class,
