@@ -201,7 +201,7 @@
                         <dd class="tabular-nums text-ink-muted dark:text-slate-500">{{ $this->money($b['wallet_contributions']) }}</dd>
                     </div>
                     <div class="flex items-center justify-between py-2">
-                        <dt class="text-ink-muted dark:text-slate-400">{{ __('Barra en efectivo') }}</dt>
+                        <dt class="text-ink-muted dark:text-slate-400">{{ __('Barra y tienda en efectivo') }}</dt>
                         <dd class="font-medium tabular-nums">{{ $this->money($b['bar_cash']) }}</dd>
                     </div>
                     <div class="flex items-center justify-between py-2">

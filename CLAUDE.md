@@ -82,7 +82,11 @@ breach. Therefore, as build requirements:
   monthly gram caps, forecast options, aforo, stock ceiling). Regional practice varies; case law moves.
 - **Vocabulary.** UI and reports use *socio*, *aportación / contribución*, *dispensación*, *aval*,
   *avalador*, *carencia*, *arqueo*, *superávit*. **Never** *cliente*, *venta*, *precio de venta*,
-  *beneficio*. Bar/merch income is a separate ledger so it never muddies non-profit accounting.
+  *beneficio*. Bar/merch income is a separate ledger so it never muddies non-profit accounting. The
+  non-cannabis income STREAM (bar drinks/food + merch) is labelled **"Barra y tienda"** in reports and
+  summaries (prompt 68) — *venta/ticket* stays on the bar receipt/POS only; the physical counter position
+  is still just **"Barra"** on the counter switcher (prompt 42). Never "Barra" alone for the income
+  figure — it hides the shop.
 - **Honesty rule.** CSCs operate under judicial *tolerance*, not authorisation. The software makes
   the club *able* to evidence what it did — it does not imply that recording an obligation discharges
   it. Where the law is unsettled/regional, say so and make it configurable. Nothing here is legal

@@ -7,7 +7,7 @@ use App\Support\Money;
 use Illuminate\Support\Facades\DB;
 
 /**
- * Ventas de barra por artículo — the itemised layer under the "Barra" aggregate that
+ * Barra y tienda por artículo — the itemised layer under the "Barra" aggregate that
  * FinancialReport already shows (prompt 43). Which drinks/snacks/merch actually sold, by
  * units and by revenue, for the period + scoped locations. The grand total reconciles
  * exactly with FinancialReport's "Barra" column (both are SUM(orders.total_cents) for
@@ -24,7 +24,7 @@ class BarSalesReport extends AbstractReport
 
     public function title(): string
     {
-        return __('Ventas de barra por artículo');
+        return __('Barra y tienda por artículo');
     }
 
     protected function build(): array
@@ -37,7 +37,7 @@ class BarSalesReport extends AbstractReport
         $totals = $this->primary()->totals;
 
         return [
-            ['label' => __('Ventas de barra'), 'value' => Money::fromCents((int) ($totals['importe'] ?? 0))->formatted()],
+            ['label' => __('Barra y tienda'), 'value' => Money::fromCents((int) ($totals['importe'] ?? 0))->formatted()],
             ['label' => __('Unidades vendidas'), 'value' => (string) (int) ($totals['unidades'] ?? 0)],
         ];
     }
@@ -89,7 +89,7 @@ class BarSalesReport extends AbstractReport
 
         return new ReportTable(
             key: 'articulos',
-            title: __('Ventas de barra por artículo'),
+            title: __('Barra y tienda por artículo'),
             columns: [
                 ReportColumn::text('articulo', __('Artículo'), sortable: false),
                 ReportColumn::number('unidades', __('Unidades')),

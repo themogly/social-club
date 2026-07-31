@@ -44,7 +44,7 @@ class IncomeByPeriodChart extends DashboardChart
             'labels' => $d['labels'],
             'datasets' => [
                 ['label' => __('Aportaciones'), 'data' => $this->centsToEuros($d['aportaciones']), 'backgroundColor' => $p['brand_soft'], 'borderColor' => $p['brand'], 'borderWidth' => 1],
-                ['label' => __('Barra'), 'data' => $this->centsToEuros($d['barra']), 'backgroundColor' => $p['success_soft'], 'borderColor' => $p['success'], 'borderWidth' => 1],
+                ['label' => __('Barra y tienda'), 'data' => $this->centsToEuros($d['barra']), 'backgroundColor' => $p['success_soft'], 'borderColor' => $p['success'], 'borderWidth' => 1],
                 ['label' => __('Cuotas'), 'data' => $this->centsToEuros($d['cuotas']), 'backgroundColor' => $p['warning_soft'], 'borderColor' => $p['warning'], 'borderWidth' => 1],
             ],
         ];

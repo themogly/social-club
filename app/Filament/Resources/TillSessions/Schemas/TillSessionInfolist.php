@@ -50,7 +50,7 @@ class TillSessionInfolist
                         self::money('float', __('Fondo de caja')),
                         self::money('cash_contributions', __('Dispensación en efectivo')),
                         self::money('wallet_contributions', __('Monedero (excluido del cajón)')),
-                        self::money('bar_cash', __('Barra en efectivo')),
+                        self::money('bar_cash', __('Barra y tienda en efectivo')),
                         self::money('top_ups', __('Recargas de monedero')),
                         self::money('refunds', __('Devoluciones')),
                         self::money('fees_cash', __('Cuotas en efectivo')),

@@ -102,7 +102,7 @@ class AgmPackReport extends AbstractReport
             columns: [
                 ReportColumn::text('sede', __('Sede')),
                 ReportColumn::money('aportaciones', __('Aportaciones')),
-                ReportColumn::money('barra', __('Barra')),
+                ReportColumn::money('barra', __('Barra y tienda')),
                 ReportColumn::money('cuotas', __('Cuotas')),
                 ReportColumn::money('gastos', __('Gastos')),
                 ReportColumn::money('superavit', __('Superávit')),

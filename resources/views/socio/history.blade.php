@@ -18,7 +18,7 @@
         </div>
     @endforelse
 
-    <h2 class="mt-6 text-sm font-semibold text-ink-muted dark:text-slate-300">{{ __('Barra') }}</h2>
+    <h2 class="mt-6 text-sm font-semibold text-ink-muted dark:text-slate-300">{{ __('Barra y tienda') }}</h2>
     @forelse ($orders as $o)
         <div class="mt-2 flex items-baseline justify-between rounded-xl border border-line bg-surface p-3 text-sm shadow-sm dark:border-slate-800 dark:bg-slate-900">
             <span class="text-ink-muted dark:text-slate-300">{{ optional($o->created_at)->format('d/m/Y') }}</span>

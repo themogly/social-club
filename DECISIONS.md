@@ -2152,3 +2152,29 @@ owner's-pocket-then-reimbursed, that is a **liability to the owner**, not merely
 accounting shape (a payable that's later settled). It's cheap to model early and expensive to reconstruct
 at the accountant's. Recommend a future prompt add an optional "reimbursable / owed to <person>" flag on
 cash expenses; do NOT infer it from `CASH` alone. Owner to confirm whether to pursue.
+
+---
+
+## Prompt 68 — rename "bar sales" → "Barra y tienda" (reporting layer only)
+
+**Chosen term: "Barra y tienda"** (bar + shop). Weighed against the alternatives: *Ventas* is too broad
+(and this app reserves *venta/ticket* for the non-cannabis POS/receipt already), *Tienda* alone drops the
+bar, *Otros ingresos* is accurate but bloodless. "Barra y tienda" is honest about what the stream actually
+contains (drinks/food **and** merch — the catalogue always held lighters + rolling papers) and stays
+clearly distinct from the cannabis *aportación* stream. Added to the CLAUDE.md vocabulary table.
+
+**Scope — reporting/vocabulary only; the counter is untouched (as the prompt steered):**
+- Renamed the DISPLAY labels: `BarSalesReport` title + summary, `BarSalesReportPage` nav/tab, the
+  `FinancialReport` + `AgmPackReport` income COLUMN label, the income chart datasets, the member's PWA
+  history section, the Orders resource/tab, the admin nav group + Article resource, and the till arqueo's
+  bar-cash line.
+- **Left alone:** `BarPos`, the `/counter/bar` route, the `pos.bar` permission, `bar_enabled`, and the
+  counter switcher label — which stays **"Barra"** (the physical bar position; `__('Barra')` there is the
+  one surviving use, correct). So: the *counter* is still the bar; the *income figure* is bar + shop.
+
+**No figures move (the whole safety property):** I renamed LABELS only. The internal `barra` totals key,
+`TillSummary`'s `bar_cash` breakdown key (a documented phpstan type consumed elsewhere), and the report
+route slug `/informes/ventas-barra` are ALL unchanged — so consumers, reconciliation and bookmarks don't
+break. Tested: the report/nav use the new name, the `barra` key still exists in the totals, and "Ventas de
+barra" is gone from BOTH lang files. The existing reconciliation tests (which read the `barra` key) stayed
+green, proving the figure didn't move. Route deliberately KEPT (bookmarks) rather than renamed.

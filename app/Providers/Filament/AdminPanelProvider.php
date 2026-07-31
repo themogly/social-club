@@ -82,7 +82,7 @@ class AdminPanelProvider extends PanelProvider
                 NavigationGroup::make(fn (): string => __('Resumen')),
                 NavigationGroup::make(fn (): string => __('Socios')),
                 NavigationGroup::make(fn (): string => __('Dispensario')),
-                NavigationGroup::make(fn (): string => __('Barra')),
+                NavigationGroup::make(fn (): string => __('Barra y tienda')),
                 NavigationGroup::make(fn (): string => __('Caja')),
                 // Informes (reports) — one page per report, each permission-gated
                 // (reports.view; the assembly pack needs reports.view.all). Discovered
@@ -120,7 +120,7 @@ class AdminPanelProvider extends PanelProvider
                 NavigationItem::make(fn (): string => __('TPV barra'))
                     ->url(fn (): string => route('counter.bar'))
                     ->icon(Heroicon::OutlinedShoppingBag)
-                    ->group(fn (): string => __('Barra'))
+                    ->group(fn (): string => __('Barra y tienda'))
                     ->sort(1)
                     ->visible(fn (): bool => Auth::user()?->can('pos.bar') ?? false),
                 NavigationItem::make(fn (): string => __('Terminal de caja'))
