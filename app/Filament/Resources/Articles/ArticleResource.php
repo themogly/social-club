@@ -31,7 +31,7 @@ class ArticleResource extends Resource
 
     public static function getNavigationGroup(): ?string
     {
-        return __('Barra');
+        return __('Barra y tienda');
     }
 
     public static function getModelLabel(): string

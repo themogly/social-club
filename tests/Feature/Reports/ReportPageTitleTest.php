@@ -18,7 +18,7 @@ class ReportPageTitleTest extends TestCase
     {
         app()->setLocale('es');
 
-        $this->assertSame(__('Ventas de barra'), (new BarSalesReportPage)->getTitle());
+        $this->assertSame(__('Barra y tienda'), (new BarSalesReportPage)->getTitle()); // renamed in prompt 68
         $this->assertNotSame('Bar Sales Report Page', (new BarSalesReportPage)->getTitle());
     }
 

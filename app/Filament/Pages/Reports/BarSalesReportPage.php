@@ -18,7 +18,7 @@ class BarSalesReportPage extends ReportPage
 
     public static function getNavigationLabel(): string
     {
-        return __('Ventas de barra');
+        return __('Barra y tienda');
     }
 
     protected function makeReport(string $organisationId, ?array $locationIds, Period $period): AbstractReport

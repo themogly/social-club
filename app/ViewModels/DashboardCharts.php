@@ -404,7 +404,7 @@ class DashboardCharts
 
         return $merged->map(fn (array $row): array => [
             'type' => $row['type'],
-            'ref' => $row['type'] === 'barra' ? __('Barra') : __('Dispensación'),
+            'ref' => $row['type'] === 'barra' ? __('Barra y tienda') : __('Dispensación'),
             'member' => $row['member_id'] !== null ? ($members[$row['member_id']] ?? null) : null,
             'operator' => $row['operator_id'] !== null ? ($operators[$row['operator_id']] ?? null) : null,
             'amount_cents' => $row['amount_cents'],

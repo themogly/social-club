@@ -17,7 +17,7 @@ class OrdersRelationManager extends RelationManager
 
     public static function getTitle(Model $ownerRecord, string $pageClass): string
     {
-        return __('Ventas de barra');
+        return __('Barra y tienda');
     }
 
     public function table(Table $table): Table

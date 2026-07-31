@@ -30,7 +30,7 @@ class OrderResource extends Resource
 
     public static function getNavigationLabel(): string
     {
-        return __('Ventas de barra');
+        return __('Barra y tienda');
     }
 
     public static function getNavigationGroup(): ?string

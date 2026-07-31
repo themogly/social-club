@@ -114,7 +114,7 @@ class FinancialReport extends AbstractReport
             columns: [
                 ReportColumn::text('dia', __('Fecha')),
                 ReportColumn::money('aportaciones', __('Aportaciones')),
-                ReportColumn::money('barra', __('Barra')),
+                ReportColumn::money('barra', __('Barra y tienda')),
                 ReportColumn::money('cuotas', __('Cuotas')),
                 ReportColumn::money('ingresos', __('Ingresos')),
                 ReportColumn::money('gastos', __('Gastos')),
