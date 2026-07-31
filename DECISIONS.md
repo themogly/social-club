@@ -2422,3 +2422,54 @@ locales, light+dark) could NOT be produced — no browser in this environment. T
 instead verified programmatically (`DemoSeedProfileTest` asserts the seeded literals + faker locale under
 both `en` and `es`). Flagged so a human runs the visual pass. Owner-authorised merge (the standing "merge
 everything to main" overrides the prompt's "do not merge"). 578 green.
+
+---
+
+## Prompt 72 — the declared forecast can be edited, but the signed declaration must never silently drift
+
+`UpdateDeclaredForecast` was the only action in `app/Actions/` with zero callers: `declared_monthly_cg` was
+edited inline on the member form, bypassing it. The mild consequence was a vocabulary loss (a generic
+`member.updated` audit instead of `member.forecast.updated`); the real one was that a club could hold a
+member's SIGNED declaration saying 100 g/month while its own record said 40, with nothing indicating the two
+disagreed — exactly the documentary inconsistency an inspection surfaces.
+
+**Routing — DECISION: take it off the generic form, make it a dedicated record action.** The inline
+`TextInput` is gone from `MemberForm`; `UpdateDeclaredForecast` is now the SINGLE writer of
+`declared_monthly_cg`, reached via the "Actualizar previsión declarada" record action (grams → centigrams at
+the edge, gated on `members.edit`, audited `member.forecast.updated`). A declared legal figure is not a phone
+number — editing it alongside contact details understated it. The column is nullable, so a new member simply
+has no declared figure until it is set through the action (also where the declaration document is then
+generated). Regression-guarded two ways: an explicit `assertFormFieldDoesNotExist` test, and the
+`FormCompletenessTest` allowlist (declared_monthly_cg allowlisted with a reason; its honesty test fails if the
+field ever returns to the form).
+
+**Drift handling — DECISION: FLAG the drift; do not regenerate, do not block.** A DERIVED indicator
+(`App\Support\DocumentDrift` + `Member::hasStaleDeclaration()` / `driftedDocuments()`) compares a generated
+document's frozen snapshot against the live record on READ — never a stored flag that could itself go stale
+(a project rule). Surfaced as a "Desactualizada — regenerar y volver a firmar" badge on the documents tab and
+a toggleable warning column on the member list. Rejected alternatives: **regenerate automatically** replaces
+signed evidence with an UNSIGNED artefact — worse than the drift, and it silently discards a signature; **block
+the edit** until re-signed is too rigid for correcting a typo. Flagging leaves the immutable signed document
+untouched (asserted: the snapshot is unchanged by the edit) and puts a human in the loop exactly where a
+signature is required. The action's helper text warns that changing the figure will require regenerating.
+
+**Sibling documents — ANSWER: yes, they drift too, so the mechanism is GENERAL.** `GenerateMemberDocument`
+freezes the SAME snapshot (name + document number + declared forecast) for every type, so a REGISTRATION_FORM
+drifts if the member's name or document number changes after it was generated. `DocumentDrift` is therefore
+type-driven, not declaration-specific: `DECLARATION` is stale on a `declared_monthly_cg` change;
+`REGISTRATION_FORM` on `declared_monthly_cg` / name / document-number change (both tested). Point-in-time types
+(`CONSENT`, `ID`) are deliberately NOT drift-checked — a consent is valid exactly as signed and does not
+"drift" because an unrelated figure moved. The libro de socios is an org-wide report/export, not a per-member
+`MemberDocument`, so it is out of this mechanism's scope.
+
+**Member-facing route — NOTED, accommodated, not built.** `forecast_options_g` + the PWA self-declaration
+idea (a member picks their own forecast from a set of options) fits this design without rework: the PWA route
+would call the SAME `UpdateDeclaredForecast`, and the drift flag would then prompt staff to regenerate and
+re-sign — which is the correct division (the member declares; the club re-issues the signed evidence). Left as
+a future branch.
+
+**Also fixed in passing:** `MemberFormTest`'s forecast test (which asserted the now-removed inline field) was
+repurposed to exercise the new action; and a latent flaky assertion in prompt 70's `DemoSeedProfileTest` (the
+dispense-regression could pick a seeded member who had already consumed toward the daily cap during the
+fortnight) was tightened to exclude members who dispensed today — a daily-limit concern, not the fee block
+under test. Owner-authorised merge (standing "merge everything to main"). 584 green.

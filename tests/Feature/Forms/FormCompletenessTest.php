@@ -134,6 +134,7 @@ class FormCompletenessTest extends TestCase
             'push_opt_outs' => 'member self-service PWA notification preference.',
             'kind' => 'set via the "Socio temporal" toggle at enrolment (a virtual field mapped in the create hook), prompt 31.',
             'temporary_expires_at' => 'system: computed from joined_at + temporary_window_days for temporary members, prompt 31.',
+            'declared_monthly_cg' => 'a signed legal figure: sole writer is the UpdateDeclaredForecast record action, never the generic form, prompt 72.',
         ],
         MembershipTierResource::class => [
             'default_fee_cents' => 'entered as euros via default_fee_eur.',

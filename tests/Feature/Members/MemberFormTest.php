@@ -185,21 +185,18 @@ class MemberFormTest extends TestCase
         $this->get($url)->assertForbidden();
     }
 
-    public function test_the_monthly_forecast_is_entered_in_grams_and_stored_in_centigrams(): void
+    public function test_the_declared_forecast_is_set_in_grams_and_stored_in_centigrams_via_the_action(): void
     {
+        // Prompt 72: the forecast is no longer an inline form field — it is set through the dedicated
+        // UpdateDeclaredForecast record action, which converts grams → centigrams at the edge.
         $this->actingAs($this->user(Role::OWNER));
+        $member = Member::factory()->create(['organisation_id' => $this->org->id, 'declared_monthly_cg' => null]);
 
-        Livewire::test(CreateMember::class)
-            ->fillForm($this->baseFormData(['declared_monthly_cg' => '50.00']))
-            ->call('create')
-            ->assertHasNoFormErrors();
-
-        $member = $this->createdMember();
-        $this->assertSame(5000, $member->declared_monthly_cg); // 50.00 g → 5000 cg
-
-        // …and it round-trips back to 50.00 g on the edit form.
         Livewire::test(EditMember::class, ['record' => $member->getRouteKey()])
-            ->assertFormSet(['declared_monthly_cg' => '50.00']);
+            ->callAction('updateDeclaredForecast', ['declared_monthly_g' => '50.00'])
+            ->assertHasNoActionErrors();
+
+        $this->assertSame(5000, $member->fresh()->declared_monthly_cg); // 50.00 g → 5000 cg
     }
 
     public function test_submitting_create_writes_a_versioned_consent_record(): void

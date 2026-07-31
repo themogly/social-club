@@ -49,6 +49,16 @@ class MembersTable
                 TextColumn::make('kind')->label(__('Tipo'))->badge()->color('warning')
                     ->state(fn (Member $record): ?string => $record->isTemporary() ? __('Temporal') : null),
                 IconColumn::make('is_therapeutic')->label(__('Terapéutico'))->boolean()->toggleable(),
+                // Prompt 72: DERIVED — a warning badge (only) when a generated declaration no longer matches
+                // the member's declared forecast. Toggleable + hidden by default: computing it loads each
+                // member's documents, so it is opt-in for an audit rather than an N+1 on the main list.
+                TextColumn::make('declaration_stale')
+                    ->label(__('Declaración'))
+                    ->badge()
+                    ->placeholder('—')
+                    ->color('warning')
+                    ->state(fn (Member $record): ?string => $record->hasStaleDeclaration() ? __('Desactualizada') : null)
+                    ->toggleable(isToggledHiddenByDefault: true),
                 TextColumn::make('joined_at')->label(__('Alta'))->date()->sortable()->toggleable(),
                 TextColumn::make('wallet_transactions_sum_amount_cents')
                     ->label(__('Monedero'))

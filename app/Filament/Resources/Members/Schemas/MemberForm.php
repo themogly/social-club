@@ -11,7 +11,6 @@ use App\Rules\AvaladorWithinSponseeCap;
 use App\Support\DocumentVault;
 use App\Support\MemberEligibility;
 use App\Support\Settings;
-use App\Support\Weight;
 use Filament\Actions\Action;
 use Filament\Forms\Components\Checkbox;
 use Filament\Forms\Components\DatePicker;
@@ -127,15 +126,11 @@ class MemberForm
                                 ? __('Obligatorio según la política de aval.')
                                 : __('Opcional según la política de aval.')),
 
-                        TextInput::make('declared_monthly_cg')
-                            ->label(__('Previsión mensual (g)'))
-                            ->numeric()
-                            ->minValue(0)
-                            ->step(0.01)
-                            ->suffix(__('g'))
-                            ->helperText(__('Previsión declarada por el socio, en gramos.'))
-                            ->formatStateUsing(fn (?int $state): ?string => filled($state) ? number_format($state / 100, 2, '.', '') : null)
-                            ->dehydrateStateUsing(fn ($state): ?int => filled($state) ? Weight::fromGrams((string) $state)->centigrams : null),
+                        // Prompt 72: the declared forecast is a signed legal figure, not a contact detail —
+                        // it is NOT edited inline here. UpdateDeclaredForecast is its single writer, reached
+                        // via the "Actualizar previsión declarada" record action, so a change is audited under
+                        // its own vocabulary and the declaration-drift flag can fire. Set at registration via
+                        // the same action (the field is nullable until first declared).
 
                         FileUpload::make('medical_cert_path')
                             ->label(__('Certificado médico'))
