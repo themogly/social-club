@@ -56,6 +56,9 @@ class Settings
         'expiring_soon_days' => 30,
         'renewal_reminder_lead_days' => 7,
 
+        // Invitations — an unused invite link expires after this many days (prompt 29).
+        'invite_expiry_days' => 14,
+
         // Stock
         'low_stock_threshold_cg' => 5000,
         'batch_expiry_window_days' => 30,

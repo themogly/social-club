@@ -5,8 +5,8 @@ namespace App\Filament\Resources\MemberApplications\Pages;
 use App\Enums\ApplicationStatus;
 use App\Filament\Resources\MemberApplications\MemberApplicationResource;
 use App\Models\MemberApplication;
+use App\Support\Settings;
 use Filament\Actions\Action;
-use Filament\Actions\CreateAction;
 use Filament\Forms\Components\Select;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\ListRecords;
@@ -20,9 +20,12 @@ class ListMemberApplications extends ListRecords
 
     protected function getHeaderActions(): array
     {
+        // No blank "New application" create: a real application needs the applicant's
+        // compliance fields (DOB, document, consents). Prospects get a tokenised invite
+        // (below); staff-entered walk-ins use the Member direct-create flow (prompt 20),
+        // which already captures those fields. (Prompt 29 decision — see DECISIONS.md.)
         return [
             $this->inviteAction(),
-            CreateAction::make(),
         ];
     }
 
@@ -47,19 +50,23 @@ class ListMemberApplications extends ListRecords
             ])
             ->action(function (array $data): void {
                 $token = Str::random(48);
+                $days = (int) Settings::get('invite_expiry_days', 14);
 
-                MemberApplication::create([
+                $application = MemberApplication::create([
                     'location_id' => $data['location_id'] ?? null,
                     'invite_token_hash' => hash('sha256', $token),
+                    'invite_token' => $token,                 // encrypted at rest → re-copyable from the list
+                    'invited_by' => Auth::id(),
+                    'invite_expires_at' => now()->addDays($days),
                     'payload' => [],
                     'status' => ApplicationStatus::PENDING,
                 ]);
 
-                $url = route('socio.application', ['token' => $token]);
-
+                // Persistent panel so a dismissed toast never loses the link — and it is now
+                // listed with a Copy action, so it is recoverable even after navigating away.
                 Notification::make()
                     ->title(__('Enlace de invitación generado'))
-                    ->body($url)
+                    ->body($application->inviteUrl())
                     ->success()
                     ->persistent()
                     ->send();

@@ -1078,3 +1078,46 @@ not the device login).
 369 tests green (6 new: assign-through-UI + resolver applies it; expired not applied + UI shows Caducado;
 denied to manager/staff at both the UI gate and the action; audit who/from → to + reason; the POS/receipt
 label; the org-template resource gated + resolving).
+
+---
+
+## Prompt 29 — application invite links had no management UI
+
+**Audit.** Invites DO persist (a PENDING `MemberApplication` + `invite_token_hash`), but the raw link is
+shown **once** (hash-only storage) → **unrecoverable** the moment the toast is dismissed (the reported bug).
+No invitations status board, no expiry, no revoke. The blank "New application" create exposed only
+Location/Status/reject-reason (not a real intake). Prompt 15's mail inventory has Approved/Rejected
+mailables but **no invite mailable** → resend-by-email was never in scope.
+
+**Build.**
+- **Re-copyable link (the fix):** the raw token is now also stored **encrypted at rest** (`invite_token`,
+  `encrypted` cast); the Invitations view rebuilds the shareable link via a **Copy link** action, so it
+  survives navigating away. Additive migration; nullable columns; every existing member backfills untouched.
+- **Invitations view:** the MemberApplications table now shows applicant, review status, **invite status**
+  (Sin abrir → Abierta → Enviada, or Anulada/Caducada), invited-by and expiry, with a lifecycle filter
+  (open invites vs submitted) and Copy-link + Revoke row actions.
+- **Status tracking:** `opened_at` (first form view), `submitted_at` (submission).
+- **Expiry + revoke:** `invite_expiry_days` setting (default 14) → `invite_expires_at`; `revoked_at` set by
+  the Revoke action. The public controller refuses an expired/revoked invite with a **clean message page**
+  (not a broken/blank form), additively — the hash-verification path is unchanged.
+
+**Decisions (documented).**
+- `OVERNIGHT-DEFAULT — CONFIRM:` **token discipline** — kept the existing non-guessable
+  `Str::random(48)` + SHA-256 **hash verification** (already non-guessable; arguably stronger than a
+  signature) and enabled re-copy via **encrypted-at-rest** storage, consistent with the ID-scan encryption
+  posture. The literal "signed-URL" pattern was **deliberately NOT** retrofitted overnight: it would rewrite
+  the ONE unauthenticated, security-critical public route, which the overnight rules say to leave for human
+  review. Re-copy + expiry + revoke are all delivered without touching the verification path.
+- `OVERNIGHT-DEFAULT — CONFIRM:` **single-use** — an invite maps to ONE prospective member's application;
+  it is **not reusable** for multiple different people (each prospect gets their own invite). It stays
+  openable until expiry / revoke / a review decision so the one applicant can complete or correct their
+  submission. (A decided application already dead-ends the link, pre-existing.)
+- `OVERNIGHT-DEFAULT — CONFIRM:` **New-application button removed** — the blank create lacked the
+  compliance-critical applicant fields (DOB, document, consents). Walk-ins use the Member direct-create flow
+  (prompt 20, which has those fields); prospects use the invite link. Removed the header CreateAction so the
+  two real creation paths are unambiguous.
+- **Resend-by-email deferred** (documented): no invite mailable exists; copy-link is the delivery. A future
+  prompt could add an invite mailable if email delivery is wanted.
+- Expiry duration is the `invite_expiry_days` setting (default 14), on the settings page.
+
+Migration verified on MySQL (encrypted-token column + FK + invite flow). 374 tests green (5 new).

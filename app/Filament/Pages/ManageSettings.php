@@ -55,6 +55,7 @@ class ManageSettings extends Page
         'avalador_therapeutic_exempt' => SettingType::BOOL,
         'expiring_soon_days' => SettingType::INT,
         'renewal_reminder_lead_days' => SettingType::INT,
+        'invite_expiry_days' => SettingType::INT,
         'batch_expiry_window_days' => SettingType::INT,
         'discounts_stack' => SettingType::BOOL,
         'data_retention_days' => SettingType::INT,
@@ -162,7 +163,9 @@ class ManageSettings extends Page
                     ->schema([
                         TextInput::make('expiring_soon_days')->label(__('Días "caduca pronto"'))->numeric()->required(),
                         TextInput::make('renewal_reminder_lead_days')->label(__('Días de aviso de renovación'))->numeric()->required(),
-                    ])->columns(2),
+                        TextInput::make('invite_expiry_days')->label(__('Caducidad de invitación (días)'))->numeric()->minValue(1)->required()
+                            ->helperText(__('Una invitación de alta sin usar caduca tras estos días.')),
+                    ])->columns(3),
 
                 Section::make(__('Existencias'))
                     ->schema([

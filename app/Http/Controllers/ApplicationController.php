@@ -23,7 +23,24 @@ class ApplicationController extends Controller
 {
     public function show(string $token): View
     {
-        $application = $this->resolve($token);
+        $application = $this->find($token);
+
+        if ($application === null) {
+            abort(404);
+        }
+
+        if ($application->isInviteRevoked()) {
+            return view('socio.application-closed', ['reason' => __('Esta invitación ha sido anulada.')]);
+        }
+
+        if ($application->isInviteExpired()) {
+            return view('socio.application-closed', ['reason' => __('Esta invitación ha caducado. Pide una nueva a la asociación.')]);
+        }
+
+        // First view marks the invite "started" (for the Invitations status board).
+        if ($application->opened_at === null) {
+            $application->update(['opened_at' => now()]);
+        }
 
         return view('socio.application', [
             'token' => $token,
@@ -34,7 +51,13 @@ class ApplicationController extends Controller
 
     public function store(SubmitApplicationRequest $request, string $token): RedirectResponse
     {
-        $application = $this->resolve($token);
+        $application = $this->find($token);
+
+        // Refuse a revoked / expired / decided invite — never write against a dead link.
+        if ($application === null || ! $application->isInviteLive()) {
+            abort(404);
+        }
+
         $data = $request->validated();
 
         $payload = [
@@ -55,20 +78,20 @@ class ApplicationController extends Controller
         ];
 
         // Still PENDING — it now carries the applicant's details and enters the review queue.
-        $application->update(['payload' => $payload]);
+        $application->update(['payload' => $payload, 'submitted_at' => now()]);
 
         return redirect()
             ->route('socio.application', ['token' => $token])
             ->with('status', __('¡Gracias! Hemos recibido tu solicitud. La asociación la revisará y te avisará por correo.'));
     }
 
-    /** A valid, unconsumed invite: PENDING status + matching token hash. 404 otherwise. */
-    private function resolve(string $token): MemberApplication
+    /** A pending invite matching the token hash, or null. Revoke/expiry are checked by the caller. */
+    private function find(string $token): ?MemberApplication
     {
         return MemberApplication::query()->withoutGlobalScopes()
             ->where('invite_token_hash', hash('sha256', $token))
             ->where('status', ApplicationStatus::PENDING)
-            ->firstOr(fn () => abort(404));
+            ->first();
     }
 
     /** Best-effort: match a sponsor by member number within the invite's organisation. */
