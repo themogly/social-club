@@ -2212,3 +2212,36 @@ regression guard against the axes collapsing back into duplicates (tested).
 vocabulary stays as entered; localizing it is a separate concern for a future prompt. **Strain type itself
 IS an enum, so it translates** — the right call for a fixed vocabulary. Supersedes prompt 62 (dropped).
 Owner-authorised merge.
+
+---
+
+## Prompt 69 — Bar report double-rows (per-location articles)
+
+With the seeder fixed (batch 2·0), the Bar report finally shows real money — but rendered every article
+TWICE with identical labels at an All-locations scope. `Article` is per-location (`ScopedToLocation`): each
+sede has its own Agua/Café/etc., distinct ids, so `BarSalesReport`'s group-by-`article_id` produced two
+correct-but-indistinguishable rows once the report only showed the name.
+
+**A fixture defect had been masking a product defect** — exactly the risk the fixtures-through-the-writer
+rule warns about. Before the seeder fix, seeded orders carried no `article_id`, so everything fell down the
+off-catalogue `m:name` path and merged by name into one row per article. Fixing the seeder to write real
+`CommitOrder`-shaped data (with `article_id`) exposed a presentation bug that was ALWAYS there for real
+orders. Noted as a case where a green-looking fixture hid a real defect.
+
+**Option chosen: a Sede column, shown only at a multi-location scope** (`count(resolvedLocationIds()) > 1`),
+hidden for a single location (no redundancy). Honest, simple, and it PRESERVES the correct per-article
+grouping — this is a presentation fix, not a grouping change. Rejected "aggregate by name across sedes"
+because two sedes may stock same-named articles at different prices, which merging would hide. The period
+total is untouched (grouping unchanged), and the reconciliation with `FinancialReport`'s Barra column still
+holds across sedes (tested). Manual off-catalogue lines (`m:name`, no location-bound article) still merge by
+name across sedes and show a "—" sede. CSV/PDF exports read the SAME `ReportTable` (columns + rows), so they
+can't diverge from the screen.
+
+**Sibling check (as required):**
+- **StockReport** — CLEAR. It groups by BATCH and renders the unique `batch_no` (`lote`), so two same-genetic
+  batches at different sedes are never indistinguishable (the batch number tells them apart). Not the
+  identical-row bug. (A sede column there is a reasonable future nicety, not this fix.)
+- **ConsumptionReport** — CLEAR. It groups by MEMBER (org-wide, not per-location) and shows the unique
+  `member_no`; its by-genetic table groups by genetic (org-wide). No per-location-same-name ambiguity.
+
+553 green. Owner-authorised merge.

@@ -3,6 +3,7 @@
 namespace App\ViewModels\Reports;
 
 use App\Enums\OrderStatus;
+use App\Models\Location;
 use App\Support\Money;
 use Illuminate\Support\Facades\DB;
 
@@ -45,18 +46,25 @@ class BarSalesReport extends AbstractReport
     private function byArticle(): ReportTable
     {
         [$start, $end] = $this->bounds();
+        $locationIds = $this->resolvedLocationIds();
 
-        $itemsPerOrder = DB::table('orders')
-            ->whereIn('location_id', $this->resolvedLocationIds())
+        // Articles are PER-LOCATION (two sedes each have their own "Agua"), so at a multi-location scope
+        // the article name alone can't tell the rows apart (prompt 69). Surface the sede — grouping stays
+        // by article_id (correct: two same-named articles genuinely are two things), this only labels it.
+        $showSede = count($locationIds) > 1;
+        $locationNames = Location::query()->withoutGlobalScopes()->whereIn('id', $locationIds)->pluck('name', 'id');
+
+        $orders = DB::table('orders')
+            ->whereIn('location_id', $locationIds)
             ->where('status', OrderStatus::COMPLETED->value)
             ->whereBetween('created_at', [$start, $end])
-            ->pluck('items');
+            ->get(['items', 'location_id']);
 
-        /** @var array<string, array{articulo: string, unidades: int, importe: int}> $agg */
+        /** @var array<string, array{articulo: string, sede: string, unidades: int, importe: int}> $agg */
         $agg = [];
 
-        foreach ($itemsPerOrder as $json) {
-            $items = json_decode((string) $json, true);
+        foreach ($orders as $order) {
+            $items = json_decode((string) $order->items, true);
 
             if (! is_array($items)) {
                 continue;
@@ -67,13 +75,15 @@ class BarSalesReport extends AbstractReport
                     continue;
                 }
 
-                // Group by article; off-catalogue manual lines (article_id null) group by their name,
-                // so every euro of the order total lands in exactly one row and the totals reconcile.
+                // Group by article; off-catalogue manual lines (article_id null) group by their name
+                // across sedes (they carry no location-bound article), so every euro lands in one row and
+                // the totals reconcile. An article's id is location-scoped, so its sede is consistent.
                 $articleId = $item['article_id'] ?? null;
                 $name = (string) ($item['name'] ?? __('Sin nombre'));
                 $groupKey = $articleId !== null ? 'a:'.$articleId : 'm:'.$name;
+                $sede = $articleId !== null ? (string) ($locationNames[$order->location_id] ?? '—') : '—';
 
-                $agg[$groupKey] ??= ['articulo' => $name, 'unidades' => 0, 'importe' => 0];
+                $agg[$groupKey] ??= ['articulo' => $name, 'sede' => $sede, 'unidades' => 0, 'importe' => 0];
                 $agg[$groupKey]['unidades'] += (int) ($item['qty'] ?? 0);
                 $agg[$groupKey]['importe'] += (int) ($item['line_total_cents'] ?? 0);
             }
@@ -87,14 +97,17 @@ class BarSalesReport extends AbstractReport
             'importe' => array_sum(array_column($rows, 'importe')),
         ];
 
+        $columns = [ReportColumn::text('articulo', __('Artículo'), sortable: false)];
+        if ($showSede) {
+            $columns[] = ReportColumn::text('sede', __('Sede'), sortable: false);
+        }
+        $columns[] = ReportColumn::number('unidades', __('Unidades'));
+        $columns[] = ReportColumn::money('importe', __('Importe'));
+
         return new ReportTable(
             key: 'articulos',
             title: __('Barra y tienda por artículo'),
-            columns: [
-                ReportColumn::text('articulo', __('Artículo'), sortable: false),
-                ReportColumn::number('unidades', __('Unidades')),
-                ReportColumn::money('importe', __('Importe')),
-            ],
+            columns: $columns,
             rows: $rows,
             totals: $totals,
             empty: __('Sin ventas de barra en este período'),
