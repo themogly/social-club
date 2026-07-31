@@ -5,6 +5,7 @@ namespace App\ViewModels;
 use App\Enums\ApplicationStatus;
 use App\Enums\BatchStatus;
 use App\Enums\DispensationStatus;
+use App\Enums\MemberKind;
 use App\Enums\MembershipStatus;
 use App\Enums\OrderStatus;
 use App\Enums\Role;
@@ -202,6 +203,9 @@ class Dashboard
         if (($n = $this->membersOverLimit()) > 0) {
             $alerts[] = ['severity' => 'warning', 'key' => 'members_over_limit', 'count' => $n];
         }
+        if (($n = $this->membersOverCap()) > 0) {
+            $alerts[] = ['severity' => 'warning', 'key' => 'active_member_cap', 'count' => $n];
+        }
         if ($this->hasUnreconciledTill()) {
             $n = $this->scopeByLocation(TillSession::query()->withoutGlobalScopes())
                 ->where('status', TillSessionStatus::OPEN->value)->count();
@@ -221,6 +225,28 @@ class Dashboard
         }
 
         return $alerts;
+    }
+
+    /**
+     * Active members in the org against the soft cap (prompt 34). Temporary members are
+     * counted only when `temporary_count_toward_cap` is on. Returns the count when at/over
+     * the cap (so the dashboard warns), else 0. Org-wide — the cap is a club-wide figure.
+     */
+    public function membersOverCap(): int
+    {
+        $cap = (int) Settings::get('active_member_cap', 0);
+        if ($cap <= 0) {
+            return 0;
+        }
+
+        $count = (int) Member::query()->withoutGlobalScopes()
+            ->where('organisation_id', $this->organisationId)
+            ->when(! (bool) Settings::get('temporary_count_toward_cap', true),
+                fn (Builder $q): Builder => $q->where('kind', '!=', MemberKind::TEMPORARY->value))
+            ->whereHas('memberships', fn (Builder $q) => $q->where('status', MembershipStatus::ACTIVE->value))
+            ->count();
+
+        return $count >= $cap ? $count : 0;
     }
 
     public function membersOverLimit(): int

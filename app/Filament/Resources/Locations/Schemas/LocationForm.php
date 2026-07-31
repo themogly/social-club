@@ -54,13 +54,8 @@ class LocationForm
                     ->default(true),
 
                 // The following bind into the model's `settings` array cast via dot paths.
-                Select::make('settings.aforo_enforcement')
-                    ->label(__('Control de aforo'))
-                    ->options([
-                        'block' => __('Bloquear'),
-                        'warn' => __('Avisar'),
-                    ]),
-
+                // (No aforo-enforcement control: aforo is a legal capacity limit and is enforced as a
+                // fixed BLOCK via the enforcement matrix — prompt 34 removed the inert warn/block dropdown.)
                 Toggle::make('settings.bar_enabled')
                     ->label(__('Bar activado')),
 
@@ -73,6 +68,12 @@ class LocationForm
 
                 Toggle::make('settings.camera_scan_enabled')
                     ->label(__('Escaneo con cámara')),
+
+                // The REAL ring-fence control (prompt 34) — read by AutoSettleDebt::isRingFenced.
+                // Replaces the inert org-level wallet_ring_fence toggle that was removed.
+                Toggle::make('settings.ring_fenced')
+                    ->label(__('Monedero por sede (ring-fence)'))
+                    ->helperText(__('Si se activa, el crédito de esta sede no salda automáticamente deudas en otras sedes.')),
             ]);
     }
 }
