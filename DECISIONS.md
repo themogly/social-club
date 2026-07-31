@@ -2696,3 +2696,40 @@ remains the key linking a session to its POS screens — this branch only makes 
 **Screenshots:** the open-flow picker + the POS not-found state listing terminals (light+dark, 1024/1440)
 could not be produced — no browser here; covered by `TillTerminalPickerTest` (8 tests). Owner-authorised merge
 (standing "merge everything to main"). 625 green.
+
+---
+
+## Prompt 85 — new members never received their QR card; the only send was a button labelled "Resend"
+
+`MemberCardMail` and `IssueMemberToken` both worked, and `resendQrAction` wired them together — but nothing
+sent the card on creation, so every member's card depended on staff remembering to click a button whose own
+label ("Reenviar carné QR") implies it was already sent once. A member who applied online, was approved, and
+never heard from anyone was the normal case.
+
+**One send path — `App\Actions\Members\SendMemberCard`** — called from BOTH creation routes (admin
+`CreateMember::afterCreate` and `ApproveApplication`) and the resend action. **Queued, never synchronous**
+(`Mail::to()->queue()`) — the old `resendQrAction` used `Mail::send()`, which blocks the counter; fixed while
+in the file, so there is no synchronous send left. **No email ⇒ no send, no error, no exception** — the
+action returns false and the state is DISCOVERABLE via `Member::cardMissing()` (derived: no email, or no card
+ever issued) surfaced as a toggleable "Carné QR" column ("Sin correo" / "Pendiente"). Audited
+`member.card.sent` — the ACT, with the channel only, never the email address (the audit log has longer
+retention — prompt 76).
+
+**No double-send on approval.** The admin `CreateMember::afterCreate` hook only runs on the Filament create
+page, NOT on the `ApproveApplication` path, so calling `SendMemberCard` explicitly once in each is correct —
+verified by a test asserting exactly one queued mail after approval. No observer sends the card, so a
+subsequent `$member->save()` cannot re-trigger it.
+
+**Token rotation on resend — DECISION: it rotates, and this is FORCED, diverging from prompt 45 deliberately.**
+`IssueMemberToken` stores the card token HASH-ONLY (NOTES §B) — the plaintext the QR encodes is returned once
+and is unrecoverable — so a resend CANNOT re-emit the old token and necessarily issues a fresh one, revoking
+the previous card. Prompt 45 took the opposite view for invite links (resend REUSES the token), but it can:
+invites store the ENCRYPTED RAW token, which is recoverable. A QR card cannot, and the security requirement
+(no recoverable card credential at rest) wins over the convenience of a still-valid printed card. Consequence,
+recorded for staff: **a member who is re-sent their card will find any previously printed card dead.** If a
+club needs "re-email the same card", that would require storing the card token encrypted-raw like invites — a
+security trade-off to be decided deliberately, not defaulted into.
+
+**Screenshots:** the `/dev/mail` card preview + the member-record card state (light+dark) could not be
+produced — no browser here; `MemberCardMail` is unchanged so it keeps its render test + `/dev/mail` entry.
+Covered by `SendMemberCardTest` (6 tests). Owner-authorised merge (standing "merge everything to main"). 631 green.

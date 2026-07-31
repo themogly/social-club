@@ -71,6 +71,10 @@ class ApproveApplication
 
         (new RecordAuditLog)->handle('application.approved', $member, null, ['application_id' => $application->id]);
 
+        // Send the QR card automatically (prompt 85). Called ONCE here — the member is fully created; the
+        // admin CreateMember page's afterCreate does not run on this path, so there is no double-send.
+        (new SendMemberCard)->handle($member);
+
         return $member;
     }
 }

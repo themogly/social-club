@@ -157,6 +157,21 @@ class Member extends Model implements Authenticatable
         return $this->hasMany(MemberToken::class);
     }
 
+    /** True once a QR card has been issued to this member (a non-revoked card token exists). */
+    public function hasQrCard(): bool
+    {
+        return $this->tokens()->where('purpose', 'QR_CARD')->whereNull('revoked_at')->exists();
+    }
+
+    /**
+     * The discoverable "card not sent" state (prompt 85), DERIVED not stored: no email to send to, or no
+     * card ever issued. A member who applied online and was approved should never be silently cardless.
+     */
+    public function cardMissing(): bool
+    {
+        return blank($this->email) || ! $this->hasQrCard();
+    }
+
     /** @return HasMany<MemberDocument, $this> */
     public function documents(): HasMany
     {

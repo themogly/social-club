@@ -4,8 +4,8 @@ namespace App\Filament\Resources\Members;
 
 use App\Actions\Documents\GenerateMemberDocument;
 use App\Actions\Members\ExportMemberData;
-use App\Actions\Members\IssueMemberToken;
 use App\Actions\Members\ManageTemporaryMember;
+use App\Actions\Members\SendMemberCard;
 use App\Actions\Members\TransitionMemberStatus;
 use App\Actions\Members\UpdateDeclaredForecast;
 use App\Actions\Members\WaiveCarencia;
@@ -29,7 +29,6 @@ use App\Filament\Resources\Members\RelationManagers\WalletTransactionsRelationMa
 use App\Filament\Resources\Members\Schemas\MemberForm;
 use App\Filament\Resources\Members\Schemas\MemberInfolist;
 use App\Filament\Resources\Members\Tables\MembersTable;
-use App\Mail\MemberCardMail;
 use App\Models\Member;
 use App\Models\User;
 use App\Support\Settings;
@@ -155,8 +154,8 @@ class MemberResource extends Resource
             ->requiresConfirmation()
             ->visible(fn (Member $record): bool => filled($record->email))
             ->action(function (Member $record): void {
-                $token = (new IssueMemberToken)->handle($record);
-                Mail::to($record->email)->send(new MemberCardMail($record, $token));
+                // Prompt 85: through the single, QUEUED SendMemberCard path (was a synchronous Mail::send()).
+                (new SendMemberCard)->handle($record);
 
                 Notification::make()
                     ->title(__('Carné QR reenviado'))

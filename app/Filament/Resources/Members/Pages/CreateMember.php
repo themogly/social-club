@@ -4,6 +4,7 @@ namespace App\Filament\Resources\Members\Pages;
 
 use App\Actions\Members\FindDuplicateMembers;
 use App\Actions\Members\RecordMemberConsent;
+use App\Actions\Members\SendMemberCard;
 use App\Actions\Members\SyncMemberScanDocuments;
 use App\Enums\MemberKind;
 use App\Filament\Resources\Members\MemberResource;
@@ -106,5 +107,8 @@ class CreateMember extends CreateRecord
 
         (new RecordMemberConsent)->handle($member, 'membership', request()->ip());
         (new SyncMemberScanDocuments)->handle($member, $actor);
+
+        // Send the QR card automatically (prompt 85) — queued; a member with no email is skipped cleanly.
+        (new SendMemberCard)->handle($member);
     }
 }
