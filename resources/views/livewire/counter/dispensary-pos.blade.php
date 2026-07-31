@@ -45,7 +45,7 @@
                 ])
             >
                 <span>{{ $flashMessage }}</span>
-                <button type="button" wire:click="$set('flashMessage', null)" class="shrink-0 rounded-md px-2 py-1 opacity-70 hover:opacity-100">✕</button>
+                <button type="button" wire:click="$set('flashMessage', null)" aria-label="{{ __('Descartar aviso') }}" class="shrink-0 rounded-md px-2 py-1 opacity-70 hover:opacity-100">✕</button>
             </div>
         @endif
 
@@ -328,7 +328,7 @@
                         <h2 class="text-base font-semibold">{{ __('Genéticas') }}</h2>
                         <input
                             type="text"
-                            wire:model.live.debounce.300ms="geneticSearch"
+                            wire:model.live.debounce.300ms="geneticSearch" aria-label="{{ __('Buscar genética…') }}"
                             autocomplete="off"
                             placeholder="{{ __('Buscar genética…') }}"
                             class="h-10 w-full rounded-xl border border-line bg-surface px-4 text-sm text-ink placeholder:text-ink-muted/60 focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/40 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 sm:w-56"

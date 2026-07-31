@@ -17,7 +17,7 @@
     {{-- Aforo ring: colour + the current/capacity number (never colour alone). --}}
     <div class="flex items-center gap-4">
         <div class="relative inline-flex shrink-0 items-center justify-center">
-            <svg viewBox="0 0 100 100" class="h-28 w-28 -rotate-90">
+            <svg viewBox="0 0 100 100" class="h-28 w-28 -rotate-90" aria-hidden="true">
                 <circle cx="50" cy="50" r="{{ $radius }}" fill="none" stroke-width="10" class="stroke-slate-200 dark:stroke-slate-700" />
                 <circle
                     cx="50" cy="50" r="{{ $radius }}"

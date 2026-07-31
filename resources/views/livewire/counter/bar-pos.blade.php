@@ -46,7 +46,7 @@
                 ])
             >
                 <span>{{ $flashMessage }}</span>
-                <button type="button" wire:click="$set('flashMessage', null)" class="shrink-0 rounded-md px-2 py-1 opacity-70 hover:opacity-100">✕</button>
+                <button type="button" wire:click="$set('flashMessage', null)" aria-label="{{ __('Descartar aviso') }}" class="shrink-0 rounded-md px-2 py-1 opacity-70 hover:opacity-100">✕</button>
             </div>
         @endif
 
@@ -124,7 +124,7 @@
                         <h2 class="text-base font-semibold">{{ __('Artículos') }}</h2>
                         <input
                             type="text"
-                            wire:model.live.debounce.300ms="articleSearch"
+                            wire:model.live.debounce.300ms="articleSearch" aria-label="{{ __('Buscar artículo…') }}"
                             autocomplete="off"
                             placeholder="{{ __('Buscar artículo…') }}"
                             class="h-10 w-full rounded-xl border border-line bg-surface px-4 text-sm text-ink placeholder:text-ink-muted/60 focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/40 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 sm:w-56"
@@ -232,14 +232,14 @@
                                         @if ($line['type'] === 'misc' && $line['reference'])· <span class="italic">{{ $line['reference'] }}</span>@endif
                                     </p>
                                     <div class="mt-1.5 inline-flex items-center gap-1 rounded-lg border border-line dark:border-slate-700">
-                                        <button type="button" wire:click="decrementLine({{ $line['index'] }})" class="flex h-8 w-8 items-center justify-center rounded-l-lg text-lg text-ink-muted transition hover:bg-surface-alt dark:text-slate-400 dark:hover:bg-slate-800">−</button>
+                                        <button type="button" wire:click="decrementLine({{ $line['index'] }})" aria-label="{{ __('Menos una unidad') }}" class="flex h-8 w-8 items-center justify-center rounded-l-lg text-lg text-ink-muted transition hover:bg-surface-alt dark:text-slate-400 dark:hover:bg-slate-800">−</button>
                                         <span class="min-w-8 text-center text-sm font-semibold tabular-nums">{{ $line['qty'] }}</span>
-                                        <button type="button" wire:click="incrementLine({{ $line['index'] }})" class="flex h-8 w-8 items-center justify-center rounded-r-lg text-lg text-ink-muted transition hover:bg-surface-alt dark:text-slate-400 dark:hover:bg-slate-800">+</button>
+                                        <button type="button" wire:click="incrementLine({{ $line['index'] }})" aria-label="{{ __('Más una unidad') }}" class="flex h-8 w-8 items-center justify-center rounded-r-lg text-lg text-ink-muted transition hover:bg-surface-alt dark:text-slate-400 dark:hover:bg-slate-800">+</button>
                                     </div>
                                 </div>
                                 <div class="flex shrink-0 flex-col items-end gap-2">
                                     <span class="font-semibold tabular-nums">{{ $this->money($line['line_total_cents']) }}</span>
-                                    <button type="button" wire:click="removeLine({{ $line['index'] }})" class="rounded-md px-2 py-1 text-ink-muted hover:bg-black/5 dark:text-slate-400 dark:hover:bg-white/5">✕</button>
+                                    <button type="button" wire:click="removeLine({{ $line['index'] }})" aria-label="{{ __('Quitar de la cesta') }}" class="rounded-md px-2 py-1 text-ink-muted hover:bg-black/5 dark:text-slate-400 dark:hover:bg-white/5">✕</button>
                                 </div>
                             </li>
                         @empty
