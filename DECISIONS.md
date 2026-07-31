@@ -1655,3 +1655,32 @@ ring_fenced survives as a row; the JSON store is gone (no column, no cast); and 
 `LocationForm::SETTING_TOGGLES` and fails if any toggle has no `Settings::get` reader (an enumerated test would
 have passed while four were dead). Owner-authorised (batch) merge. 461 green. MySQL parity for the migration
 PENDING — MySQL wouldn't start in this environment (SQLite parity holds). Screenshots pending — no browser.
+
+## Prompt 48 — audit trail completeness (the five gaps prompt 17 named)
+
+Wired `RecordAuditLog` into the five categories that wrote nothing to `audit_logs`.
+
+- **Placement rule: audit in the DOMAIN action where one exists** (every path goes through it), else the
+  Filament page's `afterSave` (plain resource edits). **Transaction boundary: INSIDE the existing DB
+  transaction** — matching `CommitStockTake` (the already-audited neighbour), so a failed audit rolls back
+  the money/stock movement it describes. One rule, not two.
+- **Wallet adjustments** — `RecordWalletTransaction`, ADJUSTMENT type only (`wallet.adjusted`); before/after
+  is the balance change. Routine top-ups/contributions/fees are traced in the wallet ledger, not flooded here.
+- **Stock adjustments + merma** — `RecordStockMovement`, ADJUSTMENT → `stock.adjusted`, MERMA →
+  `stock.merma`; before/after is the remaining quantity, and the merma REASON now lands in the audit log (not
+  only the movement row). **Batch intake** — `IntakeBatch` (now wrapped in a transaction) → `batch.intake`.
+- **Resource edits** via a shared `AuditsResourceChanges` trait (snapshot raw original in `beforeSave`, diff
+  the saved values in `afterSave` — Filament fills the record AFTER `beforeSave`, so `getDirty()` there is
+  empty): `article.updated`, `genetic.updated`, `member.updated`. Only CHANGED attributes, never the whole
+  model, and credential/secret keys (password, remember_token, two_factor_*) are always excluded.
+- **Role changes** — `EditUser` diffs the roles relation (names) → `user.roles.updated`.
+
+Contradiction with the prompt file (flagged, as instructed): the prompt suggested `article.price.updated` /
+`genetic.price.updated`, but both forms edit the whole record — used the accurate `article.updated` /
+`genetic.updated`. And **genetic PRICES have no edit surface at all** (they live in `GeneticPrice` rows —
+prompt 54's concern), so EditGenetic audits the DEFINITION, not a price. Also corrected AUDIT-FINDINGS.md AD4
+(claimed merma/wallet adjust were "audited" — they were not; now they are).
+
+Append-only stays enforced (writes only — the existing no-update/no-delete test still passes). No read is
+audited. Tests: one per gap (right action/actor/subject + real before/after), a role change names the roles,
+and no row carries credential material. Owner-authorised (batch) merge. 468 green. Screenshots pending — no browser.

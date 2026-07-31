@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\Genetics\Pages;
 
+use App\Filament\Concerns\AuditsResourceChanges;
 use App\Filament\Resources\Genetics\GeneticResource;
 use App\Models\Genetic;
 use App\Support\Weight;
@@ -11,6 +12,8 @@ use Filament\Resources\Pages\EditRecord;
 
 class EditGenetic extends EditRecord
 {
+    use AuditsResourceChanges;
+
     protected static string $resource = GeneticResource::class;
 
     protected function getHeaderActions(): array
@@ -19,6 +22,18 @@ class EditGenetic extends EditRecord
             DeleteAction::make(),
             RestoreAction::make(),
         ];
+    }
+
+    // A genetic-definition change is audited (prompt 48). NOTE: genetic PRICES live in GeneticPrice
+    // rows, which have no edit surface (see prompt 54) — so this audits the definition, not a price.
+    protected function beforeSave(): void
+    {
+        $this->captureAuditDiff();
+    }
+
+    protected function afterSave(): void
+    {
+        $this->writeAuditLog('genetic.updated');
     }
 
     /**
