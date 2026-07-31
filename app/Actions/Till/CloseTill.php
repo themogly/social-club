@@ -10,6 +10,7 @@ use App\Models\User;
 use App\Support\Settings;
 use App\Support\TillSummary;
 use Illuminate\Auth\Access\AuthorizationException;
+use Illuminate\Support\Facades\DB;
 use RuntimeException;
 
 /**
@@ -26,34 +27,42 @@ class CloseTill
             throw new AuthorizationException('Closing a till requires the till.close permission.');
         }
 
-        if ($session->status !== TillSessionStatus::OPEN) {
-            throw new TillClosedException('This till session is already closed.');
-        }
+        // Lock the session for the read-then-write (prompt 77): compute the expected figure and mark the
+        // session CLOSED in ONE transaction, holding the row lock, so a cash movement cannot land between
+        // the two steps and be excluded from the immutable arqueo forever. RecordCashMovement contends on
+        // the same lock, so a concurrent movement either commits BEFORE (counted) or is refused (closed).
+        return DB::transaction(function () use ($session, $countedCents, $closedBy, $note): TillSession {
+            $locked = TillSession::withoutGlobalScopes()->whereKey($session->id)->lockForUpdate()->firstOrFail();
 
-        $expected = TillSummary::expectedCents($session);
-        $variance = $countedCents - $expected;
-        $tolerance = (int) Settings::get('arqueo_variance_tolerance_cents', 500);
+            if ($locked->status !== TillSessionStatus::OPEN) {
+                throw new TillClosedException('This till session is already closed.');
+            }
 
-        if (abs($variance) > $tolerance && blank($note)) {
-            throw new RuntimeException('A note is required when the variance exceeds the tolerance.');
-        }
+            $expected = TillSummary::expectedCents($locked);
+            $variance = $countedCents - $expected;
+            $tolerance = (int) Settings::get('arqueo_variance_tolerance_cents', 500);
 
-        $session->update([
-            'counted_cents' => $countedCents,
-            'expected_cents' => $expected,
-            'variance_cents' => $variance,
-            'closed_by' => $closedBy->id,
-            'closed_at' => now(),
-            'status' => TillSessionStatus::CLOSED,
-            'notes' => $note ?? $session->notes,
-        ]);
+            if (abs($variance) > $tolerance && blank($note)) {
+                throw new RuntimeException('A note is required when the variance exceeds the tolerance.');
+            }
 
-        (new RecordAuditLog)->handle('till.closed', $session, null, [
-            'expected_cents' => $expected,
-            'counted_cents' => $countedCents,
-            'variance_cents' => $variance,
-        ]);
+            $locked->update([
+                'counted_cents' => $countedCents,
+                'expected_cents' => $expected,
+                'variance_cents' => $variance,
+                'closed_by' => $closedBy->id,
+                'closed_at' => now(),
+                'status' => TillSessionStatus::CLOSED,
+                'notes' => $note ?? $locked->notes,
+            ]);
 
-        return $session;
+            (new RecordAuditLog)->handle('till.closed', $locked, null, [
+                'expected_cents' => $expected,
+                'counted_cents' => $countedCents,
+                'variance_cents' => $variance,
+            ]);
+
+            return $locked;
+        });
     }
 }

@@ -20,13 +20,14 @@ class Organisation extends Model
 
     protected $fillable = [
         'name', 'legal_name', 'tax_id', 'address', 'logo_path',
-        'contact_email', 'contact_phone', 'settings',
+        'contact_email', 'contact_phone', 'settings', 'member_no_sequence',
     ];
 
     protected function casts(): array
     {
         return [
             'settings' => 'array',
+            'member_no_sequence' => 'integer',
         ];
     }
 

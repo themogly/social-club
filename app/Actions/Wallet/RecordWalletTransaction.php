@@ -35,6 +35,12 @@ class RecordWalletTransaction
         $balanceAfter = 0;
 
         $transaction = DB::transaction(function () use ($member, $location, $amountCents, $type, $options, &$crossedLow, &$balanceAfter): WalletTransaction {
+            // Serialise wallet writes for this member on the MEMBER row (the same row CommitDispensation
+            // locks — prompt 77). Without it the balance SUM below reads a stale MySQL snapshot under
+            // REPEATABLE READ, so concurrent debits each pass the debt check and the limit is bypassed.
+            // Re-entrant when CommitDispensation already holds the lock (same transaction) — no deadlock.
+            Member::withoutGlobalScopes()->whereKey($member->id)->lockForUpdate()->first();
+
             $oldBalance = Wallet::balance($member->id, $location->id);
             $newBalance = $oldBalance + $amountCents;
 
