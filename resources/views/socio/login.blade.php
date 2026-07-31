@@ -21,10 +21,7 @@
                 <input type="email" id="email" name="email" required autocomplete="email" inputmode="email"
                        placeholder="{{ __('tu@correo.es') }}"
                        class="w-full rounded-lg border border-line bg-surface px-3 py-2.5 text-ink outline-none focus:border-brand focus:ring-2 focus:ring-brand/30 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100">
-                <button type="submit"
-                        class="w-full rounded-lg bg-brand px-4 py-2.5 font-semibold text-white transition hover:bg-brand-dark">
-                    {{ __('Enviar enlace') }}
-                </button>
+                <x-button type="submit" size="md" class="w-full">{{ __('Enviar enlace') }}</x-button>
             </form>
         </div>
 

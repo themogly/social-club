@@ -39,6 +39,8 @@ class ConsentsRelationManager extends RelationManager
                     ->state(fn (ConsentRecord $record): bool => $record->withdrawn_at === null)
                     ->boolean(),
                 TextColumn::make('ip')->label(__('IP'))->placeholder('—')->toggleable(),
-            ]);
+            ])
+            ->emptyStateHeading(__('Sin consentimientos registrados'))
+            ->emptyStateDescription(__('Los consentimientos RGPD del socio se capturan al aprobar su alta y aparecerán aquí.'));
     }
 }

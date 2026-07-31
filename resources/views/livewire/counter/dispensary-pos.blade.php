@@ -28,7 +28,7 @@
         </div>
     @else
         {{-- Offline banner — unmistakable, fail closed. --}}
-        <div x-show="! online" x-cloak class="mb-4 flex items-center gap-3 rounded-xl border border-error/40 bg-error/10 px-4 py-3 text-sm font-semibold text-error">
+        <div x-show="! online" x-cloak role="alert" aria-live="assertive" class="mb-4 flex items-center gap-3 rounded-xl border border-error/40 bg-error/10 px-4 py-3 text-sm font-semibold text-error">
             <span class="text-lg">⚠️</span>
             <span>{{ __('Sin conexión. No se puede registrar ninguna dispensación; la cesta se conserva y se reactivará al reconectar.') }}</span>
         </div>
@@ -37,6 +37,8 @@
         @if ($flashMessage)
             <div
                 wire:key="flash"
+                role="{{ $flashType === 'error' ? 'alert' : 'status' }}"
+                aria-live="{{ $flashType === 'error' ? 'assertive' : 'polite' }}"
                 @class([
                     'mb-4 flex items-center justify-between gap-3 rounded-xl border px-4 py-3 text-sm font-medium',
                     'border-success/30 bg-success/10 text-success' => $flashType === 'success',
@@ -65,7 +67,7 @@
                             autocomplete="off"
                             spellcheck="false"
                             placeholder="{{ __('Escanea o escribe el código y pulsa Enter') }}"
-                            class="mt-2 h-12 w-full rounded-xl border border-line bg-surface px-4 text-base text-ink placeholder:text-ink-muted/60 focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/40 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
+                            class="mt-2 h-12 w-full rounded-xl border border-line bg-surface px-4 text-base text-ink placeholder:text-ink-muted focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/40 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
                         >
                     </form>
 
@@ -77,7 +79,7 @@
                             wire:model.live.debounce.300ms="search"
                             autocomplete="off"
                             placeholder="{{ __('Ej. García o M-00042') }}"
-                            class="mt-2 h-11 w-full rounded-xl border border-line bg-surface px-4 text-base text-ink placeholder:text-ink-muted/60 focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/40 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
+                            class="mt-2 h-11 w-full rounded-xl border border-line bg-surface px-4 text-base text-ink placeholder:text-ink-muted focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/40 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
                         >
 
                         @if ($searchResults !== null)
@@ -331,7 +333,7 @@
                             wire:model.live.debounce.300ms="geneticSearch" aria-label="{{ __('Buscar genética…') }}"
                             autocomplete="off"
                             placeholder="{{ __('Buscar genética…') }}"
-                            class="h-10 w-full rounded-xl border border-line bg-surface px-4 text-sm text-ink placeholder:text-ink-muted/60 focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/40 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 sm:w-56"
+                            class="h-10 w-full rounded-xl border border-line bg-surface px-4 text-sm text-ink placeholder:text-ink-muted focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/40 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 sm:w-56"
                         >
                     </div>
 
@@ -448,11 +450,11 @@
                     <div class="mt-4 grid grid-cols-2 gap-3">
                         <div>
                             <label for="cash" class="block text-xs font-medium text-ink-muted dark:text-slate-400">{{ __('Efectivo (€)') }}</label>
-                            <input id="cash" type="text" inputmode="decimal" wire:model.live.debounce.400ms="cashInput" autocomplete="off" placeholder="{{ __('Resto') }}" class="mt-1 h-11 w-full rounded-xl border border-line bg-surface px-3 text-base text-ink placeholder:text-ink-muted/60 focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/40 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100">
+                            <input id="cash" type="text" inputmode="decimal" wire:model.live.debounce.400ms="cashInput" autocomplete="off" placeholder="{{ __('Resto') }}" class="mt-1 h-11 w-full rounded-xl border border-line bg-surface px-3 text-base text-ink placeholder:text-ink-muted focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/40 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100">
                         </div>
                         <div>
                             <label for="wallet" class="block text-xs font-medium text-ink-muted dark:text-slate-400">{{ __('Monedero (€)') }}</label>
-                            <input id="wallet" type="text" inputmode="decimal" wire:model.live.debounce.400ms="walletInput" autocomplete="off" placeholder="0,00" class="mt-1 h-11 w-full rounded-xl border border-line bg-surface px-3 text-base text-ink placeholder:text-ink-muted/60 focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/40 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100">
+                            <input id="wallet" type="text" inputmode="decimal" wire:model.live.debounce.400ms="walletInput" autocomplete="off" placeholder="0,00" class="mt-1 h-11 w-full rounded-xl border border-line bg-surface px-3 text-base text-ink placeholder:text-ink-muted focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/40 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100">
                         </div>
                     </div>
                     <div class="mt-2 flex items-center justify-between text-xs text-ink-muted dark:text-slate-400">

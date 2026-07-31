@@ -51,7 +51,9 @@ class DocumentsRelationManager extends RelationManager
             ])
             ->recordActions([
                 MemberDocumentResource::viewDocumentAction(),
-            ]);
+            ])
+            ->emptyStateHeading(__('Sin documentos'))
+            ->emptyStateDescription(__('Sube el escaneo del DNI en la ficha del socio, o genera un documento con el botón de arriba.'));
     }
 
     /** Generar documento for the owner socio (documents.generate). */

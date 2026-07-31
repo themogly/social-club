@@ -12,8 +12,10 @@
     <x-dashboard.empty :message="__('Sin entradas registradas en el período')" :icon="\Filament\Support\Icons\Heroicon::OutlinedClock" />
 @else
     <div class="csc-heat-wrap">
-        <div class="csc-heat">
-            <div class="csc-heat-corner"></div>
+        {{-- role=img + label give screen readers a text alternative for the colour grid;
+             each cell still carries a title tooltip with its day/hour/count for pointer users. --}}
+        <div class="csc-heat" role="img" aria-label="{{ __('Mapa de calor de afluencia por día de la semana y franja horaria') }}">
+            <div class="csc-heat-corner" aria-hidden="true"></div>
             @for ($h = 0; $h < 24; $h++)
                 <div class="csc-heat-hour">{{ $h % 3 === 0 ? $h : '' }}</div>
             @endfor

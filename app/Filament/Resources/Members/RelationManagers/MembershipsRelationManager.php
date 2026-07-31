@@ -58,7 +58,9 @@ class MembershipsRelationManager extends RelationManager
             ->recordActions([
                 $this->renewAction(),
                 $this->transferAction(),
-            ]);
+            ])
+            ->emptyStateHeading(__('Sin membresías'))
+            ->emptyStateDescription(__('Este socio aún no tiene una membresía. Da de alta una con el botón de arriba.'));
     }
 
     /** Alta de membresía — enrol the socio at a location on a tier (optional fee override). */

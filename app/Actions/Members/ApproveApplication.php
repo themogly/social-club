@@ -9,7 +9,6 @@ use App\Models\MemberApplication;
 use App\Support\ActiveScope;
 use App\Support\MemberEligibility;
 use App\Support\MemberEnrolment;
-use App\Support\Settings;
 use Illuminate\Support\Facades\Auth;
 use RuntimeException;
 
@@ -50,12 +49,7 @@ class ApproveApplication
         $member->save();
 
         foreach (($payload['consents'] ?? ['membership', 'data_processing']) as $purpose) {
-            $member->consents()->create([
-                'purpose' => $purpose,
-                'consent_text_version' => (string) Settings::get('consent_text_version', '1.0'),
-                'granted_at' => now(),
-                'ip' => request()->ip(),
-            ]);
+            (new RecordMemberConsent)->handle($member, $purpose, request()->ip());
         }
 
         $application->update([

@@ -55,7 +55,9 @@ class WalletTransactionsRelationManager extends RelationManager
                 $this->topUpAction(),
                 $this->refundAction(),
                 $this->adjustAction(),
-            ]);
+            ])
+            ->emptyStateHeading(__('Sin movimientos'))
+            ->emptyStateDescription(__('El monedero del socio no tiene movimientos. Registra un ingreso con el botón de arriba.'));
     }
 
     /** Ingreso — add credit to the member's wallet at a location (positive movement). */

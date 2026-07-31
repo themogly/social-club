@@ -70,7 +70,7 @@
                         <label class="mb-1 block text-sm font-medium" for="document_type">{{ __('Tipo de documento') }}</label>
                         <select id="document_type" name="document_type" required class="{{ $input }}">
                             @foreach (\App\Enums\IdDocumentType::cases() as $type)
-                                <option value="{{ $type->value }}" @selected(old('document_type', data_get($payload, 'document_type')) === $type->value)>{{ $type->value }}</option>
+                                <option value="{{ $type->value }}" @selected(old('document_type', data_get($payload, 'document_type')) === $type->value)>{{ $type->label() }}</option>
                             @endforeach
                         </select>
                     </div>
@@ -106,9 +106,7 @@
                     <span class="text-ink-muted dark:text-slate-300">{{ __('He leído y acepto el tratamiento de mis datos y los estatutos de la asociación.') }}</span>
                 </label>
 
-                <button type="submit" class="w-full rounded-lg bg-brand px-4 py-2.5 font-semibold text-white transition hover:bg-brand-dark">
-                    {{ __('Enviar solicitud') }}
-                </button>
+                <x-button type="submit" size="md" class="w-full">{{ __('Enviar solicitud') }}</x-button>
             </form>
 
             <p class="mt-4 text-center text-xs text-ink-muted dark:text-slate-500">{{ __('Espacio privado. No es un servicio público ni una tienda.') }}</p>
