@@ -473,6 +473,19 @@
                         <span class="text-lg font-bold tabular-nums">{{ $this->money($basketTotalCents) }}</span>
                     </div>
 
+                    {{-- Price override (prompt 64): permission-gated, reasoned. Comp defective product or a
+                         €0 give-away. Leaving the amount blank charges the resolved price. --}}
+                    @can('dispensation.price.override')
+                        <div class="mt-3 rounded-xl border border-warning/30 bg-warning/5 p-3">
+                            <label class="block text-xs font-medium text-warning">{{ __('Ajustar precio (queda registrado)') }}</label>
+                            <div class="mt-1 grid gap-2 sm:grid-cols-2">
+                                <input type="text" inputmode="decimal" wire:model.blur="priceOverrideEuros" autocomplete="off" placeholder="{{ __('Nuevo total (€)') }}" class="h-11 w-full rounded-xl border border-line bg-surface px-3 text-base text-ink placeholder:text-ink-muted focus:border-warning focus:outline-none focus:ring-2 focus:ring-warning/40 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100">
+                                <input type="text" wire:model.blur="priceOverrideReason" autocomplete="off" placeholder="{{ __('Motivo (p. ej. producto defectuoso)') }}" class="h-11 w-full rounded-xl border border-line bg-surface px-3 text-base text-ink placeholder:text-ink-muted focus:border-warning focus:outline-none focus:ring-2 focus:ring-warning/40 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100">
+                            </div>
+                            <p class="mt-1 text-[11px] text-ink-muted dark:text-slate-500">{{ __('Deja el importe vacío para cobrar el precio normal. 0 € = gratis.') }}</p>
+                        </div>
+                    @endcan
+
                     {{-- Tender split --}}
                     <div class="mt-4 grid grid-cols-2 gap-3">
                         <div>

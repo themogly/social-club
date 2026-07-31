@@ -6,6 +6,7 @@ use App\Enums\DispensationStatus;
 use App\Enums\ProductType;
 use App\Models\Member;
 use App\Support\ConsumptionForecast;
+use App\Support\Money;
 use App\Support\Period;
 use App\Support\Weight;
 use Illuminate\Support\Facades\DB;
@@ -45,12 +46,28 @@ class ConsumptionReport extends AbstractReport
     public function summary(): array
     {
         $this->tables();
+        $overrideValue = $this->priceOverrideValueCents();
 
         return [
             ['label' => __('Dispensado'), 'value' => Weight::fromCentigrams($this->dispensedCg)->formatted()],
             ['label' => __('Previsión declarada'), 'value' => Weight::fromCentigrams(ConsumptionForecast::authorisedVolumeCg($this->organisationId))->formatted()],
             ['label' => __('Socios sobre límite'), 'value' => (string) $this->overLimitCount, 'tone' => $this->overLimitCount > 0 ? 'warning' : 'success'],
+            // Prompt 64: how much product left below the resolved price this period (comps / give-aways),
+            // surfaced so a manager can answer "how much left at below cost, and why" without grepping the log.
+            ['label' => __('Ajustes de precio'), 'value' => Money::fromCents($overrideValue)->formatted(), 'tone' => $overrideValue > 0 ? 'warning' : 'success'],
         ];
+    }
+
+    /** Total value forgone to price overrides this period: SUM(resolved − charged) over overridden rows. */
+    private function priceOverrideValueCents(): int
+    {
+        [$start, $end] = $this->bounds();
+
+        return (int) DB::table('dispensations')
+            ->whereIn('location_id', $this->resolvedLocationIds())
+            ->whereNotNull('original_total_cents')
+            ->whereBetween('dispensed_at', [$start, $end])
+            ->sum(DB::raw('original_total_cents - total_cents'));
     }
 
     // --- Grams by member (forecast vs actual) ---------------------------------------

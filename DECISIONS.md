@@ -2245,3 +2245,41 @@ can't diverge from the screen.
   `member_no`; its by-genetic table groups by genetic (org-wide). No per-location-same-name ambiguity.
 
 553 green. Owner-authorised merge.
+
+---
+
+## Prompt 64 — price override at the dispensary counter (comps / goodwill / owner takings)
+
+A permissioned, reasoned price override on `DispensaryPos` → `CommitDispensation`. It changes what the
+member pays; it changes NOTHING else.
+
+**Per-line vs whole-contribution — DECISION: whole-contribution.** The operator sets the total the member
+pays for the WHOLE basket (in euros), not a per-line rate. The owner's ask ("adjust the price at
+checkout", "give it free for mouldy flower") is about the total; distributing an override across a
+multi-line basket adds arithmetic and ambiguity for no benefit the cases need. **Reduce-only** (0 ≤
+override ≤ resolved) — the override comps/discounts, it never charges ABOVE cost (that would undermine the
+at-cost model). Zero is valid (the free case) and goes through the identical permission + reason + audit
+path — no special "free" shortcut.
+
+**Permission — new, dedicated `dispensation.price.override`** (OWNER + MANAGER). NOT reused from
+`limits.override` or `membership.fee.override`: different act, different risk, a club grants them
+separately. First real use of the new permission; enforced SERVER-SIDE in `CommitDispensation` (not just
+the UI `@can`), with a mandatory free-text reason (reuses the limit-override interaction).
+
+**Storage + audit.** `total_cents` stays the CHARGED (overridden) figure so the tender invariant
+(cash+wallet==total) still holds; `original_total_cents` records the RESOLVED price (null = no override),
+so the override is fully reconstructable. Every override is audited `dispensation.price.override` (before:
+resolved, after: charged + reason + authoriser + operator) INSIDE the commit transaction (prompt 48).
+**Limits/eligibility are NOT bypassed** — the limit check runs before pricing, so a member over their
+limit is still blocked even at €0 (tested). **Reporting:** the total value forgone to overrides for a
+period is surfaced on the ConsumptionReport summary ("Ajustes de precio"), so a manager can answer "how
+much left below cost, and why" without grepping the audit log.
+
+**Owner-takings — DECISION: do NOT build a separate mechanism (per the prompt).** The owner is a socio; if
+they consume product it must be DISPENSED to them AS A MEMBER — counted against their limits, present in
+the register, visible in reporting like anyone else. If it's free, that is a €0 override through this
+prompt's normal permission + reason + audit path. Routing personal consumption through `MERMA`/`ADJUSTMENT`
+would hide exactly the thing that most needs to be visible and would make the club's own numbers describe
+shrinkage that didn't happen. `MERMA`/`ADJUSTMENT` stay correct only for product NO member consumes (waste,
+mould write-off, samples, destruction). Nothing extra was built for owner takings — it already works.
+Owner-authorised merge (the prompt's "do not merge" overridden by the owner's standing "merge it all").

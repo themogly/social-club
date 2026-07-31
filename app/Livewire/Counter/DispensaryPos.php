@@ -155,6 +155,13 @@ class DispensaryPos extends Component
 
     public string $overrideReason = '';
 
+    // --- Price override (permissioned, reasoned — prompt 64) --------------------
+
+    /** The new total the member pays for the whole contribution, in euros. Empty = charge the resolved price. */
+    public string $priceOverrideEuros = '';
+
+    public string $priceOverrideReason = '';
+
     // --- Signature --------------------------------------------------------------
 
     /** Path on the PRIVATE documents disk once a signature has been captured this basket. */
@@ -253,8 +260,8 @@ class DispensaryPos extends Component
         $this->reset([
             'memberId', 'scanned', 'search', 'basket', 'activeGeneticId', 'activeBatchId',
             'weightInput', 'calculatorMode', 'unitQty', 'cashInput', 'walletInput', 'requireOverride',
-            'limitBreach', 'overrideReason', 'signaturePath', 'lastDispensationId', 'voidReason',
-            'flashMessage',
+            'limitBreach', 'overrideReason', 'priceOverrideEuros', 'priceOverrideReason', 'signaturePath',
+            'lastDispensationId', 'voidReason', 'flashMessage',
         ]);
 
         // A new socio always starts a fresh basket → a fresh idempotency key.
@@ -424,7 +431,7 @@ class DispensaryPos extends Component
         $this->reset([
             'basket', 'activeGeneticId', 'activeBatchId', 'weightInput', 'calculatorMode', 'unitQty',
             'cashInput', 'walletInput', 'requireOverride', 'limitBreach', 'overrideReason',
-            'signaturePath',
+            'priceOverrideEuros', 'priceOverrideReason', 'signaturePath',
         ]);
 
         $this->idempotencyKey = (string) Str::ulid();
@@ -536,7 +543,34 @@ class DispensaryPos extends Component
             return;
         }
 
-        $total = $this->basketTotalCents($member, $location);
+        $resolvedTotal = $this->basketTotalCents($member, $location);
+        $total = $resolvedTotal;
+
+        // Price override (prompt 64): a permission holder may charge LESS than the resolved price (comp a
+        // member for defective product, or give it free) with a mandatory reason. It changes the charged
+        // total ONLY — eligibility + limits were already enforced above. The reason panel reuses the same
+        // interaction as the limit override.
+        $priceOverrideCents = null;
+        if (trim($this->priceOverrideEuros) !== '') {
+            $user = $this->currentUser();
+
+            if ($user === null || ! $user->can('dispensation.price.override')) {
+                $this->flash(__('No tienes permiso para ajustar el precio.'), 'error');
+
+                return;
+            }
+
+            if (trim($this->priceOverrideReason) === '') {
+                $this->flash(__('Indica el motivo del ajuste de precio (queda registrado).'), 'error');
+
+                return;
+            }
+
+            $entered = (int) round_half_up(((float) str_replace(',', '.', trim($this->priceOverrideEuros))) * 100);
+            $priceOverrideCents = max(0, min($entered, $resolvedTotal)); // reduce only: 0 (free) .. resolved
+            $total = $priceOverrideCents;
+        }
+
         [$cashCents, $walletCents] = $this->tenderSplit($total);
 
         if ($cashCents < 0 || $walletCents < 0 || ($cashCents + $walletCents) !== $total) {
@@ -555,6 +589,12 @@ class DispensaryPos extends Component
 
         if ($this->signaturePath !== null) {
             $options['signature_path'] = $this->signaturePath;
+        }
+
+        if ($priceOverrideCents !== null) {
+            $options['price_override_cents'] = $priceOverrideCents;
+            $options['price_override_reason'] = trim($this->priceOverrideReason);
+            $options['price_override_by'] = $this->currentUser();
         }
 
         if ($override) {
@@ -1331,7 +1371,7 @@ class DispensaryPos extends Component
         $this->reset([
             'basket', 'activeGeneticId', 'activeBatchId', 'weightInput', 'calculatorMode', 'unitQty',
             'cashInput', 'walletInput', 'requireOverride', 'limitBreach', 'overrideReason',
-            'signaturePath',
+            'priceOverrideEuros', 'priceOverrideReason', 'signaturePath',
         ]);
         $this->idempotencyKey = (string) Str::ulid();
     }

@@ -45,7 +45,7 @@ use RuntimeException;
  *
  * @phpstan-type Line array{genetic_id: string, batch_id: string, grams_cg?: int, units?: int}
  * @phpstan-type NormalisedLine array{genetic_id: string, batch_id: string, grams_cg: int, units: ?int}
- * @phpstan-type CommitOptions array{operator_id?: ?string, till_session_id?: ?string, cash_cents?: int, wallet_cents?: int, signature_path?: ?string, idempotency_key?: ?string, reversal_of_id?: ?string, override?: bool, override_by?: ?User, override_reason?: ?string, at?: ?\DateTimeInterface}
+ * @phpstan-type CommitOptions array{operator_id?: ?string, till_session_id?: ?string, cash_cents?: int, wallet_cents?: int, signature_path?: ?string, idempotency_key?: ?string, reversal_of_id?: ?string, override?: bool, override_by?: ?User, override_reason?: ?string, price_override_cents?: ?int, price_override_reason?: ?string, price_override_by?: ?User, at?: ?\DateTimeInterface}
  */
 class CommitDispensation
 {
@@ -94,6 +94,27 @@ class CommitDispensation
 
             [$total, $lineData] = $this->buildLines($member, $lines, $location, $options);
 
+            // Price override (prompt 64): a permissioned, reasoned adjustment to what the member pays for
+            // the whole contribution — comping defective product, or a €0 give-away. It changes only the
+            // CHARGED total; limits/eligibility (already enforced above) are UNTOUCHED. The resolved figure
+            // is kept in original_total_cents so the override is reconstructable, attributed and reportable.
+            // Zero is valid and goes through the identical permission + reason + audit path.
+            $originalTotal = null;
+            $overrideReason = null;
+            $overrideBy = null;
+            if (($options['price_override_cents'] ?? null) !== null) {
+                $overrideBy = $options['price_override_by'] ?? null;
+                if (! ($overrideBy instanceof User) || ! $overrideBy->can('dispensation.price.override')) {
+                    throw new AuthorizationException('Overriding the dispensation price requires the dispensation.price.override permission.');
+                }
+                $overrideReason = trim((string) ($options['price_override_reason'] ?? ''));
+                if ($overrideReason === '') {
+                    throw new RuntimeException('A price override requires a reason.');
+                }
+                $originalTotal = $total;
+                $total = max(0, min((int) $options['price_override_cents'], $total)); // reduce only: 0 (free) .. resolved
+            }
+
             $cash = $options['cash_cents'] ?? $total;
             $wallet = $options['wallet_cents'] ?? 0;
 
@@ -104,6 +125,9 @@ class CommitDispensation
                 'operator_id' => $options['operator_id'] ?? Auth::id(),
                 'till_session_id' => $options['till_session_id'] ?? null,
                 'total_cents' => $total,
+                'original_total_cents' => $originalTotal,
+                'price_override_reason' => $overrideReason,
+                'price_override_by' => $overrideBy?->id,
                 'cash_cents' => $cash,
                 'wallet_cents' => $wallet,
                 'status' => DispensationStatus::COMPLETED,
@@ -115,6 +139,19 @@ class CommitDispensation
 
             foreach ($lineData as $line) {
                 $dispensation->lines()->create($line);
+            }
+
+            // Audit the override — resolved vs overridden, reason, authoriser, operator, member (prompt 48
+            // placement: inside the txn, so a failed audit rolls the whole dispensation back).
+            if ($originalTotal !== null) {
+                (new RecordAuditLog)->handle('dispensation.price.override', $member,
+                    ['total_cents' => $originalTotal],
+                    [
+                        'total_cents' => $total,
+                        'reason' => $overrideReason,
+                        'authorised_by' => $overrideBy->id, // non-null here: set together with $originalTotal
+                        'operator_id' => $options['operator_id'] ?? Auth::id(),
+                    ]);
             }
 
             if ($wallet > 0) {

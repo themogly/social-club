@@ -30,7 +30,7 @@ class Permissions
         // Attendance
         'checkin.manage', 'checkin.override',
         // Counter
-        'pos.use', 'pos.bar', 'dispensation.void', 'order.void', 'limits.override',
+        'pos.use', 'pos.bar', 'dispensation.void', 'order.void', 'limits.override', 'dispensation.price.override',
         // Catalogue & stock
         'genetics.manage', 'prices.manage', 'stock.manage', 'stock.merma', 'stock.transfer',
         'stock.take', 'articles.manage', 'discounts.manage',
@@ -54,7 +54,7 @@ class Permissions
         'member.sanction', 'applications.review',
         'membership.fee.override', 'membership.fee.collect', 'carencia.waive',
         'checkin.manage', 'checkin.override',
-        'pos.use', 'pos.bar', 'dispensation.void', 'order.void', 'limits.override',
+        'pos.use', 'pos.bar', 'dispensation.void', 'order.void', 'limits.override', 'dispensation.price.override',
         'genetics.manage', 'prices.manage', 'stock.manage', 'stock.merma', 'stock.transfer',
         'stock.take', 'articles.manage', 'discounts.manage',
         'wallet.adjust', 'till.open', 'till.close', 'cash.bank', 'expenses.record',
