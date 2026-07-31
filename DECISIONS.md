@@ -1483,5 +1483,6 @@ audit payloads are attacker-influenced) now sit inside a native, collapsed `<det
 Tested: till-close cents → euros; `declared_monthly_cg` → grams (the non-WeightCast case) matching
 `MemberInfolist`; enum → label; settings null-model with `_eur`/`_g` kept as-is; collapsed `<details>`;
 generalises across TillSession/Member/Expense; unlabeled field → headline + logged once. 428 green.
-**VISUAL VERIFICATION PENDING** (no browser here): before/after screenshots of an audit entry across two
-model types, light + dark. Branch pushed, **NOT merged** (per prompt).
+Owner-authorised merge (the prompt's default "do not merge" overridden by the owner, who is the reviewer).
+**VISUAL VERIFICATION STILL PENDING** (no browser here): before/after screenshots of an audit entry across
+two model types, light + dark.
