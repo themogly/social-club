@@ -520,20 +520,34 @@
                         </div>
                     @endif
 
-                    {{-- Commit --}}
-                    @php
-                        $commitDisabled = $member === null
-                            || $openTill === null
-                            || empty($basketLines)
-                            || ! empty($hardBlockRules)
-                            || ($requireSignature && $signaturePath === null);
-                    @endphp
+                    {{-- Colocated confirmation (prompt 60, mirroring the bar POS prompt-41 block): the flash
+                         ALSO renders here at the point of action, so a commit's outcome — success OR a blocked
+                         reason — is visible without scrolling to the page-top banner. --}}
+                    @if ($flashMessage)
+                        <div
+                            wire:key="flash-commit"
+                            role="{{ $flashType === 'error' ? 'alert' : 'status' }}"
+                            aria-live="{{ $flashType === 'error' ? 'assertive' : 'polite' }}"
+                            @class([
+                                'mt-4 rounded-xl border px-4 py-3 text-sm font-semibold',
+                                'border-success/30 bg-success/10 text-success' => $flashType === 'success',
+                                'border-warning/30 bg-warning/10 text-warning' => $flashType === 'warning',
+                                'border-error/30 bg-error/10 text-error' => $flashType === 'error',
+                            ])
+                        >
+                            {{ $flashMessage }}
+                        </div>
+                    @endif
+
+                    {{-- Commit — disabled ONLY when offline (prompt 60). Every other blocked state (no socio,
+                         empty basket, a hard block, missing signature) stays CLICKABLE, and commit() flashes
+                         its reason into the colocated block above — never a silent dead control. --}}
                     <button
                         type="button"
                         wire:click="commit"
                         wire:loading.attr="disabled"
                         wire:target="commit"
-                        x-bind:disabled="! online || @js($commitDisabled)"
+                        x-bind:disabled="! online"
                         class="mt-4 h-16 w-full rounded-xl bg-brand text-lg font-bold text-white transition hover:bg-brand-dark focus:outline-none focus:ring-2 focus:ring-brand/40 disabled:cursor-not-allowed disabled:opacity-50"
                     >
                         <span wire:loading.remove wire:target="commit">{{ __('Registrar aportación') }}</span>
