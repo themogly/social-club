@@ -62,8 +62,12 @@ security; seo skipped — no public site). SAFE, mechanical findings were fixed 
   `status=ACTIVE`, `member_no`, `joined_at`. If the carencia rule changes, they drift. **Fix:** extract a shared
   `EnrolMember` action both call. Structural + both paths tested — prove identical before/after.
 - **AD4. `wallet adjust` (can subtract balance) + `batch merma` (stock loss) have no `requiresConfirmation()`.**
-  Both gated + audited + reason-required, but a mistyped negative mutates money/compliance-stock with no final
+  Both gated + reason-required, but a mistyped negative mutates money/compliance-stock with no final
   confirm. **Fix:** add `->requiresConfirmation()`. (Money/stock — flagged rather than blind-changed.)
+  **CORRECTION (prompt 48):** this line originally said "gated + audited" — they were gated and reasoned in
+  their own domain ledgers but NOT written to `audit_logs`. Prompt 48 wired `RecordAuditLog` into
+  `RecordWalletTransaction` (ADJUSTMENT → `wallet.adjusted`) and `RecordStockMovement`
+  (MERMA/ADJUSTMENT → `stock.merma`/`stock.adjusted`), so they are now genuinely audited.
 - **CS5. `Genetic::grams_per_unit_cg` is a `*_cg` column cast as plain `integer`, not `WeightCast`** — the one
   suffix-convention carve-out. Defensible (definitional constant, all arithmetic is `(int)`), but decide:
   document the carve-out in CLAUDE.md, or move it onto `WeightCast` (ripples through call sites).

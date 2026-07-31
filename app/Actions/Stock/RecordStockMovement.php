@@ -2,6 +2,7 @@
 
 namespace App\Actions\Stock;
 
+use App\Actions\RecordAuditLog;
 use App\Enums\StockMovementType;
 use App\Models\Article;
 use App\Models\Batch;
@@ -70,7 +71,7 @@ class RecordStockMovement
             }
             $locked->save();
 
-            return StockMovement::create([
+            $movement = StockMovement::create([
                 'organisation_id' => $locked->organisation_id,
                 'location_id' => $locked->location_id,
                 'stockable_type' => $locked->getMorphClass(),
@@ -83,6 +84,21 @@ class RecordStockMovement
                 'reference' => $options['reference'] ?? null,
                 'stock_take_id' => $options['stock_take_id'] ?? null,
             ]);
+
+            // Manual adjustments + merma are audited (prompt 48) — the merma reason lands here too,
+            // not just on the movement row. INSIDE the txn (boundary matches CommitStockTake). Routine
+            // SALE/INTAKE depletions are not audited here (traced by their own movement rows).
+            if ($type === StockMovementType::ADJUSTMENT || $type === StockMovementType::MERMA) {
+                $key = $unitBased ? 'remaining_units' : 'remaining_cg';
+                (new RecordAuditLog)->handle(
+                    $type === StockMovementType::MERMA ? 'stock.merma' : 'stock.adjusted',
+                    $locked,
+                    [$key => $new - $delta],
+                    [$key => $new, 'reason' => $options['reason'] ?? null],
+                );
+            }
+
+            return $movement;
         });
     }
 }

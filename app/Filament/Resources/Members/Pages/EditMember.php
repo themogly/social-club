@@ -3,6 +3,7 @@
 namespace App\Filament\Resources\Members\Pages;
 
 use App\Actions\Members\SyncMemberScanDocuments;
+use App\Filament\Concerns\AuditsResourceChanges;
 use App\Filament\Resources\Members\MemberResource;
 use App\Models\Member;
 use App\Models\User;
@@ -14,6 +15,8 @@ use Illuminate\Support\Facades\Auth;
 
 class EditMember extends EditRecord
 {
+    use AuditsResourceChanges;
+
     protected static string $resource = MemberResource::class;
 
     protected function getHeaderActions(): array
@@ -24,6 +27,13 @@ class EditMember extends EditRecord
             DeleteAction::make(),
             RestoreAction::make(),
         ];
+    }
+
+    // A plain member edit (name/email/phone/document) is audited (prompt 48); status transitions have
+    // their own audited action. Capture the diff before the save syncs the original away.
+    protected function beforeSave(): void
+    {
+        $this->captureAuditDiff();
     }
 
     /**
@@ -40,5 +50,7 @@ class EditMember extends EditRecord
         $actor = Auth::user();
 
         (new SyncMemberScanDocuments)->handle($member, $actor);
+
+        $this->writeAuditLog('member.updated');
     }
 }

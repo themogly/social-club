@@ -2,6 +2,7 @@
 
 namespace App\Actions\Wallet;
 
+use App\Actions\RecordAuditLog;
 use App\Enums\WalletTransactionType;
 use App\Exceptions\DebtLimitExceededException;
 use App\Models\Location;
@@ -43,7 +44,7 @@ class RecordWalletTransaction
 
             $source = $options['source'] ?? null;
 
-            return WalletTransaction::create([
+            $transaction = WalletTransaction::create([
                 'organisation_id' => $member->organisation_id,
                 'member_id' => $member->id,
                 'location_id' => $location->id,
@@ -57,6 +58,17 @@ class RecordWalletTransaction
                 'source_id' => $source?->getKey(),
                 'transfer_pair_id' => $options['transfer_pair_id'] ?? null,
             ]);
+
+            // Manual permissioned adjustments are audited (prompt 48) — INSIDE the txn, so a failed
+            // audit rolls back the movement (matches CommitStockTake's boundary). Other movement types
+            // are traced in the wallet ledger itself and are not flooded into the audit log.
+            if ($type === WalletTransactionType::ADJUSTMENT) {
+                (new RecordAuditLog)->handle('wallet.adjusted', $member,
+                    ['balance_cents' => $newBalance - $amountCents],
+                    ['balance_cents' => $newBalance, 'reason' => $options['reason'] ?? null]);
+            }
+
+            return $transaction;
         });
     }
 }

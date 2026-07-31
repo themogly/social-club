@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\Articles\Pages;
 
+use App\Filament\Concerns\AuditsResourceChanges;
 use App\Filament\Resources\Articles\ArticleResource;
 use App\Models\Article;
 use Filament\Actions\DeleteAction;
@@ -10,6 +11,8 @@ use Filament\Resources\Pages\EditRecord;
 
 class EditArticle extends EditRecord
 {
+    use AuditsResourceChanges;
+
     protected static string $resource = ArticleResource::class;
 
     protected function getHeaderActions(): array
@@ -18,6 +21,17 @@ class EditArticle extends EditRecord
             DeleteAction::make(),
             RestoreAction::make(),
         ];
+    }
+
+    // A base-price (or any) change to a bar article is audited (prompt 48) — the price everyone pays.
+    protected function beforeSave(): void
+    {
+        $this->captureAuditDiff();
+    }
+
+    protected function afterSave(): void
+    {
+        $this->writeAuditLog('article.updated');
     }
 
     /**
