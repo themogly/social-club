@@ -3,6 +3,10 @@
 namespace Database\Seeders;
 
 use App\Actions\Bar\CommitOrder;
+use App\Actions\Memberships\EnrolMembership;
+use App\Actions\Memberships\RecordFeePayment;
+use App\Actions\Stock\RecordStockMovement;
+use App\Actions\Wallet\RecordWalletTransaction;
 use App\Enums\BatchStatus;
 use App\Enums\CategoryAppliesTo;
 use App\Enums\CheckInMethod;
@@ -13,10 +17,12 @@ use App\Enums\DiscountMode;
 use App\Enums\DispensationStatus;
 use App\Enums\ExpenseKind;
 use App\Enums\ExpensePaidFrom;
+use App\Enums\FeePaymentMethod;
 use App\Enums\IdDocumentType;
+use App\Enums\MemberKind;
 use App\Enums\MembershipPeriod;
-use App\Enums\MembershipStatus;
 use App\Enums\MemberStatus;
+use App\Enums\SanctionType;
 use App\Enums\SettingType;
 use App\Enums\StockMovementType;
 use App\Enums\StrainType;
@@ -35,32 +41,44 @@ use App\Models\Genetic;
 use App\Models\GeneticPrice;
 use App\Models\Location;
 use App\Models\Member;
+use App\Models\MemberSanction;
 use App\Models\Membership;
 use App\Models\MembershipTier;
 use App\Models\Organisation;
 use App\Models\Setting;
-use App\Models\StockMovement;
 use App\Models\TillSession;
 use App\Models\User;
-use App\Models\WalletTransaction;
 use App\Support\ActiveScope;
 use App\Support\Settings;
-use App\Support\Weight;
+use Faker\Factory as FakerFactory;
+use Faker\Generator as FakerGenerator;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Str;
 
 /**
- * Local-only demo data: one org, two premises, tiers, the seeded staff, ~20
+ * Local-only demo data: one org, two premises, tiers, the seeded staff, ~30
  * members across every status, genetics with per-location prices + batches
  * (opening stock as INTAKE movements), articles, discounts, and a fortnight of
  * dispensations, orders, check-ins, expenses and closed till sessions — so the
  * dashboard (prompt 14/15) has real data from day one. Opening balances always
  * enter through movements/adjustments, never free-typed (the go-live path).
+ *
+ * Prompt 70: everything is LOCALE-AWARE — the string set (locations, grades,
+ * tiers, articles, expense categories) and the faker locale are both chosen from
+ * the active app locale, so an English demo reads English and a Spanish one Spanish.
+ * A demo SETTINGS PROFILE then switches the optional features on (as settings rows,
+ * exactly as an admin would — Settings::DEFAULTS is never touched) and seeds the
+ * data that makes each one legible (a member in debt, one near the limit, a
+ * temporary member near expiry, fee payments so nobody is fee-blocked, a sanction).
+ * New records go through their domain writer (EnrolMembership, RecordFeePayment,
+ * RecordWalletTransaction, RecordStockMovement, CommitOrder) per the CLAUDE.md rule.
  */
 class DemoDataSeeder extends Seeder
 {
     private ActiveScope $scope;
+
+    private FakerGenerator $faker;
 
     public function run(): void
     {
@@ -69,6 +87,12 @@ class DemoDataSeeder extends Seeder
         }
 
         $this->scope = app(ActiveScope::class);
+
+        // Pick the string set + faker locale from the ACTIVE app locale (prompt 70). Setting the config
+        // makes any remaining factory `fake()` calls locale-match too; $this->faker is resolved from it.
+        $strings = $this->localeStrings(app()->getLocale());
+        config(['app.faker_locale' => $strings['faker']]);
+        $this->faker = FakerFactory::create($strings['faker']);
 
         $org = Organisation::create([
             'name' => 'CSC platform',
@@ -80,14 +104,15 @@ class DemoDataSeeder extends Seeder
         $this->scope->setOrganisation($org->id);
 
         $this->seedSettings($org->id);
+        $this->seedDemoProfile();
 
         $centro = Location::create([
-            'organisation_id' => $org->id, 'name' => 'Sede Centro', 'address' => 'TBD-ADDRESS',
+            'organisation_id' => $org->id, 'name' => $strings['locations'][0], 'address' => 'TBD-ADDRESS',
             'capacity' => 50, 'timezone' => 'Europe/Madrid', 'business_day_cutoff' => '06:00',
             'opening_time' => '12:00', 'closing_time' => '00:00', 'accent' => '#2563eb', 'active' => true,
         ]);
         $norte = Location::create([
-            'organisation_id' => $org->id, 'name' => 'Sede Norte', 'address' => 'TBD-ADDRESS',
+            'organisation_id' => $org->id, 'name' => $strings['locations'][1], 'address' => 'TBD-ADDRESS',
             'capacity' => 40, 'timezone' => 'Europe/Madrid', 'business_day_cutoff' => '06:00',
             'opening_time' => '17:00', 'closing_time' => '02:00', 'accent' => '#16a34a', 'active' => true,
         ]);
@@ -96,11 +121,11 @@ class DemoDataSeeder extends Seeder
         $staff = $this->attachStaff($locations);
 
         $tierSocio = MembershipTier::create([
-            'organisation_id' => $org->id, 'name' => 'Socio', 'default_fee_cents' => 2000,
+            'organisation_id' => $org->id, 'name' => $strings['tiers']['standard'], 'default_fee_cents' => 2000,
             'default_period' => MembershipPeriod::YEARLY, 'active' => true,
         ]);
         $tierTera = MembershipTier::create([
-            'organisation_id' => $org->id, 'name' => 'Terapéutico', 'default_fee_cents' => 1000,
+            'organisation_id' => $org->id, 'name' => $strings['tiers']['therapeutic'], 'default_fee_cents' => 1000,
             'default_period' => MembershipPeriod::YEARLY, 'active' => true,
         ]);
 
@@ -108,23 +133,62 @@ class DemoDataSeeder extends Seeder
         // hybrid) and product type, so the three POS filter rows select genuinely different sets instead
         // of one redundant "Flores" on every flower (which is what made them read as duplicates).
         $geneticCategories = [
-            'Premium' => Category::create(['organisation_id' => $org->id, 'name' => 'Premium', 'applies_to' => CategoryAppliesTo::GENETIC]),
-            'Estándar' => Category::create(['organisation_id' => $org->id, 'name' => 'Estándar', 'applies_to' => CategoryAppliesTo::GENETIC]),
+            'premium' => Category::create(['organisation_id' => $org->id, 'name' => $strings['grades']['premium'], 'applies_to' => CategoryAppliesTo::GENETIC]),
+            'standard' => Category::create(['organisation_id' => $org->id, 'name' => $strings['grades']['standard'], 'applies_to' => CategoryAppliesTo::GENETIC]),
         ];
-        $catBar = Category::create(['organisation_id' => $org->id, 'name' => 'Bar', 'applies_to' => CategoryAppliesTo::ARTICLE]);
+        $catBar = Category::create(['organisation_id' => $org->id, 'name' => $strings['bar_category'], 'applies_to' => CategoryAppliesTo::ARTICLE]);
 
-        ExpenseCategorySeeder::seedFor($org->id);
-        // Consumibles is the petty-cash (TILL) category — the drawer buys bags, gloves, etc.
-        $pettyCashCat = ExpenseCategory::where('name', 'Consumibles')->first();
+        ExpenseCategorySeeder::seedFor($org->id, app()->getLocale());
+        // The petty-cash category is identified by KIND (TILL), never by its localised name (prompt 70).
+        $pettyCashCat = ExpenseCategory::where('default_kind', ExpenseKind::TILL)->first();
 
-        Discount::create(['organisation_id' => $org->id, 'name' => 'Personal', 'kind' => DiscountKind::STAFF, 'mode' => DiscountMode::PERCENT, 'value_bp' => 1000, 'applies_to' => DiscountAppliesTo::BOTH, 'active' => true]);
-        Discount::create(['organisation_id' => $org->id, 'name' => 'Terapéutico', 'kind' => DiscountKind::THERAPEUTIC, 'mode' => DiscountMode::PERCENT, 'value_bp' => 1500, 'applies_to' => DiscountAppliesTo::GENETIC, 'active' => true]);
+        Discount::create(['organisation_id' => $org->id, 'name' => $strings['discounts']['staff'], 'kind' => DiscountKind::STAFF, 'mode' => DiscountMode::PERCENT, 'value_bp' => 1000, 'applies_to' => DiscountAppliesTo::BOTH, 'active' => true]);
+        Discount::create(['organisation_id' => $org->id, 'name' => $strings['discounts']['therapeutic'], 'kind' => DiscountKind::THERAPEUTIC, 'mode' => DiscountMode::PERCENT, 'value_bp' => 1500, 'applies_to' => DiscountAppliesTo::GENETIC, 'active' => true]);
 
-        [$batchesByLocation, $priceByBatch] = $this->seedCatalogue($org->id, $locations, $geneticCategories, $catBar);
+        [$batchesByLocation, $priceByBatch] = $this->seedCatalogue($org->id, $locations, $geneticCategories, $catBar, $staff, $strings);
 
-        $membersByLocation = $this->seedMembers($org->id, $locations, $tierSocio, $tierTera);
+        $membersByLocation = $this->seedMembers($org->id, $locations, $tierSocio, $tierTera, $staff, $strings);
 
         $this->seedFortnight($org->id, $locations, $staff, $batchesByLocation, $priceByBatch, $membersByLocation, $pettyCashCat);
+    }
+
+    /**
+     * The keyed string set + faker locale for the active locale (prompt 70). This is DATA written once,
+     * not UI rendered per request, so it deliberately does not go through lang/ files. Strain names stay
+     * as-is everywhere — they are proper nouns, identical in every language.
+     *
+     * @return array{faker: string, locations: array{0: string, 1: string}, grades: array{premium: string, standard: string}, bar_category: string, tiers: array{standard: string, therapeutic: string}, discounts: array{staff: string, therapeutic: string}, articles: array<string, int>, opening_stock: string, opening_balance: string, seed_debt: string}
+     */
+    private function localeStrings(string $locale): array
+    {
+        $sets = [
+            'es' => [
+                'faker' => 'es_ES',
+                'locations' => ['Sede Centro', 'Sede Norte'],
+                'grades' => ['premium' => 'Premium', 'standard' => 'Estándar'],
+                'bar_category' => 'Bar',
+                'tiers' => ['standard' => 'Socio', 'therapeutic' => 'Terapéutico'],
+                'discounts' => ['staff' => 'Personal', 'therapeutic' => 'Terapéutico'],
+                'articles' => ['Agua' => 150, 'Refresco' => 200, 'Café' => 120, 'Mechero' => 100, 'Papel de liar' => 90],
+                'opening_stock' => 'Existencias iniciales',
+                'opening_balance' => 'Saldo inicial (importación go-live)',
+                'seed_debt' => 'Saldo deudor (demo)',
+            ],
+            'en' => [
+                'faker' => 'en_GB',
+                'locations' => ['Central Branch', 'North Branch'],
+                'grades' => ['premium' => 'Premium', 'standard' => 'Standard'],
+                'bar_category' => 'Bar',
+                'tiers' => ['standard' => 'Member', 'therapeutic' => 'Therapeutic'],
+                'discounts' => ['staff' => 'Staff', 'therapeutic' => 'Therapeutic'],
+                'articles' => ['Water' => 150, 'Soft drink' => 200, 'Coffee' => 120, 'Lighter' => 100, 'Rolling papers' => 90],
+                'opening_stock' => 'Opening stock',
+                'opening_balance' => 'Opening balance (go-live import)',
+                'seed_debt' => 'Outstanding balance (demo)',
+            ],
+        ];
+
+        return $sets[$locale] ?? $sets['en'];
     }
 
     private function seedSettings(string $orgId): void
@@ -148,6 +212,25 @@ class DemoDataSeeder extends Seeder
     }
 
     /**
+     * Switch the optional features ON — as SETTINGS ROWS, exactly as an admin would, so Settings::DEFAULTS
+     * (the conservative production posture) is never touched (prompt 70, rule 1). Enables wallet debt (with
+     * a real €50 cap and a lower €30 door threshold, so a member can be past the door limit yet within the
+     * counter limit — both blocks are visible), temporary members, camera scanning and the dispensation
+     * signature. restrict_pos_to_checked_in / discounts_stack / ring_fenced are LEFT OFF on purpose — each
+     * changes counter behaviour in a way that would confuse the demo without heavier supporting data; the
+     * reasoning is in DECISIONS.md.
+     */
+    private function seedDemoProfile(): void
+    {
+        Settings::set('wallet_debt_allowed', '1', SettingType::BOOL);
+        Settings::set('wallet_debt_limit_cents', '5000', SettingType::INT);          // €50 counter cap
+        Settings::set('wallet_door_debt_threshold_cents', '3000', SettingType::INT); // €30 door threshold
+        Settings::set('temporary_members_enabled', '1', SettingType::BOOL);
+        Settings::set('camera_scan_enabled', '1', SettingType::BOOL);
+        Settings::set('signature_on_dispensation', '1', SettingType::BOOL);
+    }
+
+    /**
      * @param  array<int, Location>  $locations
      * @return array{owner: User, manager: User, staff: User}
      */
@@ -167,23 +250,23 @@ class DemoDataSeeder extends Seeder
 
     /**
      * @param  array<int, Location>  $locations
+     * @param  array<string, Category>  $geneticCategories
+     * @param  array{owner: User, manager: User, staff: User}  $staff
+     * @param  array{faker: string, locations: array{0: string, 1: string}, grades: array{premium: string, standard: string}, bar_category: string, tiers: array{standard: string, therapeutic: string}, discounts: array{staff: string, therapeutic: string}, articles: array<string, int>, opening_stock: string, opening_balance: string, seed_debt: string}  $strings
      * @return array{0: array<string, array<int, Batch>>, 1: array<string, int>}
      */
-    /**
-     * @param  array<string, Category>  $geneticCategories
-     */
-    private function seedCatalogue(string $orgId, array $locations, array $geneticCategories, Category $catBar): array
+    private function seedCatalogue(string $orgId, array $locations, array $geneticCategories, Category $catBar, array $staff, array $strings): array
     {
-        // [name, thc_bp, cbd_bp, cultivation, strain type, grade category] — strain + grade are spread
-        // ORTHOGONALLY (prompt 66): sativa/indica/hybrid across both Premium and Estándar, and a CBD
-        // variety with NO strain type. So Variedad, Categoría and Tipo select different sets.
+        // [name, thc_bp, cbd_bp, cultivation, strain type, grade key] — strain + grade are spread
+        // ORTHOGONALLY (prompt 66): sativa/indica/hybrid across both grades, plus a CBD variety with NO
+        // strain type. So Variedad, Categoría and Tipo select different sets. Strain names are proper nouns.
         $definitions = [
-            ['Amnesia Haze', 2200, 50, CultivationType::INDOOR, StrainType::SATIVA, 'Premium'],
-            ['Critical Kush', 1900, 80, CultivationType::INDOOR, StrainType::INDICA, 'Estándar'],
-            ['CBD Charlotte', 600, 1200, CultivationType::GREENHOUSE, null, 'Estándar'],
-            ['Moby Dick', 2300, 40, CultivationType::OUTDOOR, StrainType::SATIVA, 'Premium'],
-            ['Northern Lights', 1800, 60, CultivationType::INDOOR, StrainType::INDICA, 'Estándar'],
-            ['Purple Haze', 2000, 30, CultivationType::OUTDOOR, StrainType::HYBRID, 'Premium'],
+            ['Amnesia Haze', 2200, 50, CultivationType::INDOOR, StrainType::SATIVA, 'premium'],
+            ['Critical Kush', 1900, 80, CultivationType::INDOOR, StrainType::INDICA, 'standard'],
+            ['CBD Charlotte', 600, 1200, CultivationType::GREENHOUSE, null, 'standard'],
+            ['Moby Dick', 2300, 40, CultivationType::OUTDOOR, StrainType::SATIVA, 'premium'],
+            ['Northern Lights', 1800, 60, CultivationType::INDOOR, StrainType::INDICA, 'standard'],
+            ['Purple Haze', 2000, 30, CultivationType::OUTDOOR, StrainType::HYBRID, 'premium'],
         ];
 
         $batchesByLocation = [];
@@ -206,28 +289,29 @@ class DemoDataSeeder extends Seeder
                 ]);
 
                 $initial = random_int(20000, 80000); // cg
+                // Batch starts EMPTY; opening stock enters through the single stock writer as an INTAKE
+                // movement (the real go-live path — never a free-typed remaining_cg).
                 $batch = Batch::create([
                     'organisation_id' => $orgId, 'genetic_id' => $genetic->id, 'location_id' => $location->id,
                     'batch_no' => 'B-'.strtoupper(Str::random(6)), 'acquired_or_harvested_on' => now()->subDays(30),
-                    'initial_cg' => $initial, 'remaining_cg' => $initial, 'cost_per_gram_cents' => random_int(300, 600),
+                    'initial_cg' => $initial, 'remaining_cg' => 0, 'cost_per_gram_cents' => random_int(300, 600),
                     'status' => BatchStatus::OPEN,
                 ]);
 
-                StockMovement::create([
-                    'organisation_id' => $orgId, 'location_id' => $location->id,
-                    'stockable_type' => Batch::class, 'stockable_id' => $batch->id,
-                    'qty_cg' => $initial, 'type' => StockMovementType::INTAKE,
-                    'reason' => 'Existencias iniciales', 'reference' => $batch->batch_no,
+                (new RecordStockMovement)->handle($batch, StockMovementType::INTAKE, $initial, [
+                    'operator_id' => $staff['owner']->id,
+                    'reason' => $strings['opening_stock'],
+                    'reference' => $batch->batch_no,
                 ]);
 
-                $batchesByLocation[$location->id][] = $batch;
+                $batchesByLocation[$location->id][] = $batch->refresh();
                 $priceByBatch[$batch->id] = $pricePerGram;
             }
         }
 
         foreach ($locations as $location) {
             $this->scope->setLocation($location->id);
-            foreach (['Agua' => 150, 'Refresco' => 200, 'Café' => 120, 'Mechero' => 100, 'Papel de liar' => 90] as $name => $cents) {
+            foreach ($strings['articles'] as $name => $cents) {
                 Article::create([
                     'organisation_id' => $orgId, 'location_id' => $location->id, 'name' => $name,
                     'category_id' => $catBar->id, 'price_cents' => $cents, 'stock' => random_int(20, 100),
@@ -241,43 +325,111 @@ class DemoDataSeeder extends Seeder
 
     /**
      * @param  array<int, Location>  $locations
+     * @param  array{owner: User, manager: User, staff: User}  $staff
+     * @param  array{faker: string, locations: array{0: string, 1: string}, grades: array{premium: string, standard: string}, bar_category: string, tiers: array{standard: string, therapeutic: string}, discounts: array{staff: string, therapeutic: string}, articles: array<string, int>, opening_stock: string, opening_balance: string, seed_debt: string}  $strings
      * @return array<string, array<int, array{member: Member, balance: int}>>
      */
-    private function seedMembers(string $orgId, array $locations, MembershipTier $tierSocio, MembershipTier $tierTera): array
+    private function seedMembers(string $orgId, array $locations, MembershipTier $tierSocio, MembershipTier $tierTera, array $staff, array $strings): array
     {
         $membersByLocation = [];
         $number = 1;
+        $operatorId = $staff['manager']->id;
 
-        // 16 active members split across the two locations, plus one of each other status.
+        // 16 active members split across the two locations. Each is enrolled through EnrolMembership and has
+        // its fee PAID through RecordFeePayment (prompt 46's unpaid_fee block would otherwise stop the demo
+        // dispensing to anyone). A few carry an opening wallet balance via RecordWalletTransaction.
         for ($i = 0; $i < 16; $i++) {
             $location = $locations[$i % count($locations)];
-            $member = $this->makeMember($orgId, $number++, MemberStatus::ACTIVE, $i < 3);
-
             $this->scope->setLocation($location->id);
-            Membership::create([
-                'organisation_id' => $orgId, 'member_id' => $member->id, 'location_id' => $location->id,
-                'tier_id' => $member->is_therapeutic ? $tierTera->id : $tierSocio->id,
-                'starts_at' => now()->subMonths(6), 'expires_at' => now()->addMonths(6),
-                'fee_cents' => $member->is_therapeutic ? 1000 : 2000, 'status' => MembershipStatus::ACTIVE,
+
+            $member = $this->makeMember($orgId, $number++, MemberStatus::ACTIVE, $i < 3);
+            $tier = $member->is_therapeutic ? $tierTera : $tierSocio;
+
+            $membership = (new EnrolMembership)->handle($member, $location, $tier, [
+                'starts_at' => now()->subMonths(6), 'actor' => $staff['owner'],
+            ]);
+            (new RecordFeePayment)->handle($membership, $tier->default_fee_cents->cents, FeePaymentMethod::CASH, [
+                'operator_id' => $operatorId,
             ]);
 
             $balance = random_int(0, 6000);
             if ($balance > 0) {
-                WalletTransaction::create([
-                    'organisation_id' => $orgId, 'member_id' => $member->id, 'location_id' => $location->id,
-                    'amount_cents' => $balance, 'type' => WalletTransactionType::ADJUSTMENT,
-                    'balance_after_cents' => $balance, 'reason' => 'Saldo inicial (importación go-live)',
+                (new RecordWalletTransaction)->handle($member, $location, $balance, WalletTransactionType::ADJUSTMENT, [
+                    'operator_id' => $operatorId, 'reason' => $strings['opening_balance'],
                 ]);
             }
 
             $membersByLocation[$location->id][] = ['member' => $member, 'balance' => $balance];
         }
 
+        // One member of each non-active status — so every status badge/filter has a real example.
         foreach ([MemberStatus::APPLICANT, MemberStatus::APPLICANT, MemberStatus::INACTIVE, MemberStatus::EXPIRED, MemberStatus::SUSPENDED, MemberStatus::EXPELLED] as $status) {
             $this->makeMember($orgId, $number++, $status, false);
         }
 
+        // Feature-exercising members (prompt 70) — a flag with no data demonstrates nothing. All are at the
+        // first location, active and fee-paid, so the ONLY thing each demonstrates is its named feature.
+        $this->seedFeatureMembers($orgId, $locations[0], $tierSocio, $staff, $strings, $number);
+
         return $membersByLocation;
+    }
+
+    /**
+     * @param  array{owner: User, manager: User, staff: User}  $staff
+     * @param  array{faker: string, locations: array{0: string, 1: string}, grades: array{premium: string, standard: string}, bar_category: string, tiers: array{standard: string, therapeutic: string}, discounts: array{staff: string, therapeutic: string}, articles: array<string, int>, opening_stock: string, opening_balance: string, seed_debt: string}  $strings
+     */
+    private function seedFeatureMembers(string $orgId, Location $location, MembershipTier $tier, array $staff, array $strings, int $number): void
+    {
+        $this->scope->setLocation($location->id);
+        $operatorId = $staff['manager']->id;
+
+        $enrol = function (Member $member) use ($location, $tier, $staff, $operatorId): Membership {
+            $membership = (new EnrolMembership)->handle($member, $location, $tier, [
+                'starts_at' => now()->subMonths(3), 'actor' => $staff['owner'],
+            ]);
+            (new RecordFeePayment)->handle($membership, $tier->default_fee_cents->cents, FeePaymentMethod::CASH, ['operator_id' => $operatorId]);
+
+            return $membership;
+        };
+
+        // In debt within the €50 counter cap (−€40): past the €30 door threshold, so the door blocks but the
+        // counter allows — the balance display, door threshold and counter block are all visible at once.
+        $inDebt = $this->makeMember($orgId, $number++, MemberStatus::ACTIVE, false);
+        $enrol($inDebt);
+        (new RecordWalletTransaction)->handle($inDebt, $location, -4000, WalletTransactionType::ADJUSTMENT, [
+            'operator_id' => $operatorId, 'reason' => $strings['seed_debt'], 'allow_debt' => true,
+        ]);
+
+        // Near the cap (−€48) — the next contribution tips them over.
+        $nearLimit = $this->makeMember($orgId, $number++, MemberStatus::ACTIVE, false);
+        $enrol($nearLimit);
+        (new RecordWalletTransaction)->handle($nearLimit, $location, -4800, WalletTransactionType::ADJUSTMENT, [
+            'operator_id' => $operatorId, 'reason' => $strings['seed_debt'], 'allow_debt' => true,
+        ]);
+
+        // Temporary member approaching expiry (3 days out) — the removal-reminder path is visible.
+        $temp = $this->makeMember($orgId, $number++, MemberStatus::ACTIVE, false);
+        $temp->update(['kind' => MemberKind::TEMPORARY, 'temporary_expires_at' => now()->addDays(3)]);
+        $enrol($temp);
+
+        // In carencia (ends in 5 days) — may enter, may not dispense (the carencia block is legible).
+        $carencia = $this->makeMember($orgId, $number++, MemberStatus::ACTIVE, false);
+        $carencia->update(['carencia_ends_at' => now()->addDays(5)]);
+        $enrol($carencia);
+
+        // Membership expiring soon (5 days) — the renewal-reminder / expiring-soon filter has an example.
+        $expiring = $this->makeMember($orgId, $number++, MemberStatus::ACTIVE, false);
+        $expMembership = $enrol($expiring);
+        $expMembership->update(['expires_at' => now()->addDays(5)]);
+
+        // Active member carrying a warning sanction — so prompt 51's sanctions tab is not empty.
+        $sanctioned = $this->makeMember($orgId, $number++, MemberStatus::ACTIVE, false);
+        $enrol($sanctioned);
+        MemberSanction::create([
+            'member_id' => $sanctioned->id, 'type' => SanctionType::WARNING,
+            'reason' => $strings['seed_debt'] === 'Outstanding balance (demo)' ? 'Late fee reminder (demo)' : 'Aviso por retraso de cuota (demo)',
+            'from_date' => now()->subDays(2), 'until_date' => now()->addDays(28), 'recorded_by' => $operatorId,
+        ]);
     }
 
     private function makeMember(string $orgId, int $number, MemberStatus $status, bool $therapeutic): Member
@@ -285,14 +437,14 @@ class DemoDataSeeder extends Seeder
         return Member::create([
             'organisation_id' => $orgId,
             'member_no' => sprintf('M-%05d', $number),
-            'first_name' => fake()->firstName(),
-            'last_name' => fake()->lastName(),
-            'email' => fake()->unique()->safeEmail(),
-            'phone' => fake()->numerify('6########'),
-            'date_of_birth' => fake()->dateTimeBetween('-60 years', '-21 years'),
-            'address' => fake()->streetAddress(),
+            'first_name' => $this->faker->firstName(),
+            'last_name' => $this->faker->lastName(),
+            'email' => $this->faker->unique()->safeEmail(),
+            'phone' => $this->faker->numerify('6########'),
+            'date_of_birth' => $this->faker->dateTimeBetween('-60 years', '-21 years'),
+            'address' => $this->faker->streetAddress(),
             'document_type' => IdDocumentType::DNI,
-            'document_number' => fake()->numerify('########').'Z',
+            'document_number' => $this->faker->numerify('########').'Z',
             'status' => $status,
             'is_therapeutic' => $therapeutic,
             'joined_at' => $status === MemberStatus::APPLICANT ? null : now()->subMonths(random_int(1, 18)),
@@ -390,6 +542,11 @@ class DemoDataSeeder extends Seeder
                 $cash = $lineTotal;
             }
 
+            // NB: the fortnight's dispensations stay relational-with-full-snapshot — the documented
+            // compliance-boundary carve-out (CLAUDE.md): CommitDispensation would REJECT historical demo
+            // data (carencia/limits/fees for a back-dated day), so the seeder writes the completed shape
+            // directly, populating every column the real writer sets. The LIVE path is exercised by the
+            // fee-paid members above (a fresh CommitDispensation succeeds — see DemoSeedProfileTest).
             $dispensation = Dispensation::create([
                 'organisation_id' => $orgId, 'member_id' => $member->id, 'location_id' => $location->id,
                 'operator_id' => $operator->id, 'till_session_id' => $till->id,
@@ -404,22 +561,17 @@ class DemoDataSeeder extends Seeder
                 'line_total_cents' => $lineTotal, 'genetic_name_snapshot' => $batch->genetic->name, 'batch_no_snapshot' => $batch->batch_no,
             ]);
 
-            $batch->remaining_cg = Weight::fromCentigrams($batch->remaining_cg->centigrams - $gramsCg);
-            $batch->save();
-
-            StockMovement::create([
-                'organisation_id' => $orgId, 'location_id' => $location->id,
-                'stockable_type' => Batch::class, 'stockable_id' => $batch->id,
-                'qty_cg' => -$gramsCg, 'type' => StockMovementType::DISPENSE,
+            // Stock leaves through the single writer (a DISPENSE movement + the locked decrement). Refresh
+            // the local batch after — the writer decremented it in the DB, and the next iteration's
+            // remaining_cg guard must see the new figure, not a stale one.
+            (new RecordStockMovement)->handle($batch, StockMovementType::DISPENSE, -$gramsCg, [
                 'operator_id' => $operator->id, 'reference' => $dispensation->id,
             ]);
+            $batch->refresh();
 
             if ($wallet > 0) {
-                WalletTransaction::create([
-                    'organisation_id' => $orgId, 'member_id' => $member->id, 'location_id' => $location->id,
-                    'amount_cents' => -$wallet, 'type' => WalletTransactionType::CONTRIBUTION,
-                    'balance_after_cents' => $members[$index]['balance'], 'operator_id' => $operator->id,
-                    'till_session_id' => $till->id, 'source_type' => Dispensation::class, 'source_id' => $dispensation->id,
+                (new RecordWalletTransaction)->handle($member, $location, -$wallet, WalletTransactionType::CONTRIBUTION, [
+                    'operator_id' => $operator->id, 'till_session_id' => $till->id, 'source' => $dispensation, 'allow_debt' => true,
                 ]);
             }
 
