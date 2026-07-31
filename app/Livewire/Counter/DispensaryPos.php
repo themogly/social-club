@@ -15,6 +15,7 @@ use App\Enums\TillSessionStatus;
 use App\Exceptions\DispensationBlockedException;
 use App\Exceptions\LimitExceededException;
 use App\Exceptions\TillClosedException;
+use App\Livewire\Counter\Concerns\IdentifiesOperator;
 use App\Models\Batch;
 use App\Models\CheckIn;
 use App\Models\Dispensation;
@@ -64,6 +65,8 @@ use Throwable;
 #[Layout('components.layouts.counter')]
 class DispensaryPos extends Component
 {
+    use IdentifiesOperator;
+
     // --- Identity ---------------------------------------------------------------
 
     /** Bound to the scan input — a keyboard-wedge scanner types the token then hits Enter. */
@@ -452,6 +455,11 @@ class DispensaryPos extends Component
         if ($member === null || $location === null) {
             $this->flash(__('Identifica a un socio antes de registrar una dispensación.'), 'error');
 
+            return;
+        }
+
+        // Attribution: a PIN-identified operator is required — never the device session user.
+        if (! $this->requireOperator()) {
             return;
         }
 

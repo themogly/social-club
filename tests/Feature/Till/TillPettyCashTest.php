@@ -12,6 +12,7 @@ use App\Models\Location;
 use App\Models\Organisation;
 use App\Models\User;
 use App\Support\ActiveScope;
+use App\Support\CounterOperator;
 use App\Support\TillSummary;
 use Database\Seeders\RolePermissionSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -39,6 +40,7 @@ class TillPettyCashTest extends TestCase
     {
         $user = User::factory()->create();
         $user->assignRole(Role::STAFF->value); // holds expenses.record + till.open
+        CounterOperator::set($user); // PIN-identified operator (prompt 26 guard)
 
         return $user;
     }
@@ -90,6 +92,7 @@ class TillPettyCashTest extends TestCase
         $user->givePermissionTo('till.open'); // can open the drawer, but has no expenses.record
         $this->actingAs($user);
         app(ActiveScope::class)->setLocation($this->location->id);
+        CounterOperator::set($user); // pass the operator guard so the PERMISSION check is what denies
 
         $session = (new OpenTill)->handle($this->location, 'POS-1', 10000);
         $category = ExpenseCategory::factory()->create([

@@ -14,6 +14,7 @@ use App\Models\MembershipTier;
 use App\Models\Organisation;
 use App\Models\User;
 use App\Support\ActiveScope;
+use App\Support\CounterOperator;
 use Database\Seeders\RolePermissionSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
@@ -42,6 +43,7 @@ class CheckInScreenTest extends TestCase
         $user = User::factory()->create();
         $user->assignRole(Role::STAFF->value); // STAFF holds checkin.manage
         $user->locations()->sync([$this->location->id]);
+        CounterOperator::set($user); // PIN-identified operator (prompt 26 guard)
 
         return $user;
     }

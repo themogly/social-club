@@ -15,6 +15,7 @@ use App\Models\Order;
 use App\Models\Organisation;
 use App\Models\User;
 use App\Support\ActiveScope;
+use App\Support\CounterOperator;
 use Database\Seeders\RolePermissionSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
@@ -56,6 +57,7 @@ class BarPosScreenTest extends TestCase
         $user->locations()->sync([$this->location->id]);
         $this->actingAs($user);
         app(ActiveScope::class)->setLocation($this->location->id);
+        CounterOperator::set($user); // PIN-identified operator (prompt 26 guard)
 
         return $user;
     }

@@ -6,6 +6,7 @@ use App\Actions\Bar\CommitOrder;
 use App\Actions\Bar\VoidOrder;
 use App\Enums\TillSessionStatus;
 use App\Exceptions\TillClosedException;
+use App\Livewire\Counter\Concerns\IdentifiesOperator;
 use App\Models\Article;
 use App\Models\Location;
 use App\Models\Member;
@@ -56,6 +57,8 @@ use Throwable;
 #[Layout('components.layouts.counter')]
 class BarPos extends Component
 {
+    use IdentifiesOperator;
+
     // --- Identity / scope -------------------------------------------------------
 
     /** Live org-wide search to OPTIONALLY attach a socio (name or member number). */
@@ -349,6 +352,11 @@ class BarPos extends Component
         if ($location === null) {
             $this->flash(__('Sin sede activa.'), 'error');
 
+            return;
+        }
+
+        // Attribution: a PIN-identified operator is required — never the device session user.
+        if (! $this->requireOperator()) {
             return;
         }
 

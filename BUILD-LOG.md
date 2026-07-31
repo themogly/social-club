@@ -6,12 +6,12 @@ one branch each, `composer check` green before every merge. Prompt 18 is deliber
 
 ---
 
-# ✅ FINAL SUMMARY — run completed cleanly (+ follow-ups 19, 20, 21, 23)
+# ✅ FINAL SUMMARY — run completed cleanly (+ follow-ups 19, 20, 21, 23, 24, 25)
 
-_Latest: prompt 23 (a shared, permission-gated back-to-dashboard header on the four counter screens,
-with confirm-before-leaving unsaved work) merged green — suite now **335 tests / 2203 assertions** on
-both drivers. Prompt 22 was not part of this sequence. The narrative below predates 23; per-prompt
-entries are appended in order._
+_Latest: prompt 25 (dashboard alerts leaked Spanish in the English UI — trans_choice keys were never
+verified into the locale files; fixed + added a second notification-copy static-scan gate) merged green —
+suite now **353 tests / 2253 assertions**. Prompt 24 (debt/multi-location settings) merged before it.
+The narrative below predates 24/25; per-prompt entries are appended in order._
 
 **The unattended run reached the end.** Bootstrap + **prompts 01–17 all completed, `composer check`
 green, and merged to `main`** (prompt 18 skipped as instructed), then three requested follow-ups —
@@ -259,3 +259,13 @@ frozen-clock regression test.
 - Status: merged
 - Defaults chosen: Exposed settings the enforcement already consumed but had no form: the DOOR debt threshold (wallet_door_debt_threshold_cents, euros at the edge — a field DISTINCT from the hard limit; door reacts at the threshold via ResolveMemberEligibility, counter blocks at the limit via RecordWalletTransaction, tested independent) + the ring-fence toggle; the audit found + added limit_override_requires_manager and avalador_therapeutic_exempt too. A repeatable settings-completeness test asserts every org DEFAULT is on the form or a documented exclusion (forecast_options_g array preset + low_stock_threshold_cg per-article fallback deferred). e2e test proves the configured debt limit (not a hardcode) is what the counter enforces. Users form already had a ->multiple() locations select (location_user) — decisions recorded: OWNER picker allowed-but-irrelevant (owner gets All via the switcher); zero-location MANAGER/STAFF = deliberate no-access-yet; assignment changes effective next request (no re-login). All new labels/help bilingual (parity gate green). 341 tests.
 - Needs Ben's confirmation: OWNER picker allowed-but-irrelevant; zero-location = deliberate no-access; forecast_options_g + low_stock_threshold_cg left off the org form (reasons in DECISIONS).
+
+## Prompt 25 — alerts render in Spanish regardless of locale
+- Status: merged (overnight self-merge)
+- Root cause: dashboard alerts (+3 report/register counts) build sentences with trans_choice(), but LangKeys::usedInCode() only scanned __()/@lang() — so the 9 pluralized keys were invisible to prompt 19's parity test and never reached lang/*.json; trans_choice echoed the Spanish key and the app default is 'en'. Fixed by (a) adding the 9 keys + 4 surfaced-exception keys to both locale files, (b) extending LangKeys to scan trans_choice()/trans() so the parity test now covers pluralized keys (root-cause), (c) new tokeniser-based App\Support\NotificationCopyScanner flagging raw literals at notification/alert sinks (title/body/flash), wired into composer check with a regression-proof test. Also translated 6 exception messages surfaced live to users (POS flash + toast bodies) that leaked English into Spanish. Stored ledger 'motivo' descriptors documented as a separate stored-data-localization concern (not this branch). Tests assert actual rendered EN/ES sentence per alert type + plural grammar + end-to-end page + per-area toasts. No migration → MySQL parity N/A. 353 tests green.
+- Needs Ben's confirmation: the stored ledger 'motivo' descriptors deferred (future prompt); the 6 implemented alert types (the rest named in the prompt aren't built as dashboard alerts).
+
+## Prompt 26 — PIN operator switching: audit and complete the missing UI
+- Status: merged (overnight self-merge)
+- Audit: backend (hashed pin, rate-limited UnlockOperator, CounterOperator session store, all 5 write paths already attributing CounterOperator::id() ?? Auth::id()) and the Users admin set/reset-PIN control were ALL already built + tested — but NOTHING called UnlockOperator/CounterOperator::set() outside tests, so CounterOperator::id() was always null and every transaction silently fell back to the device login. The gap was the UI + wiring, not the feature. Built one shared trait (IdentifiesOperator) + one shared Blade partial (operator-strip: "Trabajando: [name]" indicator + tablet-first PIN pad + switch + wrong/rate-limited feedback) across all four counter screens, and a requireOperator() guard on every commit (dispensation/bar/cash-movement/check-in/till-open/petty-cash) that refuses with a clear prompt — never silently attributing to the device user. 10 new tests: UI unlock success/reject/rate-limit, switch-updates-indicator, per-type attribution (records the PIN operator not the device login), block-until-identified, and the Users-form PIN end-to-end → counter unlock. No migration → MySQL parity N/A. 363 tests green.
+- Needs Ben's confirmation: operator strip added to the TILL screen too (prompt named three); the Action-level ?? Auth::id() fallback kept for non-counter (admin) callers.

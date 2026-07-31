@@ -1,4 +1,8 @@
 <div class="flex flex-col gap-5 lg:grid lg:grid-cols-[minmax(0,1fr)_22rem] lg:items-start">
+    <div class="lg:col-span-2">
+        @include('livewire.counter.partials.operator-strip')
+    </div>
+
     {{-- ================= LEFT: the door workflow ================= --}}
     <div class="flex flex-col gap-5">
         @if ($noLocation)

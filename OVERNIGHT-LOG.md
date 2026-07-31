@@ -53,3 +53,6 @@ steps are logged as deferred-to-human rather than fabricated; `composer check` g
   (root-cause fix — parity test now covers pluralized keys); new `App\Support\NotificationCopyScanner`
   (tokeniser-based) flags raw literals at notification/alert sinks (title/body/flash), wired into
   `composer check` via a test that also proves it catches a reintroduced regression.
+
+**2026-07-31 — Prompt 25 DONE.** Merged to `main` @ 3378bfe, `composer check` green on main
+(353 tests / 2253 assertions), pushed, branch deleted. Moving to prompt 26 (PIN operator switching).
