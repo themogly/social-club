@@ -10,7 +10,11 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
 use RuntimeException;
 
-/** Append-only audit trail. No update or delete path through the model. */
+/**
+ * Append-only audit trail. No update or delete path through the model.
+ *
+ * @property-read string|null $auditable_type
+ */
 class AuditLog extends Model
 {
     /** @use HasFactory<AuditLogFactory> */
