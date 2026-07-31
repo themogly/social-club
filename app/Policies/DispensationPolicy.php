@@ -19,6 +19,17 @@ use App\Support\ActiveScope;
  */
 class DispensationPolicy
 {
+    /**
+     * List the dispensations in the panel (DispensationResource is oversight-only, prompt 71). Gated on a
+     * counter OR reporting permission — mirroring OrderPolicy — so both counter staff and reporting roles
+     * can review. The org is enforced by the model's global scope on the list query; per-row org/location
+     * checks live in `view`.
+     */
+    public function viewAny(User $user): bool
+    {
+        return $user->can('pos.use') || $user->can('reports.view');
+    }
+
     public function view(User $user, Dispensation $dispensation): bool
     {
         if (! ($user->can('pos.use') || $user->can('reports.view'))) {
@@ -34,6 +45,17 @@ class DispensationPolicy
     }
 
     public function void(User $user, Dispensation $dispensation): bool
+    {
+        return $user->can('dispensation.void') && $this->view($user, $dispensation);
+    }
+
+    /**
+     * Refund (partial/cash) a completed dispensation (prompt 71). Reuses `dispensation.void` — a deliberate,
+     * reversible choice recorded in DECISIONS (a refund is a reversal act in the same risk tier) — AND the
+     * same visibility check, so a manager cannot refund another sede's row. RefundDispensation is the writer;
+     * this only gates whether the surface is offered.
+     */
+    public function refund(User $user, Dispensation $dispensation): bool
     {
         return $user->can('dispensation.void') && $this->view($user, $dispensation);
     }

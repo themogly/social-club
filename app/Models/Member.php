@@ -202,6 +202,12 @@ class Member extends Model implements Authenticatable
         return $this->hasMany(MemberDiscount::class);
     }
 
+    /** @return HasMany<Refund, $this> */
+    public function refunds(): HasMany
+    {
+        return $this->hasMany(Refund::class);
+    }
+
     public function isTemporary(): bool
     {
         return $this->kind === MemberKind::TEMPORARY;

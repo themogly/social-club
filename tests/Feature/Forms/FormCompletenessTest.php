@@ -8,6 +8,7 @@ use App\Filament\Resources\AuditLogs\AuditLogResource;
 use App\Filament\Resources\Batches\BatchResource;
 use App\Filament\Resources\DataRequests\DataRequestResource;
 use App\Filament\Resources\Discounts\DiscountResource;
+use App\Filament\Resources\Dispensations\DispensationResource;
 use App\Filament\Resources\DocumentTemplates\DocumentTemplateResource;
 use App\Filament\Resources\Events\EventResource;
 use App\Filament\Resources\Expenses\ExpenseResource;
@@ -53,6 +54,7 @@ class FormCompletenessTest extends TestCase
         MemberDocumentResource::class => 'Read-only document vault — documents are generated/uploaded via domain actions.',
         TillSessionResource::class => 'Read-only till oversight — sessions open/close at the counter terminal, not a form.',
         OrderResource::class => 'Read-only bar-sales oversight — orders are committed/voided at the bar POS, never a form (prompt 43).',
+        DispensationResource::class => 'Read-only dispensation oversight — withdrawals happen at the dispensary POS; the only action is the refund modal (prompt 71).',
     ];
 
     /**

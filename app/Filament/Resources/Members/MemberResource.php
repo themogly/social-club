@@ -22,6 +22,7 @@ use App\Filament\Resources\Members\RelationManagers\DiscountsRelationManager;
 use App\Filament\Resources\Members\RelationManagers\DocumentsRelationManager;
 use App\Filament\Resources\Members\RelationManagers\MembershipsRelationManager;
 use App\Filament\Resources\Members\RelationManagers\OrdersRelationManager;
+use App\Filament\Resources\Members\RelationManagers\RefundsRelationManager;
 use App\Filament\Resources\Members\RelationManagers\SanctionsRelationManager;
 use App\Filament\Resources\Members\RelationManagers\VisitsRelationManager;
 use App\Filament\Resources\Members\RelationManagers\WalletTransactionsRelationManager;
@@ -348,6 +349,7 @@ class MemberResource extends Resource
             VisitsRelationManager::class,
             WalletTransactionsRelationManager::class,
             OrdersRelationManager::class,
+            RefundsRelationManager::class,
             DiscountsRelationManager::class,
             SanctionsRelationManager::class,
             AvaladosRelationManager::class,

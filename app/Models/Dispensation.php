@@ -86,6 +86,42 @@ class Dispensation extends Model
         return $this->hasMany(DispensationLine::class);
     }
 
+    /** @return HasMany<Refund, $this> */
+    public function refunds(): HasMany
+    {
+        return $this->hasMany(Refund::class);
+    }
+
+    /** Total money already refunded against this dispensation (cents) — queried live, never cached. */
+    public function refundedAmountCents(): int
+    {
+        return (int) $this->refunds()->sum('amount_cents');
+    }
+
+    /** Money still available to refund (cents): the charged total minus what has already been refunded. */
+    public function remainingRefundableCents(): int
+    {
+        return max(0, $this->total_cents->cents - $this->refundedAmountCents());
+    }
+
+    /** Total weight dispensed (centigrams) across all lines. */
+    public function dispensedGramsCg(): int
+    {
+        return (int) $this->lines()->sum('grams_cg');
+    }
+
+    /** Weight already returned via refunds (centigrams). */
+    public function refundedGramsCg(): int
+    {
+        return (int) $this->refunds()->sum('grams_cg');
+    }
+
+    /** Weight still available to return (centigrams). */
+    public function remainingRefundableGramsCg(): int
+    {
+        return max(0, $this->dispensedGramsCg() - $this->refundedGramsCg());
+    }
+
     /** @return BelongsTo<Dispensation, $this> */
     public function reversalOf(): BelongsTo
     {
