@@ -98,7 +98,7 @@ class MembershipsRelationManager extends RelationManager
                 ];
 
                 if (filled($data['fee_eur'] ?? null)) {
-                    $options['fee_cents'] = (int) round(((float) $data['fee_eur']) * 100);
+                    $options['fee_cents'] = (int) round_half_up(((float) $data['fee_eur']) * 100);
                 }
 
                 (new EnrolMembership)->handle($member, $location, $tier, $options);

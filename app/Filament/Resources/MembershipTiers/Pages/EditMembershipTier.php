@@ -52,7 +52,7 @@ class EditMembershipTier extends EditRecord
      */
     protected function mutateFormDataBeforeSave(array $data): array
     {
-        $data['default_fee_cents'] = (int) round(((float) ($data['default_fee_eur'] ?? 0)) * 100);
+        $data['default_fee_cents'] = (int) round_half_up(((float) ($data['default_fee_eur'] ?? 0)) * 100);
         $data['daily_limit_cg'] = filled($data['daily_limit_g'] ?? null) ? (int) round_half_up(((float) $data['daily_limit_g']) * 100) : null;
         $data['monthly_limit_cg'] = filled($data['monthly_limit_g'] ?? null) ? (int) round_half_up(((float) $data['monthly_limit_g']) * 100) : null;
         unset($data['default_fee_eur'], $data['daily_limit_g'], $data['monthly_limit_g']);

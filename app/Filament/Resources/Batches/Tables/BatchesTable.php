@@ -138,7 +138,7 @@ class BatchesTable
     /** A stock delta in the batch's own unit: whole units for UNIT batches, centigrams for WEIGHT. */
     protected static function signedDelta(Batch $batch, float $quantity): int
     {
-        return $batch->isUnitType() ? (int) $quantity : (int) round($quantity * 100);
+        return $batch->isUnitType() ? (int) $quantity : (int) round_half_up($quantity * 100);
     }
 
     protected static function operatorId(): ?string
