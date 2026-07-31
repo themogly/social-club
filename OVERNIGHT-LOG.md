@@ -176,3 +176,24 @@ parity verified on every migration) and pushed to origin. No step hit a hard sto
 ## Where to pick up
 1. Read `AUDIT-FINDINGS.md` top-to-bottom (🔴 first). 2. Decide the ~7 inert settings (wire or cut).
 3. Do a visual/screenshot pass on the counter screens, dashboard, and the new prompt-25→31 UI.
+
+---
+
+# Follow-up review branches (owner-authorised merges)
+
+The owner queued the audit-finding fixes as prompts 32–38 and explicitly instructed "merge to main once
+finished" (overriding each prompt's default "wait for review" — the owner is the reviewer). Status:
+- **32 — document security (S1+S2):** ✅ MERGED (7aab69a). Article-9 docs (ID scan/cert/generated PDF)
+  encrypted at rest via DocumentVault; streaming endpoint now authorises (permission + org ownership),
+  binds the URL to the user, and access-logs every VIEW. Photo/signature/business-uploads encryption +
+  receipt per-view logging = tracked follow-ups (DECISIONS.md). 393 green.
+- **33 — finance widget authz (A1):** ✅ MERGED (3f93b64). canView() + data-layer guard on the two
+  finance widgets; DispensedByGenetic € value zeroed for non-finance. 397 green.
+- **34 — inert settings (wire/cut the 8):** in progress next.
+- **35 — camera QR (both screens, fresh):** queued — large JS/camera build; visual verification needs a
+  browser (deferred), backend/wiring/tests buildable.
+- **36 — UI/a11y cleanup:** queued — note the palette/enum SAFE-FIX subset already landed in
+  chore/design-audit-fixes (38c0e40); remaining = button component, a11y (h1/aria-live/heatmap/contrast),
+  admin empty states.
+- **37 — structural cleanup (ForceDelete/EnrolMember/confirmations/dead code/CS5):** queued.
+- **38 — low-severity hardening (honeypot + CSP/HSTS):** queued.
