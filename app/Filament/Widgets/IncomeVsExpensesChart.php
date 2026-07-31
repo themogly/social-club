@@ -2,12 +2,20 @@
 
 namespace App\Filament\Widgets;
 
+use Illuminate\Support\Facades\Auth;
+
 /**
  * Income vs expenses for the period, with the superávit (surplus) drawn as a line on
  * top of the two bars — the club's break-even at a glance.
  */
 class IncomeVsExpensesChart extends DashboardChart
 {
+    /** Finance authorisation (audit A1): a STAFF user without reports.view* cannot mount this widget. */
+    public static function canView(): bool
+    {
+        return Auth::user()?->canAny(['reports.view', 'reports.view.all']) ?? false;
+    }
+
     public function getHeading(): string
     {
         return __('Ingresos vs gastos');

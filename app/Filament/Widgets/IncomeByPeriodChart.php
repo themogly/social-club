@@ -2,6 +2,8 @@
 
 namespace App\Filament\Widgets;
 
+use Illuminate\Support\Facades\Auth;
+
 /**
  * Income across the period, kept as three deliberately-separate streams — Aportaciones
  * (cannabis), Barra (bar/merch) and Cuotas (membership fees). They are never merged
@@ -9,6 +11,12 @@ namespace App\Filament\Widgets;
  */
 class IncomeByPeriodChart extends DashboardChart
 {
+    /** Finance authorisation (audit A1): a STAFF user without reports.view* cannot mount this widget. */
+    public static function canView(): bool
+    {
+        return Auth::user()?->canAny(['reports.view', 'reports.view.all']) ?? false;
+    }
+
     public function getHeading(): string
     {
         return __('Ingresos por período');
