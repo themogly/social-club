@@ -89,7 +89,9 @@ class PwaController extends Controller
         return view('socio.history', [
             'member' => $member,
             'dispensations' => $member->dispensations()->withoutGlobalScopes()->with('lines')->latest('dispensed_at')->limit(50)->get(),
+            'orders' => $member->orders()->withoutGlobalScopes()->latest()->limit(50)->get(),
             'wallet' => $member->walletTransactions()->withoutGlobalScopes()->latest()->limit(50)->get(),
+            'visits' => $member->checkIns()->withoutGlobalScopes()->latest('checked_in_at')->limit(50)->get(),
         ]);
     }
 
@@ -109,7 +111,9 @@ class PwaController extends Controller
             ],
             'memberships' => $member->memberships()->withoutGlobalScopes()->get(['location_id', 'tier_id', 'status', 'starts_at', 'expires_at']),
             'dispensaciones' => $member->dispensations()->withoutGlobalScopes()->with('lines:id,dispensation_id,grams_cg,line_total_cents,genetic_name_snapshot')->get(['id', 'location_id', 'total_cents', 'dispensed_at']),
+            'pedidos' => $member->orders()->withoutGlobalScopes()->get(['id', 'location_id', 'total_cents', 'status', 'created_at']),
             'monedero' => $member->walletTransactions()->withoutGlobalScopes()->get(['type', 'amount_cents', 'balance_after_cents', 'created_at']),
+            'visitas' => $member->checkIns()->withoutGlobalScopes()->get(['location_id', 'checked_in_at', 'checked_out_at', 'method']),
         ];
 
         return response()->json($payload, 200, [
