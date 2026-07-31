@@ -160,12 +160,15 @@ class DebtAndLocationSettingsTest extends TestCase
 
         // Money/weight/percent values edited via *_eur / *_g / *_pct virtual fields → cover their stored keys.
         // minute_quorum_fraction_bp is entered as a percentage (prompt 44).
-        $edgeCovered = ['daily_limit_cg', 'monthly_limit_cg', 'wallet_debt_limit_cents', 'wallet_door_debt_threshold_cents', 'arqueo_variance_tolerance_cents', 'expense_approval_threshold_cents', 'minute_quorum_fraction_bp'];
+        $edgeCovered = ['daily_limit_cg', 'monthly_limit_cg', 'wallet_debt_limit_cents', 'wallet_door_debt_threshold_cents', 'low_balance_threshold_cents', 'arqueo_variance_tolerance_cents', 'expense_approval_threshold_cents', 'minute_quorum_fraction_bp'];
 
         // Deliberately NOT on the org settings form (documented in DECISIONS): the enforcement
         // matrix (its own editor), per-location settings, and system/compliance constants.
         // (default_locale + enabled_locales are now ON the form — prompt 44 — so they left this list.)
         $excluded = ['enforcement', 'aforo_default', 'aforo_enforcement', 'data_retention_days', 'audit_retention_days', 'signed_url_ttl_seconds', 'consent_text_version', 'heartbeat_stale_seconds', 'monthly_window',
+            // Scheduler constant, not a front-of-house threshold: how many hours before an event to push
+            // its reminder (prompt 56 — the events:remind command reads it).
+            'event_reminder_lead_hours',
             // Per-location counter settings, edited on each LocationForm (not the org page): the POS
             // check-in / signature requirements (prompt 44 — now genuinely per-location) + camera QR (prompt 35).
             'restrict_pos_to_checked_in', 'signature_on_dispensation', 'camera_scan_enabled',

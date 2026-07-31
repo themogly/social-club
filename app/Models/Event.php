@@ -17,13 +17,14 @@ class Event extends Model
     use BelongsToOrganisation, HasFactory, HasUlids, SoftDeletes;
 
     protected $fillable = [
-        'organisation_id', 'location_id', 'title', 'description', 'starts_at', 'capacity',
+        'organisation_id', 'location_id', 'title', 'description', 'starts_at', 'capacity', 'reminder_sent_at',
     ];
 
     protected function casts(): array
     {
         return [
             'starts_at' => 'datetime',
+            'reminder_sent_at' => 'datetime',
             'capacity' => 'integer',
         ];
     }

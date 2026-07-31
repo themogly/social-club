@@ -47,10 +47,12 @@ class Settings
         'wallet_debt_allowed' => false,
         'wallet_debt_limit_cents' => 0,
         'wallet_door_debt_threshold_cents' => 0,
+        'low_balance_threshold_cents' => 500,   // €5 — push a low-balance reminder when a debit crosses below (prompt 56)
 
         // Membership lifecycle
         'expiring_soon_days' => 30,
         'renewal_reminder_lead_days' => 7,
+        'event_reminder_lead_hours' => 24,  // push event reminders this many hours before start (prompt 56)
 
         // Invitations — an unused invite link expires after this many days (prompt 29).
         'invite_expiry_days' => 14,

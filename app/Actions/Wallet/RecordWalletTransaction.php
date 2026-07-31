@@ -8,6 +8,7 @@ use App\Exceptions\DebtLimitExceededException;
 use App\Models\Location;
 use App\Models\Member;
 use App\Models\WalletTransaction;
+use App\Notifications\LowBalanceNotification;
 use App\Support\Settings;
 use App\Support\Wallet;
 use Illuminate\Database\Eloquent\Model;
@@ -30,8 +31,19 @@ class RecordWalletTransaction
      */
     public function handle(Member $member, Location $location, int $amountCents, WalletTransactionType $type, array $options = []): WalletTransaction
     {
-        return DB::transaction(function () use ($member, $location, $amountCents, $type, $options): WalletTransaction {
-            $newBalance = Wallet::balance($member->id, $location->id) + $amountCents;
+        $crossedLow = false;
+        $balanceAfter = 0;
+
+        $transaction = DB::transaction(function () use ($member, $location, $amountCents, $type, $options, &$crossedLow, &$balanceAfter): WalletTransaction {
+            $oldBalance = Wallet::balance($member->id, $location->id);
+            $newBalance = $oldBalance + $amountCents;
+
+            // Low-balance reminder (prompt 56): only when a DEBIT crosses the threshold from above to
+            // below — so it warns once on the drop, never repeatedly while already low. Dispatched after
+            // commit (below) so a rolled-back movement never pushes.
+            $threshold = (int) Settings::get('low_balance_threshold_cents', 500);
+            $crossedLow = $amountCents < 0 && $oldBalance >= $threshold && $newBalance < $threshold;
+            $balanceAfter = $newBalance;
 
             if ($newBalance < 0 && ! ($options['allow_debt'] ?? false)) {
                 $debtAllowed = (bool) Settings::get('wallet_debt_allowed', false);
@@ -70,5 +82,11 @@ class RecordWalletTransaction
 
             return $transaction;
         });
+
+        if ($crossedLow) {
+            $member->notify(new LowBalanceNotification($balanceAfter));
+        }
+
+        return $transaction;
     }
 }
