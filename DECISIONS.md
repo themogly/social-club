@@ -2048,3 +2048,28 @@ Three fully-built notifications had ZERO dispatch sites; receipts couldn't be em
   CID logo via `$message->embed`), registered in `DevMail` so it rides the existing `MailRenderTest`
   (render + inline-logo assertion) and the `/dev/mail` preview; sent by a new `emailReceipt()` action on
   the dispensary POS's last-dispensation block. 530 green. Self-merge on green (batch 3 authorisation).
+
+---
+
+## Batch 3·TIME — Prompt 55: bar article discounts (shape decided first)
+
+The bar had no discount path — even though `DiscountAppliesTo::ARTICLE` existed from the start (the case
+was built and never consumed, a prompt-08→12 handoff gap).
+
+**Shape decided BEFORE writing code (the prompt's instruction) — reuse the existing member Discount
+system, do NOT build a framework:** a member's PERCENTAGE `Discount` that explicitly `applies_to` ARTICLE
+or BOTH now discounts their bar order. Deliberate bounds:
+- **Percentage only.** A fixed-amount discount on a whole order raises "which line?" distribution
+  questions nobody asked to answer; percentages apply cleanly per line. Fixed-amount article discounts
+  are out of scope.
+- **Only explicit ARTICLE/BOTH discounts** (assigned standard Discounts + a therapeutic discount whose
+  applies_to includes articles). A **custom per-member** discount (the cannabis-side override) does NOT
+  leak onto beer — different act, deliberately excluded.
+- **Guests get nothing** (no member ⇒ no discount).
+
+**Single resolver, no desync:** `App\Actions\Pricing\ResolveArticleDiscount` (the counterpart to
+`ResolvePrice`) is called by BOTH the bar POS display (`basketView`) AND `CommitOrder` (`buildItems`), so
+the total the operator sees is exactly the total charged. The item snapshot gains a `discount_cents`;
+`line_total_cents` stays the NET, so `BarSalesReport` still reconciles (tested). The bar receipt shows the
+member discount. Tests: applied, guest-none, genetic-only-excluded, and shown==charged. 534 green.
+Self-merge on green (batch 3 authorisation). **Batch 3 IF-TIME (54, 56, 55) done; 45 next.**
