@@ -1509,3 +1509,25 @@ own note the reported overlap was very likely the OS launcher/Spotlight in the s
 Tests: success flash renders colocated (asserted via 2× occurrence in the rendered HTML) + `lastOrderId`
 retained + receipt link resolves; error flash equally colocated. Owner-authorised merge. 430 green.
 VISUAL VERIFICATION PENDING (no browser): before/after screenshots at the standard widths, light/dark.
+
+## Prompt 42 — counter screen switcher in the shared top-bar
+
+Added a screen switcher to the ONE shared counter header (`components/counter/top-bar.blade.php`), so all
+four screens (check-in, dispensary POS, bar POS, till) get it for free — same shared-component approach as
+the prompt-23 back-link and prompt-26 operator strip.
+
+- **Pattern: inline icon+label pills (tabs), not a dropdown.** The counter is tablet-first (≥1024), where
+  four labeled pills sit comfortably between the brand (left) and Panel/Log out (right); labels show from
+  `lg` up and collapse to icon-only below, and the nav is `overflow-x-auto` so a narrow header scrolls
+  rather than breaking. Simpler than a dropdown (no open-state JS) and keeps every destination one tap away.
+- **Permission-filtered per the REAL per-screen gate** (mirrored from each component's mount): check-in →
+  `checkin.manage`, dispensary → `pos.use`, bar → `pos.bar`, till → `till.open` OR `till.close`. A screen
+  the user can't use is never rendered (no 403-in-waiting), exactly like the existing Panel link.
+- **Active state** via `request()->routeIs()`: the current screen is a non-link `aria-current="page"`
+  brand-tinted pill; the others are links. Same technique as the socio PWA bottom nav.
+- **Unsaved-work confirm** reused verbatim from the Panel link (`$store.counter?.dirty` +
+  `window.confirm(@js($confirmLeave))` before `window.location.assign`) on every switch link.
+
+Tests: full-access sees all four (current active, others switch links); a `pos.bar`-only user sees only
+Barra; every switch link carries the confirm guard; the active screen is marked per screen. Owner-authorised
+merge. 434 green. Screenshots (four screens × light/dark × widths, two permission combos) pending — no browser.
