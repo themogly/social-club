@@ -83,7 +83,7 @@
                 @foreach ($dispensation->lines as $line)
                     @php $isUnit = $line->units_dispensed !== null; @endphp
                     <tr>
-                        <td>{{ $line->genetic_name_snapshot }}</td>
+                        <td>{{ $line->genetic_name_snapshot }}@if ($line->pricing_note) <span class="note">· {{ $line->pricing_note }}</span>@endif</td>
                         <td class="num">
                             @if ($isUnit)
                                 {{ $line->units_dispensed }} {{ __('uds') }} ({{ $line->grams_cg->formatted() }})

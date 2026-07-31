@@ -269,9 +269,9 @@ class CommitDispensation
      */
     private function buildLines(Member $member, array $lines, Location $location, array $options): array
     {
-        $total = 0;
-        $lineData = [];
         $resolver = new ResolvePrice;
+        $rows = [];         // per-line snapshot data (line_total_cents finalised after the eighth pass)
+        $eighthInput = [];  // per-line input to the basket-wide eighth break
 
         foreach ($lines as $line) {
             $batch = Batch::withoutGlobalScopes()->whereKey($line['batch_id'])->firstOrFail();
@@ -285,36 +285,48 @@ class CommitDispensation
             $price = $resolver->forGenetic($batch->genetic, $location, $member);
 
             if ($units !== null) {
-                // UNIT line: freeze the per-unit rate; grams_cg was computed in normalise().
+                // UNIT line: freeze the per-unit rate; grams_cg was computed in normalise(). No eighth (weight only).
                 $priced = $price->lineForUnits($units);
                 (new RecordStockMovement)->handle($batch, StockMovementType::DISPENSE, -$units, [
                     'operator_id' => $options['operator_id'] ?? Auth::id(),
                 ]);
 
                 $rateFreeze = ['price_per_gram_cents' => null, 'price_per_unit_cents' => $priced['rate_cents'], 'units_dispensed' => $units];
+                $eighthInput[] = ['grams_cg' => $grams, 'rate_cents' => 0, 'per_gram_total' => $priced['total_cents'], 'eighth_price' => null];
             } else {
-                // WEIGHT line: unchanged — freeze the per-gram rate, decrement centigrams.
+                // WEIGHT line: freeze the per-gram rate, decrement centigrams. Eligible for the eighth break.
                 $priced = $price->lineFor($grams);
                 (new RecordStockMovement)->handle($batch, StockMovementType::DISPENSE, -$grams, [
                     'operator_id' => $options['operator_id'] ?? Auth::id(),
                 ]);
 
                 $rateFreeze = ['price_per_gram_cents' => $priced['rate_cents'], 'price_per_unit_cents' => null, 'units_dispensed' => null];
+                $eighthInput[] = ['grams_cg' => $grams, 'rate_cents' => $price->effectiveRatePerGramCents(), 'per_gram_total' => $priced['total_cents'], 'eighth_price' => $price->eighthPriceCents];
             }
 
-            $total += $priced['total_cents'];
-
-            $lineData[] = [
+            $rows[] = [
                 'genetic_id' => $batch->genetic_id,
                 'batch_id' => $batch->id,
                 // grams_cg is populated on EVERY line (computed for UNIT) — the load-bearing invariant.
                 'grams_cg' => $grams,
                 'discount_cents' => $priced['discount_cents'],
-                'line_total_cents' => $priced['total_cents'],
                 'genetic_name_snapshot' => $batch->genetic->name,
                 'batch_no_snapshot' => $batch->batch_no,
                 ...$rateFreeze,
             ];
+        }
+
+        // Eighth (3.5 g) break across the WHOLE basket (prompt 83) — the resolver owns the arithmetic; here we
+        // only apply its per-line result and freeze it into the snapshot. Limits are enforced on grams above,
+        // untouched by pricing. The total is now eighth-aware, so a price override reduces from IT (prompt 64).
+        $adjusted = $resolver->applyEighthBreaks($eighthInput);
+        $total = 0;
+        $lineData = [];
+        foreach ($rows as $i => $row) {
+            $row['line_total_cents'] = $adjusted[$i]['total_cents'];
+            $row['pricing_note'] = $adjusted[$i]['eighth_applied'] ? __('Octavo (1/8)') : null;
+            $total += $row['line_total_cents'];
+            $lineData[] = $row;
         }
 
         return [$total, $lineData];

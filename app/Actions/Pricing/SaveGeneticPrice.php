@@ -26,8 +26,9 @@ class SaveGeneticPrice
         ?int $lowStockThresholdCg = null,
         bool $active = true,
         ?GeneticPrice $existing = null,
+        ?int $eighthCents = null,
     ): GeneticPrice {
-        return DB::transaction(function () use ($genetic, $location, $tierId, $priceCents, $lowStockThresholdCg, $active, $existing): GeneticPrice {
+        return DB::transaction(function () use ($genetic, $location, $tierId, $priceCents, $lowStockThresholdCg, $active, $existing, $eighthCents): GeneticPrice {
             $column = $genetic->isUnitType() ? 'price_per_unit_cents' : 'price_per_gram_cents';
             $otherColumn = $genetic->isUnitType() ? 'price_per_gram_cents' : 'price_per_unit_cents';
 
@@ -47,6 +48,8 @@ class SaveGeneticPrice
 
             $price->{$column} = $priceCents;
             $price->{$otherColumn} = null;
+            // Eighth (3.5 g) price is WEIGHT-only (prompt 83); a UNIT genetic never carries one.
+            $price->price_per_eighth_cents = $genetic->isUnitType() ? null : $eighthCents;
             $price->low_stock_threshold_cg = $lowStockThresholdCg;
             $price->active = $active;
             $price->save();
@@ -56,6 +59,7 @@ class SaveGeneticPrice
                 'location_id' => $location->id,
                 'tier_id' => $price->tier_id,
                 'price_per_gram_cents' => $price->price_per_gram_cents,
+                'price_per_eighth_cents' => $price->price_per_eighth_cents,
                 'price_per_unit_cents' => $price->price_per_unit_cents,
                 'low_stock_threshold_cg' => $price->low_stock_threshold_cg,
                 'active' => $price->active,

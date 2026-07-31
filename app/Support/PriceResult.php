@@ -25,7 +25,15 @@ final class PriceResult
         public readonly ?string $rateLabel = null,
         public readonly ?array $discount = null,
         public readonly bool $perUnit = false,
+        /** Optional eighth (3.5 g) price for this strain, in cents (prompt 83). Null = no eighth price. */
+        public readonly ?int $eighthPriceCents = null,
     ) {}
+
+    /** The per-gram rate AFTER the chosen discount — used to price the sub-eighth remainder (prompt 83). */
+    public function effectiveRatePerGramCents(): int
+    {
+        return $this->ratePerGramCents - $this->discountAmount($this->ratePerGramCents);
+    }
 
     /**
      * A WEIGHT line: subtotal = rate/g × grams. Grams in from integer centigrams.

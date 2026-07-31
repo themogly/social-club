@@ -18,7 +18,7 @@ class DispensationLine extends Model
     protected $fillable = [
         'dispensation_id', 'genetic_id', 'batch_id', 'grams_cg', 'price_per_gram_cents',
         'units_dispensed', 'price_per_unit_cents',
-        'discount_cents', 'line_total_cents', 'genetic_name_snapshot', 'batch_no_snapshot',
+        'discount_cents', 'line_total_cents', 'pricing_note', 'genetic_name_snapshot', 'batch_no_snapshot',
     ];
 
     protected function casts(): array
