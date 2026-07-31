@@ -52,19 +52,19 @@ class RecordStockMovement
                 /** @var Batch $locked */
                 $new = $locked->remaining_cg->centigrams + $delta;
                 if ($new < 0) {
-                    throw new RuntimeException("Insufficient stock in batch {$locked->batch_no}.");
+                    throw new RuntimeException(__('Stock insuficiente en el lote :batch.', ['batch' => $locked->batch_no]));
                 }
                 $locked->remaining_cg = Weight::fromCentigrams($new);
             } elseif ($locked instanceof Batch) {
                 $new = (int) ($locked->remaining_units ?? 0) + $delta;
                 if ($new < 0) {
-                    throw new RuntimeException("Insufficient stock in batch {$locked->batch_no}.");
+                    throw new RuntimeException(__('Stock insuficiente en el lote :batch.', ['batch' => $locked->batch_no]));
                 }
                 $locked->remaining_units = $new;
             } else {
                 $new = $locked->stock + $delta;
                 if ($new < 0) {
-                    throw new RuntimeException("Insufficient stock for article {$locked->name}.");
+                    throw new RuntimeException(__('Stock insuficiente para el artículo :name.', ['name' => $locked->name]));
                 }
                 $locked->stock = $new;
             }

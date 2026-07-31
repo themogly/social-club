@@ -28,7 +28,7 @@ class ApproveApplication
         $actorId ??= Auth::id();
 
         if (! MemberEligibility::isOldEnough($payload['date_of_birth'] ?? null)) {
-            throw new RuntimeException('Applicant is under the configured minimum age.');
+            throw new RuntimeException(__('El solicitante es menor de la edad mínima configurada.'));
         }
 
         $member = new Member([

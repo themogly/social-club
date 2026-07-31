@@ -927,3 +927,70 @@ select backed by `location_user`; it was not a missing field but an under-docume
   request, so a re-synced assignment takes effect on the next request; a currently-active location that is
   revoked fails the next `canAccess` scope check. The prompt-02 single-location denial test still passes, plus a
   new multi-location positive case (A and B reachable, C not).
+
+---
+
+## Prompt 25 — alerts render in Spanish regardless of locale
+
+**Root cause.** The dashboard Alerts panel builds each sentence with `trans_choice()`
+(`Dashboard::decorateAlerts()`), and 3 report/register counts do too. But `LangKeys::usedInCode()`
+only scanned `__(` / `@lang(`, never `trans_choice(` — so all 9 pluralized keys were invisible to
+prompt 19's parity test and were never added to `lang/*.json`. `trans_choice` then echoes the Spanish
+key verbatim, and the app default locale is `en`, so the English UI showed Spanish. This is a *different
+bug class* from prompt 19's: not "a key missing from one file" (parity catches that) but "a string that
+never became a verified key at all."
+
+**Audit checklist (every alert/notification path — same discipline as prompt 20's form audit; an
+independent Explore-agent sweep corroborated):**
+- Dashboard Alerts panel — 6 implemented types (members_over_limit, unreconciled_till, batches_expiring,
+  stock_ceiling_exceeded, memberships_expiring, pending_applications): all `trans_choice`, all **were
+  LEAKING** (keys absent) → **FIXED**. (The other types named in the prompt — near-limit, overrides-used,
+  aforo, low-stock, unpaid-fees, till-variance — are not implemented as dashboard alerts; some are only
+  stat-card figures. Documented, not invented.)
+- Report/register counts — `registro-dispensacion.blade.php`, `libro-socios.blade.php`,
+  `documents/register.blade.php`: same `trans_choice` leak → **FIXED**.
+- 33 Filament `Notification::make()` calls across 13 files — every `->title()` is `__()`-wrapped;
+  bodies are variables. **CLEAN.** Two `->body($e->getMessage())` families surfaced hardcoded ENGLISH
+  exception text (inverse leak) → the surfaced exceptions **translated** (see below).
+- Counter block/flash sentences (`DispensaryPos`, `CheckInScreen`, `TillSession`, `BarPos`,
+  `ResolveMemberEligibility`): all `__()`-wrapped. **CLEAN.** One `DispensaryPos` `flash($e->getMessage())`
+  surfaced English `DispensationBlockedException` text → **translated**.
+- Interpolated/`sprintf` sentences: none unwrapped except the ledger descriptors below.
+
+**Surfaced exception messages translated** (they render live in a toast body or counter flash, so a
+hardcoded language there violates the "never one-language" rule; no test couples to the text —
+`expectExceptionMessage` count = 0, so zero-risk): `CommitDispensation` ×2 (reused existing eligibility
+keys), `RecordWalletTransaction`, `RecordStockMovement` ×2 (`:batch`/`:name` placeholders),
+`ApproveApplication`. All added to both locale files.
+
+**Deliberately OUT OF SCOPE (documented, conservative — this is a focused branch, not a stored-data
+localization project):**
+- **Stored ledger `reason`/`motivo` descriptors** (`Aportación por dispensación`, `Compra en barra`,
+  `Cuota de socio`, `Liquidación automática de deuda`, `Alta de lote`, `Recuento de inventario`,
+  `Reposición`, and the interpolated `Reversal of voided …`): persisted DATA shown in the Cartera
+  "Motivo" column, in the canonical Spanish domain vocabulary (CLAUDE.md: terms of art stay Spanish even
+  in English). Localizing stored historical descriptions is a distinct concern (needs a stored key +
+  display-time mapping across ledger/reports/PDF/export; the void-reversal ones aren't fixed keys) and
+  would churn core financial Actions — not this branch. Flagged for a future prompt.
+- **Dev-mail preview fixtures** (`DevMail.php` sample names/reason): test-harness data for `/dev/mail`.
+- **`FailedJobs` admin screen** shows raw queue-exception text by design (arbitrary framework
+  exceptions, a developer diagnostic), left in English.
+
+**The two complementary checks (both wired into `composer check`):**
+1. `LangKeys::usedInCode()` extended to scan `trans_choice(` and `trans(` (safe negative-lookbehind so
+   identifier suffixes like `reTRANS(` can't misfire). The EXISTING parity test now covers pluralized
+   keys — i.e. it would now catch exactly this bug. This is the root-cause fix, not just the instances.
+2. `App\Support\NotificationCopyScanner` — a **tokeniser-based** static scan (not regex, so
+   `->body($e->getMessage())`, closures, concatenations and `__()` wrappers are reliably told apart from
+   a bare literal). Flags any raw natural-language string literal (contains whitespace + a letter) passed
+   directly to a notification/alert **sink** — `->title()`, `->body()`, `->flash()`. `NotificationCopyScannerTest`
+   asserts zero violations in `app/` AND proves the scan catches a deliberately reintroduced hardcoded
+   string (and does not flag any legitimate wrapped/dynamic form). Sink set chosen as the actual
+   notification+counter-alert surface in this codebase; extensible if new sinks appear.
+
+**Tests:** every implemented alert type asserted on the ACTUAL rendered sentence (via the real
+`decorateAlerts`) in both locales; a pluralized alert asserted grammatically (1 socio/3 socios,
+1 member/3 members — not just a substituted number); one seeded alert rendered translated end-to-end
+through the full dashboard request; a sample toast from each area (settings/members/POS/till) in both
+locales; the scanner regression test; prompt 19's parity test still green. No migration / no
+driver-sensitive change → MySQL parity N/A.
