@@ -113,9 +113,77 @@
                     </button>
                 </form>
             </section>
+        @elseif ($reweighing)
+            {{-- ============ EOD flower reweigh (prompt 47): blind count of touched flower, before the cash arqueo ============ --}}
+            <section class="rounded-2xl border border-warning/40 bg-warning/5 p-5 dark:border-warning/30 sm:p-6">
+                <h2 class="text-lg font-semibold">{{ __('Recuento de flor · fin de día') }}</h2>
+                <p class="mt-1 text-sm text-ink-muted dark:text-slate-400">
+                    {{ __('Pesa la flor de la que se ha dispensado hoy e introduce los gramos contados. El peso esperado se revela solo después de confirmar (recuento a ciegas).') }}
+                </p>
+
+                <form wire:submit="submitReweigh" class="mt-5 space-y-4">
+                    @foreach ($reweighBatches as $batch)
+                        <div wire:key="reweigh-{{ $batch->id }}">
+                            <label for="reweigh-{{ $batch->id }}" class="block text-sm font-medium text-ink-muted dark:text-slate-400">
+                                {{ $batch->genetic?->name ?? __('Sin nombre') }} · {{ $batch->batch_no }}
+                            </label>
+                            <div class="mt-2 flex items-center gap-2">
+                                <input
+                                    id="reweigh-{{ $batch->id }}"
+                                    type="text"
+                                    inputmode="decimal"
+                                    wire:model="reweighCounts.{{ $batch->id }}"
+                                    autocomplete="off"
+                                    placeholder="0,00"
+                                    class="h-14 w-full rounded-xl border border-line bg-surface px-4 text-lg text-ink placeholder:text-ink-muted focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/40 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
+                                >
+                                <span class="text-sm text-ink-muted dark:text-slate-400">{{ __('g') }}</span>
+                            </div>
+                        </div>
+                    @endforeach
+
+                    <div class="flex gap-2">
+                        <button
+                            type="button"
+                            wire:click="cancelClose"
+                            class="h-14 flex-1 rounded-xl border border-line bg-surface-alt px-6 text-base font-semibold text-ink transition hover:bg-slate-200 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:hover:bg-slate-700"
+                        >
+                            {{ __('Cancelar') }}
+                        </button>
+                        <button
+                            type="submit"
+                            class="h-14 flex-1 rounded-xl bg-warning px-6 text-base font-semibold text-white transition hover:opacity-90"
+                        >
+                            {{ __('Confirmar recuento') }}
+                        </button>
+                    </div>
+                </form>
+            </section>
+
         @elseif ($closing)
             {{-- ============ Blind count: NO figures shown until the count is confirmed ============ --}}
             <section class="rounded-2xl border border-warning/40 bg-warning/5 p-5 dark:border-warning/30 sm:p-6">
+                @if ($reweighResult !== null)
+                    {{-- Reweigh revealed: the variances, now that the blind count is committed. --}}
+                    <div class="mb-5 rounded-xl border border-line bg-surface p-4 dark:border-slate-700 dark:bg-slate-900">
+                        <h3 class="text-sm font-semibold text-ink dark:text-slate-100">{{ __('Recuento de flor registrado') }}</h3>
+                        <ul class="mt-2 space-y-1 text-sm">
+                            @foreach ($reweighResult as $line)
+                                <li class="flex items-center justify-between gap-3">
+                                    <span class="text-ink-muted dark:text-slate-400">{{ $line['name'] }}</span>
+                                    <span class="font-medium text-ink dark:text-slate-100">
+                                        {{ $line['counted'] }}
+                                        @if ($line['adjusted'])
+                                            <span class="text-warning">({{ __('ajuste') }} {{ $line['variance'] }})</span>
+                                        @else
+                                            <span class="text-success">{{ __('sin diferencia') }}</span>
+                                        @endif
+                                    </span>
+                                </li>
+                            @endforeach
+                        </ul>
+                    </div>
+                @endif
                 <h2 class="text-lg font-semibold">{{ __('Cierre de caja · arqueo a ciegas') }}</h2>
                 <p class="mt-1 text-sm text-ink-muted dark:text-slate-400">
                     {{ __('Cuenta el efectivo del cajón e introduce el total. El importe esperado se revelará solo después de confirmar el recuento.') }}
