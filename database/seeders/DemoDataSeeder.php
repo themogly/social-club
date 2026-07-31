@@ -19,6 +19,7 @@ use App\Enums\MembershipStatus;
 use App\Enums\MemberStatus;
 use App\Enums\SettingType;
 use App\Enums\StockMovementType;
+use App\Enums\StrainType;
 use App\Enums\TillSessionStatus;
 use App\Enums\WalletTransactionType;
 use App\Models\Article;
@@ -103,7 +104,13 @@ class DemoDataSeeder extends Seeder
             'default_period' => MembershipPeriod::YEARLY, 'active' => true,
         ]);
 
-        $catFlores = Category::create(['organisation_id' => $org->id, 'name' => 'Flores', 'applies_to' => CategoryAppliesTo::GENETIC]);
+        // Genetic categories are a house GRADING (prompt 66) — orthogonal to strain type (sativa/indica/
+        // hybrid) and product type, so the three POS filter rows select genuinely different sets instead
+        // of one redundant "Flores" on every flower (which is what made them read as duplicates).
+        $geneticCategories = [
+            'Premium' => Category::create(['organisation_id' => $org->id, 'name' => 'Premium', 'applies_to' => CategoryAppliesTo::GENETIC]),
+            'Estándar' => Category::create(['organisation_id' => $org->id, 'name' => 'Estándar', 'applies_to' => CategoryAppliesTo::GENETIC]),
+        ];
         $catBar = Category::create(['organisation_id' => $org->id, 'name' => 'Bar', 'applies_to' => CategoryAppliesTo::ARTICLE]);
 
         ExpenseCategorySeeder::seedFor($org->id);
@@ -113,7 +120,7 @@ class DemoDataSeeder extends Seeder
         Discount::create(['organisation_id' => $org->id, 'name' => 'Personal', 'kind' => DiscountKind::STAFF, 'mode' => DiscountMode::PERCENT, 'value_bp' => 1000, 'applies_to' => DiscountAppliesTo::BOTH, 'active' => true]);
         Discount::create(['organisation_id' => $org->id, 'name' => 'Terapéutico', 'kind' => DiscountKind::THERAPEUTIC, 'mode' => DiscountMode::PERCENT, 'value_bp' => 1500, 'applies_to' => DiscountAppliesTo::GENETIC, 'active' => true]);
 
-        [$batchesByLocation, $priceByBatch] = $this->seedCatalogue($org->id, $locations, $catFlores, $catBar);
+        [$batchesByLocation, $priceByBatch] = $this->seedCatalogue($org->id, $locations, $geneticCategories, $catBar);
 
         $membersByLocation = $this->seedMembers($org->id, $locations, $tierSocio, $tierTera);
 
@@ -162,24 +169,30 @@ class DemoDataSeeder extends Seeder
      * @param  array<int, Location>  $locations
      * @return array{0: array<string, array<int, Batch>>, 1: array<string, int>}
      */
-    private function seedCatalogue(string $orgId, array $locations, Category $catFlores, Category $catBar): array
+    /**
+     * @param  array<string, Category>  $geneticCategories
+     */
+    private function seedCatalogue(string $orgId, array $locations, array $geneticCategories, Category $catBar): array
     {
+        // [name, thc_bp, cbd_bp, cultivation, strain type, grade category] — strain + grade are spread
+        // ORTHOGONALLY (prompt 66): sativa/indica/hybrid across both Premium and Estándar, and a CBD
+        // variety with NO strain type. So Variedad, Categoría and Tipo select different sets.
         $definitions = [
-            ['Amnesia Haze', 2200, 50, CultivationType::INDOOR],
-            ['Critical Kush', 1900, 80, CultivationType::INDOOR],
-            ['CBD Charlotte', 600, 1200, CultivationType::GREENHOUSE],
-            ['Moby Dick', 2300, 40, CultivationType::OUTDOOR],
-            ['Northern Lights', 1800, 60, CultivationType::INDOOR],
-            ['Purple Haze', 2000, 30, CultivationType::OUTDOOR],
+            ['Amnesia Haze', 2200, 50, CultivationType::INDOOR, StrainType::SATIVA, 'Premium'],
+            ['Critical Kush', 1900, 80, CultivationType::INDOOR, StrainType::INDICA, 'Estándar'],
+            ['CBD Charlotte', 600, 1200, CultivationType::GREENHOUSE, null, 'Estándar'],
+            ['Moby Dick', 2300, 40, CultivationType::OUTDOOR, StrainType::SATIVA, 'Premium'],
+            ['Northern Lights', 1800, 60, CultivationType::INDOOR, StrainType::INDICA, 'Estándar'],
+            ['Purple Haze', 2000, 30, CultivationType::OUTDOOR, StrainType::HYBRID, 'Premium'],
         ];
 
         $batchesByLocation = [];
         $priceByBatch = [];
 
-        foreach ($definitions as [$name, $thc, $cbd, $cultivation]) {
+        foreach ($definitions as [$name, $thc, $cbd, $cultivation, $strain, $grade]) {
             $genetic = Genetic::create([
-                'organisation_id' => $orgId, 'name' => $name, 'category_id' => $catFlores->id,
-                'thc_bp' => $thc, 'cbd_bp' => $cbd, 'cultivation_type' => $cultivation,
+                'organisation_id' => $orgId, 'name' => $name, 'category_id' => $geneticCategories[$grade]->id,
+                'thc_bp' => $thc, 'cbd_bp' => $cbd, 'cultivation_type' => $cultivation, 'strain_type' => $strain,
                 'terpenes' => ['mirceno', 'limoneno'], 'published' => true, 'active' => true,
             ]);
 

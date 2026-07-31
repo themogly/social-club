@@ -398,6 +398,7 @@
                                 </div>
                                 <div class="mt-1 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-ink-muted dark:text-slate-400">
                                     <span class="rounded-full bg-surface-alt px-2 py-0.5 font-semibold text-ink-muted dark:bg-slate-800 dark:text-slate-300">{{ $g['product_type_label'] }}</span>
+                                    @if ($g['strain_type_label'])<span class="rounded-full bg-brand-tint px-2 py-0.5 font-semibold text-brand dark:bg-slate-800 dark:text-slate-200">{{ $g['strain_type_label'] }}</span>@endif
                                     <span>THC {{ number_format($g['thc_bp'] / 100, 1) }}%</span>
                                     <span>CBD {{ number_format($g['cbd_bp'] / 100, 1) }}%</span>
                                     @if ($g['cultivation'])<span>{{ __($g['cultivation']) }}</span>@endif

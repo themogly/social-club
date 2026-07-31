@@ -11,7 +11,7 @@
                 <span class="shrink-0 font-semibold text-brand dark:text-slate-100">{{ \App\Support\Money::fromCents($item['price']->ratePerGramCents)->formatted() }}/g</span>
             </div>
             <p class="mt-1 text-xs text-ink-muted dark:text-slate-400">
-                THC {{ $item['genetic']->thc_pct ?? '—' }}% · CBD {{ $item['genetic']->cbd_pct ?? '—' }}%
+                THC {{ $item['genetic']->thc_pct ?? '—' }}% · CBD {{ $item['genetic']->cbd_pct ?? '—' }}%@if ($item['genetic']->strain_type) · {{ $item['genetic']->strain_type->label() }}@endif
             </p>
         </article>
     @empty
