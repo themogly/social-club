@@ -4,6 +4,7 @@ namespace App\Policies;
 
 use App\Models\MemberDocument;
 use App\Models\User;
+use App\Support\ActiveScope;
 
 /**
  * Generated member documents are immutable artifacts on the private disk. They are
@@ -21,6 +22,11 @@ class MemberDocumentPolicy
 
     public function view(User $user, MemberDocument $model): bool
     {
-        return $user->can('member.documents.view');
+        // Permission AND object-ownership (audit S2): the document's member must be in the
+        // actor's active organisation — a valid signed URL for a different org still 403s.
+        // member is org-scoped: a cross-org document resolves member to null → denied. The
+        // explicit org comparison is belt-and-braces if the scope isn't applied for any reason.
+        return $user->can('member.documents.view')
+            && $model->member?->organisation_id === app(ActiveScope::class)->organisationId();
     }
 }

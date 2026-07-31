@@ -140,16 +140,17 @@ class MemberFormTest extends TestCase
         } catch (HttpException $e) {
             $this->assertSame(403, $e->getStatusCode());
         }
-        $this->assertDatabaseHas('document_access_logs', [
-            'actor_id' => $staff->id, 'member_document_id' => $document->id,
-        ]);
+        // Issuance no longer logs (audit S2) — access is logged on the actual VIEW, asserted below.
 
-        // The owner gets a short-lived signed URL that streams, then expires.
+        // The owner gets a short-lived, user-bound signed URL that streams, is logged, then expires.
         $owner = $this->user(Role::OWNER);
         $this->actingAs($owner);
         $url = (new IssueDocumentUrl)->handle($document, $owner);
 
         $this->get($url)->assertOk();
+        $this->assertDatabaseHas('document_access_logs', [
+            'actor_id' => $owner->id, 'member_document_id' => $document->id,
+        ]);
         $this->travel(3600)->seconds();
         $this->get($url)->assertForbidden();
     }

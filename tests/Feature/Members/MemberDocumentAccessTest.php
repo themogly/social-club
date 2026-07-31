@@ -4,11 +4,13 @@ namespace Tests\Feature\Members;
 
 use App\Actions\Members\IssueDocumentUrl;
 use App\Enums\Role;
+use App\Models\DocumentAccessLog;
 use App\Models\Member;
 use App\Models\MemberDocument;
 use App\Models\Organisation;
 use App\Models\User;
 use App\Support\ActiveScope;
+use App\Support\DocumentVault;
 use Database\Seeders\RolePermissionSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Storage;
@@ -19,6 +21,8 @@ class MemberDocumentAccessTest extends TestCase
 {
     use RefreshDatabase;
 
+    private Organisation $org;
+
     private MemberDocument $document;
 
     protected function setUp(): void
@@ -27,11 +31,11 @@ class MemberDocumentAccessTest extends TestCase
         Storage::fake('documents');
         $this->seed(RolePermissionSeeder::class);
 
-        $org = Organisation::factory()->create();
-        app(ActiveScope::class)->setOrganisation($org->id);
-        $member = Member::factory()->create(['organisation_id' => $org->id]);
+        $this->org = Organisation::factory()->create();
+        app(ActiveScope::class)->setOrganisation($this->org->id);
+        $member = Member::factory()->create(['organisation_id' => $this->org->id]);
 
-        Storage::disk('documents')->put('members/'.$member->id.'/dni.pdf', 'PDFDATA');
+        DocumentVault::put('members/'.$member->id.'/dni.pdf', 'PDFDATA');   // encrypted at rest
         $this->document = MemberDocument::factory()->create([
             'member_id' => $member->id, 'path' => 'members/'.$member->id.'/dni.pdf',
         ]);
@@ -45,7 +49,14 @@ class MemberDocumentAccessTest extends TestCase
         return $user;
     }
 
-    public function test_staff_is_denied_and_the_attempt_is_logged(): void
+    private function stream(User $user, string $url)
+    {
+        return $this->actingAs($user)
+            ->withSession(['scope.organisation_id' => $this->org->id])
+            ->get($url);
+    }
+
+    public function test_staff_is_denied_a_url_and_nothing_is_logged(): void
     {
         $staff = $this->userWithRole(Role::STAFF);
 
@@ -56,26 +67,25 @@ class MemberDocumentAccessTest extends TestCase
             $this->assertSame(403, $e->getStatusCode());
         }
 
-        $this->assertDatabaseHas('document_access_logs', [
-            'actor_id' => $staff->id, 'member_document_id' => $this->document->id,
-        ]);
+        // Access is logged on the VIEW (audit S2), not issuance — a denied issuance never views.
+        $this->assertSame(0, DocumentAccessLog::query()->count());
     }
 
-    public function test_owner_gets_a_signed_url_that_streams_and_then_expires(): void
+    public function test_owner_gets_a_signed_url_that_streams_is_logged_and_then_expires(): void
     {
         $owner = $this->userWithRole(Role::OWNER);
-        $this->actingAs($owner);
 
         $url = (new IssueDocumentUrl)->handle($this->document, $owner);
 
+        $this->stream($owner, $url)->assertOk();
+
+        // The VIEW itself is logged (prompt 32 / audit S2).
         $this->assertDatabaseHas('document_access_logs', [
             'actor_id' => $owner->id, 'member_document_id' => $this->document->id,
         ]);
 
-        $this->get($url)->assertOk();
-
         // Past the TTL the signed URL no longer validates.
         $this->travel(3600)->seconds();
-        $this->get($url)->assertForbidden();
+        $this->stream($owner, $url)->assertForbidden();
     }
 }

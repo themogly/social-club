@@ -158,3 +158,5 @@ excluded* — it proves a field RENDERS, not that anything READS it. That produc
 Push triggers for low-balance/expiring/event-reminder (only NewAnnouncement wired); temporary-member
 email reminder; camera scan (prompt 22/28 skipped); forecast_options_g + per-article low_stock fallback;
 signed-URL invite refactor; seed placeholders; backup placeholders; and the HIGH security items above.
+
+> **UPDATE (prompt 32, merged):** S1 + S2 RESOLVED — Article-9 docs (ID scan/cert/generated PDF) encrypted at rest via DocumentVault; the streaming endpoint now authorises (permission + org ownership), binds the URL to the user, and access-logs every view. Photo/signature/business-uploads encryption + receipt per-view logging remain tracked follow-ups.

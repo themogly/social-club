@@ -1213,3 +1213,45 @@ renders, not that it's consumed). Reality:
   `ring_fenced` setting (default false) that no form exposes. INERT + the org toggle is a no-op.
 `avalador_therapeutic_exempt` IS genuinely consumed (the avalador logic reads it), so that part stands.
 Full inert-settings inventory + recommended wire-or-cut decisions: see `AUDIT-FINDINGS.md` (Step 3).
+
+---
+
+## Prompt 32 — encrypt documents at rest (S1) + authorise/log the streaming endpoint (S2)
+
+**Merge authorization:** merged to `main` per the project owner's EXPLICIT instruction ("merge the last 3
+prompts to main"), which overrides the prompt's default "wait for review" — the owner is the reviewer
+authorising the merge. Recorded here for the audit trail, since these are Article-9 security changes.
+
+**S1 — encryption approach.** `App\Support\DocumentVault` encrypts with `Crypt::encryptString` (AES-256,
+app key) at the write boundary and decrypts ONLY at the streaming endpoint. Chosen over an encrypting
+filesystem adapter because it integrates cleanly with BOTH write mechanisms — `Storage::put` for generated
+PDFs and Filament's `saveUploadedFileUsing` for uploads — and is explicit + unit-testable (a test asserts
+the on-disk bytes are ciphertext, and a round-trip is byte-identical).
+
+- **Scope (documented, deliberate):** encrypted the streamed Article-9 documents — the **ID scan, medical
+  certificate and generated PDFs** — which all read through the ONE access-logged, authorised signed-URL
+  endpoint (`MemberDocumentController`), so encryption + decryption live in one place. The **member photo**
+  (inline Filament avatar/infolist), the **POS signature** (receipt display) and the **non-member business
+  uploads** (purchase invoices, expense receipts, batch/article/genetic docs) share this disk but read
+  INLINE through other paths; encrypting them cleanly requires re-routing those displays through a decrypt
+  path, so they are a **tracked follow-up** — still private-disk + HTTP-protected, but not yet
+  encrypted-at-rest. Corrected the false "encrypted at the model layer" comment in `config/filesystems.php`.
+- **S3 SSE-KMS:** added the `options` (`ServerSideEncryption`/`SSEKMSKeyId` via env) to the s3 documents disk
+  as defence in depth ON TOP of the app-layer encryption — both matter; no-op locally.
+- **Existing files:** **reseed** — the only stored documents are dev/test fixtures, so a re-encrypt migration
+  is unnecessary here. **If any real member documents ever exist before this ships in a real deployment, a
+  one-off re-encrypt migration is MANDATORY, not optional** (a plaintext file already on disk stays plaintext).
+
+**S2 — authorise, own, bind, log the stream.** `MemberDocumentController::show()` now: (1) rejects a URL
+whose bound `u` (the issuing user) ≠ the current session user — a leaked/replayed URL can't be reused by
+another session; (2) `Gate::authorize('view', $document)` where the policy checks `member.documents.view`
+AND org object-ownership (the document's member must be in the actor's active org — a valid signed URL for
+another org 403s); (3) writes a `DocumentAccessLog` on EVERY view (moved out of issuance — "every view is
+access-logged" now means the view, not just minting the link); (4) decrypts at the streaming boundary only.
+`IssueDocumentUrl` now binds `u` and no longer logs (superseded by the view log). Existing prompt-04/17 tests
+updated from issuance-logging to view-logging.
+
+**Receipt controllers (documented decision):** the dispensation/bar receipt controllers already
+`Gate::authorize` but do NOT per-view access-log. **Deferred as a follow-up** — receipts carry consumption
+data (Article-9-adjacent, lower sensitivity than ID scans/certs); extending the per-view access-log pattern
+to them is a smaller separate change, tracked in AUDIT-FINDINGS.md. No migration → MySQL parity N/A.
