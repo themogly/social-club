@@ -4,6 +4,7 @@ namespace App\Filament\Resources\MemberApplications\Tables;
 
 use App\Enums\ApplicationStatus;
 use App\Filament\Resources\MemberApplications\MemberApplicationResource;
+use App\Mail\ApplicationInviteMail;
 use App\Models\MemberApplication;
 use Filament\Actions\Action;
 use Filament\Actions\EditAction;
@@ -14,6 +15,8 @@ use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Mail;
+use Livewire\Component;
 
 class MemberApplicationsTable
 {
@@ -68,6 +71,7 @@ class MemberApplicationsTable
             ])
             ->recordActions([
                 self::copyLinkAction(),
+                self::resendAction(),
                 self::revokeAction(),
                 ViewAction::make(),
                 ...MemberApplicationResource::recordActions(),
@@ -84,13 +88,33 @@ class MemberApplicationsTable
             ->label(__('Copiar enlace'))
             ->icon(Heroicon::OutlinedLink)
             ->visible(fn (MemberApplication $record): bool => $record->isInviteLive() && $record->inviteUrl() !== null)
+            ->action(function (MemberApplication $record, Component $livewire): void {
+                // Prompt 45: ACTUALLY copy to the clipboard (it used to just re-show the URL in a toast).
+                // $livewire->js runs client-side within the click's transient activation.
+                $livewire->js('navigator.clipboard.writeText('.json_encode((string) $record->inviteUrl()).')');
+
+                Notification::make()->title(__('Enlace copiado'))->success()->send();
+            });
+    }
+
+    /** Reenviar invitación — re-email the SAME token to the applicant's email (prompt 45). */
+    private static function resendAction(): Action
+    {
+        return Action::make('resend')
+            ->label(__('Reenviar'))
+            ->icon(Heroicon::OutlinedEnvelope)
+            ->requiresConfirmation()
+            ->visible(fn (MemberApplication $record): bool => $record->isInviteLive()
+                && filled($record->applicant_email)
+                && $record->inviteUrl() !== null
+                && (Auth::user()?->can('members.create') ?? false))
             ->action(function (MemberApplication $record): void {
-                Notification::make()
-                    ->title(__('Enlace de invitación'))
-                    ->body($record->inviteUrl())
-                    ->success()
-                    ->persistent()
-                    ->send();
+                Mail::to((string) $record->applicant_email)->send(new ApplicationInviteMail(
+                    (string) $record->inviteUrl(),
+                    $record->invite_expires_at?->format('d/m/Y') ?? '',
+                ));
+
+                Notification::make()->title(__('Invitación reenviada'))->success()->send();
             });
     }
 

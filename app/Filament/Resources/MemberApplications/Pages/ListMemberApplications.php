@@ -4,14 +4,17 @@ namespace App\Filament\Resources\MemberApplications\Pages;
 
 use App\Enums\ApplicationStatus;
 use App\Filament\Resources\MemberApplications\MemberApplicationResource;
+use App\Mail\ApplicationInviteMail;
 use App\Models\MemberApplication;
 use App\Support\Settings;
 use Filament\Actions\Action;
 use Filament\Forms\Components\Select;
+use Filament\Forms\Components\TextInput;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\ListRecords;
 use Filament\Support\Icons\Heroicon;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Str;
 
 class ListMemberApplications extends ListRecords
@@ -47,25 +50,38 @@ class ListMemberApplications extends ListRecords
                     ->searchable()
                     ->preload()
                     ->placeholder(__('Sin sede asignada')),
+                TextInput::make('applicant_email')
+                    ->label(__('Correo del solicitante (opcional)'))
+                    ->email()
+                    ->helperText(__('Si lo indicas, la invitación se envía por email; si no, cópiala y compártela.')),
             ])
             ->action(function (array $data): void {
                 $token = Str::random(48);
                 $days = (int) Settings::get('invite_expiry_days', 14);
+                $email = $data['applicant_email'] ?? null;
 
                 $application = MemberApplication::create([
                     'location_id' => $data['location_id'] ?? null,
                     'invite_token_hash' => hash('sha256', $token),
-                    'invite_token' => $token,                 // encrypted at rest → re-copyable from the list
+                    'invite_token' => $token,                 // encrypted at rest → re-copyable / re-sendable
                     'invited_by' => Auth::id(),
+                    'applicant_email' => $email ?: null,
                     'invite_expires_at' => now()->addDays($days),
                     'payload' => [],
                     'status' => ApplicationStatus::PENDING,
                 ]);
 
+                if (filled($email)) {
+                    Mail::to($email)->send(new ApplicationInviteMail(
+                        (string) $application->inviteUrl(),
+                        $application->invite_expires_at?->format('d/m/Y') ?? '',
+                    ));
+                }
+
                 // Persistent panel so a dismissed toast never loses the link — and it is now
                 // listed with a Copy action, so it is recoverable even after navigating away.
                 Notification::make()
-                    ->title(__('Enlace de invitación generado'))
+                    ->title(filled($email) ? __('Invitación enviada por email') : __('Enlace de invitación generado'))
                     ->body($application->inviteUrl())
                     ->success()
                     ->persistent()
