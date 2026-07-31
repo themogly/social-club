@@ -1684,3 +1684,33 @@ prompt 54's concern), so EditGenetic audits the DEFINITION, not a price. Also co
 Append-only stays enforced (writes only — the existing no-update/no-delete test still passes). No read is
 audited. Tests: one per gap (right action/actor/subject + real before/after), a role change names the roles,
 and no row carries credential material. Owner-authorised (batch) merge. 468 green. Screenshots pending — no browser.
+
+## Prompt 60 — bar (and dispensary) POS: Charge could silently do nothing
+
+**Root cause (determined by code analysis — no real browser available here):** the CLIENT-SIDE
+silent-disabled swallow. Both POS Charge buttons bound `x-bind:disabled="! online || @js($commitDisabled)"`,
+where `$commitDisabled` folded in server state (no till / empty basket / no socio / hard block / missing
+signature). A native `<button disabled>` swallows its `wire:click` with NO feedback and NO `livewire/update`
+request — exactly the "click does nothing, no order, no flash" the report described: a silent dead control in
+any state where the button is disabled but that specific reason isn't rendered beside it. `requireOperator()`
+was RULED OUT — it flashes + opens the PIN panel.
+
+I could NOT reproduce the headless "enabled button, no livewire/update" capture in a real browser (none here),
+so I can't say for certain whether that specific observation was a real enabled-button failure or a headless
+artefact. But the fix closes the whole silent-failure class regardless of which it was.
+
+**Decision — disable ONLY for offline; keep every other blocked state clickable.** The binding is now
+`x-bind:disabled="! online"`. Offline is the one state a click genuinely can't reach the server, and its
+banner is driven by the SAME `online` variable — so a disabled button ALWAYS has its reason on screen (they
+can't desync). Every other blocked state now reaches `commit()`, whose guards each flash a reason (all
+unchanged, none loosened). Chosen over "keep disabled + always render the reason" because an enabled button
+that explains itself on click is more discoverable for a counter operator than a dead control they tap three
+times before asking someone.
+
+Applied to BOTH the bar and dispensary POS (shared structural pattern). The dispensary also gained a colocated
+flash beside its Charge button (mirroring prompt 41's bar block) so a blocked reason is visible without
+scrolling to the page-top banner. Prompt 41's bar block is untouched and now reliably reachable.
+
+Tests: one per blocked state asserting commit() surfaces a stated reason (the regression guard); a valid charge
+commits + confirms; both buttons' disabled binding is `! online` only. 479 green. Screenshots pending — no
+browser. Owner-authorised merge (the prompt's default "do not merge" overridden by the owner, who is the reviewer).
