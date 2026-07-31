@@ -1313,3 +1313,29 @@ are DECIDED below and implemented in follow-up commits on this line of work. Per
 
 The prompt-24 DECISIONS error (wallet_ring_fence / limit_override_requires_manager wrongly called "consumed")
 was already corrected above (see the "CORRECTION (completeness-check)" entry). No migration in this increment.
+
+---
+
+## Prompt 34 — inert settings COMPLETE (all 8 resolved)
+
+Following the incremental start (item 2, avalador cap), the remaining seven are done:
+- **1. active_member_cap (+ temporary_count_toward_cap) — WIRED:** `Dashboard::membersOverCap()` counts
+  org-wide active members and fires a dashboard alert (reusing prompt 14's alerts panel + a trans_choice
+  key, EN/ES) when at/over the cap; `temporary_count_toward_cap` includes/excludes TEMPORARY members.
+  Soft cap → a warning, not a block. Tested (fires at cap; the toggle changes the count 2↔1).
+- **3. ring-fence — RESOLVED:** cut the inert org `wallet_ring_fence` toggle; exposed the REAL per-location
+  `settings.ring_fenced` toggle on `LocationForm` (read by `AutoSettleDebt::isRingFenced`). Tested.
+- **4. aforo_enforcement — CUT the dropdown:** aforo is a legal capacity limit, enforced as a fixed BLOCK
+  via the enforcement matrix; the warn/block `LocationForm` dropdown was a lying control — removed +
+  documented in the form.
+- **5. limit_override_requires_manager — CUT:** overrides are gated by the fixed `limits.override` permission
+  (the real mechanism). Toggle + DEFAULT removed.
+- **6. fees_to_wallet_allowed — CUT:** `RecordFeePayment` always allows a wallet-charged fee. Toggle + DEFAULT
+  removed (a future prompt can add real enforcement if wanted).
+- **7. currency_locale — CUT:** `Money::formatted()` follows `app()->getLocale()` (governed by ResolveLocale,
+  prompt 19); the control couldn't lock the format independently. Select + DEFAULT removed.
+- **8. blind_count_enforced — CUT:** `CloseTill` is always blind (the safe default). DEFAULT removed.
+
+Every cut control is REMOVED from the form (not left rendering with a note). The prompt-24 DECISIONS error
+was corrected earlier. Tests confirm the cut keys are gone from `Settings::DEFAULTS` + the form, and the
+wired ones behave. Owner-authorised merge. 402 tests green.

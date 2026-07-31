@@ -19,7 +19,6 @@ class Settings
     /** Final-fallback code defaults (seeded into the settings table too). NOTES §A reference table. */
     public const DEFAULTS = [
         // Identity / display
-        'currency_locale' => 'es',          // €1.234,56 number formatting (Spanish convention)
         'enabled_locales' => ['es', 'en'],
         'default_locale' => 'en',           // organisation UI default (prompt 19: system default is en)
         'member_number_prefix' => 'M-',
@@ -34,7 +33,6 @@ class Settings
         'forecast_options_g' => [30, 50, 60, 90],
         'active_member_cap' => 750,
         'stock_ceiling_days' => 5,
-        'limit_override_requires_manager' => true,
 
         // Consumption gauge thresholds (percent of monthly allowance)
         'gauge_warning_pct' => 70,
@@ -49,8 +47,6 @@ class Settings
         'wallet_debt_allowed' => false,
         'wallet_debt_limit_cents' => 0,
         'wallet_door_debt_threshold_cents' => 0,
-        'fees_to_wallet_allowed' => true,
-        'wallet_ring_fence' => true,
 
         // Membership lifecycle
         'expiring_soon_days' => 30,
@@ -81,7 +77,6 @@ class Settings
 
         // Till / cash
         'arqueo_variance_tolerance_cents' => 500,
-        'blind_count_enforced' => true,
         'expense_approval_threshold_cents' => 10000,
 
         // Data retention & privacy

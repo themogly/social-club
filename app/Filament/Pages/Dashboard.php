@@ -186,6 +186,7 @@ class Dashboard extends BaseDashboard
             $count = $alert['count'];
             [$message, $href, $icon] = match ($alert['key']) {
                 'members_over_limit' => [trans_choice(':count socio ha superado su límite mensual|:count socios han superado su límite mensual', $count, ['count' => $count]), MemberResource::getUrl(), Heroicon::OutlinedExclamationTriangle],
+                'active_member_cap' => [trans_choice(':count socio activo · tope de socios alcanzado|:count socios activos · tope de socios alcanzado', $count, ['count' => $count]), MemberResource::getUrl(), Heroicon::OutlinedUserGroup],
                 'unreconciled_till' => [trans_choice(':count caja abierta sin arquear|:count cajas abiertas sin arquear', $count, ['count' => $count]), TillSessionResource::getUrl(), Heroicon::OutlinedCalculator],
                 'batches_expiring' => [trans_choice(':count lote caduca pronto|:count lotes caducan pronto', $count, ['count' => $count]), BatchResource::getUrl(), Heroicon::OutlinedClock],
                 'stock_ceiling_exceeded' => [trans_choice(':count sede supera el techo de existencias|:count sedes superan el techo de existencias', $count, ['count' => $count]), BatchResource::getUrl(), Heroicon::OutlinedArchiveBox],

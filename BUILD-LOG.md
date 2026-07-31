@@ -293,3 +293,7 @@ frozen-clock regression test.
 ## Prompt 33 — finance dashboard widgets authorization (A1)
 - Status: merged (owner-authorised)
 - Audited all 6 chart widgets. IncomeVsExpenses + IncomeByPeriod (pure finance) were gated only by a blade @if — added canView() (reports.view*) AND a data-layer guard (incomeByPeriod/incomeVsExpenses return empty when !canSeeFinance). DispensedByGenetic leaked total_cents in its € mode — zeroed for non-finance actors (grams stay visible). ConsumptionDistribution + StockLevels are operational-only (no finance). Tests: STAFF canView false/OWNER true; data layer empty for STAFF, real for owner; DispensedByGenetic value zeroed for STAFF. No migration → MySQL parity N/A. Green.
+
+## Prompt 34 — inert settings: wire the real ones, cut the dead ones
+- Status: merged (owner-authorised)
+- All 8 resolved. WIRED: avalador_max_sponsees cap (validation), active_member_cap dashboard alert (+ temporary_count_toward_cap controls inclusion), per-location ring_fenced exposed on LocationForm. CUT (removed from form + DEFAULTS, not left as lying controls): wallet_ring_fence (org), aforo_enforcement dropdown (aforo is fixed BLOCK via the matrix), limit_override_requires_manager (fixed permission gate), fees_to_wallet_allowed, currency_locale (Money follows app locale/ResolveLocale), blind_count_enforced (always blind). Tests confirm cuts gone + wires behave. 402 green.

@@ -36,7 +36,6 @@ class ManageSettings extends Page
 
     /** Scalar settings persisted directly, with their storage type. */
     private const SCALARS = [
-        'currency_locale' => SettingType::STRING,
         'member_number_prefix' => SettingType::STRING,
         'member_number_padding' => SettingType::INT,
         'min_age' => SettingType::INT,
@@ -49,9 +48,6 @@ class ManageSettings extends Page
         'avalador_policy' => SettingType::STRING,
         'avalador_max_sponsees' => SettingType::INT,
         'wallet_debt_allowed' => SettingType::BOOL,
-        'fees_to_wallet_allowed' => SettingType::BOOL,
-        'wallet_ring_fence' => SettingType::BOOL,
-        'limit_override_requires_manager' => SettingType::BOOL,
         'avalador_therapeutic_exempt' => SettingType::BOOL,
         'expiring_soon_days' => SettingType::INT,
         'renewal_reminder_lead_days' => SettingType::INT,
@@ -102,8 +98,6 @@ class ManageSettings extends Page
                 Section::make(__('Identidad'))
                     ->description(__('Cómo se numera y se muestra el club.'))
                     ->schema([
-                        Select::make('currency_locale')->label(__('Formato de moneda'))
-                            ->options(['es' => '€1.234,56', 'en' => '€1,234.56'])->required(),
                         TextInput::make('member_number_prefix')->label(__('Prefijo de nº de socio'))->maxLength(8),
                         TextInput::make('member_number_padding')->label(__('Dígitos del nº de socio'))
                             ->numeric()->minValue(1)->maxValue(10)->required(),
@@ -126,8 +120,6 @@ class ManageSettings extends Page
                             ->helperText(__('Aviso en el panel al acercarse a este número.')),
                         TextInput::make('stock_ceiling_days')->label(__('Días para techo de stock'))->numeric()->required()
                             ->helperText(__('socios × límite diario × estos días = stock máximo recomendado en sede.')),
-                        Toggle::make('limit_override_requires_manager')->label(__('El override de límite requiere gerente'))
-                            ->helperText(__('Si se activa, solo un gerente puede forzar una dispensación que supere el límite.')),
                     ])->columns(3),
 
                 Section::make(__('Indicador de consumo'))
@@ -157,10 +149,6 @@ class ManageSettings extends Page
                             ->helperText(__('Tope duro: el mostrador BLOQUEA una aportación que dejaría la deuda por encima de esta cifra.')),
                         TextInput::make('wallet_door_debt_threshold_eur')->label(__('Umbral de deuda en la puerta (€)'))->numeric()->minValue(0)->required()
                             ->helperText(__('Cifra DISTINTA del tope duro: la puerta reacciona (avisa/bloquea según la matriz) al llegar a esta deuda en el check-in.')),
-                        Toggle::make('fees_to_wallet_allowed')->label(__('Cobrar cuotas a la cartera'))
-                            ->helperText(__('Permite pagar la cuota de socio con saldo del monedero.')),
-                        Toggle::make('wallet_ring_fence')->label(__('Monedero por sede'))
-                            ->helperText(__('El saldo del monedero es específico de cada sede y no se comparte entre sedes.')),
                     ])->columns(3),
 
                 Section::make(__('Membresía'))
