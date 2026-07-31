@@ -10,7 +10,6 @@ use Filament\Actions\Action;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteBulkAction;
 use Filament\Actions\EditAction;
-use Filament\Actions\ForceDeleteBulkAction;
 use Filament\Actions\RestoreBulkAction;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
@@ -63,7 +62,6 @@ class BatchesTable
             ->toolbarActions([
                 BulkActionGroup::make([
                     DeleteBulkAction::make(),
-                    ForceDeleteBulkAction::make(),
                     RestoreBulkAction::make(),
                 ]),
             ]);
@@ -109,6 +107,7 @@ class BatchesTable
             ->icon(Heroicon::OutlinedFire)
             ->color('danger')
             ->visible(fn (): bool => Auth::user()?->can('stock.merma') ?? false)
+            ->requiresConfirmation()   // a loss mutates compliance-relevant stock — confirm first
             ->schema([
                 TextInput::make('quantity')
                     ->label(fn (Batch $record): string => $record->isUnitType() ? __('Merma (uds)') : __('Merma (g)'))

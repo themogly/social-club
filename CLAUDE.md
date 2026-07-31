@@ -133,7 +133,11 @@ glossary in `DECISIONS.md`; never let "translate" slip into commercial framing (
 - Money/weight value objects + casts: `app/Support/Money.php`, `app/Support/Weight.php`,
   `app/Casts/MoneyCast.php`, `app/Casts/WeightCast.php`; one rounding rule `round_half_up()`
   (`app/Support/helpers.php`). Amount `*_cents` and weight-of-goods `*_cg` columns use the casts;
-  per-gram RATE columns (`price_per_gram_cents`) and config/limit integers stay plain int.
+  per-gram RATE columns (`price_per_gram_cents`) and config/limit integers stay plain int. ONE
+  documented carve-out (prompt 37): `Genetic::grams_per_unit_cg` is a `*_cg`-named column cast as plain
+  `integer`, NOT `WeightCast` — it is a definitional per-genetic constant (the gram content of one unit,
+  a config figure), not a live weight-of-goods figure, and every use is already explicit `(int)`. Do
+  not "fix" it onto `WeightCast`; that would ripple through the unit-line arithmetic for no gain.
 - Scope: `app/Support/ActiveScope.php` (session contract) + `app/Models/Scopes/{Organisation,Location}Scope.php`
   + traits `app/Models/Concerns/{BelongsToOrganisation,ScopedToLocation}.php`. Per-location models use
   both traits; org-wide models use `BelongsToOrganisation`; children derive scope from their parent.

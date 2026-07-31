@@ -4,12 +4,11 @@ namespace App\Actions\Members;
 
 use App\Actions\RecordAuditLog;
 use App\Enums\ApplicationStatus;
-use App\Enums\MemberStatus;
 use App\Models\Member;
 use App\Models\MemberApplication;
 use App\Support\ActiveScope;
 use App\Support\MemberEligibility;
-use App\Support\MemberNumber;
+use App\Support\MemberEnrolment;
 use App\Support\Settings;
 use Illuminate\Support\Facades\Auth;
 use RuntimeException;
@@ -45,10 +44,9 @@ class ApproveApplication
             'declared_monthly_cg' => $payload['declared_monthly_cg'] ?? null,
         ]);
         $member->organisation_id = $application->organisation_id;
-        $member->status = MemberStatus::ACTIVE;
-        $member->member_no = MemberNumber::next($application->organisation_id);
-        $member->joined_at = now();
-        $member->carencia_ends_at = now()->addDays((int) Settings::get('carencia_days', 15));
+        // Shared enrolment defaults — the SAME source the direct-create form fills, so the
+        // carencia rule / active status / member-number generation can't drift (prompt 37).
+        $member->fill(MemberEnrolment::defaults($application->organisation_id));
         $member->save();
 
         foreach (($payload['consents'] ?? ['membership', 'data_processing']) as $purpose) {

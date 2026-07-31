@@ -6,7 +6,6 @@ use App\Filament\Resources\Genetics\GeneticResource;
 use App\Models\Genetic;
 use App\Support\Weight;
 use Filament\Actions\DeleteAction;
-use Filament\Actions\ForceDeleteAction;
 use Filament\Actions\RestoreAction;
 use Filament\Resources\Pages\EditRecord;
 
@@ -18,7 +17,6 @@ class EditGenetic extends EditRecord
     {
         return [
             DeleteAction::make(),
-            ForceDeleteAction::make(),
             RestoreAction::make(),
         ];
     }
