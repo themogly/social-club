@@ -13,6 +13,7 @@ use App\Enums\MembershipStatus;
 use App\Enums\TillSessionStatus;
 use App\Exceptions\DispensationBlockedException;
 use App\Exceptions\LimitExceededException;
+use App\Exceptions\ScanRateLimitedException;
 use App\Exceptions\TillClosedException;
 use App\Livewire\Counter\Concerns\IdentifiesOperator;
 use App\Models\Batch;
@@ -213,7 +214,13 @@ class DispensaryPos extends Component
             return;
         }
 
-        $member = (new ResolveMemberByToken)->handle($token);
+        try {
+            $member = (new ResolveMemberByToken)->handle($token, (string) (Auth::id() ?? request()->ip()));
+        } catch (ScanRateLimitedException) {
+            $this->flash(__('Demasiados intentos de escaneo. Espera unos segundos.'), 'error');
+
+            return;
+        }
 
         if ($member === null) {
             $this->flash(__('Tarjeta no reconocida. Inténtalo de nuevo o busca por nombre.'), 'error');

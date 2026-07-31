@@ -96,9 +96,12 @@ class Settings
 
         // Data retention & privacy
         'data_retention_days' => 1825,      // 5 years after leaving
-        'audit_retention_days' => 3650,     // deliberately longer
+        'audit_retention_days' => 3650,     // MINIMUM retention only — the audit log is append-only and
+        // never auto-purged (the model refuses deletes). Prompt 58.
         'signed_url_ttl_seconds' => 300,    // 5 minutes
         'consent_text_version' => '1.0',
+        // Brute-force guard on QR-card scans (failed scans per minute, per operator). Prompt 58.
+        'qr_scan_max_failures_per_minute' => 10,
 
         // Per-location defaults (overridable per premises)
         'aforo_default' => 50,

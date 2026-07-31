@@ -1981,3 +1981,29 @@ submit for age/aforo is forced to BLOCK), and unknown modes fail safe to BLOCK �
 submit. `OVERRIDE` is offered where it's legitimate (a manager+ permissioned override of carencia/limits/
 debt), matching the existing override affordances at the counter. 519 green. Self-merge on green
 (batch 3 authorisation).
+
+---
+
+## Batch 3·MUST — Prompt 58: QR scan rate limit + audit retention decision
+
+Two loose ends from prompt 17.
+
+**QR scan rate limit (a real fix).** `ResolveMemberByToken` had NO throttle and is called from Livewire
+(counter check-in + dispensary POS), so route middleware never applies — a scanner could try token after
+token to brute-force a valid card. Added an in-Action throttle (`RateLimiter`, the app's `UnlockOperator`
+pattern), keyed by operator/IP, tunable via a new `qr_scan_max_failures_per_minute` setting (default 10,
+now on the org settings form). Design choice: **only FAILED scans count** toward the limit — a busy
+counter scanning valid cards is never throttled, but repeated misses (the brute-force signal) are stopped
+and refused with `ScanRateLimitedException`, which both counters catch and flash. Backward-compatible: a
+call with no throttle key (e.g. the member PWA flow) is unthrottled, so prompt-15's PWA tests stay green.
+
+**Audit retention — DECISION: Option B (the prompt's steer, taken explicitly).** The audit log is a
+compliance/forensic record whose whole point (prompt 17 / RAT-07) is to evidence PAST accesses — purging
+it would destroy exactly that. And it's already append-only BY CONSTRUCTION: the `AuditLog` model throws
+on both `updating` and `deleting`, so no purge could even run. Therefore I did NOT build a purge; instead
+I made the setting honest — `audit_retention_days` is a **MINIMUM/disclosure** figure (surfaced in the
+audit-log subheading, the RAT and the health panel), NOT an auto-delete trigger, and the settings-form
+helper text now says so. Contrast with `data_retention_days`, which IS a real purge trigger (`members:purge`
+anonymises members) — the asymmetry is deliberate. Pinned with a test that deleting an audit row is
+refused (retention by construction). 523 green. Self-merge on green (batch 3 authorisation). **Batch 3
+MUST (51, 53, 58) complete.**
