@@ -47,6 +47,7 @@ class ConsumptionReport extends AbstractReport
     {
         $this->tables();
         $overrideValue = $this->priceOverrideValueCents();
+        $refundValue = $this->refundValueCents();
 
         return [
             ['label' => __('Dispensado'), 'value' => Weight::fromCentigrams($this->dispensedCg)->formatted()],
@@ -55,7 +56,20 @@ class ConsumptionReport extends AbstractReport
             // Prompt 64: how much product left below the resolved price this period (comps / give-aways),
             // surfaced so a manager can answer "how much left at below cost, and why" without grepping the log.
             ['label' => __('Ajustes de precio'), 'value' => Money::fromCents($overrideValue)->formatted(), 'tone' => $overrideValue > 0 ? 'warning' : 'success'],
+            // Prompt 65: a period's refunds belong alongside its takings, not only in the audit log.
+            ['label' => __('Reembolsos'), 'value' => Money::fromCents($refundValue)->formatted(), 'tone' => $refundValue > 0 ? 'warning' : 'success'],
         ];
+    }
+
+    /** Total refunded to members this period: SUM(amount_cents) over the refunds in scope. */
+    private function refundValueCents(): int
+    {
+        [$start, $end] = $this->bounds();
+
+        return (int) DB::table('refunds')
+            ->whereIn('location_id', $this->resolvedLocationIds())
+            ->whereBetween('created_at', [$start, $end])
+            ->sum('amount_cents');
     }
 
     /** Total value forgone to price overrides this period: SUM(resolved − charged) over overridden rows. */

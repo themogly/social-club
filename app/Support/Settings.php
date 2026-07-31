@@ -57,6 +57,10 @@ class Settings
         // Invitations — an unused invite link expires after this many days (prompt 29).
         'invite_expiry_days' => 14,
 
+        // Refunds (prompt 65) — a dispensation older than this many days cannot be refunded at the
+        // counter. 0 = no window. A configurable control, not a hardcoded const (regional practice varies).
+        'refund_window_days' => 30,
+
         // Temporary / short-stay members (prompt 31). Legally unsettled — see DECISIONS.
         'temporary_members_enabled' => false,
         'temporary_window_days' => 30,
