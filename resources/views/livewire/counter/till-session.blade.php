@@ -33,7 +33,7 @@
             <section class="rounded-2xl border border-line bg-surface p-6 dark:border-slate-800 dark:bg-slate-900">
                 <div class="flex items-center justify-between gap-3">
                     <h2 class="text-lg font-semibold">{{ __('Arqueo de caja') }}</h2>
-                    <span class="rounded-full border border-slate-300 bg-surface-alt px-2.5 py-0.5 text-xs font-semibold uppercase tracking-wide text-ink-muted dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300">{{ __('Cerrada') }}</span>
+                    <span class="rounded-full border border-line bg-surface-alt px-2.5 py-0.5 text-xs font-semibold uppercase tracking-wide text-ink-muted dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300">{{ __('Cerrada') }}</span>
                 </div>
                 <p class="mt-0.5 text-sm text-ink-muted dark:text-slate-400">{{ __('Terminal') }}: <span class="font-medium text-ink dark:text-slate-100">{{ $terminal }}</span></p>
 

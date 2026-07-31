@@ -19,7 +19,7 @@
     <h2 class="mt-6 text-sm font-semibold text-ink-muted dark:text-slate-300">{{ __('Monedero') }}</h2>
     @forelse ($wallet as $w)
         <div class="mt-2 flex items-baseline justify-between rounded-xl border border-line bg-surface p-3 text-sm shadow-sm dark:border-slate-800 dark:bg-slate-900">
-            <span class="text-ink-muted dark:text-slate-300">{{ optional($w->created_at)->format('d/m/Y') }} · {{ $w->type->value }}</span>
+            <span class="text-ink-muted dark:text-slate-300">{{ optional($w->created_at)->format('d/m/Y') }} · {{ $w->type->label() }}</span>
             <span class="font-semibold">{{ $money($w->amount_cents->cents) }}</span>
         </div>
     @empty
