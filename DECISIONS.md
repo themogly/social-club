@@ -2348,3 +2348,77 @@ a focused follow-up. Per the testing rule (tests prove correctness, not complete
 button), the feature is complete and correct at the mechanic layer and the UI is a named next step, not a
 half-wired control. Owner-authorised merge (the prompt's "do not merge" overridden by the standing "merge
 it all"). 572 green.
+
+---
+
+## Prompt 70 — locale-aware demo seed + a demo profile with the optional features switched on
+
+Two problems: (1) an English UI sat on Spanish demo data ("Sede Centro", "Flores", Spanish names) — reads
+as a half-finished translation; (2) six optional features ship OFF, so a fresh install can't demonstrate
+them at all. Fixed both without touching production defaults.
+
+**Locale-selection mechanism — DECISION: pick the string set from `app()->getLocale()` at seed time.**
+`DemoDataSeeder::localeStrings($locale)` is a small keyed array (locations, grades, tiers, discounts, bar
+articles, opening-stock/balance reasons) — DATA written once, so it deliberately does NOT go through
+`lang/` files (that is for UI rendered per request). The faker locale comes from the SAME source
+(`es → es_ES`, `en → en_GB`): the seeder sets `config('app.faker_locale')` and resolves an explicit
+`\Faker\Generator` from it, so generated names match the chosen language instead of being independently
+Spanish. Default `APP_LOCALE=en` now yields an all-English demo; `APP_LOCALE=es` yields all-Spanish.
+**Strain names are left as-is** (Amnesia Haze, Northern Lights…) — proper nouns, identical in every
+language. `ExpenseCategorySeeder` is likewise locale-aware now (an English club gets "Consumables",
+"Rent"…); its stable identity is the KIND, so the demo's petty-cash lookup uses `default_kind = TILL`,
+never the localised name.
+
+**Test that stopped depending on a Spanish literal.** `ExpenseCategorySeederTest` asserted
+`$byName['Consumibles']->default_kind === TILL`. Names are now locale-aware, so that literal dependency was
+itself the smell the prompt names — rewritten to assert the SHAPE (exactly one TILL category + six
+OVERHEAD, all active), which holds in any locale. No other test depended on a seeded literal (BarReport /
+BarSales tests build their own inline locations/articles; LibrarySmokeTest's `'Socio'` is a report column
+header, not seed data).
+
+**Rule 1 honoured — `Settings::DEFAULTS` is UNCHANGED; the profile writes rows.** `seedDemoProfile()`
+calls `Settings::set(...)` exactly as an admin would. A test asserts both halves: the rows are present via
+`Settings::get()`, AND `Settings::DEFAULTS['wallet_debt_allowed'/…]` are provably still the conservative
+values (the test fails the moment a default is flipped in code).
+
+**Which optional settings the profile enables, and why.** Enabled (the four required + a door threshold):
+`wallet_debt_allowed` with `wallet_debt_limit_cents=5000` (€50 counter cap — debt-allowed with a €0 cap
+demonstrates nothing) and `wallet_door_debt_threshold_cents=3000` (€30, LOWER than the counter cap so a
+member can be past the door limit yet within the counter limit — both blocks visible at once);
+`temporary_members_enabled`; `camera_scan_enabled`; `signature_on_dispensation`. **Left OFF deliberately:**
+`restrict_pos_to_checked_in` (would block dispensing to any un-checked-in member — muddies the "can dispense
+to anyone" demo and the regression guard; better shown live by toggling), `discounts_stack` (subtle —
+needs ≥2 overlapping discounts on one member to read as anything, risks confusing the demo pricing),
+`ring_fenced` (changes wallet settlement semantics org-wide; balances are already per-location so the debt
+demo doesn't need it, and making it legible needs a cross-location settlement scenario heavier than it's
+worth here). Each left-off flag is a "use judgement" call the prompt invited.
+
+**Data behind every switched-on flag (a flag with no data demonstrates nothing).** A member in debt at
+−€40 (within cap, past door threshold) and one at −€48 (near the cap); a TEMPORARY member expiring in 3
+days (removal-reminder path); an in-carencia member; a membership expiring in 5 days; a member carrying a
+WARNING sanction (so prompt 51's sanctions tab isn't empty) — on top of the existing one-of-each-status
+spread. **Every active member's fee is PAID via `RecordFeePayment`**, so the demo isn't fee-blocked from
+dispensing to anyone (prompt 46's `unpaid_fee` block) — asserted end-to-end by a live `CommitDispensation`
+succeeding on a freshly seeded member.
+
+**Rule 2 honoured — new records go through their domain writer.** Memberships via `EnrolMembership`, fees
+via `RecordFeePayment`, wallet (opening balances + seeded debt) via `RecordWalletTransaction`, opening
+stock as a real `RecordStockMovement` INTAKE (batch created empty, then intaken — the go-live path, no
+free-typed `remaining_cg`), the fortnight's stock depletions + wallet contributions likewise through the
+writers, orders through `CommitOrder` (the batch-2 fix). **Carve-out kept + re-documented:** the
+fortnight's back-dated `Dispensation`/`DispensationLine` stay relational-with-full-snapshot — the
+compliance-boundary carve-out already in CLAUDE.md, because `CommitDispensation` would REJECT historical
+demo data (carencia/limits/fees for a past day). The LIVE `CommitDispensation` path is exercised by the
+regression test instead.
+
+**Clean profile — RECOMMENDATION (not over-built, per the prompt).** The seeder remains the single "rich"
+profile. A minimal/empty club is best added as a selectable profile via an env flag (e.g.
+`DEMO_PROFILE=minimal` gating the fortnight + feature members) or a separate `MinimalDemoSeeder` — a small,
+additive change when someone actually needs the empty shape. Not built now to avoid a second code path with
+no current consumer.
+
+**Screenshots:** the acceptance evidence the prompt asks for (dashboard / member list / POS in both
+locales, light+dark) could NOT be produced — no browser in this environment. The locale correctness is
+instead verified programmatically (`DemoSeedProfileTest` asserts the seeded literals + faker locale under
+both `en` and `es`). Flagged so a human runs the visual pass. Owner-authorised merge (the standing "merge
+everything to main" overrides the prompt's "do not merge"). 578 green.

@@ -33,11 +33,10 @@ class ExpenseCategorySeederTest extends TestCase
 
         $this->assertCount(7, $categories);
 
-        $byName = $categories->keyBy('name');
-        // Petty cash (drawer) vs overhead (paid outside the till).
-        $this->assertSame(ExpenseKind::TILL, $byName['Consumibles']->default_kind);
-        $this->assertSame(ExpenseKind::OVERHEAD, $byName['Stock']->default_kind);
-        $this->assertSame(ExpenseKind::OVERHEAD, $byName['Alquiler']->default_kind);
-        $this->assertSame(ExpenseKind::OVERHEAD, $byName['Pago de personal']->default_kind);
+        // Prompt 70: category NAMES are now locale-aware, so this asserts the stable SHAPE (kinds), not
+        // Spanish literals. Exactly one petty-cash (TILL) category — the drawer's — and six overheads.
+        $this->assertSame(1, $categories->where('default_kind', ExpenseKind::TILL)->count());
+        $this->assertSame(6, $categories->where('default_kind', ExpenseKind::OVERHEAD)->count());
+        $this->assertTrue($categories->every(fn (ExpenseCategory $c): bool => $c->active));
     }
 }
