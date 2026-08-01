@@ -34,13 +34,32 @@
                     <img src="/socio-icons/favicon-32.png" width="24" height="24" alt="" class="rounded-md">
                     <span>{{ config('app.name') }}</span>
                 </a>
-                <a href="{{ route('socio.notifications') }}"
-                   aria-label="{{ __('Ajustes de avisos') }}"
-                   class="rounded-lg p-2 text-ink-muted hover:bg-brand-tint hover:text-brand dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-white {{ request()->routeIs('socio.notifications') ? 'text-brand dark:text-white' : '' }}">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" class="h-5 w-5" aria-hidden="true">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M14.857 17.082a23.85 23.85 0 0 0 5.454-1.31A8.97 8.97 0 0 1 18 9.75V9A6 6 0 0 0 6 9v.75a8.97 8.97 0 0 1-2.312 6.022c1.733.64 3.56 1.085 5.455 1.31m6.714 0a24.25 24.25 0 0 1-6.714 0m6.714 0a3 3 0 1 1-6.714 0"/>
-                    </svg>
-                </a>
+                <div class="flex items-center gap-1.5">
+                    {{-- Language switcher (prompt 96): persistent on every screen, so a member who lands in
+                         the wrong language can escape it immediately. Reuses the admin switcher's pattern —
+                         persists to the member row AND drops a session override for the very next request. --}}
+                    @php($localeOptions = array_values(array_intersect(['es', 'en'], (array) \App\Support\Settings::get('enabled_locales', ['es', 'en']))))
+                    @if (count($localeOptions) > 1)
+                        <form method="POST" action="{{ route('socio.locale') }}" data-locale-switcher class="flex items-center rounded-lg border border-line p-0.5 dark:border-slate-800">
+                            @csrf
+                            @foreach ($localeOptions as $loc)
+                                <button type="submit" name="locale" value="{{ $loc }}" data-locale="{{ $loc }}"
+                                        @class([
+                                            'rounded-md px-2 py-1 text-xs font-semibold uppercase transition',
+                                            'bg-brand text-white' => app()->getLocale() === $loc,
+                                            'text-ink-muted hover:text-brand dark:text-slate-400' => app()->getLocale() !== $loc,
+                                        ])>{{ $loc }}</button>
+                            @endforeach
+                        </form>
+                    @endif
+                    <a href="{{ route('socio.notifications') }}"
+                       aria-label="{{ __('Ajustes de avisos') }}"
+                       class="rounded-lg p-2 text-ink-muted hover:bg-brand-tint hover:text-brand dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-white {{ request()->routeIs('socio.notifications') ? 'text-brand dark:text-white' : '' }}">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" class="h-5 w-5" aria-hidden="true">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M14.857 17.082a23.85 23.85 0 0 0 5.454-1.31A8.97 8.97 0 0 1 18 9.75V9A6 6 0 0 0 6 9v.75a8.97 8.97 0 0 1-2.312 6.022c1.733.64 3.56 1.085 5.455 1.31m6.714 0a24.25 24.25 0 0 1-6.714 0m6.714 0a3 3 0 1 1-6.714 0"/>
+                        </svg>
+                    </a>
+                </div>
             </div>
         </header>
     @endif

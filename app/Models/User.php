@@ -9,6 +9,7 @@ use Filament\Auth\MultiFactor\App\Contracts\HasAppAuthentication;
 use Filament\Auth\MultiFactor\App\Contracts\HasAppAuthenticationRecovery;
 use Filament\Models\Contracts\FilamentUser;
 use Filament\Panel;
+use Illuminate\Contracts\Translation\HasLocalePreference;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
@@ -22,7 +23,7 @@ use Spatie\Permission\Traits\HasRoles;
 
 #[Fillable(['name', 'email', 'password', 'pin', 'active', 'locale'])]
 #[Hidden(['password', 'remember_token', 'pin', 'mfa_secret', 'mfa_recovery_codes'])]
-class User extends Authenticatable implements FilamentUser, HasAppAuthentication, HasAppAuthenticationRecovery
+class User extends Authenticatable implements FilamentUser, HasAppAuthentication, HasAppAuthenticationRecovery, HasLocalePreference
 {
     /** @use HasFactory<UserFactory> */
     use HasFactory, HasRoles, HasUlids, Notifiable, SoftDeletes;
@@ -47,6 +48,12 @@ class User extends Authenticatable implements FilamentUser, HasAppAuthentication
     public function locations(): BelongsToMany
     {
         return $this->belongsToMany(Location::class)->withTimestamps();
+    }
+
+    /** The user's own UI-language preference (prompt 96); null = fall through to the org default. */
+    public function preferredLocale(): ?string
+    {
+        return $this->locale;
     }
 
     /**

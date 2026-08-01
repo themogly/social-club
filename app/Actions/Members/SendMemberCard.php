@@ -3,6 +3,7 @@
 namespace App\Actions\Members;
 
 use App\Actions\RecordAuditLog;
+use App\Actions\ResolveLocale;
 use App\Mail\MemberCardMail;
 use App\Models\Member;
 use Illuminate\Support\Facades\Mail;
@@ -33,7 +34,11 @@ class SendMemberCard
 
         $token = (new IssueMemberToken)->handle($member);
 
-        Mail::to($member->email)->queue(new MemberCardMail($member, $token));
+        // Resolve the recipient's language NOW (in-request), and pin it onto the queued message — a worker
+        // has no session or request, so without this the card would send in the worker's locale (prompt 96).
+        Mail::to($member->email)
+            ->locale((new ResolveLocale)->handle($member))
+            ->queue(new MemberCardMail($member, $token));
 
         // Audit the ACT, never the address (the audit log has longer retention — prompt 76).
         (new RecordAuditLog)->handle('member.card.sent', $member, null, ['channel' => 'email']);

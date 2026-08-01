@@ -12,6 +12,7 @@ use App\Support\DocumentDrift;
 use Database\Factories\MemberFactory;
 use Illuminate\Auth\Authenticatable as AuthenticatableTrait;
 use Illuminate\Contracts\Auth\Authenticatable;
+use Illuminate\Contracts\Translation\HasLocalePreference;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -32,7 +33,7 @@ use NotificationChannels\WebPush\HasPushSubscriptions;
  * Notifiable + HasPushSubscriptions wire the Web Push channel (prompt 15): the member
  * owns their subscriptions and a per-channel opt-out (`push_opt_outs`).
  */
-class Member extends Model implements Authenticatable
+class Member extends Model implements Authenticatable, HasLocalePreference
 {
     /** @use HasFactory<MemberFactory> */
     use AuthenticatableTrait, BelongsToOrganisation, HasFactory, HasPushSubscriptions, HasUlids, Notifiable, SoftDeletes;
@@ -41,7 +42,7 @@ class Member extends Model implements Authenticatable
     public const PUSH_CHANNELS = ['low_balance', 'membership_expiring', 'new_announcement', 'event_reminder'];
 
     protected $fillable = [
-        'organisation_id', 'member_no', 'first_name', 'last_name', 'email', 'phone',
+        'organisation_id', 'member_no', 'first_name', 'last_name', 'email', 'phone', 'locale',
         'date_of_birth', 'address', 'photo_path', 'document_type', 'document_number', 'document_hash',
         'document_scan_path', 'medical_cert_path', 'status', 'is_therapeutic', 'avalador_member_id',
         'joined_at', 'left_at', 'carencia_ends_at', 'declared_monthly_cg',
@@ -90,6 +91,12 @@ class Member extends Model implements Authenticatable
     public function fullName(): string
     {
         return trim($this->first_name.' '.$this->last_name);
+    }
+
+    /** The member's own UI-language preference (prompt 96); null = fall through to the org default. */
+    public function preferredLocale(): ?string
+    {
+        return $this->locale;
     }
 
     /**

@@ -97,6 +97,7 @@ Route::middleware('web')->prefix('socio')->name('socio.')->group(function () {
         Route::get('menu', [PwaController::class, 'menu'])->name('menu');
         Route::get('historial', [PwaController::class, 'history'])->name('history');
         Route::get('mis-datos', [PwaController::class, 'export'])->name('export');
+        Route::post('idioma', [PwaController::class, 'switchLocale'])->name('locale');
         Route::post('logout', [SocioAuthController::class, 'logout'])->name('logout');
     });
 });

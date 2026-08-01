@@ -20,7 +20,10 @@ class Settings
     public const DEFAULTS = [
         // Identity / display
         'enabled_locales' => ['es', 'en'],
-        'default_locale' => 'en',           // organisation UI default (prompt 19: system default is en)
+        // Organisation UI default is SPANISH (prompt 96): this is a Spanish product for Spanish clubs, and
+        // members/staff with no explicit preference must not get English. English stays available and is the
+        // ultimate system fallback (config('app.locale')). Flips both the admin panel and the member PWA.
+        'default_locale' => 'es',
         'member_number_prefix' => 'M-',
         'member_number_padding' => 5,
 

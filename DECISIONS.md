@@ -3435,3 +3435,51 @@ error; the menu and the POS agree on the available set (asserted against each ot
 announcement and event are not shown to members (the sweep). **Screenshots** (`/socio/menu` degrading vs
 crashing, light/dark, phone) not produced — no browser here. Owner-authorised merge (standing "merge all to
 main"). 745 green (742 passed, 3 concurrency skips).
+
+---
+
+## Prompt 96 — Member PWA locale (member.locale, one widened resolver, switcher, queued-mail locale, es default)
+
+**The member PWA rendered in English for a Spanish club, with no way to change it.** Three causes, all fixed
+around the SINGLE resolver.
+
+**1. One resolver, widened — not a member fork.** `ResolveLocale::handle()` took `?User`; on the `socio`
+routes the guard is `member` (provider Members, not Users), so `SetLocale` passed `null` and skipped the
+per-preference step entirely. The signature is now `?HasLocalePreference` — Laravel's own
+`Illuminate\Contracts\Translation\HasLocalePreference` (idiomatic, and it wires framework mail-locale for
+free), implemented by BOTH `User` and `Member` via `preferredLocale()`. `SetLocale` now reads the subject
+from whichever guard is authenticated (web User OR member). One resolver, one documented order
+(per-subject preference → org default → system), unchanged for the admin panel (regression-tested).
+
+**2. Members have a language + a switcher.** Added a nullable `members.locale` (mirroring `users.locale`). A
+persistent ES/EN switcher lives in the shared socio header (so a member who lands in the wrong language
+escapes it on any screen), reusing the admin switcher's pattern exactly: persist to the member row AND drop
+a session override so `SetLocale` applies it on the very next request — no re-login. Only an enabled locale
+is honoured; an unknown/stale value degrades to the org default, never throws.
+
+**3. The shipped default is Spanish — deliberate, with a wide blast radius.** `Settings::DEFAULTS['default_locale']`
+flipped `en → es` (a Spanish product for Spanish clubs; a member/user with no preference must not get
+English). Because `Settings::get` prefers `DEFAULTS` over the caller's fallback, this flips BOTH the admin
+panel and the PWA by default. `.env.example` was internally contradictory (comment said "Spanish default",
+values said `en`) — corrected to `APP_LOCALE=es` / `APP_FALLBACK_LOCALE=es` so a real install is Spanish at
+every level, with English fully available. English remains the ultimate system fallback in code
+(`config('app.locale')`). This supersedes the earlier en-default note; recorded here per the prompt (and it
+sits inside prompt 78's flagged contradiction — prompt 78 is not merged, so no boundary conflict). Blast
+radius on the suite: 6 tests updated to the new default (two locale-resolution tests, the middleware test, the
+`Member.locale` form-completeness allowlist, and two dashboard tests that formatted an expected figure in the
+test's ambient locale rather than the page's).
+
+**4. Queued mail resolves an EXPLICIT locale.** `SetLocale` is HTTP middleware, so a job (QR card, invite,
+reminders, the convocatoria) runs with no session or request and would send in the worker's locale. Each
+member-facing send now resolves the recipient's language IN-REQUEST via `ResolveLocale` and pins it onto the
+message with `->locale()`: `SendMemberCard` (QR card) and `IssueConvocatoria` (per recipient, resolved at
+issue). A statutory convocatoria now reaches each member in THEIR language — the same bug in a place that
+matters more.
+
+**Tests:** `MemberLocaleTest` (7) — a member sees the PWA in their own locale (es/en); no-preference falls to
+the ORG default not unconditional en (and an org override to en is honoured); the switcher changes the
+language immediately and persists across a fresh session; an unknown/disabled member locale degrades
+gracefully; the QR card and the convocatoria are QUEUED in each recipient's resolved locale (dispatched from
+a job, no HTTP); the admin user-locale behaviour is unchanged. Prompt-19 parity still green. **Screenshots**
+(PWA home/menu/history in both languages + the switcher, light/dark) not produced — no browser here.
+Owner-authorised merge (standing "merge all to main"). 752 green (749 passed, 3 concurrency skips).

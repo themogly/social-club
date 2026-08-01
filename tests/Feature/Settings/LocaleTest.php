@@ -16,8 +16,8 @@ class LocaleTest extends TestCase
 
         $this->withSession(['locale' => 'en'])->get('/__locale')->assertOk()->assertSee('en');
         $this->withSession(['locale' => 'es'])->get('/__locale')->assertOk()->assertSee('es');
-        // A disabled/invalid locale is ignored → stays the default (en).
-        $this->withSession(['locale' => 'zz'])->get('/__locale')->assertOk()->assertSee('en');
+        // A disabled/invalid locale is ignored → stays the org default (now es — prompt 96).
+        $this->withSession(['locale' => 'zz'])->get('/__locale')->assertOk()->assertSee('es');
     }
 
     public function test_ui_strings_render_in_spanish_and_english(): void

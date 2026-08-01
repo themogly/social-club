@@ -147,6 +147,7 @@ class FormCompletenessTest extends TestCase
             'monthly_limit_cg' => 'per-member override set via the member.limits.set action, not onboarding.',
             'anonymised_at' => 'system: stamped by AnonymiseMember (RGPD erasure).',
             'push_opt_outs' => 'member self-service PWA notification preference.',
+            'locale' => 'member self-service: set by the member via the PWA language switcher, not the admin form (prompt 96).',
             'kind' => 'set via the "Socio temporal" toggle at enrolment (a virtual field mapped in the create hook), prompt 31.',
             'temporary_expires_at' => 'system: computed from joined_at + temporary_window_days for temporary members, prompt 31.',
             'declared_monthly_cg' => 'a signed legal figure: sole writer is the UpdateDeclaredForecast record action, never the generic form, prompt 72.',
