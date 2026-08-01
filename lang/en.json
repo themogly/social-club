@@ -1986,5 +1986,12 @@
     "No se pudo liquidar la visita. Revisa las cestas y el stock.": "The visit could not be settled. Check the baskets and stock.",
     "Visita liquidada: dispensación y barra.": "Visit settled: dispensation and bar.",
     "Barra y tienda (misma visita)": "Bar & shop (same visit)",
-    "Liquidar visita · :total": "Settle visit · :total"
+    "Liquidar visita · :total": "Settle visit · :total",
+    "Sistema temporalmente no disponible": "System temporarily unavailable",
+    "El sistema no está disponible temporalmente (infraestructura degradada). Inténtalo de nuevo en unos momentos.": "The system is temporarily unavailable (degraded infrastructure). Please try again in a few moments.",
+    "Caché": "Cache",
+    "Accesible": "Reachable",
+    "No accesible": "Unreachable",
+    "Almacén": "Store",
+    "La caché no responde. El mostrador y la autorización siguen funcionando (permisos en base de datos); las colas están detenidas hasta que se restablezca.": "The cache is not responding. The counter and authorisation keep working (permissions on the database); queues are paused until it is restored."
 }

@@ -4512,3 +4512,43 @@ What I believe the result should be:
   browser to confirm/measure.
 
 `composer check` green (892 tests, 889 passed, 3 pre-existing skips, PHPStan 0). No new copy.
+
+## Prompt 124 — Survive a Redis outage (permission cache off Redis)
+
+A stopped Redis 500'd **every** authenticated screen — the counter and even the System Health page — because
+`spatie/laravel-permission` loads its permission set from the configured cache store (`CACHE_STORE=redis`) on
+every `$user->can()`, and Filament + `SetLocale` check permissions on every request. Sessions were never the
+cause (`SESSION_DRIVER=database` already); authorization alone was.
+
+**Where the permission cache now lives.** `config/permission.php` `cache.store` is
+`env('PERMISSION_CACHE_STORE', 'database')` — deliberately NOT the default (Redis) store. `database` survives a
+Redis outage (the DB is already a hard dependency — the register cannot be written without it) AND stays SHARED
+across workers, so a role edit + `php artisan permission:cache-reset` still propagates everywhere (a per-process
+`file`/`array` store would not). Smallest change, largest effect — the package's own supported knob. Trade
+recorded: one extra DB read on a permission-cache miss, negligible against the many DB reads a request already
+makes. `PERMISSION_CACHE_STORE` documented in `.env.example` + `SETUP.md`.
+
+**What the counter does during an outage.** It keeps trading: authenticated screens render (they no longer touch
+Redis for authz; sessions are database; `Settings::get` already degrades). The paths that STILL touch Redis — the
+login throttle, an explicit cache/queue call — now hit a `render` handler in `bootstrap/app.php` that returns a
+stated **"infrastructure degraded"** 503 (`errors/degraded.blade.php`, self-contained — no cache/auth/asset
+dependency) instead of a stack-trace 500 or a silent bounce. Scoped to Redis by exception type
+(`Predis\PredisException` / `RedisException`) or the `:6379` in its message, so a DB outage is untouched.
+
+**System Health survives what it reports on.** New `SystemHealth::cache()` does a trivial round-trip against the
+default store and reports reachable/unreachable, NEVER throwing; the page renders and shows the cache as *No
+accesible*. **Login** says something true (the 503 message) rather than silently returning to an empty form.
+
+**Queue side (verified, documented).** `QUEUE_CONNECTION=redis`, so jobs stop with Redis — expected and much
+less severe: jobs already enqueued survive (Redis persistence) and resume on recovery; a NEW dispatch during the
+outage fails loudly (the request gets the degraded message), so nothing is silently lost. The scheduler
+heartbeat is DB-based (`HeartbeatLog`), so it stays fresh through a Redis outage and correctly reports a gap only
+when the CRON is actually down, not when Redis is.
+
+**Recovery stays automatic** — Redis returning restores everything with no restart (tested). No data behaviour
+changed; caching was relocated, not removed.
+
+Tests (`RedisDegradationTest`, 5): counter + dashboard render 200 with the default cache unreachable (the
+branch); System Health renders + reports degraded; a Redis failure surfaces the 503 message; permission changes
+apply after `cache-reset` on the new store; recovery. `composer check` green (897 tests, 894 passed, 3
+pre-existing skips, PHPStan 0). EN/ES parity gated.

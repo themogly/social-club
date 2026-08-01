@@ -7,7 +7,9 @@ use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
+use Predis\PredisException;
 use Sentry\Laravel\Integration;
+use Symfony\Component\HttpFoundation\Response;
 
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
@@ -48,4 +50,31 @@ return Application::configure(basePath: dirname(__DIR__))
         $exceptions->shouldRenderJsonWhen(
             fn (Request $request) => $request->is('api/*'),
         );
+
+        // A Redis outage must SAY something true, not a stack-trace 500 or a silent bounce (prompt 124). With
+        // the permission cache on the database store, authenticated screens (the counter included) render fine;
+        // the paths that still touch Redis — the login throttle, an explicit cache/queue call — now surface a
+        // maintenance message instead. Scoped to Redis by exception type / the :6379 in its message, so a DB
+        // failure (a different, total outage) is untouched.
+        $exceptions->render(function (Throwable $e, Request $request): ?Response {
+            $isRedis = false;
+            for ($cursor = $e, $i = 0; $cursor !== null && $i < 6; $cursor = $cursor->getPrevious(), $i++) {
+                if ($cursor instanceof PredisException
+                    || (class_exists('RedisException', false) && $cursor instanceof RedisException)
+                    || str_contains($cursor->getMessage(), '6379')) {
+                    $isRedis = true;
+                    break;
+                }
+            }
+
+            if (! $isRedis) {
+                return null;
+            }
+
+            $message = __('El sistema no está disponible temporalmente (infraestructura degradada). Inténtalo de nuevo en unos momentos.');
+
+            return ($request->expectsJson() || $request->is('api/*'))
+                ? response()->json(['message' => $message], 503)
+                : response()->view('errors.degraded', ['message' => $message], 503);
+        });
     })->create();
