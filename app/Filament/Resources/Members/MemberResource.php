@@ -3,6 +3,7 @@
 namespace App\Filament\Resources\Members;
 
 use App\Actions\Documents\GenerateMemberDocument;
+use App\Actions\Members\CancelMembership;
 use App\Actions\Members\ExportMemberData;
 use App\Actions\Members\ManageTemporaryMember;
 use App\Actions\Members\SendMemberCard;
@@ -108,6 +109,7 @@ class MemberResource extends Resource
             self::updateDeclaredForecastAction(),
             self::waiveCarenciaAction(),
             self::setLimitsAction(),
+            self::recordBajaAction(),
             self::suspendAction(),
             self::expelAction(),
             self::reactivateAction(),
@@ -260,6 +262,40 @@ class MemberResource extends Resource
                 );
 
                 Notification::make()->title(__('Límites del socio actualizados'))->success()->send();
+            });
+    }
+
+    /**
+     * Registrar baja — a member's VOLUNTARY departure (prompt 80). Cancels their active membership(s) and
+     * records the baja (INACTIVE + left_at) via CancelMembership, so the libro de socios shows a leave date.
+     * Distinct from Suspender/Expulsar (punitive sanctions); gated on members.edit, not member.sanction, and
+     * hidden once the member has already left.
+     */
+    public static function recordBajaAction(): Action
+    {
+        return Action::make('recordBaja')
+            ->label(__('Registrar baja'))
+            ->icon(Heroicon::OutlinedUserMinus)
+            ->color('danger')
+            ->visible(fn (Member $record): bool => (Auth::user()?->can('members.edit') ?? false)
+                && $record->left_at === null
+                && ! in_array($record->status, [MemberStatus::INACTIVE, MemberStatus::EXPIRED, MemberStatus::EXPELLED], true))
+            ->requiresConfirmation()
+            ->schema([
+                Textarea::make('reason')
+                    ->label(__('Motivo de la baja'))
+                    ->required()
+                    ->helperText(__('Queda registrado en la auditoría.')),
+            ])
+            ->action(function (Member $record, array $data): void {
+                $actor = Auth::user();
+                if (! $actor instanceof User) {
+                    return;
+                }
+
+                (new CancelMembership)->handle($record, $actor, (string) ($data['reason'] ?? ''));
+
+                Notification::make()->title(__('Baja registrada'))->success()->send();
             });
     }
 

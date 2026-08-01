@@ -3728,3 +3728,32 @@ when already installed, refuses a blank legal name) + `TrustedProxyTest`.
 
 **Owed:** none material (both are non-visual). Owner-authorised merge. 792 tests, 789 passed, 3 pre-existing
 concurrency skips, PHPStan 0.
+
+---
+
+## Prompt 80 — Member exit (baja)
+
+Re-run after the audit found members could not leave.
+
+A member could be EXPELLED (a punitive sanction) but could not simply LEAVE: there was no `CancelMembership`
+action, `MembershipStatus::CANCELLED` was assigned nowhere, and although `left_at` (the baja column) existed
+and `TransitionMemberStatus` would set it for INACTIVE, nothing ever transitioned a member to INACTIVE
+voluntarily — so the libro de socios (`MembersRegister`, which maps `baja => left_at`) printed "—" in the
+Departure column.
+
+**`CancelMembership` action.** Cancels every ACTIVE membership → `MembershipStatus::CANCELLED` (across all
+sedes — a baja leaves the association, not one premises), then records the baja through the single member-status
+writer `TransitionMemberStatus(INACTIVE)` (sets `left_at` + status + audits), plus its own
+`member.membership.cancelled` audit row. Reasoned; refused once the member has already left (no double baja).
+Gated on **members.edit** (a routine admin act), deliberately NOT `member.sanction` — a voluntary departure is
+not a punishment, which is the distinction the existing Suspender/Expulsar actions carry.
+
+**Reachable:** a `Registrar baja` header action on the Member resource (confirmation + reason), gated on
+members.edit and hidden once the member has left — so the Action isn't a finished-but-unreachable class.
+
+**Tests (`CancelMembershipTest`):** the baja cancels the membership, sets INACTIVE + left_at, and the libro de
+socios then shows the departure date (not "—"); STAFF (no members.edit) is denied; a second baja is refused; a
+reason is required.
+
+**Owed:** none material. Owner-authorised merge. 796 tests, 793 passed, 3 pre-existing concurrency skips,
+PHPStan 0.
