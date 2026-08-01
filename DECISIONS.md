@@ -4049,3 +4049,39 @@ covered by `AnonymiseMember` (its COVERED_MEMBER_TABLES enumerates why). No decl
 
 **Owed:** no browser — the audit-log + SystemHealth screenshots are not produced. Owner-authorised merge. 843
 tests, 840 passed, 3 pre-existing skips, PHPStan 0.
+
+---
+
+## Prompt 114 — Integrity harness (acceptance gate for 103–113)
+
+Added `audits/integrity-harness.php` verbatim (use-as-given) — plain PHP, no test framework, reads real data,
+rolls back the two mutating sections, exits non-zero on any failure. `composer audit:integrity` runs it;
+deliberately NOT in `composer check` (it needs a seeded DB; `check` must run on an empty one). `audits/` is
+excluded from Pint so the tool stays exactly as supplied.
+
+**Baseline confirmed as a progress signal.** On a fresh seed with 103/104/107/110 already merged it reports
+**22 passed, 9 failed** (up from the batch's 16/15 baseline on bare main). Every remaining failure maps to an
+unmerged prompt:
+- `closed tills match a fresh TillSummary recomputation`, `every till-cash expense has its PETTY_CASH movement`
+  → **106**
+- `'today' agrees for <sede>` ×2 → **105**
+- `<sede>: on-site stock is within the ceiling` ×2 → **the seed** (see below)
+- `every settings key is read somewhere` (temporary_reminder_lead_days, aforo_enforcement) → **111**
+- `the till report does not scale queries with sessions` → **108**
+- `reading one settings key ten times is not ten queries` → **109**
+
+Target: **31 passed, 0 failed** once 105/106/108/109/111 land.
+
+**Conflict surfaced — supersedes a prompt-110 decision.** The harness asserts `on-site stock is within the
+ceiling`, which contradicts the "deliberate labelled overage" I chose for the prompt-110 demo seed. The harness
+is the acceptance gate, so it wins: the seed must be brought WITHIN the ceiling. This is folded into **106**
+(the seeder branch), which will also flip the two ceiling rows green and update the prompt-110 seed test from
+"expects exceeded" to "within".
+
+**Guard (`IntegrityHarnessTest`).** Runs the harness against an isolated COPY of the seeded dev DB: `--list`
+exits 0; a directly-broken batch `remaining_cg` makes it exit non-zero (the property that makes it a gate); a
+full run leaves the row counts unchanged (the mutating sections roll back).
+
+**Out of scope (recorded):** the two concurrency properties (gram cap + no-oversell under simultaneous
+counters) need real child processes and a `--concurrency` mode; verified separately on MariaDB, not in-process.
+Owner-authorised merge. 846 tests, 843 passed, 3 pre-existing skips, PHPStan 0.
