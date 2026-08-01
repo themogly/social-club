@@ -2893,3 +2893,41 @@ permission allowlist holds the four above. The test is a comment-stripped file w
 Added the rule to `CLAUDE.md` alongside the fixture rule: **a domain action ships with the entry point that
 calls it** — the two are the same lesson learned twice. Owner-authorised merge (standing "merge everything to
 main"). 651 green (3 concurrency skips).
+
+---
+
+## Prompt 82 — there is no way to see who owes the club money
+
+A `DebtorReport` on the shared `ReportPage`/`AbstractReport` (period picker, location scope, sortable table,
+CSV/PDF export for free), listing members who owe the club — assembly, not invention: every figure already
+existed.
+
+**Two debt types kept DISTINCT — the core decision.** Wallet debt (spent past the balance; bounded, blocks
+at the counter past a threshold) and unpaid cuota (the membership fee, a standing issue that blocks
+dispensing) are DIFFERENT obligations with different consequences, so they are **separate columns with
+separate totals**. The only place they are ever added is the summary's "Total adeudado" — the one aggregate
+the treasurer takes to the asamblea. A member in both appears ONCE with both amounts, never double-counted
+(tested).
+
+**One definition, used by the report and the counter.** Wallet debt = `SUM(wallet_transactions.amount_cents)`
+(the same source as `Wallet::balance`); the "Bloqueado en mostrador" flag = `debt > wallet_debt_limit_cents`,
+which is exactly the negation of `ResolveMemberEligibility::debtWithinThreshold` at the counter; unpaid cuota
+= `fee_cents − SUM(fee payments)`, the negation of `feesPaid`. A test asserts the report's over-threshold
+flag equals the resolver's `debt` rule for the same member, so the report can never chase people the POS lets
+through (or vice versa).
+
+**Aggregated in SQL, not per-member — the N+1 the dashboard audit flagged.** The report groups
+`wallet_transactions` by member and `memberships`⋈`membership_fee_payments` by membership, then resolves the
+debtor union to member rows in ONE query — a constant ~3 queries regardless of membership size (asserted:
+identical query count for 2 vs 12 debtors). The eligibility resolvers are per-member and would N+1 over the
+whole roll, so they are the tested source of truth for the DEFINITION, not called in a loop.
+
+**"Desde" (age) is a documented approximation.** It shows the earliest obligation date on the books (the
+unpaid membership's `starts_at`, and/or the oldest wallet movement) so "€5 since March" sorts apart from "€5
+since yesterday". A precise "in wallet debt since" needs a per-member running-balance walk — exactly the N+1
+avoided above — so the cheaper, honest proxy is used and flagged here. **Scope:** a single-sede view sums that
+sede's balance (matching the resolver there); the owner's "All" view sums a member's wallet across sedes (an
+org-wide member's total position). Location-scoped with a denial test; gated on `reports.view` via ReportPage.
+
+**Screenshots** (both debt types present, light+dark) could not be produced — no browser here; covered by
+`DebtorReportTest` (6 tests). Owner-authorised merge (standing "merge everything to main"). 657 green.

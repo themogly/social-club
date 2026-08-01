@@ -1,4 +1,13 @@
 {
+    "Deudores": "Debtors",
+    "Socios con deuda": "Members in debt",
+    "Deuda de monedero": "Wallet debt",
+    "Cuotas pendientes": "Unpaid fees",
+    "Total adeudado": "Total owed",
+    "Bloqueado en mostrador": "Blocked at counter",
+    "Ningún socio debe dinero al club": "No member owes the club money",
+    "La deuda de monedero y las cuotas pendientes aparecerán aquí.": "Wallet debt and unpaid fees will appear here.",
+    ":n socios con deuda": ":n members in debt",
     "Documentos de identidad, fotografías y certificados médicos": "ID documents, photographs and medical certificates",
     "Verificación de identidad y mayoría de edad; conservación de la copia del documento, la fotografía y, en su caso, el certificado médico del socio terapéutico.": "Identity and age verification; retention of the ID copy, the photograph and, where applicable, the therapeutic member’s medical certificate.",
     "Obligación de verificar la mayoría de edad, consentimiento del interesado y consentimiento explícito para el certificado médico (Art. 9.2.a RGPD).": "Obligation to verify age of majority, data-subject consent, and explicit consent for the medical certificate (Art. 9.2.a GDPR).",
