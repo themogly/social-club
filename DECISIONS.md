@@ -4477,3 +4477,38 @@ Filament-theme pass rather than fixed blind here. Separately observed a PRE-EXIS
 `diffInDays == 30` assertion under full-suite timing — worth hardening now that CI (prompt 117) runs the suite.
 
 `composer check` green (892 tests, 889 passed, 3 pre-existing skips, PHPStan 0). Pure CSS/Blade — no logic tests.
+
+## Prompt 116 — Counter touch / keyboard
+
+Concrete, mechanically-correct fixes applied:
+- **Bar POS autofocus.** The bar POS member-search input now carries `autofocus`, matching the dispensary's scan
+  input, so the operator can type/scan the moment the screen loads — no click first.
+- **Portrait nav labels.** The counter top-bar nav labels were `hidden lg:inline` (shown only ≥1024px), so a
+  tablet in PORTRAIT (768–834px) saw icons only. Changed to `hidden md:inline` (≥768px) so labels show in
+  portrait.
+- **44px touch targets.** Bumped every sub-44px PRIMARY interactive element on the two POS screens to ≥44px:
+  the bar POS quantity steppers (`h-8 w-8` → `h-11 w-11`, 32→44px) and all `h-10` (40px) buttons/links —
+  "Ir a la caja", "Anular", the signature Borrar/Guardar — to `h-11` (44px).
+
+## Verification gap
+
+Required tests not run here (no browser):
+- At 1024×768 (tablet) light AND dark: assert NO interactive element on any counter screen (dispensary, bar,
+  check-in) is under 44×44 CSS px.
+- Bar POS keyboard: focus lands on the member search on load, and Tab traverses search → article grid → tender
+  → commit in that order.
+- Portrait tablet (≈768–834 wide): the counter nav shows text labels, not icons only.
+- Dispensary "vertical budget": at a short laptop height / tablet portrait the dispensary column fits without the
+  primary commit action being pushed below the fold.
+
+What I changed that these exercise:
+- `resources/views/livewire/counter/bar-pos.blade.php` (autofocus on `#member-search`; `h-8 w-8`→`h-11 w-11`
+  steppers; `h-10`→`h-11` buttons), `resources/views/livewire/counter/dispensary-pos.blade.php` (`h-10`→`h-11`),
+  `resources/views/components/counter/top-bar.blade.php` (nav label `lg:inline`→`md:inline`).
+
+What I believe the result should be:
+- No interactive element under 44×44 on the two POS screens; the bar POS focuses its search on load; portrait
+  tablets show nav labels. The check-in screen's audit and the dispensary vertical-budget check still need a
+  browser to confirm/measure.
+
+`composer check` green (892 tests, 889 passed, 3 pre-existing skips, PHPStan 0). No new copy.

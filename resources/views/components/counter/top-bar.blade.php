@@ -142,7 +142,7 @@
                         class="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-brand-tint px-3 py-2 text-sm font-semibold text-brand dark:bg-slate-800 dark:text-white"
                     >
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" class="h-5 w-5" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="{{ $screen['icon'] }}"/></svg>
-                        <span class="hidden lg:inline">{{ $screen['label'] }}</span>
+                        <span class="hidden md:inline">{{ $screen['label'] }}</span>
                     </span>
                 @else
                     <a
@@ -154,7 +154,7 @@
                         class="inline-flex shrink-0 items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium text-ink-muted transition hover:bg-brand-tint hover:text-brand dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-white"
                     >
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" class="h-5 w-5" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="{{ $screen['icon'] }}"/></svg>
-                        <span class="hidden lg:inline">{{ $screen['label'] }}</span>
+                        <span class="hidden md:inline">{{ $screen['label'] }}</span>
                     </a>
                 @endif
             @endforeach
