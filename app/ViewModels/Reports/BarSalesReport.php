@@ -83,7 +83,9 @@ class BarSalesReport extends AbstractReport
                 $groupKey = $articleId !== null ? 'a:'.$articleId : 'm:'.$name;
                 $sede = $articleId !== null ? (string) ($locationNames[$order->location_id] ?? '—') : '—';
 
-                $agg[$groupKey] ??= ['articulo' => $name, 'sede' => $sede, 'unidades' => 0, 'importe' => 0];
+                // Flag off-catalogue manual lines so an owner can pick out exactly the ones that bypass the
+                // catalogue and its prices — the whole reason a reason is required on them (prompt 126).
+                $agg[$groupKey] ??= ['articulo' => $name, 'sede' => $sede, 'unidades' => 0, 'importe' => 0, 'manual' => $articleId === null];
                 $agg[$groupKey]['unidades'] += (int) ($item['qty'] ?? 0);
                 $agg[$groupKey]['importe'] += (int) ($item['line_total_cents'] ?? 0);
             }
