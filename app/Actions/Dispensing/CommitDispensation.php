@@ -26,6 +26,7 @@ use App\Support\LimitSnapshot;
 use App\Support\MemberEligibility;
 use App\Support\Settings;
 use Illuminate\Auth\Access\AuthorizationException;
+use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use RuntimeException;
@@ -59,113 +60,140 @@ class CommitDispensation
             throw new RuntimeException('A dispensation needs at least one line.');
         }
 
-        return DB::transaction(function () use ($member, $location, $lines, $options): Dispensation {
-            // Idempotency: never double-commit the same basket.
-            $key = $options['idempotency_key'] ?? null;
-            if ($key !== null) {
-                $existing = Dispensation::withoutGlobalScopes()->where('idempotency_key', $key)->first();
+        $idempotencyKey = $options['idempotency_key'] ?? null;
+
+        // The pre-check inside handles the common non-concurrent retry cheaply. Under TRUE concurrency both
+        // requests can miss it and both insert; the unique index on idempotency_key is the real guarantee, and
+        // the request that LOSES that race raises a UniqueConstraintViolationException here instead of taking the
+        // pre-check's return path. Catch it, and do what the pre-check would have (prompt 123).
+        try {
+            return DB::transaction(function () use ($member, $location, $lines, $options): Dispensation {
+                // Idempotency FAST PATH: never double-commit the same basket on a plain (non-concurrent) retry.
+                $existing = $this->findByIdempotencyKey($options['idempotency_key'] ?? null);
+                if ($existing !== null) {
+                    return $existing;
+                }
+
+                // A dispensation may only attach to an OPEN till session.
+                $tillSessionId = $options['till_session_id'] ?? null;
+                if ($tillSessionId !== null) {
+                    $till = TillSession::withoutGlobalScopes()->find($tillSessionId);
+                    if ($till === null || $till->status !== TillSessionStatus::OPEN) {
+                        throw new TillClosedException('The dispensation must attach to an open till session.');
+                    }
+                }
+
+                // Serialise per member so concurrent tills cannot jointly breach the limit.
+                Member::withoutGlobalScopes()->whereKey($member->id)->lockForUpdate()->first();
+
+                $this->assertEligible($member, $location);
+
+                // Normalise every line to a stored grams_cg (computed for UNIT lines) BEFORE the
+                // limit check, so the daily/monthly ceiling arithmetic is fed the same figure it
+                // always was — ResolveMemberLimits itself is untouched.
+                $lines = $this->normalise($lines);
+
+                $totalGrams = array_sum(array_map(fn (array $line) => (int) $line['grams_cg'], $lines));
+                $snapshot = (new ResolveMemberLimits)->handle($member, $location, $options['at'] ?? null);
+                $this->assertWithinLimits($snapshot, $totalGrams, $member, $location, $options);
+
+                [$total, $lineData] = $this->buildLines($member, $lines, $location, $options);
+
+                // Price override (prompt 64): a permissioned, reasoned adjustment to what the member pays for
+                // the whole contribution — comping defective product, or a €0 give-away. It changes only the
+                // CHARGED total; limits/eligibility (already enforced above) are UNTOUCHED. The resolved figure
+                // is kept in original_total_cents so the override is reconstructable, attributed and reportable.
+                // Zero is valid and goes through the identical permission + reason + audit path.
+                $originalTotal = null;
+                $overrideReason = null;
+                $overrideBy = null;
+                if (($options['price_override_cents'] ?? null) !== null) {
+                    $overrideBy = $options['price_override_by'] ?? null;
+                    if (! ($overrideBy instanceof User) || ! $overrideBy->can('dispensation.price.override')) {
+                        throw new AuthorizationException('Overriding the dispensation price requires the dispensation.price.override permission.');
+                    }
+                    $overrideReason = trim((string) ($options['price_override_reason'] ?? ''));
+                    if ($overrideReason === '') {
+                        throw new RuntimeException('A price override requires a reason.');
+                    }
+                    $originalTotal = $total;
+                    $total = max(0, min((int) $options['price_override_cents'], $total)); // reduce only: 0 (free) .. resolved
+                }
+
+                $cash = $options['cash_cents'] ?? $total;
+                $wallet = $options['wallet_cents'] ?? 0;
+
+                $dispensation = Dispensation::create([
+                    'organisation_id' => $member->organisation_id,
+                    'member_id' => $member->id,
+                    'location_id' => $location->id,
+                    'operator_id' => $options['operator_id'] ?? Auth::id(),
+                    'till_session_id' => $options['till_session_id'] ?? null,
+                    'total_cents' => $total,
+                    'original_total_cents' => $originalTotal,
+                    'price_override_reason' => $overrideReason,
+                    'price_override_by' => $overrideBy?->id,
+                    'cash_cents' => $cash,
+                    'wallet_cents' => $wallet,
+                    'status' => DispensationStatus::COMPLETED,
+                    'reversal_of_id' => $options['reversal_of_id'] ?? null,
+                    'signature_path' => $options['signature_path'] ?? null,
+                    'idempotency_key' => $options['idempotency_key'] ?? null,
+                    'dispensed_at' => $options['at'] ?? now(),
+                ]);
+
+                foreach ($lineData as $line) {
+                    $dispensation->lines()->create($line);
+                }
+
+                // Audit the override — resolved vs overridden, reason, authoriser, operator, member (prompt 48
+                // placement: inside the txn, so a failed audit rolls the whole dispensation back).
+                if ($originalTotal !== null) {
+                    (new RecordAuditLog)->handle('dispensation.price.override', $member,
+                        ['total_cents' => $originalTotal],
+                        [
+                            'total_cents' => $total,
+                            'reason' => $overrideReason,
+                            'authorised_by' => $overrideBy->id, // non-null here: set together with $originalTotal
+                            'operator_id' => $options['operator_id'] ?? Auth::id(),
+                        ]);
+                }
+
+                if ($wallet > 0) {
+                    (new RecordWalletTransaction)->handle($member, $location, -$wallet, WalletTransactionType::CONTRIBUTION, [
+                        'source' => $dispensation,
+                        'operator_id' => $options['operator_id'] ?? Auth::id(),
+                        'till_session_id' => $options['till_session_id'] ?? null,
+                        'reason' => 'Aportación por dispensación',
+                        'allow_debt' => true, // debt policy on the wallet spend is enforced separately
+                    ]);
+                }
+
+                return $dispensation;
+            });
+        } catch (UniqueConstraintViolationException $e) {
+            // Re-read on the now-HEALTHY connection — the doomed transaction has already rolled back — and
+            // return the winner's row, so the caller cannot tell it lost (the whole point of an idempotency
+            // key). A row exists for this key ONLY when the violation WAS the idempotency collision; any other
+            // unique violation finds nothing here and rethrows as the real error it is.
+            if ($idempotencyKey !== null) {
+                $existing = Dispensation::withoutGlobalScopes()->where('idempotency_key', $idempotencyKey)->first();
                 if ($existing !== null) {
                     return $existing;
                 }
             }
 
-            // A dispensation may only attach to an OPEN till session.
-            $tillSessionId = $options['till_session_id'] ?? null;
-            if ($tillSessionId !== null) {
-                $till = TillSession::withoutGlobalScopes()->find($tillSessionId);
-                if ($till === null || $till->status !== TillSessionStatus::OPEN) {
-                    throw new TillClosedException('The dispensation must attach to an open till session.');
-                }
-            }
+            throw $e;
+        }
+    }
 
-            // Serialise per member so concurrent tills cannot jointly breach the limit.
-            Member::withoutGlobalScopes()->whereKey($member->id)->lockForUpdate()->first();
-
-            $this->assertEligible($member, $location);
-
-            // Normalise every line to a stored grams_cg (computed for UNIT lines) BEFORE the
-            // limit check, so the daily/monthly ceiling arithmetic is fed the same figure it
-            // always was — ResolveMemberLimits itself is untouched.
-            $lines = $this->normalise($lines);
-
-            $totalGrams = array_sum(array_map(fn (array $line) => (int) $line['grams_cg'], $lines));
-            $snapshot = (new ResolveMemberLimits)->handle($member, $location, $options['at'] ?? null);
-            $this->assertWithinLimits($snapshot, $totalGrams, $member, $location, $options);
-
-            [$total, $lineData] = $this->buildLines($member, $lines, $location, $options);
-
-            // Price override (prompt 64): a permissioned, reasoned adjustment to what the member pays for
-            // the whole contribution — comping defective product, or a €0 give-away. It changes only the
-            // CHARGED total; limits/eligibility (already enforced above) are UNTOUCHED. The resolved figure
-            // is kept in original_total_cents so the override is reconstructable, attributed and reportable.
-            // Zero is valid and goes through the identical permission + reason + audit path.
-            $originalTotal = null;
-            $overrideReason = null;
-            $overrideBy = null;
-            if (($options['price_override_cents'] ?? null) !== null) {
-                $overrideBy = $options['price_override_by'] ?? null;
-                if (! ($overrideBy instanceof User) || ! $overrideBy->can('dispensation.price.override')) {
-                    throw new AuthorizationException('Overriding the dispensation price requires the dispensation.price.override permission.');
-                }
-                $overrideReason = trim((string) ($options['price_override_reason'] ?? ''));
-                if ($overrideReason === '') {
-                    throw new RuntimeException('A price override requires a reason.');
-                }
-                $originalTotal = $total;
-                $total = max(0, min((int) $options['price_override_cents'], $total)); // reduce only: 0 (free) .. resolved
-            }
-
-            $cash = $options['cash_cents'] ?? $total;
-            $wallet = $options['wallet_cents'] ?? 0;
-
-            $dispensation = Dispensation::create([
-                'organisation_id' => $member->organisation_id,
-                'member_id' => $member->id,
-                'location_id' => $location->id,
-                'operator_id' => $options['operator_id'] ?? Auth::id(),
-                'till_session_id' => $options['till_session_id'] ?? null,
-                'total_cents' => $total,
-                'original_total_cents' => $originalTotal,
-                'price_override_reason' => $overrideReason,
-                'price_override_by' => $overrideBy?->id,
-                'cash_cents' => $cash,
-                'wallet_cents' => $wallet,
-                'status' => DispensationStatus::COMPLETED,
-                'reversal_of_id' => $options['reversal_of_id'] ?? null,
-                'signature_path' => $options['signature_path'] ?? null,
-                'idempotency_key' => $key,
-                'dispensed_at' => $options['at'] ?? now(),
-            ]);
-
-            foreach ($lineData as $line) {
-                $dispensation->lines()->create($line);
-            }
-
-            // Audit the override — resolved vs overridden, reason, authoriser, operator, member (prompt 48
-            // placement: inside the txn, so a failed audit rolls the whole dispensation back).
-            if ($originalTotal !== null) {
-                (new RecordAuditLog)->handle('dispensation.price.override', $member,
-                    ['total_cents' => $originalTotal],
-                    [
-                        'total_cents' => $total,
-                        'reason' => $overrideReason,
-                        'authorised_by' => $overrideBy->id, // non-null here: set together with $originalTotal
-                        'operator_id' => $options['operator_id'] ?? Auth::id(),
-                    ]);
-            }
-
-            if ($wallet > 0) {
-                (new RecordWalletTransaction)->handle($member, $location, -$wallet, WalletTransactionType::CONTRIBUTION, [
-                    'source' => $dispensation,
-                    'operator_id' => $options['operator_id'] ?? Auth::id(),
-                    'till_session_id' => $options['till_session_id'] ?? null,
-                    'reason' => 'Aportación por dispensación',
-                    'allow_debt' => true, // debt policy on the wallet spend is enforced separately
-                ]);
-            }
-
-            return $dispensation;
-        });
+    /**
+     * The idempotency FAST-PATH lookup (the pre-check only). Overridable so a test can force a pre-check MISS
+     * and drive the true-race path; the catch does its OWN inline re-read, so an override never masks it.
+     */
+    protected function findByIdempotencyKey(?string $key): ?Dispensation
+    {
+        return $key !== null ? Dispensation::withoutGlobalScopes()->where('idempotency_key', $key)->first() : null;
     }
 
     private function assertEligible(Member $member, Location $location): void

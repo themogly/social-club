@@ -4415,3 +4415,31 @@ bar panel in the tablet POS (no browser):
   the sede runs a bar; behaviour (add/remove/settle, both receipts, combined total) is Livewire-tested green.
 
 `composer check` green (888 tests, 885 passed, 3 pre-existing skips, PHPStan 0). EN/ES parity gated.
+
+## Prompt 123 — The idempotency guarantee is the unique index; the race loser returns the winner
+
+Two genuinely concurrent commits of one basket charged the member once and moved exactly the right stock (the
+defence in depth working) — but the request that LOST the race died with a raw
+`UniqueConstraintViolationException` on the one screen where an operator must know whether a sale went through,
+and their natural response was to try again.
+
+`CommitDispensation` and `CommitOrder` now catch that violation and do what the pre-check would have: re-read the
+row for the key and return it, so the caller cannot tell it won or lost (the whole point of an idempotency key).
+
+- **The guarantee is the UNIQUE INDEX** on `idempotency_key`; the check-then-insert pre-check is only a fast path
+  for the common non-concurrent retry (unchanged). Under true concurrency both requests miss the pre-check and
+  both insert; the index refuses the second, and the catch turns that refusal into the return path.
+- **Transaction boundary:** the catch wraps the `DB::transaction(...)` call, so the re-read runs on the now-HEALTHY
+  connection AFTER the doomed transaction has rolled back — never inside it.
+- **Scoped to the idempotency key, no driver string-matching:** Laravel raises the typed
+  `UniqueConstraintViolationException`; the catch re-reads BY KEY and returns only if a row exists. A violation on
+  any OTHER constraint finds no row for this key and rethrows as the real error it is.
+- **Nothing written changed** — the data behaviour is byte-identical; this only changes the losing request's
+  OUTCOME. The pre-check was extracted into an overridable `findByIdempotencyKey()` (fast path only; the catch
+  keeps its own inline re-read) so the race is exercised DETERMINISTICALLY: a test forces a pre-check miss against
+  a real pre-committed winner, on `:memory:`, without needing OS-level parallelism.
+
+Tests (`IdempotencyRaceTest`): the unique index exists on both tables; a sequential retry returns the original and
+moves stock once (pre-check path); a race-loser returns the winner without throwing and rolls its own stock move
+back (catch path) — for both a dispensation and an order. `composer check` green (892 tests, 889 passed, 3
+pre-existing skips, PHPStan 0). No user-facing copy (the fix is silent by design).
