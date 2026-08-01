@@ -152,6 +152,7 @@ class FormCompletenessTest extends TestCase
             'quorum_present' => 'system-computed from attendees at the meeting date.',
             'quorum_required' => 'system-computed from active members at the meeting date.',
             'signed_at' => 'system: set by the SignMinute action (immutable thereafter).',
+            'signed_by' => 'system: the signatory, set to the acting user by the SignMinute action (never user-entered; immutable thereafter).',
         ],
         PurchaseResource::class => [
             'amount_cents' => 'entered as euros via amount_eur.',

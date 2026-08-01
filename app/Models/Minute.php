@@ -20,7 +20,7 @@ class Minute extends Model
     protected $fillable = [
         'organisation_id', 'book', 'number', 'type', 'held_on', 'location_id',
         'agenda', 'resolutions', 'attendees', 'quorum_present', 'quorum_required',
-        'body', 'signed_at', 'supersedes_id',
+        'body', 'signed_at', 'signed_by', 'supersedes_id',
     ];
 
     protected function casts(): array
@@ -59,6 +59,17 @@ class Minute extends Model
     public function location(): BelongsTo
     {
         return $this->belongsTo(Location::class);
+    }
+
+    /**
+     * The user who signed (closed) this acta. Null for actas signed before signatories were recorded,
+     * or whose signatory's account was later deleted — reported honestly as "no consta", never invented.
+     *
+     * @return BelongsTo<User, $this>
+     */
+    public function signedBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'signed_by');
     }
 
     /** @return BelongsTo<Minute, $this> */

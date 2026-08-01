@@ -6,6 +6,7 @@ use App\Enums\MinuteBook;
 use App\Filament\Resources\Minutes\MinuteResource;
 use App\Models\Member;
 use App\Models\Minute;
+use App\Models\User;
 use Filament\Infolists\Components\TextEntry;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Schema;
@@ -39,6 +40,11 @@ class MinuteInfolist
                             ->badge()
                             ->state(fn (Minute $record): string => $record->signed_at === null ? __('Borrador') : __('Firmada'))
                             ->color(fn (Minute $record): string => $record->signed_at === null ? 'warning' : 'success'),
+                        TextEntry::make('signatory')
+                            ->label(__('Firmante'))
+                            ->state(fn (Minute $record): string => self::signatory($record))
+                            // Only meaningful once signed; hidden on drafts.
+                            ->visible(fn (Minute $record): bool => $record->signed_at !== null),
                     ])
                     ->columns(2),
 
@@ -82,6 +88,23 @@ class MinuteInfolist
                             ->placeholder(__('Sin contenido')),
                     ]),
             ]);
+    }
+
+    /**
+     * The signatory's name for a signed acta. Honest when unrecorded: an acta signed before signatories
+     * were tracked (or whose signer's account was deleted) shows "no consta", never a fabricated name.
+     */
+    private static function signatory(Minute $record): string
+    {
+        if ($record->signed_at === null) {
+            return '—';
+        }
+
+        // Not through the magic relation: the FK is nullable (historical/deleted signer), and it must
+        // report "no consta" honestly rather than fabricate a name. value() models that null cleanly.
+        $name = User::query()->whereKey($record->signed_by)->value('name');
+
+        return is_string($name) ? $name : __('No consta');
     }
 
     /** @return list<string> */
