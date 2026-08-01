@@ -34,7 +34,7 @@ class ZReport
             'opened_at' => $session->opened_at,
             'closed_at' => $session->closed_at,
             'operator' => $session->openedBy?->name,
-            'status' => $session->status->value,
+            'status' => $session->status->label(), // localized label, never the raw enum (prompt 94)
         ]);
     }
 }

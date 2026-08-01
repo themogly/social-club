@@ -997,7 +997,9 @@ class DispensaryPos extends Component
                 'grams_per_unit_cg' => (int) $genetic->grams_per_unit_cg,
                 'thc_bp' => (int) $genetic->thc_bp,
                 'cbd_bp' => (int) $genetic->cbd_bp,
-                'cultivation' => $genetic->cultivation_type?->value,
+                // Pre-labelled like product_type_label / strain_type_label — never the raw enum value, which
+                // the blade would have printed as INDOOR/OUTDOOR in both languages (prompt 94).
+                'cultivation' => $genetic->cultivation_type?->label(),
                 'category_id' => $genetic->category_id,
                 'category_name' => $genetic->category?->name,
                 'rate_cents' => $price->ratePerGramCents,

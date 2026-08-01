@@ -3340,3 +3340,47 @@ are each flagged (and complete ones are not); a location without prices is flagg
 onward (redirect to its page) and skipping leaves it visibly incomplete. **Screenshots** (incomplete genetic,
 the guided path, the strain then at the POS — both languages) not produced — no browser here. Owner-authorised
 merge (standing "merge everything to main"). 733 green (730 passed, 3 concurrency skips).
+
+---
+
+## Prompt 94 — Spanish localisation fixes (Contador→Mostrador; raw-enum leaks; the guard)
+
+**Term chosen for the counter: `Mostrador`.** The counter layout subtitle was the key `'Contador'` → es
+`Contador`, which in Spanish means *accountant* (or an electricity *meter*) — a Spanish staff member opened
+the POS labelled "Accountant". Renamed the key to **`Mostrador`** (the literal, correct word for a service
+counter), updated both call sites (the counter layout `<title>` and the shared top-bar `<h1>`), and removed
+the old `Contador` key from both lang files. A test asserts the new term renders in es/en and that
+`__('Contador')` appears nowhere in the app.
+
+**Three raw backed-enum values were reaching humans in BOTH languages** — every enum here implements
+`HasLabel` with a proper `label()`, and these call sites bypassed it (CLAUDE.md forbids rendering a raw enum):
+- `DispensaryPos` genetic cards passed `cultivation_type?->value` (INDOOR/OUTDOOR/GREENHOUSE), then the blade
+  wrapped it in `__()` which silently returned its input — now passes `->label()`, rendered verbatim like its
+  neighbours `product_type_label` / `strain_type_label`.
+- `MembersRegister` (the **libro de socios** — a statutory register) emitted `status->value`, printing
+  ACTIVE/SUSPENDED in English on screen, in the **CSV** and in the **PDF that leaves the building** — now
+  `status->label()` (Activo/Suspendido).
+- `ZReport` (till Z-report) emitted `status->value` — now `status->label()`.
+
+**A permanent guard, in the localization suite.** `RawEnumRenderTest` (5) pins each fix — the libro de socios
+label in es AND en (asserted on the register data AND the rendered PDF, the artefact that leaves the
+building); the cultivation label; the Mostrador rename — and, crucially, asserts the DISCRIMINATION the prompt
+demanded: the display producers (`MembersRegister`, `ZReport`) use `->label()` and NOT `->value`, while the
+**Article 20 portability export** (`ExportMemberData`) legitimately KEEPS `->status->value` (machine-readable
+is correct there). So the guard fires on a display leak but never on the legitimate machine-readable / audit /
+comparison uses.
+
+**Seed English-in-es (decided: documented, no change).** The demo seed is already locale-aware (prompt 70): a
+Spanish-locale seed produces Spanish reference data (verified by `DemoSeedProfileTest`). Premium/Standard and
+"Central Branch" appear only when the seed is run under `en`; that is correct behaviour for real club-entered
+data (it does not translate), and the demo simply reflects the locale it is seeded under. No code change.
+
+**Native-read follow-up (flagged, not in scope here):** `TillSessionsTable`'s status *filter* builds its
+option labels from `$case->value` (renders OPEN/CLOSED raw in the filter dropdown) — a fourth instance of the
+same class, in a filter rather than a record. Left for a focused follow-up so this branch stays the three
+named human-facing renders + the guard.
+
+**Tests:** `RawEnumRenderTest` (5). Prompt-19 EN/ES parity still green (the `Contador` key removed from both
+files together, `Mostrador` added to both). No behaviour change — presentation only. **Screenshots** (the POS
+in both languages with the corrected subtitle and cultivation badges) not produced — no browser here.
+Owner-authorised merge (standing "merge everything to main"). 738 green (735 passed, 3 concurrency skips).

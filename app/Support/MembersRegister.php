@@ -30,7 +30,7 @@ class MembersRegister
                 'documento' => $m->document_number, // decrypted at the register edge (permissioned)
                 'alta' => $m->joined_at?->toDateString(),
                 'baja' => $m->left_at?->toDateString(),
-                'estado' => $m->status->value,
+                'estado' => $m->status->label(), // libro de socios — the localized label, never the raw enum (prompt 94)
                 'sede' => $m->memberships->first()?->location->name ?? '—',
             ])->all();
     }
