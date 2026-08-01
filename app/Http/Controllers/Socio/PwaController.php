@@ -13,8 +13,11 @@ use App\Models\Member;
 use App\Models\Scopes\LocationScope;
 use App\Models\Scopes\OrganisationScope;
 use App\Support\Qr;
+use App\Support\Settings;
 use App\Support\Wallet;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\View\View;
 
@@ -107,6 +110,24 @@ class PwaController extends Controller
             'wallet' => $member->walletTransactions()->withoutGlobalScopes()->latest()->limit(50)->get(),
             'visits' => $member->checkIns()->withoutGlobalScopes()->latest('checked_in_at')->limit(50)->get(),
         ]);
+    }
+
+    /**
+     * The member's own language switch (prompt 96). Reuses the admin switcher's pattern: persist the choice
+     * to the member's row (follows them across devices) AND drop a session override so SetLocale applies it
+     * on the very next request — no re-login. Only an enabled locale is honoured; anything else is ignored.
+     */
+    public function switchLocale(Request $request): RedirectResponse
+    {
+        $locale = (string) $request->input('locale');
+        $enabled = Settings::get('enabled_locales', ['es', 'en']);
+
+        if (is_array($enabled) && in_array($locale, $enabled, true)) {
+            $this->member()->forceFill(['locale' => $locale])->save();
+            $request->session()->put('locale', $locale);
+        }
+
+        return back();
     }
 
     /** The member's own RGPD data export (their data only). */

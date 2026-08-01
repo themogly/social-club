@@ -42,10 +42,11 @@ class LocalizationTest extends TestCase
         $this->assertSame([], $missingEs, 'Missing Spanish keys: '.implode(' | ', array_slice($missingEs, 0, 15)));
     }
 
-    public function test_a_fresh_install_resolves_to_english(): void
+    public function test_a_fresh_install_resolves_to_spanish(): void
     {
-        // No user, no org override → system default en.
-        $this->assertSame('en', (new ResolveLocale)->handle(null));
+        // Prompt 96: the shipped organisation default is now SPANISH (a Spanish product for Spanish clubs),
+        // so no subject + no org override resolves to es, not en. English stays the ultimate fallback.
+        $this->assertSame('es', (new ResolveLocale)->handle(null));
     }
 
     public function test_resolution_order_user_beats_org_beats_system(): void
@@ -53,20 +54,20 @@ class LocalizationTest extends TestCase
         $org = Organisation::factory()->create();
         app(ActiveScope::class)->setOrganisation($org->id);
 
-        // System default (no org override configured beyond the 'en' default).
-        $this->assertSame('en', (new ResolveLocale)->handle(null));
-
-        // Org default beats system (Settings scope to the active organisation).
-        Settings::set('default_locale', 'es');
+        // Shipped default (no org override configured) is now Spanish (prompt 96).
         $this->assertSame('es', (new ResolveLocale)->handle(null));
 
-        // Explicit per-user preference beats the org default.
-        $user = User::factory()->create(['locale' => 'en']);
-        $this->assertSame('en', (new ResolveLocale)->handle($user));
+        // An org override beats the shipped default (Settings scope to the active organisation).
+        Settings::set('default_locale', 'en');
+        $this->assertSame('en', (new ResolveLocale)->handle(null));
 
-        // A user with no preference falls through to the org default.
+        // Explicit per-subject preference beats the org default.
+        $user = User::factory()->create(['locale' => 'es']);
+        $this->assertSame('es', (new ResolveLocale)->handle($user));
+
+        // A subject with no preference falls through to the org default.
         $noPref = User::factory()->create(['locale' => null]);
-        $this->assertSame('es', (new ResolveLocale)->handle($noPref));
+        $this->assertSame('en', (new ResolveLocale)->handle($noPref));
     }
 
     public function test_the_switcher_persists_the_users_locale_immediately(): void

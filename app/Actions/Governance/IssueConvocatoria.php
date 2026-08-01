@@ -3,6 +3,7 @@
 namespace App\Actions\Governance;
 
 use App\Actions\RecordAuditLog;
+use App\Actions\ResolveLocale;
 use App\Enums\ConvocatoriaRecipientStatus;
 use App\Mail\ConvocatoriaMail;
 use App\Models\Convocatoria;
@@ -51,6 +52,11 @@ class IssueConvocatoria
         $members = $this->rollAsAtNow($convocatoria);
         $fractionBp = (int) Settings::get('minute_quorum_fraction_bp', 5000);
 
+        // Resolve each member's language NOW (in-request, org scope set) — the convocatoria is a statutory
+        // notice; a Spanish member must not receive it in English because a queued worker had no locale
+        // (prompt 96). Pinned onto each queued message below.
+        $localeByMember = $members->mapWithKeys(fn (Member $m): array => [$m->id => (new ResolveLocale)->handle($m)]);
+
         $recipients = DB::transaction(function () use ($convocatoria, $actor, $members, $noticeDays, $fractionBp): array {
             $rows = [];
             foreach ($members as $member) {
@@ -84,7 +90,8 @@ class IssueConvocatoria
             if ($recipient->email === null) {
                 continue;
             }
-            Mail::to($recipient->email)->queue(ConvocatoriaMail::fromConvocatoria($convocatoria, $recipient->name));
+            $locale = $localeByMember->get($recipient->member_id) ?? (new ResolveLocale)->handle();
+            Mail::to($recipient->email)->locale($locale)->queue(ConvocatoriaMail::fromConvocatoria($convocatoria, $recipient->name));
             $notified++;
         }
 

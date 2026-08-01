@@ -3,10 +3,11 @@
 namespace App\Http\Middleware;
 
 use App\Actions\ResolveLocale;
-use App\Models\User;
 use App\Support\Settings;
 use Closure;
+use Illuminate\Contracts\Translation\HasLocalePreference;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Symfony\Component\HttpFoundation\Response;
 
 /**
@@ -21,8 +22,15 @@ class SetLocale
 {
     public function handle(Request $request, Closure $next): Response
     {
-        $user = $request->user();
-        $locale = (new ResolveLocale)->handle($user instanceof User ? $user : null);
+        // The subject is whoever is authenticated on the ACTIVE guard — a User in the admin panel, or a
+        // Member on the socio routes (guard `member`, whose provider is NOT Users). The old code only
+        // looked at the default guard, so a member's preference was skipped entirely (prompt 96).
+        $subject = $request->user();
+        if (! $subject instanceof HasLocalePreference) {
+            $member = Auth::guard('member')->user();
+            $subject = $member instanceof HasLocalePreference ? $member : null;
+        }
+        $locale = (new ResolveLocale)->handle($subject);
 
         $session = $request->session()->get('locale');
         $enabled = Settings::get('enabled_locales', ['en', 'es']);

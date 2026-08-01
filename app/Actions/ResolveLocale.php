@@ -2,27 +2,29 @@
 
 namespace App\Actions;
 
-use App\Models\User;
 use App\Support\Settings;
+use Illuminate\Contracts\Translation\HasLocalePreference;
 
 /**
  * THE single place the UI language is decided (same shape as ResolveMemberLimits /
  * ResolvePrice — one named home, never duplicated or hardcoded). Resolution order:
  *
- *   explicit per-user preference → organisation default → system default (en)
+ *   explicit per-subject preference → organisation default → system default (en)
  *
- * Only an ENABLED locale is honoured; anything else falls through to the next level,
- * so a stale or unknown value degrades gracefully to English rather than throwing.
- * Read through Settings::get (safe fallback), never a raw property access.
+ * The subject is anything with a language preference — a `User` (admin panel) or a `Member` (PWA), both
+ * via the `HasLocalePreference` contract (prompt 96), so there is ONE resolver for both, not a member
+ * fork. Only an ENABLED locale is honoured; anything else falls through to the next level, so a stale or
+ * unknown value degrades gracefully rather than throwing. Read through Settings::get (safe fallback),
+ * never a raw property access — so a queued job (no HTTP, no session) resolves safely too.
  */
 class ResolveLocale
 {
-    public function handle(?User $user = null): string
+    public function handle(?HasLocalePreference $subject = null): string
     {
         $enabled = $this->enabled();
         $system = 'en';
 
-        foreach ([$user?->locale, Settings::get('default_locale', $system), config('app.locale')] as $candidate) {
+        foreach ([$subject?->preferredLocale(), Settings::get('default_locale', $system), config('app.locale')] as $candidate) {
             if (is_string($candidate) && in_array($candidate, $enabled, true)) {
                 return $candidate;
             }

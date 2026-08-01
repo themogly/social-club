@@ -86,6 +86,8 @@ class DashboardScreenTest extends TestCase
         $vm = $this->scopedFor($manager, Period::today());
         $this->assertSame(3500, $vm->contributionsCents());
 
+        // The page renders in the shipped org default (es — prompt 96), so format the expected figure there.
+        app()->setLocale('es');
         $formatted = Money::fromCents($vm->contributionsCents())->formatted();
         $this->visit($manager, $this->location->id)->assertOk()->assertSee($formatted);
     }
@@ -165,6 +167,7 @@ class DashboardScreenTest extends TestCase
 
         $manager = $this->user(Role::MANAGER);
 
+        app()->setLocale('es'); // the page renders in the shipped org default (es — prompt 96)
         $message = trans_choice(':count caja abierta sin arquear|:count cajas abiertas sin arquear', 1, ['count' => 1]);
         $this->visit($manager, $this->location->id)->assertOk()->assertSee($message);
     }
