@@ -2789,3 +2789,60 @@ full sequential suite proving no single-writer behaviour changed, and the determ
 start in this environment (noted repeatedly in this file). This is flagged as an outstanding verification step:
 a green SQLite run is explicitly NOT evidence for these fixes, so a human/CI MySQL run + the external parallel
 harness is still owed. Owner-authorised merge (standing "merge everything to main"). 637 green (3 skipped).
+
+---
+
+## Prompt 76 — erasure left health data behind, the audit log undid it, and the RAT no longer matched
+
+Three findings, one failure: the RGPD tooling was built for the data that existed at the time and nothing
+updated it as the schema grew. **Written for whoever answers the next subject-access request.**
+
+### 1. Erasure now actually erases
+`AnonymiseMember` deleted only `photo_path` + `document_scan_path`. It now:
+- Deletes EVERY member-linked file from the private disk: photo, ID scan, **medical certificate** (Art. 9
+  health document), and every generated-document PDF.
+- Clears `medical_cert_path` and **`is_therapeutic`** (the health flag is itself special-category data).
+- Enumerates member-linked tables in `COVERED_MEMBER_TABLES` (14 tables), each with a reason. A guard test
+  reads the schema for every `member_id` table and fails if one is undocumented — so a new table (refunds,
+  orders and sanctions were all added after the original build) can't silently reopen the gap. All except
+  `member_documents` hold only a `member_id` reference + non-identity operational fields, so scrubbing the
+  member row erases the person from them.
+
+**Retention vs redaction — the substantive Art. 17(3) decision, per document type:**
+- **DECLARATION (consumo) + REGISTRATION_FORM (libro de socios): RETAINED as REDACTED metadata.** These may
+  carry a legal-retention obligation (the club must be able to evidence that a member and their declaration
+  existed). So the ROW survives with the name + DNI redacted out of its snapshot (`nombre`/`documento` →
+  `[borrado]`), the non-identifying figure/version/date kept, and the **identifying PDF deleted** (its `path`
+  nulled — the column was made nullable for exactly this). Nothing that IDENTIFIES the member survives; the
+  minimal proof-of-existence does.
+- **Every other generated document (CONSENT, ID, MEDICAL, SANCTION_ACT, OTHER): DESTROYED** — row + file.
+- Rationale: resolves the erasure right against the retention obligation without deleting everything (which
+  would breach retention) or keeping everything (which would breach erasure). Asserted against ACTUAL stored
+  content: after erasure no surviving snapshot contains the name or DNI.
+
+### 2. The audit log no longer undoes erasure
+The audit diff excluded only credentials, so `member.updated` rows held `is_therapeutic` (health) and
+`document_hash` — an **unsalted SHA-256 of the DNI**, a lookup table from the original — and the audit log's
+retention is deliberately LONGER than member data. Two-part fix:
+- **PREVENT (going forward):** `is_therapeutic` + `document_hash` added to `AuditsResourceChanges`'s sensitive
+  list, so new diffs never capture them. And `member.anonymised` now records only the LIST of cleared fields,
+  never their values.
+- **REDACT (existing):** `RedactMemberAuditLogs`, invoked by erasure, masks those values (plus any direct PII)
+  out of the member's existing `before`/`after` payloads in place. It is NOT a hole in the append-only log: a
+  narrow, explicit bypass (`AuditLog::$redacting`) permits ONLY masking `before`/`after` — the entry's actor,
+  action, subject, date and IP are frozen (enforced by the `updating` guard), nothing is deleted, and the
+  redaction itself is audited (`member.audit.redacted`). Outside a redaction the log is still append-only
+  (tested). `document_number` itself was already correctly encrypted — the fix is the unsalted INDEX.
+
+### 3. The RAT now describes reality, anchored to the schema
+- **RAT-03** (ID docs) now includes the **medical certificate store** and is flagged **`article_9 => true`**
+  (was false — it processes health data).
+- **RAT-06** (communications) now declares the **browser push services (Google/Mozilla/Apple/Microsoft) as
+  processors and the transfer OUTSIDE the EEA** (subscription endpoint + payload) — Web Push is live via
+  `MemberPushNotification` and this transfer was undeclared anywhere.
+- **Anti-drift:** the erasure guard test derives its coverage from the live `member_id` schema, and the RAT
+  test anchors the Art. 9 declaration to columns that genuinely exist (`is_therapeutic`, `medical_cert_path`)
+  — so a schema change that removes the grounding fails the test rather than ageing silently.
+
+Nothing here weakens the at-rest encryption or the signed-URL / document-access-log path (the audit found
+those sound). Owner-authorised merge (standing "merge everything to main"). 643 green (3 concurrency skips).

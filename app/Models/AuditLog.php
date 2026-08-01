@@ -33,10 +33,26 @@ class AuditLog extends Model
         ];
     }
 
+    /**
+     * The ONLY sanctioned reason to touch an existing audit row: a RGPD-Art.17 REDACTION that masks
+     * special-category values out of a `before`/`after` payload (prompt 76). It is not a general edit path —
+     * only the payloads may change, the entry's identity (actor, action, subject, date, IP) is frozen — and
+     * it is itself audited. Set only inside App\Actions\Members\RedactMemberAuditLogs::withRedaction().
+     */
+    public static bool $redacting = false;
+
     protected static function booted(): void
     {
-        static::updating(function (): void {
-            throw new RuntimeException('The audit log is append-only and cannot be updated.');
+        static::updating(function (AuditLog $log): void {
+            if (! self::$redacting) {
+                throw new RuntimeException('The audit log is append-only and cannot be updated.');
+            }
+
+            // During a redaction ONLY the before/after payloads may be masked — never the entry's identity.
+            $frozen = array_diff(array_keys($log->getDirty()), ['before', 'after']);
+            if ($frozen !== []) {
+                throw new RuntimeException('A redaction may only mask before/after, not: '.implode(', ', $frozen));
+            }
         });
 
         static::deleting(function (): void {
