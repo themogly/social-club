@@ -38,8 +38,14 @@ class SubmitApplicationRequest extends FormRequest
             'document_number' => ['required', 'string', 'max:64'],
             'is_therapeutic' => ['sometimes', 'boolean'],
             'declared_monthly_g' => ['nullable', 'numeric', 'min:0', 'max:1000'],
-            'avalador_member_no' => ['nullable', 'string', 'max:64'],
-            'consent' => ['accepted'],
+            // Sponsor by NAME or number (prompt 97): a prospect knows the person, not their member number.
+            // Never required at the form — the avalador_policy is enforced (and waived) at approval, so an
+            // applicant who cannot supply one is not silently blocked here.
+            'avalador_ref' => ['nullable', 'string', 'max:255'],
+            // Two SEPARATE consents (prompt 97): data processing and the statutes are different agreements,
+            // and two ticks are stronger evidence than one bundled box. Both are required.
+            'consent_data' => ['accepted'],
+            'consent_statutes' => ['accepted'],
         ];
     }
 
@@ -67,7 +73,8 @@ class SubmitApplicationRequest extends FormRequest
             'date_of_birth' => __('fecha de nacimiento'),
             'document_type' => __('tipo de documento'),
             'document_number' => __('número de documento'),
-            'consent' => __('consentimiento'),
+            'consent_data' => __('consentimiento de tratamiento de datos'),
+            'consent_statutes' => __('aceptación de los estatutos'),
         ];
     }
 }

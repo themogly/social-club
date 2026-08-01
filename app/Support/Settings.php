@@ -109,7 +109,13 @@ class Settings
         'audit_retention_days' => 3650,     // MINIMUM retention only — the audit log is append-only and
         // never auto-purged (the model refuses deletes). Prompt 58.
         'signed_url_ttl_seconds' => 300,    // 5 minutes
+        // Consent (prompt 97): the version stamped on every consent record, AND the two texts it refers to —
+        // shown to the applicant so the consent is INFORMED. Whoever revises a text bumps the version; the
+        // version stamped at capture is the one the applicant actually saw. Plain text, displayed inline
+        // (there is no public page to link to — NOTES §A).
         'consent_text_version' => '1.0',
+        'consent_privacy_text' => 'Tratamos tus datos personales para gestionar tu condición de socio/a (alta, cuota, control de acceso y dispensación) conforme al RGPD. El consumo de cannabis y el uso terapéutico son datos de categoría especial (art. 9 RGPD) y reciben protección reforzada. No cedemos tus datos a terceros salvo obligación legal. Puedes ejercer tus derechos de acceso, rectificación y supresión desde tu área de socio/a.',
+        'consent_statutes_text' => 'Solicitar el alta implica aceptar los estatutos de la asociación: es una asociación privada sin ánimo de lucro de consumidores de cannabis, no un comercio; el cannabis se dispensa a coste como aportación al consumo compartido entre socios, nunca como venta. La asociación opera bajo tolerancia judicial, no autorización. Pide una copia íntegra de los estatutos a la asociación.',
         // Brute-force guard on QR-card scans (failed scans per minute, per operator). Prompt 58.
         'qr_scan_max_failures_per_minute' => 10,
 

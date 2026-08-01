@@ -63,6 +63,10 @@
                 <div>
                     <label class="mb-1 block text-sm font-medium" for="date_of_birth">{{ __('Fecha de nacimiento') }}</label>
                     <input id="date_of_birth" name="date_of_birth" type="date" required value="{{ old('date_of_birth', data_get($payload, 'date_of_birth')) }}" class="{{ $input }}">
+                    {{-- Explicit format hint (prompt 97): the native picker's displayed order follows the
+                         document language, but the submitted value is always ISO — the hint removes any doubt
+                         about which number is the day, since DOB drives the minimum-age check. --}}
+                    <p class="mt-1 text-xs text-ink-muted dark:text-slate-500">{{ __('Formato: día / mes / año') }}</p>
                 </div>
 
                 <div class="grid grid-cols-2 gap-3">
@@ -85,15 +89,26 @@
                     <input id="address" name="address" type="text" value="{{ old('address', data_get($payload, 'address')) }}" class="{{ $input }}">
                 </div>
 
-                <div class="grid grid-cols-2 gap-3">
-                    <div>
-                        <label class="mb-1 block text-sm font-medium" for="declared_monthly_g">{{ __('Consumo mensual (g)') }}</label>
-                        <input id="declared_monthly_g" name="declared_monthly_g" type="number" step="0.01" min="0" value="{{ old('declared_monthly_g', $declaredG) }}" class="{{ $input }}">
-                    </div>
-                    <div>
-                        <label class="mb-1 block text-sm font-medium" for="avalador_member_no">{{ __('Nº socio/a avalador/a') }}</label>
-                        <input id="avalador_member_no" name="avalador_member_no" type="text" value="{{ old('avalador_member_no') }}" class="{{ $input }}">
-                    </div>
+                {{-- Consumo: a GUIDED choice from the club's forecast presets (prompt 97), not a free number
+                     an applicant has no basis for — it becomes the figure on their signed declaration. --}}
+                @php($forecastOptions = array_values(array_filter((array) \App\Support\Settings::get('forecast_options_g', [30, 50, 60, 90]), 'is_numeric')))
+                <div>
+                    <label class="mb-1 block text-sm font-medium" for="declared_monthly_g">{{ __('Consumo mensual estimado') }}</label>
+                    <select id="declared_monthly_g" name="declared_monthly_g" class="{{ $input }}">
+                        <option value="">{{ __('Prefiero no indicarlo ahora') }}</option>
+                        @foreach ($forecastOptions as $opt)
+                            <option value="{{ $opt }}" @selected((string) old('declared_monthly_g', $declaredG !== null ? (int) $declaredG : '') === (string) $opt)>{{ __(':n g al mes', ['n' => $opt]) }}</option>
+                        @endforeach
+                    </select>
+                    <p class="mt-1 text-xs text-ink-muted dark:text-slate-500">{{ __('Una estimación orientativa. Podrás ajustarla con la asociación.') }}</p>
+                </div>
+
+                {{-- Avalador: a NAME or a number (prompt 97) — a prospect knows the person, not the number,
+                     and this is never a hard block; the association confirms the aval at review. --}}
+                <div>
+                    <label class="mb-1 block text-sm font-medium" for="avalador_ref">{{ __('Tu avalador/a (nombre o nº de socio/a)') }}</label>
+                    <input id="avalador_ref" name="avalador_ref" type="text" value="{{ old('avalador_ref', data_get($payload, 'avalador_ref')) }}" class="{{ $input }}">
+                    <p class="mt-1 text-xs text-ink-muted dark:text-slate-500">{{ __('El socio/a que te presenta. Si no lo sabes, déjalo en blanco y la asociación te orientará.') }}</p>
                 </div>
 
                 <label class="flex items-start gap-2 rounded-lg bg-surface-alt p-3 text-sm dark:bg-slate-950">
@@ -101,10 +116,40 @@
                     <span class="text-ink-muted dark:text-slate-300">{{ __('Uso terapéutico (podré aportar certificado médico)') }}</span>
                 </label>
 
-                <label class="flex items-start gap-2 rounded-lg bg-surface-alt p-3 text-sm dark:bg-slate-950">
-                    <input type="checkbox" name="consent" value="1" required @checked(old('consent')) class="mt-0.5 h-5 w-5 rounded border-line text-brand dark:border-slate-600 dark:bg-slate-900">
-                    <span class="text-ink-muted dark:text-slate-300">{{ __('He leído y acepto el tratamiento de mis datos y los estatutos de la asociación.') }}</span>
-                </label>
+                {{-- Informed consent (prompt 97): the two texts the applicant is agreeing to are SHOWN here,
+                     tagged with the exact version stamped on their consent record. Two SEPARATE ticks — data
+                     processing and the statutes are different agreements. --}}
+                @php($consentVersion = (string) \App\Support\Settings::get('consent_text_version', '1.0'))
+                <div class="space-y-3 rounded-lg border border-line bg-surface-alt p-3 text-sm dark:border-slate-700 dark:bg-slate-950">
+                    <p class="text-xs text-ink-muted dark:text-slate-500">{{ __('Textos legales · versión :v', ['v' => $consentVersion]) }}</p>
+
+                    <div>
+                        <details class="mb-2" data-consent-privacy>
+                            <summary class="cursor-pointer font-medium">{{ __('Información sobre el tratamiento de tus datos') }}</summary>
+                            <p class="mt-2 whitespace-pre-line text-ink-muted dark:text-slate-400">{{ \App\Support\Settings::get('consent_privacy_text', '') }}</p>
+                        </details>
+                        <label class="flex items-start gap-2">
+                            <input type="checkbox" name="consent_data" value="1" required @checked(old('consent_data')) class="mt-0.5 h-5 w-5 rounded border-line text-brand dark:border-slate-600 dark:bg-slate-900">
+                            <span class="text-ink-muted dark:text-slate-300">{{ __('He leído y acepto el tratamiento de mis datos.') }}</span>
+                        </label>
+                    </div>
+
+                    <div>
+                        <details class="mb-2" data-consent-statutes>
+                            <summary class="cursor-pointer font-medium">{{ __('Estatutos de la asociación') }}</summary>
+                            <p class="mt-2 whitespace-pre-line text-ink-muted dark:text-slate-400">{{ \App\Support\Settings::get('consent_statutes_text', '') }}</p>
+                        </details>
+                        <label class="flex items-start gap-2">
+                            <input type="checkbox" name="consent_statutes" value="1" required @checked(old('consent_statutes')) class="mt-0.5 h-5 w-5 rounded border-line text-brand dark:border-slate-600 dark:bg-slate-900">
+                            <span class="text-ink-muted dark:text-slate-300">{{ __('He leído y acepto los estatutos de la asociación.') }}</span>
+                        </label>
+                    </div>
+                </div>
+
+                {{-- What happens next (prompt 97): set the expectation before they submit. --}}
+                <p class="rounded-lg bg-brand-tint/60 p-3 text-xs text-ink-muted dark:bg-slate-800/60 dark:text-slate-400">
+                    {{ __('Qué ocurre después: la asociación revisará tu solicitud. Si se aprueba, recibirás por correo tu tarjeta de socio/a con un código QR para identificarte en la sede. La revisión puede tardar unos días.') }}
+                </p>
 
                 <x-button type="submit" size="md" class="w-full">{{ __('Enviar solicitud') }}</x-button>
             </form>

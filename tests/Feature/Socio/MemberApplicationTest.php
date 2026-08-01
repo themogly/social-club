@@ -77,7 +77,8 @@ class MemberApplicationTest extends TestCase
             'document_type' => 'DNI',
             'document_number' => '12345678Z',
             'declared_monthly_g' => '30',
-            'consent' => '1',
+            'consent_data' => '1',
+            'consent_statutes' => '1',
             ApplicationSpamGuard::HONEYPOT => '',
             ApplicationSpamGuard::TIMESTAMP => $this->agedToken(ApplicationSpamGuard::MIN_SECONDS + 2),
         ], $overrides);
@@ -154,7 +155,7 @@ class MemberApplicationTest extends TestCase
             'first_name' => 'Joven',
             'last_name' => 'Persona',
             'email' => 'joven@example.es',
-            'date_of_birth' => now()->subYears(16)->format('Y-m-d'),
+            'date_of_birth' => now()->subYears(16)->format('Y-m-d'), 'consent_data' => '1', 'consent_statutes' => '1',
             'document_type' => 'DNI',
             'document_number' => '00000000A',
             'consent' => '1',

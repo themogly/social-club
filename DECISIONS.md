@@ -3483,3 +3483,54 @@ gracefully; the QR card and the convocatoria are QUEUED in each recipient's reso
 a job, no HTTP); the admin user-locale behaviour is unchanged. Prompt-19 parity still green. **Screenshots**
 (PWA home/menu/history in both languages + the switcher, light/dark) not produced — no browser here.
 Owner-authorised merge (standing "merge all to main"). 752 green (749 passed, 3 concurrency skips).
+
+---
+
+## Prompt 97 — Public application form: unambiguous DOB, informed consent, fillable fields, next steps, es
+
+The first thing a prospect ever sees — the tokenised `/socio/solicitud/{token}` form. Structurally sound;
+the fixes are in what it asks for and records. The route stays unauthenticated + token-gated (bad token still
+404s), and the honeypot + `throttle:10,1` are untouched.
+
+**Date of birth — unambiguous, not US format.** The `<input type="date">` always SUBMITS ISO (`yyyy-mm-dd`)
+regardless of the picker's displayed order, so storage was never actually transposed — but the picker showed
+`mm/dd/yyyy` because the page rendered in English (§5). Two fixes: the page now renders in the club default
+(Spanish — see below), so the native picker shows `dd/mm/aaaa`; and an explicit "**Formato: día / mes / año**"
+hint sits under the field, removing any doubt regardless of the browser. Tested: 4 March entered stores as 4
+March and approves to `04/03/1990`, in a Spanish-locale context; an under-age applicant (date entered in the
+form's ISO format) is rejected, so a format regression fails the test.
+
+**Consent — informed and version-tied.** The privacy notice and the statutes are now DISPLAYED on the page
+(two `<details>` expanders fed by new `consent_privacy_text` / `consent_statutes_text` Settings — there is no
+public page to link to, NOTES §A), tagged with the exact `consent_text_version`. The single bundled tick
+became TWO separate required consents (data processing / statutes) — different agreements, stronger evidence.
+The version tie: the form captures the `consent_text_version` the applicant SAW at submit into the payload,
+and `RecordMemberConsent` (still the single writer) now stamps THAT version at approval, not the current one —
+so a revision between application and approval can never rewrite what they agreed to. Tested: submit at v1.0,
+bump to v2.0, approve → the consent records read v1.0.
+
+**Two fields an applicant can actually fill.** The sponsor field takes a **name OR a member number** (a
+prospect knows the person, not the number), resolved best-effort — by number, else an unambiguous single
+active-member name match — with the raw text kept on the payload for the reviewer. It is NEVER required at the
+form (the `avalador_policy` is enforced and waived at approval), so an applicant who cannot supply one is not
+blocked. Declared consumption became a **guided select of the club's `forecast_options_g`** (with "prefiero no
+indicarlo") instead of a free number the applicant has no basis for — it is the figure that lands on their
+signed declaration (prompt 72). No new personal data is collected (Art. 9).
+
+**What happens next.** The form now states, before submit and on the confirmation, that the association
+reviews the application and — if approved — sends a membership card with a QR code by email (prompt 85), and
+that it may take a few days.
+
+**Language (§5) — resolved by prompt 96.** The route has no authenticated anything, so `ResolveLocale` falls
+straight to the org default. Prompt 96 (merged) flipped that default to `es` and `SetLocale` runs on the `web`
+group, so the form now renders Spanish — the sharpest case for the club default, since a prospect cannot have
+a preference. Tested (`lang="es"` + Spanish copy). No new lever needed here; the dependency on prompt 96 is
+noted and satisfied.
+
+**Tests:** `PublicApplicationFormTest` (9) — unambiguous DOB (es); under-age rejected in the form's format;
+consent texts shown + recorded version = displayed version (across a revision); either consent missing is
+refused; honeypot + bad-token guards intact; renders in the club default; an applicant without a sponsor is
+not blocked; sponsor resolved by name or number; consumption guided + stored as centigrams. Existing
+application/invite tests updated to the two-consent + `avalador_ref` contract. **Screenshots** (form at 390px,
+both languages, date/consent/confirmation, light/dark) not produced — no browser here. Owner-authorised merge
+(standing "merge all to main"). 761 green (758 passed, 3 concurrency skips).
