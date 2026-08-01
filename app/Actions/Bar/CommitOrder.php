@@ -16,6 +16,7 @@ use App\Models\Location;
 use App\Models\Member;
 use App\Models\Order;
 use App\Models\TillSession;
+use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use RuntimeException;
@@ -45,69 +46,97 @@ class CommitOrder
             throw new RuntimeException('An order needs at least one line.');
         }
 
-        return DB::transaction(function () use ($location, $lines, $options): Order {
-            // Idempotency: never double-commit the same basket.
-            $key = $options['idempotency_key'] ?? null;
-            if ($key !== null) {
-                $existing = Order::withoutGlobalScopes()->where('idempotency_key', $key)->first();
+        $idempotencyKey = $options['idempotency_key'] ?? null;
+
+        // The pre-check inside handles the common non-concurrent retry cheaply. Under TRUE concurrency both
+        // requests can miss it and both insert; the unique index on idempotency_key is the real guarantee, and
+        // the request that LOSES that race raises a UniqueConstraintViolationException here instead of the
+        // pre-check's return path. Catch it, and do what the pre-check would have (prompt 123).
+        try {
+            return DB::transaction(function () use ($location, $lines, $options): Order {
+                // Idempotency FAST PATH: never double-commit the same basket on a plain (non-concurrent) retry.
+                $key = $options['idempotency_key'] ?? null;
+                $existing = $this->findByIdempotencyKey($key);
+                if ($existing !== null) {
+                    return $existing;
+                }
+
+                // An order may only attach to an OPEN till session (shared with the dispensary).
+                $tillSessionId = $options['till_session_id'] ?? null;
+                if ($tillSessionId !== null) {
+                    $till = TillSession::withoutGlobalScopes()->find($tillSessionId);
+                    if ($till === null || $till->status !== TillSessionStatus::OPEN) {
+                        throw new TillClosedException('The order must attach to an open till session.');
+                    }
+                }
+
+                [$total, $items] = $this->buildItems($location, $lines, $options);
+
+                $memberId = $options['member_id'] ?? null;
+                $cash = $options['cash_cents'] ?? $total;
+                $wallet = $options['wallet_cents'] ?? 0;
+
+                if ($wallet > 0 && $memberId === null) {
+                    throw new RuntimeException('A wallet payment requires a member.');
+                }
+
+                $order = Order::create([
+                    'organisation_id' => $location->organisation_id,
+                    'location_id' => $location->id,
+                    'member_id' => $memberId,
+                    'operator_id' => $options['operator_id'] ?? Auth::id(),
+                    'till_session_id' => $tillSessionId,
+                    'items' => $items,
+                    'total_cents' => $total,
+                    'cash_cents' => $cash,
+                    'wallet_cents' => $wallet,
+                    'status' => OrderStatus::COMPLETED,
+                    'reversal_of_id' => $options['reversal_of_id'] ?? null,
+                    'reference' => $options['reference'] ?? null,
+                    'idempotency_key' => $key,
+                ]);
+
+                if ($wallet > 0) {
+                    $member = Member::withoutGlobalScopes()->findOrFail($memberId);
+                    (new RecordWalletTransaction)->handle($member, $location, -$wallet, WalletTransactionType::PURCHASE, [
+                        'source' => $order,
+                        'operator_id' => $options['operator_id'] ?? Auth::id(),
+                        'till_session_id' => $tillSessionId,
+                        'reason' => 'Compra en barra',
+                        'allow_debt' => true, // the wallet writer enforces the debt limit itself
+                    ]);
+                }
+
+                (new RecordAuditLog)->handle('order.committed', $order, null, [
+                    'total_cents' => $total,
+                    'member_id' => $memberId,
+                ]);
+
+                return $order;
+            });
+        } catch (UniqueConstraintViolationException $e) {
+            // Re-read on the now-HEALTHY connection — the doomed transaction has already rolled back — and
+            // return the winner's row, so the caller cannot tell it lost (the whole point of an idempotency
+            // key). A row exists for this key ONLY when the violation WAS the idempotency collision; any other
+            // unique violation finds nothing here and rethrows as the real error it is.
+            if ($idempotencyKey !== null) {
+                $existing = Order::withoutGlobalScopes()->where('idempotency_key', $idempotencyKey)->first();
                 if ($existing !== null) {
                     return $existing;
                 }
             }
 
-            // An order may only attach to an OPEN till session (shared with the dispensary).
-            $tillSessionId = $options['till_session_id'] ?? null;
-            if ($tillSessionId !== null) {
-                $till = TillSession::withoutGlobalScopes()->find($tillSessionId);
-                if ($till === null || $till->status !== TillSessionStatus::OPEN) {
-                    throw new TillClosedException('The order must attach to an open till session.');
-                }
-            }
+            throw $e;
+        }
+    }
 
-            [$total, $items] = $this->buildItems($location, $lines, $options);
-
-            $memberId = $options['member_id'] ?? null;
-            $cash = $options['cash_cents'] ?? $total;
-            $wallet = $options['wallet_cents'] ?? 0;
-
-            if ($wallet > 0 && $memberId === null) {
-                throw new RuntimeException('A wallet payment requires a member.');
-            }
-
-            $order = Order::create([
-                'organisation_id' => $location->organisation_id,
-                'location_id' => $location->id,
-                'member_id' => $memberId,
-                'operator_id' => $options['operator_id'] ?? Auth::id(),
-                'till_session_id' => $tillSessionId,
-                'items' => $items,
-                'total_cents' => $total,
-                'cash_cents' => $cash,
-                'wallet_cents' => $wallet,
-                'status' => OrderStatus::COMPLETED,
-                'reversal_of_id' => $options['reversal_of_id'] ?? null,
-                'reference' => $options['reference'] ?? null,
-                'idempotency_key' => $key,
-            ]);
-
-            if ($wallet > 0) {
-                $member = Member::withoutGlobalScopes()->findOrFail($memberId);
-                (new RecordWalletTransaction)->handle($member, $location, -$wallet, WalletTransactionType::PURCHASE, [
-                    'source' => $order,
-                    'operator_id' => $options['operator_id'] ?? Auth::id(),
-                    'till_session_id' => $tillSessionId,
-                    'reason' => 'Compra en barra',
-                    'allow_debt' => true, // the wallet writer enforces the debt limit itself
-                ]);
-            }
-
-            (new RecordAuditLog)->handle('order.committed', $order, null, [
-                'total_cents' => $total,
-                'member_id' => $memberId,
-            ]);
-
-            return $order;
-        });
+    /**
+     * The idempotency FAST-PATH lookup (the pre-check only). Overridable so a test can force a pre-check MISS
+     * and drive the true-race path; the catch does its OWN inline re-read, so an override never masks it.
+     */
+    protected function findByIdempotencyKey(?string $key): ?Order
+    {
+        return $key !== null ? Order::withoutGlobalScopes()->where('idempotency_key', $key)->first() : null;
     }
 
     /**
