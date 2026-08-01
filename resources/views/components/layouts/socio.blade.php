@@ -45,7 +45,8 @@
                             @foreach ($localeOptions as $loc)
                                 <button type="submit" name="locale" value="{{ $loc }}" data-locale="{{ $loc }}"
                                         @class([
-                                            'rounded-md px-2 py-1 text-xs font-semibold uppercase transition',
+                                            // ≥ 24×24 CSS px target (WCAG 2.2 Target Size, prompt 98) — a control non-native speakers depend on.
+                                            'inline-flex min-h-[1.5rem] min-w-[1.75rem] items-center justify-center rounded-md px-2 py-1 text-xs font-semibold uppercase transition',
                                             'bg-brand text-white' => app()->getLocale() === $loc,
                                             'text-ink-muted hover:text-brand dark:text-slate-400' => app()->getLocale() !== $loc,
                                         ])>{{ $loc }}</button>
