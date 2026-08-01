@@ -231,6 +231,14 @@ glossary in `DECISIONS.md`; never let "translate" slip into commercial framing (
   owns. Carve-out: a compliance-boundary writer that would reject demo data (e.g. `CommitDispensation`
   gating on fees/carencia/limits) may stay relational-with-full-snapshot IF every column the real
   writer sets is populated — but say so in `DECISIONS.md`, because it is exactly the drift risk above.
+- **A domain action ships with the entry point that calls it — never finished, tested and permissioned but
+  UNREACHABLE.** The single most-repeated defect here was a complete Action with nothing that calls it
+  (`RecordFeePayment`, `CommitStockTake`, `RefundDispensation`, `UpdateDeclaredForecast`, `GeneticPrice`
+  editing, `WaiveCarencia`, …) — each passed `composer check` because the suite proves a unit WORKS, not that
+  anything REACHES it. This is the same lesson as the fixture rule above, learned twice: a green test can
+  certify code no user can run. `tests/Feature/Cleanup/UnreachableCodeGuardTest` now guards it (every
+  `app/Actions` class, every notification, every declared permission must be referenced from a non-test
+  caller; a docblock mention never counts). When you build an Action, wire its trigger in the SAME branch.
 - Idempotency: anything triggered by schedulers/webhooks must not double-fire (tested under retry).
 - **Tests prove CORRECTNESS, not COMPLETENESS.** No test catches a feature quietly shipped as a
   placeholder/stub. Periodically run the completeness check (grep TODO/FIXME/placeholder; walk pages

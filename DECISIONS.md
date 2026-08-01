@@ -2846,3 +2846,50 @@ retention is deliberately LONGER than member data. Two-part fix:
 
 Nothing here weakens the at-rest encryption or the signed-URL / document-access-log path (the audit found
 those sound). Owner-authorised merge (standing "merge everything to main"). 643 green (3 concurrency skips).
+
+---
+
+## Prompt 73 — a guard test for the "built it, never wired it" pattern
+
+The most-repeated defect in this codebase was never a bug in a feature — it was a finished, tested,
+permissioned class with nothing that calls it (eight-plus times: RecordFeePayment, AutoSettleDebt/
+TransferCredit, ImportMembers, CommitStockTake, WaiveCarencia, GeneticPrice editing, RefundDispensation,
+UpdateDeclaredForecast). Every one passed `composer check`. `tests/Feature/Cleanup/UnreachableCodeGuardTest`
+closes it, mirroring `FormCompletenessTest` (a guard + an honesty test that fails on a stale allowlist entry).
+
+**Detection — the part that had to be right.** COMMENTS NEVER COUNT: the two hand-run scans during the
+original investigation produced false negatives by counting docblock mentions (CommitStockTake and
+RefundDispensation both looked reachable because other files named them in transaction-boundary docblocks).
+So every target file is stripped of `T_COMMENT`/`T_DOC_COMMENT` via `token_get_all` before matching; a class
+is reached if a stripped file contains `use FQCN;`, `new Short`, or `Short::`. Searched: `app/`, `routes/`,
+`database/seeders/` — **never `tests/`** (a class exercised only by its own unit test is exactly the thing
+being caught). A regression test asserts the exact docblock-mention false negative is not counted, and
+another proves the detector reports a fabricated never-referenced class (a guard nobody has seen fail is not
+a guard).
+
+**Direct vs transitive — DECISION: DIRECT.** Reachability = "referenced from a non-test file under app/,
+routes/ or seeders". True reachable-from-an-entry-point (controller/Livewire/Filament/command/job/observer)
+is stronger but far more brittle; the direct check has caught every real instance to date. Documented as a
+deliberate limit. A test confirms real entry points (Filament pages/relation-managers, scheduled commands)
+count — an action reached only from a Filament page is not flagged.
+
+**Sibling checks — added the cheap ones, did not build a framework.**
+- **Notifications** (no dispatch site) — added; all four are reached.
+- **Permissions** (declared in `Permissions::ALL` + role-assigned but never CHECKED) — added; a permission
+  counts as checked only if its literal appears in `app/`/`routes/` (NOT the declaration or the role seeder,
+  which merely ASSIGN it). This surfaced FOUR genuinely-dead permissions — `members.transfer`,
+  `member.limits.set`, `stock.transfer`, `cash.bank` — the same anti-pattern, for permissions. They are
+  allowlisted with a "wire or remove" reason rather than silently carried; the honesty test forces the entry
+  to be removed the moment one is wired.
+- **Settings** — NOT added: already guarded by `tests/Feature/Settings/InertSettingsResolvedTest` (prompt 59).
+  Not duplicated.
+
+**Allowlist policy:** every entry carries a written reason in the test file; the honesty test fails when an
+entry becomes unnecessary; a short list is the point (it grows → that IS the signal). Actions + notifications
+allowlists are EMPTY (every offender was wired by prompts 47/71/72 and the rest of this batch); the
+permission allowlist holds the four above. The test is a comment-stripped file walk — fast enough to live in
+`composer check` (~0.3 s).
+
+Added the rule to `CLAUDE.md` alongside the fixture rule: **a domain action ships with the entry point that
+calls it** — the two are the same lesson learned twice. Owner-authorised merge (standing "merge everything to
+main"). 651 green (3 concurrency skips).
