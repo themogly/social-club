@@ -1966,5 +1966,10 @@
     "Último latido": "Last heartbeat",
     "…": "…",
     "… o añade un terminal nuevo": "… or add a new terminal",
-    "€/g": "€/g"
+    "€/g": "€/g",
+    "Editar caducidad": "Edit expiry",
+    "barra": "bar",
+    "todo": "all",
+    "Elige un descuento predefinido. Se crean en Dispensario ▸ Descuentos.": "Choose a pre-made discount. They are created in Dispensary ▸ Discounts.",
+    "Este socio paga la tarifa estándar. Asigna un descuento predefinido si procede.": "This member pays the standard rate. Assign a pre-made discount if applicable."
 }

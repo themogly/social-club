@@ -4227,3 +4227,40 @@ flipped from asserting a sede exceeds to asserting every sede sits within.
 **Harness:** all four remaining rows green — closed-till recompute, zero orphaned petty-cash, both sede ceilings.
 Overall **31 passed / 0 failed** — the acceptance gate target for prompts 103–114 is met. Owner-authorised merge.
 862 tests, 859 passed, 3 pre-existing skips, PHPStan 0.
+
+## Prompt 119 — Member discounts are chosen from templates, not typed by hand
+
+The member "Asignar descuento" form let an owner type a `mode` + a percentage/amount, but offered no way to
+pick one of the org's pre-made discounts — so every member discount the UI could produce was a global,
+unnamed one-off, and (the owner's second complaint) the "Tipo" dropdown promised a discount list but showed
+units of measurement. The link path already existed end to end (`member_discounts.discount_id`,
+`MemberDiscount::discount()`, `AssignMemberDiscount` accepting `discount_id`, `ResolvePrice` resolving it); only
+the form never collected a `discount_id`.
+
+**Chosen, not described.** The assign form is now a single `Select` over the organisation's ACTIVE discounts
+(`discountOptions()`, scoped by the Discount model's org global scope), each shown as "Name — value (scope)"
+e.g. "Staff — 10 % (todo)". It passes `discount_id` to `AssignMemberDiscount`. The free-value fields
+(`mode`/`value_pct`/`value_eur`) are gone.
+
+**Why it's a correctness fix, not just tidiness.** A linked discount keeps its own `applies_to`: `ResolvePrice`
+and `ResolveArticleDiscount` both honour GENETIC/ARTICLE/BOTH, so a genetics-only therapeutic rate does not
+touch the bar. A hand-typed "15 %" is global by construction and silently applied everywhere. A test asserts
+the same assigned therapeutic template discounts a genetic line but contributes 0 bp at the bar.
+
+**Decisions recorded:**
+- **No free-value escape hatch survives.** A new rate is created once as a named, auditable, reusable Discount
+  and then assigned — the owner's instinct, and the right default. There is no permission-gated inline path.
+- **Legacy inline rows are kept working and read-only-except-expiry.** They still price through `ResolvePrice`
+  (regression-tested), show as `Personalizado`, and can have their expiry changed or be removed — not migrated
+  (which would invent names) and never silently dropped. `UpdateMemberDiscount` now edits ONLY the expiry
+  (preserving `discount_id` and any inline value); to change a rate you remove and reassign.
+- **Naming.** "Tipo" no longer means three things: the form field and the member table column that name WHICH
+  discount are both "Descuento"; the value column is "Valor"; the edit action is "Editar caducidad". "Tipo"
+  survives only on the Descuentos templates list, where it means the discount's `kind`.
+- **Date format.** The expiry picker is `native(false)` with `displayFormat('d/m/Y')` (dd/mm/aaaa), not the
+  browser-default US mm/dd/yyyy.
+
+**Deferred / owed:** the relation-manager tab row clips its last tab on narrow widths — the same can't-shrink
+defect class as prompt 101; noted there rather than fixed blind here. Screenshots (assign modal before/after,
+an assigned template discount + the resulting POS price, light/dark) are OWED — no browser in this environment.
+New labels shipped in `lang/en` + `lang/es` (parity gated). `ResolvePrice`/`ResolveArticleDiscount` unchanged.
