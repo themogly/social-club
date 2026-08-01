@@ -164,3 +164,5 @@ email reminder; camera scan (prompt 22/28 skipped); forecast_options_g + per-art
 signed-URL invite refactor; seed placeholders; backup placeholders; and the HIGH security items above.
 
 > **UPDATE (prompt 32, merged):** S1 + S2 RESOLVED — Article-9 docs (ID scan/cert/generated PDF) encrypted at rest via DocumentVault; the streaming endpoint now authorises (permission + org ownership), binds the URL to the user, and access-logs every view. Photo/signature/business-uploads encryption + receipt per-view logging remain tracked follow-ups.
+>
+> **UPDATE (prompt 113, merged):** the member PHOTO and POS SIGNATURE follow-up is CLOSED — both now write through DocumentVault (encrypted at rest) and stream only through the authorised, access-logged endpoint (VaultStream, shared with the document controller). Non-member business uploads (invoices/receipts/batch-article docs) are private but NOT Article-9 and stay unencrypted by decision (see DECISIONS.md). Receipt per-view logging remains the one open S2 follow-up.

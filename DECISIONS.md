@@ -3859,3 +3859,51 @@ and the totals row is consistent over a mixed open/closed/voided period.
 
 **Owed:** no browser — the till report totals row + a reprinted adjusted Z un-screenshotted. Owner-authorised
 merge (standing "merge + push to main"). 809 tests, 806 passed, 3 pre-existing concurrency skips, PHPStan 0.
+
+---
+
+## Prompt 113 — Member photos + POS signatures: the plaintext files on the encrypted disk
+
+Closes the prompt-32 tracked follow-up. The member photo and the POS signature sat plaintext on the private
+Article-9 disk and were served by a bare `temporaryUrl` (no user binding, no policy, no access log). Both are
+now on the same footing as ID scans/certs.
+
+**Encrypted at rest.** Photo writes go through `DocumentVault::storeUpload` (Filament `saveUploadedFileUsing`,
+`previewable(false)` like the ID scan); the signature capture in `DispensaryPos` now `DocumentVault::put`s the
+PNG instead of `Storage::put`. A round-trip test + "bytes on disk are ciphertext" test pin it.
+
+**Served through the authorised, access-logged endpoint — pattern extracted, not forked.** The five prompt-32
+protections moved into `App\Support\VaultStream::respond()` (signed route, `u`-binding, `$authorize` closure,
+per-view `DocumentAccessLog`, decrypt-at-boundary). `MemberDocumentController` now calls it, and a new
+`MemberMediaController` serves the photo and signature through it. `App\Support\VaultUrl` mints the short-lived,
+user-bound signed URLs (mirroring `IssueDocumentUrl`). The counter (`CheckInScreen`/`DispensaryPos`) and the
+member infolist render the photo via that URL — no bare `temporaryUrl` anywhere on the disk.
+
+**Access log widened.** `document_access_logs.member_document_id` is now nullable and gains a polymorphic
+`(subject_type, subject_id)`, so a photo view (subject = Member) or signature view (subject = Dispensation) is
+logged the same way. Cross-driver migration (drop FK → nullable → re-add nullable FK; SQLite rebuilds).
+
+**Authorisation.** Photo = `MemberPolicy::viewPhoto` (`members.view` + org) — deliberately NOT the owner-only
+`member.documents.view`, because the counter shows the photo to identify the member and STAFF hold
+`members.view`; the view is logged regardless. Signature = `DispensationPolicy::view` (counter/report right +
+org + location). Denial + URL-replay tests cover both.
+
+**Migration of existing files.** A one-off `csc:encrypt-vault-media` COMMAND (not a schema migration, so the
+test suite's filesystem isn't rewritten on every RefreshDatabase) walks `member-photos`/`signatures`,
+encrypting only files that don't already decrypt — idempotent, safe to run twice, `--dry-run` supported.
+
+**Erasure.** `AnonymiseMember` already deleted the photo + document files; it now also deletes the member's
+POS signature files and nulls the pointers (biometric-ish PII on retained dispensation records).
+
+**Non-member uploads (decision).** Purchase invoices, expense receipts and batch/article/genetic docs share the
+disk but are ordinary private BUSINESS documents, not Article-9 special-category — they stay on the private disk
+UNENCRYPTED by decision (they are financial, so not `public` either). Encrypting them is a possible defence-in-
+depth follow-up, not a compliance requirement, so out of this branch.
+
+**Notes corrected.** `config/filesystems.php`, `DocumentVault`'s docblock and `AUDIT-FINDINGS.md` now say the
+follow-up is closed rather than pending.
+
+**Owed:** no browser — check-in/POS photo screenshots + the door-render before/after timing are NOT produced.
+A per-view decrypt is heavier than a static signed URL; if the door proves slow the lever is a smaller stored
+image or a short in-request cache, never dropping the log. Owner-authorised merge (standing "merge + push").
+816 tests, 813 passed, 3 pre-existing concurrency skips, PHPStan 0.

@@ -70,6 +70,12 @@ class AnonymiseMember
                 Storage::disk('documents')->delete($document->path);
             }
         }
+        // The member's captured POS signatures are biometric-ish PII on retained dispensation records —
+        // delete the encrypted file and null the pointer, keeping the dispensation itself (prompt 113).
+        foreach ($member->dispensations()->withoutGlobalScopes()->whereNotNull('signature_path')->get() as $dispensation) {
+            Storage::disk('documents')->delete((string) $dispensation->signature_path);
+            $dispensation->forceFill(['signature_path' => null])->save();
+        }
 
         // 2. Scrub the member row — including the HEALTH flag and the medical-cert path (Art. 9).
         $clearedFields = ['first_name', 'last_name', 'email', 'phone', 'address', 'date_of_birth', 'document_number', 'document_hash', 'is_therapeutic', 'medical_cert_path'];

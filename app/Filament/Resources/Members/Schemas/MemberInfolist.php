@@ -7,14 +7,17 @@ use App\Enums\MembershipStatus;
 use App\Enums\MemberStatus;
 use App\Models\Location;
 use App\Models\Member;
+use App\Models\User;
 use App\Support\ActiveScope;
 use App\Support\Money;
+use App\Support\VaultUrl;
 use App\Support\Weight;
 use Filament\Infolists\Components\IconEntry;
 use Filament\Infolists\Components\ImageEntry;
 use Filament\Infolists\Components\TextEntry;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Schema;
+use Illuminate\Support\Facades\Auth;
 
 class MemberInfolist
 {
@@ -24,10 +27,13 @@ class MemberInfolist
             ->components([
                 Section::make(__('Resumen'))
                     ->schema([
-                        ImageEntry::make('photo_path')
+                        // The encrypted photo is shown via the signed, access-logged endpoint (prompt 113),
+                        // NOT a raw disk URL — so viewing the member's file logs the view, like a document.
+                        ImageEntry::make('photo')
                             ->label(__('Foto'))
-                            ->disk('documents')
-                            ->visibility('private')
+                            // Null-guarded: label introspection (AuditFieldLabeler) builds this schema with no record.
+                            ->state(fn (?Member $record): ?string => $record instanceof Member && ($u = Auth::user()) instanceof User ? VaultUrl::photo($record, $u) : null)
+                            ->visible(fn (?Member $record): bool => $record instanceof Member && filled($record->photo_path))
                             ->circular(),
 
                         TextEntry::make('member_no')

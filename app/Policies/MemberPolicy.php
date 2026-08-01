@@ -4,6 +4,7 @@ namespace App\Policies;
 
 use App\Models\Member;
 use App\Models\User;
+use App\Support\ActiveScope;
 
 /**
  * The member directory is org-wide. Viewing is gated on `members.view`, creation
@@ -42,6 +43,18 @@ class MemberPolicy
     public function restore(User $user, Member $model): bool
     {
         return $user->can('members.edit');
+    }
+
+    /**
+     * View a member's PHOTO through the encrypted, access-logged streaming endpoint (prompt 113). Identity
+     * data seen at the counter to recognise the member, so it is `members.view` (STAFF hold it) + org
+     * ownership — NOT the owner-only `member.documents.view` that gates the ID scan and medical certificate.
+     * Every view is still logged, whatever the permission.
+     */
+    public function viewPhoto(User $user, Member $model): bool
+    {
+        return $user->can('members.view')
+            && $model->organisation_id === app(ActiveScope::class)->organisationId();
     }
 
     /**
