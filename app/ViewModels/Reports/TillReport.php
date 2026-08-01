@@ -67,10 +67,14 @@ class TillReport extends AbstractReport
 
         $this->sessionCount = $sessions->count();
 
+        // One batched Z-report for the whole period — a fixed number of grouped queries, not ~12 per session
+        // in this loop (prompt 108).
+        $zBySession = ZReport::forMany($sessions);
+
         $rows = [];
         $totals = ['float' => 0, 'expected' => 0, 'counted' => 0, 'variance' => 0, 'tx' => 0];
         foreach ($sessions as $session) {
-            $z = ZReport::for($session);
+            $z = $zBySession[$session->id];
             $rows[] = [
                 'sort' => $session->opened_at?->getTimestamp() ?? 0,
                 'fecha' => $session->opened_at,
