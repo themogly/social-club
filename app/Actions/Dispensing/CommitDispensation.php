@@ -301,7 +301,7 @@ class CommitDispensation
                 ]);
 
                 $rateFreeze = ['price_per_gram_cents' => $priced['rate_cents'], 'price_per_unit_cents' => null, 'units_dispensed' => null];
-                $eighthInput[] = ['grams_cg' => $grams, 'rate_cents' => $price->effectiveRatePerGramCents(), 'per_gram_total' => $priced['total_cents'], 'eighth_price' => $price->eighthPriceCents];
+                $eighthInput[] = ['grams_cg' => $grams, 'rate_cents' => $price->effectiveRatePerGramCents(), 'per_gram_total' => $priced['total_cents'], 'eighth_price' => $price->effectiveEighthPriceCents()];
             }
 
             $rows[] = [

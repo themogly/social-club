@@ -36,6 +36,21 @@ final class PriceResult
     }
 
     /**
+     * The eighth price AFTER the chosen discount (prompt 90). The member's discount applies to the eighth
+     * price exactly as it applies to the per-gram rate — the SAME chosen discount (discountAmount), never a
+     * separately re-derived one — so a discount can never silently vanish on an eighth-priced quantity.
+     * Null when the strain has no eighth price.
+     */
+    public function effectiveEighthPriceCents(): ?int
+    {
+        if ($this->eighthPriceCents === null) {
+            return null;
+        }
+
+        return $this->eighthPriceCents - $this->discountAmount($this->eighthPriceCents);
+    }
+
+    /**
      * A WEIGHT line: subtotal = rate/g × grams. Grams in from integer centigrams.
      *
      * @return Line

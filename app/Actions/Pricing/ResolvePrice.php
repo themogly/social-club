@@ -74,11 +74,20 @@ class ResolvePrice
 
     /**
      * Apply eighth (3.5 g) quantity breaks across a WHOLE weight basket (prompt 83) — "calculate it in the
-     * background". Lines are GROUPED by their (identical, non-null) eighth price; a group reaching >= 350 cg
-     * is charged floor(grams / 350) eighths at that price PLUS the sub-eighth remainder per gram, and that
-     * charge is split across the group's lines proportional to grams by largest-remainder, so the per-line
-     * totals sum EXACTLY to the group charge — no lost or gained cent. Lines with no eighth price, and groups
-     * below 350 cg, keep their per-gram total unchanged. This is the ONLY place the eighth arithmetic lives.
+     * background". Lines are GROUPED by their (identical, non-null) EFFECTIVE eighth price (i.e. after the
+     * member's discount — prompt 90); a group reaching >= 350 cg is charged floor(grams / 350) eighths at
+     * that price PLUS the sub-eighth remainder per gram, split across the group's lines proportional to
+     * grams by largest-remainder so the per-line totals sum EXACTLY to the group charge — no lost or gained
+     * cent, at every multiple.
+     *
+     * The break is applied ONLY when it is genuinely cheaper: the group charge is FLOORED at the group's own
+     * per-gram total, so an eighth price set above the per-gram total (a typo, or a per-gram price later
+     * reduced) can NEVER increase what a member pays (prompt 90 — the acceptance property). When the break is
+     * not cheaper the lines keep their per-gram totals unchanged. Because the eighth price passed in is
+     * already discounted, the discount applies ON TOP of the eighth, and the floor is discounted-vs-discounted.
+     *
+     * `rate_cents` and `eighth_price` are the EFFECTIVE (post-discount) figures; `per_gram_total` is the
+     * line's post-discount per-gram charge.
      *
      * @param  list<array{grams_cg: int, rate_cents: int, per_gram_total: int, eighth_price: ?int}>  $lines
      * @return list<array{total_cents: int, eighth_applied: bool}> in the same order
@@ -87,7 +96,7 @@ class ResolvePrice
     {
         $result = array_map(fn (array $l): array => ['total_cents' => $l['per_gram_total'], 'eighth_applied' => false], $lines);
 
-        // Group line indices by eighth price (only lines that HAVE one).
+        // Group line indices by (effective) eighth price (only lines that HAVE one).
         $groups = [];
         foreach ($lines as $i => $line) {
             if ($line['eighth_price'] !== null && $line['eighth_price'] > 0) {
@@ -103,12 +112,21 @@ class ResolvePrice
                 continue; // below one eighth → stays per-gram (near-miss like 3.4 g)
             }
 
-            // Remainder above whole eighths is per-gram at the group's LOWEST effective rate (member-favourable).
+            // The group charge, computed ONCE: N eighths + the sub-eighth remainder at the group's LOWEST
+            // effective rate (member-favourable). Discount is already baked into $eighthPrice and the rates.
             $remainderCg = $totalCg - $eighths * self::EIGHTH_CG;
             $minRate = min(array_map(fn (int $i): int => $lines[$i]['rate_cents'], $indices));
-            $groupTotal = $eighths * (int) $eighthPrice + (int) round_half_up($minRate * $remainderCg / 100);
+            $eighthCharge = $eighths * (int) $eighthPrice + (int) round_half_up($minRate * $remainderCg / 100);
 
-            $shares = $this->distribute($groupTotal, array_map(fn (int $i): int => $lines[$i]['grams_cg'], $indices));
+            // FLOOR (prompt 90): never charge more than the group would cost per gram. If the "break" is not
+            // strictly cheaper, keep the per-gram totals (already in $result) — a member is never charged
+            // more because an eighth price exists.
+            $groupPerGramTotal = array_sum(array_map(fn (int $i): int => $lines[$i]['per_gram_total'], $indices));
+            if ($eighthCharge >= $groupPerGramTotal) {
+                continue;
+            }
+
+            $shares = $this->distribute($eighthCharge, array_map(fn (int $i): int => $lines[$i]['grams_cg'], $indices));
             foreach ($indices as $pos => $i) {
                 $result[$i] = ['total_cents' => $shares[$pos], 'eighth_applied' => true];
             }
