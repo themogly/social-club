@@ -962,13 +962,11 @@ class DispensaryPos extends Component
 
         $resolver = new ResolvePrice;
 
+        // The SAME "sellable at this sede" definition the member menu uses (prompt 95) — one scope, so the
+        // counter and the member app can never disagree on what is available.
         /** @var Collection<int, Genetic> $genetics */
         $genetics = Genetic::query()
-            ->where('active', true)
-            ->whereHas('prices', fn ($q) => $q->withoutGlobalScopes()
-                ->where('location_id', $location->id)
-                ->whereNull('tier_id')
-                ->where('active', true))
+            ->sellableAt($location->id)
             ->with('category')
             ->orderBy('name')
             ->get();

@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Member;
 
 use App\Models\Announcement;
 use App\Models\Member;
+use App\Models\Scopes\OrganisationScope;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\View\View;
@@ -28,7 +29,9 @@ class AnnouncementController extends MemberController
         $locationIds = $this->memberLocationIds($member)->all();
 
         /** @var Collection<int, Announcement> $announcements */
-        $announcements = Announcement::query()->withoutGlobalScopes()
+        // Escape ONLY the organisation scope (the member guard does not set the active scope), NOT the
+        // soft-delete scope — a deleted announcement must never reach a member (prompt 95 sweep).
+        $announcements = Announcement::query()->withoutGlobalScope(OrganisationScope::class)
             ->where('organisation_id', $member->organisation_id)
             ->whereNotNull('published_at')
             ->where('published_at', '<=', now())

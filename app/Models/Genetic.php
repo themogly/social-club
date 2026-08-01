@@ -134,6 +134,24 @@ class Genetic extends Model
     }
 
     /**
+     * The ONE definition of "sellable at a sede" (prompt 95): active, and with an active base price at that
+     * location. The dispensary POS and the member menu both scope through this, so the two surfaces can never
+     * disagree on what is available — and an unpriced strain is simply FILTERED OUT, never a thrown error
+     * that takes a page down. Soft-deleted genetics are excluded because this does not touch that scope.
+     *
+     * @param  Builder<static>  $query
+     * @return Builder<static>
+     */
+    public function scopeSellableAt(Builder $query, string $locationId): Builder
+    {
+        return $query->where('active', true)
+            ->whereHas('prices', fn (Builder $q) => $q->withoutGlobalScopes()
+                ->where('location_id', $locationId)
+                ->whereNull('tier_id')
+                ->where('active', true));
+    }
+
+    /**
      * Why this genetic cannot yet be dispensed anywhere — 'no_price' (needs a per-location price),
      * 'no_stock' (priced but no batch), or null when it is ready. Derived live, never stored.
      */
