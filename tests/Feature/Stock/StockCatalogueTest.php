@@ -6,12 +6,15 @@ use App\Actions\Stock\CommitStockTake;
 use App\Actions\Stock\IntakeBatch;
 use App\Actions\Stock\SelectBatch;
 use App\Enums\BatchStatus;
+use App\Enums\MembershipStatus;
 use App\Enums\StockMovementType;
 use App\Models\Article;
 use App\Models\Batch;
 use App\Models\Genetic;
 use App\Models\Location;
 use App\Models\Member;
+use App\Models\Membership;
+use App\Models\MembershipTier;
 use App\Models\Organisation;
 use App\Models\StockTake;
 use App\Models\User;
@@ -53,7 +56,13 @@ class StockCatalogueTest extends TestCase
 
     public function test_low_stock_scope_and_premises_ceiling_alert(): void
     {
-        Member::factory()->count(4)->create(['organisation_id' => $this->org->id, 'status' => 'ACTIVE']);
+        // 4 members with an ACTIVE membership AT THIS sede (prompt 110 counts sede membership, not org total).
+        $tier = MembershipTier::factory()->create(['organisation_id' => $this->org->id]);
+        Member::factory()->count(4)->create(['organisation_id' => $this->org->id, 'status' => 'ACTIVE'])
+            ->each(fn (Member $m) => Membership::factory()->create([
+                'organisation_id' => $this->org->id, 'member_id' => $m->id,
+                'location_id' => $this->location->id, 'tier_id' => $tier->id, 'status' => MembershipStatus::ACTIVE,
+            ]));
         // ceiling = 4 members × 350 cg × 5 days = 7000 cg.
         (new IntakeBatch)->handle($this->genetic, $this->location, ['grams' => 50]); // 5000 cg — under ceiling
 

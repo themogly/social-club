@@ -140,6 +140,11 @@ class Settings
                 'sanction' => 'BLOCK', 'debt' => 'BLOCK', 'unpaid_fee' => 'BLOCK',
                 'daily_limit' => 'BLOCK', 'monthly_limit' => 'BLOCK',
             ],
+            // The premises legal stock ceiling at intake (prompt 110). Defaults to WARN, not BLOCK: a club
+            // legitimately receives a harvest that briefly exceeds a rolling figure, and a hard block with no
+            // way through would push staff into not recording stock at all — far worse than an overage. A club
+            // may set BLOCK; a BLOCK is overridable with limits.override, a reason and an audit row.
+            'stock' => ['ceiling' => 'WARN'],
         ],
     ];
 

@@ -294,6 +294,10 @@ class DemoDataSeeder extends Seeder
                     'low_stock_threshold_cg' => 5000, 'active' => true,
                 ]);
 
+                // DELIBERATE, LABELLED demo of the stock ceiling (prompt 110): the curated 16-member demo base
+                // is far smaller than a real club's, so its per-sede ceiling (members × daily × days) is small
+                // and this realistic dispensary stock trips the compliance WARNING on purpose — it demonstrates
+                // the feature working. A genuine fresh install (csc:install) has no stock, so it never alarms.
                 $initial = random_int(20000, 80000); // cg
                 // Batch starts EMPTY; opening stock enters through the single stock writer as an INTAKE
                 // movement (the real go-live path — never a free-typed remaining_cg).

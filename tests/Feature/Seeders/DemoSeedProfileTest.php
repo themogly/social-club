@@ -17,6 +17,7 @@ use App\Models\Organisation;
 use App\Support\ActiveScope;
 use App\Support\Period;
 use App\Support\Settings;
+use App\Support\StockCeiling;
 use App\Support\Wallet;
 use App\ViewModels\Reports\BarSalesReport;
 use App\ViewModels\Reports\FinancialReport;
@@ -49,6 +50,25 @@ class DemoSeedProfileTest extends TestCase
         app()->setLocale($locale);
         $this->seed(DatabaseSeeder::class);
         app(ActiveScope::class)->setOrganisation(Organisation::firstOrFail()->id);
+    }
+
+    public function test_the_stock_ceiling_is_per_sede_and_a_deliberate_demo(): void
+    {
+        $this->seedDemo('es');
+        $org = Organisation::firstOrFail();
+        $locations = Location::query()->where('organisation_id', $org->id)->get();
+
+        // Per-sede arithmetic (prompt 110): each sede computes its OWN active-member count, not the org total.
+        foreach ($locations as $location) {
+            $this->assertGreaterThan(0, StockCeiling::forLocation($location)['active_members']);
+        }
+
+        // Deliberate, labelled demo: the small curated member base means the compliance ceiling fires by
+        // design — documenting the overage is intentional, not the old org-wide-count bug returning.
+        $this->assertTrue(
+            $locations->contains(fn (Location $l): bool => StockCeiling::forLocation($l)['exceeded']),
+            'The demo seed is expected to exceed the ceiling at a sede to demonstrate the warning.'
+        );
     }
 
     public function test_an_english_locale_seed_produces_english_data(): void

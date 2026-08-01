@@ -5,11 +5,16 @@ namespace App\Actions\Stock;
 use App\Actions\RecordAuditLog;
 use App\Enums\BatchStatus;
 use App\Enums\StockMovementType;
+use App\Exceptions\StockCeilingExceededException;
 use App\Models\Batch;
 use App\Models\Genetic;
 use App\Models\Location;
 use App\Models\StockMovement;
+use App\Models\User;
+use App\Support\Settings;
+use App\Support\StockCeiling;
 use App\Support\Weight;
+use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -21,7 +26,7 @@ use Illuminate\Support\Str;
  * as an INTAKE movement (opening balances always enter through the ledger). Exactly one
  * of the cg / units column pairs is populated — the other is set null explicitly.
  *
- * @phpstan-type IntakeData array{grams?: int|float|string, units?: int|string, batch_no?: ?string, cost_per_gram_cents?: int, acquired_or_harvested_on?: mixed, expires_on?: mixed, lab_report_path?: ?string, notes?: ?string, operator_id?: ?string}
+ * @phpstan-type IntakeData array{grams?: int|float|string, units?: int|string, batch_no?: ?string, cost_per_gram_cents?: int, acquired_or_harvested_on?: mixed, expires_on?: mixed, lab_report_path?: ?string, notes?: ?string, operator_id?: ?string, override?: bool, override_by?: ?User, override_reason?: ?string}
  */
 class IntakeBatch
 {
@@ -34,10 +39,14 @@ class IntakeBatch
         $units = $isUnit ? (int) ($data['units'] ?? 0) : null;
         $cg = $isUnit ? null : Weight::fromGrams($data['grams'] ?? 0)->centigrams;
 
+        // Premises stock ceiling (prompt 110): would this intake push the on-site weight over the legal
+        // ceiling? WARN → proceed; BLOCK → refuse unless a limits.override holder authorised it with a reason.
+        $ceilingOverride = $this->authoriseCeiling($genetic, $location, $cg, $units, $data);
+
         // Batch + its opening-balance movement are atomic, and new stock entering the premises is
         // audited (prompt 48 — the most traceability-sensitive event in a cannabis club). INSIDE the
         // txn, so a failed audit rolls back the intake (boundary matches CommitStockTake).
-        return DB::transaction(function () use ($genetic, $location, $data, $units, $cg): Batch {
+        return DB::transaction(function () use ($genetic, $location, $data, $units, $cg, $ceilingOverride): Batch {
             $batch = Batch::create([
                 'organisation_id' => $genetic->organisation_id,
                 'genetic_id' => $genetic->id,
@@ -76,7 +85,58 @@ class IntakeBatch
                 'cost_per_gram_cents' => (int) ($data['cost_per_gram_cents'] ?? 0),
             ], fn ($v): bool => $v !== null));
 
+            // A ceiling override is its OWN audit row — a reasoned, permissioned breach of a compliance limit.
+            if ($ceilingOverride !== null) {
+                (new RecordAuditLog)->handle('stock.ceiling.overridden', $batch, null, $ceilingOverride);
+            }
+
             return $batch;
         });
+    }
+
+    /**
+     * Enforce the premises stock ceiling for this intake. Returns override metadata to audit when a BLOCK was
+     * authorised, or null when no override was needed (within the ceiling, or WARN mode).
+     *
+     * @param  IntakeData  $data
+     * @return array<string, mixed>|null
+     */
+    private function authoriseCeiling(Genetic $genetic, Location $location, ?int $cg, ?int $units, array $data): ?array
+    {
+        $incomingCg = $cg ?? (($units ?? 0) * (int) $genetic->grams_per_unit_cg);
+        if ($incomingCg <= 0) {
+            return null;
+        }
+
+        $ceiling = StockCeiling::forLocation($location);
+        $projected = $ceiling['on_site_cg'] + $incomingCg;
+        if ($projected <= $ceiling['ceiling_cg']) {
+            return null; // within the ceiling
+        }
+
+        if (Settings::enforcement('stock', 'ceiling') === 'WARN') {
+            return null; // allowed — surfaced by the dashboard indicator and the intake form
+        }
+
+        // BLOCK — the same override contract as a member limit: permission-gated, reasoned, audited.
+        $by = $data['override_by'] ?? null;
+        $reason = trim((string) ($data['override_reason'] ?? ''));
+
+        if (empty($data['override']) || ! $by instanceof User) {
+            throw new StockCeilingExceededException('This intake would exceed the premises stock ceiling.');
+        }
+        if (! $by->can('limits.override')) {
+            throw new AuthorizationException('Overriding the stock ceiling requires the limits.override permission.');
+        }
+        if ($reason === '') {
+            throw new StockCeilingExceededException('A stock-ceiling override requires a reason.');
+        }
+
+        return [
+            'override_by' => $by->id,
+            'reason' => $reason,
+            'projected_on_site_cg' => $projected,
+            'ceiling_cg' => $ceiling['ceiling_cg'],
+        ];
     }
 }
