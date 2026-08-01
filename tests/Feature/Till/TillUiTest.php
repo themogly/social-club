@@ -42,6 +42,7 @@ class TillUiTest extends TestCase
     {
         $user = User::factory()->create();
         $user->assignRole(Role::MANAGER->value);
+        $user->locations()->sync([$this->location->id]);
 
         return $user;
     }

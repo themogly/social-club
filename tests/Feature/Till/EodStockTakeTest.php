@@ -48,6 +48,7 @@ class EodStockTakeTest extends TestCase
     {
         $user = User::factory()->create();
         $user->assignRole(Role::MANAGER->value); // holds stock.take + till.open + till.close
+        $user->locations()->sync([$this->location->id]);
         CounterOperator::set($user);
 
         return $user;
@@ -191,6 +192,7 @@ class EodStockTakeTest extends TestCase
     {
         $staff = User::factory()->create();
         $staff->assignRole(Role::STAFF->value); // has till.open, NOT stock.take
+        $staff->locations()->sync([$this->location->id]);
         CounterOperator::set($staff);
         $this->actingAs($staff);
 

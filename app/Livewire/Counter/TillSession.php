@@ -19,6 +19,7 @@ use App\Exceptions\DebtLimitExceededException;
 use App\Exceptions\TillAlreadyOpenException;
 use App\Exceptions\TillClosedException;
 use App\Livewire\Counter\Concerns\IdentifiesOperator;
+use App\Livewire\Counter\Concerns\ResolvesCounterLocation;
 use App\Models\Batch;
 use App\Models\ExpenseCategory;
 use App\Models\Location;
@@ -29,7 +30,6 @@ use App\Models\StockTake;
 use App\Models\StockTakeLine;
 use App\Models\TillSession as TillSessionModel;
 use App\Models\User;
-use App\Support\ActiveScope;
 use App\Support\CounterOperator;
 use App\Support\Money;
 use App\Support\TerminalName;
@@ -58,7 +58,7 @@ use RuntimeException;
 #[Layout('components.layouts.counter')]
 class TillSession extends Component
 {
-    use IdentifiesOperator;
+    use IdentifiesOperator, ResolvesCounterLocation;
 
     /** The active location id, resolved in mount(). */
     public ?string $locationId = null;
@@ -152,20 +152,9 @@ class TillSession extends Component
     {
         abort_unless($this->userCan('till.open') || $this->userCan('till.close'), 403);
 
-        $scope = app(ActiveScope::class);
-        $this->locationId = $scope->locationId();
-
-        // No active location yet: fall back to the operator's first assigned sede.
-        if ($this->locationId === null) {
-            $first = $this->currentUser()?->locations()->where('active', true)->orderBy('name')->first();
-
-            if ($first !== null) {
-                $scope->setLocation($first->id);
-                $this->locationId = $first->id;
-            }
-        }
-
-        $this->noLocation = $this->locationId === null;
+        // Resolve the counter's OWN working sede (session key counter.location_id) — never the panel
+        // scope, never a silent guess. One assigned sede is adopted; several ⇒ ask (mustChooseLocation).
+        $this->resolveCounterLocation();
 
         // Convenience: resume the single open session at this sede so returning to the
         // screen lands on its summary. Ambiguous (several terminals open) → operator picks.

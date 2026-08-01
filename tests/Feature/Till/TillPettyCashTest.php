@@ -40,6 +40,7 @@ class TillPettyCashTest extends TestCase
     {
         $user = User::factory()->create();
         $user->assignRole(Role::STAFF->value); // holds expenses.record + till.open
+        $user->locations()->sync([$this->location->id]);
         CounterOperator::set($user); // PIN-identified operator (prompt 26 guard)
 
         return $user;
@@ -90,6 +91,7 @@ class TillPettyCashTest extends TestCase
     {
         $user = User::factory()->create();
         $user->givePermissionTo('till.open'); // can open the drawer, but has no expenses.record
+        $user->locations()->sync([$this->location->id]);
         $this->actingAs($user);
         app(ActiveScope::class)->setLocation($this->location->id);
         CounterOperator::set($user); // pass the operator guard so the PERMISSION check is what denies

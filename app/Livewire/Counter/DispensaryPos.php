@@ -17,6 +17,7 @@ use App\Exceptions\ScanRateLimitedException;
 use App\Exceptions\TillClosedException;
 use App\Livewire\Counter\Concerns\HandlesTender;
 use App\Livewire\Counter\Concerns\IdentifiesOperator;
+use App\Livewire\Counter\Concerns\ResolvesCounterLocation;
 use App\Mail\DispensationReceiptMail;
 use App\Models\Batch;
 use App\Models\CheckIn;
@@ -28,7 +29,6 @@ use App\Models\MemberSanction;
 use App\Models\Membership;
 use App\Models\TillSession;
 use App\Models\User;
-use App\Support\ActiveScope;
 use App\Support\CounterOperator;
 use App\Support\EligibilityVerdict;
 use App\Support\Money;
@@ -69,7 +69,7 @@ use Throwable;
 #[Layout('components.layouts.counter')]
 class DispensaryPos extends Component
 {
-    use HandlesTender, IdentifiesOperator;
+    use HandlesTender, IdentifiesOperator, ResolvesCounterLocation;
 
     // --- Identity ---------------------------------------------------------------
 
@@ -184,20 +184,9 @@ class DispensaryPos extends Component
     {
         abort_unless($this->userCan('pos.use'), 403);
 
-        $scope = app(ActiveScope::class);
-        $this->locationId = $scope->locationId();
-
-        // No active location yet: fall back to the operator's first assigned sede.
-        if ($this->locationId === null) {
-            $first = $this->currentUser()?->locations()->where('active', true)->orderBy('name')->first();
-
-            if ($first !== null) {
-                $scope->setLocation($first->id);
-                $this->locationId = $first->id;
-            }
-        }
-
-        $this->noLocation = $this->locationId === null;
+        // Resolve the counter's OWN working sede (session key counter.location_id) — never the panel
+        // scope, never a silent guess. One assigned sede is adopted; several ⇒ ask (mustChooseLocation).
+        $this->resolveCounterLocation();
 
         // Adopt the single open till at this sede so cash contributions land on it.
         if ($this->terminal === '' && $this->locationId !== null) {
