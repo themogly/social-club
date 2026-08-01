@@ -98,11 +98,14 @@ class DemoDataSeeder extends Seeder
         config(['app.faker_locale' => $strings['faker']]);
         $this->faker = FakerFactory::create($strings['faker']);
 
+        // Demo statutory identity (prompt 115). Plausible placeholder values so the seeded club can generate
+        // statutory documents out of the box; a real install sets its own in Ajustes. G-prefixed CIF is the
+        // Spanish form for an asociación. OVERNIGHT-DEFAULT — CONFIRM: real clubs replace these at go-live.
         $org = Organisation::create([
             'name' => 'CSC platform',
-            'legal_name' => 'TBD-LEGAL-NAME',      // OVERNIGHT-PLACEHOLDER — CONFIRM
-            'tax_id' => 'TBD-CIF-NIF',             // OVERNIGHT-PLACEHOLDER — CONFIRM
-            'address' => 'TBD-ADDRESS',            // OVERNIGHT-PLACEHOLDER — CONFIRM
+            'legal_name' => 'Asociación Cannábica CSC Demo',
+            'tax_id' => 'G00000000',
+            'address' => 'Calle de Ejemplo 1, 28001 Madrid',
             'contact_email' => 'info@club.test',
         ]);
         $this->scope->setOrganisation($org->id);
@@ -115,12 +118,12 @@ class DemoDataSeeder extends Seeder
         // a demo (prompt 105). A real club sets its own timezone + business_day_cutoff (fallback Madrid/06:00)
         // and every report now honours it through BusinessDay — proven by tests using a Madrid location.
         $centro = Location::create([
-            'organisation_id' => $org->id, 'name' => $strings['locations'][0], 'address' => 'TBD-ADDRESS',
+            'organisation_id' => $org->id, 'name' => $strings['locations'][0], 'address' => 'Calle de Ejemplo 1, 28001 Madrid',
             'capacity' => 50, 'timezone' => 'UTC', 'business_day_cutoff' => '00:00',
             'opening_time' => '12:00', 'closing_time' => '00:00', 'accent' => '#2563eb', 'active' => true,
         ]);
         $norte = Location::create([
-            'organisation_id' => $org->id, 'name' => $strings['locations'][1], 'address' => 'TBD-ADDRESS',
+            'organisation_id' => $org->id, 'name' => $strings['locations'][1], 'address' => 'Avenida del Norte 42, 08001 Barcelona',
             'capacity' => 40, 'timezone' => 'UTC', 'business_day_cutoff' => '00:00',
             'opening_time' => '17:00', 'closing_time' => '02:00', 'accent' => '#16a34a', 'active' => true,
         ]);

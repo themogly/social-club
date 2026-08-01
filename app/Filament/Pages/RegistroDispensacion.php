@@ -3,9 +3,11 @@
 namespace App\Filament\Pages;
 
 use App\Enums\DispensationStatus;
+use App\Filament\Concerns\GuardsStatutoryDocuments;
 use App\Filament\Pages\Reports\ReportPage;
 use App\Models\Location;
 use App\Support\Money;
+use App\Support\OrganisationIdentity;
 use App\Support\Period;
 use App\Support\Weight;
 use App\ViewModels\Reports\AbstractReport;
@@ -28,6 +30,8 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
  */
 class RegistroDispensacion extends ReportPage
 {
+    use GuardsStatutoryDocuments;
+
     protected string $view = 'filament.pages.registro-dispensacion';
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedClipboardDocumentCheck;
@@ -83,8 +87,13 @@ class RegistroDispensacion extends ReportPage
         ];
     }
 
-    public function exportPdf(): StreamedResponse
+    public function exportPdf(): ?StreamedResponse
     {
+        if (! self::hasStatutoryIdentity()) {
+            return null;
+        }
+
+        $identity = OrganisationIdentity::current();
         $rows = $this->controlRows();
         $content = Pdf::loadView('documents.dispensing-record', [
             'rows' => $rows,
@@ -92,7 +101,8 @@ class RegistroDispensacion extends ReportPage
             'summary' => $this->report()->summary(),
             'scopeLabel' => $this->scopeLabel(),
             'periodLabel' => $this->periodLabel(),
-            'orgName' => config('app.name'),
+            'orgName' => $identity['display_name'],
+            'identity' => $identity,
             'generatedAt' => now(),
         ])->output();
 

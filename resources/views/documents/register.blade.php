@@ -21,7 +21,7 @@
 </head>
 <body>
     <div class="head">
-        <div class="org">{{ $orgName }}</div>
+        @include('documents.partials.identity')
         <h1>{{ __('Libro de socios') }}</h1>
         <div class="meta">
             {{ $sedeLabel }} ·
@@ -51,8 +51,8 @@
                         <td>{{ $row['member_no'] ?? '—' }}</td>
                         <td>{{ $row['nombre'] ?? '—' }}</td>
                         <td>{{ $row['documento'] ?? '—' }}</td>
-                        <td>{{ $row['alta'] ?? '—' }}</td>
-                        <td>{{ $row['baja'] ?? '—' }}</td>
+                        <td>{{ ! empty($row['alta']) ? \Illuminate\Support\Carbon::parse($row['alta'])->format('d/m/Y') : '—' }}</td>
+                        <td>{{ ! empty($row['baja']) ? \Illuminate\Support\Carbon::parse($row['baja'])->format('d/m/Y') : '—' }}</td>
                         <td>{{ $row['estado'] ?? '—' }}</td>
                         <td>{{ $row['sede'] ?? '—' }}</td>
                     </tr>

@@ -2,9 +2,11 @@
 
 namespace App\Filament\Pages;
 
+use App\Filament\Concerns\GuardsStatutoryDocuments;
 use App\Models\Location;
 use App\Support\ActiveScope;
 use App\Support\MembersRegister;
+use App\Support\OrganisationIdentity;
 use BackedEnum;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Filament\Pages\Page;
@@ -23,6 +25,8 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
  */
 class LibroSocios extends Page
 {
+    use GuardsStatutoryDocuments;
+
     protected string $view = 'filament.pages.libro-socios';
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedBookOpen;
@@ -109,15 +113,21 @@ class LibroSocios extends Page
         ]);
     }
 
-    public function exportPdf(): StreamedResponse
+    public function exportPdf(): ?StreamedResponse
     {
+        if (! self::hasStatutoryIdentity()) {
+            return null;
+        }
+
+        $identity = OrganisationIdentity::current();
         $rows = $this->rows();
         $content = Pdf::loadView('documents.register', [
             'rows' => $rows,
             'count' => count($rows),
             'asAt' => $this->asAtDate(),
             'sedeLabel' => $this->sedeLabel(),
-            'orgName' => config('app.name'),
+            'orgName' => $identity['display_name'],
+            'identity' => $identity,
             'generatedAt' => now(),
         ])->output();
 

@@ -27,7 +27,7 @@
 </head>
 <body>
     <h1>{{ $title }}</h1>
-    <p class="muted">{{ config('app.name') }} · {{ __('Nº de socio/a: :no', ['no' => $snapshot['member_no']]) }}</p>
+    <p class="muted">{{ $orgName }} · {{ __('Nº de socio/a: :no', ['no' => $snapshot['member_no']]) }}</p>
 
     <table>
         <tr><td class="k">{{ __('Socio/a') }}</td><td>{{ $snapshot['nombre'] }}</td></tr>

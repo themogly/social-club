@@ -110,7 +110,9 @@ abstract class ReportPage extends Page
         ]);
     }
 
-    public function exportPdf(): StreamedResponse
+    // Nullable so a statutory subclass (RegistroDispensacion) can refuse the export when the organisation has
+    // no legal name (prompt 115); the generic informe always returns a response.
+    public function exportPdf(): ?StreamedResponse
     {
         $report = $this->report();
         $tables = $report->tables();

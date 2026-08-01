@@ -28,7 +28,7 @@
 </head>
 <body>
     <div class="head">
-        <div class="org">{{ $orgName }}</div>
+        @include('documents.partials.identity')
         <h1>{{ $title }}</h1>
         <div class="meta">{{ $scopeLabel }} · {{ $periodLabel }} · {{ __('Generado') }} {{ $generatedAt->format('d/m/Y H:i') }}</div>
     </div>

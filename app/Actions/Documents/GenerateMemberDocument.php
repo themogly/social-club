@@ -10,6 +10,7 @@ use App\Models\Member;
 use App\Models\MemberDocument;
 use App\Models\User;
 use App\Support\DocumentVault;
+use App\Support\OrganisationIdentity;
 use App\Support\Settings;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Auth\Access\AuthorizationException;
@@ -56,6 +57,7 @@ class GenerateMemberDocument
             'member' => $member,
             'snapshot' => $snapshot,
             'templateBody' => $template?->body,
+            'orgName' => OrganisationIdentity::current()['display_name'],
         ])->render();
 
         $path = 'generated/'.Str::ulid().'.pdf';
