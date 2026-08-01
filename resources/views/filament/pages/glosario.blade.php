@@ -26,17 +26,10 @@
             {{ __('Los términos técnicos se mantienen en español porque tienen valor legal. Nada de esto constituye asesoramiento legal.') }}
         </p>
 
-        {{-- Per-screen guides: what each screen is for and the things you do there (help index). --}}
-        <h2 class="mb-3 mt-8 text-base font-semibold text-gray-950 dark:text-white">{{ __('Guías por pantalla') }}</h2>
-        <div class="grid gap-3 sm:grid-cols-2">
-            @foreach ($guides as $guide)
-                <section class="rounded-xl border border-gray-200 bg-white p-4 dark:border-white/10 dark:bg-gray-900">
-                    <h3 class="text-sm font-semibold text-gray-950 dark:text-white">{{ __($guide['title']) }}</h3>
-                    @foreach ($guide['body'] as $paragraph)
-                        <p class="mt-1.5 text-sm text-gray-600 dark:text-gray-300">{{ __($paragraph) }}</p>
-                    @endforeach
-                </section>
-            @endforeach
-        </div>
+        {{-- The per-screen guides and task walkthroughs live on the Manual, filtered by role (prompt 99). --}}
+        <p class="mt-6 text-sm text-gray-600 dark:text-gray-300">
+            {{ __('¿Quieres saber para qué sirve cada pantalla o cómo se hace una tarea?') }}
+            <a href="{{ \App\Filament\Pages\Manual::getUrl() }}" class="font-medium text-primary-700 hover:underline dark:text-primary-300">{{ __('Abre el manual') }}</a>.
+        </p>
     </div>
 </x-filament-panels::page>

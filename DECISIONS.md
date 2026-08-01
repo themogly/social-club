@@ -3588,3 +3588,45 @@ change — colour and padding only.
 **Tests:** `ColourContrastTest` (4). **Screenshots** (four counter screens + an admin screen, both schemes,
 warning/success/error) not produced — no browser here. Owner-authorised merge (standing "merge all to main").
 765 green (762 passed, 3 concurrency skips).
+
+---
+
+## Prompt 99 — Help that covers every screen, matches the role, and teaches the tasks
+
+**Extended `Help`, did not fork it.** Added `PAGE_TOPICS` (18 admin pages, keyed by page FQCN) alongside the
+existing model-keyed `TOPICS` (now 25 resources), and a `permission` key on EVERY topic derived from the
+screen's own policy `viewAny` (grepped from `app/Policies`, not invented). `allTopics()` unions both;
+`topicsVisibleTo(?User)` filters by `permission === null || $user->can($permission)`. Coverage is now
+**enforced**: `HelpGuidesTest` walks every `*Resource` and every concrete `Filament\Pages\Page`
+(excluding the abstract `ReportPage` and the two help pages) and fails if one has no topic.
+
+**Five task GUIDES** (`Help::GUIDES`), each a walkthrough with the consequence flagged where it bites, gated
+on its FIRST step's permission (`guidesVisibleTo`): new-location (`locations.manage`), add-product
+(`genetics.manage`), eighth-pricing (`pos.use`), taking-payment (`pos.use`), till-day (`till.open`).
+Role filtering is tested **both directions** — STAFF sees the counter/till/payment guides and the
+member/expense/dispensation/order topics but NOT settings, enforcement, RGPD (`Rat`/`DataRequest`), audit
+or users; OWNER sees all; and no guide is ever shown to someone who cannot perform its opening move.
+
+**Eighth-pricing worked example is pinned to code, not typed.** `Help::EIGHTH_EXAMPLE` holds only RAW inputs
+(€10/g, €25/eighth, 30 % member discount, 3.5 g); `Help::eighthExample()` computes the effective rates and
+runs them through `ResolvePrice::applyEighthBreaks` — so the €17.50 the guide shows IS what the till charges
+(post-prompt-90 floor behaviour). `HelpGuidesTest` reproduces the arithmetic independently from the raw
+inputs and asserts equality, that the break is genuinely cheaper, and the saving. The guide view renders
+`eighthExample()` live, so it can never drift.
+
+**Surfaces.** New `Manual` page (`ayuda/manual`, group "Ayuda") renders the role-filtered guides (deep-linked
+by `#guia-<key>`, printable) + the live eighth table + the per-screen topics; `Glosario` slimmed to the
+glossary alone and links to it. The prompt-92 topbar help menu (`data-screen-help`) now lists the guides the
+reader can start (so help is reachable from where the task begins) and links to the Manual. Rules are NAMED,
+never restated as a number — `HelpTest`'s setting-value guard was widened to scan `allTopics()` + `GUIDES`.
+
+**i18n.** All ~146 new Spanish strings added to `lang/es.json` (identity) and `lang/en.json` (English) with
+EN/ES parity gated by `LocalizationTest`; the topic/guide strings are `__($var)` (dynamic, so not
+auto-extracted) — a dedicated `HelpGuidesTest` asserts every one is a key in BOTH files, so English can't
+leak Spanish. Domain terms keep their established English (Members/Batches/Bar & shop…). The Order topic
+title is **"Barra y tienda"** (reusing the glossary key), NOT "Ventas de barra …", to satisfy the prompt-68
+rename guard (`BarSalesRenameTest`).
+
+**Owed / not done:** no browser here — the Manual + help-menu (owner/staff, light/dark, five widths) are
+un-screenshotted; MySQL suite not run locally. Owner-authorised merge (standing "merge all to main").
+776 tests, 773 passed, 3 pre-existing concurrency skips, PHPStan 0.

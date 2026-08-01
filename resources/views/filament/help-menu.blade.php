@@ -1,6 +1,8 @@
-{{-- The shared help affordance (prompt 92): an unobtrusive icon on every panel page, opening a short
-     static panel. Links to the glossary (the club's terms of art) and the per-screen guides. Content only —
-     it never gates or changes anything, and it loads nothing. --}}
+{{-- The shared help affordance (prompts 92 + 99): an unobtrusive icon on every panel page, opening a short
+     static panel. It lists the task guides the reader can actually START (permission-filtered, deep-linked
+     into the manual so help is reachable from where the task begins), and links to the manual and glossary.
+     Content only — it never gates or changes anything, and it loads nothing. --}}
+@php($helpGuides = \App\Support\Help::guidesVisibleTo(auth()->user()))
 <div x-data="{ open: false }" class="relative" data-screen-help>
     <button
         type="button"
@@ -22,12 +24,24 @@
         @keydown.escape.window="open = false"
         class="absolute right-0 z-40 mt-1 w-72 rounded-xl border border-gray-200 bg-white p-2 shadow-lg dark:border-white/10 dark:bg-gray-900"
     >
-        <p class="px-3 py-2 text-xs font-semibold uppercase tracking-wide text-gray-400">{{ __('Ayuda') }}</p>
+        @if (count($helpGuides) > 0)
+            <p class="px-3 py-2 text-xs font-semibold uppercase tracking-wide text-gray-400">{{ __('Guías de tareas') }}</p>
+            @foreach ($helpGuides as $key => $guide)
+                <a href="{{ \App\Filament\Pages\Manual::getUrl().'#guia-'.$key }}" class="flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-gray-700 transition hover:bg-gray-100 dark:text-gray-200 dark:hover:bg-white/5">
+                    <span aria-hidden="true">→</span> {{ __($guide['title']) }}
+                </a>
+            @endforeach
+            <div class="my-1 border-t border-gray-100 dark:border-white/5"></div>
+        @endif
+
+        <a href="{{ \App\Filament\Pages\Manual::getUrl() }}" class="flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-gray-700 transition hover:bg-gray-100 dark:text-gray-200 dark:hover:bg-white/5">
+            <span aria-hidden="true">📘</span> {{ __('Manual: pantallas y tareas') }}
+        </a>
         <a href="{{ \App\Filament\Pages\Glosario::getUrl() }}" class="flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-gray-700 transition hover:bg-gray-100 dark:text-gray-200 dark:hover:bg-white/5">
-            <span>📖</span> {{ __('Glosario de términos del club') }}
+            <span aria-hidden="true">📖</span> {{ __('Glosario de términos del club') }}
         </a>
         <p class="px-3 pb-1 pt-2 text-xs text-gray-500 dark:text-gray-400">
-            {{ __('Cada pantalla explica para qué sirve y qué puedes hacer. Consulta el glosario para los términos.') }}
+            {{ __('Cada pantalla explica para qué sirve y qué puedes hacer. Solo ves la ayuda de lo que tu rol permite.') }}
         </p>
     </div>
 </div>

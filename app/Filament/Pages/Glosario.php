@@ -46,10 +46,10 @@ class Glosario extends Page
     /** @return array<string, mixed> */
     protected function getViewData(): array
     {
+        // Glossary only. The per-screen guides and the task walkthroughs live on the Manual (prompt 99),
+        // where they are filtered to what the reader's role can do; the glossary is for everyone.
         return [
             'terms' => Help::glossary(),
-            // The per-screen guides (layer 2/5): what each screen is for, collected into the help index.
-            'guides' => array_values(Help::TOPICS),
         ];
     }
 }

@@ -99,9 +99,21 @@ class HelpTest extends TestCase
     {
         // The rules are configurable Settings; help must NAME them ("the daily limit"), never state a value.
         // (The eighth is a definitional constant — 3,5 g — not a Setting, so it is legitimately stated.)
+        $guideStrings = [];
+        foreach (Help::GUIDES as $guide) {
+            $guideStrings[] = $guide['title'];
+            $guideStrings[] = $guide['intro'];
+            foreach ($guide['steps'] as $step) {
+                $guideStrings[] = $step['title'];
+                array_push($guideStrings, ...$step['body']);
+            }
+        }
+
         $all = implode(' ', array_merge(
             array_merge(...array_map(fn (array $c): array => [$c['heading'], $c['description']], array_values(Help::EMPTY_STATES))),
-            array_merge(...array_map(fn (array $t): array => array_merge([$t['title']], $t['body']), array_values(Help::TOPICS))),
+            // Resource topics AND page topics AND the task guides — every help string, not just some.
+            array_merge(...array_map(fn (array $t): array => array_merge([$t['title']], $t['body']), array_values(Help::allTopics()))),
+            $guideStrings,
             array_values(Help::glossary()),
         ));
 
