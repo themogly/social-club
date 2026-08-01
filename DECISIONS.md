@@ -3826,3 +3826,36 @@ bundle still carries `--color-brand/ink/surface`.
 languages, light/dark, before/after) are NOT produced. Branch pushed, **NOT merged** (per the prompt, and
 because the visual acceptance can't be self-certified without a browser). 793 tests, 790 passed, 3 skips,
 PHPStan 0, `npm run build` clean.
+
+---
+
+## Prompt 103 — A closed till's Z-report changes after the fact
+
+**Closed sessions read stored figures; open sessions derive live.** `ZReport::for()` merged
+`TillSummary::breakdown()` (recomputed live from the ledger — correct for an OPEN session) with the frozen
+`counted`/`variance`, so a CLOSED session's `expected` followed the ledger forever while `counted`/`variance`
+stayed pinned at cierre. After a routine next-day void the three figures contradicted each other on the face
+of the signed document (and `TillReport`'s totals row: Σesperado − Σcontado ≠ Σdescuadre). Fixed in
+`ZReport::for()` — for `status = CLOSED` and a stored `expected_cents`, `expected` comes from that stored
+figure (written by `CloseTill` under lock); an OPEN session still derives live (prompt 42 depends on it, and it
+is the number the operator counts against). Every consumer (`TillReport`, the `TillSessionInfolist` reprint)
+inherits it. No new storage column — the three stored figures already express it; the marker is derived.
+
+**Post-close void: ALLOW it, freeze the figures, surface the correction.** Two things are both true — a
+next-day correction is legitimate, and yesterday's cash-up must not silently change. So the void is permitted
+(blocking it pushes staff into deleting/re-keying/leaving the error), the session's stored expected/counted/
+variance are untouched, and the amendment is made VISIBLE: `ZReport` returns `post_close_adjusted` (true when
+the live recomputation now differs from the stored figure) plus `expected_live`; `TillReport` flags the row
+(«Cerrada (ajustada tras el cierre)») and the reprinted Z (infolist) shows a warning with the current
+recomputation. This mirrors `RefundDispensation`'s precedent (a cash refund still needs an open till) rather
+than inventing a second pattern.
+
+**The invariant.** `counted − expected === variance` now holds structurally on every closed session (all three
+from storage, `CloseTill` sets `variance = counted − expected`). The **totals row reconciles the closed
+sessions only** — an OPEN session has no arqueo, so its live `expected` is shown per row but excluded from the
+reconciliation total, so an in-progress drawer can't make the total contradict itself. Tested: closed reads
+stored, the void-after-close regression leaves all three unchanged + flags the session, open still tracks live,
+and the totals row is consistent over a mixed open/closed/voided period.
+
+**Owed:** no browser — the till report totals row + a reprinted adjusted Z un-screenshotted. Owner-authorised
+merge (standing "merge + push to main"). 809 tests, 806 passed, 3 pre-existing concurrency skips, PHPStan 0.
