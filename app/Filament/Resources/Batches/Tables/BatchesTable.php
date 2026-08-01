@@ -6,6 +6,9 @@ use App\Actions\Stock\RecordStockMovement;
 use App\Enums\BatchStatus;
 use App\Enums\StockMovementType;
 use App\Models\Batch;
+use App\Support\Spreadsheet\ReportExport;
+use App\Support\Weight;
+use App\ViewModels\BatchRecall;
 use Filament\Actions\Action;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteBulkAction;
@@ -20,6 +23,7 @@ use Filament\Tables\Filters\TrashedFilter;
 use Filament\Tables\Table;
 use Illuminate\Support\Facades\Auth;
 use RuntimeException;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class BatchesTable
 {
@@ -55,6 +59,7 @@ class BatchesTable
                 TrashedFilter::make(),
             ])
             ->recordActions([
+                self::recallAction(),
                 self::adjustAction(),
                 self::mermaAction(),
                 EditAction::make(),
@@ -65,6 +70,45 @@ class BatchesTable
                     RestoreBulkAction::make(),
                 ]),
             ]);
+    }
+
+    /**
+     * Retirada (recall) — who received product from this batch, how much and when, for a health recall
+     * (prompt 86). Read-only; opens the affected-member list and downloads it as CSV. Article 9 data (who
+     * consumed what), so gated on `reports.view` — the same role that sees consumption reports, not everyone
+     * who can view a batch. The batch's status is shown prominently so nobody recalls one still being sold.
+     */
+    protected static function recallAction(): Action
+    {
+        return Action::make('recall')
+            ->label(__('Retirada'))
+            ->icon(Heroicon::OutlinedExclamationTriangle)
+            ->color('danger')
+            ->visible(fn (): bool => Auth::user()?->can('reports.view') ?? false)
+            ->modalHeading(fn (Batch $record): string => __('Retirada de lote :batch', ['batch' => $record->batch_no]))
+            ->modalDescription(fn (Batch $record): string => self::recallSummary($record))
+            ->modalContent(fn (Batch $record) => view('filament.batch-recall', ['recall' => new BatchRecall($record)]))
+            ->modalSubmitActionLabel(__('Descargar CSV'))
+            ->action(fn (Batch $record): StreamedResponse => response()->streamDownload(
+                fn () => print ReportExport::csv((new BatchRecall($record))->table()),
+                'recall-'.$record->batch_no.'.csv',
+                ['Content-Type' => 'text/csv; charset=UTF-8'],
+            ));
+    }
+
+    private static function recallSummary(Batch $batch): string
+    {
+        $t = (new BatchRecall($batch))->totals();
+        $range = $t['first'] !== null && $t['last'] !== null
+            ? $t['first']->format('d/m/Y').' – '.$t['last']->format('d/m/Y')
+            : '—';
+
+        return __(':members socios · :grams · :range · Estado del lote: :status', [
+            'members' => $t['members'],
+            'grams' => Weight::fromCentigrams($t['grams_cg'])->formatted(),
+            'range' => $range,
+            'status' => $batch->status->label(),
+        ]);
     }
 
     /** Ajuste — a signed correction recorded through the stock ledger, in the batch's own unit. */

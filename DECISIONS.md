@@ -2931,3 +2931,55 @@ org-wide member's total position). Location-scoped with a denial test; gated on 
 
 **Screenshots** (both debt types present, light+dark) could not be produced — no browser here; covered by
 `DebtorReportTest` (6 tests). Owner-authorised merge (standing "merge everything to main"). 657 green.
+
+---
+
+## Prompt 86 — Batch recall (who received product from a batch)
+
+**The inverse of the prompt-07 traceability spine.** Prompt 07 answers "where did THIS member's product come
+from"; a health recall asks the other direction — "given this batch, WHO holds product from it, how much, and
+when, so we can reach them." Built as a read-only `App\ViewModels\BatchRecall` over the dispensing history: it
+never alters a dispensation, movement or wallet. One row per affected member (grams total + first/last date +
+contact), aggregated **in SQL** (`GROUP BY member`, `SUM(grams_cg)`, `MIN/MAX(dispensed_at)`) so it does not
+N+1 the batch's whole history. Surfaced as a per-row **Retirada** action on the batches table that opens the
+affected-member list and downloads it as CSV through the existing `ReportExport::csv(ReportTable)` machinery
+(no second export path).
+
+**Completeness over tidiness — voided and refunded lines are INCLUDED and labelled, not filtered.** A voided
+dispensation still means product physically left the counter at some point; a refund may mean only some came
+back. For a *health* recall, dropping either risks missing someone who has product in hand. Each is counted
+(`SUM(CASE WHEN status='VOIDED')`, and a `refunds`⋈`dispensations` id set) and shown as an `anulada` /
+`reembolsada` flag on the row rather than excluded. The safe error is a name too many, never one too few.
+
+**Recall ignores the batch's own stock and status — that is the whole point.** The batch being recalled is
+precisely the one that is closed, empty or expired; a stock/status filter would hide exactly the case the
+feature exists for. The list reads only the dispensing lines, never `remaining_cg`/`status`/`expires_on`
+(tested: a CLOSED, drained, past-expiry batch still returns its full list). The batch's current status IS
+shown prominently in the modal summary so nobody runs a recall on a batch still being actively sold without
+noticing — surfaced, not enforced.
+
+**By product, org-wide — never narrowed to a home sede.** Members are org-wide; the same batch may have been
+dispensed to members across sedes. The query is by `dispensation_lines.batch_id` with no location scope, so
+pointing the panel at a different sede does not shrink the list (tested). A recall that missed cross-sede
+recipients would be worse than useless.
+
+**Access = `reports.view`, deliberately narrower than batch access.** Who-consumed-what is Article 9
+special-category data, so the recall is gated on `reports.view` — the consumption-report gate — NOT on the
+`stock.manage` gate that merely opens the batches table. A stock manager without `reports.view` sees the batch
+but not the recall action (denial test mounts `ListBatches` and asserts `assertTableActionHidden('recall')`);
+a `reports.view` holder sees it. MANAGER/OWNER hold both; STAFF holds neither.
+
+**Not built (recommended, with reasons):** (1) a one-click "quarantine this batch" from the recall modal was
+declined — quarantine is a stock-status change owned by the stock writer and a different permission; the modal
+instead surfaces the current status and the operator quarantines through the existing batch action, keeping
+one writer. (2) Auto-notifying affected members (push/email) was NOT built — a recall is a legally and
+medically sensitive broadcast that must be composed and authorised by a human, not fired by opening a modal;
+the CSV hands the treasurer/secretary the exact contact list to act on. Both are logged here as the next
+step if the club wants them.
+
+**Tests:** `BatchRecallTest` (8) — one row per member with correct summed total and MIN/MAX date range;
+different-batch recipient excluded; voided + refunded included and labelled; closed/empty/expired batch still
+returns the full list; CSV lists the same members; cross-sede not narrowed by active location; recall action
+hidden from a `stock.manage`-only viewer and visible to a `reports.view` holder. **Screenshots** (recall
+modal, light+dark) not produced — no browser here. Owner-authorised merge (standing "merge everything to
+main"). 665 green (662 passed, 3 pre-existing concurrency skips).
