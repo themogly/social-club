@@ -4443,3 +4443,37 @@ Tests (`IdempotencyRaceTest`): the unique index exists on both tables; a sequent
 moves stock once (pre-check path); a race-loser returns the winner without throwing and rolls its own stock move
 back (catch path) — for both a dispensation and an order. `composer check` green (892 tests, 889 passed, 3
 pre-existing skips, PHPStan 0). No user-facing copy (the fix is silent by design).
+
+## Prompt 101 — Dashboard stat cards clip their own content
+
+The stat card (`.csc-card`) has `overflow: hidden` (for its rounded corners + spark), and its header is a flex row
+`icon · label · delta` where `.csc-card-label` had no `min-width: 0`. A flex item defaults to `min-width: auto`
+(won't shrink below its content), so a long label pushed the delta out and was clipped by the card rather than
+truncating. Fixed in `resources/views/filament/pages/partials/dashboard-styles.blade.php`:
+- `.csc-card-label` → `flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;`
+  (takes the free space and truncates with an ellipsis; the delta stays visible).
+- `.csc-card-head` → `min-width: 0` (so the head can shrink within the card).
+- `.csc-card-body > div` → `min-width: 0` and `.csc-card-value` → `overflow-wrap: anywhere` (a long figure wraps
+  beside the ring instead of clipping).
+
+## Verification gap
+
+Required tests not run here (no browser):
+- Screenshot the dashboard stat cards across 1440 / 1280 / 1024 / 390 and a short laptop height, light AND dark,
+  asserting no stat card clips its label or value (long labels show an ellipsis; long values wrap).
+
+What I changed that these would exercise:
+- `dashboard-styles.blade.php` — the `.csc-card-label` / `.csc-card-head` / `.csc-card-body > div` /
+  `.csc-card-value` rules above (the flex `min-width:0` + `text-overflow` truncation mechanism).
+
+What I believe the result should be:
+- No stat card clips content at any width: the label truncates to an ellipsis when it can't fit (delta still
+  visible), and a long value wraps rather than being cut by the card's `overflow:hidden`.
+
+Also noted (deferred): the relation-manager TAB row clipping flagged in prompt 119 is a Filament resource-tabs
+component, not a dashboard card — the same `min-width:0` defect class but a different surface; left for a
+Filament-theme pass rather than fixed blind here. Separately observed a PRE-EXISTING flake (not from this branch):
+`TemporaryMemberTest::test_enrolling_a_temporary_member_computes_the_expiry_from_the_window` intermittently fails a
+`diffInDays == 30` assertion under full-suite timing — worth hardening now that CI (prompt 117) runs the suite.
+
+`composer check` green (892 tests, 889 passed, 3 pre-existing skips, PHPStan 0). Pure CSS/Blade — no logic tests.
