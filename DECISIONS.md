@@ -3021,3 +3021,60 @@ signatory cannot be changed; the PDF names the signatory when recorded and shows
 the sign action is visible to a signer and hidden from a manager. `FormCompletenessTest` allowlist documents
 `signed_by` as system-set. **Screenshots** (infolist signatory row, signed acta PDF) not produced — no browser
 here. Owner-authorised merge (standing "merge everything to main"). 673 green (670 passed, 3 concurrency skips).
+
+---
+
+## Prompt 88 — Convocatoria de asamblea (convene an assembly, email the membership)
+
+**The club had no way to convene a general assembly or email its members.** Built a `Convocatoria` (the
+formal notice) + `ConvocatoriaRecipient` (the roll), a Filament resource under "Documentos" to draft and
+issue one, a per-member `ConvocatoriaMail`, and the one writer that ties it together —
+`App\Actions\Governance\IssueConvocatoria`. A DRAFT is editable; issuing freezes it.
+
+**The recipient roll is FROZEN at issue and never recomputed.** `IssueConvocatoria` snapshots every member
+of the association as-at the notice date (joined by now, not yet left — the same "as-at" semantics the acta
+quorum uses, so the convened roll and the quorum agree) into `convocatoria_recipients` with their
+number/name/email AS THEY WERE. The point of the roll is to evidence exactly who was convened, which cannot
+change even as the membership does — a test proves a member who joins *after* issue is never added to a
+stored roll. `roll_count`, `quorum_required` (roll × `minute_quorum_fraction_bp`) and `notice_days` are all
+frozen onto the row at the same instant.
+
+**One separate email per member — never a shared To/CC.** Each recipient with an address gets its own
+`Mail::to($email)->queue(...)` message (queued after the DB commit), so the whole membership's addresses are
+never leaked to every recipient. A test asserts one queued `ConvocatoriaMail` per member AND that each
+carries exactly one `to`. The mailable carries scalars (not the model) so it renders in `/dev/mail` and the
+permanent `MailRenderTest` without a database.
+
+**Members with no email are recorded as un-notified, not dropped.** A member without an address still gets a
+roll row, flagged `NO_EMAIL` with `notified_at = null`, so the club can see (and reach another way) exactly
+who it could not email. Silent omission was the specific failure to avoid.
+
+**The notice period BLOCKS.** `assembly_notice_days` (default 15, now an editable org Setting on the settings
+page) is the legal minimum between issuing and holding; `IssueConvocatoria` refuses an assembly sooner than
+`now + notice_days` (too-short notice invalidates the assembly), leaving nothing issued and nothing sent.
+
+**Permissioned, audited, immutable, linked.** Gated on `minutes.manage` (governance — the same authority as
+actas; STAFF denied, tested at the action AND the Filament index). Issuing writes a `convocatoria.issued`
+audit row (counts + notice/quorum, no PII). An issued convocatoria is immutable (`Convocatoria::booted`
+refuses update/delete; policy withholds edit/delete). The acta references the convocatoria that called the
+meeting (`minutes.convocatoria_id`, surfaced on the acta form).
+
+**A general assembly is of the ASSOCIATION.** The roll is always the whole org; the convocatoria's `location`
+is only the venue, never a filter on who is convened — documented in `IssueConvocatoria`.
+
+**RGPD:** `convocatoria_recipients` snapshots name + email, so `AnonymiseMember` now redacts that snapshot
+(name → `[borrado]`, email → null) on erasure while keeping the row + NOTIFIED/NO_EMAIL status as the
+assembly's convening evidence. Documented in `AnonymiseMember::COVERED_MEMBER_TABLES` (the RGPD-completeness
+guard passes).
+
+**Also fixed (was blocking the green gate):** `DemoDataSeeder::seedOrders` committed a fortnight of bar
+sales against fixed seeded article stock and intermittently exhausted an article ("Insufficient stock for
+article Coffee/Water"), a real flaky-seed bug. It now re-reads live stock each line, sells only articles
+still in stock and bounds the quantity to what remains — 4/4 clean seed runs.
+
+**Tests:** `ConvocatoriaTest` (9 — frozen/never-recomputed roll, one-mail-per-member never shared,
+no-email un-notified, notice-period block, frozen quorum/notice, no double-issue, immutability, permission
+denial, acta↔convocatoria link) + `ConvocatoriaResourceTest` (3 — index denied to staff, loads for
+governance, issue-from-table freezes + queues). Mailable in `MailRenderTest` + `/dev/mail`. **Screenshots**
+(resource, issue modal, frozen roll, email) not produced — no browser here. Owner-authorised merge (standing
+"merge everything to main"). 685 green (682 passed, 3 concurrency skips).

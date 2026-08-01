@@ -41,6 +41,7 @@ class ManageSettings extends Page
         'member_number_padding' => SettingType::INT,
         'min_age' => SettingType::INT,
         'carencia_days' => SettingType::INT,
+        'assembly_notice_days' => SettingType::INT,
         'monthly_window' => SettingType::STRING,
         'active_member_cap' => SettingType::INT,
         'stock_ceiling_days' => SettingType::INT,
@@ -128,6 +129,10 @@ class ManageSettings extends Page
                             ->label(__('Quórum de actas (%)'))
                             ->numeric()->minValue(1)->maxValue(100)->required()
                             ->helperText(__('% de socios activos necesario para el quórum de una asamblea.')),
+                        TextInput::make('assembly_notice_days')
+                            ->label(__('Plazo de convocatoria (días)'))
+                            ->numeric()->minValue(0)->required()
+                            ->helperText(__('Días mínimos entre emitir una convocatoria y celebrar la asamblea.')),
                     ])->columns(3),
 
                 Section::make(__('Cumplimiento'))

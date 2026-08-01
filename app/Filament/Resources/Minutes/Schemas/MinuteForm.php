@@ -4,6 +4,7 @@ namespace App\Filament\Resources\Minutes\Schemas;
 
 use App\Enums\MinuteBook;
 use App\Filament\Resources\Minutes\MinuteResource;
+use App\Models\Convocatoria;
 use App\Models\Location;
 use App\Models\Member;
 use App\Models\Minute;
@@ -55,6 +56,15 @@ class MinuteForm
                             ->label(__('Sede'))
                             ->placeholder(__('General (organización)'))
                             ->options(fn (): array => Location::query()->orderBy('name')->pluck('name', 'id')->all()),
+
+                        Select::make('convocatoria_id')
+                            ->label(__('Convocatoria'))
+                            ->placeholder(__('Sin convocatoria vinculada'))
+                            ->helperText(__('La convocatoria que llamó a esta asamblea, si la hubo.'))
+                            ->options(fn (): array => Convocatoria::query()
+                                ->whereNotNull('issued_at')
+                                ->orderByDesc('held_at')
+                                ->pluck('title', 'id')->all()),
                     ])
                     ->columns(2),
 
