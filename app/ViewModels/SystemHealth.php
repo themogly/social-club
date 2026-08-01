@@ -55,6 +55,17 @@ class SystemHealth
     }
 
     /**
+     * The audit-log retention sweep (audit:redact-retention). Goes stale — red — if it stops running, so a
+     * declared retention period is proven to be APPLIED, not just configured (prompt 112).
+     *
+     * @return array{last_at: ?CarbonInterface, age_seconds: ?int, stale: bool, threshold_seconds: int}
+     */
+    public function auditRetentionSweep(): array
+    {
+        return $this->component('audit-retention-sweep', self::DAILY_STALE_SECONDS);
+    }
+
+    /**
      * @return array{last_at: ?CarbonInterface, age_seconds: ?int, stale: bool, threshold_seconds: int}
      */
     private function component(string $component, int $threshold): array

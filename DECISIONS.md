@@ -4014,3 +4014,38 @@ can never free-type it.
 
 **Owed:** no browser — the article stock-movement history (opening intake + restock row) is un-screenshotted.
 Owner-authorised merge. 835 tests, 832 passed, 3 pre-existing skips, PHPStan 0.
+
+---
+
+## Prompt 112 — The ROPA promised an audit retention the code never applied
+
+`audit_retention_days` (3650) was declared, rendered into the RAT as a binding retention statement, printed
+under the audit-log screen and reported by SystemHealth — and nothing ever pruned an audit row, so the register
+grew forever: a stated retention never applied is worse than none.
+
+**Redact, not delete (decision).** The register is described — in the ROPA and the UI — as INALTERABLE, and the
+model already sanctions exactly one reason to touch an existing row: an Art.17 REDACTION masking payloads (the
+`$redacting` flag). The retention sweep reuses that: `audit:redact-retention` nulls the `before`/`after`
+payloads of entries past retention, keeping each row's identity (action, actor, subject, date) so the register
+stays inalterable and the SHAPE of past activity survives while the special-category detail is removed.
+Deletion was the other defensible answer, but it contradicts "inalterable", would need a NEW exception to the
+append-only guard, and the ROPA already says "anonimización al vencer" — redaction makes the document true with
+the least change. Trade-off recorded: redaction does not bound the table's row count; if size ever matters,
+archival is separate future work.
+
+**Accounts for its own gap.** Each run that redacts anything writes ONE summary entry (`audit.retention.redacted`,
+count + up-to date), which is itself exempt from the sweep — an audit trail with an unexplained hole is worse
+than a truncated one. Batched via `chunkById` (the table is unbounded); `--dry-run`; a `audit-retention-sweep`
+heartbeat so `SystemHealth` shows it RED if it stops running (a number with no mechanism is what caused this).
+Scheduled daily in `routes/console.php` — scheduled-only, no user-facing delete/edit path (tested: a user delete
+or edit through the model throws).
+
+**ROPA updated** to say member data is anonymised AND the audit register is redacted at retention, so document
+and behaviour ship together.
+
+**Declared-retention sweep.** `data_retention_days` → `PurgeExpiredMembers` (members) ✓; audit → this ✓; the
+per-activity retentions for check-ins/consents/data-requests/member-documents/convocatoria-recipients are all
+covered by `AnonymiseMember` (its COVERED_MEMBER_TABLES enumerates why). No declared period is now un-applied.
+
+**Owed:** no browser — the audit-log + SystemHealth screenshots are not produced. Owner-authorised merge. 843
+tests, 840 passed, 3 pre-existing skips, PHPStan 0.
