@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Enums\IdDocumentType;
 use App\Enums\MemberDocumentType;
 use App\Enums\MemberKind;
+use App\Enums\MembershipStatus;
 use App\Enums\MemberStatus;
 use App\Models\Concerns\BelongsToOrganisation;
 use App\Support\DocumentDrift;
@@ -253,5 +254,15 @@ class Member extends Model implements Authenticatable
     public function scopeActive(Builder $query): Builder
     {
         return $query->where('status', MemberStatus::ACTIVE);
+    }
+
+    /**
+     * Derived (prompt 93) — a member with NO active membership looks fine on their record but cannot be
+     * dispensed to at the counter. Never stored; queried live.
+     */
+    public function hasActiveMembership(): bool
+    {
+        return $this->memberships()->withoutGlobalScopes()
+            ->where('status', MembershipStatus::ACTIVE->value)->exists();
     }
 }

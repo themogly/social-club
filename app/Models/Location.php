@@ -66,4 +66,14 @@ class Location extends Model
     {
         return $query->where('active', true);
     }
+
+    /**
+     * Derived (prompt 93) — a location with NO active price is a counter that can sell nothing. Never
+     * stored; queried live over the per-location GeneticPrice rows.
+     */
+    public function hasActivePrices(): bool
+    {
+        return GeneticPrice::query()->withoutGlobalScopes()
+            ->where('location_id', $this->id)->where('active', true)->exists();
+    }
 }
