@@ -18,6 +18,7 @@ use App\Exceptions\DispensationBlockedException;
 use App\Exceptions\LimitExceededException;
 use App\Exceptions\ScanRateLimitedException;
 use App\Exceptions\TillClosedException;
+use App\Livewire\Counter\Concerns\CollectsMembershipFees;
 use App\Livewire\Counter\Concerns\HandlesTender;
 use App\Livewire\Counter\Concerns\IdentifiesOperator;
 use App\Livewire\Counter\Concerns\ResolvesCounterLocation;
@@ -74,7 +75,7 @@ use RuntimeException;
 #[Layout('components.layouts.counter')]
 class DispensaryPos extends Component
 {
-    use HandlesTender, IdentifiesOperator, ResolvesCounterLocation;
+    use CollectsMembershipFees, HandlesTender, IdentifiesOperator, ResolvesCounterLocation;
 
     // --- Identity ---------------------------------------------------------------
 
@@ -263,6 +264,35 @@ class DispensaryPos extends Component
     public function selectMember(string $memberId): void
     {
         $this->holdMember($memberId, scanned: false);
+    }
+
+    /**
+     * Collect the held socio's outstanding fee inline on the POS card (prompt 127), through the SAME shared
+     * concern the till and Socios tab use — so the operator does not have to break off a basket to send them to
+     * another screen. A CASH fee needs the open till; a WALLET fee does not. On success the counter verdict
+     * re-resolves and the unpaid_fee warning clears itself, unblocking the dispensation.
+     */
+    public function collectMemberFee(): void
+    {
+        if (! $this->requireOperator()) {
+            return;
+        }
+
+        $user = $this->currentUser();
+        if ($user === null || ! $user->can('membership.fee.collect')) {
+            $this->flash(__('No tienes permiso para cobrar cuotas.'), 'error');
+
+            return;
+        }
+
+        $location = $this->resolveLocation();
+        $member = $this->resolveMember();
+        if ($location === null || $member === null) {
+            return;
+        }
+
+        $result = $this->collectInlineFeeFor($member, $this->openTillSession($location), $location, $user);
+        $this->flash($result['message'], $result['type']);
     }
 
     public function clearMember(): void
@@ -938,6 +968,7 @@ class DispensaryPos extends Component
         $limits = null;
         $membership = null;
         $walletCents = 0;
+        $openTill = $location !== null ? $this->openTillSession($location) : null;
 
         if ($member !== null && $location !== null) {
             $verdict = (new ResolveMemberEligibility)->handle($member, $location, 'counter');
@@ -976,7 +1007,7 @@ class DispensaryPos extends Component
             'activeGenetic' => $this->activeGeneticId !== null ? Genetic::query()->find($this->activeGeneticId) : null,
             'activeGeneticBatches' => $this->activeGeneticBatches($location),
             'activeGeneticPriceCents' => $this->activeGeneticRateCents($location, $member),
-            'openTill' => $location !== null ? $this->openTillSession($location) : null,
+            'openTill' => $openTill,
             'requireSignature' => $this->signatureRequired(),
             'requireCheckedIn' => $this->checkedInRequired(),
             'cameraScanEnabled' => (bool) Settings::get('camera_scan_enabled', false),
@@ -984,6 +1015,10 @@ class DispensaryPos extends Component
             'overridableRules' => $verdict !== null ? $this->overridableRules($verdict) : [],
             'canOverride' => $this->userCan('limits.override'),
             'canVoid' => $this->userCan('dispensation.void'),
+            // Inline fee (prompt 127): the collect action follows the unpaid-fee verdict onto the POS card.
+            'canCollectFee' => $this->userCan('membership.fee.collect'),
+            'feeOwedCents' => $membership !== null ? $this->owedCents($membership) : 0,
+            'openTillPresent' => $openTill !== null,
             // Bar side of the same visit (prompt 118) — only where the sede runs a bar. barArticles feeds the
             // quick-add; barLines + barTotalCents render the in-progress bar basket.
             'barEnabled' => $location !== null && (bool) Settings::get('bar_enabled', true, $location->id),

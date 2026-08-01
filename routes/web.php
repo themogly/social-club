@@ -14,6 +14,7 @@ use App\Http\Controllers\Socio\PwaController;
 use App\Livewire\Counter\BarPos;
 use App\Livewire\Counter\CheckInScreen;
 use App\Livewire\Counter\DispensaryPos;
+use App\Livewire\Counter\MembershipCounter;
 use App\Livewire\Counter\TillSession;
 use Illuminate\Support\Facades\Route;
 
@@ -50,6 +51,13 @@ Route::middleware(['web', 'auth', 'signed'])
 Route::middleware(['web', 'auth'])
     ->get('/counter/checkin', CheckInScreen::class)
     ->name('counter.checkin');
+
+// Socios — the counter membership tab (prompt 127): find a member, see what's owed, collect a fee. A THIN
+// shell over the shared CollectsMembershipFees concern → RecordFeePayment. Gated in the component on
+// membership.fee.collect.
+Route::middleware(['web', 'auth'])
+    ->get('/counter/members', MembershipCounter::class)
+    ->name('counter.members');
 
 // The till (caja) terminal — same tablet-first pattern as the door. Opening/closing a
 // session and recording cash movements all happen here (never inside Filament, which is

@@ -2,8 +2,10 @@
 
 namespace Tests\Feature\Products;
 
+use App\Actions\Till\OpenTill;
 use App\Enums\BatchStatus;
 use App\Enums\MembershipStatus;
+use App\Enums\MemberStatus;
 use App\Enums\Role;
 use App\Livewire\Counter\DispensaryPos;
 use App\Models\Batch;
@@ -12,10 +14,12 @@ use App\Models\GeneticPrice;
 use App\Models\Location;
 use App\Models\Member;
 use App\Models\Membership;
+use App\Models\MembershipFeePayment;
 use App\Models\MembershipTier;
 use App\Models\Organisation;
 use App\Models\User;
 use App\Support\ActiveScope;
+use App\Support\CounterOperator;
 use Database\Seeders\RolePermissionSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
@@ -87,6 +91,43 @@ class DispensaryPosUnitTest extends TestCase
         ]);
 
         return $member;
+    }
+
+    /** An eligible member whose ACTIVE membership carries an unpaid fee (the POS card flags unpaid_fee). */
+    private function memberOwing(int $feeCents = 2000): Member
+    {
+        $member = Member::factory()->create([
+            'organisation_id' => $this->org->id,
+            'status' => MemberStatus::ACTIVE,
+            'date_of_birth' => now()->subYears(30),
+            'carencia_ends_at' => now()->subDay(),
+        ]);
+        $tier = MembershipTier::factory()->create(['organisation_id' => $this->org->id]);
+        Membership::factory()->create([
+            'organisation_id' => $this->org->id, 'member_id' => $member->id, 'location_id' => $this->location->id,
+            'tier_id' => $tier->id, 'status' => MembershipStatus::ACTIVE, 'fee_cents' => $feeCents,
+        ]);
+
+        return $member;
+    }
+
+    public function test_the_pos_card_collects_an_outstanding_fee_inline(): void
+    {
+        // Prompt 127 Part 2 — the fee action follows the unpaid-fee verdict onto the POS member card, through the
+        // SAME shared concern (RecordFeePayment). A blank amount collects the full owed balance; a CASH fee lands
+        // in the open drawer.
+        $operator = $this->operator();
+        CounterOperator::set($operator); // PIN-identified operator (the POS requires one to attribute the fee)
+        (new OpenTill)->handle($this->location, 'POS-1', 10000, ['operator_id' => $operator->id]);
+        $member = $this->memberOwing(2000);
+
+        Livewire::test(DispensaryPos::class)
+            ->call('selectMember', $member->id)
+            ->assertSee(__('Cobrar cuota pendiente'))
+            ->call('collectMemberFee')
+            ->assertSet('flashType', 'success');
+
+        $this->assertSame(2000, (int) MembershipFeePayment::query()->sum('amount_cents'));
     }
 
     public function test_selecting_a_unit_genetic_shows_the_stepper_and_a_weight_genetic_the_grams_pad(): void

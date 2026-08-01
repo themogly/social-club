@@ -3,34 +3,28 @@
 namespace App\Livewire\Counter;
 
 use App\Actions\Expenses\RecordTillExpense;
-use App\Actions\Memberships\RecordFeePayment;
 use App\Actions\Stock\CommitStockTake;
 use App\Actions\Till\CloseTill;
 use App\Actions\Till\OpenTill;
 use App\Actions\Till\RecordCashMovement;
 use App\Enums\BatchStatus;
 use App\Enums\CashMovementType;
-use App\Enums\FeePaymentMethod;
-use App\Enums\MembershipStatus;
 use App\Enums\StockTakeStatus;
 use App\Enums\TillSessionStatus;
 use App\Enums\UnitType;
-use App\Exceptions\DebtLimitExceededException;
 use App\Exceptions\TillAlreadyOpenException;
 use App\Exceptions\TillClosedException;
+use App\Livewire\Counter\Concerns\CollectsMembershipFees;
 use App\Livewire\Counter\Concerns\IdentifiesOperator;
 use App\Livewire\Counter\Concerns\ResolvesCounterLocation;
 use App\Models\Batch;
 use App\Models\ExpenseCategory;
 use App\Models\Location;
 use App\Models\Member;
-use App\Models\Membership;
-use App\Models\MembershipFeePayment;
 use App\Models\StockTake;
 use App\Models\StockTakeLine;
 use App\Models\TillSession as TillSessionModel;
 use App\Models\User;
-use App\Support\CounterOperator;
 use App\Support\Money;
 use App\Support\Settings;
 use App\Support\TerminalName;
@@ -60,7 +54,7 @@ use RuntimeException;
 #[Layout('components.layouts.counter')]
 class TillSession extends Component
 {
-    use IdentifiesOperator, ResolvesCounterLocation;
+    use CollectsMembershipFees, IdentifiesOperator, ResolvesCounterLocation;
 
     /** The active location id, resolved in mount(). #[Locked] (prompt 75): the client can never retarget the counter's sede. */
     #[Locked]
@@ -140,19 +134,7 @@ class TillSession extends Component
     /** success | warning | error */
     public string $flashType = 'success';
 
-    // --- Fee collection (Cobrar cuota) -----------------------------------------
-
-    /** Org-wide member search to pick who's paying a membership fee. */
-    public string $feeSearch = '';
-
-    /** The held member id — their outstanding fee is resolved live, never stored. */
-    public ?string $feeMemberId = null;
-
-    /** The amount being collected, in euros (partial/instalment allowed). */
-    public string $feeAmount = '';
-
-    /** CASH (into the drawer) or WALLET (posts a FEE ledger movement). */
-    public string $feeMethod = 'CASH';
+    // --- Fee collection (Cobrar cuota) — state + logic live in CollectsMembershipFees (prompt 127) ------
 
     public function mount(): void
     {
@@ -374,136 +356,35 @@ class TillSession extends Component
 
     // --- Fee collection (Cobrar cuota) — the only path that clears unpaid_fee ----
 
-    public function selectFeeMember(string $memberId): void
-    {
-        $this->feeMemberId = $memberId;
-        $this->feeSearch = '';
-    }
-
-    public function clearFeeMember(): void
-    {
-        $this->reset(['feeMemberId', 'feeSearch', 'feeAmount']);
-        $this->feeMethod = 'CASH';
-    }
-
     public function collectFee(): void
     {
+        // The till screen keeps its "open drawer required" gate for BOTH methods (it IS the till). The shared
+        // collectFeeThrough enforces the CASH-needs-a-till rule for callers that allow a wallet fee without one
+        // (the Socios tab); here we pass the resolved open session so behaviour is unchanged (prompt 127).
         $session = $this->resolveOpenSession();
-
-        // A CASH fee MUST attach to an open session (the till-reconciliation invariant); the fee
-        // action lives on the till, so we require the open drawer for either method.
         if ($session === null) {
             $this->flash(__('No hay caja abierta en este terminal.'), 'error');
 
             return;
         }
-
         if (! $this->requireOperator()) {
             return;
         }
-
         $user = $this->currentUser();
-
         if ($user === null || ! $user->can('membership.fee.collect')) {
             $this->flash(__('No tienes permiso para cobrar cuotas.'), 'error');
 
             return;
         }
-
         $location = $this->resolveLocation();
-        $member = $this->feeMemberId !== null ? Member::query()->find($this->feeMemberId) : null;
-
-        if ($member === null || $location === null) {
+        if ($location === null) {
             $this->flash(__('Selecciona un socio.'), 'error');
 
             return;
         }
 
-        // The SAME membership feesPaid() checks: the latest active one at this sede.
-        $membership = $this->outstandingMembership($member, $location);
-
-        if ($membership === null) {
-            $this->flash(__('Este socio no tiene cuota pendiente en esta sede.'), 'error');
-
-            return;
-        }
-
-        $owed = $this->owedCents($membership);
-        $cents = $this->toCents($this->feeAmount);
-
-        if ($cents === null || $cents <= 0) {
-            $this->flash(__('El importe no es válido.'), 'error');
-
-            return;
-        }
-
-        if ($cents > $owed) {
-            $this->flash(__('El importe supera la cuota pendiente (:owed).', ['owed' => $this->money($owed)]), 'error');
-
-            return;
-        }
-
-        $method = $this->feeMethod === 'WALLET' ? FeePaymentMethod::WALLET : FeePaymentMethod::CASH;
-
-        try {
-            (new RecordFeePayment)->handle($membership, $cents, $method, [
-                'till_session_id' => $session->id,
-                'operator_id' => CounterOperator::id() ?? $user->id,
-            ]);
-        } catch (DebtLimitExceededException $e) {
-            $this->flash(__('El monedero no admite el cargo: :reason', ['reason' => $e->getMessage()]), 'error');
-
-            return;
-        }
-
-        $remaining = $owed - $cents;
-        $this->reset(['feeMemberId', 'feeSearch', 'feeAmount']);
-        $this->feeMethod = 'CASH';
-
-        $this->flash($remaining > 0
-            ? __('Cuota parcial cobrada. Pendiente: :remaining', ['remaining' => $this->money($remaining)])
-            : __('Cuota cobrada por completo.'), 'success');
-    }
-
-    /** The member's outstanding membership at this sede (latest active with a balance), or null. */
-    private function outstandingMembership(Member $member, Location $location): ?Membership
-    {
-        $membership = $member->memberships()->withoutGlobalScopes()
-            ->where('location_id', $location->id)
-            ->where('status', MembershipStatus::ACTIVE->value)
-            ->latest('id')->first();
-
-        return ($membership !== null && $this->owedCents($membership) > 0) ? $membership : null;
-    }
-
-    private function owedCents(Membership $membership): int
-    {
-        $paid = (int) MembershipFeePayment::query()->where('membership_id', $membership->id)->sum('amount_cents');
-
-        return max(0, $membership->fee_cents->cents - $paid);
-    }
-
-    /**
-     * Org-wide socio search — the SAME by-name/member_no query the dispensary POS uses.
-     *
-     * @return Collection<int, Member>|null
-     */
-    private function feeSearchResults(): ?Collection
-    {
-        $term = trim($this->feeSearch);
-
-        if (mb_strlen($term) < 2) {
-            return null;
-        }
-
-        return Member::query()
-            ->where(fn ($q) => $q
-                ->where('first_name', 'like', '%'.$term.'%')
-                ->orWhere('last_name', 'like', '%'.$term.'%')
-                ->orWhere('member_no', 'like', '%'.$term.'%'))
-            ->orderBy('last_name')
-            ->limit(8)
-            ->get();
+        $result = $this->collectFeeThrough($session, $location, $user);
+        $this->flash($result['message'], $result['type']);
     }
 
     // --- Blind close (arqueo) --------------------------------------------------
