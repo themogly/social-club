@@ -128,7 +128,7 @@ class DispensaryPosScreenTest extends TestCase
         Livewire::test(DispensaryPos::class)
             ->assertOk()
             ->assertSet('noLocation', false)
-            ->assertSee(__('Escanear tarjeta de socio'))
+            ->assertSee(__('Escanear tarjeta o buscar socio'))
             ->assertSee($this->genetic->name); // the genetics grid lists the priced sede genetic
     }
 

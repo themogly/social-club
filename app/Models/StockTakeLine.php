@@ -18,6 +18,7 @@ class StockTakeLine extends Model
     protected $fillable = [
         'stock_take_id', 'countable_type', 'countable_id',
         'counted_cg', 'counted_units', 'expected_cg', 'expected_units', 'variance_cg', 'variance_units',
+        'not_counted', 'not_counted_reason',
     ];
 
     protected function casts(): array
@@ -29,6 +30,7 @@ class StockTakeLine extends Model
             'expected_units' => 'integer',
             'variance_cg' => WeightCast::class,
             'variance_units' => 'integer',
+            'not_counted' => 'boolean',
         ];
     }
 

@@ -117,7 +117,13 @@ class TillSession extends Component
     /** @var array<string, string> batch id => counted grams (blind entry). */
     public array $reweighCounts = [];
 
-    /** @var list<array{name: string, counted: string, variance: string, adjusted: bool}>|null Revealed after commit. */
+    /** @var array<string, bool> batch id => marked "not counted" (could not be weighed) this reweigh (prompt 91). */
+    public array $reweighNotCounted = [];
+
+    /** @var array<string, string> batch id => why a batch was not counted (required when not counted). */
+    public array $reweighReasons = [];
+
+    /** @var list<array{name: string, counted: ?string, variance: ?string, adjusted: bool, not_counted: bool, reason: ?string, repeated: bool}>|null Revealed after commit. */
     public ?array $reweighResult = null;
 
     /**
@@ -563,9 +569,23 @@ class TillSession extends Component
         $counts = [];
 
         foreach ($batches as $batch) {
+            // Escape hatch (prompt 91): a jar that cannot be weighed is marked "not counted" WITH A REASON —
+            // the close proceeds and its stock is left untouched. Never a silent skip, never a fake number.
+            if ($this->reweighNotCounted[$batch->id] ?? false) {
+                $reason = trim($this->reweighReasons[$batch->id] ?? '');
+                if ($reason === '') {
+                    $this->flash(__('Indica por qué no se pudo contar el lote.'), 'error');
+
+                    return;
+                }
+                $counts[] = ['type' => 'batch', 'id' => $batch->id, 'not_counted' => true, 'reason' => $reason];
+
+                continue;
+            }
+
             $raw = trim($this->reweighCounts[$batch->id] ?? '');
             if ($raw === '' || ! is_numeric($raw) || (float) $raw < 0) {
-                $this->flash(__('Introduce el peso contado de cada lote de flor.'), 'error');
+                $this->flash(__('Introduce el peso contado de cada lote, o márcalo como no contado.'), 'error');
 
                 return;
             }
@@ -589,6 +609,17 @@ class TillSession extends Component
 
         $this->reweighResult = $batches->map(function (Batch $batch) use ($linesByBatch): array {
             $line = $linesByBatch->get($batch->id);
+
+            if ($line !== null && $line->not_counted) {
+                return [
+                    'name' => trim($batch->genetic->name.' · '.$batch->batch_no),
+                    'counted' => null, 'variance' => null, 'adjusted' => false,
+                    'not_counted' => true, 'reason' => $line->not_counted_reason,
+                    // Flag a jar that keeps escaping the count — exactly what a count exists to catch.
+                    'repeated' => $this->wasRecentlyNotCounted($batch->id, (string) $line->stock_take_id),
+                ];
+            }
+
             $variance = $line?->variance_cg->centigrams ?? 0;
             $counted = $line?->counted_cg->centigrams ?? 0;
 
@@ -597,13 +628,59 @@ class TillSession extends Component
                 'counted' => Weight::fromCentigrams($counted)->formatted(),
                 'variance' => Weight::fromCentigrams($variance)->formatted(),
                 'adjusted' => $variance !== 0,
+                'not_counted' => false, 'reason' => null, 'repeated' => false,
             ];
         })->all();
 
         $this->reweighDone = true;
         $this->reweighing = false;
         $this->reweighCounts = [];
+        $this->reweighNotCounted = [];
+        $this->reweighReasons = [];
         $this->flash(__('Recuento de flor registrado.'), 'success');
+    }
+
+    /** Toggle a batch between "counted" (needs a weight) and "not counted" (needs a reason) — prompt 91. */
+    public function toggleNotCounted(string $batchId): void
+    {
+        $this->reweighNotCounted[$batchId] = ! ($this->reweighNotCounted[$batchId] ?? false);
+        if ($this->reweighNotCounted[$batchId]) {
+            $this->reweighCounts[$batchId] = ''; // a not-counted jar has no weight
+        }
+    }
+
+    /**
+     * Progress for the reweigh panel: how many of the touched batches have a decision (a weight OR a
+     * not-counted mark). Gives staff something to anchor against on a long list (prompt 91).
+     *
+     * @return array{done: int, total: int}
+     */
+    public function reweighProgress(): array
+    {
+        $batches = $this->reweighBatches();
+        $done = 0;
+        foreach ($batches as $batch) {
+            $marked = $this->reweighNotCounted[$batch->id] ?? false;
+            $weighed = trim($this->reweighCounts[$batch->id] ?? '') !== '';
+            if ($marked || $weighed) {
+                $done++;
+            }
+        }
+
+        return ['done' => $done, 'total' => $batches->count()];
+    }
+
+    /** Has this batch already been left "not counted" in a recent committed count (a jar that keeps escaping)? */
+    private function wasRecentlyNotCounted(string $batchId, string $exceptStockTakeId): bool
+    {
+        return StockTakeLine::query()
+            ->where('countable_type', Batch::class)
+            ->where('countable_id', $batchId)
+            ->where('not_counted', true)
+            ->where('stock_take_id', '!=', $exceptStockTakeId)
+            ->whereHas('stockTake', fn ($q) => $q->where('status', StockTakeStatus::COMMITTED->value)
+                ->where('committed_at', '>=', now()->subDays(60)))
+            ->exists();
     }
 
     public function submitCount(): void

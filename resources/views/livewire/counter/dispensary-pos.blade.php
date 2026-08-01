@@ -51,14 +51,20 @@
             </div>
         @endif
 
-        <div class="grid gap-4 lg:grid-cols-2 xl:grid-cols-[19rem_minmax(0,1fr)_21rem] xl:items-start">
+        {{-- Prompt 91 — the SAME basket-column pattern batch 2 gave the bar POS (the dispensary was never
+             given it): at lg (1024, the counter's tablet-first width) the basket + contribution (RIGHT) is
+             pinned to a dedicated column 2 spanning both rows, so socio (LEFT) + genetics (CENTRE) stack in
+             column 1 with no dead space and the primary action stays top-right. At xl the RIGHT div resets
+             to auto-placement for the 3-column sidebar layout. Kept identical to bar-pos on purpose — one
+             layout, asserted by both PosLayout tests. --}}
+        <div class="grid gap-4 lg:grid-cols-[minmax(0,1fr)_22rem] lg:items-start xl:grid-cols-[19rem_minmax(0,1fr)_21rem]">
 
             {{-- ================= LEFT: the socio ================= --}}
             <div class="flex flex-col gap-4">
                 {{-- Identify --}}
                 <section class="rounded-2xl border border-line bg-surface p-4 dark:border-slate-800 dark:bg-slate-900">
                     <form wire:submit="submitScan">
-                        <label for="scan" class="block text-sm font-medium text-ink-muted dark:text-slate-400">{{ __('Escanear tarjeta de socio') }}</label>
+                        <label for="scan" class="block text-sm font-medium text-ink-muted dark:text-slate-400">{{ __('Escanear tarjeta o buscar socio') }}</label>
                         <input
                             id="scan"
                             type="text"
@@ -66,7 +72,7 @@
                             autofocus
                             autocomplete="off"
                             spellcheck="false"
-                            placeholder="{{ __('Escanea o escribe el código y pulsa Enter') }}"
+                            placeholder="{{ __('Escanea la tarjeta, o escribe nombre / nº y pulsa Enter') }}"
                             class="mt-2 h-12 w-full rounded-xl border border-line bg-surface px-4 text-base text-ink placeholder:text-ink-muted focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/40 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
                         >
                     </form>
@@ -425,7 +431,9 @@
             </div>
 
             {{-- ================= RIGHT: the basket + contribution ================= --}}
-            <div class="flex flex-col gap-4">
+            {{-- Pinned to column 2 spanning both rows at lg so it never drops below the genetics grid into
+                 dead space; auto-placement at xl for the 3-column sidebar (prompt 91, mirrors bar-pos). --}}
+            <div class="flex flex-col gap-4 lg:col-start-2 lg:row-start-1 lg:row-span-2 xl:col-auto xl:row-auto">
                 {{-- No open till → unmistakable, blocks commit. --}}
                 @unless ($openTill)
                     <div class="rounded-2xl border border-error/40 bg-error/10 p-4 text-sm">
@@ -472,6 +480,13 @@
                         @endforelse
                     </ul>
 
+                    {{-- Progressive disclosure (prompt 91): the whole payment apparatus — total, price
+                         override, tender, the signature canvas and the commit — appears only once the
+                         transaction has taken shape (a line in the basket). Before that there is nothing to
+                         pay for, so the two first actions (identify a socio, choose a genetic) are not pushed
+                         into the margin by a payment form for a transaction that does not exist. This governs
+                         what is SHOWN; once shown, blocked controls still stay clickable and explain (prompt 60). --}}
+                    @if (! empty($basketLines))
                     {{-- Total --}}
                     <div class="mt-3 flex items-center justify-between rounded-xl bg-surface-alt px-4 py-3 dark:bg-slate-800">
                         <span class="font-semibold">{{ __('Total aportación') }}</span>
@@ -607,9 +622,17 @@
                         </div>
                     @endif
 
-                    {{-- Commit — disabled ONLY when offline (prompt 60). Every other blocked state (no socio,
-                         empty basket, a hard block, missing signature) stays CLICKABLE, and commit() flashes
-                         its reason into the colocated block above — never a silent dead control. --}}
+                    @else
+                        {{-- Empty basket: no heavy payment apparatus (tender, signature, breakdown), just the
+                             next step. The commit stays below (prompt 60), it simply has nothing to charge yet. --}}
+                        <p data-empty-basket-hint class="mt-3 rounded-xl border border-dashed border-line px-4 py-6 text-center text-sm text-ink-muted dark:border-slate-700 dark:text-slate-400">
+                            {{ __('Identifica a un socio y añade una genética para empezar.') }}
+                        </p>
+                    @endif
+
+                    {{-- Commit — ALWAYS shown and disabled ONLY when offline (prompt 60). Every other blocked
+                         state (no socio, empty basket, a hard block, missing signature) stays CLICKABLE, and
+                         commit() flashes its reason into the colocated block above — never a silent dead control. --}}
                     <button
                         type="button"
                         wire:click="commit"

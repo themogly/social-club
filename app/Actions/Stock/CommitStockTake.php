@@ -17,7 +17,11 @@ use Illuminate\Support\Facades\DB;
  * reference) so the ledger reconciles to the counted figure. Never a silent
  * overwrite; permissioned by the caller and audited.
  *
- * @phpstan-type Count array{type: 'batch'|'article', id: string, counted: int}
+ * A count entry may instead be flagged `not_counted` (prompt 91): the omission is recorded as a line with
+ * its reason, and the batch's stock is left UNTOUCHED — NO variance, NO adjustment, NO merma. It is not a
+ * count of zero (that is `counted: 0`); it is "could not weigh this jar", surfaced for a manager to chase.
+ *
+ * @phpstan-type Count array{type: 'batch'|'article', id: string, counted?: int, not_counted?: bool, reason?: ?string}
  */
 class CommitStockTake
 {
@@ -30,7 +34,18 @@ class CommitStockTake
             $recorder = new RecordStockMovement;
 
             foreach ($counts as $count) {
-                $counted = (int) $count['counted'];
+                // "Not counted": record the omission and its reason, touch NOTHING in the ledger.
+                if (($count['not_counted'] ?? false) === true) {
+                    $class = $count['type'] === 'batch' ? Batch::class : Article::class;
+                    $stockTake->lines()->create([
+                        'countable_type' => $class, 'countable_id' => $count['id'],
+                        'not_counted' => true, 'not_counted_reason' => $count['reason'] ?? null,
+                    ]);
+
+                    continue;
+                }
+
+                $counted = (int) ($count['counted'] ?? 0);
 
                 if ($count['type'] === 'batch') {
                     $batch = Batch::withoutGlobalScopes()->findOrFail($count['id']);

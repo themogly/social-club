@@ -223,7 +223,11 @@ class DispensaryPos extends Component
         }
 
         if ($member === null) {
-            $this->flash(__('Tarjeta no reconocida. Inténtalo de nuevo o busca por nombre.'), 'error');
+            // A name (or member number) typed into the scan field falls through to the SAME search
+            // (prompt 91), so the lookup never depends on the operator noticing which of two adjacent boxes
+            // has the cursor. If it really was a card, the search simply returns nothing and they retype.
+            $this->search = $token;
+            $this->flash(__('Tarjeta no reconocida. Buscando por nombre o nº de socio…'), 'warning');
 
             return;
         }
