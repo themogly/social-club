@@ -209,11 +209,15 @@ return [
         'key' => 'spatie.permission.cache',
 
         /*
-         * You may optionally indicate a specific cache driver to use for permission and
-         * role caching using any of the `store` drivers listed in the cache.php config
-         * file. Using 'default' here means to use the `default` set in cache.php.
+         * The cache store used for the permission set. Deliberately NOT 'default' (prompt 124): the default
+         * store is Redis in production, and spatie loads this cache on EVERY $user->can() — so a Redis blip
+         * made every authenticated request (the counter included) throw a 500 before rendering. 'database'
+         * survives a Redis outage (the DB is already a hard dependency — the register cannot be written without
+         * it) AND stays SHARED across workers, so a role edit + `permission:cache-reset` still propagates to
+         * every process (unlike a per-process 'file'/'array' store). Overridable for a single-server box that
+         * prefers 'file'. This is the smallest change with the largest effect — the package's own supported knob.
          */
 
-        'store' => 'default',
+        'store' => env('PERMISSION_CACHE_STORE', 'database'),
     ],
 ];

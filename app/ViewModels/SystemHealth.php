@@ -5,6 +5,7 @@ namespace App\ViewModels;
 use App\Models\HeartbeatLog;
 use App\Support\Settings;
 use Carbon\CarbonInterface;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -91,6 +92,29 @@ class SystemHealth
             'pending' => (int) DB::table('jobs')->count(),
             'failed' => (int) DB::table('failed_jobs')->count(),
         ];
+    }
+
+    /**
+     * The DEFAULT cache store's reachability (prompt 124) — usually Redis. A monitoring page that dies with the
+     * thing it monitors is not monitoring, so this does a trivial round-trip and reports whether it worked,
+     * NEVER throwing. When it is unreachable, authorisation still runs (the permission cache lives on the
+     * `database` store), but the queue is stopped and cached reads fall back to a query — so the page shows it
+     * as degraded rather than failing.
+     *
+     * @return array{store: string, reachable: bool}
+     */
+    public function cache(): array
+    {
+        $store = (string) config('cache.default');
+
+        try {
+            Cache::store($store)->put('csc.health.probe', 1, 10);
+            $reachable = Cache::store($store)->get('csc.health.probe') === 1;
+        } catch (\Throwable) {
+            $reachable = false;
+        }
+
+        return ['store' => $store, 'reachable' => $reachable];
     }
 
     /**

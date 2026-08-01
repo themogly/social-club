@@ -138,6 +138,25 @@
             @endif
         </x-filament::section>
 
+        {{-- Cache / Redis reachability (prompt 124). This page is designed to SURVIVE what it reports on:
+             authorisation runs off the database store, so it renders and simply shows the cache as degraded. --}}
+        <x-filament::section :heading="__('Caché')" icon="heroicon-o-circle-stack">
+            <div style="display:flex;align-items:center;gap:.5rem;margin-bottom:.5rem;">
+                <x-filament::badge :color="$cache['reachable'] ? 'success' : 'danger'">
+                    {{ $cache['reachable'] ? __('Accesible') : __('No accesible') }}
+                </x-filament::badge>
+            </div>
+            <dl style="font-size:.875rem;display:grid;gap:.35rem;">
+                <div style="display:flex;justify-content:space-between;gap:1rem;">
+                    <dt style="opacity:.65;">{{ __('Almacén') }}</dt>
+                    <dd>{{ $cache['store'] }}</dd>
+                </div>
+            </dl>
+            @unless ($cache['reachable'])
+                <p style="margin-top:.6rem;font-size:.8rem;opacity:.75;">{{ __('La caché no responde. El mostrador y la autorización siguen funcionando (permisos en base de datos); las colas están detenidas hasta que se restablezca.') }}</p>
+            @endunless
+        </x-filament::section>
+
         <x-filament::section :heading="__('Copias de seguridad')" icon="heroicon-o-server-stack">
             <dl style="font-size:.875rem;display:grid;gap:.35rem;">
                 <div style="display:flex;justify-content:space-between;gap:1rem;">

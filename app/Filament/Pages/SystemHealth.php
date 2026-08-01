@@ -66,6 +66,7 @@ class SystemHealth extends Page
             'temporarySweep' => (bool) Settings::get('temporary_members_enabled', false) ? $health->temporarySweep() : null,
             'auditRetentionSweep' => $health->auditRetentionSweep(),
             'queue' => $health->queue(),
+            'cache' => $health->cache(),
             'backups' => $health->backups(),
             'auditRetentionDays' => $health->auditRetentionDays(),
             'dataRetentionDays' => $health->dataRetentionDays(),

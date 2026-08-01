@@ -83,6 +83,14 @@ Everything used in code/config appears in `.env.example`. Highlights:
 - **DB:** `DB_CONNECTION=sqlite` locally; production sets the MySQL block (`DB_CONNECTION=mysql`, host,
   db, user, password).
 - **Redis:** `REDIS_CLIENT=predis` (pure-PHP, no extension). `QUEUE_CONNECTION=redis`, `CACHE_STORE=redis`.
+  - **Redis resilience (prompt 124).** `PERMISSION_CACHE_STORE=database` keeps the authorization cache OFF
+    Redis, so a Redis blip does NOT 500 every authenticated screen — the counter keeps trading and the register
+    keeps recording (sessions are already `database`). During an outage: authenticated pages render; the queue
+    (Horizon) stops until Redis returns and nothing dispatched is lost; the login form and any explicit
+    cache/queue call show a stated "infrastructure degraded" message instead of a blank bounce; **Salud del
+    sistema** renders and reports the cache as *No accesible*. Recovery is automatic — Redis returning restores
+    everything with no restart. `database` (not `file`/`array`) so a role edit + `php artisan
+    permission:cache-reset` still propagates across workers; use `file` only on a single-server box.
 - **Mail:** local `MAIL_MAILER=log`. Production uses **Resend** — `composer require resend/resend-laravel`,
   set `MAIL_MAILER=resend` and `RESEND_KEY`, and a verified `MAIL_FROM_ADDRESS`.
 - **Storage:** `FILESYSTEM_DISK` for general uploads. **ID documents & member photos use the separate
