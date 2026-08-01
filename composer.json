@@ -63,6 +63,9 @@
             "vendor/bin/phpstan analyse --no-progress --memory-limit=2G",
             "@php artisan test"
         ],
+        "audit:integrity": [
+            "@php audits/integrity-harness.php"
+        ],
         "test": [
             "@php artisan config:clear --ansi @no_additional_args",
             "@php artisan test"
