@@ -4686,3 +4686,35 @@ cannot silently return). This is the same defect class as prompts 101/116 — st
 owed.
 
 Tests (`DashboardScreenTest::test_delta_bearing_stat_cards_keep_a_readable_label`). `composer check` green.
+
+---
+
+## Prompt 130 — The counter nav overlapped itself on a portrait tablet
+
+**Problem.** Prompt 116 changed the counter screen-switcher labels from `lg:inline` to `md:inline` so labels
+would appear sooner. But prompt 127 then added a fifth destination (the Socios tab), and five icon+label items
+at the `md` breakpoint (768px) do not fit beside the brand/sede block and the right-hand actions on a portrait
+tablet — the three flex regions collided. (116's own code comment still said "labels from lg up", so the `md`
+change had already drifted from its stated intent.)
+
+**Fix — a scrollable strip that fits before it is labelled.** The `<nav>` is now `flex-1 min-w-0
+overflow-x-auto`: it takes only the space between the brand/sede block and the right actions and scrolls
+horizontally within it, so it can NEVER overlap either neighbour. The brand/title block is `min-w-0` and
+truncates (kept rendered at every width so the counter's single `<h1>` is never dropped from the a11y tree);
+the right-hand actions are `shrink-0`. Labels are shown UNIFORMLY only from `lg` up (reverting 116's `md`),
+where a labelled five-item strip actually fits; below that every item is an equal **44px** (`h-11`) icon-only
+target, and the strip scrolls if it still runs out. So labelling is all-or-nothing and only when it fits — never
+a half-labelled or overflowing row.
+
+**Dispensary filter chips.** The Categoría / Tipo / Variedad chips were `px-3 py-1` (~28px) — below the 44px
+touch target the rest of the counter now uses (prompt 116). Raised to `min-h-11` (44px) with `inline-flex
+items-center px-4`; they still wrap (`flex-wrap`), so more chips never overlap.
+
+**Verification gap (owed — no browser here).** The full proof is a bounding-box screenshot at **768 / 800 /
+1024 / 1280**, light and dark, confirming no two interactive elements overlap and the labels appear only where
+they fit. What is asserted without a browser (`CounterScreenSwitcherTest`, +2): the rendered nav is a
+`flex-1` + `overflow-x-auto` strip carrying all five destinations, its items are `h-11`, labels are `hidden
+lg:inline` and `hidden md:inline` is gone, and the dispensary chips are `min-h-11` with the old sub-44px chip
+class removed. Same defect class as 101/116/129 — structural guard now, pixel proof owed.
+
+`composer check` green (915 tests, 912 passed, 3 pre-existing skips, PHPStan 0).

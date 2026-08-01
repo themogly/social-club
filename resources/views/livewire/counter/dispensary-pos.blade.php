@@ -354,9 +354,9 @@
                         <div class="mt-3">
                             <p class="mb-1 text-xs font-medium text-ink-muted dark:text-slate-400">{{ __('Categoría') }}</p>
                             <div role="group" aria-label="{{ __('Categoría') }}" class="flex flex-wrap gap-2">
-                                <button type="button" wire:click="filterCategory(null)" @class(['rounded-full border px-3 py-1 text-sm', 'border-brand bg-brand text-white' => $categoryId === null, 'border-line text-ink-muted dark:border-slate-700 dark:text-slate-400' => $categoryId !== null])>{{ __('Todas') }}</button>
+                                <button type="button" wire:click="filterCategory(null)" @class(['inline-flex items-center rounded-full border min-h-11 px-4 text-sm', 'border-brand bg-brand text-white' => $categoryId === null, 'border-line text-ink-muted dark:border-slate-700 dark:text-slate-400' => $categoryId !== null])>{{ __('Todas') }}</button>
                                 @foreach ($categories as $category)
-                                    <button type="button" wire:click="filterCategory('{{ $category['id'] }}')" @class(['rounded-full border px-3 py-1 text-sm', 'border-brand bg-brand text-white' => $categoryId === $category['id'], 'border-line text-ink-muted dark:border-slate-700 dark:text-slate-400' => $categoryId !== $category['id']])>{{ $category['name'] }}</button>
+                                    <button type="button" wire:click="filterCategory('{{ $category['id'] }}')" @class(['inline-flex items-center rounded-full border min-h-11 px-4 text-sm', 'border-brand bg-brand text-white' => $categoryId === $category['id'], 'border-line text-ink-muted dark:border-slate-700 dark:text-slate-400' => $categoryId !== $category['id']])>{{ $category['name'] }}</button>
                                 @endforeach
                             </div>
                         </div>
@@ -366,9 +366,9 @@
                         <div class="mt-2">
                             <p class="mb-1 text-xs font-medium text-ink-muted dark:text-slate-400">{{ __('Tipo') }}</p>
                             <div role="group" aria-label="{{ __('Tipo') }}" class="flex flex-wrap gap-2">
-                                <button type="button" wire:click="filterProductType(null)" @class(['rounded-full border px-3 py-1 text-sm', 'border-brand bg-brand text-white' => $productType === null, 'border-line text-ink-muted dark:border-slate-700 dark:text-slate-400' => $productType !== null])>{{ __('Todos los tipos') }}</button>
+                                <button type="button" wire:click="filterProductType(null)" @class(['inline-flex items-center rounded-full border min-h-11 px-4 text-sm', 'border-brand bg-brand text-white' => $productType === null, 'border-line text-ink-muted dark:border-slate-700 dark:text-slate-400' => $productType !== null])>{{ __('Todos los tipos') }}</button>
                                 @foreach ($productTypes as $type)
-                                    <button type="button" wire:click="filterProductType('{{ $type['value'] }}')" @class(['rounded-full border px-3 py-1 text-sm', 'border-brand bg-brand text-white' => $productType === $type['value'], 'border-line text-ink-muted dark:border-slate-700 dark:text-slate-400' => $productType !== $type['value']])>{{ $type['label'] }}</button>
+                                    <button type="button" wire:click="filterProductType('{{ $type['value'] }}')" @class(['inline-flex items-center rounded-full border min-h-11 px-4 text-sm', 'border-brand bg-brand text-white' => $productType === $type['value'], 'border-line text-ink-muted dark:border-slate-700 dark:text-slate-400' => $productType !== $type['value']])>{{ $type['label'] }}</button>
                                 @endforeach
                             </div>
                         </div>
@@ -378,9 +378,9 @@
                         <div class="mt-2">
                             <p class="mb-1 text-xs font-medium text-ink-muted dark:text-slate-400">{{ __('Variedad') }}</p>
                             <div role="group" aria-label="{{ __('Variedad') }}" class="flex flex-wrap gap-2">
-                                <button type="button" wire:click="filterStrainType(null)" @class(['rounded-full border px-3 py-1 text-sm', 'border-brand bg-brand text-white' => $strainType === null, 'border-line text-ink-muted dark:border-slate-700 dark:text-slate-400' => $strainType !== null])>{{ __('Todas') }}</button>
+                                <button type="button" wire:click="filterStrainType(null)" @class(['inline-flex items-center rounded-full border min-h-11 px-4 text-sm', 'border-brand bg-brand text-white' => $strainType === null, 'border-line text-ink-muted dark:border-slate-700 dark:text-slate-400' => $strainType !== null])>{{ __('Todas') }}</button>
                                 @foreach ($strainTypes as $variety)
-                                    <button type="button" wire:click="filterStrainType('{{ $variety['value'] }}')" @class(['rounded-full border px-3 py-1 text-sm', 'border-brand bg-brand text-white' => $strainType === $variety['value'], 'border-line text-ink-muted dark:border-slate-700 dark:text-slate-400' => $strainType !== $variety['value']])>{{ $variety['label'] }}</button>
+                                    <button type="button" wire:click="filterStrainType('{{ $variety['value'] }}')" @class(['inline-flex items-center rounded-full border min-h-11 px-4 text-sm', 'border-brand bg-brand text-white' => $strainType === $variety['value'], 'border-line text-ink-muted dark:border-slate-700 dark:text-slate-400' => $strainType !== $variety['value']])>{{ $variety['label'] }}</button>
                                 @endforeach
                             </div>
                         </div>
