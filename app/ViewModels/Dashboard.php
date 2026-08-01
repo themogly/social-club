@@ -253,20 +253,30 @@ class Dashboard
     {
         [$start, $end] = Period::thisMonth()->bounds();
 
-        return Member::query()->withoutGlobalScopes()
+        // The members carrying a per-member monthly override (the only limit this alert measures).
+        $limits = Member::query()->withoutGlobalScopes()
             ->where('organisation_id', $this->organisationId)
             ->whereNotNull('monthly_limit_cg')->where('monthly_limit_cg', '>', 0)
-            ->get(['id', 'monthly_limit_cg'])
-            ->filter(function (Member $member) use ($start, $end): bool {
-                $used = (int) DispensationLine::query()->withoutGlobalScopes()
-                    ->whereHas('dispensation', fn (Builder $q) => $q
-                        ->where('member_id', $member->id)
-                        ->where('status', DispensationStatus::COMPLETED->value)
-                        ->whereBetween('dispensed_at', [$start, $end]))
-                    ->sum('grams_cg');
+            ->pluck('monthly_limit_cg', 'id');
 
-                return $used >= (int) $member->monthly_limit_cg;
-            })->count();
+        if ($limits->isEmpty()) {
+            return 0;
+        }
+
+        // ONE aggregate for this month's COMPLETED grams per member — not a DispensationLine query per member
+        // (prompt 79: the per-member closure was a landing-page N+1, ~401 queries / ~20 s at scale).
+        $used = DispensationLine::query()->withoutGlobalScopes()
+            ->join('dispensations', 'dispensations.id', '=', 'dispensation_lines.dispensation_id')
+            ->whereIn('dispensations.member_id', $limits->keys())
+            ->where('dispensations.status', DispensationStatus::COMPLETED->value)
+            ->whereBetween('dispensations.dispensed_at', [$start, $end])
+            ->groupBy('dispensations.member_id')
+            ->selectRaw('dispensations.member_id as member_id, SUM(dispensation_lines.grams_cg) as used_cg')
+            ->pluck('used_cg', 'member_id');
+
+        return $limits->filter(
+            fn (int $limitCg, string $memberId): bool => (int) ($used[$memberId] ?? 0) >= $limitCg
+        )->count();
     }
 
     public function expiringBatches(): int

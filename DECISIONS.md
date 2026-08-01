@@ -3757,3 +3757,26 @@ reason is required.
 
 **Owed:** none material. Owner-authorised merge. 796 tests, 793 passed, 3 pre-existing concurrency skips,
 PHPStan 0.
+
+---
+
+## Prompt 79 — Performance (dashboard N+1 + audit-log index)
+
+Re-run after the audit found both untouched.
+
+**1. `Dashboard::membersOverLimit()` was an N+1 on the landing page** — a `->get()->filter()` over
+override-carrying members, each running its own `DispensationLine` sum inside the closure (the audit measured
+~401 queries / ~20 s). Rewritten set-based: one `pluck` of the members with a monthly override, then ONE
+grouped aggregate (`JOIN dispensations … GROUP BY member_id, SUM(grams_cg)`) of this month's COMPLETED grams
+for just those members, compared in memory. Two queries, flat in member count (short-circuits to one when no
+member has an override). `MembersOverLimitPerformanceTest` pins the query count (≤ 3) so the N+1 cannot return,
+and checks the count stays correct.
+
+**2. `audit_logs` index.** The list is `WHERE organisation_id = ? ORDER BY created_at DESC` (+ date filters),
+scoped in `AuditLogResource::getEloquentQuery()`. The only index, `(action, created_at)`, is led by `action`
+and by leftmost-prefix cannot serve that ordering. Added `(organisation_id, created_at)` in a new migration
+(the `(action, created_at)` index stays for action-filtered views). `AuditLogIndexTest` asserts the index
+exists.
+
+**Owed:** none material (both non-visual; the win is measured as a query count, not a wall-clock, since the
+suite is SQLite). Owner-authorised merge. 799 tests, 796 passed, 3 pre-existing concurrency skips, PHPStan 0.
