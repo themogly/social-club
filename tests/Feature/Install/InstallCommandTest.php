@@ -2,7 +2,9 @@
 
 namespace Tests\Feature\Install;
 
+use App\Enums\ExpenseKind;
 use App\Enums\Role;
+use App\Models\ExpenseCategory;
 use App\Models\Organisation;
 use App\Models\User;
 use App\Support\ActiveScope;
@@ -48,6 +50,19 @@ class InstallCommandTest extends TestCase
         $this->assertTrue($owner->hasRole(Role::OWNER->value));
         $this->assertTrue($owner->canAccessPanel(app('filament')->getPanel('admin')));
         $this->assertTrue(Hash::check('sup3rsecret', (string) $owner->password)); // stored hashed, never plain
+    }
+
+    public function test_it_seeds_the_default_expense_categories_for_the_new_org(): void
+    {
+        $this->artisan('csc:install', $this->installOptions())->assertSuccessful();
+        $org = Organisation::query()->firstOrFail();
+
+        // The club can record expenses from day one — the default set is scoped to the new org and includes
+        // the TILL (petty cash) category the till expense flow needs (prompt 117).
+        $this->assertGreaterThan(0, ExpenseCategory::query()->where('organisation_id', $org->id)->count());
+        $this->assertTrue(
+            ExpenseCategory::query()->where('organisation_id', $org->id)->where('default_kind', ExpenseKind::TILL)->exists(),
+        );
     }
 
     public function test_it_refuses_when_an_organisation_already_exists(): void
