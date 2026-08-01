@@ -5,6 +5,7 @@ namespace Database\Seeders;
 use App\Actions\Bar\CommitOrder;
 use App\Actions\Memberships\EnrolMembership;
 use App\Actions\Memberships\RecordFeePayment;
+use App\Actions\Stock\IntakeArticle;
 use App\Actions\Stock\RecordStockMovement;
 use App\Actions\Wallet\RecordWalletTransaction;
 use App\Enums\BatchStatus;
@@ -322,11 +323,13 @@ class DemoDataSeeder extends Seeder
         foreach ($locations as $location) {
             $this->scope->setLocation($location->id);
             foreach ($strings['articles'] as $name => $cents) {
-                Article::create([
+                // Opening stock enters through the ledger as an INTAKE (prompt 104) — the same writer the
+                // create screen uses, so every seeded article reconciles instead of summing negative.
+                (new IntakeArticle)->handle([
                     'organisation_id' => $orgId, 'location_id' => $location->id, 'name' => $name,
-                    'category_id' => $catBar->id, 'price_cents' => $cents, 'stock' => random_int(20, 100),
+                    'category_id' => $catBar->id, 'price_cents' => $cents,
                     'low_stock_threshold' => 10, 'active' => true,
-                ]);
+                ], random_int(20, 100), ['operator_id' => $staff['owner']->id]);
             }
         }
 

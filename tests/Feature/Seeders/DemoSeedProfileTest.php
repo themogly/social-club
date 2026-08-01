@@ -7,6 +7,7 @@ use App\Actions\Dispensing\CommitDispensation;
 use App\Enums\DispensationStatus;
 use App\Enums\MemberKind;
 use App\Enums\MemberStatus;
+use App\Models\Article;
 use App\Models\Batch;
 use App\Models\ExpenseCategory;
 use App\Models\Location;
@@ -14,6 +15,7 @@ use App\Models\Member;
 use App\Models\MemberSanction;
 use App\Models\MembershipTier;
 use App\Models\Organisation;
+use App\Models\StockMovement;
 use App\Support\ActiveScope;
 use App\Support\Period;
 use App\Support\Settings;
@@ -50,6 +52,33 @@ class DemoSeedProfileTest extends TestCase
         app()->setLocale($locale);
         $this->seed(DatabaseSeeder::class);
         app(ActiveScope::class)->setOrganisation(Organisation::firstOrFail()->id);
+    }
+
+    public function test_every_article_and_batch_reconciles_to_its_ledger_after_seeding(): void
+    {
+        $this->seedDemo('es');
+
+        // Prompt 104: every article's opening stock entered the ledger, so Σ qty_units == stock (was negative).
+        $morphArticle = (new Article)->getMorphClass();
+        foreach (Article::query()->withoutGlobalScopes()->get() as $article) {
+            $ledger = (int) StockMovement::query()->withoutGlobalScopes()
+                ->where('stockable_type', $morphArticle)->where('stockable_id', $article->id)->sum('qty_units');
+            $this->assertSame((int) $article->stock, $ledger, "Article {$article->name} must reconcile to its ledger.");
+        }
+
+        // Batches already reconciled (they always entered through the ledger) — keep it that way.
+        $morphBatch = (new Batch)->getMorphClass();
+        foreach (Batch::query()->withoutGlobalScopes()->get() as $batch) {
+            if ($batch->remaining_units !== null) {
+                $ledger = (int) StockMovement::query()->withoutGlobalScopes()
+                    ->where('stockable_type', $morphBatch)->where('stockable_id', $batch->id)->sum('qty_units');
+                $this->assertSame((int) $batch->remaining_units, $ledger, "Unit batch {$batch->batch_no} must reconcile.");
+            } else {
+                $ledger = (int) StockMovement::query()->withoutGlobalScopes()
+                    ->where('stockable_type', $morphBatch)->where('stockable_id', $batch->id)->sum('qty_cg');
+                $this->assertSame($batch->remaining_cg->centigrams, $ledger, "Weight batch {$batch->batch_no} must reconcile.");
+            }
+        }
     }
 
     public function test_the_stock_ceiling_is_per_sede_and_a_deliberate_demo(): void

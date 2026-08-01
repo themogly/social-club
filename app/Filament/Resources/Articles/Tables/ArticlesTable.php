@@ -73,11 +73,14 @@ class ArticlesTable
                     ->required(),
             ])
             ->action(function (Article $record, array $data): void {
+                // A restock is goods ARRIVING — an INTAKE, not an ADJUSTMENT (prompt 104). ADJUSTMENT/MERMA
+                // are audited as corrections; filing a delivery as one destroys the "someone corrected a
+                // miscount" signal. A genuine count correction is a separate, ADJUSTMENT-typed action.
                 (new RecordStockMovement)->handle(
                     $record,
-                    StockMovementType::ADJUSTMENT,
+                    StockMovementType::INTAKE,
                     (int) $data['units'],
-                    ['reason' => 'Reposición', 'operator_id' => self::operatorId()],
+                    ['reason' => __('Reposición'), 'operator_id' => self::operatorId()],
                 );
 
                 Notification::make()->title(__('Stock repuesto'))->success()->send();

@@ -3981,3 +3981,36 @@ income streams were verified consistent. The only divergences were the four aggr
 
 **Owed:** no browser — the dashboard/financial-report side-by-side (same superávit, with an org-level overhead)
 is un-screenshotted. Owner-authorised merge. 830 tests, 827 passed, 3 pre-existing skips, PHPStan 0.
+
+---
+
+## Prompt 104 — Bar/shop article opening stock never entered the ledger
+
+Articles wrote `stock` straight from the form with no movement, so every article's ledger held only
+depletions and summed negative (10/10 wrong); batches were correct because `IntakeBatch` writes the opening
+INTAKE. The asymmetry was the bug.
+
+**Opening stock enters through the ledger.** New `IntakeArticle` action (the article mirror of `IntakeBatch`)
+creates the article EMPTY and writes its opening balance as an INTAKE through the single stock writer, atomically
+— zero opening writes no movement. `CreateArticle::handleRecordCreation` and the demo seeder both route through
+it, so every article reconciles (Σ qty_units == stock) from the first row. Tested as a property over the whole
+seeded install (articles AND batches), not just one article.
+
+**Restock is an INTAKE, not an ADJUSTMENT.** `ArticlesTable::restockAction` filed each delivery as
+`ADJUSTMENT` — but `RecordStockMovement` audits ADJUSTMENT/MERMA as corrections and deliberately does not audit
+INTAKE/SALE, so every purchase read as "someone corrected a miscount", destroying that signal. A restock is now
+`INTAKE`. A genuine count correction remains `ADJUSTMENT` (still reachable via `CommitStockTake` / `VoidDispensation`).
+
+**Back-fill (decision).** `csc:reconcile-article-stock` (a manual command, not a schema migration, so the test
+suite's data isn't rewritten every RefreshDatabase) writes ONE opening INTAKE per pre-existing article sized to
+reconcile (`stock − Σqty_units`), with a reconciliation reason so the rows are identifiable as a back-fill, not
+a real delivery. Idempotent — an article that already reconciles gets nothing, safe to run twice.
+
+**Stock-writer sweep.** Grepped every write to `stock`/`remaining_cg`/`remaining_units` in `app/`. The only
+writers are `RecordStockMovement` (the single writer), `IntakeBatch` and now `IntakeArticle` (opening balances,
+both writing their ledger row). The other matches are casts, POS display arrays (reads, not writes) and the
+enforcement config — none bypass the ledger. `ArticleForm` restricts `stock` to the create operation, so Edit
+can never free-type it.
+
+**Owed:** no browser — the article stock-movement history (opening intake + restock row) is un-screenshotted.
+Owner-authorised merge. 835 tests, 832 passed, 3 pre-existing skips, PHPStan 0.
