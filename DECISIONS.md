@@ -4202,3 +4202,28 @@ Deleted from `Settings::DEFAULTS` and from the `DebtAndLocationSettingsTest` exc
 does not exist" stays green (301 columns — the new marker column exists after migrate). Overall **27 passed / 4
 failed** (was 26/5). The remaining 4 are all prompt 106 (petty-cash movement, 2 stock-ceiling, closed-till
 recompute). Owner-authorised merge. 862 tests, 859 passed, 3 pre-existing skips, PHPStan 0.
+
+## Prompt 106 — Demo seed routed through the owning actions; stock seeded within the ceiling
+
+The demo till lifecycle was hand-built, and its stock deliberately over the ceiling. Both are now corrected —
+this is the "route the seed through the Action" rule (CLAUDE.md) applied to the last places that dodged it.
+
+**Till through its Actions.** `seedFortnight` now opens with `OpenTill`, records petty cash with
+`RecordTillExpense` (which writes the matching `PETTY_CASH` cash movement — the hand-built `Expense` wrote none,
+so the drawer read 12 sessions over), and closes with `CloseTill` (so `expected_cents` is DERIVED from the
+ledger, never a hand-tallied figure a later void could contradict). Only the wall-clock timestamps
+(`opened_at`/`closed_at`, `Expense.incurred_on`) are backdated onto the action-created rows to build historical
+demo days — the financial shape is entirely action-owned. Dispensations keep the documented
+compliance-boundary carve-out (`CommitDispensation` would reject back-dated data), orders already went through
+`CommitOrder`.
+
+**Stock within the ceiling (supersedes prompt 110's deliberate overage).** Members are now seeded BEFORE the
+catalogue so each sede's ceiling (`active-members × daily-limit × ceiling-days`) is known, and total opening
+intake per sede is capped at 80% of it, split across the genetics. Because dispensing only REDUCES stock,
+on-site can only end lower — so a fresh seed always reads "within" (Central 117g / 245g, North 54g / 140g). The
+ceiling WARNING is exercised by `StockCeilingTest`, not by shipping demo data that alarms. `DemoSeedProfileTest`
+flipped from asserting a sede exceeds to asserting every sede sits within.
+
+**Harness:** all four remaining rows green — closed-till recompute, zero orphaned petty-cash, both sede ceilings.
+Overall **31 passed / 0 failed** — the acceptance gate target for prompts 103–114 is met. Owner-authorised merge.
+862 tests, 859 passed, 3 pre-existing skips, PHPStan 0.

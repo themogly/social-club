@@ -3,10 +3,13 @@
 namespace Database\Seeders;
 
 use App\Actions\Bar\CommitOrder;
+use App\Actions\Expenses\RecordTillExpense;
 use App\Actions\Memberships\EnrolMembership;
 use App\Actions\Memberships\RecordFeePayment;
 use App\Actions\Stock\IntakeArticle;
 use App\Actions\Stock\RecordStockMovement;
+use App\Actions\Till\CloseTill;
+use App\Actions\Till\OpenTill;
 use App\Actions\Wallet\RecordWalletTransaction;
 use App\Enums\BatchStatus;
 use App\Enums\CategoryAppliesTo;
@@ -17,7 +20,6 @@ use App\Enums\DiscountKind;
 use App\Enums\DiscountMode;
 use App\Enums\DispensationStatus;
 use App\Enums\ExpenseKind;
-use App\Enums\ExpensePaidFrom;
 use App\Enums\FeePaymentMethod;
 use App\Enums\IdDocumentType;
 use App\Enums\MemberKind;
@@ -27,7 +29,6 @@ use App\Enums\SanctionType;
 use App\Enums\SettingType;
 use App\Enums\StockMovementType;
 use App\Enums\StrainType;
-use App\Enums\TillSessionStatus;
 use App\Enums\WalletTransactionType;
 use App\Models\Article;
 use App\Models\Batch;
@@ -51,6 +52,8 @@ use App\Models\TillSession;
 use App\Models\User;
 use App\Support\ActiveScope;
 use App\Support\Settings;
+use App\Support\StockCeiling;
+use App\Support\TillSummary;
 use Faker\Factory as FakerFactory;
 use Faker\Generator as FakerGenerator;
 use Illuminate\Database\Seeder;
@@ -150,9 +153,11 @@ class DemoDataSeeder extends Seeder
         Discount::create(['organisation_id' => $org->id, 'name' => $strings['discounts']['staff'], 'kind' => DiscountKind::STAFF, 'mode' => DiscountMode::PERCENT, 'value_bp' => 1000, 'applies_to' => DiscountAppliesTo::BOTH, 'active' => true]);
         Discount::create(['organisation_id' => $org->id, 'name' => $strings['discounts']['therapeutic'], 'kind' => DiscountKind::THERAPEUTIC, 'mode' => DiscountMode::PERCENT, 'value_bp' => 1500, 'applies_to' => DiscountAppliesTo::GENETIC, 'active' => true]);
 
-        [$batchesByLocation, $priceByBatch] = $this->seedCatalogue($org->id, $locations, $geneticCategories, $catBar, $staff, $strings);
-
+        // Members BEFORE the catalogue (prompt 106): the opening-stock intake is sized to each sede's live
+        // compliance ceiling, and the ceiling is members × daily × days — so the members must already exist.
         $membersByLocation = $this->seedMembers($org->id, $locations, $tierSocio, $tierTera, $staff, $strings);
+
+        [$batchesByLocation, $priceByBatch] = $this->seedCatalogue($org->id, $locations, $geneticCategories, $catBar, $staff, $strings);
 
         $this->seedFortnight($org->id, $locations, $staff, $batchesByLocation, $priceByBatch, $membersByLocation, $pettyCashCat);
     }
@@ -277,6 +282,17 @@ class DemoDataSeeder extends Seeder
         $batchesByLocation = [];
         $priceByBatch = [];
 
+        // Size opening stock to sit WITHIN each sede's compliance ceiling (prompt 106 supersedes prompt 110's
+        // deliberate overage). The ceiling is active-members × daily-limit × ceiling-days; because dispensing
+        // only REDUCES stock, capping TOTAL intake per sede at 80% of its ceiling guarantees on-site never
+        // exceeds it — split evenly across the genetics, floored so a batch is never seeded empty.
+        $geneticCount = count($definitions);
+        $intakePerBatch = [];
+        foreach ($locations as $location) {
+            $ceilingCg = StockCeiling::forLocation($location)['ceiling_cg'];
+            $intakePerBatch[$location->id] = max(500, intdiv((int) round_half_up($ceilingCg * 0.8), $geneticCount));
+        }
+
         foreach ($definitions as [$name, $thc, $cbd, $cultivation, $strain, $grade]) {
             $genetic = Genetic::create([
                 'organisation_id' => $orgId, 'name' => $name, 'category_id' => $geneticCategories[$grade]->id,
@@ -299,11 +315,10 @@ class DemoDataSeeder extends Seeder
                     'low_stock_threshold_cg' => 5000, 'active' => true,
                 ]);
 
-                // DELIBERATE, LABELLED demo of the stock ceiling (prompt 110): the curated 16-member demo base
-                // is far smaller than a real club's, so its per-sede ceiling (members × daily × days) is small
-                // and this realistic dispensary stock trips the compliance WARNING on purpose — it demonstrates
-                // the feature working. A genuine fresh install (csc:install) has no stock, so it never alarms.
-                $initial = random_int(20000, 80000); // cg
+                // Opening stock sized to sit WITHIN this sede's ceiling (prompt 106): total intake per sede is
+                // 80% of its compliance ceiling, so a fresh seed reads "within" rather than tripping the warning
+                // by design. The dashboard/intake ceiling feature is exercised by StockCeilingTest, not the seed.
+                $initial = $intakePerBatch[$location->id]; // cg
                 // Batch starts EMPTY; opening stock enters through the single stock writer as an INTAKE
                 // movement (the real go-live path — never a free-typed remaining_cg).
                 $batch = Batch::create([
@@ -491,32 +506,27 @@ class DemoDataSeeder extends Seeder
                     continue;
                 }
 
-                $till = TillSession::create([
-                    'organisation_id' => $orgId, 'location_id' => $location->id, 'terminal' => 'POS-1',
-                    'opened_by' => $staff['owner']->id, 'opened_at' => $day->copy()->setTime(12, 0),
-                    'float_cents' => 10000, 'status' => TillSessionStatus::OPEN,
-                ]);
-                $expectedCash = 10000;
+                // The whole till lifecycle goes through its Actions (prompt 106) — the single writers that own
+                // the drawer's shape — with only the wall-clock timestamps backdated to build historical demo
+                // days. Open with a float:
+                $till = (new OpenTill)->handle($location, 'POS-1', 10000, ['operator_id' => $staff['owner']->id]);
+                $till->forceFill(['opened_at' => $day->copy()->setTime(12, 0)])->save();
 
-                $expectedCash += $this->seedDispensations($orgId, $location, $till, $day, $staff['staff'], $batches, $priceByBatch, $membersByLocation[$location->id]);
-                $expectedCash += $this->seedOrders($orgId, $location, $till, $day, $staff['staff']);
+                $this->seedDispensations($orgId, $location, $till, $day, $staff['staff'], $batches, $priceByBatch, $membersByLocation[$location->id]);
+                $this->seedOrders($orgId, $location, $till, $day, $staff['staff']);
 
+                // Petty cash through RecordTillExpense so the matching PETTY_CASH movement is written and the
+                // drawer reconciles (a hand-built Expense left the till reading over by the expense amount).
                 if ($pettyCashCat !== null && random_int(0, 2) === 0) {
-                    $amount = random_int(500, 3000);
-                    Expense::create([
-                        'organisation_id' => $orgId, 'location_id' => $location->id, 'category_id' => $pettyCashCat->id,
-                        'amount_cents' => $amount, 'paid_from' => ExpensePaidFrom::TILL_CASH, 'kind' => ExpenseKind::TILL,
-                        'till_session_id' => $till->id, 'recorded_by' => $staff['manager']->id, 'incurred_on' => $day,
-                    ]);
-                    $expectedCash -= $amount;
+                    $expense = (new RecordTillExpense)->handle($till, $pettyCashCat, random_int(500, 3000), $staff['manager']);
+                    $expense->forceFill(['incurred_on' => $day->toDateString()])->save();
                 }
 
-                $variance = random_int(-200, 200);
-                $till->update([
-                    'closed_by' => $staff['owner']->id, 'closed_at' => $day->copy()->setTime(23, 0),
-                    'counted_cents' => $expectedCash + $variance, 'expected_cents' => $expectedCash,
-                    'variance_cents' => $variance, 'status' => TillSessionStatus::CLOSED,
-                ]);
+                // Close through CloseTill so expected_cents is DERIVED from the ledger, never a hand-tallied
+                // figure a later void could contradict; the count is that derived figure plus a small variance.
+                $expected = TillSummary::expectedCents($till);
+                (new CloseTill)->handle($till, $expected + random_int(-200, 200), $staff['owner']);
+                $till->forceFill(['closed_at' => $day->copy()->setTime(23, 0)])->save();
             }
         }
     }

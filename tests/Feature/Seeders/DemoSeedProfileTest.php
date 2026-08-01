@@ -92,12 +92,16 @@ class DemoSeedProfileTest extends TestCase
             $this->assertGreaterThan(0, StockCeiling::forLocation($location)['active_members']);
         }
 
-        // Deliberate, labelled demo: the small curated member base means the compliance ceiling fires by
-        // design — documenting the overage is intentional, not the old org-wide-count bug returning.
-        $this->assertTrue(
-            $locations->contains(fn (Location $l): bool => StockCeiling::forLocation($l)['exceeded']),
-            'The demo seed is expected to exceed the ceiling at a sede to demonstrate the warning.'
-        );
+        // Prompt 106 supersedes prompt 110's deliberate overage: opening stock is now sized to 80% of each
+        // sede's ceiling, so a fresh seed sits WITHIN it (the warning is exercised by StockCeilingTest, not by
+        // shipping demo data that alarms). Because dispensing only reduces stock, on-site can only be lower.
+        foreach ($locations as $location) {
+            $ceiling = StockCeiling::forLocation($location);
+            $this->assertFalse(
+                $ceiling['exceeded'],
+                "The demo seed must sit within {$location->name}'s ceiling ({$ceiling['on_site_cg']}cg on site vs {$ceiling['ceiling_cg']}cg)."
+            );
+        }
     }
 
     public function test_an_english_locale_seed_produces_english_data(): void
