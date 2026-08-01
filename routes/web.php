@@ -8,6 +8,7 @@ use App\Http\Controllers\Member\AnnouncementController;
 use App\Http\Controllers\Member\EventController;
 use App\Http\Controllers\Member\NotificationController;
 use App\Http\Controllers\MemberDocumentController;
+use App\Http\Controllers\MemberMediaController;
 use App\Http\Controllers\Socio\AuthController as SocioAuthController;
 use App\Http\Controllers\Socio\PwaController;
 use App\Livewire\Counter\BarPos;
@@ -22,6 +23,15 @@ use Illuminate\Support\Facades\Route;
 Route::middleware(['web', 'auth', 'signed'])
     ->get('members/documents/{document}', [MemberDocumentController::class, 'show'])
     ->name('members.documents.show');
+
+// Member photo + POS signature — the two Article-9 files prompt 113 moved behind the same authorised,
+// access-logged, decrypting endpoint (no more bare temporaryUrl to the raw file).
+Route::middleware(['web', 'auth', 'signed'])
+    ->get('members/photo/{member}', [MemberMediaController::class, 'photo'])
+    ->name('members.photo.show');
+Route::middleware(['web', 'auth', 'signed'])
+    ->get('dispensations/signature/{dispensation}', [MemberMediaController::class, 'signature'])
+    ->name('dispensations.signature.show');
 
 // No public web routes. This app has no public/marketing surface (Spanish CSCs
 // may not advertise — a legal constraint, see NOTES §A). The Filament admin panel

@@ -152,11 +152,14 @@ class MemberForm
                         FileUpload::make('photo_path')
                             ->label(__('Foto'))
                             ->image()
-                            ->avatar()
-                            ->imageEditor()
                             ->disk('documents')
                             ->directory('member-photos')
-                            ->visibility('private'),
+                            ->visibility('private')
+                            // Encrypted at rest through the vault, like the ID scan (prompt 113) — so no inline
+                            // preview of the raw file; it is viewed only via the signed, logged endpoint.
+                            ->saveUploadedFileUsing(fn (TemporaryUploadedFile $file): string => DocumentVault::storeUpload($file, 'member-photos'))
+                            ->previewable(false)
+                            ->helperText(__('Se guarda cifrada y solo se puede ver mediante un enlace firmado y registrado.')),
                     ]),
 
                 Section::make(__('Declaraciones'))

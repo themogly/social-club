@@ -16,9 +16,10 @@ use Illuminate\Support\Str;
  * point of streaming through the access-logged, signed-URL, authorised endpoint
  * (`MemberDocumentController`). The private disk + signed URL protect the HTTP path;
  * this protects the disk / backup / snapshot / object-store path — the two are NOT
- * redundant, both matter. See DECISIONS.md for the (documented) scope: the member
- * photo, POS signature and non-member uploads share this disk but read inline through
- * other paths and are a tracked follow-up.
+ * redundant, both matter. Prompt 113 closed the prompt-32 follow-up: the member photo and
+ * the POS signature now write through here too and stream through the same authorised,
+ * access-logged endpoint (VaultStream). Non-member business uploads (invoices, receipts)
+ * are private but not Article-9 and stay unencrypted by decision (see DECISIONS.md).
  */
 class DocumentVault
 {

@@ -30,10 +30,12 @@ use App\Models\Membership;
 use App\Models\TillSession;
 use App\Models\User;
 use App\Support\CounterOperator;
+use App\Support\DocumentVault;
 use App\Support\EligibilityVerdict;
 use App\Support\Money;
 use App\Support\Settings;
 use App\Support\TerminalName;
+use App\Support\VaultUrl;
 use App\Support\Wallet;
 use App\Support\Weight;
 use Illuminate\Auth\Access\AuthorizationException;
@@ -41,14 +43,12 @@ use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Mail;
-use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use InvalidArgumentException;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Locked;
 use Livewire\Component;
 use RuntimeException;
-use Throwable;
 
 /**
  * The dispensary POS — a tablet-first, full-page Livewire component on its own
@@ -448,7 +448,8 @@ class DispensaryPos extends Component
         }
 
         $path = 'signatures/'.Str::ulid().'.png';
-        Storage::disk('documents')->put($path, $binary);
+        // Encrypted at rest through the vault (prompt 113) — never plaintext on the Article-9 disk.
+        DocumentVault::put($path, $binary);
         $this->signaturePath = $path;
         $this->flash(__('Firma capturada.'), 'success');
     }
@@ -1270,21 +1271,10 @@ class DispensaryPos extends Component
 
     private function photoUrl(Member $member): ?string
     {
-        if ($member->photo_path === null || $member->photo_path === '') {
-            return null;
-        }
+        // Encrypted photo → authorised, access-logged endpoint only (prompt 113). Null → initials fallback.
+        $actor = Auth::user();
 
-        try {
-            $disk = Storage::disk('documents');
-
-            if (! $disk->exists($member->photo_path)) {
-                return null;
-            }
-
-            return $disk->temporaryUrl($member->photo_path, now()->addSeconds((int) Settings::get('signed_url_ttl_seconds', 300)));
-        } catch (Throwable) {
-            return null; // local driver does not sign URLs — fall back to initials.
-        }
+        return $actor instanceof User ? VaultUrl::photo($member, $actor) : null;
     }
 
     /**

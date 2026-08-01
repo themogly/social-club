@@ -21,6 +21,7 @@ use App\Models\Membership;
 use App\Models\User;
 use App\Support\Money;
 use App\Support\Settings;
+use App\Support\VaultUrl;
 use App\Support\Wallet;
 use App\Support\Weight;
 use Illuminate\Auth\Access\AuthorizationException;
@@ -31,7 +32,6 @@ use Illuminate\Support\Facades\Storage;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Locked;
 use Livewire\Component;
-use Throwable;
 
 /**
  * The tablet-first check-in counter (the "door") — a full-page Livewire component
@@ -322,21 +322,11 @@ class CheckInScreen extends Component
      */
     private function photoUrl(Member $member): ?string
     {
-        if ($member->photo_path === null || $member->photo_path === '') {
-            return null;
-        }
+        // The encrypted photo is served ONLY through the authorised, access-logged endpoint (prompt 113) —
+        // never a bare disk temporaryUrl to the raw file. Null → initials when there is no photo or no user.
+        $actor = Auth::user();
 
-        try {
-            $disk = Storage::disk('documents');
-
-            if (! $disk->exists($member->photo_path)) {
-                return null;
-            }
-
-            return $disk->temporaryUrl($member->photo_path, now()->addSeconds((int) Settings::get('signed_url_ttl_seconds', 300)));
-        } catch (Throwable) {
-            return null; // local driver does not sign URLs — fall back to initials.
-        }
+        return $actor instanceof User ? VaultUrl::photo($member, $actor) : null;
     }
 
     /**

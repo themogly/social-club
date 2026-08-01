@@ -1470,6 +1470,7 @@
     "Se aplica a": "Applies to",
     "Se dispensa: :modo": "Dispensed: :modo",
     "Se fijará la lista de socios convocados (a día de hoy) y se enviará un email a cada socio con dirección. Una vez emitida, la convocatoria no podrá modificarse.": "The list of convened members (as of today) will be fixed and an email sent to each member with an address. Once issued, the notice cannot be changed.",
+    "Se guarda cifrada y solo se puede ver mediante un enlace firmado y registrado.": "Stored encrypted and viewable only through a signed, logged link.",
     "Se requiere la autorización de un responsable para continuar.": "A manager's authorisation is required to continue.",
     "Se revela la diferencia entre lo contado y lo esperado. Si supera la tolerancia configurada, añade una nota explicando por qué. El cierre genera el informe de la sesión.": "The difference between counted and expected is revealed. If it exceeds the configured tolerance, add a note explaining why. Closing generates the session report.",
     "Sección": "Section",

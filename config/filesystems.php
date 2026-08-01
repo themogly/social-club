@@ -51,9 +51,11 @@ return [
         // private, never publicly served, accessed only via short-lived, user-bound,
         // access-logged signed URLs. The ID scans / medical certs / generated PDFs are
         // ENCRYPTED at rest via App\Support\DocumentVault (Crypt, AES-256) before write
-        // and decrypted only at the streaming endpoint (prompt 32). NOTE: the member
-        // photo, POS signature and non-member uploads on this disk read inline through
-        // other paths and are a tracked follow-up (see DECISIONS.md) — not yet encrypted.
+        // and decrypted only at the streaming endpoint (prompt 32). The member photo and
+        // POS signature are now on the SAME footing (prompt 113): encrypted at rest and
+        // served only through the authorised, access-logged endpoint. Non-member business
+        // uploads (purchase invoices, expense/batch/article docs) are private but NOT
+        // Article-9 and stay unencrypted here by decision (see DECISIONS.md, prompt 113).
         // Local dev uses the local driver; production sets DOCUMENTS_DRIVER=s3
         // with a dedicated private bucket (AWS_DOCUMENTS_BUCKET). `throw => true`
         // so a lost/failed ID-scan write fails loud, never silently.
