@@ -1,0 +1,95 @@
+<?php
+
+namespace App\Support;
+
+use App\Models\Organisation;
+use App\ViewModels\Rat;
+use Illuminate\Support\Facades\Storage;
+use Throwable;
+
+/**
+ * The organisation's STATUTORY identity for documents (prompt 115) — the legal name, tax id (CIF/NIF),
+ * registered address and logo a libro de socios, registro de dispensación, convocatoria, acta or report PDF
+ * must carry so it evidences WHICH asociación produced it.
+ *
+ * Distinct from `config('app.name')`, which is the PRODUCT name (fine for UI chrome and transactional email,
+ * wrong on a statutory document — a court does not care what the software is called). Promoted out of
+ * {@see Rat} (which now delegates here) so every document resolves identity through one place.
+ *
+ * The name a document PRINTS is the LEGAL name; a statutory document should not be generated at all without
+ * one ({@see self::hasLegalName()}), never silently falling back to the trading name as if it were the legal
+ * identity.
+ */
+class OrganisationIdentity
+{
+    /**
+     * The active organisation's identity block for a document view.
+     *
+     * @return array{name: string, legal_name: ?string, display_name: string, tax_id: ?string, address: ?string, contact_email: ?string, contact_phone: ?string, logo: ?string}
+     */
+    public static function current(): array
+    {
+        return self::for(self::activeOrganisation());
+    }
+
+    /**
+     * @return array{name: string, legal_name: ?string, display_name: string, tax_id: ?string, address: ?string, contact_email: ?string, contact_phone: ?string, logo: ?string}
+     */
+    public static function for(?Organisation $organisation): array
+    {
+        $name = filled($organisation?->name) ? (string) $organisation->name : (string) config('app.name');
+        $legalName = filled($organisation?->legal_name) ? (string) $organisation->legal_name : null;
+
+        return [
+            'name' => $name,
+            'legal_name' => $legalName,
+            // What a statutory document prints: the legal name, or the trading name only as a last resort.
+            'display_name' => $legalName ?? $name,
+            'tax_id' => filled($organisation?->tax_id) ? (string) $organisation->tax_id : null,
+            'address' => filled($organisation?->address) ? (string) $organisation->address : null,
+            'contact_email' => filled($organisation?->contact_email) ? (string) $organisation->contact_email : null,
+            'contact_phone' => filled($organisation?->contact_phone) ? (string) $organisation->contact_phone : null,
+            'logo' => self::logoDataUri($organisation),
+        ];
+    }
+
+    /**
+     * True when the active org (or the given one) carries a legal name. A statutory document must refuse to
+     * generate without it — the whole point of the document is to name the responsible association.
+     */
+    public static function hasLegalName(?Organisation $organisation = null): bool
+    {
+        return filled(($organisation ?? self::activeOrganisation())?->legal_name);
+    }
+
+    private static function activeOrganisation(): ?Organisation
+    {
+        $id = app(ActiveScope::class)->organisationId();
+
+        return $id !== null ? Organisation::query()->whereKey($id)->first() : null;
+    }
+
+    /**
+     * The org logo as a base64 data URI so dompdf can embed it (it cannot fetch a remote or disk-relative
+     * path). Degrades to null on any problem — a document must still generate without a logo, never throw.
+     */
+    private static function logoDataUri(?Organisation $organisation): ?string
+    {
+        if ($organisation === null || blank($organisation->logo_path)) {
+            return null;
+        }
+
+        try {
+            $disk = Storage::disk('public');
+            if (! $disk->exists($organisation->logo_path)) {
+                return null;
+            }
+
+            $mime = $disk->mimeType($organisation->logo_path) ?: 'image/png';
+
+            return 'data:'.$mime.';base64,'.base64_encode($disk->get($organisation->logo_path));
+        } catch (Throwable) {
+            return null;
+        }
+    }
+}

@@ -78,12 +78,13 @@ class Rat extends Page
         abort_unless(static::canAccess(), 403);
 
         $rat = new RatRegistry;
+        $controller = $rat->controller();
         $content = Pdf::loadView('documents.rat', [
-            'controller' => $rat->controller(),
+            'controller' => $controller,
             'activities' => $rat->activities(),
             'security' => $rat->securityMeasures(),
             'generatedAt' => $rat->generatedAt(),
-            'orgName' => (string) config('app.name'),
+            'orgName' => $controller['display_name'],
         ])->output();
 
         return response()->streamDownload(fn () => print ($content), 'rat-'.now()->format('Ymd').'.pdf', [

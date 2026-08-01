@@ -1971,5 +1971,7 @@
     "barra": "bar",
     "todo": "all",
     "Elige un descuento predefinido. Se crean en Dispensario ▸ Descuentos.": "Choose a pre-made discount. They are created in Dispensary ▸ Discounts.",
-    "Este socio paga la tarifa estándar. Asigna un descuento predefinido si procede.": "This member pays the standard rate. Assign a pre-made discount if applicable."
+    "Este socio paga la tarifa estándar. Asigna un descuento predefinido si procede.": "This member pays the standard rate. Assign a pre-made discount if applicable.",
+    "Falta el nombre legal de la asociación": "The association's legal name is missing",
+    "Añade el nombre legal de la asociación en los ajustes antes de generar un documento estatutario.": "Add the association's legal name in settings before generating a statutory document."
 }

@@ -2,6 +2,7 @@
 
 namespace App\Support\Spreadsheet;
 
+use App\Support\OrganisationIdentity;
 use App\Support\Period;
 use App\ViewModels\Reports\ReportColumn;
 use App\ViewModels\Reports\ReportTable;
@@ -57,6 +58,8 @@ class ReportExport
      */
     public static function pdf(string $title, array $summary, array $tables, string $scopeLabel, string $periodLabel): string
     {
+        $identity = OrganisationIdentity::current();
+
         return Pdf::loadView('reports.pdf', [
             'title' => $title,
             'summary' => $summary,
@@ -64,7 +67,8 @@ class ReportExport
             'scopeLabel' => $scopeLabel,
             'periodLabel' => $periodLabel,
             'generatedAt' => now(),
-            'orgName' => config('app.name'),
+            'orgName' => $identity['display_name'],
+            'identity' => $identity,
         ])->output();
     }
 

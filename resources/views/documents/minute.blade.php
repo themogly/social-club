@@ -32,7 +32,7 @@
 </head>
 <body>
     <div class="head">
-        <div class="org">{{ $orgName }}</div>
+        @include('documents.partials.identity')
         <h1>{{ __('Acta nº :n', ['n' => $minute->number]) }} · {{ $bookLabel }}</h1>
         <div class="meta">
             {{ $typeLabel ?: __('Reunión') }} ·

@@ -4264,3 +4264,31 @@ the same assigned therapeutic template discounts a genetic line but contributes 
 defect class as prompt 101; noted there rather than fixed blind here. Screenshots (assign modal before/after,
 an assigned template discount + the resulting POS price, light/dark) are OWED — no browser in this environment.
 New labels shipped in `lang/en` + `lang/es` (parity gated). `ResolvePrice`/`ResolveArticleDiscount` unchanged.
+
+## Prompt 115 — Statutory identity on documents (one resolver, refuse without a legal name)
+
+Every statutory document printed `config('app.name')` — the PRODUCT name — where it must carry the
+association's own legal identity. Promoted `Rat::controller()` into `App\Support\OrganisationIdentity`, the one
+place identity resolves: `current()`/`for()` return name, legal_name, **display_name** (legal name, or trading
+name only as a last resort), tax_id, address, contact_email/phone, and a base64 **logo** data URI (dompdf
+cannot fetch a path; the logo degrades to null on any error so a document still generates). `Rat::controller()`
+now delegates here.
+
+Wired into the libro de socios, registro de dispensación, convocatoria, actas, the report PDFs, the member
+document and the RAT — via a shared `documents/partials/identity.blade.php` header (logo + legal name + CIF/NIF
++ address). Register PDF member dates now render **d/m/Y** (were ISO `Y-m-d`).
+
+**Refuse without a legal name.** `App\Filament\Concerns\GuardsStatutoryDocuments` (`hasStatutoryIdentity()`)
+blocks the libro de socios, registro de dispensación, convocatoria and acta exports when the org has no legal
+name, sending a notification that says where to set it, rather than emitting a document that prints the trading
+name as if it were the legal identity. Those export methods now return `?StreamedResponse` (and
+`ReportPage::exportPdf` was widened to nullable so `RegistroDispensacion` can refuse). **Decision:** the generic
+*informes* are NOT hard-blocked — they carry the identity header but a management report should not be
+un-runnable for a missing legal name; `display_name` falls back to the trading name there.
+
+**OVERNIGHT-DEFAULT — CONFIRM:** the demo seed's placeholder identity (`TBD-…`) is replaced with plausible
+values — legal_name "Asociación Cannábica CSC Demo", CIF `G00000000` (G is the Spanish form for an asociación),
+Madrid/Barcelona addresses. A real club sets its own in Ajustes; these exist only so the seeded club can
+generate documents out of the box.
+
+`composer check` green (873 tests, 870 passed, 3 pre-existing skips, PHPStan 0). EN/ES parity gated.

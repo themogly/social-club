@@ -22,7 +22,7 @@
 <body>
     <p class="sub">{{ __('Convocatoria de asamblea :type', ['type' => $convocatoria->type->label()]) }}</p>
     <h1>{{ $convocatoria->title }}</h1>
-    <p class="muted">{{ $orgName }}</p>
+    <div style="margin:4px 0 8px;">@include('documents.partials.identity')</div>
 
     <table class="kv">
         <tr>

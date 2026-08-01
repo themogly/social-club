@@ -4,6 +4,7 @@ namespace App\Filament\Resources\Minutes;
 
 use App\Actions\Documents\SignMinute;
 use App\Enums\MinuteBook;
+use App\Filament\Concerns\GuardsStatutoryDocuments;
 use App\Filament\Resources\Minutes\Pages\CreateMinute;
 use App\Filament\Resources\Minutes\Pages\EditMinute;
 use App\Filament\Resources\Minutes\Pages\ListMinutes;
@@ -14,6 +15,7 @@ use App\Filament\Resources\Minutes\Tables\MinutesTable;
 use App\Models\Member;
 use App\Models\Minute;
 use App\Models\User;
+use App\Support\OrganisationIdentity;
 use BackedEnum;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Filament\Actions\Action;
@@ -34,6 +36,8 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
  */
 class MinuteResource extends Resource
 {
+    use GuardsStatutoryDocuments;
+
     protected static ?string $model = Minute::class;
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedDocumentText;
@@ -129,7 +133,11 @@ class MinuteResource extends Resource
             ->label(__('PDF'))
             ->icon(Heroicon::OutlinedDocumentArrowDown)
             ->color('gray')
-            ->action(function (Minute $record): StreamedResponse {
+            ->action(function (Minute $record): ?StreamedResponse {
+                if (! self::hasStatutoryIdentity()) {
+                    return null;
+                }
+
                 $content = Pdf::loadView('documents.minute', self::pdfData($record))->output();
                 $filename = 'acta-'.$record->book->value.'-'.$record->number.'.pdf';
 
@@ -162,7 +170,7 @@ class MinuteResource extends Resource
             'bookLabel' => self::bookLabel($record->book),
             'typeLabel' => self::typeOptions()[$record->type] ?? $record->type,
             'attendeeNames' => $names,
-            'orgName' => config('app.name'),
+            'identity' => OrganisationIdentity::current(),
         ];
     }
 

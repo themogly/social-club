@@ -3,6 +3,7 @@
 namespace App\Filament\Resources\Convocatorias;
 
 use App\Actions\Governance\IssueConvocatoria;
+use App\Filament\Concerns\GuardsStatutoryDocuments;
 use App\Filament\Resources\Convocatorias\Pages\CreateConvocatoria;
 use App\Filament\Resources\Convocatorias\Pages\EditConvocatoria;
 use App\Filament\Resources\Convocatorias\Pages\ListConvocatorias;
@@ -13,6 +14,7 @@ use App\Filament\Resources\Convocatorias\Schemas\ConvocatoriaInfolist;
 use App\Filament\Resources\Convocatorias\Tables\ConvocatoriasTable;
 use App\Models\Convocatoria;
 use App\Models\User;
+use App\Support\OrganisationIdentity;
 use BackedEnum;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Filament\Actions\Action;
@@ -35,6 +37,8 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
  */
 class ConvocatoriaResource extends Resource
 {
+    use GuardsStatutoryDocuments;
+
     protected static ?string $model = Convocatoria::class;
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedEnvelope;
@@ -118,7 +122,11 @@ class ConvocatoriaResource extends Resource
             ->label(__('PDF'))
             ->icon(Heroicon::OutlinedDocumentArrowDown)
             ->color('gray')
-            ->action(function (Convocatoria $record): StreamedResponse {
+            ->action(function (Convocatoria $record): ?StreamedResponse {
+                if (! self::hasStatutoryIdentity()) {
+                    return null;
+                }
+
                 $content = Pdf::loadView('documents.convocatoria', self::pdfData($record))->output();
 
                 return response()->streamDownload(fn () => print $content, 'convocatoria-'.$record->id.'.pdf', [
@@ -132,7 +140,7 @@ class ConvocatoriaResource extends Resource
     {
         return [
             'convocatoria' => $record,
-            'orgName' => config('app.name'),
+            'identity' => OrganisationIdentity::current(),
         ];
     }
 

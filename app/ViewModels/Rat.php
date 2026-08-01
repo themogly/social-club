@@ -2,8 +2,7 @@
 
 namespace App\ViewModels;
 
-use App\Models\Organisation;
-use App\Support\ActiveScope;
+use App\Support\OrganisationIdentity;
 use App\Support\Settings;
 use Illuminate\Support\Carbon;
 
@@ -19,19 +18,12 @@ class Rat
     /**
      * The data controller (responsable del tratamiento) — the active organisation.
      *
-     * @return array{name: string, legal_name: ?string, tax_id: ?string, address: ?string, contact_email: ?string}
+     * @return array{name: string, legal_name: ?string, display_name: string, tax_id: ?string, address: ?string, contact_email: ?string, contact_phone: ?string, logo: ?string}
      */
     public function controller(): array
     {
-        $org = Organisation::query()->whereKey(app(ActiveScope::class)->organisationId())->first();
-
-        return [
-            'name' => $org->name ?? (string) config('app.name'),
-            'legal_name' => $org?->legal_name,
-            'tax_id' => $org?->tax_id,
-            'address' => $org?->address,
-            'contact_email' => $org?->contact_email,
-        ];
+        // The statutory identity now resolves through one place (prompt 115); the RAT was its origin.
+        return OrganisationIdentity::current();
     }
 
     public function generatedAt(): Carbon
