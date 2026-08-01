@@ -1,0 +1,16 @@
+Preview of database/samples/members-import-sample.csv
+(against an org with sede "Sede Centro" and tier "General"; daily_limit_cg=350, stock_ceiling_days=5)
+========================================================================
+Rows to create : 4
+Duplicates skipped : 0
+Rows with errors : 3
+Consent-pending (no consent on the CSV) : 3
+
+Errors (row => reasons) — these rows are NOT imported:
+  row 5: below minimum age or missing DOB
+  row 6: member number 'M-00020' appears more than once in the file
+  row 7: member number 'M-00020' appears more than once in the file
+
+Resulting active membership + stock ceiling per sede:
+  Sede Centro: 0 active now → 2 after import (+2); ceiling 0.00 g → 35.00 g
+

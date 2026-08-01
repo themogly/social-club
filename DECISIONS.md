@@ -4659,3 +4659,61 @@ wallet fee needs no till; a partial reports what remains; collecting clears the 
 the door and the POS card each collect an outstanding fee inline (blank → full) and the door's inline cash
 fee with no till is refused; a wrong-permission user is 403'd from the tab. `composer check` green (912
 tests, 909 passed, 3 pre-existing skips, PHPStan 0). EN/ES parity gated (7 new keys).
+
+---
+
+## Prompt 131 — The member import carries the paper register's two most important facts
+
+**Problem.** `ImportMembers` stamped `now()` as everyone's *alta* and allocated fresh member numbers, so it
+discarded the two facts a paper *libro de socios* exists to record — the real join date and the member's own
+number — and the statutory register the system then printed contradicted the book. It also created no
+membership (so every imported member was unservable — *"Sin membresía activa en esta sede"*) and no consent
+record (so the club had no lawful-basis evidence for exactly the members it holds the longest history on).
+
+**Extended column contract (every new column OPTIONAL; today's behaviour is the fallback).** The header may now
+carry `member_no, joined_at, left_at, status, location, tier, membership_start, consent_date,
+consent_text_version` alongside the originals. A CSV of only the original columns imports exactly as before
+(tested): number generated, `joined_at = now()`, no membership, consent-pending. Locations and tiers resolve by
+name (case-insensitive) within the org; an unknown name, an unknown status, an invalid date, or half a
+location/tier pair is a per-row error the **preview** surfaces.
+
+**Member-number sequence.** `MemberNumber::next()` stays the ONLY allocator. Added `MemberNumber::advanceAtLeast()`
+(same row lock, monotonic — only ever raises) and `MemberNumber::parseSequence()` (trailing digits → int). The
+atomic import first fast-forwards the org counter past the highest imported number, THEN allocates `next()` for
+any blank-`member_no` rows — so a generated number can never collide with one the same import placed, and the
+sequence is never left below an imported number (tested: counter ends ≥ highest imported; the next enrolment
+gets a free number). A clash — the same number twice in the file, or one already held — is a **preview
+validation error**, never a runtime unique-index failure mid-import (tested).
+
+**Consent is never fabricated.** A row is only given a `ConsentRecord` when the CSV carries BOTH `consent_date`
+and `consent_text_version` — the version the member actually signed on paper, its real date (`RecordMemberConsent`
+gained an optional `$grantedAt`; it stays the single consent writer). It is **never** defaulted to the current
+digital version — recording agreement to a text the member never saw is worse than recording nothing. A row
+with no consent imports and is left **consent-pending**: a new derived `Member::hasConsent()` drives a
+toggleable "Consentimiento → Pendiente" badge on the members table so the club can see exactly who to chase.
+Half a consent pair (a date without a version, or vice-versa) is a row error, not a fabricated half.
+
+**Servability.** The import now enrols a membership (via `EnrolMembership`, which gained an optional `status`)
+when the row carries a location+tier, so an imported member is dispensable immediately — the end-to-end test
+commits a real dispensation with no carencia block and no "sin membresía" refusal. Carencia stays served for
+imported members (`carencia_ends_at = now()->subDay()`), unchanged.
+
+**Stock ceiling — the number that stops manufactured headroom.** Since prompt 110 the on-site ceiling derives
+from ACTIVE members holding an ACTIVE membership at that sede. So the membership status mirrors the member
+status (ACTIVE member → ACTIVE membership; anything else → LAPSED), and the **preview reports the resulting
+active membership per sede and the ceiling it implies** (`StockCeiling::forLocation` reused, so the arithmetic
+is never forked), writing nothing. Importing members inactive does not raise the ceiling; importing them active
+raises it by exactly `added × daily_limit_cg × ceiling_days` (both tested). The Filament import is now a genuine
+**preview-then-confirm**: step 1 stages the file and runs `preview()`; the confirm modal shows the per-sede
+ceiling consequence before step 2 writes.
+
+**Atomicity (not resumability).** `import()` writes the whole run inside ONE transaction — a partial failure
+rolls back rather than leaving half a club imported. Idempotency on re-run is preserved (the duplicate guard
+skips anyone already present), and the run stays audited (`members.imported`).
+
+**Sample.** `database/samples/members-import-sample.csv` + its generated `…-preview.txt` (4 to create, 3 errors
+— an under-age row and an in-file `M-00020` clash on both rows — 3 consent-pending, ceiling 0 → 35.00 g).
+
+Tests (`MemberImportPaperRegisterTest`, 9; existing import tests unchanged and green). `composer check` green
+(921 tests, 918 passed, 3 pre-existing skips, PHPStan 0). EN/ES parity gated (11 new keys). Pushed for review —
+**not merged** (the prompt's explicit instruction; a whole-club data migration warrants a human look first).

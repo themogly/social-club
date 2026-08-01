@@ -19,7 +19,7 @@ use Illuminate\Auth\Access\AuthorizationException;
  * `membership.fee.override` permission and records who overrode (and why, in the
  * audit trail).
  *
- * @phpstan-type EnrolOptions array{starts_at?: CarbonInterface, expires_at?: ?CarbonInterface, fee_cents?: int, actor?: ?User, fee_override_reason?: ?string}
+ * @phpstan-type EnrolOptions array{starts_at?: CarbonInterface, expires_at?: ?CarbonInterface, fee_cents?: int, actor?: ?User, fee_override_reason?: ?string, status?: MembershipStatus}
  */
 class EnrolMembership
 {
@@ -38,6 +38,9 @@ class EnrolMembership
             throw new AuthorizationException('Overriding the membership fee requires the membership.fee.override permission.');
         }
 
+        // Status defaults to ACTIVE (the only enrolment path until the paper-register import, prompt 131, which
+        // brings across memberships that are already lapsed/cancelled — those must NOT count toward the sede's
+        // stock ceiling, so an imported non-active membership stays non-active here).
         $membership = Membership::create([
             'organisation_id' => $member->organisation_id,
             'member_id' => $member->id,
@@ -47,7 +50,7 @@ class EnrolMembership
             'expires_at' => self::expiryFor($tier->default_period, $startsAt, $options['expires_at'] ?? null),
             'fee_cents' => $feeCents,
             'fee_override_by' => $overridden ? $actor->id : null,
-            'status' => MembershipStatus::ACTIVE,
+            'status' => $options['status'] ?? MembershipStatus::ACTIVE,
         ]);
 
         (new RecordAuditLog)->handle('membership.enrolled', $membership, null, [
