@@ -37,8 +37,8 @@ class Permissions
         // Money
         'wallet.adjust', 'till.open', 'till.close', 'cash.bank', 'expenses.record',
         'expenses.approve', 'expenses.overheads', 'expenses.categories', 'purchases.manage',
-        // Governance
-        'documents.generate', 'minutes.manage', 'register.view',
+        // Governance ('minutes.manage' drafts an acta; 'minute.sign' signs it — a narrower, owner-only authority)
+        'documents.generate', 'minutes.manage', 'minute.sign', 'register.view',
         // Communications (announcements + events, member PWA)
         'comms.manage',
         // Privacy

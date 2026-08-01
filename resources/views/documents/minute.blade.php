@@ -26,6 +26,7 @@
         .muted { color: #94a3b8; }
         .sign { width: 100%; margin-top: 44px; border-collapse: collapse; }
         .sign td { border: none; border-top: 1px solid #0f172a; padding-top: 6px; text-align: center; width: 50%; font-size: 10px; color: #475569; }
+        .signedby { margin-top: 30px; font-size: 10px; color: #475569; }
         .foot { margin-top: 22px; color: #94a3b8; font-size: 9px; }
     </style>
 </head>
@@ -49,6 +50,12 @@
             <td class="k">{{ __('Estado') }}</td>
             <td>{{ $minute->signed_at === null ? __('Borrador') : __('Firmada el :date', ['date' => $minute->signed_at->format('d/m/Y H:i')]) }}</td>
         </tr>
+        @if ($minute->signed_at !== null)
+            <tr>
+                <td class="k">{{ __('Firmante') }}</td>
+                <td>{{ $minute->signedBy?->name ?? __('No consta') }}</td>
+            </tr>
+        @endif
     </table>
 
     <h2>{{ __('Orden del día') }}</h2>
@@ -90,6 +97,10 @@
     @if ($minute->body)
         <h2>{{ __('Desarrollo de la sesión') }}</h2>
         <div class="body">{{ $minute->body }}</div>
+    @endif
+
+    @if ($minute->signed_at !== null)
+        <p class="signedby">{{ __('Cerrada y firmada en el sistema por :name el :date', ['name' => $minute->signedBy?->name ?? __('No consta'), 'date' => $minute->signed_at->format('d/m/Y H:i')]) }}</p>
     @endif
 
     <table class="sign">

@@ -2983,3 +2983,41 @@ returns the full list; CSV lists the same members; cross-sede not narrowed by ac
 hidden from a `stock.manage`-only viewer and visible to a `reports.view` holder. **Screenshots** (recall
 modal, light+dark) not produced — no browser here. Owner-authorised merge (standing "merge everything to
 main"). 665 green (662 passed, 3 pre-existing concurrency skips).
+
+---
+
+## Prompt 87 — Acta signatory (record who signed a minute)
+
+**An acta recorded THAT it was signed (`signed_at`) but not by WHOM.** Added a nullable `signed_by` FK
+(→ `users`, `nullOnDelete`) that `SignMinute` sets to the acting user, in the SAME `save()` as `signed_at`.
+Because the model refuses any update once `signed_at` is present (`Minute::booted`), the signatory is frozen
+with the signature — never re-signable, never editable. `signedBy()` relation added; the signatory is
+rendered on the acta PDF (status line + an explicit "Cerrada y firmada en el sistema por … el …" line above
+the wet-signature blocks) and in the Filament infolist.
+
+**Signing is a new permission, `minute.sign`, deliberately narrower than `minutes.manage`.** Drafting an acta
+and *signing* one are different acts: signing attributes a legal signature and makes the record immutable, so
+it belongs to the club's signing authority, not to everyone who can edit a draft. `minute.sign` is granted to
+**OWNER only** by default (the legal representative / president); MANAGER keeps `minutes.manage` (create,
+correct, export) but cannot sign — a natural role-based denial, tested. It is a *permission*, not a hardcode:
+a club whose secretary signs simply grants `minute.sign` to that account. (`SignMinute` now checks
+`minute.sign`; existing signing flows already act as OWNER, so nothing regressed. The prompt-73 unreachable-code
+guard confirms the new permission is referenced.)
+
+**Historical actas stay honest — no backfill, no fabrication.** `signed_by` is nullable and never
+backfilled: an acta signed before this column existed, or one whose signer's account was later deleted
+(`nullOnDelete`), has no attributable signatory. Every surface reports that as **"No consta"** (not recorded)
+rather than inventing a name or implying the signature is void — the signature is real, only its author is
+unrecorded. Tested: a `signed_at`-present / `signed_by`-null acta renders "Firmada el …" AND "No consta".
+
+**Immutability of the signatory.** The `updating` guard on `Minute` already refuses any change once signed, so
+`signed_by` cannot be rewritten via the model; `SignMinute` refuses a second signature outright. Both paths
+are tested. The signatory (user id + name) is also written to the append-only audit log's `after` payload —
+neither is special-category data, so it is safe to retain there.
+
+**Tests:** `MinuteSignatoryTest` (8) — signing records the signatory + relation resolves; audit log names the
+signer; a manager can draft but is refused signing; staff refused; a signed acta cannot be re-signed and its
+signatory cannot be changed; the PDF names the signatory when recorded and shows "No consta" when historical;
+the sign action is visible to a signer and hidden from a manager. `FormCompletenessTest` allowlist documents
+`signed_by` as system-set. **Screenshots** (infolist signatory row, signed acta PDF) not produced — no browser
+here. Owner-authorised merge (standing "merge everything to main"). 673 green (670 passed, 3 concurrency skips).

@@ -100,8 +100,8 @@ class MinuteResource extends Resource
             ->color('primary')
             ->requiresConfirmation()
             ->modalHeading(__('Firmar acta'))
-            ->modalDescription(__('Una vez firmada, el acta queda inmutable: no podrá editarse ni eliminarse. Una corrección se registra como un acta nueva vinculada.'))
-            ->visible(fn (Minute $record): bool => $record->signed_at === null && (Auth::user()?->can('minutes.manage') ?? false))
+            ->modalDescription(__('Una vez firmada, el acta queda inmutable: no podrá editarse ni eliminarse. Se registrará su nombre como firmante. Una corrección se registra como un acta nueva vinculada.'))
+            ->visible(fn (Minute $record): bool => $record->signed_at === null && (Auth::user()?->can('minute.sign') ?? false))
             ->action(function (Minute $record): void {
                 /** @var User $actor */
                 $actor = Auth::user();
