@@ -3,14 +3,17 @@
 namespace App\Livewire\Counter;
 
 use App\Actions\Attendance\ResolveMemberEligibility;
+use App\Actions\Counter\CommitCombinedSettle;
 use App\Actions\Dispensing\CommitDispensation;
 use App\Actions\Dispensing\ResolveMemberLimits;
 use App\Actions\Dispensing\VoidDispensation;
 use App\Actions\Members\ResolveMemberByToken;
+use App\Actions\Pricing\ResolveArticleDiscount;
 use App\Actions\Pricing\ResolvePrice;
 use App\Actions\Stock\SelectBatch;
 use App\Enums\MembershipStatus;
 use App\Enums\TillSessionStatus;
+use App\Exceptions\DebtLimitExceededException;
 use App\Exceptions\DispensationBlockedException;
 use App\Exceptions\LimitExceededException;
 use App\Exceptions\ScanRateLimitedException;
@@ -19,6 +22,7 @@ use App\Livewire\Counter\Concerns\HandlesTender;
 use App\Livewire\Counter\Concerns\IdentifiesOperator;
 use App\Livewire\Counter\Concerns\ResolvesCounterLocation;
 use App\Mail\DispensationReceiptMail;
+use App\Models\Article;
 use App\Models\Batch;
 use App\Models\CheckIn;
 use App\Models\Dispensation;
@@ -125,6 +129,18 @@ class DispensaryPos extends Component
 
     /** One idempotency key per basket — a double-tap or retry cannot double-commit. */
     public ?string $idempotencyKey = null;
+
+    /**
+     * The OPTIONAL bar/merch side of the same visit (prompt 118): a list of {article_id, qty}. When present at
+     * settle, the visit is committed through CommitCombinedSettle — one payment, but a Dispensation AND an
+     * Order on their separate ledgers. Empty (the common case) leaves the plain dispensation commit untouched.
+     *
+     * @var list<array{article_id: string, qty: int}>
+     */
+    public array $barBasket = [];
+
+    /** The just-committed bar Order from a combined settle — the SECOND receipt offered alongside the first. */
+    public ?string $lastOrderId = null;
 
     // --- Weight entry -----------------------------------------------------------
 
@@ -255,7 +271,7 @@ class DispensaryPos extends Component
             'memberId', 'scanned', 'search', 'basket', 'activeGeneticId', 'activeBatchId',
             'weightInput', 'calculatorMode', 'unitQty', 'cashTendered', 'walletInput', 'requireOverride',
             'limitBreach', 'overrideReason', 'priceOverrideEuros', 'priceOverrideReason', 'signaturePath',
-            'lastDispensationId', 'voidReason', 'flashMessage',
+            'lastDispensationId', 'lastOrderId', 'barBasket', 'voidReason', 'flashMessage',
         ]);
 
         // A new socio always starts a fresh basket → a fresh idempotency key.
@@ -662,6 +678,186 @@ class DispensaryPos extends Component
         $this->flash(__('Dispensación registrada.'), 'success');
     }
 
+    // --- Combined settle: same visit, cannabis + bar, two records (prompt 118) --------
+
+    /** Add a bar/merch article to the visit's bar side. Articles only — a genetic can never appear here. */
+    public function addBarItem(string $articleId): void
+    {
+        $location = $this->resolveLocation();
+        if ($location === null) {
+            return;
+        }
+
+        $article = Article::query()->where('location_id', $location->id)->find($articleId);
+        if ($article === null || ! $article->active) {
+            return;
+        }
+
+        foreach ($this->barBasket as $i => $line) {
+            if ($line['article_id'] === $articleId) {
+                $this->barBasket[$i]['qty']++;
+
+                return;
+            }
+        }
+        $this->barBasket[] = ['article_id' => $articleId, 'qty' => 1];
+    }
+
+    public function removeBarItem(int $index): void
+    {
+        unset($this->barBasket[$index]);
+        $this->barBasket = array_values($this->barBasket);
+    }
+
+    /**
+     * Settle the whole visit in one payment: a Dispensation AND a bar Order, atomically, on separate ledgers
+     * (prompt 118). Reuses the SAME dispensation guards as a plain commit (eligibility, signature, open till),
+     * then hands both baskets to CommitCombinedSettle. The quick combined path stays for the clean case: a
+     * dispensation that needs a limit/price override uses the ordinary dispensation flow.
+     */
+    public function settleWithBar(): void
+    {
+        $member = $this->resolveMember();
+        $location = $this->resolveLocation();
+
+        if ($member === null || $location === null) {
+            $this->flash(__('Identifica a un socio antes de registrar una dispensación.'), 'error');
+
+            return;
+        }
+        if (! $this->requireOperator()) {
+            return;
+        }
+        if ($this->offline) {
+            $this->flash(__('Sin conexión: no se puede registrar. La cesta se conserva hasta reconectar.'), 'error');
+
+            return;
+        }
+        if ($this->basket === [] || $this->barBasket === []) {
+            $this->flash(__('Una liquidación combinada necesita cesta de dispensario y de barra.'), 'error');
+
+            return;
+        }
+
+        $verdict = (new ResolveMemberEligibility)->handle($member, $location, 'counter');
+        if ($this->hardBlockRules($verdict) !== []) {
+            $this->flash(__('Dispensación bloqueada: :reasons', ['reasons' => implode(' · ', $verdict->blockingMessages())]), 'error');
+
+            return;
+        }
+        // An override-needed dispensation is not quick-settled with the bar — use the ordinary flow for it.
+        if ($this->overridableRules($verdict) !== [] || $this->limitBreach) {
+            $this->flash(__('Esta dispensación requiere autorización: liquídala por separado.'), 'warning');
+
+            return;
+        }
+        if ($this->signatureRequired() && $this->signaturePath === null) {
+            $this->flash(__('Falta la firma del socio.'), 'warning');
+
+            return;
+        }
+
+        $till = $this->openTillSession($location);
+        if ($till === null) {
+            $this->flash(__('No hay caja abierta en este terminal.'), 'error');
+
+            return;
+        }
+
+        $dispTotal = $this->basketTotalCents($member, $location);
+        $barTotal = $this->barBasketTotalCents($member, $location);
+        [$cashApplied, $walletApplied] = $this->tenderSplit($dispTotal + $barTotal);
+
+        if ($this->isUnderTendered($cashApplied)) {
+            $this->flash(__('El efectivo entregado no cubre el total.'), 'error');
+
+            return;
+        }
+
+        // Allocate the one payment across the two records: wallet to the dispensation first, then the bar; the
+        // cash remainder fills each. The split reconciles by construction (Σwallet + Σcash = combined total).
+        $dispWallet = min($walletApplied, $dispTotal);
+        $barWallet = $walletApplied - $dispWallet;
+
+        $dispLines = array_map(fn (array $l): array => [
+            'genetic_id' => (string) $l['genetic_id'],
+            'batch_id' => (string) $l['batch_id'],
+            'grams_cg' => (int) $l['grams_cg'],
+            'units' => $l['units'] !== null ? (int) $l['units'] : null,
+        ], $this->basket);
+        $orderLines = array_map(fn (array $l): array => ['article_id' => (string) $l['article_id'], 'qty' => (int) $l['qty']], $this->barBasket);
+
+        $operatorId = CounterOperator::id() ?? $this->currentUser()?->id;
+        $dispOptions = ['cash_cents' => $dispTotal - $dispWallet, 'wallet_cents' => $dispWallet, 'idempotency_key' => $this->idempotencyKey];
+        if ($this->signaturePath !== null) {
+            $dispOptions['signature_path'] = $this->signaturePath;
+        }
+
+        try {
+            $result = (new CommitCombinedSettle)->handle($member, $location, $dispLines, $orderLines, [
+                'till_session_id' => $till->id,
+                'operator_id' => $operatorId,
+                'dispensation' => $dispOptions,
+                'order' => [
+                    'cash_cents' => $barTotal - $barWallet,
+                    'wallet_cents' => $barWallet,
+                    'idempotency_key' => $this->idempotencyKey !== null ? $this->idempotencyKey.'-bar' : null,
+                ],
+            ]);
+        } catch (DebtLimitExceededException) {
+            $this->flash(__('El pago combinado con monedero superaría el saldo disponible del socio.'), 'error');
+
+            return;
+        } catch (DispensationBlockedException $e) {
+            $this->flash($e->getMessage(), 'error');
+
+            return;
+        } catch (LimitExceededException) {
+            $this->limitBreach = true;
+            $this->requireOverride = true;
+            $this->flash(__('Supera el límite de consumo. Se requiere autorización con motivo.'), 'warning');
+
+            return;
+        } catch (TillClosedException) {
+            $this->flash(__('La caja no está abierta.'), 'error');
+
+            return;
+        } catch (RuntimeException) {
+            $this->flash(__('No se pudo liquidar la visita. Revisa las cestas y el stock.'), 'error');
+
+            return;
+        }
+
+        $this->lastDispensationId = $result['dispensation']->id;
+        $this->lastOrderId = $result['order']->id;
+        $this->resetBasketState();
+        $this->barBasket = [];
+        $this->flash(__('Visita liquidada: dispensación y barra.'), 'success');
+    }
+
+    /** The charged bar total, priced through the SAME resolver CommitOrder uses so the tender matches. */
+    private function barBasketTotalCents(?Member $member, ?Location $location): int
+    {
+        if ($location === null || $this->barBasket === []) {
+            return 0;
+        }
+
+        $discounter = new ResolveArticleDiscount;
+        $bp = $member !== null ? $discounter->bpFor($member, $location) : 0;
+        $total = 0;
+
+        foreach ($this->barBasket as $line) {
+            $article = Article::query()->where('location_id', $location->id)->find($line['article_id']);
+            if ($article === null) {
+                continue;
+            }
+            $gross = $article->price_cents->cents * max(1, (int) $line['qty']);
+            $total += $gross - $discounter->discountCents($gross, $bp);
+        }
+
+        return $total;
+    }
+
     // --- Void -------------------------------------------------------------------
 
     public function voidLast(): void
@@ -788,7 +984,54 @@ class DispensaryPos extends Component
             'overridableRules' => $verdict !== null ? $this->overridableRules($verdict) : [],
             'canOverride' => $this->userCan('limits.override'),
             'canVoid' => $this->userCan('dispensation.void'),
+            // Bar side of the same visit (prompt 118) — only where the sede runs a bar. barArticles feeds the
+            // quick-add; barLines + barTotalCents render the in-progress bar basket.
+            'barEnabled' => $location !== null && (bool) Settings::get('bar_enabled', true, $location->id),
+            'barArticles' => $this->barArticleRows($location),
+            'barLines' => $this->barBasketView($location),
+            'barTotalCents' => $this->barBasketTotalCents($member, $location),
         ]);
+    }
+
+    /**
+     * The articles this sede can add to a visit's bar side — active, in stock — for the quick-add.
+     *
+     * @return list<array{id: string, name: string, price_cents: int}>
+     */
+    private function barArticleRows(?Location $location): array
+    {
+        if ($location === null) {
+            return [];
+        }
+
+        return Article::query()->where('location_id', $location->id)->where('active', true)->where('stock', '>', 0)
+            ->orderBy('name')->get()
+            ->map(fn (Article $a): array => ['id' => $a->id, 'name' => $a->name, 'price_cents' => $a->price_cents->cents])
+            ->all();
+    }
+
+    /**
+     * The in-progress bar basket resolved for display (name + qty + line total, live-priced).
+     *
+     * @return list<array{index: int, name: string, qty: int, line_total_cents: int}>
+     */
+    private function barBasketView(?Location $location): array
+    {
+        if ($location === null) {
+            return [];
+        }
+
+        $rows = [];
+        foreach ($this->barBasket as $index => $line) {
+            $article = Article::query()->where('location_id', $location->id)->find($line['article_id']);
+            if ($article === null) {
+                continue;
+            }
+            $qty = max(1, (int) $line['qty']);
+            $rows[] = ['index' => $index, 'name' => $article->name, 'qty' => $qty, 'line_total_cents' => $article->price_cents->cents * $qty];
+        }
+
+        return $rows;
     }
 
     /** Grams for display (integer centigrams → 2 dp, locale-aware). */

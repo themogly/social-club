@@ -493,6 +493,43 @@
                         <span class="text-lg font-bold tabular-nums">{{ $this->money($basketTotalCents) }}</span>
                     </div>
 
+                    {{-- Bar/merch side of the SAME visit (prompt 118): add articles, then settle the whole visit
+                         once — one payment, but a dispensation AND a bar order on their separate ledgers. Only
+                         where the sede runs a bar. The shared tender below covers the combined total. --}}
+                    @if ($barEnabled)
+                        <div class="mt-3 rounded-xl border border-line p-3 dark:border-slate-700">
+                            <p class="text-xs font-semibold uppercase tracking-wide text-ink-muted dark:text-slate-400">{{ __('Barra y tienda (misma visita)') }}</p>
+
+                            @if (! empty($barLines))
+                                <ul class="mt-2 divide-y divide-line dark:divide-slate-800">
+                                    @foreach ($barLines as $line)
+                                        <li class="flex items-center justify-between gap-2 py-1.5 text-sm">
+                                            <span>{{ $line['qty'] }}× {{ $line['name'] }}</span>
+                                            <span class="flex items-center gap-2 tabular-nums">
+                                                {{ $this->money($line['line_total_cents']) }}
+                                                <button type="button" wire:click="removeBarItem({{ $line['index'] }})" aria-label="{{ __('Quitar') }}" class="rounded-md px-1.5 text-ink-muted hover:bg-black/5 dark:text-slate-400 dark:hover:bg-white/5">✕</button>
+                                            </span>
+                                        </li>
+                                    @endforeach
+                                </ul>
+                            @endif
+
+                            @if (! empty($barArticles))
+                                <div class="mt-2 flex flex-wrap gap-1.5">
+                                    @foreach ($barArticles as $article)
+                                        <button type="button" wire:click="addBarItem('{{ $article['id'] }}')" class="rounded-full border border-line px-3 py-1 text-sm text-ink transition hover:bg-surface-alt dark:border-slate-700 dark:text-slate-100 dark:hover:bg-slate-800">+ {{ $article['name'] }}</button>
+                                    @endforeach
+                                </div>
+                            @endif
+
+                            @if (! empty($barLines))
+                                <button type="button" wire:click="settleWithBar" wire:loading.attr="disabled" wire:target="settleWithBar" x-bind:disabled="! online" class="mt-3 h-12 w-full rounded-xl bg-brand text-base font-semibold text-white transition hover:bg-brand-dark focus:outline-none focus:ring-2 focus:ring-brand/40 disabled:opacity-60">
+                                    {{ __('Liquidar visita · :total', ['total' => $this->money($basketTotalCents + $barTotalCents)]) }}
+                                </button>
+                            @endif
+                        </div>
+                    @endif
+
                     {{-- Price override (prompt 64): permission-gated, reasoned. Comp defective product or a
                          €0 give-away. Leaving the amount blank charges the resolved price. --}}
                     @can('dispensation.price.override')

@@ -4379,3 +4379,39 @@ both, so enrolment stays possible at manager level. A club that wants on-the-spo
 
 `composer check` green (882 tests, 879 passed, 3 pre-existing skips). Anonymous surface + member-PWA isolation
 unchanged (existing security-sweep tests still green).
+
+## Prompt 118 — One visit, one payment, two records (combined dispensary + bar settle)
+
+A member who takes cannabis AND buys at the bar in one visit now settles once, but the two stay on SEPARATE
+ledgers — a Dispensation and an Order, never a merged row — because they are legally different (a shared-cost
+aportación vs a bar sale) and bar spend must never touch the gram cap.
+
+**`App\Actions\Counter\CommitCombinedSettle`** orchestrates the two UNCHANGED single writers
+(`CommitDispensation`, `CommitOrder`) so the pair is ATOMIC — an outer `DB::transaction` wraps both (each nests
+via a savepoint), so a failing order rolls the dispensation back with it; no "cannabis taken, bar not charged"
+state is ever visible. The dispensation commits FIRST (it is the compliance boundary — eligibility, carencia,
+gram limits), so a blocked visit stops before any bar stock or cash moves. It adds the ONE thing neither writer
+can do alone: a **combined wallet-limit check** up front — each writer records its wallet spend with allow_debt
+(its per-writer debt check is bypassed), so a member could otherwise wallet-pay each half within limit yet blow
+it across the two; this validates the combined draw against balance + debt allowance before any write.
+
+**Reachable entry:** `DispensaryPos::settleWithBar()` — a bar basket (`barBasket`, articles only) added alongside
+the dispensation basket; one shared tender covers the combined total, allocated wallet-to-dispensation-first,
+cash-remainder-each. Both receipts (`lastDispensationId` + `lastOrderId`) land. The plain dispensation `commit()`
+path is untouched; the combined quick-settle stays for the clean case (an override-needed dispensation uses the
+ordinary flow). Bar items never enter the gram cap — inherent in keeping them on the Order.
+
+Tests (`CommitCombinedSettleTest`, 6): one dispensation + one order on separate ledgers; atomic rollback on a
+failing order (stock restored); combined wallet gate refused up front AND a within-balance draw settles;
+bar-items-never-in-the-gram-cap; and the end-to-end `settleWithBar` Livewire flow lands both receipts.
+
+**## Verification gap** — the ONE combined-settle piece not verifiable here is the VISUAL rendering of the new
+bar panel in the tablet POS (no browser):
+- Required (unrun): screenshot the combined settle showing two receipts, light + dark, at 1024×768.
+- What I changed that these exercise: `resources/views/livewire/counter/dispensary-pos.blade.php` (a contained
+  "Barra y tienda (misma visita)" card in the basket column — bar quick-add pills, bar basket list, and the
+  "Liquidar visita · <total>" button, all reusing existing card/button classes).
+- Believed result: the panel sits below the aportación total in the right basket column and appears only where
+  the sede runs a bar; behaviour (add/remove/settle, both receipts, combined total) is Livewire-tested green.
+
+`composer check` green (888 tests, 885 passed, 3 pre-existing skips, PHPStan 0). EN/ES parity gated.

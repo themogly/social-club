@@ -1979,5 +1979,12 @@
     "Terminales (cajas)": "Terminals (tills)",
     "Nombres de las cajas de esta sede, p. ej. «Caja 1», «Barra».": "Names of this location’s tills, e.g. “Till 1”, “Bar”.",
     "Añadir terminal": "Add terminal",
-    "Elige un terminal.": "Choose a terminal."
+    "Elige un terminal.": "Choose a terminal.",
+    "Una liquidación combinada necesita cesta de dispensario y de barra.": "A combined settle needs both a dispensary and a bar basket.",
+    "Esta dispensación requiere autorización: liquídala por separado.": "This dispensation needs authorisation — settle it separately.",
+    "El pago combinado con monedero superaría el saldo disponible del socio.": "The combined wallet payment would exceed the member’s available balance.",
+    "No se pudo liquidar la visita. Revisa las cestas y el stock.": "The visit could not be settled. Check the baskets and stock.",
+    "Visita liquidada: dispensación y barra.": "Visit settled: dispensation and bar.",
+    "Barra y tienda (misma visita)": "Bar & shop (same visit)",
+    "Liquidar visita · :total": "Settle visit · :total"
 }
