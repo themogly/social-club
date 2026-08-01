@@ -70,7 +70,7 @@ class AttendanceReport extends AbstractReport
 
         return $this->checkInsCache = CheckIn::query()->withoutGlobalScopes()
             ->whereIn('location_id', $this->resolvedLocationIds())
-            ->whereBetween('checked_in_at', [$start, $end])
+            ->where('checked_in_at', '>=', $start)->where('checked_in_at', '<', $end)
             ->orderBy('checked_in_at')
             ->get();
     }

@@ -64,16 +64,16 @@ class AgmPackReport extends AbstractReport
 
         $disp = DB::table('dispensations')->whereIn('location_id', $ids)
             ->where('status', DispensationStatus::COMPLETED->value)
-            ->whereBetween('dispensed_at', [$start, $end])
+            ->where('dispensed_at', '>=', $start)->where('dispensed_at', '<', $end)
             ->groupBy('location_id')->pluck(DB::raw('SUM(total_cents) as agg'), 'location_id');
         $ord = DB::table('orders')->whereIn('location_id', $ids)
             ->where('status', OrderStatus::COMPLETED->value)
-            ->whereBetween('created_at', [$start, $end])
+            ->where('created_at', '>=', $start)->where('created_at', '<', $end)
             ->groupBy('location_id')->pluck(DB::raw('SUM(total_cents) as agg'), 'location_id');
         $fees = DB::table('membership_fee_payments')
             ->join('memberships', 'membership_fee_payments.membership_id', '=', 'memberships.id')
             ->whereIn('memberships.location_id', $ids)
-            ->whereBetween('membership_fee_payments.paid_at', [$start, $end])
+            ->where('membership_fee_payments.paid_at', '>=', $start)->where('membership_fee_payments.paid_at', '<', $end)
             ->groupBy('memberships.location_id')->pluck(DB::raw('SUM(membership_fee_payments.amount_cents) as agg'), 'memberships.location_id');
         $exp = $this->expensesInPeriod()->whereIn('location_id', $ids)
             ->groupBy('location_id')->pluck(DB::raw('SUM(amount_cents) as agg'), 'location_id');

@@ -68,7 +68,7 @@ class ConsumptionReport extends AbstractReport
 
         return (int) DB::table('refunds')
             ->whereIn('location_id', $this->resolvedLocationIds())
-            ->whereBetween('created_at', [$start, $end])
+            ->where('created_at', '>=', $start)->where('created_at', '<', $end)
             ->sum('amount_cents');
     }
 
@@ -80,7 +80,7 @@ class ConsumptionReport extends AbstractReport
         return (int) DB::table('dispensations')
             ->whereIn('location_id', $this->resolvedLocationIds())
             ->whereNotNull('original_total_cents')
-            ->whereBetween('dispensed_at', [$start, $end])
+            ->where('dispensed_at', '>=', $start)->where('dispensed_at', '<', $end)
             ->sum(DB::raw('original_total_cents - total_cents'));
     }
 
@@ -95,7 +95,7 @@ class ConsumptionReport extends AbstractReport
             ->join('members', 'dispensations.member_id', '=', 'members.id')
             ->whereIn('dispensations.location_id', $this->resolvedLocationIds())
             ->where('dispensations.status', DispensationStatus::COMPLETED->value)
-            ->whereBetween('dispensations.dispensed_at', [$start, $end])
+            ->where('dispensations.dispensed_at', '>=', $start)->where('dispensations.dispensed_at', '<', $end)
             ->groupBy('members.id')
             ->get([
                 DB::raw('MAX(members.member_no) as member_no'),
@@ -157,7 +157,7 @@ class ConsumptionReport extends AbstractReport
             ->leftJoin('genetics', 'dispensation_lines.genetic_id', '=', 'genetics.id')
             ->whereIn('dispensations.location_id', $this->resolvedLocationIds())
             ->where('dispensations.status', DispensationStatus::COMPLETED->value)
-            ->whereBetween('dispensations.dispensed_at', [$start, $end])
+            ->where('dispensations.dispensed_at', '>=', $start)->where('dispensations.dispensed_at', '<', $end)
             ->groupBy('dispensation_lines.genetic_id')
             ->orderByDesc(DB::raw('SUM(dispensation_lines.grams_cg)'))
             ->get([
@@ -211,7 +211,7 @@ class ConsumptionReport extends AbstractReport
             ->join('dispensations', 'dispensation_lines.dispensation_id', '=', 'dispensations.id')
             ->whereIn('dispensations.location_id', $this->resolvedLocationIds())
             ->where('dispensations.status', DispensationStatus::COMPLETED->value)
-            ->whereBetween('dispensations.dispensed_at', [$start, $end])
+            ->where('dispensations.dispensed_at', '>=', $start)->where('dispensations.dispensed_at', '<', $end)
             ->groupBy('dispensations.member_id')
             ->pluck(DB::raw('SUM(dispensation_lines.grams_cg) as agg'), 'dispensations.member_id');
 
@@ -264,7 +264,7 @@ class ConsumptionReport extends AbstractReport
         $entries = DB::table('audit_logs')
             ->where('organisation_id', $this->organisationId)
             ->where('action', 'dispensation.limit.override')
-            ->whereBetween('created_at', [$start, $end])
+            ->where('created_at', '>=', $start)->where('created_at', '<', $end)
             ->orderByDesc('created_at')
             ->get(['created_at', 'auditable_id', 'after']);
 

@@ -69,14 +69,14 @@ class FinancialReport extends AbstractReport
 
         $disp = DB::table('dispensations')->whereIn('location_id', $ids)
             ->where('status', DispensationStatus::COMPLETED->value)
-            ->whereBetween('dispensed_at', [$start, $end])->get(['dispensed_at', 'total_cents']);
+            ->where('dispensed_at', '>=', $start)->where('dispensed_at', '<', $end)->get(['dispensed_at', 'total_cents']);
         $ord = DB::table('orders')->whereIn('location_id', $ids)
             ->where('status', OrderStatus::COMPLETED->value)
-            ->whereBetween('created_at', [$start, $end])->get(['created_at', 'total_cents']);
+            ->where('created_at', '>=', $start)->where('created_at', '<', $end)->get(['created_at', 'total_cents']);
         $fees = DB::table('membership_fee_payments')
             ->join('memberships', 'membership_fee_payments.membership_id', '=', 'memberships.id')
             ->whereIn('memberships.location_id', $ids)
-            ->whereBetween('membership_fee_payments.paid_at', [$start, $end])
+            ->where('membership_fee_payments.paid_at', '>=', $start)->where('membership_fee_payments.paid_at', '<', $end)
             ->get(['membership_fee_payments.paid_at as paid_at', 'membership_fee_payments.amount_cents as amount_cents']);
         $exp = $this->expensesQuery()
             ->where('incurred_on', '>=', $start->toDateString())
@@ -140,21 +140,21 @@ class FinancialReport extends AbstractReport
 
         $dispCash = (int) DB::table('dispensations')->whereIn('location_id', $ids)
             ->where('status', DispensationStatus::COMPLETED->value)
-            ->whereBetween('dispensed_at', [$start, $end])->sum('cash_cents');
+            ->where('dispensed_at', '>=', $start)->where('dispensed_at', '<', $end)->sum('cash_cents');
         $dispWallet = (int) DB::table('dispensations')->whereIn('location_id', $ids)
             ->where('status', DispensationStatus::COMPLETED->value)
-            ->whereBetween('dispensed_at', [$start, $end])->sum('wallet_cents');
+            ->where('dispensed_at', '>=', $start)->where('dispensed_at', '<', $end)->sum('wallet_cents');
         $ordCash = (int) DB::table('orders')->whereIn('location_id', $ids)
             ->where('status', OrderStatus::COMPLETED->value)
-            ->whereBetween('created_at', [$start, $end])->sum('cash_cents');
+            ->where('created_at', '>=', $start)->where('created_at', '<', $end)->sum('cash_cents');
         $ordWallet = (int) DB::table('orders')->whereIn('location_id', $ids)
             ->where('status', OrderStatus::COMPLETED->value)
-            ->whereBetween('created_at', [$start, $end])->sum('wallet_cents');
+            ->where('created_at', '>=', $start)->where('created_at', '<', $end)->sum('wallet_cents');
 
         $feesByMethod = DB::table('membership_fee_payments')
             ->join('memberships', 'membership_fee_payments.membership_id', '=', 'memberships.id')
             ->whereIn('memberships.location_id', $ids)
-            ->whereBetween('membership_fee_payments.paid_at', [$start, $end])
+            ->where('membership_fee_payments.paid_at', '>=', $start)->where('membership_fee_payments.paid_at', '<', $end)
             ->groupBy('membership_fee_payments.method')
             ->pluck(DB::raw('SUM(membership_fee_payments.amount_cents) as agg'), 'membership_fee_payments.method');
 
@@ -292,7 +292,7 @@ class FinancialReport extends AbstractReport
             ->join('dispensations', 'dispensation_lines.dispensation_id', '=', 'dispensations.id')
             ->whereIn('dispensations.location_id', $ids)
             ->where('dispensations.status', DispensationStatus::COMPLETED->value)
-            ->whereBetween('dispensations.dispensed_at', [$start, $end])
+            ->where('dispensations.dispensed_at', '>=', $start)->where('dispensations.dispensed_at', '<', $end)
             ->groupBy('dispensation_lines.genetic_id')
             ->pluck(DB::raw('SUM(dispensation_lines.grams_cg) as agg'), 'dispensation_lines.genetic_id');
 

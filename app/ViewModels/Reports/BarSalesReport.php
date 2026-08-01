@@ -57,7 +57,7 @@ class BarSalesReport extends AbstractReport
         $orders = DB::table('orders')
             ->whereIn('location_id', $locationIds)
             ->where('status', OrderStatus::COMPLETED->value)
-            ->whereBetween('created_at', [$start, $end])
+            ->where('created_at', '>=', $start)->where('created_at', '<', $end)
             ->get(['items', 'location_id']);
 
         /** @var array<string, array{articulo: string, sede: string, unidades: int, importe: int}> $agg */

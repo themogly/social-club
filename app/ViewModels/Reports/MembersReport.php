@@ -48,8 +48,8 @@ class MembersReport extends AbstractReport
         $this->tables();
         [$start, $end] = $this->bounds();
 
-        $joined = $this->memberScope()->whereBetween('joined_at', [$start, $end])->count();
-        $left = $this->memberScope()->whereBetween('left_at', [$start, $end])->count();
+        $joined = $this->memberScope()->where('joined_at', '>=', $start)->where('joined_at', '<', $end)->count();
+        $left = $this->memberScope()->where('left_at', '>=', $start)->where('left_at', '<', $end)->count();
 
         return [
             ['label' => __('Total socios'), 'value' => (string) $this->total],
@@ -191,7 +191,7 @@ class MembersReport extends AbstractReport
             ->with('member')
             ->whereHas('member', fn (Builder $q) => $q->where('organisation_id', $this->organisationId)
                 ->when(! $this->includesAllLocations(), fn (Builder $q) => $q->whereHas('memberships', fn (Builder $m) => $m->whereIn('location_id', $this->resolvedLocationIds()))))
-            ->whereBetween('created_at', [$start, $end])
+            ->where('created_at', '>=', $start)->where('created_at', '<', $end)
             ->orderByDesc('created_at')
             ->get()
             ->map(fn (MemberSanction $s): array => [

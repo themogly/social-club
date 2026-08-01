@@ -126,7 +126,7 @@ class Dashboard
 
         return (int) Member::query()->withoutGlobalScopes()
             ->where('organisation_id', $this->organisationId)
-            ->whereBetween('joined_at', [$start, $end])->count();
+            ->where('joined_at', '>=', $start)->where('joined_at', '<', $end)->count();
     }
 
     public function stockOnHandCg(): int
@@ -269,7 +269,7 @@ class Dashboard
             ->join('dispensations', 'dispensations.id', '=', 'dispensation_lines.dispensation_id')
             ->whereIn('dispensations.member_id', $limits->keys())
             ->where('dispensations.status', DispensationStatus::COMPLETED->value)
-            ->whereBetween('dispensations.dispensed_at', [$start, $end])
+            ->where('dispensations.dispensed_at', '>=', $start)->where('dispensations.dispensed_at', '<', $end)
             ->groupBy('dispensations.member_id')
             ->selectRaw('dispensations.member_id as member_id, SUM(dispensation_lines.grams_cg) as used_cg')
             ->pluck('used_cg', 'member_id');
@@ -388,7 +388,7 @@ class Dashboard
 
         return $this->scopeByLocation($query)
             ->where('status', DispensationStatus::COMPLETED->value)
-            ->whereBetween('dispensed_at', [$start, $end]);
+            ->where('dispensed_at', '>=', $start)->where('dispensed_at', '<', $end);
     }
 
     /**
@@ -400,7 +400,7 @@ class Dashboard
 
         return $this->scopeByLocation(Order::query()->withoutGlobalScopes())
             ->where('status', OrderStatus::COMPLETED->value)
-            ->whereBetween('created_at', [$start, $end]);
+            ->where('created_at', '>=', $start)->where('created_at', '<', $end);
     }
 
     /**

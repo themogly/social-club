@@ -9,7 +9,9 @@ use App\Filament\Resources\Batches\BatchResource;
 use App\Filament\Resources\MemberApplications\MemberApplicationResource;
 use App\Filament\Resources\Members\MemberResource;
 use App\Filament\Resources\TillSessions\TillSessionResource;
+use App\Models\Location;
 use App\Models\User;
+use App\Support\ActiveScope;
 use App\Support\Money;
 use App\Support\Period;
 use App\Support\Weight;
@@ -82,7 +84,20 @@ class Dashboard extends BaseDashboard
             );
         }
 
-        return Period::fromKey($this->period);
+        // The dashboard's "Hoy/semana/mes" resolves through the scoped sede's BUSINESS day (prompt 105).
+        return Period::fromKey($this->period, $this->periodLocation());
+    }
+
+    /** The sede whose business-day config resolves the period — active sede, else the org's canonical (first) sede. */
+    protected function periodLocation(): ?Location
+    {
+        $scope = app(ActiveScope::class);
+        $orgId = $scope->organisationId();
+        $id = $scope->locationId() ?? ($orgId !== null
+            ? Location::query()->withoutGlobalScopes()->where('organisation_id', $orgId)->orderBy('name')->value('id')
+            : null);
+
+        return $id !== null ? Location::query()->withoutGlobalScopes()->find($id) : null;
     }
 
     /**
