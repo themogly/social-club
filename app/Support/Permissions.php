@@ -67,8 +67,12 @@ class Permissions
     /** STAFF — per assigned location. Counter + door + basic member intake only. */
     private const STAFF = [
         'pos.use', 'pos.bar', 'checkin.manage',
-        'members.view', 'members.create',
+        'members.view',
         'expenses.record', 'membership.fee.collect', 'till.open',
+        // members.create is deliberately NOT here (prompt 122): admitting a member is a board/assembly act in a
+        // Spanish asociación, and application review is already manager-gated (applications.review) — so the
+        // direct enrol route should not be more open than the reviewed one. A club that wants on-the-spot staff
+        // enrolment grants members.create back to the STAFF role. See DECISIONS (OVERNIGHT-DEFAULT — CONFIRM).
     ];
 
     /**

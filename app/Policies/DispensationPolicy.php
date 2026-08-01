@@ -20,14 +20,14 @@ use App\Support\ActiveScope;
 class DispensationPolicy
 {
     /**
-     * List the dispensations in the panel (DispensationResource is oversight-only, prompt 71). Gated on a
-     * counter OR reporting permission — mirroring OrderPolicy — so both counter staff and reporting roles
-     * can review. The org is enforced by the model's global scope on the list query; per-row org/location
-     * checks live in `view`.
+     * BROWSE the whole dispensation archive in the panel (DispensationResource, oversight-only, prompt 71).
+     * Reporting only — NOT `pos.use` (prompt 122): operating the till serves the member in front of you
+     * (CommitDispensation), it does not open every member's Article-9 consumption history. A counter operator's
+     * legitimate SINGLE-row reads (receipt reprint, refund lookup) go through `view`, which keeps `pos.use`.
      */
     public function viewAny(User $user): bool
     {
-        return $user->can('pos.use') || $user->can('reports.view');
+        return $user->can('reports.view');
     }
 
     public function view(User $user, Dispensation $dispensation): bool

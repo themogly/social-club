@@ -4339,3 +4339,43 @@ Tests: `SingleTillTest` (default is single-till; open asks only the float; the c
 sedes honour their own setting) and `TillTerminalPickerTest` now enables multi-till (the picker is that path).
 `composer check` green (877 tests, 874 passed, 3 pre-existing skips). Visual layout of the open form (float-only
 vs picker) is behaviour-verified via Livewire; a screenshot pass is owed (no browser here). EN/ES parity gated.
+
+## Prompt 122 — Separate "operate the counter" from "browse the whole archive"
+
+Three `viewAny` policies used an OPERATIONAL permission (one staff hold) to authorise browsing everyone else's
+historical record. Operating is not archival access.
+
+**Before → after (STAFF actor):**
+
+| Route | Before | After | Manager |
+|---|---|---|---|
+| `/dispensations` (Art-9 archive) | ALLOW (`pos.use`) | **DENY** | ALLOW |
+| `/expenses` (rent, invoices) | ALLOW (`expenses.record`) | **DENY** | ALLOW |
+| `/orders` (bar purchase history) | ALLOW (`pos.bar`) | **DENY** | ALLOW |
+| `members/create` (direct enrol) | ALLOW (`members.create`) | **DENY** | ALLOW |
+| single dispensation `view` (receipt/refund lookup) | ALLOW | ALLOW (unchanged) | ALLOW |
+
+`DispensationPolicy::viewAny` and `OrderPolicy::viewAny` now key off `reports.view`; `ExpensePolicy::viewAny`
+off `expenses.overheads`/`expenses.approve` (dropping `expenses.record`). The single-row `view` abilities keep
+`pos.use`/`pos.bar`/`expenses.record` as before, so the counter's legitimate single-member reads (the receipt
+controller, the refund lookup, the POS member card) are untouched — verified: the counter uses `pos.use`/
+`pos.bar` DIRECTLY and the single-row `view`, never `viewAny`, and the full staff-shift suite stays green.
+
+**`members.create` — OVERNIGHT-DEFAULT — CONFIRM:** removed from the STAFF role. Admitting a member is a
+board/assembly act in a Spanish asociación, and application review is already manager-gated
+(`applications.review`); the direct enrol route should not be more open than the reviewed one. MANAGER keeps
+both, so enrolment stays possible at manager level. A club that wants on-the-spot staff enrolment grants
+`members.create` back to STAFF.
+
+**viewAny sweep (all policies):**
+- Same shape, FIXED: Dispensation (`pos.use`), Order (`pos.bar`), Expense (`expenses.record`).
+- Same shape, LEFT + reported: `TillSessionPolicy::viewAny` = `till.open || till.close` lets staff browse every
+  operator's Z-report. Left because a till session is operational CASH data (not member/Art-9), the design
+  documented the intent (staff review their own drawer), and the branch scopes the fix to the member-consumption
+  and expense archives. A club could tighten it to `till.close`; flagged here rather than changed blind.
+- Correctly scoped (no change): Purchase (`purchases.manage`), Batch (`stock.manage`), Genetic
+  (`genetics.manage`), Article (`articles.manage`) — management perms STAFF do not hold; Member (`members.view`)
+  is the deliberate counter identity read, with the statutory register gated separately at `register.view`.
+
+`composer check` green (882 tests, 879 passed, 3 pre-existing skips). Anonymous surface + member-PWA isolation
+unchanged (existing security-sweep tests still green).

@@ -206,12 +206,15 @@ class RefundUiTest extends TestCase
 
     public function test_the_refund_action_is_hidden_without_permission(): void
     {
-        $staff = User::factory()->create();
-        $staff->assignRole(Role::STAFF->value); // no dispensation.void
-        $staff->locations()->sync([$this->location->id]);
+        // A viewer who can SEE the dispensation (reports.view — the panel archive gate, prompt 122) but lacks
+        // dispensation.void: the record opens, the refund action does not appear.
+        $viewer = User::factory()->create();
+        $viewer->assignRole(Role::STAFF->value);
+        $viewer->givePermissionTo('reports.view'); // panel access to the record, still no dispensation.void
+        $viewer->locations()->sync([$this->location->id]);
         $d = $this->dispensation();
 
-        $this->actingAs($staff);
+        $this->actingAs($viewer);
         Livewire::test(ViewDispensation::class, ['record' => $d->getKey()])
             ->assertActionHidden('refund');
     }

@@ -16,9 +16,14 @@ use App\Support\ActiveScope;
  */
 class ExpensePolicy
 {
+    /**
+     * BROWSE the expense archive in the panel — NOT `expenses.record` (prompt 122): taking a €20 petty-cash
+     * slip out of the drawer (`create`, below, keeps `expenses.record`) must not reveal rent, utilities and
+     * supplier invoices. Browsing is a treasurer/approver concern.
+     */
     public function viewAny(User $user): bool
     {
-        return $user->canAny(['expenses.record', 'expenses.overheads', 'expenses.approve']);
+        return $user->canAny(['expenses.overheads', 'expenses.approve']);
     }
 
     public function view(User $user, Expense $expense): bool
