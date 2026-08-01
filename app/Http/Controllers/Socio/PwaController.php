@@ -10,6 +10,8 @@ use App\Http\Controllers\Controller;
 use App\Models\Genetic;
 use App\Models\Location;
 use App\Models\Member;
+use App\Models\Scopes\LocationScope;
+use App\Models\Scopes\OrganisationScope;
 use App\Support\Qr;
 use App\Support\Wallet;
 use Illuminate\Http\JsonResponse;
@@ -35,7 +37,12 @@ class PwaController extends Controller
     /** The member's home location — their most recent active membership's sede. */
     private function location(Member $member): ?Location
     {
-        return $member->memberships()->withoutGlobalScopes()
+        // Escape the org + location scopes (a member's memberships span sedes and the member guard sets no
+        // active scope) but NOT the soft-delete scope — a deleted membership must not resolve as their home
+        // (prompt 95 sweep).
+        return $member->memberships()
+            ->withoutGlobalScope(OrganisationScope::class)
+            ->withoutGlobalScope(LocationScope::class)
             ->where('status', MembershipStatus::ACTIVE->value)
             ->latest('id')->first()?->location;
     }
@@ -70,8 +77,15 @@ class PwaController extends Controller
         $genetics = collect();
         if ($location !== null) {
             $resolver = new ResolvePrice;
-            $genetics = Genetic::query()->withoutGlobalScopes()
+            // Only genetics SELLABLE at this member's sede (prompt 95) — the same definition the dispensary
+            // POS uses, so the two agree. An unpriced strain is filtered out, never a thrown error that 500s
+            // the menu. Escape ONLY the organisation scope (the menu spans the member's org, which the
+            // member guard does not set as the active scope) — NOT the soft-delete scope, so a deleted
+            // strain never reaches a member. forGenetic() is now only ever called where a price exists.
+            $genetics = Genetic::query()->withoutGlobalScope(OrganisationScope::class)
                 ->where('organisation_id', $member->organisation_id)
+                ->sellableAt($location->id)
+                ->orderBy('name')
                 ->get()
                 ->map(fn (Genetic $g): array => [
                     'genetic' => $g,

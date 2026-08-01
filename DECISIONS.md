@@ -3384,3 +3384,54 @@ named human-facing renders + the guard.
 files together, `Mostrador` added to both). No behaviour change — presentation only. **Screenshots** (the POS
 in both languages with the corrected subtitle and cultivation badges) not produced — no browser here.
 Owner-authorised merge (standing "merge everything to main"). 738 green (735 passed, 3 concurrency skips).
+
+---
+
+## Prompt 95 — Member menu 500 on an unpriced/soft-deleted genetic + withoutGlobalScopes() sweep
+
+**Production-down: `/socio/menu` returned 500 whenever any genetic had no active price at the member's sede**
+— an entirely ordinary half-priced strain (exactly prompt 93's state) took down a member-facing screen for
+every member, and soft-deleting the strain did not fix it.
+
+**Defect 1 — filter, don't throw (one definition of "sellable").** `menu()` mapped
+`ResolvePrice::forGenetic()` over EVERY genetic; that resolver throws for an unpriced strain and nothing
+caught it. Rather than a try/catch, the menu now uses the SAME filter the dispensary POS uses — extracted into
+`Genetic::scopeSellableAt($locationId)` (active + an active base price at that sede) and adopted by BOTH
+`PwaController::menu()` and `DispensaryPos::geneticRows()`. So there is ONE definition of what is available,
+the two surfaces can never disagree (asserted against each other), and `forGenetic()` is only ever called
+where a price exists.
+
+**`ResolvePrice` contract — kept throwing, made the safe path the default.** `forGenetic()` still throws for a
+caller that asks to price an unpriceable genetic (a genuine programming error), but callers no longer defend
+individually: the shared `scopeSellableAt()` filter is the default-safe path, and `Genetic::hasActivePriceAt()`
+(prompt 93) is the cheap companion check. Changing the resolver to return null would ripple through every
+caller (POS/PWA/reports/receipts) for no gain now that the filter is shared, so the throw stays — recorded per
+the prompt's request.
+
+**Defect 2 — `withoutGlobalScopes()` also stripped the soft-delete scope.** `Genetic` uses `SoftDeletes`; the
+blanket call removed `SoftDeletingScope` too, so the menu advertised DELETED strains (why soft-deleting didn't
+fix the crash). The intent was only to escape the *organisation* scope (the member guard sets no active
+scope), so it is now `withoutGlobalScope(OrganisationScope::class)` — soft-deleted genetics are excluded.
+
+**The sweep (every blanket `withoutGlobalScopes()` vs `SoftDeletes`).** 190 call sites. The rule applied: a
+MEMBER-FACING surface must never see trashed rows; staff oversight that reports HISTORY may. Findings:
+- **Fixed (member-facing, were leaking trashed rows):** `PwaController::menu` (Genetic),
+  `Member/AnnouncementController` (Announcement — a deleted, still-published aviso would show),
+  `Member/EventController` (Event — same), and `PwaController::location()` (Membership — a deleted membership
+  must not resolve as a member's home sede). Each narrowed to escape only Organisation (+ Location for the
+  member's cross-sede memberships), keeping the soft-delete scope.
+- **Reviewed, correctly left as-is:** the Dashboard and Reports viewmodels (`Dashboard`, `*Report`) — these
+  are staff oversight aggregating HISTORY, where excluding a later-deleted member/genetic/batch would silently
+  change past figures; the counter screens (`DispensaryPos`/`BarPos`/`CheckInScreen`) — id-lookups of a
+  just-created record or an eligibility membership under the staff scope, not member-facing; and the model
+  internals (`Batch`/`GeneticPrice` fetching a parent Genetic's `unit_type` by id) — a trashed parent's
+  arithmetic constant is still needed. `PwaController` history/export read the member's OWN non-soft-deletable
+  records (dispensations/orders/wallet/visits) plus their own memberships in an RGPD Art. 20 export (left
+  inclusive for completeness — the member's own data, not a catalog advertised to them).
+
+**Tests:** `MemberMenuCrashTest` (7) — unpriced genetic absent + 200 (the crash regression); priced at A not B
+(both 200); soft-deleted genetic never appears; member with no active location gets an empty menu not an
+error; the menu and the POS agree on the available set (asserted against each other); a soft-deleted
+announcement and event are not shown to members (the sweep). **Screenshots** (`/socio/menu` degrading vs
+crashing, light/dark, phone) not produced — no browser here. Owner-authorised merge (standing "merge all to
+main"). 745 green (742 passed, 3 concurrency skips).

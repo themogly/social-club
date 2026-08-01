@@ -6,6 +6,7 @@ use App\Enums\EventRsvpStatus;
 use App\Models\Event;
 use App\Models\EventRsvp;
 use App\Models\Member;
+use App\Models\Scopes\OrganisationScope;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Http\RedirectResponse;
@@ -94,7 +95,9 @@ class EventController extends MemberController
         $locationIds = $this->memberLocationIds($member)->all();
 
         /** @var Collection<int, Event> $events */
-        $events = Event::query()->withoutGlobalScopes()
+        // Escape ONLY the organisation scope, NOT the soft-delete scope — a deleted event must never
+        // reach a member (prompt 95 sweep).
+        $events = Event::query()->withoutGlobalScope(OrganisationScope::class)
             ->where('organisation_id', $member->organisation_id)
             ->where(fn (Builder $q): Builder => $q->whereNull('location_id')->orWhereIn('location_id', $locationIds))
             ->where(fn (Builder $q): Builder => $q->whereNull('starts_at')->orWhere('starts_at', '>=', now()->subDay()))
