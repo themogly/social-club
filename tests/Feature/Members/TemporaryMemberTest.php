@@ -72,6 +72,12 @@ class TemporaryMemberTest extends TestCase
 
     public function test_enrolling_a_temporary_member_computes_the_expiry_from_the_window(): void
     {
+        // Freeze the clock (prompt 125): enrolment calls now() inside MemberEnrolment::defaults(), so without
+        // this the test races the clock and a sub-day drift used to truncate 30 → 29 under full-suite timing.
+        $this->freezeTime();
+        // Read the RULE from Settings, never a hard-coded 30 — the window is temporary_window_days.
+        $window = (int) Settings::get('temporary_window_days');
+
         $this->actingAs($this->owner());
 
         Livewire::test(CreateMember::class)
@@ -88,9 +94,36 @@ class TemporaryMemberTest extends TestCase
 
         $member = Member::query()->withoutGlobalScopes()->where('first_name', 'Vera')->firstOrFail();
         $this->assertTrue($member->isTemporary());
-        // joined_at + 30 days (same day-of).
         $this->assertNotNull($member->temporary_expires_at);
-        $this->assertSame(30, (int) $member->joined_at->diffInDays($member->temporary_expires_at));
+        // Assert the RULE as timestamps, not a truncated diff: expiry is EXACTLY joined_at + the window. This
+        // still fails if the code computes from the wrong base or the wrong window.
+        $this->assertTrue(
+            $member->temporary_expires_at->equalTo($member->joined_at->copy()->addDays($window)),
+            "temporary_expires_at must equal joined_at + {$window} days (temporary_window_days).",
+        );
+    }
+
+    public function test_changing_the_temporary_window_changes_the_computed_expiry(): void
+    {
+        // The test tracks the SETTING, it does not encode a magic number (prompt 125).
+        $this->freezeTime();
+        Settings::set('temporary_window_days', 45, SettingType::INT);
+
+        $this->actingAs($this->owner());
+        Livewire::test(CreateMember::class)
+            ->fillForm([
+                'first_name' => 'Nadia', 'last_name' => 'Nómada', 'email' => 'nadia@example.test',
+                'date_of_birth' => now()->subYears(30)->format('Y-m-d'),
+                'document_type' => IdDocumentType::DNI->value, 'document_number' => '87654321X',
+                'is_therapeutic' => false, 'avalador_member_id' => $this->avalador->id,
+                'declared_monthly_cg' => '50.00', 'consent_given' => true,
+                'is_temporary' => true,
+            ])
+            ->call('create')
+            ->assertHasNoFormErrors();
+
+        $member = Member::query()->withoutGlobalScopes()->where('first_name', 'Nadia')->firstOrFail();
+        $this->assertTrue($member->temporary_expires_at->equalTo($member->joined_at->copy()->addDays(45)));
     }
 
     // --- The load-bearing rule: identical compliance -------------------------------
