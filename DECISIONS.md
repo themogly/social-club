@@ -4122,3 +4122,29 @@ and reports honour it — proven by tests using a Madrid location.
 
 **Harness:** the `dayboundary` section is now 3/3 (was 2 failing); overall **24 passed / 7 failed** (was 22/9).
 Owner-authorised merge. 853 tests, 850 passed, 3 pre-existing skips, PHPStan 0.
+
+## Prompt 109 — Settings memo (per resolved scope, safe under multi-tenancy)
+
+`Settings::get()` now memoises resolved values in a request-lifetime static (`self::$memo`), keyed on the
+**RESOLVED `(organisationId, locationId, key)`** — never on key alone. The scope is ambient and changes
+within one process (the seeder loops locations; a queued worker touches several orgs), so a key-only cache
+would hand one club's setting to another — a multi-tenancy leak worse than the query it saves. The key uses
+the location *after* `?? $scope->locationId()` resolution, so an explicit-location read and the active-location
+read of the same sede share one entry, and a different sede gets its own.
+
+**Only successful resolutions are memoised:** a real override row (cast value), or — when there is no row — the
+**constant** `DEFAULTS[$key]`. A key absent from `DEFAULTS` falls through to the caller's `$default`, which
+varies per call site, so it is deliberately **not** memoised (else a later call with a different default would
+get the first call's). The `catch (Throwable)` degrade-to-default path is never cached — a DB blip must not pin
+the app to code defaults for the rest of the request.
+
+**Invalidation:** `Settings::set()` clears the whole memo (writes are rare, reads constant — simpler and safer
+than surgical invalidation). Between tests the base `TestCase::setUp()` calls `Settings::flush()`, so one test's
+resolved value can never leak into the next (the isolation a fresh request gets for free).
+
+`DebtorReportTest::test_the_query_count_does_not_scale_with_member_count` now flushes the memo before each
+measurement so both are COLD renders — otherwise the first render pays the one-time setting query the second
+gets free, and the two differ by that constant (which is not the member-count scaling that test guards).
+
+**Harness:** "reading one settings key ten times is not ten queries" → **1 query** (green). Overall **25 passed
+/ 6 failed** (was 24/7). Owner-authorised merge. 859 tests, 856 passed, 3 pre-existing skips, PHPStan 0.

@@ -1,0 +1,113 @@
+<?php
+
+namespace Tests\Feature\Settings;
+
+use App\Enums\SettingType;
+use App\Models\Location;
+use App\Models\Organisation;
+use App\Support\ActiveScope;
+use App\Support\Settings;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
+use Tests\TestCase;
+
+/**
+ * Prompt 109 — Settings::get() memoises per RESOLVED (organisation, location, key). The multi-tenancy tests
+ * come first: the scope is ambient and changes within a process, so a key-only cache would hand one club's
+ * value to another. These prove it does not, which is what makes the memo safe to ship.
+ */
+class SettingsMemoTest extends TestCase
+{
+    use RefreshDatabase;
+
+    private function scope(): ActiveScope
+    {
+        return app(ActiveScope::class);
+    }
+
+    public function test_two_organisations_never_share_a_memoised_value(): void
+    {
+        $a = Organisation::factory()->create();
+        $b = Organisation::factory()->create();
+
+        $this->scope()->setOrganisation($a->id);
+        Settings::set('daily_limit_cg', 111, SettingType::INT);
+        $this->scope()->setOrganisation($b->id);
+        Settings::set('daily_limit_cg', 222, SettingType::INT);
+
+        // Read alternately in ONE process — each org gets its own value.
+        $this->scope()->setOrganisation($a->id);
+        $this->assertSame(111, Settings::get('daily_limit_cg'));
+        $this->scope()->setOrganisation($b->id);
+        $this->assertSame(222, Settings::get('daily_limit_cg'));
+        $this->scope()->setOrganisation($a->id);
+        $this->assertSame(111, Settings::get('daily_limit_cg'));
+    }
+
+    public function test_two_locations_in_one_org_never_share_a_memoised_value(): void
+    {
+        $org = Organisation::factory()->create();
+        $this->scope()->setOrganisation($org->id);
+        $a = Location::factory()->create(['organisation_id' => $org->id]);
+        $b = Location::factory()->create(['organisation_id' => $org->id]);
+
+        Settings::set('daily_limit_cg', 333, SettingType::INT, $a->id);
+        Settings::set('daily_limit_cg', 444, SettingType::INT, $b->id);
+
+        $this->scope()->setLocation($a->id);
+        $this->assertSame(333, Settings::get('daily_limit_cg'));
+        $this->scope()->setLocation($b->id);
+        $this->assertSame(444, Settings::get('daily_limit_cg'));
+        $this->scope()->setLocation($a->id);
+        $this->assertSame(333, Settings::get('daily_limit_cg'));
+    }
+
+    public function test_reading_one_key_ten_times_is_one_query(): void
+    {
+        $org = Organisation::factory()->create();
+        $this->scope()->setOrganisation($org->id);
+
+        DB::enableQueryLog();
+        for ($i = 0; $i < 10; $i++) {
+            Settings::get('daily_limit_cg');
+        }
+        $queries = count(DB::getQueryLog());
+        DB::disableQueryLog();
+
+        $this->assertLessThanOrEqual(1, $queries, "10 reads issued {$queries} queries — the memo is not working.");
+    }
+
+    public function test_a_write_is_immediately_visible_to_the_next_get(): void
+    {
+        $org = Organisation::factory()->create();
+        $this->scope()->setOrganisation($org->id);
+
+        $this->assertSame(Settings::DEFAULTS['daily_limit_cg'], Settings::get('daily_limit_cg')); // memoises the default
+        Settings::set('daily_limit_cg', 999, SettingType::INT);                                    // clears the memo
+        $this->assertSame(999, Settings::get('daily_limit_cg'));                                   // the override, not the stale memo
+    }
+
+    public function test_a_location_override_set_after_reading_the_org_value_wins(): void
+    {
+        $org = Organisation::factory()->create();
+        $this->scope()->setOrganisation($org->id);
+        Settings::set('daily_limit_cg', 500, SettingType::INT); // org-level
+        $loc = Location::factory()->create(['organisation_id' => $org->id]);
+        $this->scope()->setLocation($loc->id);
+
+        $this->assertSame(500, Settings::get('daily_limit_cg')); // reads (and memoises) the org value for this scope
+        Settings::set('daily_limit_cg', 700, SettingType::INT, $loc->id); // location override clears the memo
+        $this->assertSame(700, Settings::get('daily_limit_cg')); // the override, not the memo
+    }
+
+    public function test_a_missing_key_returns_the_callers_default_and_does_not_memoise_it(): void
+    {
+        $org = Organisation::factory()->create();
+        $this->scope()->setOrganisation($org->id);
+
+        // A key absent from DEFAULTS with no row resolves to the caller's $default, which varies per call —
+        // so it must NOT be memoised (or the second call would wrongly return the first call's default).
+        $this->assertSame('x', Settings::get('__phantom_key__', 'x'));
+        $this->assertSame('y', Settings::get('__phantom_key__', 'y'));
+    }
+}

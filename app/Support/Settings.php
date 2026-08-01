@@ -153,6 +153,17 @@ class Settings
      * ACTIVE location is used (the normal enforcement path); pass an explicit id to read a SPECIFIC
      * location's override (e.g. the Location edit form, which edits a sede that isn't the active one).
      */
+    /**
+     * Request-lifetime memo keyed on the RESOLVED (organisation, location, key) — NOT on key alone (prompt
+     * 109). The scope is ambient (the seeder loops locations, a queued worker processes several orgs), so a
+     * key-only cache would hand one club's setting to another — a multi-tenancy leak, worse than the query
+     * cost it saves. Only SUCCESSFUL resolutions are memoised (a real override, or a constant DEFAULTS value);
+     * the swallow-to-default failure path is never cached, or a DB blip would pin the app to DEFAULTS.
+     *
+     * @var array<string, mixed>
+     */
+    private static array $memo = [];
+
     public static function get(string $key, mixed $default = null, ?string $locationId = null): mixed
     {
         try {
@@ -160,17 +171,29 @@ class Settings
             $organisationId = $scope->organisationId();
 
             if ($organisationId !== null) {
+                $resolvedLocation = $locationId ?? $scope->locationId();
+                $memoKey = $organisationId.'|'.($resolvedLocation ?? '').'|'.$key;
+
+                if (array_key_exists($memoKey, self::$memo)) {
+                    return self::$memo[$memoKey];
+                }
+
                 $rows = Setting::query()->withoutGlobalScopes()
                     ->where('organisation_id', $organisationId)
                     ->where('key', $key)
                     ->get();
 
-                $locationId ??= $scope->locationId();
-                $row = ($locationId !== null ? $rows->firstWhere('location_id', $locationId) : null)
+                $row = ($resolvedLocation !== null ? $rows->firstWhere('location_id', $resolvedLocation) : null)
                     ?? $rows->firstWhere('location_id', null);
 
                 if ($row !== null) {
-                    return self::cast($row->value, $row->type);
+                    return self::$memo[$memoKey] = self::cast($row->value, $row->type);
+                }
+                // No override: memoise the CONSTANT code default (safe — DEFAULTS[$key] never varies). A key
+                // absent from DEFAULTS resolves to the caller's $default, which varies per call site, so it is
+                // deliberately NOT memoised.
+                if (array_key_exists($key, self::DEFAULTS)) {
+                    return self::$memo[$memoKey] = self::DEFAULTS[$key];
                 }
             }
         } catch (Throwable) {
@@ -179,6 +202,12 @@ class Settings
         }
 
         return self::DEFAULTS[$key] ?? $default;
+    }
+
+    /** Clear the request-lifetime memo. Called on every write, and reset between tests (base TestCase). */
+    public static function flush(): void
+    {
+        self::$memo = [];
     }
 
     /**
@@ -206,6 +235,10 @@ class Settings
     public static function set(string $key, mixed $value, SettingType $type = SettingType::STRING, ?string $locationId = null): Setting
     {
         $organisationId = app(ActiveScope::class)->organisationId();
+
+        // Any write invalidates the whole memo — writes are rare, reads constant, so clearing all is safer
+        // (and simpler) than surgical invalidation (prompt 109).
+        self::flush();
 
         return Setting::withoutGlobalScopes()->updateOrCreate(
             ['organisation_id' => $organisationId, 'location_id' => $locationId, 'key' => $key],
