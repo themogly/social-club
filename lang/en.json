@@ -1993,5 +1993,12 @@
     "Accesible": "Reachable",
     "No accesible": "Unreachable",
     "Almacén": "Store",
-    "La caché no responde. El mostrador y la autorización siguen funcionando (permisos en base de datos); las colas están detenidas hasta que se restablezca.": "The cache is not responding. The counter and authorisation keep working (permissions on the database); queues are paused until it is restored."
+    "La caché no responde. El mostrador y la autorización siguen funcionando (permisos en base de datos); las colas están detenidas hasta que se restablezca.": "The cache is not responding. The counter and authorisation keep working (permissions on the database); queues are paused until it is restored.",
+    "Un concepto fuera de catálogo (no mueve stock). El motivo queda registrado para poder revisarlo después.": "An off-catalogue item (moves no stock). The reason is recorded so it can be reviewed later.",
+    "Artículo sin dar de alta": "Item not yet in stock",
+    "Precio especial": "Special price",
+    "Evento": "Event",
+    "… o escribe un motivo": "… or type a reason",
+    "Justifica por qué es una línea sin catálogo — se revisa al cerrar la caja.": "Justify why this is an off-catalogue line — reviewed at till close.",
+    "Indica un motivo para la línea manual.": "Give a reason for the manual line."
 }

@@ -134,17 +134,24 @@
             </div>
 
             {{-- ================= CENTRE: article grid + misc line ================= --}}
-            <div class="flex flex-col gap-4">
+            {{-- Prompt 126: the manual-line entry is reachable from a button in THIS header (always visible at
+                 1024×768), opening a modal — it is no longer a section buried below the article grid. --}}
+            <div class="flex flex-col gap-4" x-data="{ showMisc: false }" x-on:misc-added.window="showMisc = false">
                 <section class="rounded-2xl border border-line bg-surface p-4 dark:border-slate-800 dark:bg-slate-900">
                     <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                         <h2 class="text-base font-semibold">{{ __('Artículos') }}</h2>
-                        <input
-                            type="text"
-                            wire:model.live.debounce.300ms="articleSearch" aria-label="{{ __('Buscar artículo…') }}"
-                            autocomplete="off"
-                            placeholder="{{ __('Buscar artículo…') }}"
-                            class="h-11 w-full rounded-xl border border-line bg-surface px-4 text-sm text-ink placeholder:text-ink-muted focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/40 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 sm:w-56"
-                        >
+                        <div class="flex items-center gap-2">
+                            <input
+                                type="text"
+                                wire:model.live.debounce.300ms="articleSearch" aria-label="{{ __('Buscar artículo…') }}"
+                                autocomplete="off"
+                                placeholder="{{ __('Buscar artículo…') }}"
+                                class="h-11 w-full rounded-xl border border-line bg-surface px-4 text-sm text-ink placeholder:text-ink-muted focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/40 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 sm:w-48"
+                            >
+                            <button type="button" @click="showMisc = true" class="inline-flex h-11 shrink-0 items-center gap-1 rounded-xl border border-brand/40 bg-brand-tint/40 px-3 text-sm font-semibold text-brand transition hover:bg-brand-tint dark:border-brand/40 dark:bg-slate-800 dark:text-slate-100">
+                                <span aria-hidden="true">＋</span>{{ __('Importe manual') }}
+                            </button>
+                        </div>
                     </div>
 
                     @if (! empty($categories))
@@ -199,26 +206,41 @@
                     </div>
                 </section>
 
-                {{-- Miscellaneous / quick-amount line (a reference is REQUIRED). --}}
-                <section class="rounded-2xl border border-line bg-surface p-4 dark:border-slate-800 dark:bg-slate-900">
-                    <h2 class="text-base font-semibold">{{ __('Importe manual') }}</h2>
-                    <p class="mt-1 text-xs text-ink-muted dark:text-slate-400">{{ __('Un concepto fuera de catálogo. La referencia es obligatoria.') }}</p>
-                    <div class="mt-3 grid gap-3 sm:grid-cols-2">
-                        <div class="sm:col-span-2">
-                            <label for="misc-desc" class="block text-xs font-medium text-ink-muted dark:text-slate-400">{{ __('Descripción') }}</label>
-                            <input id="misc-desc" type="text" wire:model="miscDescription" autocomplete="off" class="mt-1 h-11 w-full rounded-xl border border-line bg-surface px-3 text-base text-ink focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/40 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100">
+                {{-- Manual-line entry as an on-demand modal (prompt 126) — opened from the header button, so it is
+                     reachable at 1024×768 without scrolling past the catalogue. The reason is ONE TAP for the
+                     common cases (categorised + fast) with free text as the fallback. --}}
+                <div x-show="showMisc" x-cloak @keydown.escape.window="showMisc = false"
+                     class="fixed inset-0 z-40 flex items-center justify-center bg-black/40 p-4" role="dialog" aria-modal="true" aria-label="{{ __('Importe manual') }}">
+                    <div @click.outside="showMisc = false" class="w-full max-w-md rounded-2xl border border-line bg-surface p-5 shadow-xl dark:border-slate-800 dark:bg-slate-900">
+                        <div class="flex items-center justify-between">
+                            <h2 class="text-base font-semibold">{{ __('Importe manual') }}</h2>
+                            <button type="button" @click="showMisc = false" aria-label="{{ __('Cerrar') }}" class="flex h-11 w-11 items-center justify-center rounded-lg text-ink-muted hover:bg-black/5 dark:text-slate-400 dark:hover:bg-white/5">✕</button>
                         </div>
-                        <div>
-                            <label for="misc-amount" class="block text-xs font-medium text-ink-muted dark:text-slate-400">{{ __('Importe (€)') }}</label>
-                            <input id="misc-amount" type="text" inputmode="decimal" wire:model="miscAmount" autocomplete="off" placeholder="0,00" class="mt-1 h-11 w-full rounded-xl border border-line bg-surface px-3 text-base text-ink placeholder:text-ink-muted focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/40 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100">
-                        </div>
-                        <div>
-                            <label for="misc-ref" class="block text-xs font-medium text-ink-muted dark:text-slate-400">{{ __('Referencia (obligatoria)') }}</label>
-                            <input id="misc-ref" type="text" wire:model="miscReference" autocomplete="off" class="mt-1 h-11 w-full rounded-xl border border-line bg-surface px-3 text-base text-ink focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/40 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100">
+                        <p class="mt-1 text-xs text-ink-muted dark:text-slate-400">{{ __('Un concepto fuera de catálogo (no mueve stock). El motivo queda registrado para poder revisarlo después.') }}</p>
+
+                        <div class="mt-3 space-y-3">
+                            <div>
+                                <label for="misc-desc" class="block text-xs font-medium text-ink-muted dark:text-slate-400">{{ __('Descripción') }}</label>
+                                <input id="misc-desc" type="text" wire:model="miscDescription" autocomplete="off" class="mt-1 h-11 w-full rounded-xl border border-line bg-surface px-3 text-base text-ink focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/40 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100">
+                            </div>
+                            <div>
+                                <label for="misc-amount" class="block text-xs font-medium text-ink-muted dark:text-slate-400">{{ __('Importe (€)') }}</label>
+                                <input id="misc-amount" type="text" inputmode="decimal" wire:model="miscAmount" autocomplete="off" placeholder="0,00" class="mt-1 h-11 w-full rounded-xl border border-line bg-surface px-3 text-base text-ink placeholder:text-ink-muted focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/40 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100">
+                            </div>
+                            <div>
+                                <label for="misc-ref" class="block text-xs font-medium text-ink-muted dark:text-slate-400">{{ __('Motivo') }}</label>
+                                <div class="mt-1 flex flex-wrap gap-1.5">
+                                    @foreach ([__('Artículo sin dar de alta'), __('Precio especial'), __('Evento')] as $reason)
+                                        <button type="button" @click="$wire.set('miscReference', @js($reason))" class="rounded-full border border-line px-3 py-1.5 text-sm text-ink transition hover:bg-surface-alt dark:border-slate-700 dark:text-slate-100 dark:hover:bg-slate-800">{{ $reason }}</button>
+                                    @endforeach
+                                </div>
+                                <input id="misc-ref" type="text" wire:model="miscReference" autocomplete="off" placeholder="{{ __('… o escribe un motivo') }}" class="mt-2 h-11 w-full rounded-xl border border-line bg-surface px-3 text-base text-ink placeholder:text-ink-muted focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/40 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100">
+                                <p class="mt-1 text-[11px] text-ink-muted dark:text-slate-500">{{ __('Justifica por qué es una línea sin catálogo — se revisa al cerrar la caja.') }}</p>
+                            </div>
+                            <button type="button" wire:click="addMiscLine" class="h-11 w-full rounded-xl bg-brand text-sm font-semibold text-white transition hover:bg-brand-dark focus:outline-none focus:ring-2 focus:ring-brand/40">{{ __('Añadir importe manual') }}</button>
                         </div>
                     </div>
-                    <button type="button" wire:click="addMiscLine" class="mt-3 h-11 w-full rounded-xl border border-brand/40 bg-brand-tint/40 text-sm font-semibold text-brand transition hover:bg-brand-tint dark:border-brand/40 dark:bg-slate-800 dark:text-slate-100">{{ __('Añadir importe manual') }}</button>
-                </section>
+                </div>
             </div>
 
             {{-- ================= RIGHT: the basket + payment ================= --}}

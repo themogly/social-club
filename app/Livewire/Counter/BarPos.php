@@ -248,9 +248,10 @@ class BarPos extends Component
             return;
         }
 
-        // A miscellaneous line is NOT in the catalogue, so a reference is required.
+        // A miscellaneous line is NOT in the catalogue, so a reason is still required — but the modal makes it
+        // one tap (prompt 126), so satisfying it no longer pushes staff to type "x" or take cash off book.
         if ($reference === '') {
-            $this->flash(__('Una línea manual requiere una referencia.'), 'error');
+            $this->flash(__('Indica un motivo para la línea manual.'), 'error');
 
             return;
         }
@@ -266,6 +267,9 @@ class BarPos extends Component
         $this->reset(['miscDescription', 'miscAmount', 'miscReference']);
         $this->ensureIdempotencyKey();
         $this->flashMessage = null;
+        // Tell the blade's modal to close — but only now, on SUCCESS, so a validation refusal keeps it open with
+        // the operator's input intact.
+        $this->dispatch('misc-added');
     }
 
     public function incrementLine(int $index): void

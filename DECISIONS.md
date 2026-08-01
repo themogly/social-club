@@ -4584,3 +4584,35 @@ missed, surfaced by 125's clean-checkout note.)
 
 No production code changed. `composer check` green (898 tests, 895 passed, 3 pre-existing skips, PHPStan 0) plus
 four green randomised runs.
+
+## Prompt 126 — Surface the bar manual line (discoverability + friction)
+
+The manual bar line already existed (`BarPos::miscDescription/miscAmount/miscReference`, `CommitOrder`
+description/unit_price line, distinguishable snapshot + receipt) but sat as a section BELOW the article grid —
+below the fold on a 768–1024px tablet — and asked for three fields with a mandatory free-text reference.
+
+**Where it lives now.** A **"＋ Importe manual" button in the article header** (always visible, beside the
+search) opens an Alpine **modal**. It is no longer a section you scroll past a full catalogue to reach. The modal
+closes only on SUCCESS (a `misc-added` Livewire event), so a validation refusal keeps the operator's input.
+
+**The reference requirement.** KEPT (a free-text line has nothing to reconcile against — operator + till are
+already recorded, so the reference carries the *why*, not the *who/when*), but made ONE TAP: reason chips
+(*Artículo sin dar de alta / Precio especial / Evento*) set the field, with free text as the fallback and helper
+text that says what it is for. So the categorised, analysable field is faster than the old blank box — removing
+the "type x / take cash off book" failure mode rather than the auditability.
+
+**Identifiable in the report.** `BarSalesReport` already grouped manual lines separately (article_id null); added
+an explicit `manual` flag on the row so an owner can pick out exactly the off-catalogue lines.
+
+**Below-the-fold sweep.** This is the third built-but-unfindable counter feature — the per-sede signature toggle
+(now on LocationForm) and the member-discount picker (prompt 119) were the others. A full visual sweep of every
+counter control at 1024×768 needs a browser (owed); known candidates flagged.
+
+## Verification gap
+- Required (unrun, no browser): at 1024×768 with a full catalogue, the manual-line control is visible without
+  scrolling. Its PRESENCE + header placement is asserted (`BarMiscLineTest`); the pixel measurement is the
+  owed screenshot.
+
+Tests (`BarMiscLineTest`, 5): control present; a manual line commits with its description + reason and moves no
+stock; an empty reason is refused; the line is flagged in the bar report; a genetic still cannot reach an order.
+`composer check` green (903 tests, 900 passed, 3 pre-existing skips, PHPStan 0). EN/ES parity gated.
