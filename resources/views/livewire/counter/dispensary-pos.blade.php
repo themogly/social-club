@@ -343,7 +343,7 @@
                             wire:model.live.debounce.300ms="geneticSearch" aria-label="{{ __('Buscar genética…') }}"
                             autocomplete="off"
                             placeholder="{{ __('Buscar genética…') }}"
-                            class="h-10 w-full rounded-xl border border-line bg-surface px-4 text-sm text-ink placeholder:text-ink-muted focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/40 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 sm:w-56"
+                            class="h-11 w-full rounded-xl border border-line bg-surface px-4 text-sm text-ink placeholder:text-ink-muted focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/40 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 sm:w-56"
                         >
                     </div>
 
@@ -439,7 +439,7 @@
                     <div class="rounded-2xl border border-error/40 bg-error/10 p-4 text-sm">
                         <p class="font-semibold text-error">{{ __('No hay caja abierta') }}</p>
                         <p class="mt-1 text-error/90">{{ __('Abre una caja en este terminal antes de dispensar.') }}</p>
-                        <a href="{{ route('counter.till') }}" wire:navigate class="mt-3 inline-flex h-10 items-center rounded-lg bg-error px-4 text-sm font-semibold text-white transition hover:opacity-90">{{ __('Ir a la caja') }}</a>
+                        <a href="{{ route('counter.till') }}" wire:navigate class="mt-3 inline-flex h-11 items-center rounded-lg bg-error px-4 text-sm font-semibold text-white transition hover:opacity-90">{{ __('Ir a la caja') }}</a>
                     </div>
                 @endunless
 
@@ -619,8 +619,8 @@
                                         @touchstart.prevent="start($event)" @touchmove.prevent="move($event)" @touchend="stop()"
                                     ></canvas>
                                     <div class="mt-2 flex gap-2">
-                                        <button type="button" @click="wipe()" class="h-10 flex-1 rounded-lg border border-line bg-surface-alt text-sm font-medium text-ink-muted dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300">{{ __('Borrar') }}</button>
-                                        <button type="button" @click="save()" class="h-10 flex-1 rounded-lg bg-brand text-sm font-semibold text-white hover:bg-brand-dark">{{ __('Guardar firma') }}</button>
+                                        <button type="button" @click="wipe()" class="h-11 flex-1 rounded-lg border border-line bg-surface-alt text-sm font-medium text-ink-muted dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300">{{ __('Borrar') }}</button>
+                                        <button type="button" @click="save()" class="h-11 flex-1 rounded-lg bg-brand text-sm font-semibold text-white hover:bg-brand-dark">{{ __('Guardar firma') }}</button>
                                     </div>
                                 </div>
                             @endif
@@ -699,7 +699,7 @@
                                 <div class="rounded-xl border border-line bg-surface p-3 dark:border-slate-700 dark:bg-slate-900">
                                     <label class="block text-xs font-medium text-ink-muted dark:text-slate-400">{{ __('Anular esta dispensación') }}</label>
                                     <textarea wire:model="voidReason" rows="2" placeholder="{{ __('Motivo de la anulación (queda registrado)') }}" class="mt-1 w-full rounded-lg border border-line bg-surface px-3 py-2 text-sm focus:border-error focus:outline-none focus:ring-2 focus:ring-error/30 dark:border-slate-700 dark:bg-slate-950"></textarea>
-                                    <button type="button" wire:click="voidLast" wire:confirm="{{ __('¿Anular la dispensación? Se revertirán stock y monedero.') }}" class="mt-2 h-10 w-full rounded-lg border border-error/40 bg-error/10 text-sm font-semibold text-error transition hover:bg-error/20">{{ __('Anular') }}</button>
+                                    <button type="button" wire:click="voidLast" wire:confirm="{{ __('¿Anular la dispensación? Se revertirán stock y monedero.') }}" class="mt-2 h-11 w-full rounded-lg border border-error/40 bg-error/10 text-sm font-semibold text-error transition hover:bg-error/20">{{ __('Anular') }}</button>
                                 </div>
                             @endif
                         </div>
