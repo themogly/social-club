@@ -54,12 +54,16 @@
     .csc-card-link:hover { transform: translateY(-2px); border-color: var(--br); box-shadow: 0 8px 24px rgba(37, 99, 235, .14); }
     .csc-card-link:focus-visible { outline: 2px solid var(--br); outline-offset: 2px; }
     .csc-card[data-flag="true"] { border-color: var(--warn); }
-    .csc-card-head { display: flex; align-items: center; gap: 0.5rem; }
+    .csc-card-head { display: flex; align-items: center; gap: 0.5rem; min-width: 0; }
     .csc-card-icon { display: inline-flex; align-items: center; justify-content: center; width: 1.9rem; height: 1.9rem; border-radius: 0.55rem; background: var(--brt); color: var(--br); flex: none; }
     .csc-ico { width: 1.05rem; height: 1.05rem; }
-    .csc-card-label { font-size: 0.78rem; font-weight: 600; color: var(--mut); }
+    /* Prompt 101: the label takes the free space and TRUNCATES (min-width:0 lets a flex child shrink below its
+       content width) instead of pushing the delta out and being clipped by the card's overflow:hidden. */
+    .csc-card-label { font-size: 0.78rem; font-weight: 600; color: var(--mut); flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .csc-card-body { display: flex; align-items: flex-end; justify-content: space-between; gap: 0.5rem; }
-    .csc-card-value { font-size: 1.6rem; line-height: 1.15; font-weight: 700; letter-spacing: -.01em; color: var(--tx); }
+    /* The value block must be able to shrink beside the ring so a long figure wraps rather than clipping. */
+    .csc-card-body > div { min-width: 0; }
+    .csc-card-value { font-size: 1.6rem; line-height: 1.15; font-weight: 700; letter-spacing: -.01em; color: var(--tx); overflow-wrap: anywhere; }
     .csc-card-sub { font-size: 0.74rem; color: var(--mut); margin-top: 0.2rem; }
     .csc-card-spark { height: 32px; color: var(--br); }
     .csc-spark { width: 100%; height: 100%; display: block; }
