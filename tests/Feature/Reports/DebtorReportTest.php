@@ -139,11 +139,16 @@ class DebtorReportTest extends TestCase
         for ($i = 0; $i < 2; $i++) {
             $this->wallet($this->member(0), -100);
         }
+        // Flush the settings memo before each measurement so both are COLD renders (the first render in a
+        // request). Otherwise the first render pays a one-time setting query the second gets for free (prompt
+        // 109), and the two would differ by that constant — which is not the member-count scaling this guards.
+        Settings::flush();
         $small = $this->countQueries(fn () => $this->report()->tables());
 
         for ($i = 0; $i < 12; $i++) {
             $this->wallet($this->member(0), -100);
         }
+        Settings::flush();
         $large = $this->countQueries(fn () => $this->report()->tables());
 
         $this->assertSame($small, $large, 'The debtor report must aggregate in SQL, not per member.');
