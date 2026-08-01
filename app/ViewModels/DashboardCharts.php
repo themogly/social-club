@@ -69,7 +69,7 @@ class DashboardCharts
         [$start, $end, $bounds] = $this->trailingDays($days);
         $rows = DB::table('dispensations')->whereIn('location_id', $this->resolvedLocationIds())
             ->where('status', DispensationStatus::COMPLETED->value)
-            ->whereBetween('dispensed_at', [$start, $end])->get(['dispensed_at', 'total_cents']);
+            ->where('dispensed_at', '>=', $start)->where('dispensed_at', '<', $end)->get(['dispensed_at', 'total_cents']);
 
         return $this->bucket($rows, $bounds, 'dispensed_at', 'total_cents');
     }
@@ -82,7 +82,7 @@ class DashboardCharts
             ->join('dispensations', 'dispensation_lines.dispensation_id', '=', 'dispensations.id')
             ->whereIn('dispensations.location_id', $this->resolvedLocationIds())
             ->where('dispensations.status', DispensationStatus::COMPLETED->value)
-            ->whereBetween('dispensations.dispensed_at', [$start, $end])
+            ->where('dispensations.dispensed_at', '>=', $start)->where('dispensations.dispensed_at', '<', $end)
             ->get(['dispensations.dispensed_at as dispensed_at', 'dispensation_lines.grams_cg as grams_cg']);
 
         return $this->bucket($rows, $bounds, 'dispensed_at', 'grams_cg');
@@ -95,10 +95,10 @@ class DashboardCharts
         $ids = $this->resolvedLocationIds();
         $disp = DB::table('dispensations')->whereIn('location_id', $ids)
             ->where('status', DispensationStatus::COMPLETED->value)
-            ->whereBetween('dispensed_at', [$start, $end])->get(['dispensed_at']);
+            ->where('dispensed_at', '>=', $start)->where('dispensed_at', '<', $end)->get(['dispensed_at']);
         $ord = DB::table('orders')->whereIn('location_id', $ids)
             ->where('status', OrderStatus::COMPLETED->value)
-            ->whereBetween('created_at', [$start, $end])->get(['created_at']);
+            ->where('created_at', '>=', $start)->where('created_at', '<', $end)->get(['created_at']);
 
         $a = $this->bucket($disp, $bounds, 'dispensed_at', null);
         $b = $this->bucket($ord, $bounds, 'created_at', null);
@@ -111,7 +111,7 @@ class DashboardCharts
     {
         [$start, $end, $bounds] = $this->trailingDays($days);
         $rows = DB::table('check_ins')->whereIn('location_id', $this->resolvedLocationIds())
-            ->whereBetween('checked_in_at', [$start, $end])->get(['checked_in_at']);
+            ->where('checked_in_at', '>=', $start)->where('checked_in_at', '<', $end)->get(['checked_in_at']);
 
         return $this->bucket($rows, $bounds, 'checked_in_at', null);
     }
@@ -122,7 +122,7 @@ class DashboardCharts
         [$start, $end, $bounds] = $this->trailingDays($days);
         $rows = DB::table('members')->where('organisation_id', $this->organisationId)
             ->whereNull('deleted_at') // a soft-deleted member is not a new joiner
-            ->whereBetween('joined_at', [$start, $end])->get(['joined_at']);
+            ->where('joined_at', '>=', $start)->where('joined_at', '<', $end)->get(['joined_at']);
 
         return $this->bucket($rows, $bounds, 'joined_at', null);
     }
@@ -133,7 +133,7 @@ class DashboardCharts
         [$start, $end, $bounds] = $this->trailingDays($days);
         $rows = DB::table('till_sessions')->whereIn('location_id', $this->resolvedLocationIds())
             ->whereNotNull('variance_cents')->whereNotNull('closed_at')
-            ->whereBetween('closed_at', [$start, $end])->get(['closed_at', 'variance_cents']);
+            ->where('closed_at', '>=', $start)->where('closed_at', '<', $end)->get(['closed_at', 'variance_cents']);
 
         return $this->bucket($rows, $bounds, 'closed_at', 'variance_cents');
     }
@@ -163,14 +163,14 @@ class DashboardCharts
 
         $disp = DB::table('dispensations')->whereIn('location_id', $ids)
             ->where('status', DispensationStatus::COMPLETED->value)
-            ->whereBetween('dispensed_at', [$start, $end])->get(['dispensed_at', 'total_cents']);
+            ->where('dispensed_at', '>=', $start)->where('dispensed_at', '<', $end)->get(['dispensed_at', 'total_cents']);
         $ord = DB::table('orders')->whereIn('location_id', $ids)
             ->where('status', OrderStatus::COMPLETED->value)
-            ->whereBetween('created_at', [$start, $end])->get(['created_at', 'total_cents']);
+            ->where('created_at', '>=', $start)->where('created_at', '<', $end)->get(['created_at', 'total_cents']);
         $fees = DB::table('membership_fee_payments')
             ->join('memberships', 'membership_fee_payments.membership_id', '=', 'memberships.id')
             ->whereIn('memberships.location_id', $ids)
-            ->whereBetween('membership_fee_payments.paid_at', [$start, $end])
+            ->where('membership_fee_payments.paid_at', '>=', $start)->where('membership_fee_payments.paid_at', '<', $end)
             ->get(['membership_fee_payments.paid_at as paid_at', 'membership_fee_payments.amount_cents as amount_cents']);
 
         return [
@@ -234,7 +234,7 @@ class DashboardCharts
             ->join('dispensations', 'dispensation_lines.dispensation_id', '=', 'dispensations.id')
             ->whereIn('dispensations.location_id', $this->resolvedLocationIds())
             ->where('dispensations.status', DispensationStatus::COMPLETED->value)
-            ->whereBetween('dispensations.dispensed_at', [$start, $end])
+            ->where('dispensations.dispensed_at', '>=', $start)->where('dispensations.dispensed_at', '<', $end)
             ->groupBy('dispensation_lines.genetic_id')
             ->selectRaw('MAX(dispensation_lines.genetic_name_snapshot) as genetic')
             ->selectRaw('COUNT(DISTINCT dispensation_lines.dispensation_id) as tx')
@@ -281,7 +281,7 @@ class DashboardCharts
             ->join('dispensations', 'dispensation_lines.dispensation_id', '=', 'dispensations.id')
             ->whereIn('dispensations.location_id', $this->resolvedLocationIds())
             ->where('dispensations.status', DispensationStatus::COMPLETED->value)
-            ->whereBetween('dispensations.dispensed_at', [$start, $end])
+            ->where('dispensations.dispensed_at', '>=', $start)->where('dispensations.dispensed_at', '<', $end)
             ->groupBy('dispensations.member_id')
             ->selectRaw('dispensations.member_id as member_id, SUM(dispensation_lines.grams_cg) as used')
             ->pluck('used', 'member_id');
@@ -383,7 +383,7 @@ class DashboardCharts
 
         $disp = DB::table('dispensations')->whereIn('location_id', $ids)
             ->where('status', DispensationStatus::COMPLETED->value)
-            ->whereBetween('dispensed_at', [$start, $end])
+            ->where('dispensed_at', '>=', $start)->where('dispensed_at', '<', $end)
             ->orderByDesc('dispensed_at')->limit($limit)
             ->get(['id', 'member_id', 'operator_id', 'total_cents', 'dispensed_at'])
             ->map(fn (\stdClass $r): array => [
@@ -392,7 +392,7 @@ class DashboardCharts
             ]);
         $ord = DB::table('orders')->whereIn('location_id', $ids)
             ->where('status', OrderStatus::COMPLETED->value)
-            ->whereBetween('created_at', [$start, $end])
+            ->where('created_at', '>=', $start)->where('created_at', '<', $end)
             ->orderByDesc('created_at')->limit($limit)
             ->get(['id', 'member_id', 'operator_id', 'total_cents', 'created_at'])
             ->map(fn (\stdClass $r): array => [
@@ -436,12 +436,12 @@ class DashboardCharts
         return $this->scopedLocations()->map(function (Location $location) use ($start, $end): array {
             $contributions = (int) DB::table('dispensations')->where('location_id', $location->id)
                 ->where('status', DispensationStatus::COMPLETED->value)
-                ->whereBetween('dispensed_at', [$start, $end])->sum('total_cents');
+                ->where('dispensed_at', '>=', $start)->where('dispensed_at', '<', $end)->sum('total_cents');
             $grams = (int) DB::table('dispensation_lines')
                 ->join('dispensations', 'dispensation_lines.dispensation_id', '=', 'dispensations.id')
                 ->where('dispensations.location_id', $location->id)
                 ->where('dispensations.status', DispensationStatus::COMPLETED->value)
-                ->whereBetween('dispensations.dispensed_at', [$start, $end])->sum('dispensation_lines.grams_cg');
+                ->where('dispensations.dispensed_at', '>=', $start)->where('dispensations.dispensed_at', '<', $end)->sum('dispensation_lines.grams_cg');
             $inside = (int) DB::table('check_ins')->where('location_id', $location->id)
                 ->whereNull('checked_out_at')->count();
 

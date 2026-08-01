@@ -4085,3 +4085,40 @@ full run leaves the row counts unchanged (the mutating sections roll back).
 **Out of scope (recorded):** the two concurrency properties (gram cap + no-oversell under simultaneous
 counters) need real child processes and a `--concurrency` mode; verified separately on MariaDB, not in-process.
 Owner-authorised merge. 846 tests, 843 passed, 3 pre-existing skips, PHPStan 0.
+
+---
+
+## Prompt 105 — Reports used a UTC calendar day; the cap and Z-report use the business day
+
+`BusinessDay` is the single definition of a day (gram cap, month reset, auto-checkout, entry sheet, Z-report),
+but `Period` computed a naive UTC calendar day inline, and every report + dashboard widget ran on `Period` —
+4–5 h apart for a Madrid/06:00 club, so a member at the cap could read over or under depending on the document.
+
+**Reports/dashboard now resolve through `BusinessDay`.** `Period::fromKey($key, ?Location)` gains a location;
+with one it returns the BUSINESS day/week/month window (`Period::businessWindow`), computed in the location's
+timezone then converted to storage-tz instants (so `whereBetween` string-compares like-for-like), exactly as
+`BusinessDay::window` does — a test asserts the report day EQUALS the cap day. Without a location it stays the
+legacy calendar window (callers with none). `ReportPage` and `Dashboard` pass their scoped sede.
+
+**Multi-location (decision):** resolve against the ACTIVE sede; for the "All" rollup (no single sede) against
+the organisation's canonical (first) sede, and state the constraint — sedes share timezone/cutoff in practice,
+and when they differ the rollup uses the canonical sede's day. (Union-of-windows was the alternative; the
+single canonical sede is simpler and exact when configs match, which they do.)
+
+**`previous()` is DST-correct.** For a business-day period it recomputes in the location's timezone the window
+containing the instant just before this one's start, so across a DST transition the previous window is a
+genuinely different absolute length — tested at both 2026 transitions (spring-forward previous day = 23 h,
+fall-back = 25 h). Storage stays UTC; `app.timezone` unchanged.
+
+**Half-open bounds.** 48 `whereBetween($col, [$start, $end])` sites across the report/dashboard layer compared
+inclusively on both ends while `Period` documents `[start, end)`, so a row stamped at the exact boundary fell
+in two adjacent periods. All converted to `>= $start AND < $end`. No-op on the seeded data (nothing on a
+boundary), a test proves a boundary instant now falls in exactly one period.
+
+**Demo seed → timezone-neutral (UTC/00:00).** So its business day equals the storage calendar day: the demo is
+reproducible regardless of the deployer's locale, has no 00:00–06:00 gap to confuse it, and the integrity
+harness's day-agreement check is green. Real clubs configure their own timezone + cutoff (fallback Madrid/06:00)
+and reports honour it — proven by tests using a Madrid location.
+
+**Harness:** the `dayboundary` section is now 3/3 (was 2 failing); overall **24 passed / 7 failed** (was 22/9).
+Owner-authorised merge. 853 tests, 850 passed, 3 pre-existing skips, PHPStan 0.

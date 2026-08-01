@@ -61,7 +61,7 @@ class TillReport extends AbstractReport
         $sessions = TillSession::query()->withoutGlobalScopes()
             ->with('openedBy')
             ->whereIn('location_id', $this->resolvedLocationIds())
-            ->whereBetween('opened_at', [$start, $end])
+            ->where('opened_at', '>=', $start)->where('opened_at', '<', $end)
             ->orderByDesc('opened_at')
             ->get();
 
@@ -172,7 +172,7 @@ class TillReport extends AbstractReport
         $byType = DB::table('cash_movements')
             ->join('till_sessions', 'cash_movements.till_session_id', '=', 'till_sessions.id')
             ->whereIn('till_sessions.location_id', $this->resolvedLocationIds())
-            ->whereBetween('till_sessions.opened_at', [$start, $end])
+            ->where('till_sessions.opened_at', '>=', $start)->where('till_sessions.opened_at', '<', $end)
             ->groupBy('cash_movements.type')
             ->get([
                 'cash_movements.type as type',

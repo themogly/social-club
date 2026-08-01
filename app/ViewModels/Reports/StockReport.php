@@ -134,7 +134,7 @@ class StockReport extends AbstractReport
 
         $byType = DB::table('stock_movements')
             ->whereIn('location_id', $this->resolvedLocationIds())
-            ->whereBetween('created_at', [$start, $end])
+            ->where('created_at', '>=', $start)->where('created_at', '<', $end)
             ->groupBy('type')
             ->get([
                 'type',
@@ -195,7 +195,7 @@ class StockReport extends AbstractReport
             ->join('stock_takes', 'stock_take_lines.stock_take_id', '=', 'stock_takes.id')
             ->whereIn('stock_takes.location_id', $this->resolvedLocationIds())
             ->where('stock_takes.status', StockTakeStatus::COMMITTED->value)
-            ->whereBetween('stock_takes.committed_at', [$start, $end])
+            ->where('stock_takes.committed_at', '>=', $start)->where('stock_takes.committed_at', '<', $end)
             ->where('stock_take_lines.countable_type', (new Batch)->getMorphClass())
             ->get([
                 'stock_take_lines.countable_id as batch_id',
@@ -240,7 +240,7 @@ class StockReport extends AbstractReport
             ->join('dispensations', 'dispensation_lines.dispensation_id', '=', 'dispensations.id')
             ->whereIn('dispensations.location_id', $this->resolvedLocationIds())
             ->where('dispensations.status', DispensationStatus::COMPLETED->value)
-            ->whereBetween('dispensations.dispensed_at', [$start, $end])
+            ->where('dispensations.dispensed_at', '>=', $start)->where('dispensations.dispensed_at', '<', $end)
             ->sum('dispensation_lines.grams_cg');
 
         $perDay = intdiv($trailing, 30);

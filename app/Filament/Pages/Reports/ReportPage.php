@@ -170,7 +170,22 @@ abstract class ReportPage extends Page
             );
         }
 
-        return Period::fromKey($this->period);
+        // Resolve day/week/month through the BUSINESS day of the location in scope (prompt 105), so a report
+        // and the gram cap never disagree by the cutoff offset. A custom date range stays a plain calendar span.
+        return Period::fromKey($this->period, $this->periodLocation());
+    }
+
+    /**
+     * The location whose business-day config resolves the period: the active sede, or — for the "All" rollup,
+     * which has no single sede — the organisation's first sede as the canonical boundary (all sedes share the
+     * same timezone/cutoff in practice; when they differ the rollup uses the canonical sede's day).
+     */
+    protected function periodLocation(): ?Location
+    {
+        $id = app(ActiveScope::class)->locationId() ?? Location::query()->withoutGlobalScopes()
+            ->where('organisation_id', $this->organisationId())->orderBy('name')->value('id');
+
+        return $id !== null ? Location::query()->withoutGlobalScopes()->find($id) : null;
     }
 
     /**
