@@ -1,0 +1,9 @@
+@import '../../../../vendor/filament/filament/resources/css/theme.css';
+/* Share the product's semantic tokens with the counter/PWA (prompt 100) — ONE source, so prompt 98's
+   WCAG-AA values reach the panel too. Never a forked copy. */
+@import '../../tokens.css';
+
+/* Scan the custom panel views so their hand-written Tailwind utilities actually compile — this is the whole
+   point (the help pages had markup but no stylesheet serving these classes). */
+@source '../../../../app/Filament/**/*';
+@source '../../../../resources/views/filament/**/*';

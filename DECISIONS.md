@@ -3697,3 +3697,52 @@ allowlist entries keep them honestly visible until then.
 
 **Owed:** no browser — the member limit action + till screens un-screenshotted; MySQL suite not run locally.
 Owner-authorised merge. 787 tests, 784 passed, 3 pre-existing concurrency skips, PHPStan 0.
+
+---
+
+## Prompt 100 — Filament custom-panel views had no stylesheet
+
+**Root cause confirmed:** the admin panel never had a Filament theme, so panel pages were styled only by
+Filament's stock precompiled CSS (the classes its own components need). `app.css` is loaded by the counter
+and PWA layouts, NOT by panel pages — so hand-written Tailwind in a custom Filament page (the prompt-99 help
+manual/glossary) received nothing and rendered as raw text. `primary-*` is a Filament palette that only exists
+inside a Filament theme.
+
+**Fix (framework's supported path).** `php artisan make:filament-theme admin` scaffolded
+`resources/css/filament/admin/theme.css` (imports Filament's preset so `primary-*`/the panel palette resolve;
+`@source` globs scan `app/Filament/**` and `resources/views/filament/**` — the compile step that was missing),
+registered `->viteTheme('resources/css/filament/admin/theme.css')` on the panel, and added the entry to
+`vite.config.js`. No `app.css` injected into the panel, no hand-rolled stylesheet.
+
+**One token source, shared — not forked.** Extracted the semantic tokens (`--color-brand/ink/surface/line`
++ `--color-success/warning/error` with prompt 98's per-scheme WCAG values and dark overrides) into
+`resources/css/tokens.css`, imported by BOTH `app.css` and the panel `theme.css`. A token edit now reaches
+both surfaces; 98's corrected values are verified present in both built bundles (`#166534/#92400e/#b91c1c`
++ dark `#f87171`). `ColourContrastTest` now reads `tokens.css` (the single source). `app.css` keeps only
+`--font-sans`.
+
+**Custom-view sweep (resources/views/filament/**):**
+- *Were silently unstyled, now fixed by the theme:* `manual.blade` (41 hand-written utilities — the reported
+  one), `batch-recall.blade` (13, used by `BatchesTable`), `glosario.blade` (7), `help-menu.blade` (8).
+- *Fine — render via their own inline `<style>` partial, independent of the theme:* the dashboard
+  (`partials/dashboard-styles` `.csc-card`) and every report (`partials/report-styles`). This is why they
+  looked right without a theme (and why prompt 101's `.csc-card` clipping is a separate design issue, not a
+  missing-stylesheet one).
+- *Fine — built from Filament components (`x-filament-*`), covered by Filament's own CSS:* failed-jobs,
+  manage-settings, manage-enforcement, registro-dispensacion, rat, exportacion-contable, system-health,
+  libro-socios, reports/report.
+
+**Bundle.** The theme is 632 kB (65 kB gzip) — Filament's preset baseline; the `@source` globs are scoped to
+the two custom-view roots, not the whole app, so it scans the custom views (the point) without pulling in
+everything.
+
+**Tests (`FilamentThemeTest`).** Source guards (always run): `viteTheme` registered, theme is a Vite entry,
+tokens are one shared import (not redefined in `app.css`). Compiled guards (skip when `public/build` absent —
+it is gitignored): the built theme serves the help utilities (`primary-*`, `rounded-xl`, `grid-cols-2`,
+`tabular-nums`, `scroll-mt-24`), the WCAG token values are identical across both bundles, and the counter
+bundle still carries `--color-brand/ink/surface`.
+
+**Owed / not done:** no browser here — the acceptance screenshots (`/ayuda/manual` + `/ayuda/glosario`, both
+languages, light/dark, before/after) are NOT produced. Branch pushed, **NOT merged** (per the prompt, and
+because the visual acceptance can't be self-certified without a browser). 793 tests, 790 passed, 3 skips,
+PHPStan 0, `npm run build` clean.

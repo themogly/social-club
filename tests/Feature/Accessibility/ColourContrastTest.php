@@ -23,7 +23,8 @@ class ColourContrastTest extends TestCase
     /** @return array<string, array{light: string, dark: string}> */
     private function tokens(): array
     {
-        $css = (string) file_get_contents(base_path('resources/css/app.css'));
+        // Tokens moved to the shared partial (prompt 100) — the ONE source read by both app.css and the panel theme.
+        $css = (string) file_get_contents(base_path('resources/css/tokens.css'));
         $out = [];
         foreach (['warning', 'success', 'error'] as $token) {
             preg_match_all('/--color-'.$token.':\s*(#[0-9a-fA-F]{6})/', $css, $m);

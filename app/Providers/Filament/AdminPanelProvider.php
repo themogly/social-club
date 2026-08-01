@@ -35,6 +35,7 @@ class AdminPanelProvider extends PanelProvider
             ->default()
             ->id('admin')
             ->path('')
+            ->viteTheme('resources/css/filament/admin/theme.css')
             ->brandName(config('app.name'))
             ->login()
             // Staff/admins authenticate here and land on the club dashboard at "/".
