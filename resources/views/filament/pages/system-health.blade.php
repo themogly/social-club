@@ -93,6 +93,28 @@
             </x-filament::section>
         @endif
 
+        <x-filament::section :heading="__('Retención de auditoría')" icon="heroicon-o-shield-check">
+            <div style="display:flex;align-items:center;gap:.5rem;margin-bottom:.5rem;">
+                <x-filament::badge :color="$auditRetentionSweep['stale'] ? 'danger' : 'success'">
+                    {{ $auditRetentionSweep['stale'] ? __('Sin ejecución reciente') : __('Al día') }}
+                </x-filament::badge>
+            </div>
+            <dl style="font-size:.875rem;display:grid;gap:.35rem;">
+                <div style="display:flex;justify-content:space-between;gap:1rem;">
+                    <dt style="opacity:.65;">{{ __('Última ejecución') }}</dt>
+                    <dd>{{ $auditRetentionSweep['last_at']?->format('d/m/Y H:i:s') ?? '—' }}</dd>
+                </div>
+                <div style="display:flex;justify-content:space-between;gap:1rem;">
+                    <dt style="opacity:.65;">{{ __('Antigüedad') }}</dt>
+                    <dd>{{ $fmtAge($auditRetentionSweep['age_seconds']) }}</dd>
+                </div>
+                <div style="display:flex;justify-content:space-between;gap:1rem;">
+                    <dt style="opacity:.65;">{{ __('Periodo de retención') }}</dt>
+                    <dd>{{ $auditRetentionDays }} {{ __('días') }}</dd>
+                </div>
+            </dl>
+        </x-filament::section>
+
         <x-filament::section :heading="__('Colas')" icon="heroicon-o-queue-list">
             <div style="display:flex;align-items:center;gap:.5rem;margin-bottom:.5rem;">
                 <x-filament::badge :color="$queue['failed'] > 0 ? 'danger' : 'success'">

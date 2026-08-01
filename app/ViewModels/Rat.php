@@ -42,7 +42,7 @@ class Rat
     /** Shared technical & organisational security measures (RGPD Art. 32). */
     public function securityMeasures(): string
     {
-        return __('Cifrado en reposo de datos sensibles (documento de identidad), seudonimización mediante índice ciego, control de acceso por roles, autenticación multifactor disponible, registro de accesos a documentos y registro de auditoría inalterable, URLs firmadas de corta duración, anonimización automática al vencer el periodo de conservación.');
+        return __('Cifrado en reposo de datos sensibles (documento de identidad), seudonimización mediante índice ciego, control de acceso por roles, autenticación multifactor disponible, registro de accesos a documentos y registro de auditoría inalterable, URLs firmadas de corta duración, anonimización automática de los datos de socio y redacción del registro de auditoría al vencer su periodo de conservación.');
     }
 
     /**

@@ -29,6 +29,11 @@ Schedule::command('checkins:auto-checkout')->dailyAt('06:00');
 // Materialise due recurring overheads (rent, utilities). Idempotent per template/period.
 Schedule::command('expenses:materialise-recurring')->dailyAt('05:30');
 
+// Apply the declared audit-log retention (prompt 112): redact the payloads of entries past
+// audit_retention_days. Redact-not-delete keeps the register inalterable; the ROPA promised
+// this and nothing applied it. Idempotent (a redacted row holds nothing left to redact).
+Schedule::command('audit:redact-retention')->dailyAt('05:45');
+
 // Cross-location wallet settlement — credit at one unfenced sede clears debt at another.
 // Reads live balances; a no-op when nothing to settle, so a double-fire moves no extra money.
 Schedule::command('wallet:settle-cross-location')->dailyAt('03:30');
