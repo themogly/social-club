@@ -7,6 +7,7 @@ use App\Enums\BatchStatus;
 use App\Enums\MembershipStatus;
 use App\Enums\MemberStatus;
 use App\Enums\Role;
+use App\Enums\SettingType;
 use App\Exceptions\TillAlreadyOpenException;
 use App\Livewire\Counter\DispensaryPos;
 use App\Livewire\Counter\TillSession as TillSessionScreen;
@@ -22,6 +23,7 @@ use App\Models\TillSession;
 use App\Models\User;
 use App\Support\ActiveScope;
 use App\Support\CounterOperator;
+use App\Support\Settings;
 use App\Support\TerminalName;
 use Database\Seeders\RolePermissionSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -30,7 +32,8 @@ use Tests\TestCase;
 
 /**
  * Prompt 84 — the till terminal is a picker over configured terminals, normalised so a typo can't open a
- * phantom till the POS then can't find. "POS 1", "POS-1" and "pos-1" are ONE terminal.
+ * phantom till the POS then can't find. "POS 1", "POS-1" and "pos-1" are ONE terminal. The picker is the
+ * MULTI-till path (prompt 102), so this sede enables it; single-till behaviour is covered in SingleTillTest.
  */
 class TillTerminalPickerTest extends TestCase
 {
@@ -47,6 +50,7 @@ class TillTerminalPickerTest extends TestCase
         $this->org = Organisation::factory()->create();
         app(ActiveScope::class)->setOrganisation($this->org->id);
         $this->location = Location::factory()->create(['organisation_id' => $this->org->id]);
+        Settings::set('multiple_tills_enabled', true, SettingType::BOOL, $this->location->id);
     }
 
     private function operator(Role $role = Role::MANAGER): User

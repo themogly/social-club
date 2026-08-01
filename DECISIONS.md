@@ -4318,3 +4318,24 @@ Not added to `composer check` (that must stay runnable on an empty DB).
 
 `composer check` green (874 tests, 871 passed, 3 pre-existing skips, PHPStan 0). EN/ES parity unaffected (no new
 user-facing copy).
+
+## Prompt 102 — One till per sede is the default; terminal CRUD moves to admin
+
+Most clubs run a single drawer, but the counter always demanded a terminal (a picker AND a free-text "new
+terminal" box), so a one-till sede met an ambiguous form and could open a phantom till by typo.
+
+**`multiple_tills_enabled` per-location setting (default `false`)** — added to `Settings::DEFAULTS` and the
+LocationForm toggles (the `SETTING_TOGGLES` pattern, stored as a location-scoped Setting row). OFF (the default):
+the counter presets the sede's single terminal and the open form asks ONLY for the float — no picker, nothing
+to get wrong. ON: the operator picks from the sede's CONFIGURED terminals.
+
+**`TillSession::$newTerminal` removed.** Terminals are no longer free-typed at the counter; they are managed in
+admin — a `TagsInput` on `terminals` on the LocationForm (terminal CRUD moved there). `open()` uses the preset
+default terminal (single-till) or the picked configured one (multi-till); `TillSession::multipleTills()` and
+`defaultTerminal()` (first configured terminal, or `POS-1`) drive both the component and its view. OpenTill
+still normalises + registers any terminal it is handed (prompt 84), so the two paths can't desync.
+
+Tests: `SingleTillTest` (default is single-till; open asks only the float; the configured name is used; two
+sedes honour their own setting) and `TillTerminalPickerTest` now enables multi-till (the picker is that path).
+`composer check` green (877 tests, 874 passed, 3 pre-existing skips). Visual layout of the open form (float-only
+vs picker) is behaviour-verified via Livewire; a screenshot pass is owed (no browser here). EN/ES parity gated.

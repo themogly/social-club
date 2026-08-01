@@ -32,6 +32,7 @@ use App\Models\TillSession as TillSessionModel;
 use App\Models\User;
 use App\Support\CounterOperator;
 use App\Support\Money;
+use App\Support\Settings;
 use App\Support\TerminalName;
 use App\Support\TillSummary;
 use App\Support\Weight;
@@ -68,11 +69,8 @@ class TillSession extends Component
     /** Friendly state when the operator has no location at all (still a 200). */
     public bool $noLocation = false;
 
-    /** The terminal this screen manages — the open form binds it; it then keys the session. */
+    /** The terminal this screen manages — the open form binds it (multi-till) or it is preset (single-till). */
     public string $terminal = '';
-
-    /** A brand-new terminal name typed at open (prompt 84) — used in preference to the picked one when filled. */
-    public string $newTerminal = '';
 
     /** Open form: the float in euros (converted to cents at the edge). */
     public string $floatInput = '';
@@ -164,8 +162,16 @@ class TillSession extends Component
         // scope, never a silent guess. One assigned sede is adopted; several ⇒ ask (mustChooseLocation).
         $this->resolveCounterLocation();
 
-        // Convenience: resume the single open session at this sede so returning to the
-        // screen lands on its summary. Ambiguous (several terminals open) → operator picks.
+        // Single-till sede (the default, prompt 102): there is one drawer, so preset its terminal — the open
+        // form then asks only for the float, and there is no picker to get wrong.
+        if ($this->locationId !== null && ! $this->multipleTills()) {
+            $this->terminal = $this->defaultTerminal();
+
+            return;
+        }
+
+        // Multi-till: resume the single open session at this sede so returning to the screen lands on its
+        // summary. Ambiguous (several terminals open) → operator picks.
         if ($this->terminal === '' && $this->locationId !== null) {
             $terminals = TillSessionModel::query()->withoutGlobalScopes()
                 ->where('location_id', $this->locationId)
@@ -176,6 +182,25 @@ class TillSession extends Component
                 $this->terminal = (string) $terminals->first();
             }
         }
+    }
+
+    /** True when this sede runs more than one till at once (prompt 102) — resolved for the counter's OWN sede. */
+    public function multipleTills(): bool
+    {
+        return (bool) Settings::get('multiple_tills_enabled', false, $this->locationId);
+    }
+
+    /**
+     * The terminal a SINGLE-till sede opens: its first configured terminal (managed in admin, prompt 102),
+     * or a sensible default when none is named yet. The name is cosmetic when there is only one drawer.
+     */
+    public function defaultTerminal(): string
+    {
+        $configured = $this->locationId !== null
+            ? (Location::query()->withoutGlobalScopes()->find($this->locationId)?->terminalNames() ?? [])
+            : [];
+
+        return TerminalName::clean($configured[0] ?? 'POS-1');
     }
 
     // --- Open ------------------------------------------------------------------
@@ -193,11 +218,13 @@ class TillSession extends Component
             return;
         }
 
-        // Prefer a newly-typed terminal over the picked one; OpenTill normalises + registers it (prompt 84).
-        $terminal = TerminalName::clean($this->newTerminal !== '' ? $this->newTerminal : $this->terminal);
+        // Single-till (default): the sede's one terminal, preset — the operator only entered a float. Multi-
+        // till: the terminal the operator picked from this sede's CONFIGURED terminals (managed in admin,
+        // prompt 102 — no longer free-typed at the counter). OpenTill normalises + registers it (prompt 84).
+        $terminal = $this->multipleTills() ? TerminalName::clean($this->terminal) : $this->defaultTerminal();
 
         if ($terminal === '') {
-            $this->flash(__('Elige un terminal o escribe uno nuevo.'), 'error');
+            $this->flash(__('Elige un terminal.'), 'error');
 
             return;
         }
@@ -219,7 +246,6 @@ class TillSession extends Component
         }
 
         $this->terminal = $terminal;
-        $this->newTerminal = '';
         $this->floatInput = '';
         $this->flash(__('Caja abierta.'), 'success');
     }

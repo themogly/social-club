@@ -5,6 +5,7 @@ namespace App\Filament\Resources\Locations\Schemas;
 use App\Support\Settings;
 use Filament\Forms\Components\ColorPicker;
 use Filament\Forms\Components\Select;
+use Filament\Forms\Components\TagsInput;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
 use Filament\Schemas\Schema;
@@ -23,6 +24,7 @@ class LocationForm
         'restrict_pos_to_checked_in',
         'camera_scan_enabled',
         'ring_fenced',
+        'multiple_tills_enabled',
     ];
 
     public static function configure(Schema $schema): Schema
@@ -90,6 +92,19 @@ class LocationForm
                 Toggle::make('ring_fenced')
                     ->label(__('Monedero por sede (ring-fence)'))
                     ->helperText(__('Si se activa, el crédito de esta sede no salda automáticamente deudas en otras sedes.')),
+
+                // One drawer is the default (prompt 102): OFF, and opening a caja asks only for the float. ON
+                // lets the sede run several terminals at once and the operator picks which to open.
+                Toggle::make('multiple_tills_enabled')
+                    ->label(__('Varias cajas por sede'))
+                    ->helperText(__('Actívalo solo si esta sede abre más de una caja a la vez.')),
+
+                // Terminal CRUD lives here now (prompt 102), not free-typed at the counter: the named tills of
+                // this sede. With one till the name is cosmetic; with several it is what the operator picks.
+                TagsInput::make('terminals')
+                    ->label(__('Terminales (cajas)'))
+                    ->helperText(__('Nombres de las cajas de esta sede, p. ej. «Caja 1», «Barra».'))
+                    ->placeholder(__('Añadir terminal')),
             ]);
     }
 }

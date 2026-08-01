@@ -84,6 +84,10 @@ class Settings
         // (Replaces the org-wide pos_require_checked_in / pos_signature_required, which no UI ever wrote.)
         'restrict_pos_to_checked_in' => false,  // only dispense to members checked in at the door
         'signature_on_dispensation' => false,   // capture an on-screen signature per withdrawal (acta-grade)
+        // Whether this sede runs MORE THAN ONE till at once (prompt 102). Default false: most clubs run one
+        // drawer, so opening a caja asks only for the float and uses the sede's single terminal. Turn on for a
+        // multi-terminal sede, and the operator picks which configured terminal to open.
+        'multiple_tills_enabled' => false,
 
         // Counter scanning (per location) — opt-in camera QR at the door + POS. OFF by default:
         // camera access is a deliberate per-premises choice; the keyboard-wedge scanner + name
