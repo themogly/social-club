@@ -95,6 +95,7 @@ class Settings
 
         // Governance / actas
         'minute_quorum_fraction_bp' => 5000,  // quorum = 50% of active members (basis points)
+        'assembly_notice_days' => 15,         // minimum days between issuing a convocatoria and the assembly
 
         // Till / cash
         'arqueo_variance_tolerance_cents' => 500,

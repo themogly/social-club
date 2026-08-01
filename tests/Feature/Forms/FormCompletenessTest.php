@@ -6,6 +6,7 @@ use App\Filament\Resources\Announcements\AnnouncementResource;
 use App\Filament\Resources\Articles\ArticleResource;
 use App\Filament\Resources\AuditLogs\AuditLogResource;
 use App\Filament\Resources\Batches\BatchResource;
+use App\Filament\Resources\Convocatorias\ConvocatoriaResource;
 use App\Filament\Resources\DataRequests\DataRequestResource;
 use App\Filament\Resources\Discounts\DiscountResource;
 use App\Filament\Resources\Dispensations\DispensationResource;
@@ -67,6 +68,14 @@ class FormCompletenessTest extends TestCase
     private const ALLOWLIST = [
         AnnouncementResource::class => [
             'author_id' => 'system: set to the authenticated author on create (mutateFormDataBeforeCreate).',
+        ],
+        ConvocatoriaResource::class => [
+            'created_by' => 'system: set to the authenticated creator on create (mutateFormDataBeforeCreate).',
+            'issued_at' => 'system: set by IssueConvocatoria when the notice is issued (immutable thereafter).',
+            'issued_by' => 'system: set to the issuing user by IssueConvocatoria.',
+            'notice_days' => 'system: notice period frozen from settings at issue by IssueConvocatoria.',
+            'quorum_required' => 'system: first-call quorum computed from the frozen roll at issue.',
+            'roll_count' => 'system: size of the frozen recipient roll, set at issue.',
         ],
         ArticleResource::class => [
             'location_id' => 'scope: active location (ScopedToLocation).',

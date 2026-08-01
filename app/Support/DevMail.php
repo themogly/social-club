@@ -5,6 +5,7 @@ namespace App\Support;
 use App\Mail\ApplicationApprovedMail;
 use App\Mail\ApplicationInviteMail;
 use App\Mail\ApplicationRejectedMail;
+use App\Mail\ConvocatoriaMail;
 use App\Mail\DispensationReceiptMail;
 use App\Mail\ExampleClubMail;
 use App\Mail\MemberCardMail;
@@ -44,6 +45,18 @@ class DevMail
             'application-invite' => new ApplicationInviteMail('https://mi-club.example/alta/preview-token', '2026-09-30'),
             'application-approved' => new ApplicationApprovedMail('María García', 'M-00042'),
             'application-rejected' => new ApplicationRejectedMail('María García', 'Falta el documento de identidad.'),
+            'convocatoria' => new ConvocatoriaMail(
+                memberName: 'María García',
+                title: 'Aprobación de cuentas 2026 y renovación de la junta',
+                typeLabel: __('Ordinaria'),
+                heldAt: '2026-09-20 18:00',
+                secondCallAt: '2026-09-20 18:30',
+                venue: 'Sede Centro — Calle Mayor 1',
+                agenda: ['Lectura del acta anterior', 'Aprobación de cuentas 2026', 'Renovación de la junta directiva', 'Ruegos y preguntas'],
+                body: 'Se ruega puntualidad. La documentación estará disponible en la sede desde una semana antes.',
+                noticeDays: 15,
+                quorumRequired: 42,
+            ),
         ];
     }
 }

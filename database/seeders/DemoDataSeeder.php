@@ -590,8 +590,13 @@ class DemoDataSeeder extends Seeder
         }
 
         for ($i = 0; $i < random_int(1, 3); $i++) {
-            $article = $articles->random();
-            $qty = random_int(1, 3);
+            // Re-read live so a fortnight of seeded sales never asks CommitOrder for more than the article
+            // has left (it refuses, rightly) — pick only articles still in stock and bound the qty to it.
+            $article = Article::where('location_id', $location->id)->where('stock', '>', 0)->inRandomOrder()->first();
+            if ($article === null) {
+                break; // everything sold out for the day
+            }
+            $qty = min(random_int(1, 3), (int) $article->stock);
 
             // Through the REAL writer (never hand-build a shape a domain action owns — see CLAUDE.md).
             // CommitOrder builds the item snapshot (article_id + unit_price_cents + line_total_cents that

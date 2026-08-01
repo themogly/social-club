@@ -20,7 +20,7 @@ class Minute extends Model
     protected $fillable = [
         'organisation_id', 'book', 'number', 'type', 'held_on', 'location_id',
         'agenda', 'resolutions', 'attendees', 'quorum_present', 'quorum_required',
-        'body', 'signed_at', 'signed_by', 'supersedes_id',
+        'body', 'signed_at', 'signed_by', 'supersedes_id', 'convocatoria_id',
     ];
 
     protected function casts(): array
@@ -76,5 +76,16 @@ class Minute extends Model
     public function supersedes(): BelongsTo
     {
         return $this->belongsTo(self::class, 'supersedes_id');
+    }
+
+    /**
+     * The convocatoria that called the assembly this acta records, when there was one (a board minute or a
+     * pre-existing acta may have none).
+     *
+     * @return BelongsTo<Convocatoria, $this>
+     */
+    public function convocatoria(): BelongsTo
+    {
+        return $this->belongsTo(Convocatoria::class);
     }
 }

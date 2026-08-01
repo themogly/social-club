@@ -21,7 +21,7 @@ use Illuminate\Support\Facades\DB;
  * (SignMinute) closes it and makes it immutable; a correction is a new minute
  * pointing back via supersedes_id.
  *
- * @phpstan-type MinuteData array{type?: ?string, held_on?: ?string, location_id?: ?string, agenda?: array<int, mixed>, resolutions?: array<int, mixed>, attendees?: list<string>, body?: ?string, supersedes_id?: ?string}
+ * @phpstan-type MinuteData array{type?: ?string, held_on?: ?string, location_id?: ?string, agenda?: array<int, mixed>, resolutions?: array<int, mixed>, attendees?: list<string>, body?: ?string, supersedes_id?: ?string, convocatoria_id?: ?string}
  */
 class CreateMinute
 {
@@ -61,6 +61,7 @@ class CreateMinute
                         'quorum_required' => $quorumRequired,
                         'body' => $data['body'] ?? null,
                         'supersedes_id' => $data['supersedes_id'] ?? null,
+                        'convocatoria_id' => $data['convocatoria_id'] ?? null,
                     ]);
                 });
             } catch (QueryException $e) {

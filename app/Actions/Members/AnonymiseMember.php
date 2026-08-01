@@ -4,6 +4,7 @@ namespace App\Actions\Members;
 
 use App\Actions\RecordAuditLog;
 use App\Enums\MemberDocumentType;
+use App\Models\ConvocatoriaRecipient;
 use App\Models\Member;
 use Illuminate\Support\Facades\Storage;
 
@@ -52,6 +53,7 @@ class AnonymiseMember
         'data_requests' => 'reference + request type/status/dates (no name/DNI).',
         'dispensations' => 'reference + amounts/weights, the Art. 9 ledger kept intact (no name/DNI).',
         'refunds' => 'reference + amount/reason (no name/DNI).',
+        'convocatoria_recipients' => 'HANDLED here: the frozen roll keeps the row + status as assembly evidence; the name/email SNAPSHOT it holds is redacted.',
     ];
 
     public function handle(Member $member): Member
@@ -103,7 +105,11 @@ class AnonymiseMember
         $member->tokens()->whereNull('revoked_at')->update(['revoked_at' => now()]);
         (new RedactMemberAuditLogs)->handle($member);
 
-        // 5. Record the erasure itself WITHOUT any of the scrubbed values — the fact, not the data.
+        // 5. Convocatoria rolls snapshot the member's name + email. Keep the row (and its NOTIFIED/NO_EMAIL
+        //    status) as the assembly's legal evidence that they were convened, but redact the personal data.
+        ConvocatoriaRecipient::query()->where('member_id', $member->id)->update(['name' => '[borrado]', 'email' => null]);
+
+        // 6. Record the erasure itself WITHOUT any of the scrubbed values — the fact, not the data.
         (new RecordAuditLog)->handle('member.anonymised', $member, null, ['fields_cleared' => $clearedFields]);
 
         return $member;
