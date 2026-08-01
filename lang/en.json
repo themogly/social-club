@@ -2000,5 +2000,12 @@
     "Evento": "Event",
     "… o escribe un motivo": "… or type a reason",
     "Justifica por qué es una línea sin catálogo — se revisa al cerrar la caja.": "Justify why this is an off-catalogue line — reviewed at till close.",
-    "Indica un motivo para la línea manual.": "Give a reason for the manual line."
+    "Indica un motivo para la línea manual.": "Give a reason for the manual line.",
+    "Cobrar cuota pendiente": "Collect outstanding fee",
+    "Cobro de cuota": "Fee collection",
+    "No hay caja abierta en esta sede: solo puedes cobrar cuotas con monedero hasta que se abra una.": "No till is open at this location: you can only collect fees to the wallet until one is opened.",
+    "No hay caja abierta: un cobro en efectivo debe registrarse en la caja.": "No till is open: a cash payment must be recorded in the till.",
+    "No tienes ninguna sede activa. Pide a un responsable que te asigne una.": "You have no active location. Ask a manager to assign you one.",
+    "Puedes cobrar el total o una parte.": "You can collect the full amount or part of it.",
+    "Sin caja abierta solo se admite el cobro con monedero.": "With no open till, only wallet collection is allowed."
 }

@@ -4616,3 +4616,46 @@ counter control at 1024×768 needs a browser (owed); known candidates flagged.
 Tests (`BarMiscLineTest`, 5): control present; a manual line commits with its description + reason and moves no
 stock; an empty reason is refused; the line is flagged in the bar report; a genetic still cannot reach an order.
 `composer check` green (903 tests, 900 passed, 3 pre-existing skips, PHPStan 0). EN/ES parity gated.
+
+---
+
+## Prompt 127 — Collecting a membership fee, wherever the member is standing
+
+**Problem.** The only way to take a membership fee was buried inside the till screen, so a member who
+came specifically to pay, or who was flagged *cuota pendiente* at the door or the POS, forced the
+operator off their current screen to collect it. Fee collection needed to live where the member is.
+
+**One writer, one concern — never a second path.** Extracted the till screen's fee logic into a shared
+`App\Livewire\Counter\Concerns\CollectsMembershipFees` trait (search/outstanding/owed/parse state +
+`collectFeeThrough()`), and refactored `TillSession` onto it with byte-identical behaviour (it still
+passes its own resolved session, so a fee there is unchanged). `RecordFeePayment` stays the SINGLE
+writer; the trait only holds the shared validation (amount ≤ owed, method, the CASH-needs-an-open-till
+invariant) and returns a result the host flashes. Collecting a fee remains the ONLY thing that clears
+the `unpaid_fee` verdict.
+
+**Part 1 — the Socios tab.** New `MembershipCounter` component + `counter.members` route + a fifth nav
+entry (`Socios`), gated on the existing `membership.fee.collect` (unchanged — not widened). A THIN shell:
+find a member, see tier/expiry/owed, collect a fee (CASH or WALLET, full or partial). Deliberately SMALL
+— renewals, tier changes and suspensions stay in the admin panel where they carry authorisation weight.
+The tab can take a WALLET fee with no till open, but refuses a CASH fee without one (drawer
+reconciliation), exactly as the till screen does.
+
+**Part 2 — the action follows the verdict.** Added `collectInlineFeeFor(member, session, location, user)`
+to the same trait (points the shared state at an already-held member; a blank amount defaults to the FULL
+owed balance) and a shared `partials/inline-fee.blade.php`. Wired it into `CheckInScreen` (the door) and
+`DispensaryPos` (the POS member card): wherever the `unpaid_fee` verdict is rendered and the operator
+holds `membership.fee.collect`, the collect affordance renders beside it. `feesPaid()` (the resolver) and
+`outstandingMembership()`/`owedCents()` (the trait) share one definition, so the affordance appears
+exactly when the door/counter flags the fee — and on success the verdict re-resolves and the flag clears
+itself, unblocking entry/dispensation without leaving the screen.
+
+**Nav coordination.** The Socios tab is the fifth counter destination; this makes the portrait-tablet nav
+overlap (my prompt 116 `md:inline`) worse — prompt 130 owns the fix and now has the full 5-destination
+list to fit.
+
+Tests (`MembershipCounterTest` 6; `CheckInScreenTest` +2; `DispensaryPosUnitTest` +1): a cash fee from the
+tab records the payment and moves the drawer by exactly the amount; a cash fee with no till is refused; a
+wallet fee needs no till; a partial reports what remains; collecting clears the door `unpaid_fee` verdict;
+the door and the POS card each collect an outstanding fee inline (blank → full) and the door's inline cash
+fee with no till is refused; a wrong-permission user is 403'd from the tab. `composer check` green (912
+tests, 909 passed, 3 pre-existing skips, PHPStan 0). EN/ES parity gated (7 new keys).

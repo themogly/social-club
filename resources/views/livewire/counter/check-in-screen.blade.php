@@ -210,6 +210,7 @@
                                             ? __('Un responsable con permiso debe autorizar la entrada para continuar.')
                                             : __('Puede entrar; el aviso queda registrado.') }}
                                     </p>
+                                    @include('livewire.counter.partials.inline-fee')
                                 </div>
                             @endif
                         </div>

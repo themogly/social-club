@@ -223,6 +223,7 @@
                                         @if (! empty($hardBlockRules))
                                             <p class="text-sm font-medium text-error">{{ __('No se puede dispensar a este socio.') }}</p>
                                         @endif
+                                        @include('livewire.counter.partials.inline-fee')
                                     </div>
                                 @endif
                             </div>

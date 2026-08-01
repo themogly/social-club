@@ -9,8 +9,10 @@ use App\Actions\Dispensing\ResolveMemberLimits;
 use App\Actions\Members\ResolveMemberByToken;
 use App\Enums\CheckInMethod;
 use App\Enums\MembershipStatus;
+use App\Enums\TillSessionStatus;
 use App\Exceptions\CheckInBlockedException;
 use App\Exceptions\ScanRateLimitedException;
+use App\Livewire\Counter\Concerns\CollectsMembershipFees;
 use App\Livewire\Counter\Concerns\IdentifiesOperator;
 use App\Livewire\Counter\Concerns\ResolvesCounterLocation;
 use App\Models\CheckIn;
@@ -18,6 +20,7 @@ use App\Models\Location;
 use App\Models\Member;
 use App\Models\MemberSanction;
 use App\Models\Membership;
+use App\Models\TillSession;
 use App\Models\User;
 use App\Support\Money;
 use App\Support\Settings;
@@ -48,7 +51,7 @@ use Livewire\Component;
 #[Layout('components.layouts.counter')]
 class CheckInScreen extends Component
 {
-    use IdentifiesOperator, ResolvesCounterLocation;
+    use CollectsMembershipFees, IdentifiesOperator, ResolvesCounterLocation;
 
     /** Bound to the scan input — a keyboard-wedge scanner types the token then hits Enter. */
     public string $scan = '';
@@ -226,6 +229,34 @@ class CheckInScreen extends Component
         $this->dispatch('checkins-updated');
     }
 
+    /**
+     * Collect the held member's outstanding fee inline, right where the door flagged it (prompt 127) — the SAME
+     * shared concern the till and Socios tab use, so it is one write path. A CASH fee needs the open drawer; a
+     * WALLET fee does not. On success the door verdict re-resolves and the unpaid_fee flag clears itself.
+     */
+    public function collectMemberFee(): void
+    {
+        if (! $this->requireOperator()) {
+            return;
+        }
+
+        $user = $this->currentUser();
+        if ($user === null || ! $user->can('membership.fee.collect')) {
+            $this->flash(__('No tienes permiso para cobrar cuotas.'), 'error');
+
+            return;
+        }
+
+        $location = $this->resolveLocation();
+        $member = $this->resolveMember();
+        if ($location === null || $member === null) {
+            return;
+        }
+
+        $result = $this->collectInlineFeeFor($member, $this->openTill($location), $location, $user);
+        $this->flash($result['message'], $result['type']);
+    }
+
     // --- View data (assembled here; the view stays declarative) ----------------
 
     public function render(): View
@@ -238,6 +269,7 @@ class CheckInScreen extends Component
         $openCheckIn = null;
         $membership = null;
         $walletCents = 0;
+        $openTill = null;
 
         if ($member !== null && $location !== null) {
             $verdict = (new ResolveMemberEligibility)->handle($member, $location, 'door');
@@ -245,6 +277,7 @@ class CheckInScreen extends Component
             $openCheckIn = $this->openCheckIn($member, $location);
             $membership = $this->activeMembership($member, $location);
             $walletCents = Wallet::balance($member->id, $location->id);
+            $openTill = $this->openTill($location);
         }
 
         return view('livewire.counter.check-in-screen', [
@@ -260,6 +293,10 @@ class CheckInScreen extends Component
             'searchResults' => $this->searchResults(),
             'canOverride' => $this->userCan('checkin.override'),
             'cameraScanEnabled' => (bool) Settings::get('camera_scan_enabled', false),
+            // Inline fee (prompt 127): the action follows the unpaid-fee verdict. Owed>0 iff the door flags it.
+            'canCollectFee' => $this->userCan('membership.fee.collect'),
+            'feeOwedCents' => $membership !== null ? $this->owedCents($membership) : 0,
+            'openTillPresent' => $openTill !== null,
         ]);
     }
 
@@ -285,6 +322,15 @@ class CheckInScreen extends Component
     private function resolveMember(): ?Member
     {
         return $this->memberId !== null ? Member::query()->find($this->memberId) : null;
+    }
+
+    /** Any open till at this sede — a CASH inline fee needs one; a WALLET fee does not (prompt 127). */
+    private function openTill(Location $location): ?TillSession
+    {
+        return TillSession::query()->withoutGlobalScopes()
+            ->where('location_id', $location->id)
+            ->where('status', TillSessionStatus::OPEN->value)
+            ->latest('opened_at')->first();
     }
 
     private function openCheckIn(Member $member, Location $location): ?CheckIn
