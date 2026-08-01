@@ -9,13 +9,13 @@ use App\Enums\TillSessionStatus;
 use App\Exceptions\TillClosedException;
 use App\Livewire\Counter\Concerns\HandlesTender;
 use App\Livewire\Counter\Concerns\IdentifiesOperator;
+use App\Livewire\Counter\Concerns\ResolvesCounterLocation;
 use App\Models\Article;
 use App\Models\Location;
 use App\Models\Member;
 use App\Models\Order;
 use App\Models\TillSession;
 use App\Models\User;
-use App\Support\ActiveScope;
 use App\Support\CounterOperator;
 use App\Support\Money;
 use App\Support\Settings;
@@ -60,7 +60,7 @@ use Throwable;
 #[Layout('components.layouts.counter')]
 class BarPos extends Component
 {
-    use HandlesTender, IdentifiesOperator;
+    use HandlesTender, IdentifiesOperator, ResolvesCounterLocation;
 
     // --- Identity / scope -------------------------------------------------------
 
@@ -138,20 +138,9 @@ class BarPos extends Component
     {
         abort_unless($this->userCan('pos.bar'), 403);
 
-        $scope = app(ActiveScope::class);
-        $this->locationId = $scope->locationId();
-
-        // No active location yet: fall back to the operator's first assigned sede.
-        if ($this->locationId === null) {
-            $first = $this->currentUser()?->locations()->where('active', true)->orderBy('name')->first();
-
-            if ($first !== null) {
-                $scope->setLocation($first->id);
-                $this->locationId = $first->id;
-            }
-        }
-
-        $this->noLocation = $this->locationId === null;
+        // Resolve the counter's OWN working sede (session key counter.location_id) — never the panel
+        // scope, never a silent guess. One assigned sede is adopted; several ⇒ ask (mustChooseLocation).
+        $this->resolveCounterLocation();
 
         // The bar can be turned off per sede (prompt 59) — refuse the POS with a friendly state.
         $this->barDisabled = $this->locationId !== null && ! (bool) Settings::get('bar_enabled', true);

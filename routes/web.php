@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\ApplicationController;
 use App\Http\Controllers\BarReceiptController;
+use App\Http\Controllers\CounterLocationController;
 use App\Http\Controllers\DispensationReceiptController;
 use App\Http\Controllers\Member\AnnouncementController;
 use App\Http\Controllers\Member\EventController;
@@ -60,6 +61,13 @@ Route::middleware(['web', 'auth'])
 Route::middleware(['web', 'auth'])
     ->get('/counter/pos/receipt/{dispensation}', [DispensationReceiptController::class, 'show'])
     ->name('counter.pos.receipt');
+
+// Switch the counter's working sede (prompt 89). The ONLY writer of `counter.location_id`, gated by
+// LocationSwitcher's server-side assignment check — never a raw setLocation from client input, and it
+// never touches the admin panel's scope. POST + redirect back so the counter screen re-mounts on the sede.
+Route::middleware(['web', 'auth'])
+    ->post('/counter/location', [CounterLocationController::class, 'switch'])
+    ->name('counter.location');
 
 // The bar / merch POS — the auxiliary-income counterpart, same tablet-first pattern. A
 // THIN shell over CommitOrder (freezes the item snapshot, depletes UNIT stock, optionally

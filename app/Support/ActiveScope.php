@@ -19,6 +19,10 @@ class ActiveScope
 {
     private ?string $organisationId = null;
 
+    private ?string $locationId = null;
+
+    private bool $locationResolved = false;
+
     public function organisationId(): ?string
     {
         if ($this->organisationId === null) {
@@ -38,12 +42,32 @@ class ActiveScope
     /** The active location id, or null for "All locations". */
     public function locationId(): ?string
     {
-        return session('scope.location_id');
+        if (! $this->locationResolved) {
+            $this->locationId = session('scope.location_id');
+            $this->locationResolved = true;
+        }
+
+        return $this->locationId;
     }
 
+    /** Set AND persist the active location (the admin panel's location switcher). */
     public function setLocation(?string $locationId): void
     {
+        $this->locationId = $locationId;
+        $this->locationResolved = true;
         session(['scope.location_id' => $locationId]);
+    }
+
+    /**
+     * Make a location active for THIS REQUEST ONLY, without persisting it to the session. The counter uses
+     * this so its working sede scopes per-location Settings and global scopes for the request WITHOUT
+     * writing the admin panel's `scope.location_id` (visiting a counter screen must never silently change
+     * the panel's active location — prompt 89).
+     */
+    public function useLocation(?string $locationId): void
+    {
+        $this->locationId = $locationId;
+        $this->locationResolved = true;
     }
 
     public function allLocations(): bool
@@ -51,16 +75,21 @@ class ActiveScope
         return $this->locationId() === null;
     }
 
-    /** Run a callback as if a specific location were active, then restore. */
+    /**
+     * Run a callback as if a specific location were active, then restore. A TEMPORARY, request-scoped
+     * switch — it must not persist to the session (it restores anyway), so it goes through useLocation.
+     * Otherwise, called inside a counter request, its restore would write the counter's sede back into the
+     * panel's scope.location_id (the exact leak prompt 89 removes).
+     */
     public function forLocation(?string $locationId, callable $callback): mixed
     {
         $previous = $this->locationId();
-        $this->setLocation($locationId);
+        $this->useLocation($locationId);
 
         try {
             return $callback();
         } finally {
-            $this->setLocation($previous);
+            $this->useLocation($previous);
         }
     }
 }

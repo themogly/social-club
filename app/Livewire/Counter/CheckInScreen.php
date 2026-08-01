@@ -12,13 +12,13 @@ use App\Enums\MembershipStatus;
 use App\Exceptions\CheckInBlockedException;
 use App\Exceptions\ScanRateLimitedException;
 use App\Livewire\Counter\Concerns\IdentifiesOperator;
+use App\Livewire\Counter\Concerns\ResolvesCounterLocation;
 use App\Models\CheckIn;
 use App\Models\Location;
 use App\Models\Member;
 use App\Models\MemberSanction;
 use App\Models\Membership;
 use App\Models\User;
-use App\Support\ActiveScope;
 use App\Support\Money;
 use App\Support\Settings;
 use App\Support\Wallet;
@@ -47,7 +47,7 @@ use Throwable;
 #[Layout('components.layouts.counter')]
 class CheckInScreen extends Component
 {
-    use IdentifiesOperator;
+    use IdentifiesOperator, ResolvesCounterLocation;
 
     /** Bound to the scan input — a keyboard-wedge scanner types the token then hits Enter. */
     public string $scan = '';
@@ -84,20 +84,9 @@ class CheckInScreen extends Component
     {
         abort_unless($this->userCan('checkin.manage'), 403);
 
-        $scope = app(ActiveScope::class);
-        $this->locationId = $scope->locationId();
-
-        // No active location yet: fall back to the operator's first assigned sede.
-        if ($this->locationId === null) {
-            $first = $this->currentUser()?->locations()->where('active', true)->orderBy('name')->first();
-
-            if ($first !== null) {
-                $scope->setLocation($first->id);
-                $this->locationId = $first->id;
-            }
-        }
-
-        $this->noLocation = $this->locationId === null;
+        // Resolve the counter's OWN working sede (session key counter.location_id) — never the panel
+        // scope, never a silent guess. One assigned sede is adopted; several ⇒ ask (mustChooseLocation).
+        $this->resolveCounterLocation();
     }
 
     // --- Scan & search ---------------------------------------------------------

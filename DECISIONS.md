@@ -3078,3 +3078,59 @@ denial, acta↔convocatoria link) + `ConvocatoriaResourceTest` (3 — index deni
 governance, issue-from-table freezes + queues). Mailable in `MailRenderTest` + `/dev/mail`. **Screenshots**
 (resource, issue modal, frozen roll, email) not produced — no browser here. Owner-authorised merge (standing
 "merge everything to main"). 685 green (682 passed, 3 concurrency skips).
+
+---
+
+## Prompt 89 — Counter shows (and asks for) its sede; stops the silent panel-scope write-back
+
+**The counter now keeps its OWN location state, fully separated from the admin panel's scope.** The old
+`mount()` read `scope.location_id` and, when it was null ("All locations"), silently adopted the operator's
+alphabetically-first assigned sede AND wrote that guess back via `ActiveScope::setLocation()` — the same
+session key the panel's `LocationSwitcher` reads — so visiting a counter screen quietly changed the panel's
+active location, and nothing on screen said which sede you were on. Replaced with a shared trait
+`App\Livewire\Counter\Concerns\ResolvesCounterLocation` used by all four screens: the working sede lives in
+its own session key `counter.location_id` and the panel's `scope.location_id` is **never written** by the
+counter.
+
+**Separation mechanism — an in-memory scope override.** The four counter components are self-sufficient
+(every stock/till/dispensation query already passes `location_id` explicitly with `withoutGlobalScopes`), but
+per-location `Settings::get` (e.g. `signature_on_dispensation`, `restrict_pos_to_checked_in`) still resolves
+through `ActiveScope::locationId()`. So the counter must make its sede *active for the request* without
+persisting it. Added `ActiveScope::useLocation()` — sets the in-memory location only, no session write — and
+the trait applies it on every request (`bootedResolvesCounterLocation`). `ActiveScope::forLocation()` (used
+by `ResolveMemberEligibility`/`ResolveMemberLimits`, which the counter calls) was switched from `setLocation`
+to `useLocation`: it is a temporary switch-and-restore that must not persist, and under the old code its
+*restore* would have written the counter's sede back into the panel scope — the exact leak, via a back door.
+A regression test asserts `forLocation` inside a counter request leaves `scope.location_id` null.
+
+**Multi-sede is an explicit choice, never a guess.** Resolution from the operator's own assignments
+(`LocationSwitcher::available` — owner sees all, others their assignments): a valid prior `counter.location_id`
+wins (sticky); else exactly one assigned sede is adopted without ceremony; else (several) the screen ASKS —
+`mustChooseLocation` is set, `locationId` stays null, and the shared header shows a highlighted "Elige tu
+sede" picker (auto-opened). Getting this wrong toward asking is far cheaper than dispensing from the wrong
+sede's stock/aforo/till, so a multi-sede operator is never silently placed.
+
+**One shared change shows the sede everywhere.** The sede name, the switcher and the choose-state all live in
+`resources/views/components/counter/top-bar.blade.php` — the single header every counter screen renders — so
+a fifth screen gets it for free. Zero sedes → a warning badge; one → a static badge; several → a dropdown
+switcher (current marked).
+
+**Switching is server-side-validated, confirms unsaved work, and refuses an open till.** The only writer of
+`counter.location_id` is `POST /counter/location` (`CounterLocationController`), which validates the target
+against `LocationSwitcher::available` — never a raw `setLocation` from client input, and "All locations"
+(null) is not a valid counter target. Each switch form fires the existing `$store.counter?.dirty` unsaved-work
+confirm before the full-page navigation that re-mounts the screen. And because the till is the thing most
+likely to end up mis-scoped, switching **away from a sede whose till is still open is refused** — close the
+blind arqueo first.
+
+**Test-setup consequence (documented):** counter tests that set `scope.location_id` but never assigned the
+operator to that sede were relying on the old scope-reading behaviour; four Till tests now assign the operator
+to the location (the realistic setup — you cannot work a counter at a sede you are not assigned to).
+
+**Tests:** `CounterLocationTest` (11) — each screen displays the sede; single-sede adopts + displays;
+multi-sede asks (not silently adopted) and prompts to choose; visiting never writes the panel scope (incl. via
+`forLocation`); switching validated server-side (unassigned sede refused); valid switch applied; refused while
+a till is open; the switch control carries the unsaved-work confirm; no-assignment shows the no-sede state.
+**Screenshots** (four screens showing the sede, the choose state, the switch flow, light/dark, 1024/1440) not
+produced — no browser here. Owner-authorised merge (standing "merge everything to main"). 696 green (693
+passed, 3 concurrency skips).

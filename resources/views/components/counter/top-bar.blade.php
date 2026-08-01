@@ -6,6 +6,21 @@
     $canPanel = $user !== null && $user->canAccessPanel(\Filament\Facades\Filament::getPanel('admin'));
     $confirmLeave = __('Tienes trabajo sin guardar en el mostrador. ¿Seguro que quieres salir?');
 
+    // Which sede this terminal is working at (prompt 89). Resolved HERE, in the one shared header, so all
+    // four counter screens show it identically. Read from the counter's OWN state (session
+    // `counter.location_id`) — never the admin panel scope, and switching goes through the validated
+    // POST /counter/location route. A single-sede operator shows their only sede even before the component
+    // has persisted the adoption; several sedes with none chosen ⇒ the operator must pick (never a guess).
+    $availableSedes = $user !== null ? app(\App\Support\LocationSwitcher::class)->available($user) : collect();
+    $currentSedeId = session('counter.location_id');
+    $currentSede = is_string($currentSedeId) ? $availableSedes->firstWhere('id', $currentSedeId) : null;
+    if ($currentSede === null && $availableSedes->count() === 1) {
+        $currentSede = $availableSedes->first();
+    }
+    $mustChooseSede = $currentSede === null && $availableSedes->count() > 1;
+    $noSede = $availableSedes->isEmpty();
+    $sedeSwitchError = session('counterLocationError');
+
     // The screen switcher. Each entry is shown ONLY if the current user passes that screen's
     // real per-screen gate (mirrored from each Livewire component's mount()), so a link to a
     // 403 is never rendered. `granted` is resolved here; the markup below is presentation only.
@@ -41,6 +56,75 @@
             {{-- The counter screen's one <h1> (a11y): the shared header renders it for every
                  terminal, so headings below can start at h2 without skipping a level. --}}
             <h1 class="text-xs text-ink-muted dark:text-slate-400">{{ $title ?? __('Contador') }}</h1>
+        </div>
+
+        {{-- Which sede this terminal is working at (prompt 89) — shown on EVERY counter screen, from the
+             one shared header. Zero sedes: a warning. One sede: a static badge (nothing to switch to).
+             Several: a switcher (each a validated POST to /counter/location, confirming unsaved work);
+             several with none chosen yet ⇒ a highlighted "choose your sede" prompt, never a silent guess. --}}
+        <div class="relative" data-counter-sede-region>
+            @if ($noSede)
+                <span data-counter-sede-state="none"
+                      class="inline-flex items-center gap-1.5 rounded-lg bg-warning/10 px-2.5 py-1.5 text-sm font-medium text-warning">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" class="h-4 w-4" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M15 10.5a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z"/><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1 1 15 0Z"/></svg>
+                    {{ __('Sin sede') }}
+                </span>
+            @elseif ($availableSedes->count() === 1)
+                <span data-counter-sede-current="{{ $currentSede?->id }}"
+                      class="inline-flex items-center gap-1.5 rounded-lg bg-surface-alt px-2.5 py-1.5 text-sm font-medium text-ink dark:bg-slate-800 dark:text-slate-100">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" class="h-4 w-4 text-brand" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M15 10.5a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z"/><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1 1 15 0Z"/></svg>
+                    {{ $currentSede?->name }}
+                </span>
+            @else
+                <div x-data="{ open: {{ $mustChooseSede ? 'true' : 'false' }} }">
+                    <button type="button" @click="open = ! open"
+                            data-counter-sede-current="{{ $currentSede?->id }}"
+                            aria-haspopup="true" :aria-expanded="open.toString()"
+                            @class([
+                                'inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-sm font-medium transition',
+                                'bg-warning/10 text-warning ring-1 ring-warning/50' => $mustChooseSede,
+                                'bg-surface-alt text-ink hover:bg-brand-tint hover:text-brand dark:bg-slate-800 dark:text-slate-100' => ! $mustChooseSede,
+                            ])>
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" class="h-4 w-4" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M15 10.5a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z"/><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1 1 15 0Z"/></svg>
+                        <span>{{ $mustChooseSede ? __('Elige tu sede') : $currentSede?->name }}</span>
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" class="h-4 w-4" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5"/></svg>
+                    </button>
+                    <div x-show="open" x-cloak @click.outside="open = false" @keydown.escape.window="open = false"
+                         data-counter-sede-menu
+                         class="absolute left-0 z-30 mt-1 w-60 rounded-xl border border-line bg-surface p-1 shadow-lg dark:border-slate-800 dark:bg-slate-900">
+                        @if ($mustChooseSede)
+                            <p class="px-3 py-2 text-xs text-ink-muted dark:text-slate-400">{{ __('Selecciona la sede en la que trabajas.') }}</p>
+                        @endif
+                        @foreach ($availableSedes as $sede)
+                            @php $isCurrent = $currentSede?->id === $sede->id; @endphp
+                            <form method="POST" action="{{ route('counter.location') }}"
+                                  @submit="($store.counter?.dirty && ! window.confirm(@js($confirmLeave))) && $event.preventDefault()">
+                                @csrf
+                                <input type="hidden" name="location_id" value="{{ $sede->id }}">
+                                <button type="submit" data-counter-sede="{{ $sede->id }}"
+                                        @class([
+                                            'flex w-full items-center justify-between gap-2 rounded-lg px-3 py-2 text-left text-sm transition',
+                                            'bg-brand-tint font-semibold text-brand dark:bg-slate-800 dark:text-white' => $isCurrent,
+                                            'font-medium text-ink hover:bg-brand-tint hover:text-brand dark:text-slate-200 dark:hover:bg-slate-800' => ! $isCurrent,
+                                        ])
+                                        @if ($isCurrent) aria-current="true" @endif>
+                                    <span>{{ $sede->name }}</span>
+                                    @if ($isCurrent)
+                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="h-4 w-4" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5"/></svg>
+                                    @endif
+                                </button>
+                            </form>
+                        @endforeach
+                    </div>
+                </div>
+            @endif
+
+            @if ($sedeSwitchError)
+                <p role="alert" data-counter-sede-error
+                   class="absolute left-0 top-full z-30 mt-1 w-max max-w-xs rounded-lg bg-error px-2.5 py-1.5 text-xs font-medium text-white shadow">
+                    {{ $sedeSwitchError }}
+                </p>
+            @endif
         </div>
     </div>
 
