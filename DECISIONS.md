@@ -3186,3 +3186,65 @@ end-to-end discounted commits; the entry guard rejects > 3.5× and allows the bo
 strains sharing an eighth that splits to one. The prompt-83 `EighthPricingTest` (9) still passes unchanged.
 **Screenshots** (discounted multiple + explanation, the guard firing) not produced — no browser here.
 Owner-authorised merge (standing "merge everything to main"). 710 green (707 passed, 3 concurrency skips).
+
+---
+
+## Prompt 91 — A staff day at the counter (one blocker + six frictions)
+
+Presentation, sequencing and one missing state. No change to what is recorded — money, stock and the blind
+arqueo behave exactly as before.
+
+**1. The blocker: a jar that can't be weighed no longer traps the close.** The EOD reweigh required a figure
+for every touched batch; a mislaid jar made the till uncloseable, and typing `0` posts a catastrophic merma
+of the whole remaining weight. Added an explicit per-batch **"not counted"** state: `stock_take_lines` gains
+`not_counted` + `not_counted_reason`; `CommitStockTake` records the omission as a line and touches NOTHING in
+the ledger (no variance, no adjustment, no merma); `TillSession::submitReweigh` accepts a batch marked not
+counted WITH A REASON and the close proceeds. It is NOT a count of zero — `0` is still a real
+`counted_cg = 0` that adjusts down (tested: the two paths diverge — zero drains the batch, not-counted leaves
+it). The omission surfaces in the reveal, and a batch left not-counted in a recent prior committed count is
+flagged **"otra vez"** — a jar that keeps escaping is exactly what a count exists to catch.
+
+**2. The loudest button was the most dangerous.** "Cerrar caja · arqueo" was a full-width primary blue CTA;
+the routine movement/expense actions were pale. Inverted: the close is now a quiet outlined button (and it
+opens a deliberate multi-step close — reweigh → blind count — rather than committing on tap), and
+"Registrar movimiento" / "Registrar gasto" / "Cobrar cuota" carry the brand fill their frequency deserves.
+
+**3. Forms gate BEFORE the work, not on submit.** `requireOperator()` refused only on submit, after the
+operator had filled the form. The cash-movement, expense and fee forms now show a **"identifícate como
+operario"** banner and disable their controls (a `<fieldset disabled>`) whenever no operator is identified —
+prompt 60's "never a silent dead control", applied in reverse (the control isn't silent, it was just too
+late). Shared partial `needs-operator.blade.php`, one pattern across all three.
+
+**4. The dispensary basket is pinned to its own column at 1024 — the batch-2 bar POS fix, now shared.** The
+dispensary grid became `lg:grid-cols-[minmax(0,1fr)_22rem]` with the basket div `lg:col-start-2 lg:row-start-1
+lg:row-span-2` (auto at xl), IDENTICAL to bar-pos — one layout, asserted by both POS-layout tests, so it is
+never fixed twice.
+
+**5. Progressive disclosure of the payment apparatus.** With an empty basket the screen showed the whole
+tender/wallet/cash/breakdown block and an empty signature canvas — a form for a transaction that did not
+exist. The heavy apparatus (total, price override, tender, signature, breakdown) is now revealed only once
+the basket has a line; before that a "identifica un socio y añade una genética" hint sits there instead. The
+charge button STAYS shown and offline-only-disabled (prompt 60) — disclosure governs what is *shown*, not
+what is disabled.
+
+**6. One lookup, not two boxes with the wrong one focused.** A name typed into the autofocused "scan" field
+now falls through to the SAME member search (`submitScan` routes an unrecognised token into `$search`), so the
+lookup never depends on the operator noticing which of two adjacent boxes has the cursor. The scan field's
+label/placeholder now say it accepts a name too.
+
+**7. The reweigh copy matches its filter, with progress.** The panel said "flor dispensada hoy"; the filter is
+`remaining_cg <> initial_cg` — touched since intake. Copy corrected to say so (the filter is the correct
+behaviour for a stock count). Added a **":done de :total pesados"** progress indicator (a weight OR a
+not-counted mark counts as done) so a long list has something to anchor against.
+
+**Seed.** `DemoDataSeeder` dispensed from every batch, so the reweigh's "only touched batches" exclusion could
+never be seen working. It now reserves one WEIGHT batch per sede as never-dispensed-from, so a fresh install
+has an untouched batch that is correctly absent from the reweigh (tested against the real seed).
+
+**Tests:** `CounterStaffDayTest` (10) — not-counted closes + leaves stock untouched + records the omission;
+not-counted needs a reason; zero ≠ not-counted; till forms gated (and ungated) by operator; basket pinned to
+its column; apparatus hidden until a basket line (charge still observable); a name in the scan field routes to
+search; reweigh copy matches the filter + progress reflects the count; the seed leaves an untouched weight
+batch out of the reweigh. Existing `EodStockTakeTest` (7) still green; `ChargeAlwaysObservableTest` updated for
+disclosure. **Screenshots** (the full staff-day sequence, both widths, light/dark) not produced — no browser
+here. Owner-authorised merge (standing "merge everything to main"). 720 green (717 passed, 3 concurrency skips).

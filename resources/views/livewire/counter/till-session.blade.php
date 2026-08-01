@@ -128,30 +128,66 @@
             </section>
         @elseif ($reweighing)
             {{-- ============ EOD flower reweigh (prompt 47): blind count of touched flower, before the cash arqueo ============ --}}
+            @php $reweighProgress = $this->reweighProgress(); @endphp
             <section class="rounded-2xl border border-warning/40 bg-warning/5 p-5 dark:border-warning/30 sm:p-6">
-                <h2 class="text-lg font-semibold">{{ __('Recuento de flor · fin de día') }}</h2>
+                <div class="flex flex-wrap items-start justify-between gap-2">
+                    <h2 class="text-lg font-semibold">{{ __('Recuento de flor · fin de día') }}</h2>
+                    {{-- Progress: something to anchor against on a long list (prompt 91). --}}
+                    <span data-reweigh-progress class="rounded-full bg-surface px-3 py-1 text-sm font-semibold text-ink-muted dark:bg-slate-800 dark:text-slate-300">
+                        {{ __(':done de :total pesados', ['done' => $reweighProgress['done'], 'total' => $reweighProgress['total']]) }}
+                    </span>
+                </div>
                 <p class="mt-1 text-sm text-ink-muted dark:text-slate-400">
-                    {{ __('Pesa la flor de la que se ha dispensado hoy e introduce los gramos contados. El peso esperado se revela solo después de confirmar (recuento a ciegas).') }}
+                    {{-- Copy matches the FILTER: touched since intake (remaining ≠ initial), not "dispensed today" (prompt 91). --}}
+                    {{ __('Pesa cada lote de flor tocado desde su entrada e introduce los gramos contados. Si no puedes contar un bote, márcalo como no contado e indica el motivo — su stock no se tocará. El peso esperado se revela solo después de confirmar (recuento a ciegas).') }}
                 </p>
 
                 <form wire:submit="submitReweigh" class="mt-5 space-y-4">
                     @foreach ($reweighBatches as $batch)
-                        <div wire:key="reweigh-{{ $batch->id }}">
-                            <label for="reweigh-{{ $batch->id }}" class="block text-sm font-medium text-ink-muted dark:text-slate-400">
-                                {{ $batch->genetic?->name ?? __('Sin nombre') }} · {{ $batch->batch_no }}
-                            </label>
-                            <div class="mt-2 flex items-center gap-2">
-                                <input
-                                    id="reweigh-{{ $batch->id }}"
-                                    type="text"
-                                    inputmode="decimal"
-                                    wire:model="reweighCounts.{{ $batch->id }}"
-                                    autocomplete="off"
-                                    placeholder="0,00"
-                                    class="h-14 w-full rounded-xl border border-line bg-surface px-4 text-lg text-ink placeholder:text-ink-muted focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/40 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
+                        @php $notCounted = $reweighNotCounted[$batch->id] ?? false; @endphp
+                        <div wire:key="reweigh-{{ $batch->id }}" data-reweigh-batch="{{ $batch->id }}" class="rounded-xl border border-line bg-surface p-3 dark:border-slate-700 dark:bg-slate-900">
+                            <div class="flex items-center justify-between gap-2">
+                                <label for="reweigh-{{ $batch->id }}" class="block text-sm font-medium text-ink dark:text-slate-100">
+                                    {{ $batch->genetic?->name ?? __('Sin nombre') }} · {{ $batch->batch_no }}
+                                </label>
+                                <button
+                                    type="button"
+                                    wire:click="toggleNotCounted('{{ $batch->id }}')"
+                                    data-reweigh-not-counted-toggle="{{ $batch->id }}"
+                                    @class([
+                                        'shrink-0 rounded-lg px-2.5 py-1 text-xs font-semibold transition',
+                                        'bg-warning text-white' => $notCounted,
+                                        'bg-surface-alt text-ink-muted hover:bg-warning/10 hover:text-warning dark:bg-slate-800 dark:text-slate-400' => ! $notCounted,
+                                    ])
                                 >
-                                <span class="text-sm text-ink-muted dark:text-slate-400">{{ __('g') }}</span>
+                                    {{ $notCounted ? __('Marcar para contar') : __('No se puede contar') }}
+                                </button>
                             </div>
+
+                            @if ($notCounted)
+                                <input
+                                    type="text"
+                                    wire:model="reweighReasons.{{ $batch->id }}"
+                                    data-reweigh-reason="{{ $batch->id }}"
+                                    autocomplete="off"
+                                    placeholder="{{ __('Motivo (p. ej. bote no localizado)') }}"
+                                    class="mt-2 h-14 w-full rounded-xl border border-warning/50 bg-warning/5 px-4 text-base text-ink placeholder:text-ink-muted focus:border-warning focus:outline-none focus:ring-2 focus:ring-warning/40 dark:text-slate-100"
+                                >
+                                <p class="mt-1 text-xs text-warning">{{ __('No contado: el stock de este lote no se modificará. Un responsable lo revisará.') }}</p>
+                            @else
+                                <div class="mt-2 flex items-center gap-2">
+                                    <input
+                                        id="reweigh-{{ $batch->id }}"
+                                        type="text"
+                                        inputmode="decimal"
+                                        wire:model="reweighCounts.{{ $batch->id }}"
+                                        autocomplete="off"
+                                        placeholder="0,00"
+                                        class="h-14 w-full rounded-xl border border-line bg-surface px-4 text-lg text-ink placeholder:text-ink-muted focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/40 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
+                                    >
+                                    <span class="text-sm text-ink-muted dark:text-slate-400">{{ __('g') }}</span>
+                                </div>
+                            @endif
                         </div>
                     @endforeach
 
@@ -185,11 +221,12 @@
                                 <li class="flex items-center justify-between gap-3">
                                     <span class="text-ink-muted dark:text-slate-400">{{ $line['name'] }}</span>
                                     <span class="font-medium text-ink dark:text-slate-100">
-                                        {{ $line['counted'] }}
-                                        @if ($line['adjusted'])
-                                            <span class="text-warning">({{ __('ajuste') }} {{ $line['variance'] }})</span>
+                                        @if ($line['not_counted'])
+                                            <span class="text-warning" data-reweigh-omission>{{ __('No contado') }}@if ($line['repeated']) · {{ __('otra vez') }}@endif</span>
+                                        @elseif ($line['adjusted'])
+                                            {{ $line['counted'] }} <span class="text-warning">({{ __('ajuste') }} {{ $line['variance'] }})</span>
                                         @else
-                                            <span class="text-success">{{ __('sin diferencia') }}</span>
+                                            {{ $line['counted'] }} <span class="text-success">{{ __('sin diferencia') }}</span>
                                         @endif
                                     </span>
                                 </li>
@@ -324,7 +361,9 @@
             {{-- Cash movement --}}
             <section class="rounded-2xl border border-line bg-surface p-5 dark:border-slate-800 dark:bg-slate-900 sm:p-6">
                 <h3 class="text-base font-semibold">{{ __('Registrar movimiento de efectivo') }}</h3>
+                @unless ($this->hasOperator()) @include('livewire.counter.partials.needs-operator') @endunless
                 <form wire:submit="recordMovement" class="mt-4 grid gap-3 sm:grid-cols-2">
+                    <fieldset @disabled(! $this->hasOperator()) class="contents">
                     <div>
                         <label for="movementType" class="block text-sm font-medium text-ink-muted dark:text-slate-400">{{ __('Tipo') }}</label>
                         <select
@@ -365,11 +404,12 @@
                         <button
                             type="submit"
                             wire:loading.attr="disabled"
-                            class="h-12 w-full rounded-xl border border-line bg-surface-alt px-6 text-base font-semibold text-ink transition hover:bg-slate-200 disabled:opacity-60 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:hover:bg-slate-700"
+                            class="h-12 w-full rounded-xl bg-brand px-6 text-base font-semibold text-white transition hover:bg-brand-dark focus:outline-none focus:ring-2 focus:ring-brand/40 disabled:opacity-60"
                         >
                             {{ __('Registrar movimiento') }}
                         </button>
                     </div>
+                    </fieldset>
                 </form>
             </section>
 
@@ -380,7 +420,9 @@
                 <section class="rounded-2xl border border-line bg-surface p-5 dark:border-slate-800 dark:bg-slate-900 sm:p-6">
                     <h3 class="text-base font-semibold">{{ __('Registrar gasto de caja') }}</h3>
                     <p class="mt-0.5 text-sm text-ink-muted dark:text-slate-400">{{ __('Sale del efectivo del cajón (caja chica).') }}</p>
+                    @unless ($this->hasOperator()) @include('livewire.counter.partials.needs-operator') @endunless
                     <form wire:submit="recordExpense" class="mt-4 grid gap-3 sm:grid-cols-2">
+                        <fieldset @disabled(! $this->hasOperator()) class="contents">
                         <div>
                             <label for="expenseCategory" class="block text-sm font-medium text-ink-muted dark:text-slate-400">{{ __('Categoría') }}</label>
                             <select
@@ -421,11 +463,12 @@
                             <button
                                 type="submit"
                                 wire:loading.attr="disabled"
-                                class="h-12 w-full rounded-xl border border-line bg-surface-alt px-6 text-base font-semibold text-ink transition hover:bg-slate-200 disabled:opacity-60 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:hover:bg-slate-700"
+                                class="h-12 w-full rounded-xl bg-brand px-6 text-base font-semibold text-white transition hover:bg-brand-dark focus:outline-none focus:ring-2 focus:ring-brand/40 disabled:opacity-60"
                             >
                                 {{ __('Registrar gasto') }}
                             </button>
                         </div>
+                        </fieldset>
                     </form>
                 </section>
             @endcan
@@ -436,6 +479,8 @@
                 <section class="rounded-2xl border border-line bg-surface p-5 dark:border-slate-800 dark:bg-slate-900 sm:p-6">
                     <h3 class="text-base font-semibold">{{ __('Cobrar cuota') }}</h3>
                     <p class="mt-0.5 text-sm text-ink-muted dark:text-slate-400">{{ __('Registra el pago de la cuota de socio.') }}</p>
+                    @unless ($this->hasOperator()) @include('livewire.counter.partials.needs-operator') @endunless
+                    <fieldset @disabled(! $this->hasOperator()) class="contents">
 
                     @if ($feeMember === null)
                         <div class="mt-4">
@@ -495,15 +540,20 @@
                             </form>
                         @endif
                     @endif
+                    </fieldset>
                 </section>
             @endcan
 
-            {{-- Close (arqueo) — only a till.close holder may close. --}}
+            {{-- Close (arqueo) — DEMOTED (prompt 91): a once-a-day, irreversible action must not be the
+                 loudest control on a tablet being scrolled mid-shift. A quiet, outlined button (the routine
+                 movement/expense/fee actions carry the brand fill instead), and it opens a deliberate
+                 multi-step close (reweigh → blind count) rather than committing anything on tap. --}}
             @can('till.close')
                 <button
                     type="button"
                     wire:click="startClose"
-                    class="h-16 w-full rounded-xl bg-brand text-lg font-bold text-white transition hover:bg-brand-dark focus:outline-none focus:ring-2 focus:ring-brand/40"
+                    data-close-till
+                    class="mt-2 h-12 w-full rounded-xl border border-line bg-surface px-6 text-base font-semibold text-ink-muted transition hover:border-ink-muted hover:text-ink focus:outline-none focus:ring-2 focus:ring-brand/30 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-400 dark:hover:text-slate-100"
                 >
                     {{ __('Cerrar caja · arqueo') }}
                 </button>

@@ -519,10 +519,15 @@ class DemoDataSeeder extends Seeder
     {
         $cashTaken = 0;
 
+        // Reserve one WEIGHT batch per sede as NEVER dispensed-from (prompt 91), so the EOD reweigh's
+        // "only touched batches" filter (remaining_cg = initial_cg) is demonstrable on a fresh install —
+        // the seed used to dispense from every batch, so the exclusion could never be seen working.
+        $pickable = count($batches) > 1 ? array_slice($batches, 0, -1) : $batches;
+
         for ($i = 0; $i < random_int(2, 4); $i++) {
             $index = array_rand($members);
             $member = $members[$index]['member'];
-            $batch = $batches[array_rand($batches)];
+            $batch = $pickable[array_rand($pickable)];
             if ($batch->remaining_cg->centigrams < 500) {
                 continue;
             }
