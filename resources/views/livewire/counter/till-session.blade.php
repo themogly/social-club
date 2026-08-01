@@ -1,5 +1,6 @@
 <div class="mx-auto flex w-full max-w-2xl flex-col gap-5">
     @include('livewire.counter.partials.operator-strip')
+    @include('livewire.counter.partials.lock-overlay')
 
     @if ($noLocation)
         {{-- Intentional empty state: an operator with no assigned sede. Still a 200. --}}

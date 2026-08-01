@@ -449,6 +449,12 @@ class BarPos extends Component
             return;
         }
 
+        // A void is a reversal WRITE, so it needs a PIN-identified operator too — this is also what makes the
+        // idle lock (prompt 120) refuse it server-side, since locking signs the operator out.
+        if (! $this->requireOperator()) {
+            return;
+        }
+
         $user = $this->currentUser();
 
         if ($user === null || ! $user->can('order.void')) {

@@ -171,6 +171,20 @@
     @endif
 
     <div class="flex shrink-0 items-center gap-1">
+        {{-- Lock now (prompt 120): a 44px affordance to lock the screen on the way out, without waiting for the
+             idle timer. Sets the shared store flag, which raises the overlay and signs the operator out. --}}
+        <button
+            type="button"
+            @click="$store.counter.lockNow()"
+            data-counter-lock-now
+            aria-label="{{ __('Bloquear pantalla') }}"
+            title="{{ __('Bloquear pantalla') }}"
+            class="inline-flex h-11 w-11 items-center justify-center rounded-lg text-ink-muted transition hover:bg-brand-tint hover:text-brand dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-white"
+        >
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" class="h-5 w-5" aria-hidden="true">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 1 0-9 0v3.75m-.75 0h10.5a2.25 2.25 0 0 1 2.25 2.25v6.75a2.25 2.25 0 0 1-2.25 2.25H6.75a2.25 2.25 0 0 1-2.25-2.25v-6.75a2.25 2.25 0 0 1 2.25-2.25Z"/>
+            </svg>
+        </button>
         {{-- Help where the task is (prompt 92): the same shared affordance on every counter screen. --}}
         <x-counter.help />
         @if ($canPanel)

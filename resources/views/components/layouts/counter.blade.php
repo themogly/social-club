@@ -20,13 +20,60 @@
             @vite(['resources/css/app.css', 'resources/js/app.js'])
         @endif
 
-        {{-- Shared "unsaved counter work" flag; the POS/till screens set it, the header's
-             Panel/Log out controls confirm before leaving when it is true. --}}
+        {{-- Shared counter store. `dirty` = unsaved work (POS/till screens set it; the header's Panel/Log out
+             controls confirm before leaving). `locked` = the idle-lock overlay (prompt 120): after
+             `idleMinutes` of NO real operator input the screen locks, obscuring member data and signing the
+             operator out server-side (a commit then fails requireOperator, not just the overlay). Only genuine
+             input (pointer/key/touch) resets the timer — Livewire polling and re-renders never do. The window is
+             the per-location `counter_idle_lock_minutes` setting; 0 disables it. --}}
         <script>
             document.addEventListener('alpine:init', () => {
-                if (! window.Alpine.store('counter')) {
-                    window.Alpine.store('counter', { dirty: false });
+                if (window.Alpine.store('counter')) {
+                    return;
                 }
+
+                window.Alpine.store('counter', {
+                    dirty: false,
+                    locked: false,
+                    idleMinutes: {{ (int) \App\Support\Settings::get('counter_idle_lock_minutes', 5) }},
+                    _timer: null,
+
+                    startIdleWatch() {
+                        if (this.idleMinutes <= 0) {
+                            return; // idle lock disabled for this sede
+                        }
+                        const reset = () => this.armIdle();
+                        ['pointerdown', 'keydown', 'touchstart'].forEach(
+                            (evt) => document.addEventListener(evt, reset, { passive: true, capture: true })
+                        );
+                        this.armIdle();
+                    },
+
+                    armIdle() {
+                        if (this.locked || this.idleMinutes <= 0) {
+                            return;
+                        }
+                        clearTimeout(this._timer);
+                        this._timer = setTimeout(() => this.lockNow(), this.idleMinutes * 60000);
+                    },
+
+                    lockNow() {
+                        if (this.locked) {
+                            return;
+                        }
+                        this.locked = true;
+                        clearTimeout(this._timer);
+                        // Sign the operator out server-side so commits are refused, not merely hidden.
+                        window.Livewire && window.Livewire.dispatch('counter-lock');
+                    },
+
+                    unlocked() {
+                        this.locked = false;
+                        this.armIdle();
+                    },
+                });
+
+                window.Alpine.store('counter').startIdleWatch();
             });
         </script>
 

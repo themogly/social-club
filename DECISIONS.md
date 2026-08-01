@@ -4718,3 +4718,46 @@ lg:inline` and `hidden md:inline` is gone, and the dispensary chips are `min-h-1
 class removed. Same defect class as 101/116/129 — structural guard now, pixel proof owed.
 
 `composer check` green (915 tests, 912 passed, 3 pre-existing skips, PHPStan 0).
+
+---
+
+## Prompt 120 — Counter idle lock + PIN-throttle hardening
+
+Scope decision (owner, via AskUserQuestion): **counter only, PIN re-entry** — the idle lock covers the five
+counter screens; the Filament admin panel keeps its normal session timeout (a separate concern).
+
+**Idle lock reuses the operator gate (the key design choice).** Locking the counter simply signs the operator
+OUT (`CounterOperator::clear()` in `IdentifiesOperator::lockCounter`, a `#[On('counter-lock')]` listener). That
+reuses the gate that already fronts every commit: `requireOperator()` now finds no operator, so a
+dispensation, order, fee, check-in, cash movement — and now a **void** (added `requireOperator()` to
+`DispensaryPos::voidLast`/`BarPos::voidLast`, previously unguarded) — is refused SERVER-SIDE, not merely hidden
+behind the overlay. No new lock table or flag; no change to `requireOperator()` itself. Unlocking is the SAME
+PIN pad + throttle as identifying an operator, so on success the trait dispatches `counter-unlocked` and the
+overlay lifts with the basket and session untouched (a client overlay never clears component state).
+
+**The overlay + timer (client).** The shared `counter` Alpine store (counter layout) gained `locked` + an idle
+timer that resets ONLY on real input (`pointerdown`/`keydown`/`touchstart`, capture phase) — Livewire polling
+and re-renders never reset it. After `counter_idle_lock_minutes` it flips `locked` and dispatches
+`counter-lock`. A shared `partials/lock-overlay.blade.php` (included by every screen, like the operator strip)
+paints an OPAQUE full-viewport surface so an unattended tablet stops showing member data, with its own PIN pad.
+A 44px "lock now" button in the top bar locks on demand. The window is the per-location
+`counter_idle_lock_minutes` setting (default 5, **0 disables**), edited on `LocationForm` via a new
+`SETTING_INTEGERS` reconciliation (parallel to the boolean `SETTING_TOGGLES`).
+
+**PIN throttle hardening.** The bucket is now **location-wide** (`counter-pin:{locationId}` — dropped the
+`:sessionId`, since a shared counter has many devices and a browser session is trivial to rotate), and the
+lockout **escalates**: `UnlockOperator` was reworked off `RateLimiter` onto cache keys with an escalating
+window schedule `[60, 300, 900, 3600]` — each successive lockout at a sede is longer, a correct PIN clears
+everything, and strikes decay after an hour of calm. **Graceful degradation (prompt 124):** the overlay's
+lockout check runs on every counter render, so every cache touch is wrapped to swallow a backend outage and
+fail the throttle OPEN (a Redis blip must never 503 the counter; a correct PIN is still required, so access
+stays gated). `RedisDegradationTest` proves the counter still renders when the default cache explodes.
+
+**Verification gap (owed — no browser here).** Fully tested server-side (`CounterPinTest` +2 escalation/clear,
+`OperatorUnlockTest` +3 idle-lock: lock signs the operator out and blocks a commit while the basket survives,
+unlock dispatches the lift event, every screen carries the overlay). NOT verifiable without a browser: the
+idle timer firing, the overlay actually obscuring the screen, "only real input resets", the lock-now button,
+and the countdown. Given prompt 130 showed an unverified front-end fix can ship incomplete, this branch is
+**pushed, not merged** — the client overlay wants a real browser pass first.
+
+`composer check` green (920 tests, 917 passed, 3 pre-existing skips, PHPStan 0). EN/ES parity gated (6 keys).

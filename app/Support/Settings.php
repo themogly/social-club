@@ -122,6 +122,10 @@ class Settings
         'consent_statutes_text' => 'Solicitar el alta implica aceptar los estatutos de la asociación: es una asociación privada sin ánimo de lucro de consumidores de cannabis, no un comercio; el cannabis se dispensa a coste como aportación al consumo compartido entre socios, nunca como venta. La asociación opera bajo tolerancia judicial, no autorización. Pide una copia íntegra de los estatutos a la asociación.',
         // Brute-force guard on QR-card scans (failed scans per minute, per operator). Prompt 58.
         'qr_scan_max_failures_per_minute' => 10,
+        // Minutes of NO real operator input before a counter screen auto-locks (prompt 120). Locking signs the
+        // operator out, so commits are refused server-side and an unattended tablet stops showing member data
+        // until someone re-enters a PIN. Per-location (a quiet sede may want longer). 0 disables the idle lock.
+        'counter_idle_lock_minutes' => 5,
 
         // Per-location defaults (overridable per premises)
         'aforo_default' => 50,

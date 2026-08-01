@@ -221,6 +221,57 @@ class OperatorUnlockTest extends TestCase
         $this->assertSame(0, CheckIn::query()->withoutGlobalScopes()->count());
     }
 
+    // --- Idle lock (prompt 120) -----------------------------------------------------
+
+    public function test_locking_the_counter_signs_the_operator_out_and_blocks_a_commit(): void
+    {
+        $this->priceAt(1000);
+        $this->batch(100000);
+        $this->openTill();
+        $member = $this->eligibleMember();
+
+        $pos = Livewire::actingAs($this->device)->test(DispensaryPos::class)
+            ->set('operatorPin', '4321')->call('unlockOperator')
+            ->call('selectMember', $member->id)
+            ->call('chooseGenetic', $this->genetic->id)
+            ->set('weightInput', '3.5')
+            ->call('addLine');
+
+        $this->assertSame($this->operator->id, CounterOperator::id());
+
+        // The idle timer (or the "lock now" button) dispatches counter-lock → the operator is signed out.
+        $pos->call('lockCounter');
+        $this->assertNull(CounterOperator::id());
+
+        // A commit is now refused SERVER-SIDE (not just hidden behind the overlay): the pad is forced open and
+        // nothing is written.
+        $pos->call('commit')
+            ->assertSet('operatorPanelOpen', true)
+            ->assertSet('flashType', 'error');
+        $this->assertSame(0, Dispensation::query()->withoutGlobalScopes()->count());
+
+        // The basket SURVIVED the lock: re-identifying and committing writes the same basket, once.
+        $pos->set('operatorPin', '4321')->call('unlockOperator')
+            ->call('commit')
+            ->assertSet('flashType', 'success');
+        $this->assertSame(1, Dispensation::query()->withoutGlobalScopes()->count());
+    }
+
+    public function test_unlocking_dispatches_the_event_that_lifts_the_overlay(): void
+    {
+        Livewire::actingAs($this->device)->test(DispensaryPos::class)
+            ->set('operatorPin', '4321')->call('unlockOperator')
+            ->assertDispatched('counter-unlocked');
+    }
+
+    public function test_every_counter_screen_carries_the_idle_lock_overlay(): void
+    {
+        foreach ([CheckInScreen::class, DispensaryPos::class, BarPos::class, TillSession::class] as $screen) {
+            Livewire::actingAs($this->device)->test($screen)
+                ->assertSee('data-counter-lock', false);
+        }
+    }
+
     // --- The Users-resource set/reset-PIN control works end to end ------------------
 
     public function test_a_pin_set_through_the_users_resource_form_unlocks_at_the_counter(): void

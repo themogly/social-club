@@ -2,6 +2,7 @@
      shell over the shared fee-collection concern (RecordFeePayment). Cash reconciles against the open till. --}}
 <div>
     @include('livewire.counter.partials.operator-strip')
+    @include('livewire.counter.partials.lock-overlay')
 
     @if ($noLocation)
         <div class="rounded-2xl border border-line bg-surface p-8 text-center dark:border-slate-800 dark:bg-slate-900">

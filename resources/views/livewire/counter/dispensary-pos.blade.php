@@ -16,6 +16,7 @@
     }"
 >
     @include('livewire.counter.partials.operator-strip')
+    @include('livewire.counter.partials.lock-overlay')
 
     @if ($noLocation)
         {{-- Intentional empty state: an operator with no assigned sede. Still a 200. --}}

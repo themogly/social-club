@@ -58,6 +58,50 @@ class CounterPinTest extends TestCase
         $this->assertNull($action->handle($this->location, '4321', $key));
     }
 
+    public function test_the_lockout_window_escalates_on_repeated_lockouts(): void
+    {
+        $action = new UnlockOperator;
+        $key = 'pin:test:escalate';
+
+        // First lockout → the shortest window.
+        for ($i = 0; $i < UnlockOperator::MAX_ATTEMPTS; $i++) {
+            $action->handle($this->location, '0000', $key);
+        }
+        $this->assertTrue($action->isLockedOut($key));
+        $firstWindow = $action->lockoutSecondsRemaining($key);
+        $this->assertGreaterThan(0, $firstWindow);
+        $this->assertLessThanOrEqual(UnlockOperator::LOCKOUT_WINDOWS[0], $firstWindow);
+
+        // Let the first window elapse, then trip it again at the SAME location → a longer window.
+        $this->travel(UnlockOperator::LOCKOUT_WINDOWS[0] + 1)->seconds();
+        $this->assertFalse($action->isLockedOut($key));
+        for ($i = 0; $i < UnlockOperator::MAX_ATTEMPTS; $i++) {
+            $action->handle($this->location, '0000', $key);
+        }
+
+        $this->assertTrue($action->isLockedOut($key));
+        $this->assertGreaterThan($firstWindow, $action->lockoutSecondsRemaining($key)); // escalated
+    }
+
+    public function test_a_correct_pin_clears_the_escalating_throttle(): void
+    {
+        $action = new UnlockOperator;
+        $key = 'pin:test:clear';
+
+        // Four wrong attempts (one shy of a lockout), then the correct PIN — the tally resets.
+        for ($i = 0; $i < UnlockOperator::MAX_ATTEMPTS - 1; $i++) {
+            $action->handle($this->location, '0000', $key);
+        }
+        $this->assertNotNull($action->handle($this->location, '4321', $key));
+        $this->assertFalse($action->isLockedOut($key));
+
+        // A fresh run of wrong attempts starts from zero (no residual count carried over).
+        for ($i = 0; $i < UnlockOperator::MAX_ATTEMPTS - 1; $i++) {
+            $action->handle($this->location, '0000', $key);
+        }
+        $this->assertFalse($action->isLockedOut($key)); // still one short — the earlier attempts did not persist
+    }
+
     public function test_transaction_records_the_unlocked_operator_not_the_device_user(): void
     {
         $deviceUser = User::factory()->create();
