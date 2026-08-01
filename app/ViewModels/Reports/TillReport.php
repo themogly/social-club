@@ -81,13 +81,23 @@ class TillReport extends AbstractReport
                 'counted' => $z['counted'],
                 'variance' => $z['variance'],
                 'tx' => (int) $z['transaction_count'],
-                'estado' => $session->status === TillSessionStatus::OPEN ? __('Abierta') : __('Cerrada'),
+                'estado' => $session->status === TillSessionStatus::OPEN
+                    ? __('Abierta')
+                    // A closed session whose ledger moved after cierre (a post-close void) is flagged, so the
+                    // frozen cash-up is not mistaken for the current state (prompt 103).
+                    : ($z['post_close_adjusted'] ? __('Cerrada (ajustada tras el cierre)') : __('Cerrada')),
                 'operator_key' => $session->opened_by ?? 'none',
             ];
             $totals['float'] += (int) $z['float'];
-            $totals['expected'] += (int) $z['expected'];
-            $totals['counted'] += (int) ($z['counted'] ?? 0);
-            $totals['variance'] += (int) ($z['variance'] ?? 0);
+            // The totals row reconciles the ARQUEO — the closed sessions (prompt 103): expected, counted and
+            // variance sum over the same set, so Σcounted − Σexpected === Σvariance holds. An OPEN session has
+            // no arqueo yet (counted/variance null); its live expected is shown per row but excluded here, so
+            // an in-progress drawer cannot make the reconciliation total contradict itself.
+            if ($z['counted'] !== null) {
+                $totals['expected'] += (int) $z['expected'];
+                $totals['counted'] += (int) $z['counted'];
+                $totals['variance'] += (int) $z['variance'];
+            }
             $totals['tx'] += (int) $z['transaction_count'];
         }
 

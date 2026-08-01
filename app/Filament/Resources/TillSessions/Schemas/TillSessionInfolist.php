@@ -67,6 +67,16 @@ class TillSessionInfolist
                         self::money('counted', __('Contado')),
                         self::money('variance', __('Diferencia'))
                             ->color(fn (TillSession $record): string => (int) (self::report($record)['variance'] ?? 0) !== 0 ? 'danger' : 'gray'),
+                        // Prompt 103: a closed session whose ledger moved after cierre (a post-close void) shows
+                        // the cash-up FIXED at close; this flags that the register has since changed.
+                        TextEntry::make('post_close_note')
+                            ->label(__('Aviso'))
+                            ->state(fn (TillSession $record): ?string => (self::report($record)['post_close_adjusted'] ?? false)
+                                ? __('Ajustada tras el cierre: el arqueo mostrado es el fijado al cerrar; el registro ha cambiado desde entonces (recálculo actual: :amount).', ['amount' => Money::fromCents((int) self::report($record)['expected_live'])->formatted()])
+                                : null)
+                            ->visible(fn (TillSession $record): bool => (bool) (self::report($record)['post_close_adjusted'] ?? false))
+                            ->color('warning')
+                            ->columnSpanFull(),
                         TextEntry::make('notes')->label(__('Nota'))->placeholder('—')->columnSpanFull(),
                     ])
                     ->columns(3),
