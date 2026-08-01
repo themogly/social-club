@@ -4148,3 +4148,34 @@ gets free, and the two differ by that constant (which is not the member-count sc
 
 **Harness:** "reading one settings key ten times is not ten queries" → **1 query** (green). Overall **25 passed
 / 6 failed** (was 24/7). Owner-authorised merge. 859 tests, 856 passed, 3 pre-existing skips, PHPStan 0.
+
+## Prompt 108 — Till report: batched Z-report (no N+1 over sessions)
+
+`TillReport::sessions()` previously called `ZReport::for($session)` inside its per-session loop, and each
+`for()` issued ~12 queries (the `TillSummary::breakdown` sums, two transaction counts, two void counts) — so a
+period report scaled its query count linearly with the number of sessions.
+
+Introduced batched siblings and made the single-session entry points delegate to them, so the arithmetic and
+the per-model scoping have ONE definition and a batched figure can never disagree with a per-session one:
+- `TillSummary::breakdownMany(Collection $sessions)` — one grouped `SUM … GROUP BY till_session_id` per ledger
+  source (dispensations, orders, wallet top-ups/refunds, fees, cash movements), returning `[id => Breakdown]`.
+  `TillSummary::breakdown($session)` now delegates with a one-element collection.
+- `ZReport::forMany(Collection $sessions)` — calls `breakdownMany` once plus two grouped COUNTs (total +
+  `SUM(CASE WHEN status = VOIDED …)`), returning `[id => zArray]`. `ZReport::for($session)` delegates.
+- `TillReport::sessions()` calls `ZReport::forMany($sessions)` once.
+
+Query count is now FLAT in session count (a fixed ~12 whether 5 sessions or 29). The two grouped-aggregate
+helpers are `@template TModel of Model` generic (Builder's model generic is invariant, so a non-generic
+`Builder<Model>` param rejects `Builder<Dispensation>`); aggregate columns are read via array access
+(`$row['agg']`), which returns the dynamic attribute without a declared-property assumption.
+
+**Harness metric corrected (not loosened).** The old check divided total queries by session count and asserted
+`< 2.0` — date-fragile (at a month boundary "this month" holds a session or two, so a correct O(1) report's
+fixed overhead reads as scaling) and it never compared two session counts, so it could not tell flat from
+linear. Replaced with a direct test: render the report over a narrow window and a wide one and assert the wide
+window has MORE sessions but the SAME query count. This still fails loudly if a per-session query returns.
+
+**Harness:** "the till report does not scale queries with sessions" → **12 queries for 5 sessions, still 12 for
+29 — flat** (green). Overall **26 passed / 5 failed** (was 25/6). The remaining 5 are 106 (petty-cash movement,
+2 stock-ceiling, closed-till recompute) and 111 (two unread settings keys). Owner-authorised merge. 859 tests,
+856 passed, 3 pre-existing skips, PHPStan 0.

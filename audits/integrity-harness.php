@@ -516,18 +516,26 @@ $sections['reports'] = function (Result $R) use ($org, $locationIds, $money): vo
     $R->check('CSV exports carry a BOM and no raw enum values', $issues === [],
         $issues === [] ? "{$checked} tables × 2 locales" : implode('; ', array_slice($issues, 0, 3)));
 
-    // Query volume must not scale with the number of rows being reported.
-    DB::flushQueryLog();
-    DB::enableQueryLog();
-    $tillReport = new \App\ViewModels\Reports\TillReport($org->id, $locationIds, $period);
-    $tillReport->tables();
-    $queries = count(DB::getQueryLog());
-    DB::disableQueryLog();
-    $sessions = max(1, TillSession::withoutGlobalScopes()->whereIn('location_id', $locationIds)
-        ->whereBetween('opened_at', [$start, $end])->count());
-    $perSession = $queries / $sessions;
-    $R->check('the till report does not scale queries with sessions', $perSession < 2.0,
-        sprintf('%d queries for %d sessions (%.1f each)', $queries, $sessions, $perSession));
+    // Query volume must not scale with the number of sessions reported. Tested DIRECTLY: the same report over
+    // a WIDER window (more sessions) must issue the SAME number of queries as over a narrow one. A per-session
+    // ratio was date-fragile — at a month boundary "this month" holds only a session or two, so a correct
+    // O(1) report's fixed overhead looks like scaling — and never actually compared two session counts, so it
+    // could not distinguish flat from linear. This does, and still fails loudly if a per-session query returns.
+    $measure = function (Period $p) use ($org, $locationIds): array {
+        DB::flushQueryLog();
+        DB::enableQueryLog();
+        (new \App\ViewModels\Reports\TillReport($org->id, $locationIds, $p))->tables();
+        $q = count(DB::getQueryLog());
+        DB::disableQueryLog();
+        $s = TillSession::withoutGlobalScopes()->whereIn('location_id', $locationIds)
+            ->where('opened_at', '>=', $p->start)->where('opened_at', '<', $p->end)->count();
+
+        return [$q, $s];
+    };
+    [$qNarrow, $sNarrow] = $measure(Period::custom(CarbonImmutable::now()->subDay(), CarbonImmutable::now()->addDay()));
+    [$qWide, $sWide] = $measure(Period::custom(CarbonImmutable::now()->subDays(20), CarbonImmutable::now()->addDay()));
+    $R->check('the till report does not scale queries with sessions', $sWide > $sNarrow && $qWide === $qNarrow,
+        sprintf('%d queries for %d sessions, still %d for %d — flat', $qNarrow, $sNarrow, $qWide, $sWide));
 
     // Settings must be memoised — the same key read repeatedly is one query, not many.
     DB::flushQueryLog();
