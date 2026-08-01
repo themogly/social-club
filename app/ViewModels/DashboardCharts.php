@@ -7,6 +7,7 @@ use App\Enums\DispensationStatus;
 use App\Enums\MembershipStatus;
 use App\Enums\OrderStatus;
 use App\Enums\Role;
+use App\Models\Expense;
 use App\Models\Location;
 use App\Models\User;
 use App\Support\ActiveScope;
@@ -120,6 +121,7 @@ class DashboardCharts
     {
         [$start, $end, $bounds] = $this->trailingDays($days);
         $rows = DB::table('members')->where('organisation_id', $this->organisationId)
+            ->whereNull('deleted_at') // a soft-deleted member is not a new joiner
             ->whereBetween('joined_at', [$start, $end])->get(['joined_at']);
 
         return $this->bucket($rows, $bounds, 'joined_at', null);
@@ -195,8 +197,10 @@ class DashboardCharts
         [$labels, $bounds, $unit] = $this->periodBuckets($period);
         [$start, $end] = $period->bounds();
 
-        $expenseRows = DB::table('expenses')->whereIn('location_id', $this->resolvedLocationIds())
-            ->whereNull('recurrence') // concrete outgoings only — a template is a schedule
+        // THE one outgoing rule (prompt 107) — org + not-deleted + concrete + the org-level (null-location)
+        // fold-in on the all-locations view. Previously a bare whereIn(location) that dropped every overhead
+        // (rent/utilities live at null location) and every soft-deleted row, so the superávit read too healthy.
+        $expenseRows = Expense::concreteForPeriod(DB::table('expenses'), $this->organisationId, $this->resolvedLocationIds(), $this->includesAllLocations())
             ->where('incurred_on', '>=', $start->toDateString())
             ->where('incurred_on', '<', $end->toDateString())
             ->get(['incurred_on', 'amount_cents']);
@@ -263,6 +267,7 @@ class DashboardCharts
         $members = DB::table('members')
             ->join('memberships', 'members.id', '=', 'memberships.member_id')
             ->where('members.organisation_id', $this->organisationId)
+            ->whereNull('members.deleted_at') // exclude soft-deleted members from the distribution
             ->whereIn('memberships.location_id', $this->resolvedLocationIds())
             ->where('memberships.status', MembershipStatus::ACTIVE->value)
             ->distinct()->get(['members.id as id', 'members.monthly_limit_cg as monthly_limit_cg']);
@@ -315,6 +320,7 @@ class DashboardCharts
     {
         $rows = DB::table('batches')
             ->join('genetics', 'batches.genetic_id', '=', 'genetics.id')
+            ->whereNull('batches.deleted_at') // raw query bypasses SoftDeletingScope — a deleted batch is not stock
             ->whereIn('batches.location_id', $this->resolvedLocationIds())
             ->where('batches.status', BatchStatus::OPEN->value)
             ->groupBy('batches.genetic_id')
@@ -479,6 +485,12 @@ class DashboardCharts
     }
 
     // --- Scoping + bucketing helpers ------------------------------------------------
+
+    /** True for the owner's "All locations" view — the only view that folds in org-wide (null-location) outgoings. */
+    private function includesAllLocations(): bool
+    {
+        return $this->locationIds === null;
+    }
 
     /** @return list<string> */
     private function resolvedLocationIds(): array
