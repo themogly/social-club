@@ -67,16 +67,16 @@
              one shared header. Zero sedes: a warning. One sede: a static badge (nothing to switch to).
              Several: a switcher (each a validated POST to /counter/location, confirming unsaved work);
              several with none chosen yet ⇒ a highlighted "choose your sede" prompt, never a silent guess. --}}
-        <div class="relative" data-counter-sede-region>
+        <div class="relative shrink-0" data-counter-sede-region>
             @if ($noSede)
                 <span data-counter-sede-state="none"
-                      class="inline-flex items-center gap-1.5 rounded-lg bg-warning/10 px-2.5 py-1.5 text-sm font-medium text-warning">
+                      class="inline-flex items-center gap-1.5 rounded-lg bg-warning/10 min-h-11 px-3 text-sm font-medium text-warning">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" class="h-4 w-4" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M15 10.5a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z"/><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1 1 15 0Z"/></svg>
                     {{ __('Sin sede') }}
                 </span>
             @elseif ($availableSedes->count() === 1)
                 <span data-counter-sede-current="{{ $currentSede?->id }}"
-                      class="inline-flex items-center gap-1.5 rounded-lg bg-surface-alt px-2.5 py-1.5 text-sm font-medium text-ink dark:bg-slate-800 dark:text-slate-100">
+                      class="inline-flex items-center gap-1.5 rounded-lg bg-surface-alt min-h-11 px-3 text-sm font-medium text-ink dark:bg-slate-800 dark:text-slate-100">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" class="h-4 w-4 text-brand" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M15 10.5a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z"/><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1 1 15 0Z"/></svg>
                     {{ $currentSede?->name }}
                 </span>
@@ -86,7 +86,7 @@
                             data-counter-sede-current="{{ $currentSede?->id }}"
                             aria-haspopup="true" :aria-expanded="open.toString()"
                             @class([
-                                'inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-sm font-medium transition',
+                                'inline-flex items-center gap-1.5 rounded-lg min-h-11 px-3 text-sm font-medium transition',
                                 'bg-warning/10 text-warning ring-1 ring-warning/50' => $mustChooseSede,
                                 'bg-surface-alt text-ink hover:bg-brand-tint hover:text-brand dark:bg-slate-800 dark:text-slate-100' => ! $mustChooseSede,
                             ])>
@@ -170,37 +170,96 @@
         </nav>
     @endif
 
-    <div class="flex shrink-0 items-center gap-1">
-        {{-- Help where the task is (prompt 92): the same shared affordance on every counter screen. --}}
-        <x-counter.help />
-        @if ($canPanel)
-            <a
-                href="{{ url('/') }}"
-                data-counter-dashboard
-                wire:navigate.ignore
-                @click.prevent="(! ($store.counter?.dirty) || window.confirm(@js($confirmLeave))) && window.location.assign('{{ url('/') }}')"
-                class="inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium text-ink-muted transition hover:bg-brand-tint hover:text-brand dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-white"
-            >
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" class="h-5 w-5" aria-hidden="true">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M2.25 12 12 2.25 21.75 12M4.5 9.75v9.75a.75.75 0 0 0 .75.75H9.75V15.75a1.5 1.5 0 0 1 1.5-1.5h1.5a1.5 1.5 0 0 1 1.5 1.5v4.5h4.5a.75.75 0 0 0 .75-.75V9.75"/>
-                </svg>
-                <span class="hidden sm:inline">{{ __('Panel') }}</span>
-            </a>
-        @endif
-
-        <form
-            method="POST"
-            action="{{ route('filament.admin.auth.logout') }}"
-            @submit="($store.counter?.dirty && ! window.confirm(@js($confirmLeave))) && $event.preventDefault()"
+    {{-- Secondary actions, collapsed behind ONE 44px overflow control (prompt 132). Help, Panel and Log out are
+         the three items in the bar that are NOT a counter destination and the least-used; folding them into a
+         single dropdown is what lets the whole bar be one non-overlapping flow at every width — the widened
+         five-destination primary group (130 + 127) no longer runs into a wide fixed secondary group, because
+         there isn't one any more. The trigger and every menu item are 44px. `data-counter-help` /
+         `data-counter-dashboard` / `data-counter-logout` are preserved for the existing tests. --}}
+    <div
+        x-data="{ open: false }"
+        class="relative shrink-0"
+        data-counter-overflow
+        data-counter-help
+    >
+        <button
+            type="button"
+            @click="open = ! open"
+            aria-haspopup="true"
+            :aria-expanded="open.toString()"
+            aria-label="{{ __('Más opciones') }}"
+            data-counter-overflow-trigger
+            class="inline-flex h-11 w-11 items-center justify-center rounded-lg text-ink-muted transition hover:bg-brand-tint hover:text-brand dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-white"
         >
-            @csrf
-            <button
-                type="submit"
-                data-counter-logout
-                class="rounded-lg px-3 py-2 text-sm font-medium text-ink-muted transition hover:bg-black/5 dark:text-slate-400 dark:hover:bg-white/5"
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" class="h-5 w-5" aria-hidden="true">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M6.75 12a.75.75 0 1 1-1.5 0 .75.75 0 0 1 1.5 0ZM12.75 12a.75.75 0 1 1-1.5 0 .75.75 0 0 1 1.5 0ZM18.75 12a.75.75 0 1 1-1.5 0 .75.75 0 0 1 1.5 0Z"/>
+            </svg>
+        </button>
+
+        <div
+            x-show="open"
+            x-cloak
+            @click.outside="open = false"
+            @keydown.escape.window="open = false"
+            class="absolute right-0 z-40 mt-1 w-80 max-w-[90vw] rounded-xl border border-line bg-surface p-2 text-left shadow-lg dark:border-slate-700 dark:bg-slate-900"
+        >
+            {{-- Panel + Log out (44px rows). --}}
+            @if ($canPanel)
+                <a
+                    href="{{ url('/') }}"
+                    data-counter-dashboard
+                    wire:navigate.ignore
+                    @click.prevent="(! ($store.counter?.dirty) || window.confirm(@js($confirmLeave))) && window.location.assign('{{ url('/') }}')"
+                    class="flex min-h-11 items-center gap-2 rounded-lg px-3 text-sm font-medium text-ink-muted transition hover:bg-brand-tint hover:text-brand dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-white"
+                >
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" class="h-5 w-5 shrink-0" aria-hidden="true">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M2.25 12 12 2.25 21.75 12M4.5 9.75v9.75a.75.75 0 0 0 .75.75H9.75V15.75a1.5 1.5 0 0 1 1.5-1.5h1.5a1.5 1.5 0 0 1 1.5 1.5v4.5h4.5a.75.75 0 0 0 .75-.75V9.75"/>
+                    </svg>
+                    {{ __('Panel') }}
+                </a>
+            @endif
+
+            <form
+                method="POST"
+                action="{{ route('filament.admin.auth.logout') }}"
+                @submit="($store.counter?.dirty && ! window.confirm(@js($confirmLeave))) && $event.preventDefault()"
             >
-                {{ __('Cerrar sesión') }}
-            </button>
-        </form>
+                @csrf
+                <button
+                    type="submit"
+                    data-counter-logout
+                    class="flex min-h-11 w-full items-center gap-2 rounded-lg px-3 text-sm font-medium text-ink-muted transition hover:bg-black/5 dark:text-slate-400 dark:hover:bg-white/5"
+                >
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" class="h-5 w-5 shrink-0" aria-hidden="true">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0 0 13.5 3h-6a2.25 2.25 0 0 0-2.25 2.25v13.5A2.25 2.25 0 0 0 7.5 21h6a2.25 2.25 0 0 0 2.25-2.25V15M12 9l-3 3m0 0 3 3m-3-3h12.75"/>
+                    </svg>
+                    {{ __('Cerrar sesión') }}
+                </button>
+            </form>
+
+            {{-- Ayuda (prompt 92): the same answers to the blocked states staff hit, folded into the one overflow
+                 menu (prompt 132). Static — nothing loads. Rules are NAMED, never a hard-coded value. --}}
+            <div class="mt-1 border-t border-line px-1 pt-2 dark:border-slate-800" data-counter-help-content>
+                <h2 class="px-2 text-sm font-semibold">{{ __('¿Por qué no puedo dispensar a un socio?') }}</h2>
+                <ul class="mt-1 space-y-1 px-2 text-sm text-ink-muted dark:text-slate-400">
+                    <li>· {{ __('No tiene una membresía activa, o no está al corriente de la cuota.') }}</li>
+                    <li>· {{ __('Está en carencia: el período de espera desde el alta aún no ha terminado.') }}</li>
+                    <li>· {{ __('Alcanzaría el límite diario o mensual de gramos configurado.') }}</li>
+                    <li>· {{ __('No cumple la edad mínima, o su documento ha caducado.') }}</li>
+                    <li>· {{ __('Debe dinero por encima del umbral permitido en el monedero.') }}</li>
+                </ul>
+                <p class="mt-2 px-2 text-xs text-ink-muted dark:text-slate-400">{{ __('El mostrador te dice el motivo exacto en cada caso. Un responsable puede autorizar algunas excepciones.') }}</p>
+
+                <h3 class="mt-3 px-2 text-sm font-semibold">{{ __('Términos') }}</h3>
+                <dl class="mt-1 space-y-1 px-2 pb-1 text-xs">
+                    @foreach (['Aportación', 'Dispensación', 'Carencia', 'Arqueo'] as $term)
+                        <div>
+                            <dt class="inline font-semibold text-ink dark:text-slate-200">{{ $term }}:</dt>
+                            <dd class="inline text-ink-muted dark:text-slate-400">{{ __(\App\Support\Help::GLOSSARY[$term]) }}</dd>
+                        </div>
+                    @endforeach
+                </dl>
+            </div>
+        </div>
     </div>
 </header>

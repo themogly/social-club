@@ -4718,3 +4718,38 @@ lg:inline` and `hidden md:inline` is gone, and the dispensary chips are `min-h-1
 class removed. Same defect class as 101/116/129 — structural guard now, pixel proof owed.
 
 `composer check` green (915 tests, 912 passed, 3 pre-existing skips, PHPStan 0).
+
+---
+
+## Prompt 132 — The counter nav overlap remainder (worst at 1024, the width a tablet runs on)
+
+**Problem.** Prompt 130 widened the primary group (four → five destinations, labels from lg) but left the
+secondary group — Ayuda (36 px), Panel (87 px), Cerrar sesión (114 px) — as a ~240 px fixed block at
+x-positions the widened row now ran into. A real browser measured a **70 px `Caja`∩`Panel` collision at
+1024×768** (the till button over the leave-the-counter button), plus smaller ones at 768/800; 1280 was clean.
+130's structural test passed while this was live — the defect was purely positional, so only a bounding-box
+measurement catches it.
+
+**Fix — one flow, secondary behind a single overflow control.** Help, Panel and Log out (the three bar items
+that are NOT a counter destination) are collapsed into ONE 44 px overflow (`⋯`) dropdown; the help content is
+folded in and the standalone `x-counter.help` component retired. The trailing fixed width drops from ~240 px to
+one 44 px control, so the header is now brand/title (shrinks + truncates) · sede chip (44 px, shrink-0) · nav
+(the ONLY flex-1, min-w-0, scrollable element) · overflow (44 px, shrink-0). There is no wide fixed group left
+for the nav to intersect, at any width — the property, not a pixel budget. Every control is ≥44 px, including
+the sede chip (was 164×32) and every item inside the overflow menu. Uniform labelling (lg gate) and 130's other
+wins are untouched.
+
+**Verified in a real browser (the thing 130 lacked).** `tests/Browser/measure-topbar.mjs` (Playwright/chromium)
+measured the real, authed top-bar at **768 / 800 / 1024 / 1280**: **ALL PASS** — 7 controls (five destinations +
+sede chip + overflow trigger), **zero overlaps, none under 44×44, no horizontal page scroll**. Screenshots at
+1024×768 (light + dark) and 768×1024 confirm the single clean flow. Playwright is deliberately NOT a CI
+dependency (~100 MB browser); `tests/Browser/TopbarHarnessTest` runs in `composer check` as the STRUCTURAL guard
+(one overflow control; Help/Panel/Log out folded in; five destinations reachable; 44 px trigger; lg-gated
+labels) and writes the harness the `.mjs` measures — see `tests/Browser/README.md`.
+
+**Coordination note.** Prompt 120 (idle lock, branch `feat/counter-idle-lock`, unmerged) adds a 44 px "lock now"
+button to this same trailing group. On merge, keep it as a 44 px control beside the overflow (or as a top item
+inside it); re-run `measure-topbar.mjs` after reconciling, since it changes the trailing width.
+
+`composer check` green (915 tests, 912 passed, 3 pre-existing skips, PHPStan 0). EN/ES parity gated (1 key).
+Pushed; **not merged** (the prompt's instruction; a human should eyeball the four screens).
