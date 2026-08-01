@@ -71,6 +71,13 @@ class AdminPanelProvider extends PanelProvider
                 PanelsRenderHook::TOPBAR_END,
                 fn (): string => Blade::render('@livewire($component)', ['component' => LocaleSwitcher::class]),
             )
+            // In-app help (prompt 92): one shared, unobtrusive affordance on EVERY panel page — a help
+            // menu linking to the glossary and the per-screen guides. Content-only, static (no queries),
+            // so a screen without help is visibly missing this pattern rather than each screen inventing one.
+            ->renderHook(
+                PanelsRenderHook::TOPBAR_END,
+                fn (): string => Blade::render("@include('filament.help-menu')"),
+            )
             // Grouped sidebar, in operational order. Every group is deliberate; a group
             // renders only when the actor can see at least one item in it (so STAFF never
             // sees Sistema, and Informes/Documentos/Audit are omitted until they exist —

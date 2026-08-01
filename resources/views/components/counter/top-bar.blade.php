@@ -162,6 +162,8 @@
     @endif
 
     <div class="flex items-center gap-1">
+        {{-- Help where the task is (prompt 92): the same shared affordance on every counter screen. --}}
+        <x-counter.help />
         @if ($canPanel)
             <a
                 href="{{ url('/') }}"

@@ -3248,3 +3248,49 @@ search; reweigh copy matches the filter + progress reflects the count; the seed 
 batch out of the reweigh. Existing `EodStockTakeTest` (7) still green; `ChargeAlwaysObservableTest` updated for
 disclosure. **Screenshots** (the full staff-day sequence, both widths, light/dark) not produced — no browser
 here. Owner-authorised merge (standing "merge everything to main"). 720 green (717 passed, 3 concurrency skips).
+
+---
+
+## Prompt 92 — In-app help (empty states, glossary, per-screen guides, counter help)
+
+**Where help content lives.** ALL of it is Spanish source strings in `app/Support/Help.php` (empty states,
+per-screen topics, glossary), rendered through `__()` so it flows the prompt-19 lang pipeline — English in
+`lang/en.json`, es identity in `lang/es.json`, key-set parity gated. No parallel content store. Because the
+strings reach `__()` dynamically (`__($definition)`), which `lang:sync` cannot statically extract, they are
+added to BOTH JSON files explicitly; the parity test still guards them, so the Spanish cannot silently rot.
+Help is CONTENT ONLY — it never gates an action, changes behaviour, or restates a rule as a number (rules
+live in code; help NAMES them — "el límite diario configurado" — a test asserts no help string hard-codes a
+Setting value; the eighth's 3,5 g is allowed because it is a definitional constant, not a Setting).
+
+**The layering (cheapest, highest-leverage first).**
+1. **Empty states that teach** — every resource table gets a heading + description (what the records are, why
+   they matter, the first action) from `Help::EMPTY_STATES`, applied by ONE global `Table::configureUsing()`
+   default in `AppServiceProvider` keyed by model. A resource's own `emptyStateDescription` still overrides.
+   A walk test fails when a new resource ships without one.
+2. **A shared help affordance on every panel page** — one global topbar render hook (`filament.help-menu`),
+   static + Alpine, `data-screen-help`, linking to the glossary and the per-screen guides. One pattern, not 40
+   bespoke; a page without it is visibly missing it.
+3. **The glossary** — its own searchable page (`Glosario`, nav group "Ayuda"), static Alpine filter, the
+   club's terms of art defined once in both languages. The terms STAY Spanish (they are legally load-bearing —
+   aportación vs venta); the page explains them, it does not translate them away.
+4. **Counter help** — a shared help panel in the counter top-bar (`x-counter.help`, on all four screens),
+   answering the blocked states staff actually hit ("¿por qué no puedo dispensar?") in plain language, plus
+   the key terms. Static, lazy — nothing slows the till. It NAMES the rules (age, carencia, límite, cuota,
+   debt) that `ResolveMemberEligibility` enforces; the counter still shows the exact per-rule reason live.
+5. **The help index** — the Glosario page collects the per-screen guides (`Help::TOPICS`) as "Guías por
+   pantalla", reachable from the topbar affordance.
+
+**Who is the Spanish authority for the domain terms.** The Spanish in `Help::GLOSSARY` is the authoritative
+version — written first, in Spanish, for the legal vocabulary; the English is a faithful gloss that keeps the
+Spanish term. This is the highest-value help in the system precisely because these terms are not guessable.
+
+**Scope note (honest v1).** Per-screen help is a shared, global affordance plus registered per-screen guides
+surfaced on the help index — not yet a bespoke inline modal on each of the 35 screens. The registry
+(`Help::TOPICS`) is the seam: adding a richer inline panel later is content already written, not new plumbing.
+
+**Tests:** `HelpTest` (6) — every resource has an empty state (walk); every glossary term resolves in both
+locales and is translated (not one-language-only); no help string hard-codes a Setting value; the shared
+affordance renders on a resource page; the glossary renders in es AND en (term stays Spanish); the counter
+carries help in both locales. Prompt-19 parity still green. **Screenshots** (empty state, help panel, glossary,
+counter help — both languages) not produced — no browser here. Owner-authorised merge (standing "merge
+everything to main"). 726 green (723 passed, 3 concurrency skips).
