@@ -3294,3 +3294,49 @@ affordance renders on a resource page; the glossary renders in es AND en (term s
 carries help in both locales. Prompt-19 parity still green. **Screenshots** (empty state, help panel, glossary,
 counter help — both languages) not produced — no browser here. Owner-authorised merge (standing "merge
 everything to main"). 726 green (723 passed, 3 concurrency skips).
+
+---
+
+## Prompt 93 — Guided flows + derived incompleteness
+
+**The case that proves it:** a genetic created and nothing else is `Active: Yes, Published: Yes`, yet it is
+absent from the POS — "No genetics with an active price at this sede" — and nothing said why. Two
+complementary mechanisms, the derivation being the higher-value half.
+
+**1. Tell the truth about incompleteness — DERIVED, never stored.** A stored "complete" flag disagrees with
+reality the first time someone edits around it, so completeness is computed live:
+- `Genetic::completenessReason()` → `no_price` (needs a per-location price — the exact `whereHas('prices',
+  active, base)` condition the POS filters on), `no_stock` (priced but no OPEN batch with stock), or null
+  (ready). Plus `hasActivePriceAt($location)` / `hasStockAt($location)` for the per-sede truth.
+- `Member::hasActiveMembership()` — a member with none cannot be dispensed to.
+- `Location::hasActivePrices()` — a sede with none is a counter that sells nothing.
+- `User::setupIncompleteReasons()` → `no_role` (canAccessPanel refuses), `no_location` (scoped to nothing),
+  `no_pin` (cannot identify at the counter).
+Each is surfaced as a badge in its resource LIST (Genetics "Sin precio/Sin stock/Lista", Members "Sin
+membresía", Locations "Sin precios", Users "Falta rol · PIN"), naming the gap with a tooltip pointing to the
+fix. It catches the problem whenever it arises, including for records created before any guidance existed, and
+does not depend on anyone following a happy path.
+
+**2. Carry the user onward — guide, don't force.** `CreateGenetic::getRedirectUrl()` now lands the user on the
+new genetic's own page (where the GeneticPrices relation manager lives), with a notification naming the
+remaining steps (add a price, add a batch), instead of dropping them on the list one third of the way through.
+It never traps them: they can stop, and mechanism (1)'s "Sin precio" flag is what makes stopping safe and
+visible. No wizard — these are genuinely separate records with their own permissions.
+
+**No new authorization, no broken links.** Each step keeps its existing permission; the guidance NAMES the
+next steps in text (a notification, a badge tooltip) rather than linking to a page the viewer might not be
+allowed to open — so a user without `stock.manage` is told about the batch step, never shown a link that
+403s. The derived flags are permission-independent (anyone who can see the list sees the truth).
+
+**Boundary with prompt 78 (go-live/first-run):** untouched. This branch is about the ongoing incompleteness of
+individual records (a strain, a member, a user, a sede), not the one-time organisation/first-owner bootstrap
+prompt 78 owns.
+
+**Tests:** `GuidedFlowsTest` (7) — a genetic without a price is flagged in the list AND absent from that
+location's POS (asserted together, since the whole point is they currently disagree); adding a price clears
+the flag for that location only and moves it to "no stock"; a priced + batched genetic is ready and appears at
+the POS (regression: no false alarm); a member without a membership, and a user missing a role/location/PIN,
+are each flagged (and complete ones are not); a location without prices is flagged; creating a genetic guides
+onward (redirect to its page) and skipping leaves it visibly incomplete. **Screenshots** (incomplete genetic,
+the guided path, the strain then at the POS — both languages) not produced — no browser here. Owner-authorised
+merge (standing "merge everything to main"). 733 green (730 passed, 3 concurrency skips).

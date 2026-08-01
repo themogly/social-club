@@ -24,6 +24,22 @@ class GeneticsTable
         return $table
             ->columns([
                 TextColumn::make('name')->label(__('Nombre'))->searchable()->sortable(),
+                // Derived completeness (prompt 93) — NEVER stored. A genetic can be Active + Published and
+                // still appear NOWHERE at the counter; this says why, so nobody has to guess.
+                TextColumn::make('completeness')
+                    ->label(__('Estado'))
+                    ->badge()
+                    ->state(fn (Genetic $record): string => match ($record->completenessReason()) {
+                        'no_price' => __('Sin precio'),
+                        'no_stock' => __('Sin stock'),
+                        default => __('Lista'),
+                    })
+                    ->color(fn (Genetic $record): string => $record->completenessReason() === null ? 'success' : 'warning')
+                    ->tooltip(fn (Genetic $record): ?string => match ($record->completenessReason()) {
+                        'no_price' => __('Añade un precio por sede para poder dispensarla.'),
+                        'no_stock' => __('Añade un lote con stock para poder dispensarla.'),
+                        default => null,
+                    }),
                 TextColumn::make('product_type')->label(__('Tipo'))->badge()->sortable(),
                 TextColumn::make('strain_type')->label(__('Variedad'))->badge()->placeholder('—')->toggleable(),
                 TextColumn::make('category.name')->label(__('Categoría'))->sortable()->toggleable(),

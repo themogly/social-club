@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\Users\Tables;
 
+use App\Models\User;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteBulkAction;
 use Filament\Actions\EditAction;
@@ -18,6 +19,13 @@ class UsersTable
         return $table
             ->columns([
                 TextColumn::make('name')->label(__('Nombre'))->searchable()->sortable(),
+                // Derived (prompt 93): a user with no role can't enter the panel, no PIN can't identify at
+                // the counter, no sede is scoped to nothing. Never stored; each gap is named.
+                TextColumn::make('setup_gap')
+                    ->label(__('Configuración'))
+                    ->badge()
+                    ->state(fn (User $record): string => self::setupLabel($record))
+                    ->color(fn (User $record): string => $record->setupIncompleteReasons() === [] ? 'success' : 'warning'),
                 TextColumn::make('email')->label(__('Correo'))->searchable()->toggleable(),
                 TextColumn::make('roles.name')->label(__('Roles'))->badge(),
                 TextColumn::make('locations.name')->label(__('Sedes'))->badge()->toggleable(),
@@ -37,5 +45,22 @@ class UsersTable
                     RestoreBulkAction::make(),
                 ]),
             ]);
+    }
+
+    /** Name each setup gap so the badge tells the truth (prompt 93). */
+    private static function setupLabel(User $user): string
+    {
+        $labels = [
+            'no_role' => __('Falta rol'),
+            'no_location' => __('Falta sede'),
+            'no_pin' => __('Falta PIN'),
+        ];
+
+        $reasons = $user->setupIncompleteReasons();
+        if ($reasons === []) {
+            return __('Completa');
+        }
+
+        return implode(' · ', array_map(fn (string $r): string => $labels[$r] ?? $r, $reasons));
     }
 }

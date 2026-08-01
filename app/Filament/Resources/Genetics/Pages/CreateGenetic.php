@@ -4,11 +4,31 @@ namespace App\Filament\Resources\Genetics\Pages;
 
 use App\Filament\Resources\Genetics\GeneticResource;
 use App\Support\Weight;
+use Filament\Notifications\Notification;
 use Filament\Resources\Pages\CreateRecord;
 
 class CreateGenetic extends CreateRecord
 {
     protected static string $resource = GeneticResource::class;
+
+    /**
+     * Carry the user onward (prompt 93): a genetic alone dispenses NOWHERE — it needs a per-location price
+     * and a batch. Land them on the genetic's own page (where the prices relation manager lives) with a
+     * notification naming the remaining steps, rather than dropping them on the list one third of the way
+     * through. They can still stop: the "Sin precio" flag on the list keeps that safe and visible.
+     */
+    protected function getRedirectUrl(): string
+    {
+        return GeneticResource::getUrl('edit', ['record' => $this->getRecord()]);
+    }
+
+    protected function getCreatedNotification(): ?Notification
+    {
+        return Notification::make()
+            ->success()
+            ->title(__('Genética creada'))
+            ->body(__('Para que aparezca en el mostrador, añade un precio por sede y un lote con stock.'));
+    }
 
     /**
      * THC/CBD live as integer basis points (thc_bp / cbd_bp) and the per-unit gram

@@ -35,6 +35,13 @@ class MembersTable
             ))
             ->columns([
                 TextColumn::make('member_no')->label(__('Nº socio'))->searchable()->sortable(),
+                // Derived (prompt 93): a member with no active membership cannot be dispensed to. Never stored.
+                TextColumn::make('membership_gap')
+                    ->label(__('Alta'))
+                    ->badge()
+                    ->state(fn (Member $record): string => $record->hasActiveMembership() ? __('Completa') : __('Sin membresía'))
+                    ->color(fn (Member $record): string => $record->hasActiveMembership() ? 'success' : 'warning')
+                    ->tooltip(fn (Member $record): ?string => $record->hasActiveMembership() ? null : __('Sin una membresía activa no se le puede dispensar. Enrola una cuota.')),
                 TextColumn::make('first_name')->label(__('Nombre'))->searchable()->sortable(),
                 TextColumn::make('last_name')->label(__('Apellidos'))->searchable()->sortable(),
                 TextColumn::make('status')

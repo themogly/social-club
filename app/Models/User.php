@@ -49,6 +49,29 @@ class User extends Authenticatable implements FilamentUser, HasAppAuthentication
         return $this->belongsToMany(Location::class)->withTimestamps();
     }
 
+    /**
+     * Derived setup gaps (prompt 93), never stored: without a ROLE canAccessPanel() refuses; without a
+     * LOCATION they are scoped to nothing; without a PIN they cannot identify at the counter. A user row
+     * can look complete while being unable to do any of these.
+     *
+     * @return list<string>
+     */
+    public function setupIncompleteReasons(): array
+    {
+        $reasons = [];
+        if ($this->getRoleNames()->isEmpty()) {
+            $reasons[] = 'no_role';
+        }
+        if ($this->locations()->count() === 0) {
+            $reasons[] = 'no_location';
+        }
+        if (blank($this->getRawOriginal('pin'))) {
+            $reasons[] = 'no_pin';
+        }
+
+        return $reasons;
+    }
+
     // --- Multi-factor (TOTP app authentication) --------------------------------
 
     public function getAppAuthenticationSecret(): ?string

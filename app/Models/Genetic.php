@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Enums\BatchStatus;
 use App\Enums\ConcentrateSubtype;
 use App\Enums\CultivationType;
 use App\Enums\ProductType;
@@ -99,6 +100,53 @@ class Genetic extends Model
     public function scopePublished(Builder $query): Builder
     {
         return $query->where('published', true);
+    }
+
+    // --- Derived completeness (prompt 93) — NEVER stored. A genetic can be Active + Published and still
+    //     appear NOWHERE at the counter, because dispensing needs, per location, an active base price AND
+    //     stock. These derive that truth live so the list and the record can explain the gap.
+
+    /** Has an active base (non-tier) price at this location — the exact condition the POS filters on. */
+    public function hasActivePriceAt(string $locationId): bool
+    {
+        return $this->prices()->withoutGlobalScopes()
+            ->where('location_id', $locationId)->whereNull('tier_id')->where('active', true)->exists();
+    }
+
+    /** Has an active base price at ANY location (i.e. it can be dispensed somewhere). */
+    public function hasAnyActivePrice(): bool
+    {
+        return $this->prices()->withoutGlobalScopes()->whereNull('tier_id')->where('active', true)->exists();
+    }
+
+    /** Has an OPEN batch with stock at this location (weight or units). */
+    public function hasStockAt(string $locationId): bool
+    {
+        return $this->batches()->withoutGlobalScopes()
+            ->where('location_id', $locationId)->where('status', BatchStatus::OPEN->value)
+            ->where(fn (Builder $q) => $q->where('remaining_cg', '>', 0)->orWhere('remaining_units', '>', 0))->exists();
+    }
+
+    public function hasAnyStock(): bool
+    {
+        return $this->batches()->withoutGlobalScopes()->where('status', BatchStatus::OPEN->value)
+            ->where(fn (Builder $q) => $q->where('remaining_cg', '>', 0)->orWhere('remaining_units', '>', 0))->exists();
+    }
+
+    /**
+     * Why this genetic cannot yet be dispensed anywhere — 'no_price' (needs a per-location price),
+     * 'no_stock' (priced but no batch), or null when it is ready. Derived live, never stored.
+     */
+    public function completenessReason(): ?string
+    {
+        if (! $this->hasAnyActivePrice()) {
+            return 'no_price';
+        }
+        if (! $this->hasAnyStock()) {
+            return 'no_stock';
+        }
+
+        return null;
     }
 
     /**
