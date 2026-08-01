@@ -49,15 +49,18 @@
     data-counter-topbar
     class="flex items-center justify-between border-b border-line px-4 py-3 dark:border-slate-800 sm:px-6"
 >
-    <div class="flex items-center gap-3">
-        <span class="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-brand text-base font-bold text-white">
+    <div class="flex min-w-0 items-center gap-3">
+        <span class="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-brand text-base font-bold text-white">
             {{ mb_substr(config('app.name', 'C'), 0, 1) }}
         </span>
-        <div class="leading-tight">
-            <p class="text-sm font-semibold">{{ config('app.name') }}</p>
+        {{-- Prompt 130: the brand/title block can shrink and TRUNCATE (min-w-0 + truncate) rather than shoving
+             the nav into its neighbours on a narrow (portrait-tablet) header. It stays rendered at every width so
+             the counter screen's single <h1> is never dropped from the a11y tree. --}}
+        <div class="min-w-0 leading-tight">
+            <p class="truncate text-sm font-semibold">{{ config('app.name') }}</p>
             {{-- The counter screen's one <h1> (a11y): the shared header renders it for every
                  terminal, so headings below can start at h2 without skipping a level. --}}
-            <h1 class="text-xs text-ink-muted dark:text-slate-400">{{ $title ?? __('Mostrador') }}</h1>
+            <h1 class="truncate text-xs text-ink-muted dark:text-slate-400">{{ $title ?? __('Mostrador') }}</h1>
         </div>
 
         {{-- Which sede this terminal is working at (prompt 89) — shown on EVERY counter screen, from the
@@ -131,20 +134,24 @@
     </div>
 
     @if (count($screens) > 0)
-        {{-- Screen switcher (prompt 42): jump straight between the counter screens the operator is
-             allowed to use — the current one marked active, not a link. Same unsaved-work confirm as
-             the Panel link. Icon-only below lg, labels from lg up; scrolls if a narrow header runs out. --}}
-        <nav aria-label="{{ __('Cambiar de pantalla') }}" class="flex min-w-0 items-center gap-1 overflow-x-auto">
+        {{-- Screen switcher (prompt 42/130): jump straight between the counter screens the operator is allowed
+             to use — the current one marked active, not a link. Same unsaved-work confirm as the Panel link.
+             Prompt 130: it is a flex-1, min-w-0, horizontally-SCROLLABLE strip, so it takes only the middle
+             space between the brand/sede block and the right-hand actions and can NEVER overlap them (116's
+             `md:inline` labelled all five destinations at 768px, which on a portrait tablet overflowed into the
+             neighbours). Labels appear UNIFORMLY only from `lg` up, where a labelled strip actually fits; below
+             that every item is an equal 44px icon-only target and the strip scrolls if it still runs out. --}}
+        <nav aria-label="{{ __('Cambiar de pantalla') }}" class="flex min-w-0 flex-1 items-center gap-1 overflow-x-auto">
             @foreach ($screens as $screen)
                 @php $active = request()->routeIs($screen['route']); @endphp
                 @if ($active)
                     <span
                         aria-current="page"
                         data-counter-screen="{{ $screen['route'] }}"
-                        class="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-brand-tint px-3 py-2 text-sm font-semibold text-brand dark:bg-slate-800 dark:text-white"
+                        class="inline-flex h-11 shrink-0 items-center gap-1.5 rounded-lg bg-brand-tint px-3 text-sm font-semibold text-brand dark:bg-slate-800 dark:text-white"
                     >
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" class="h-5 w-5" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="{{ $screen['icon'] }}"/></svg>
-                        <span class="hidden md:inline">{{ $screen['label'] }}</span>
+                        <span class="hidden lg:inline">{{ $screen['label'] }}</span>
                     </span>
                 @else
                     <a
@@ -153,17 +160,17 @@
                         data-counter-switch="{{ $screen['route'] }}"
                         wire:navigate.ignore
                         @click.prevent="(! ($store.counter?.dirty) || window.confirm(@js($confirmLeave))) && window.location.assign('{{ route($screen['route']) }}')"
-                        class="inline-flex shrink-0 items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium text-ink-muted transition hover:bg-brand-tint hover:text-brand dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-white"
+                        class="inline-flex h-11 shrink-0 items-center gap-1.5 rounded-lg px-3 text-sm font-medium text-ink-muted transition hover:bg-brand-tint hover:text-brand dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-white"
                     >
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" class="h-5 w-5" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="{{ $screen['icon'] }}"/></svg>
-                        <span class="hidden md:inline">{{ $screen['label'] }}</span>
+                        <span class="hidden lg:inline">{{ $screen['label'] }}</span>
                     </a>
                 @endif
             @endforeach
         </nav>
     @endif
 
-    <div class="flex items-center gap-1">
+    <div class="flex shrink-0 items-center gap-1">
         {{-- Help where the task is (prompt 92): the same shared affordance on every counter screen. --}}
         <x-counter.help />
         @if ($canPanel)
