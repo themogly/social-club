@@ -8,11 +8,12 @@ use App\Models\User;
 use Illuminate\Auth\Access\AuthorizationException;
 
 /**
- * Update an existing per-member discount (value / expiry). Owner-only
- * (`member.discount.assign`), audited from → to. Mirrors {@see AssignMemberDiscount};
- * the resolver reads the same MemberDiscount, so no second pricing path is introduced.
+ * Update an existing per-member discount — its EXPIRY only (prompt 119). Owner-only
+ * (`member.discount.assign`), audited from → to. The discount's VALUE is not editable by hand: a linked
+ * template owns its value, and a legacy inline value is frozen (to change a rate, remove and reassign a named
+ * discount). So the link (`discount_id`) and any inline value are deliberately left untouched here.
  *
- * @phpstan-type UpdateData array{mode?: mixed, value_bp?: ?int, value_cents?: ?int, expires_at?: mixed, reason?: ?string}
+ * @phpstan-type UpdateData array{expires_at?: mixed, reason?: ?string}
  */
 class UpdateMemberDiscount
 {
@@ -27,10 +28,8 @@ class UpdateMemberDiscount
 
         $before = $this->snapshot($memberDiscount);
 
+        // Only the expiry moves — never the value or the template link (prompt 119).
         $memberDiscount->update([
-            'mode' => $data['mode'] ?? null,
-            'value_bp' => $data['value_bp'] ?? null,
-            'value_cents' => $data['value_cents'] ?? null,
             'expires_at' => $data['expires_at'] ?? null,
             'assigned_by' => $actor->id,
         ]);
