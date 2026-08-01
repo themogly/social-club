@@ -214,6 +214,29 @@ class DashboardScreenTest extends TestCase
             ->assertSee(__('Nada dispensado en este período'));
     }
 
+    // --- Stat-card labels survive over the delta chip (prompt 129) -------------------
+
+    public function test_delta_bearing_stat_cards_keep_a_readable_label(): void
+    {
+        // The three cards that carry a delta chip — Aportaciones, Dispensado, Transacciones — are the ones
+        // prompt 101's single-line ellipsis erased on a narrow card. Their labels must render in full...
+        $this->dispense(3500, 2000, 1500, 350);
+        $owner = $this->user(Role::OWNER);
+
+        app()->setLocale('es'); // the page renders in the shipped org default (es — prompt 96)
+        $response = $this->visit($owner, $this->location->id)->assertOk();
+        foreach (['Aportaciones', 'Dispensado', 'Transacciones'] as $label) {
+            $response->assertSee($label);
+        }
+
+        // ...and the stylesheet must WRAP the label to two lines rather than truncate it to one ellipsised
+        // line (which is what starved these labels beside the chip). This is the structural guard; the full
+        // proof is a screenshot at 768 / 800 / 1024 / 1280 — owed, no browser here.
+        $styles = file_get_contents(resource_path('views/filament/pages/partials/dashboard-styles.blade.php'));
+        $this->assertMatchesRegularExpression('/\.csc-card-label\s*\{[^}]*-webkit-line-clamp:\s*2/', $styles);
+        $this->assertDoesNotMatchRegularExpression('/\.csc-card-label\s*\{[^}]*white-space:\s*nowrap/', $styles);
+    }
+
     // --- No N+1: the query count is bounded and stable across data volume ------------
 
     public function test_dashboard_query_count_is_bounded_and_does_not_grow_with_volume(): void

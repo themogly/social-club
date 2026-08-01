@@ -4659,3 +4659,30 @@ wallet fee needs no till; a partial reports what remains; collecting clears the 
 the door and the POS card each collect an outstanding fee inline (blank → full) and the door's inline cash
 fee with no till is refused; a wrong-permission user is 403'd from the tab. `composer check` green (912
 tests, 909 passed, 3 pre-existing skips, PHPStan 0). EN/ES parity gated (7 new keys).
+
+---
+
+## Prompt 129 — Dashboard stat-card labels must survive over the delta chip
+
+**Problem.** Prompt 101 stopped the stat cards clipping by making `.csc-card-label` a single truncating line
+(`flex:1; white-space:nowrap; text-overflow:ellipsis`). That fixed the overflow but over-corrected: on a narrow
+card the label lost its fight with the delta chip beside it and ellipsised to a stub. The three cards that carry
+a delta — **Aportaciones, Dispensado, Transacciones** — were left with no readable label at the 2-up and 4-up
+breakpoints.
+
+**Fix (option A — wrap the header to two lines).** `.csc-card-label` now clamps to TWO lines
+(`display:-webkit-box; -webkit-line-clamp:2; overflow:hidden; overflow-wrap:anywhere`) instead of one, and the
+delta chip is `flex:none` so it keeps its size and the label wraps beside/under it rather than being squeezed.
+The header aligns to `flex-start` so the chip pins to the top of a two-line label. This KEEPS prompt 101's
+no-overflow win — a label longer than two lines still ellipsises, and it never pushes the chip out or clips the
+card. The grid is `display:grid` with the default `align-items:stretch`, so a two-line-label card and a
+one-line-label card in the same row stay equal height (no new unevenness).
+
+**Verification gap (owed — no browser here).** The full proof is a screenshot at **768 / 800 / 1024 / 1280**,
+light and dark, confirming each of the six metrics shows a readable title. What is asserted without a browser:
+the three delta-bearing labels render in full in the DOM, AND a stylesheet regression guard that
+`.csc-card-label` uses `-webkit-line-clamp: 2` and NO LONGER uses `white-space: nowrap` (so 101's truncation
+cannot silently return). This is the same defect class as prompts 101/116 — structural test now, pixel proof
+owed.
+
+Tests (`DashboardScreenTest::test_delta_bearing_stat_cards_keep_a_readable_label`). `composer check` green.

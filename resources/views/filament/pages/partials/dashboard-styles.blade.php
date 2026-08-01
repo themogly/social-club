@@ -54,12 +54,15 @@
     .csc-card-link:hover { transform: translateY(-2px); border-color: var(--br); box-shadow: 0 8px 24px rgba(37, 99, 235, .14); }
     .csc-card-link:focus-visible { outline: 2px solid var(--br); outline-offset: 2px; }
     .csc-card[data-flag="true"] { border-color: var(--warn); }
-    .csc-card-head { display: flex; align-items: center; gap: 0.5rem; min-width: 0; }
+    .csc-card-head { display: flex; align-items: flex-start; gap: 0.5rem; min-width: 0; }
     .csc-card-icon { display: inline-flex; align-items: center; justify-content: center; width: 1.9rem; height: 1.9rem; border-radius: 0.55rem; background: var(--brt); color: var(--br); flex: none; }
     .csc-ico { width: 1.05rem; height: 1.05rem; }
-    /* Prompt 101: the label takes the free space and TRUNCATES (min-width:0 lets a flex child shrink below its
-       content width) instead of pushing the delta out and being clipped by the card's overflow:hidden. */
-    .csc-card-label { font-size: 0.78rem; font-weight: 600; color: var(--mut); flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    /* Prompt 129: the label WRAPS to two lines and keeps its priority over the delta chip — correcting prompt
+       101's single-line ellipsis, which erased "Aportaciones", "Dispensado" and "Transacciones" (the three
+       cards that carry a delta) down to unreadable stubs on a narrow card. The 2-line clamp keeps 101's
+       no-overflow win: the label never pushes the chip out and the card never clips. A label longer than two
+       lines still ellipsises rather than overflowing. */
+    .csc-card-label { font-size: 0.78rem; font-weight: 600; color: var(--mut); flex: 1; min-width: 0; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; overflow: hidden; overflow-wrap: anywhere; }
     .csc-card-body { display: flex; align-items: flex-end; justify-content: space-between; gap: 0.5rem; }
     /* The value block must be able to shrink beside the ring so a long figure wraps rather than clipping. */
     .csc-card-body > div { min-width: 0; }
@@ -71,7 +74,9 @@
     .csc-spark-area { fill: var(--brt); stroke: none; }
 
     /* Delta chip */
-    .csc-delta { margin-inline-start: auto; display: inline-flex; align-items: center; gap: 0.15rem; font-size: 0.72rem; font-weight: 700; padding: 0.12rem 0.45rem; border-radius: 999px; }
+    /* flex:none so the chip keeps its size and the label wraps beside it rather than being squeezed to an
+       ellipsis (prompt 129); it pins to the top of a two-line header. */
+    .csc-delta { margin-inline-start: auto; flex: none; display: inline-flex; align-items: center; gap: 0.15rem; font-size: 0.72rem; font-weight: 700; padding: 0.12rem 0.45rem; border-radius: 999px; }
     .csc-delta-ico { width: 0.85rem; height: 0.85rem; }
     .csc-delta-success { color: var(--okt); background: var(--okbg); }
     .csc-delta-error { color: var(--errt); background: var(--errbg); }
