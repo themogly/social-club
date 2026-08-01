@@ -62,6 +62,8 @@ class BarPosTest extends TestCase
     {
         $user = User::factory()->create();
         $user->assignRole(Role::MANAGER->value); // has order.void
+        // The void policy binds the actor to the order's sede (prompt 75) — assign the one they work.
+        $user->locations()->sync([$this->location->id]);
 
         return $user;
     }
@@ -200,5 +202,21 @@ class BarPosTest extends TestCase
 
         $this->expectException(AuthorizationException::class);
         (new VoidOrder)->handle($order, $staff, 'nope');
+    }
+
+    public function test_a_manager_cannot_void_another_sedes_order(): void
+    {
+        // The order belongs to $this->location; this manager is assigned only to a DIFFERENT sede.
+        // order.void alone is not enough — the policy binds the actor to the row's location (prompt 75).
+        $otherLocation = Location::factory()->create(['organisation_id' => $this->org->id]);
+        $manager = User::factory()->create();
+        $manager->assignRole(Role::MANAGER->value);
+        $manager->locations()->sync([$otherLocation->id]);
+
+        $a = $this->article(500, 5);
+        $order = $this->commit([['article_id' => $a->id, 'qty' => 1]]);
+
+        $this->expectException(AuthorizationException::class);
+        (new VoidOrder)->handle($order, $manager, 'cross-sede void attempt');
     }
 }

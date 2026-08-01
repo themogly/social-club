@@ -45,6 +45,7 @@ use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use InvalidArgumentException;
 use Livewire\Attributes\Layout;
+use Livewire\Attributes\Locked;
 use Livewire\Component;
 use RuntimeException;
 use Throwable;
@@ -97,7 +98,8 @@ class DispensaryPos extends Component
     /** True when the held member arrived via a scanned card. */
     public bool $scanned = false;
 
-    /** The active location id, resolved in mount(). */
+    /** The active location id, resolved in mount(). #[Locked] (prompt 75): the client can never retarget the counter's sede. */
+    #[Locked]
     public ?string $locationId = null;
 
     /** The till terminal this POS contributes cash into (adopted from the single open session). */

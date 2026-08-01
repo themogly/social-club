@@ -29,6 +29,7 @@ use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Storage;
 use Livewire\Attributes\Layout;
+use Livewire\Attributes\Locked;
 use Livewire\Component;
 use Throwable;
 
@@ -61,7 +62,12 @@ class CheckInScreen extends Component
     /** True when the held member arrived via a scanned card (records QR vs MANUAL). */
     public bool $scanned = false;
 
-    /** The active location id, resolved in mount(). */
+    /**
+     * The active location id, resolved in mount() from the operator's OWN available sedes. #[Locked]
+     * (prompt 75) so the client can NEVER retarget it to another sede — the booted hook re-applies this
+     * value as the request scope on every request, so an unlocked property would be a cross-sede write hole.
+     */
+    #[Locked]
     public ?string $locationId = null;
 
     /** Friendly state when the operator has no location at all (still a 200). */

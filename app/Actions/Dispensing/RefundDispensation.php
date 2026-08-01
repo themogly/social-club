@@ -48,8 +48,10 @@ class RefundDispensation
      */
     public function handle(Dispensation $dispensation, User $actor, array $data): Refund
     {
-        if (! $actor->can('dispensation.void')) {
-            throw new AuthorizationException('Refunding a dispensation requires the dispensation.void permission.');
+        // Authorize through the POLICY (prompt 75): DispensationPolicy::refund binds the actor to the row's
+        // OWN sede, so a manager at sede A cannot refund a sede-B dispensation — the same gap as void.
+        if ($actor->cannot('refund', $dispensation)) {
+            throw new AuthorizationException('Refunding a dispensation requires dispensation.void at the row\'s location.');
         }
 
         $reason = trim($data['reason']);
