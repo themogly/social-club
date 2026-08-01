@@ -16,6 +16,7 @@ use App\Notifications\EventReminderNotification;
 use App\Notifications\LowBalanceNotification;
 use App\Notifications\MembershipExpiringNotification;
 use App\Notifications\NewAnnouncementNotification;
+use App\Notifications\TemporaryAccessEndingNotification;
 use App\Support\ActiveScope;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Notification;
@@ -159,7 +160,12 @@ class MemberPushTest extends TestCase
             'membership_expiring' => new MembershipExpiringNotification('2026-12-31'),
             'new_announcement' => new NewAnnouncementNotification($announcement),
             'event_reminder' => new EventReminderNotification($event),
+            'temporary_ending' => new TemporaryAccessEndingNotification('2026-12-31'),
         ];
+
+        // Completeness: every declared push channel needs a render case here, so a new channel can't ship
+        // without proof it builds a message and honours its opt-out.
+        $this->assertEqualsCanonicalizing(Member::PUSH_CHANNELS, array_keys($cases), 'every push channel needs a render case');
 
         foreach ($cases as $channel => $notification) {
             // Opted in: the notification builds a real Web Push message and routes to the channel.

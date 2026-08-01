@@ -4,6 +4,7 @@
         'membership_expiring' => __('Vencimiento de la membresía'),
         'new_announcement' => __('Nuevos avisos del club'),
         'event_reminder' => __('Recordatorios de eventos'),
+        'temporary_ending' => __('Fin del acceso temporal'),
     ])
 
     <header class="mb-4">

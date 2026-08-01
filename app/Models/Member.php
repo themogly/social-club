@@ -39,7 +39,7 @@ class Member extends Model implements Authenticatable, HasLocalePreference
     use AuthenticatableTrait, BelongsToOrganisation, HasFactory, HasPushSubscriptions, HasUlids, Notifiable, SoftDeletes;
 
     /** The push channels a member can independently opt out of (prompt 15). */
-    public const PUSH_CHANNELS = ['low_balance', 'membership_expiring', 'new_announcement', 'event_reminder'];
+    public const PUSH_CHANNELS = ['low_balance', 'membership_expiring', 'new_announcement', 'event_reminder', 'temporary_ending'];
 
     protected $fillable = [
         'organisation_id', 'member_no', 'first_name', 'last_name', 'email', 'phone', 'locale',
@@ -47,7 +47,7 @@ class Member extends Model implements Authenticatable, HasLocalePreference
         'document_scan_path', 'medical_cert_path', 'status', 'is_therapeutic', 'avalador_member_id',
         'joined_at', 'left_at', 'carencia_ends_at', 'declared_monthly_cg',
         'daily_limit_cg', 'monthly_limit_cg', 'sole_association_declared_at', 'anonymised_at',
-        'kind', 'temporary_expires_at', 'push_opt_outs',
+        'kind', 'temporary_expires_at', 'temporary_reminder_sent_at', 'push_opt_outs',
     ];
 
     protected static function booted(): void
@@ -75,6 +75,7 @@ class Member extends Model implements Authenticatable, HasLocalePreference
             'status' => MemberStatus::class,
             'kind' => MemberKind::class,
             'temporary_expires_at' => 'datetime',
+            'temporary_reminder_sent_at' => 'datetime',
             'is_therapeutic' => 'boolean',
             'joined_at' => 'datetime',
             'left_at' => 'datetime',

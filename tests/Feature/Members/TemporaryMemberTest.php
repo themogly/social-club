@@ -16,11 +16,13 @@ use App\Models\Location;
 use App\Models\Member;
 use App\Models\Organisation;
 use App\Models\User;
+use App\Notifications\TemporaryAccessEndingNotification;
 use App\Support\ActiveScope;
 use App\Support\Settings;
 use App\ViewModels\SystemHealth;
 use Database\Seeders\RolePermissionSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Storage;
 use Livewire\Livewire;
 use Tests\TestCase;
@@ -52,6 +54,9 @@ class TemporaryMemberTest extends TestCase
         $this->avalador = Member::factory()->create(['organisation_id' => $this->org->id, 'status' => MemberStatus::ACTIVE]);
         Settings::set('temporary_members_enabled', true, SettingType::BOOL);
         Settings::set('temporary_window_days', 30, SettingType::INT);
+        // A configured VAPID keypair so the expiry-reminder push actually routes to its channel under
+        // Notification::fake() (via() gates on VAPID); the reminder assertions below would be vacuous without it.
+        config(['webpush.vapid.public_key' => 'BPUBLICKEY', 'webpush.vapid.private_key' => 'PRIVATEKEY']);
     }
 
     private function owner(): User
@@ -166,6 +171,59 @@ class TemporaryMemberTest extends TestCase
         $this->assertEquals($anonymisedAt, $member->fresh()->anonymised_at); // unchanged — not re-processed
 
         $this->assertDatabaseHas('audit_logs', ['action' => 'member.anonymised']);
+    }
+
+    // --- Expiry reminder (prompt 111) -----------------------------------------------
+
+    public function test_the_sweep_reminds_a_member_inside_the_lead_window_once(): void
+    {
+        Notification::fake();
+        Settings::set('temporary_reminder_lead_days', 3, SettingType::INT);
+        $member = Member::factory()->create([
+            'organisation_id' => $this->org->id, 'kind' => MemberKind::TEMPORARY,
+            'temporary_expires_at' => now()->addDays(2),   // inside the 3-day lead, not yet expired
+        ]);
+
+        $this->artisan('members:remove-temporary')->assertSuccessful();
+
+        Notification::assertSentTo($member, TemporaryAccessEndingNotification::class);
+        $this->assertNotNull($member->fresh()->temporary_reminder_sent_at);  // idempotency marker stamped
+        $this->assertNull($member->fresh()->anonymised_at);                  // reminded, not removed
+
+        // A second nightly run does not re-send — the marker makes it a no-op.
+        Notification::fake();
+        $this->artisan('members:remove-temporary')->assertSuccessful();
+        Notification::assertNothingSent();
+    }
+
+    public function test_the_sweep_does_not_remind_before_the_lead_window(): void
+    {
+        Notification::fake();
+        Settings::set('temporary_reminder_lead_days', 3, SettingType::INT);
+        $member = Member::factory()->create([
+            'organisation_id' => $this->org->id, 'kind' => MemberKind::TEMPORARY,
+            'temporary_expires_at' => now()->addDays(10),  // well beyond the lead
+        ]);
+
+        $this->artisan('members:remove-temporary')->assertSuccessful();
+
+        Notification::assertNothingSent();
+        $this->assertNull($member->fresh()->temporary_reminder_sent_at);
+    }
+
+    public function test_dry_run_neither_reminds_nor_stamps_the_marker(): void
+    {
+        Notification::fake();
+        Settings::set('temporary_reminder_lead_days', 3, SettingType::INT);
+        $member = Member::factory()->create([
+            'organisation_id' => $this->org->id, 'kind' => MemberKind::TEMPORARY,
+            'temporary_expires_at' => now()->addDay(),
+        ]);
+
+        $this->artisan('members:remove-temporary --dry-run')->assertSuccessful();
+
+        Notification::assertNothingSent();
+        $this->assertNull($member->fresh()->temporary_reminder_sent_at);
     }
 
     // --- Convert / extend -----------------------------------------------------------
