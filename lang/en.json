@@ -1122,6 +1122,7 @@
     "No puedes trabajar en esa sede.": "You cannot work at that location.",
     "Cierra la caja de esta sede antes de cambiar.": "Close this location's till before switching.",
     "Trabajas en varias sedes. Selecciona en la barra superior en cuál estás.": "You work at several locations. Choose which one you are at in the top bar.",
+    "El precio por octavo no puede superar 3,5 × el precio por gramo (:max €).": "The eighth price cannot exceed 3.5 × the per-gram price (:max €).",
     "Convocatorias": "Assembly notices",
     "Días mínimos entre emitir una convocatoria y celebrar la asamblea.": "Minimum days between issuing a notice and holding the assembly.",
     "Email": "Email",

@@ -3134,3 +3134,55 @@ a till is open; the switch control carries the unsaved-work confirm; no-assignme
 **Screenshots** (four screens showing the sede, the choose state, the switch flow, light/dark, 1024/1440) not
 produced — no browser here. Owner-authorised merge (standing "merge everything to main"). 696 green (693
 passed, 3 concurrency skips).
+
+---
+
+## Prompt 90 — Eighth pricing overcharge fixed (floor at per-gram; discount applies on top)
+
+**A money defect: members were overchargeable.** Prompt 83's eighth arithmetic was cents-exact, but the
+break was applied *unconditionally* — whether or not it was actually cheaper — and it compared a *discounted*
+per-gram total against an *undiscounted* flat eighth. So a badly-set eighth (above 3.5 × per-gram) overcharged
+everyone, and any member discount silently vanished on eighth-priced quantities (hitting therapeutic members
+hardest). Both are now fixed in `ResolvePrice::applyEighthBreaks()` — still the only place the eighth
+arithmetic lives.
+
+**Never charge more than the alternative (the acceptance property).** The group charge is now FLOORED at the
+group's own per-gram total: `applyEighthBreaks` computes the eighth charge and, if it is not strictly cheaper
+than the sum of the group's per-gram line totals, keeps the per-gram totals. A member is never charged more
+because an eighth price exists — asserted single-strain and split across two, discounted and not.
+
+**Discounts apply ON TOP of the eighth price — per the owner's explicit decision.** Added
+`PriceResult::effectiveEighthPriceCents()` alongside the existing `effectiveRatePerGramCents()`, using the
+SAME chosen discount (`discountAmount`, which reads the one `chooseDiscount` result) — never a second,
+independently-resolved discount. Both counter call sites (`DispensaryPos`, `CommitDispensation`) now pass
+`effectiveEighthPriceCents()` to `applyEighthBreaks`, so a member on 30% off buying an eighth pays 30% off the
+eighth, and the floor above is discounted-vs-discounted.
+
+**Group charge computed once, then distributed — the exact-sum property preserved.** For N eighths (+ any
+sub-eighth remainder at the group's lowest effective per-gram rate) the charge is computed once for the whole
+group and split across its lines by the existing largest-remainder `distribute()`, so line totals sum EXACTLY
+to the group charge at every multiple and with a discount — including a 33%-style discount that does not
+divide evenly across a 117+117+116 split (tested: sums to the cent). Discounting per line and summing was
+explicitly avoided; it would reintroduce a rounding error at every line and multiple.
+
+**Guard at entry.** The `GeneticPrices` relation-manager form now REJECTS an eighth price above 3.5 × the
+per-gram price (a validation rule on the field) — almost always a typo, and cheaper to catch here than to rely
+on the counter's floor. The boundary (exactly 3.5×) is allowed.
+
+**What was applied survives to the receipt.** The per-line `pricing_note` ("Octavo (1/8)") set when the break
+is taken, plus the discount label already carried on each line, render on the basket and on the contribution
+receipt — so an operator asked to explain "2 × eighth, less 30%" has it on the printout. (Kept the existing
+mechanism; the money is the correctness surface and is asserted to the cent.)
+
+**Seed.** `DemoDataSeeder` seeded 0 of 12 `GeneticPrice` rows with an eighth price (prompt 70 predated
+prompt 83). Now every weight strain at a sede shares an eighth of €23 — below 3.5 × the lowest per-gram, so
+always a genuine break — making the feature visible on a fresh install and letting a 1.75 g + 1.75 g
+cross-strain basket exercise the split immediately (tested against the real seed).
+
+**Tests:** `EighthPricingDiscountTest` (14) — floor (single/split, discounted/not); discounted eighth charged
+(single/split); multiples carry the discount (7 g, 10.5 g, 8 g = two eighths + 1 g remainder); exact-sum over
+an uneven three-line split with a discount; `effectiveEighthPriceCents` uses the same discount as the rate;
+end-to-end discounted commits; the entry guard rejects > 3.5× and allows the boundary; the seeded DB has two
+strains sharing an eighth that splits to one. The prompt-83 `EighthPricingTest` (9) still passes unchanged.
+**Screenshots** (discounted multiple + explanation, the guard firing) not produced — no browser here.
+Owner-authorised merge (standing "merge everything to main"). 710 green (707 passed, 3 concurrency skips).

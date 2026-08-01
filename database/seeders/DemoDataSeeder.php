@@ -285,7 +285,13 @@ class DemoDataSeeder extends Seeder
 
                 GeneticPrice::create([
                     'organisation_id' => $orgId, 'genetic_id' => $genetic->id, 'location_id' => $location->id,
-                    'tier_id' => null, 'price_per_gram_cents' => $pricePerGram, 'low_stock_threshold_cg' => 5000, 'active' => true,
+                    'tier_id' => null, 'price_per_gram_cents' => $pricePerGram,
+                    // A SHARED eighth price (prompt 90) — the same €23 across every weight strain at the sede,
+                    // so the feature is visible on a fresh install and a 1.75 g + 1.75 g basket across two
+                    // strains exercises the cross-strain split immediately. €23 < 3.5 × €7 (the lowest
+                    // per-gram), so it is always a genuine break, never overriding the floor.
+                    'price_per_eighth_cents' => 2300,
+                    'low_stock_threshold_cg' => 5000, 'active' => true,
                 ]);
 
                 $initial = random_int(20000, 80000); // cg

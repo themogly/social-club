@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\Genetics\RelationManagers;
 
+use App\Actions\Pricing\ResolvePrice;
 use App\Actions\Pricing\SaveGeneticPrice;
 use App\Models\Genetic;
 use App\Models\GeneticPrice;
@@ -18,6 +19,7 @@ use Filament\Forms\Components\Toggle;
 use Filament\Notifications\Notification;
 use Filament\Resources\RelationManagers\RelationManager;
 use Filament\Schemas\Components\Component;
+use Filament\Schemas\Components\Utilities\Get;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Columns\IconColumn;
 use Filament\Tables\Columns\TextColumn;
@@ -165,7 +167,23 @@ class GeneticPricesRelationManager extends RelationManager
                 ->helperText(__('Opcional. Si dos variedades comparten este precio, un octavo (3,5 g) repartido entre ellas se cobra a este precio.'))
                 ->numeric()
                 ->minValue(0)
-                ->visible(! $perUnit), // eighth pricing is WEIGHT-only
+                ->visible(! $perUnit) // eighth pricing is WEIGHT-only
+                // Guard at entry (prompt 90): an eighth above 3.5 × per-gram is almost always a typo and can
+                // only ever OVERCHARGE (the counter floors it away, but catch it here where it is cheaper).
+                ->rule(static function (Get $get): \Closure {
+                    return static function (string $attribute, mixed $value, \Closure $fail) use ($get): void {
+                        if (blank($value)) {
+                            return;
+                        }
+                        $perGram = (float) ($get('price_eur') ?? 0);
+                        $maxEighth = round_half_up($perGram * ResolvePrice::EIGHTH_CG / 100 * 100) / 100; // 3.5 × per-gram, 2dp
+                        if ($perGram > 0 && (float) $value > $maxEighth) {
+                            $fail(__('El precio por octavo no puede superar 3,5 × el precio por gramo (:max €).', [
+                                'max' => number_format($maxEighth, 2, ',', '.'),
+                            ]));
+                        }
+                    };
+                }),
             TextInput::make('low_stock_threshold_g')
                 ->label(__('Aviso de stock bajo (g)'))
                 ->helperText($perUnit
