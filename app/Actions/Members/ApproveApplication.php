@@ -58,8 +58,11 @@ class ApproveApplication
         $member->fill(MemberEnrolment::defaults($application->organisation_id));
         $member->save();
 
+        // Stamp the version the applicant actually SAW at submit (prompt 97), not the current one, so a text
+        // revision between application and approval can never rewrite what they agreed to.
+        $consentVersion = isset($payload['consent_version']) && is_string($payload['consent_version']) ? $payload['consent_version'] : null;
         foreach (($payload['consents'] ?? ['membership', 'data_processing']) as $purpose) {
-            (new RecordMemberConsent)->handle($member, $purpose, request()->ip());
+            (new RecordMemberConsent)->handle($member, $purpose, request()->ip(), $consentVersion);
         }
 
         $application->update([

@@ -8,6 +8,7 @@ use App\Http\Requests\SubmitApplicationRequest;
 use App\Models\Member;
 use App\Models\MemberApplication;
 use App\Support\ApplicationSpamGuard;
+use App\Support\Settings;
 use App\Support\Weight;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\View\View;
@@ -79,11 +80,18 @@ class ApplicationController extends Controller
             'document_type' => $data['document_type'],
             'document_number' => $data['document_number'],
             'is_therapeutic' => (bool) ($data['is_therapeutic'] ?? false),
-            'avalador_member_id' => $this->resolveAvalador($application, $data['avalador_member_no'] ?? null),
+            // Sponsor by name OR number (prompt 97): resolve best-effort, and KEEP the raw text the applicant
+            // typed so the reviewer can find them even when it doesn't match a record exactly.
+            'avalador_ref' => $data['avalador_ref'] ?? null,
+            'avalador_member_id' => $this->resolveAvalador($application, $data['avalador_ref'] ?? null),
+            // Empty ("Prefiero no indicarlo") arrives as null (ConvertEmptyStringsToNull) ⇒ no declaration.
             'declared_monthly_cg' => isset($data['declared_monthly_g'])
                 ? Weight::fromGrams($data['declared_monthly_g'])->centigrams
                 : null,
             'consents' => ['membership', 'data_processing'],
+            // The consent-text version the applicant ACTUALLY saw, captured now — RecordMemberConsent stamps
+            // THIS at approval, so the recorded version can never be a later revision they never read.
+            'consent_version' => (string) Settings::get('consent_text_version', '1.0'),
         ];
 
         // Still PENDING — it now carries the applicant's details and enters the review queue.
@@ -97,7 +105,7 @@ class ApplicationController extends Controller
     {
         return redirect()
             ->route('socio.application', ['token' => $token])
-            ->with('status', __('¡Gracias! Hemos recibido tu solicitud. La asociación la revisará y te avisará por correo.'));
+            ->with('status', __('¡Gracias! Hemos recibido tu solicitud. La asociación la revisará y, si se aprueba, recibirás por correo tu tarjeta de socio/a con un código QR para identificarte. La revisión puede tardar unos días.'));
     }
 
     /** A pending invite matching the token hash, or null. Revoke/expiry are checked by the caller. */
@@ -109,17 +117,34 @@ class ApplicationController extends Controller
             ->first();
     }
 
-    /** Best-effort: match a sponsor by member number within the invite's organisation. */
-    private function resolveAvalador(MemberApplication $application, ?string $memberNo): ?string
+    /**
+     * Best-effort: match a sponsor by member NUMBER or by NAME within the invite's organisation (prompt 97 —
+     * a prospect usually knows the name, not the number). An ambiguous name match is left unresolved for the
+     * reviewer (the raw text is kept on the payload) rather than guessing the wrong socio.
+     */
+    private function resolveAvalador(MemberApplication $application, ?string $ref): ?string
     {
-        if ($memberNo === null || trim($memberNo) === '') {
+        $ref = trim((string) $ref);
+        if ($ref === '') {
             return null;
         }
 
-        return Member::query()->withoutGlobalScopes()
+        $base = fn () => Member::query()->withoutGlobalScopes()
             ->where('organisation_id', $application->organisation_id)
-            ->where('member_no', trim($memberNo))
-            ->where('status', MemberStatus::ACTIVE->value)
-            ->value('id');
+            ->where('status', MemberStatus::ACTIVE->value);
+
+        $byNumber = $base()->where('member_no', $ref)->value('id');
+        if ($byNumber !== null) {
+            return $byNumber;
+        }
+
+        // A NAME match, only when it is unambiguous (exactly one active socio). Matched in PHP so the
+        // full-name comparison is portable across SQLite (dev) and MySQL (prod).
+        $needle = mb_strtolower($ref);
+        $byName = $base()->get(['id', 'first_name', 'last_name'])
+            ->filter(fn (Member $m): bool => mb_strtolower(trim($m->first_name.' '.$m->last_name)) === $needle)
+            ->pluck('id');
+
+        return $byName->count() === 1 ? (string) $byName->first() : null;
     }
 }

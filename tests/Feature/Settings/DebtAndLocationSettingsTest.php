@@ -165,7 +165,7 @@ class DebtAndLocationSettingsTest extends TestCase
         // Deliberately NOT on the org settings form (documented in DECISIONS): the enforcement
         // matrix (its own editor), per-location settings, and system/compliance constants.
         // (default_locale + enabled_locales are now ON the form — prompt 44 — so they left this list.)
-        $excluded = ['enforcement', 'aforo_default', 'aforo_enforcement', 'data_retention_days', 'audit_retention_days', 'signed_url_ttl_seconds', 'consent_text_version', 'heartbeat_stale_seconds', 'monthly_window',
+        $excluded = ['enforcement', 'aforo_default', 'aforo_enforcement', 'data_retention_days', 'audit_retention_days', 'signed_url_ttl_seconds', 'consent_text_version', 'consent_privacy_text', 'consent_statutes_text', 'heartbeat_stale_seconds', 'monthly_window',
             // Scheduler constant, not a front-of-house threshold: how many hours before an event to push
             // its reminder (prompt 56 — the events:remind command reads it).
             'event_reminder_lead_hours',
