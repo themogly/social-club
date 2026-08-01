@@ -4179,3 +4179,26 @@ window has MORE sessions but the SAME query count. This still fails loudly if a 
 29 — flat** (green). Overall **26 passed / 5 failed** (was 25/6). The remaining 5 are 106 (petty-cash movement,
 2 stock-ceiling, closed-till recompute) and 111 (two unread settings keys). Owner-authorised merge. 859 tests,
 856 passed, 3 pre-existing skips, PHPStan 0.
+
+## Prompt 111 — Wire the temporary-member expiry reminder; retire the dead aforo_enforcement key
+
+Two settings keys were never read (the harness "every settings key is read somewhere" row named both).
+
+**`temporary_reminder_lead_days` — now wired.** The `members:remove-temporary` sweep gained a REMIND step ahead
+of its REMOVE step: a temporary member whose window closes within the configured lead gets one heads-up push
+(`TemporaryAccessEndingNotification`, new `temporary_ending` opt-out channel) so they can ask to continue before
+the auto-anonymisation removes them. Idempotent via a new nullable `members.temporary_reminder_sent_at` marker
+(same shape as `memberships.reminder_sent_for`); the push is a silent no-op for a member with no subscription or
+a channel opt-out (the base `via()` gates both); `--dry-run` reports without sending or stamping. The command's
+name stayed `members:remove-temporary` (one scheduled job owns the whole temporary lifecycle) with a broadened
+description. `MemberPushTest` now asserts `array_keys($cases) == Member::PUSH_CHANNELS`, so a future channel
+can't ship without a render + opt-out case.
+
+**`aforo_enforcement` — removed.** It was dead: aforo is a fixed BLOCK via the enforcement matrix
+(`enforcement.door.aforo`), there is no block/warn toggle, and `LocationForm` documents "No aforo control".
+Deleted from `Settings::DEFAULTS` and from the `DebtAndLocationSettingsTest` exclusion list (stale reference).
+
+**Harness:** "every settings key is read somewhere" → **51 keys** (green); "no aggregate references a column that
+does not exist" stays green (301 columns — the new marker column exists after migrate). Overall **27 passed / 4
+failed** (was 26/5). The remaining 4 are all prompt 106 (petty-cash movement, 2 stock-ceiling, closed-till
+recompute). Owner-authorised merge. 862 tests, 859 passed, 3 pre-existing skips, PHPStan 0.

@@ -121,7 +121,6 @@ class Settings
 
         // Per-location defaults (overridable per premises)
         'aforo_default' => 50,
-        'aforo_enforcement' => 'block',     // block | warn
 
         /*
          * Enforcement matrix — each check is independently BLOCK | WARN | OVERRIDE at the

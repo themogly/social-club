@@ -150,6 +150,7 @@ class FormCompletenessTest extends TestCase
             'locale' => 'member self-service: set by the member via the PWA language switcher, not the admin form (prompt 96).',
             'kind' => 'set via the "Socio temporal" toggle at enrolment (a virtual field mapped in the create hook), prompt 31.',
             'temporary_expires_at' => 'system: computed from joined_at + temporary_window_days for temporary members, prompt 31.',
+            'temporary_reminder_sent_at' => 'system: idempotency marker stamped by the members:remove-temporary sweep when the expiry reminder is sent, prompt 111.',
             'declared_monthly_cg' => 'a signed legal figure: sole writer is the UpdateDeclaredForecast record action, never the generic form, prompt 72.',
         ],
         MembershipTierResource::class => [
