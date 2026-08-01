@@ -21,15 +21,14 @@ use App\Support\ActiveScope;
 class OrderPolicy
 {
     /**
-     * List the bar/merch orders in the panel (OrderResource is oversight-only). Gated on
-     * holding EITHER the bar counter permission OR a reporting permission — mirroring the
-     * `view` gate — so both counter staff and reporting roles can review. The org is
-     * enforced by the model's global scope on the list query; per-row org/location checks
-     * live in `view`.
+     * BROWSE the bar/merch order archive in the panel (OrderResource, oversight-only). Reporting only — NOT
+     * `pos.bar` (prompt 122, kept in step with DispensationPolicy): running the bar takes the order in front
+     * of you, it does not open every member's purchase history. Single-row reads (a bar receipt reprint) stay
+     * on `view`, which keeps `pos.bar`.
      */
     public function viewAny(User $user): bool
     {
-        return $user->can('pos.bar') || $user->can('reports.view');
+        return $user->can('reports.view');
     }
 
     public function view(User $user, Order $order): bool
