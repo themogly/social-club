@@ -407,7 +407,7 @@
                                     @if ($g['strain_type_label'])<span class="rounded-full bg-brand-tint px-2 py-0.5 font-semibold text-brand dark:bg-slate-800 dark:text-slate-200">{{ $g['strain_type_label'] }}</span>@endif
                                     <span>THC {{ number_format($g['thc_bp'] / 100, 1) }}%</span>
                                     <span>CBD {{ number_format($g['cbd_bp'] / 100, 1) }}%</span>
-                                    @if ($g['cultivation'])<span>{{ __($g['cultivation']) }}</span>@endif
+                                    @if ($g['cultivation'])<span>{{ $g['cultivation'] }}</span>@endif
                                 </div>
                                 <div class="mt-2 flex items-center justify-between text-xs">
                                     <span class="text-ink-muted dark:text-slate-400">{{ __('Stock') }}: {{ $g['is_unit'] ? $g['remaining_units'].' '.__('uds').' ('.$this->grams($g['remaining_cg']).')' : $this->grams($g['remaining_cg']) }}</span>

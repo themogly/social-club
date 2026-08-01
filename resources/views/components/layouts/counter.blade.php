@@ -12,7 +12,7 @@
         {{-- No public/indexable surface anywhere in this app (NOTES §A / §B). --}}
         <meta name="robots" content="noindex, nofollow">
 
-        <title>{{ $title ?? __('Contador') }} · {{ config('app.name') }}</title>
+        <title>{{ $title ?? __('Mostrador') }} · {{ config('app.name') }}</title>
 
         {{-- Assets only when built (or the Vite dev server is hot); guarded so a
              full-page GET never 500s before `npm run build`, and tests stay quiet. --}}
