@@ -1,0 +1,42 @@
+/* The product's semantic design tokens — the ONE source of truth (prompt 100). Shared by the counter/PWA
+   (resources/css/app.css) AND the Filament admin panel (resources/css/filament/admin/theme.css) via @import,
+   so a value edited here reaches BOTH surfaces and can never drift between them. Prompt 98's per-scheme
+   WCAG 2.1 AA values live HERE precisely so the fix applies to the panel and the counter alike. Colours come
+   ONLY from this palette (CLAUDE.md design rules); utilities: bg-brand / text-ink-muted / border-line … */
+@theme {
+    --color-brand: #2563eb;
+    --color-brand-dark: #1d4ed8;
+    --color-brand-tint: #eff6ff;
+
+    --color-surface: #ffffff;
+    --color-surface-alt: #f8fafc;
+    --color-ink: #0f172a;
+    --color-ink-muted: #475569;
+    --color-line: #e2e8f0;
+
+    /* Semantic tokens carry PER-SCHEME values for WCAG 2.1 AA (prompt 98). Each failed in only one scheme,
+       so a single swap could not fix them: warning/success were too dark on light, error too dark on dark.
+       These are the LIGHT set — darkened one–two ramp steps to clear 4.5:1 on BOTH surfaces (#ffffff,
+       #f8fafc) AND the /10 tinted badge/banner backgrounds. The dark set is restored below. */
+    --color-success: #166534; /* green-800 · min 5.86:1 on light incl tint */
+    --color-warning: #92400e; /* amber-800 · min 5.80:1 on light incl tint */
+    --color-error: #b91c1c;   /* red-700 · min 5.24:1 on light incl tint */
+}
+
+/* Dark surfaces (#0f172a): warning/success keep their original (already passed dark ≥5:1); error goes LIGHTER
+   (red-400) because on dark it needed more luminance. Applied for the counter's prefers-color-scheme dark AND
+   an explicit dark theme (Filament / data-theme), but never when an explicit LIGHT theme is set. */
+@media (prefers-color-scheme: dark) {
+    :root:not(.light):not([data-theme='light']) {
+        --color-success: #16a34a; /* min 4.81:1 on dark incl tint */
+        --color-warning: #d97706; /* min 5.01:1 on dark incl tint */
+        --color-error: #f87171;   /* red-400 · min 5.69:1 on dark incl tint */
+    }
+}
+:root.dark,
+:root[data-theme='dark'],
+.dark {
+    --color-success: #16a34a;
+    --color-warning: #d97706;
+    --color-error: #f87171;
+}
