@@ -47,10 +47,10 @@ class UnreachableCodeGuardTest extends TestCase
      * @var array<string, string>
      */
     private const PERMISSION_ALLOWLIST = [
+        // member.limits.set + cash.bank were WIRED in prompt 81 (SetMemberLimits + MemberPolicy::setLimits;
+        // the till's BANKED movement gated on cash.bank) — removed from the allowlist, now enforced as checked.
         'members.transfer' => 'declared + role-assigned; the cross-location member transfer UI is not built yet — wire or remove.',
-        'member.limits.set' => 'declared + role-assigned; the per-member limit-override UI is not built yet — wire or remove.',
         'stock.transfer' => 'declared + role-assigned; the inter-location stock transfer UI is not built yet — wire or remove.',
-        'cash.bank' => 'declared + role-assigned; a BANKED cash movement exists but is not yet gated on this permission — wire or remove.',
     ];
 
     // --- The guards ------------------------------------------------------------

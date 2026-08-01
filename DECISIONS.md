@@ -3659,3 +3659,41 @@ never required.
 
 **Owed:** no browser — counter screens un-screenshotted; MySQL suite not run locally. Owner-authorised merge.
 779 tests, 776 passed, 3 pre-existing concurrency skips, PHPStan 0.
+
+---
+
+## Prompt 81 — Authorization loose ends (Article-9 exposure + dead permissions)
+
+Re-run after the audit found none of it in the tree.
+
+**Article-9 relation managers gated (the headline).** `ConsumptionRelationManager`, `VisitsRelationManager`
+and `OrdersRelationManager` each lift `LocationScope` to show a socio's history ACROSS every sede — health
+and attendance data — with NO authorization. A STAFF user with only `members.view` could open any member and
+read their org-wide consumption, visits and bar orders. Each now has `canViewForRecord()` gated on
+`reports.view` (manager/owner oversight), so the lowest role never sees them. Denial tests both directions
+(`MemberRelationManagerGatingTest`).
+
+**`member.limits.set` wired** (was declared, role-assigned to OWNER, and checked NOWHERE — the per-member
+gram override at the TOP of `ResolveMemberLimits`' precedence could not be written). New `SetMemberLimits`
+action (single writer, audited, reasoned) + `MemberPolicy::setLimits` + a `Límites personalizados` header
+action on the Member resource (grams at the edge → centigrams stored; null clears the override). Tested: it
+stores cg, beats the org default in the resolver, clears back to the default, and is denied for MANAGER
+(owner-only) and STAFF.
+
+**`cash.bank` wired** (the `BANKED` cash movement existed and was even offered in the till UI, but ungated —
+any `till.open` holder could bank cash out of the drawer). `TillSession::recordMovement` now whitelists
+IN/OUT/BANKED (petty cash keeps its own audited flow) and gates BANKED on `cash.bank`; the blade hides the
+option otherwise. `CashBankingTest`: a manager banks (drawer drops), staff forcing the type past the UI is
+refused (drawer untouched).
+
+**Honesty.** `member.limits.set` and `cash.bank` were removed from `UnreachableCodeGuardTest`'s
+`PERMISSION_ALLOWLIST` (its honesty test would otherwise fail — they are now checked).
+
+**Deliberately NOT done — flagged, not hidden.** `members.transfer` (cross-location member transfer) and
+`stock.transfer` (inter-location stock transfer) remain declared, role-assigned and allowlisted. These are
+net-new subsystems (two-sided transfers with their own audit/consistency rules), not authorization loose
+ends, and building them blind without a spec would be guesswork — each deserves its own prompt. The
+allowlist entries keep them honestly visible until then.
+
+**Owed:** no browser — the member limit action + till screens un-screenshotted; MySQL suite not run locally.
+Owner-authorised merge. 787 tests, 784 passed, 3 pre-existing concurrency skips, PHPStan 0.

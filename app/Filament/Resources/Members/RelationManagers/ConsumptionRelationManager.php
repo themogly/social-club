@@ -5,6 +5,7 @@ namespace App\Filament\Resources\Members\RelationManagers;
 use App\Enums\DispensationStatus;
 use App\Models\Dispensation;
 use App\Models\Scopes\LocationScope;
+use App\Models\User;
 use App\Support\Weight;
 use Filament\Resources\RelationManagers\RelationManager;
 use Filament\Tables\Columns\TextColumn;
@@ -20,6 +21,18 @@ use Illuminate\Database\Eloquent\Model;
 class ConsumptionRelationManager extends RelationManager
 {
     protected static string $relationship = 'dispensations';
+
+    /**
+     * Prompt 81 — this manager lifts LocationScope to show a socio's consumption ACROSS every sede, which is
+     * Article-9 special-category (health) data. members.view alone (STAFF, counter intake) must NOT see it —
+     * gate on reports.view (manager/owner oversight), so the lowest role never gets org-wide consumption.
+     */
+    public static function canViewForRecord(Model $ownerRecord, string $pageClass): bool
+    {
+        $user = auth()->user();
+
+        return $user instanceof User && $user->can('reports.view');
+    }
 
     public static function getTitle(Model $ownerRecord, string $pageClass): string
     {

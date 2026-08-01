@@ -6,6 +6,7 @@ use App\Actions\Documents\GenerateMemberDocument;
 use App\Actions\Members\ExportMemberData;
 use App\Actions\Members\ManageTemporaryMember;
 use App\Actions\Members\SendMemberCard;
+use App\Actions\Members\SetMemberLimits;
 use App\Actions\Members\TransitionMemberStatus;
 use App\Actions\Members\UpdateDeclaredForecast;
 use App\Actions\Members\WaiveCarencia;
@@ -106,6 +107,7 @@ class MemberResource extends Resource
             self::generateDocumentAction(),
             self::updateDeclaredForecastAction(),
             self::waiveCarenciaAction(),
+            self::setLimitsAction(),
             self::suspendAction(),
             self::expelAction(),
             self::reactivateAction(),
@@ -213,6 +215,54 @@ class MemberResource extends Resource
      * and audited. Only offered while the member is actually IN carencia; wires up the previously
      * caller-less WaiveCarencia action (prompt 51).
      */
+    /**
+     * Límites personalizados — set/clear this member's per-member gram override (prompt 81), the caps at the
+     * TOP of the precedence chain (member → tier → location → org). Gated on member.limits.set; grams at the
+     * edge, centigrams stored; the SetMemberLimits action is the single writer and audits the change.
+     */
+    public static function setLimitsAction(): Action
+    {
+        return Action::make('setLimits')
+            ->label(__('Límites personalizados'))
+            ->icon(Heroicon::OutlinedScale)
+            ->visible(fn (): bool => Auth::user()?->can('member.limits.set') ?? false)
+            ->fillForm(fn (Member $record): array => [
+                'daily_limit_g' => $record->daily_limit_cg !== null ? $record->daily_limit_cg / 100 : null,
+                'monthly_limit_g' => $record->monthly_limit_cg !== null ? $record->monthly_limit_cg / 100 : null,
+            ])
+            ->schema([
+                TextInput::make('daily_limit_g')
+                    ->label(__('Límite diario (g)'))
+                    ->numeric()->minValue(0)->step('0.01')
+                    ->helperText(__('Vacío = usar el límite de la cuota, la sede o la organización.')),
+                TextInput::make('monthly_limit_g')
+                    ->label(__('Límite mensual (g)'))
+                    ->numeric()->minValue(0)->step('0.01'),
+                Textarea::make('reason')
+                    ->label(__('Motivo'))
+                    ->required()
+                    ->helperText(__('Queda registrado en la auditoría.')),
+            ])
+            ->action(function (Member $record, array $data): void {
+                $actor = Auth::user();
+                if (! $actor instanceof User) {
+                    return;
+                }
+
+                $toCg = fn ($g): ?int => ($g === null || $g === '') ? null : (int) round_half_up((float) $g * 100);
+
+                (new SetMemberLimits)->handle(
+                    $record,
+                    $actor,
+                    $toCg($data['daily_limit_g'] ?? null),
+                    $toCg($data['monthly_limit_g'] ?? null),
+                    (string) ($data['reason'] ?? ''),
+                );
+
+                Notification::make()->title(__('Límites del socio actualizados'))->success()->send();
+            });
+    }
+
     public static function waiveCarenciaAction(): Action
     {
         return Action::make('waiveCarencia')

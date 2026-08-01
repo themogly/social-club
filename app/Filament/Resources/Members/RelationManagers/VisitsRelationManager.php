@@ -3,6 +3,7 @@
 namespace App\Filament\Resources\Members\RelationManagers;
 
 use App\Models\Scopes\LocationScope;
+use App\Models\User;
 use Filament\Resources\RelationManagers\RelationManager;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
@@ -15,6 +16,14 @@ use Illuminate\Database\Eloquent\Model;
 class VisitsRelationManager extends RelationManager
 {
     protected static string $relationship = 'checkIns';
+
+    /** Prompt 81 — org-wide attendance is oversight data; gate on reports.view so STAFF (members.view) can't see it. */
+    public static function canViewForRecord(Model $ownerRecord, string $pageClass): bool
+    {
+        $user = auth()->user();
+
+        return $user instanceof User && $user->can('reports.view');
+    }
 
     public static function getTitle(Model $ownerRecord, string $pageClass): string
     {

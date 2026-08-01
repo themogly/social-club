@@ -43,4 +43,15 @@ class MemberPolicy
     {
         return $user->can('members.edit');
     }
+
+    /**
+     * Set a per-member limit override (prompt 81) — the daily/monthly gram caps that sit at the TOP of the
+     * precedence chain (member → tier → location → org, ResolveMemberLimits). A distinct, higher authority
+     * than a plain member edit: `member.limits.set` (manager+), never bundled into `members.edit`. The
+     * member is org-scoped by the global scope, so cross-org access is already impossible.
+     */
+    public function setLimits(User $user, Member $model): bool
+    {
+        return $user->can('member.limits.set');
+    }
 }

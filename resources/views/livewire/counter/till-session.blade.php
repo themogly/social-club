@@ -373,8 +373,10 @@
                         >
                             <option value="IN">{{ __('Entrada') }}</option>
                             <option value="OUT">{{ __('Salida') }}</option>
-                            <option value="BANKED">{{ __('Ingreso en banco') }}</option>
-                            <option value="PETTY_CASH">{{ __('Caja chica') }}</option>
+                            {{-- Banking cash out is gated on cash.bank (prompt 81); petty cash has its own audited form below. --}}
+                            @if ($this->canBankCash())
+                                <option value="BANKED">{{ __('Ingreso en banco') }}</option>
+                            @endif
                         </select>
                     </div>
                     <div>

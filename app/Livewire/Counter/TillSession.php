@@ -241,8 +241,18 @@ class TillSession extends Component
 
         $type = CashMovementType::tryFrom($this->movementType);
 
-        if ($type === null) {
+        // This form records only manual drawer movements: cash IN, cash OUT, or a BANK deposit. Petty cash
+        // has its OWN audited flow (recordExpense → RecordTillExpense) — never a raw movement here.
+        if ($type === null || ! in_array($type, [CashMovementType::IN, CashMovementType::OUT, CashMovementType::BANKED], true)) {
             $this->flash(__('Tipo de movimiento no válido.'), 'error');
+
+            return;
+        }
+
+        // Banking cash out to the bank is a sensitive move — gate it on cash.bank (prompt 81 wired this
+        // previously-dead permission). A STAFF operator (till.open) can record IN/OUT but never a bank deposit.
+        if ($type === CashMovementType::BANKED && ! $this->userCan('cash.bank')) {
+            $this->flash(__('Ingresar efectivo en el banco requiere permiso.'), 'error');
 
             return;
         }
@@ -874,6 +884,12 @@ class TillSession extends Component
     private function userCan(string $permission): bool
     {
         return $this->currentUser()?->can($permission) ?? false;
+    }
+
+    /** Whether this operator may bank cash (cash.bank) — the view hides the BANK option otherwise (prompt 81). */
+    public function canBankCash(): bool
+    {
+        return $this->userCan('cash.bank');
     }
 
     private function currentUser(): ?User

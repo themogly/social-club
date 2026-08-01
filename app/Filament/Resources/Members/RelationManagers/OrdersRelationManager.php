@@ -5,6 +5,7 @@ namespace App\Filament\Resources\Members\RelationManagers;
 use App\Enums\OrderStatus;
 use App\Models\Order;
 use App\Models\Scopes\LocationScope;
+use App\Models\User;
 use Filament\Resources\RelationManagers\RelationManager;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
@@ -14,6 +15,14 @@ use Illuminate\Database\Eloquent\Model;
 class OrdersRelationManager extends RelationManager
 {
     protected static string $relationship = 'orders';
+
+    /** Prompt 81 — org-wide bar/shop orders are oversight data; gate on reports.view so STAFF (members.view) can't see them. */
+    public static function canViewForRecord(Model $ownerRecord, string $pageClass): bool
+    {
+        $user = auth()->user();
+
+        return $user instanceof User && $user->can('reports.view');
+    }
 
     public static function getTitle(Model $ownerRecord, string $pageClass): string
     {
