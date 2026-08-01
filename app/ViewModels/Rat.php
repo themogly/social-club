@@ -61,6 +61,10 @@ class Rat
         // Resend, the email-delivery provider (encargado del tratamiento) for transactional + notice mail.
         $emailProcessor = __('Proveedor de envío de correo electrónico (Resend) como encargado del tratamiento, para la entrega de correos (p. ej. enlace de acceso, aprobación de alta y avisos).');
         $emailTransfer = __('El proveedor de correo puede tratar datos fuera del EEE, sujeto a sus garantías contractuales.');
+        // Web Push is live (MemberPushNotification): the browser's push service receives the subscription
+        // endpoint + encrypted payload, and those services (Google/Mozilla/Apple/Microsoft) sit OUTSIDE the EEE.
+        $pushProcessor = __('Servicios de notificaciones push del navegador (Google, Mozilla, Apple, Microsoft) como encargados, que reciben el punto de conexión de la suscripción y el mensaje para entregar el aviso.');
+        $pushTransfer = __('Las notificaciones push se entregan a través de servicios ubicados fuera del EEE (endpoints de navegador), sujeto a sus garantías.');
 
         return [
             [
@@ -96,14 +100,16 @@ class Rat
             ],
             [
                 'ref' => 'RAT-03',
-                'name' => __('Documentos de identidad y fotografías'),
-                'purpose' => __('Verificación de identidad y mayoría de edad; conservación de la copia del documento y la fotografía del socio.'),
-                'legal_basis' => __('Obligación de verificar la mayoría de edad y consentimiento del interesado.'),
+                'name' => __('Documentos de identidad, fotografías y certificados médicos'),
+                'purpose' => __('Verificación de identidad y mayoría de edad; conservación de la copia del documento, la fotografía y, en su caso, el certificado médico del socio terapéutico.'),
+                'legal_basis' => __('Obligación de verificar la mayoría de edad, consentimiento del interesado y consentimiento explícito para el certificado médico (Art. 9.2.a RGPD).'),
                 'data_categories' => [
                     __('Copia del documento de identidad (cifrada, disco privado)'),
                     __('Fotografía del socio'),
+                    __('Certificado médico del socio terapéutico (dato de salud, cifrado, disco privado)'),
                 ],
-                'article_9' => false,
+                // Art. 9: the medical certificate store is HEALTH data (finding: it was flagged false).
+                'article_9' => true,
                 'recipients' => $noRecipients,
                 'transfers' => $noTransfer,
                 'retention' => __(':base Acceso solo mediante URL firmada (:ttl s) y registrado.', ['base' => $memberRetention, 'ttl' => $ttl]),
@@ -142,10 +148,11 @@ class Rat
                 'legal_basis' => __('Consentimiento del interesado, revocable en cualquier momento.'),
                 'data_categories' => [
                     __('Datos de contacto y preferencias de notificación'),
+                    __('Punto de conexión de la suscripción push del navegador'),
                 ],
                 'article_9' => false,
-                'recipients' => $emailProcessor,
-                'transfers' => $emailTransfer,
+                'recipients' => $emailProcessor.' '.$pushProcessor,
+                'transfers' => $emailTransfer.' '.$pushTransfer,
                 'retention' => __('Hasta la retirada del consentimiento o la baja del socio.'),
             ],
             [

@@ -15,8 +15,12 @@ use Filament\Resources\Pages\EditRecord;
  */
 trait AuditsResourceChanges
 {
-    /** Attributes never placed in an audit diff — credentials/secrets and noise. */
-    private const AUDIT_SENSITIVE = ['password', 'remember_token', 'two_factor_secret', 'two_factor_recovery_codes', 'updated_at'];
+    /**
+     * Attributes never placed in an audit diff — credentials/secrets, special-category (Art. 9) data, and
+     * noise. `is_therapeutic` is a health flag; `document_hash` is an UNSALTED index of the DNI (a lookup
+     * table from the original) — neither belongs in the longer-retained audit log (prompt 76).
+     */
+    private const AUDIT_SENSITIVE = ['password', 'remember_token', 'two_factor_secret', 'two_factor_recovery_codes', 'is_therapeutic', 'document_hash', 'updated_at'];
 
     /** @var array<string, mixed> raw original attributes, snapshotted before the save */
     private array $auditOriginal = [];
