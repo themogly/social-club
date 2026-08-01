@@ -1973,5 +1973,11 @@
     "Elige un descuento predefinido. Se crean en Dispensario ▸ Descuentos.": "Choose a pre-made discount. They are created in Dispensary ▸ Discounts.",
     "Este socio paga la tarifa estándar. Asigna un descuento predefinido si procede.": "This member pays the standard rate. Assign a pre-made discount if applicable.",
     "Falta el nombre legal de la asociación": "The association's legal name is missing",
-    "Añade el nombre legal de la asociación en los ajustes antes de generar un documento estatutario.": "Add the association's legal name in settings before generating a statutory document."
+    "Añade el nombre legal de la asociación en los ajustes antes de generar un documento estatutario.": "Add the association's legal name in settings before generating a statutory document.",
+    "Varias cajas por sede": "Multiple tills per location",
+    "Actívalo solo si esta sede abre más de una caja a la vez.": "Turn on only if this location opens more than one till at a time.",
+    "Terminales (cajas)": "Terminals (tills)",
+    "Nombres de las cajas de esta sede, p. ej. «Caja 1», «Barra».": "Names of this location’s tills, e.g. “Till 1”, “Bar”.",
+    "Añadir terminal": "Add terminal",
+    "Elige un terminal.": "Choose a terminal."
 }

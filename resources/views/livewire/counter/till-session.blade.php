@@ -80,11 +80,11 @@
                 <p class="mt-0.5 text-sm text-ink-muted dark:text-slate-400">{{ __('No hay ninguna caja abierta en este terminal.') }}</p>
 
                 <form wire:submit="open" class="mt-5 space-y-4">
-                    {{-- Prompt 84: pick a configured terminal (no more free-text typos opening a phantom till),
-                         or name a genuinely new one — OpenTill normalises + registers it. --}}
-                    <div>
-                        <label for="terminal" class="block text-sm font-medium text-ink-muted dark:text-slate-400">{{ __('Terminal') }}</label>
-                        @if (! empty($terminals))
+                    @if ($this->multipleTills())
+                        {{-- Multi-till sede (prompt 102): pick one of this sede's CONFIGURED terminals. Terminals
+                             are managed in admin now, never free-typed here — no phantom-till typos. --}}
+                        <div>
+                            <label for="terminal" class="block text-sm font-medium text-ink-muted dark:text-slate-400">{{ __('Terminal') }}</label>
                             <select
                                 id="terminal"
                                 wire:model="terminal"
@@ -95,16 +95,11 @@
                                     <option value="{{ $t }}">{{ $t }}</option>
                                 @endforeach
                             </select>
-                        @endif
-                        <input
-                            type="text"
-                            wire:model="newTerminal"
-                            autocomplete="off"
-                            spellcheck="false"
-                            placeholder="{{ empty($terminals) ? __('Ej. POS-1') : __('… o añade un terminal nuevo') }}"
-                            class="mt-2 h-12 w-full rounded-xl border border-line bg-surface px-4 text-base text-ink placeholder:text-ink-muted focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/40 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
-                        >
-                    </div>
+                        </div>
+                    @else
+                        {{-- Single-till sede (the default): one drawer, its terminal preset — only the float is asked. --}}
+                        <p class="text-sm text-ink-muted dark:text-slate-400">{{ __('Terminal') }}: <span class="font-medium text-ink dark:text-slate-100">{{ $terminal }}</span></p>
+                    @endif
                     <div>
                         <label for="float" class="block text-sm font-medium text-ink-muted dark:text-slate-400">{{ __('Fondo de caja (€)') }}</label>
                         <input
