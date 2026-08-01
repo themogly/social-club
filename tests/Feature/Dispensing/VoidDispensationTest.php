@@ -77,6 +77,8 @@ class VoidDispensationTest extends TestCase
     {
         $user = User::factory()->create();
         $user->assignRole($role->value);
+        // A real operator is ASSIGNED to the sede they work — the void policy now binds to it (prompt 75).
+        $user->locations()->sync([$this->location->id]);
 
         return $user;
     }
@@ -127,6 +129,21 @@ class VoidDispensationTest extends TestCase
 
         $this->expectException(AuthorizationException::class);
         (new VoidDispensation)->handle($dispensation, $staff, 'nope');
+    }
+
+    public function test_a_manager_cannot_void_another_sedes_dispensation(): void
+    {
+        // The dispensation belongs to $this->location; this manager is assigned only to a DIFFERENT sede.
+        // dispensation.void alone is not enough — the policy binds the actor to the row's location (prompt 75).
+        $otherLocation = Location::factory()->create(['organisation_id' => $this->org->id]);
+        $manager = User::factory()->create();
+        $manager->assignRole(Role::MANAGER->value);
+        $manager->locations()->sync([$otherLocation->id]);
+
+        $dispensation = $this->commit($this->member(), 100);
+
+        $this->expectException(AuthorizationException::class);
+        (new VoidDispensation)->handle($dispensation, $manager, 'cross-sede void attempt');
     }
 
     public function test_voiding_requires_a_reason(): void

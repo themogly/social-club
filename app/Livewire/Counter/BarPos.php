@@ -29,6 +29,7 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Livewire\Attributes\Layout;
+use Livewire\Attributes\Locked;
 use Livewire\Component;
 use RuntimeException;
 use Throwable;
@@ -76,7 +77,8 @@ class BarPos extends Component
     /** Category filter over the article grid (null = all). */
     public ?string $categoryId = null;
 
-    /** The active location id, resolved in mount(). */
+    /** The active location id, resolved in mount(). #[Locked] (prompt 75): the client can never retarget the counter's sede. */
+    #[Locked]
     public ?string $locationId = null;
 
     /** The till terminal this POS posts cash into (adopted from the single open session). */

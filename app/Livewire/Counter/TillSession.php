@@ -41,6 +41,7 @@ use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\Auth;
 use InvalidArgumentException;
 use Livewire\Attributes\Layout;
+use Livewire\Attributes\Locked;
 use Livewire\Component;
 use RuntimeException;
 
@@ -60,7 +61,8 @@ class TillSession extends Component
 {
     use IdentifiesOperator, ResolvesCounterLocation;
 
-    /** The active location id, resolved in mount(). */
+    /** The active location id, resolved in mount(). #[Locked] (prompt 75): the client can never retarget the counter's sede. */
+    #[Locked]
     public ?string $locationId = null;
 
     /** Friendly state when the operator has no location at all (still a 200). */

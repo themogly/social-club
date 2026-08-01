@@ -32,8 +32,11 @@ class VoidDispensation
 {
     public function handle(Dispensation $dispensation, User $actor, string $reason): Dispensation
     {
-        if (! $actor->can('dispensation.void')) {
-            throw new AuthorizationException('Voiding a dispensation requires the dispensation.void permission.');
+        // Authorize through the POLICY, not the bare permission (prompt 75): DispensationPolicy::void binds
+        // the actor to the row's OWN sede (via ::view), so a manager at sede A cannot void a sede-B row — a
+        // bare `can('dispensation.void')` checked the permission but not the location, the exploited gap.
+        if ($actor->cannot('void', $dispensation)) {
+            throw new AuthorizationException('Voiding a dispensation requires dispensation.void at the row\'s location.');
         }
 
         if (trim($reason) === '') {

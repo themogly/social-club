@@ -31,8 +31,10 @@ class VoidOrder
 {
     public function handle(Order $order, User $actor, string $reason): Order
     {
-        if (! $actor->can('order.void')) {
-            throw new AuthorizationException('Voiding an order requires the order.void permission.');
+        // Authorize through the POLICY, not the bare permission (prompt 75): OrderPolicy::void binds the
+        // actor to the row's OWN sede, so a manager at sede A cannot void a sede-B order.
+        if ($actor->cannot('void', $order)) {
+            throw new AuthorizationException('Voiding an order requires order.void at the row\'s location.');
         }
 
         if (trim($reason) === '') {

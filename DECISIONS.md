@@ -3630,3 +3630,32 @@ rename guard (`BarSalesRenameTest`).
 **Owed / not done:** no browser here — the Manual + help-menu (owner/staff, light/dark, five widths) are
 un-screenshotted; MySQL suite not run locally. Owner-authorised merge (standing "merge all to main").
 776 tests, 773 passed, 3 pre-existing concurrency skips, PHPStan 0.
+
+---
+
+## Prompt 75 — Cross-sede authorization (three verified-live exploits closed)
+
+Re-run after an audit found it was never actually in the tree (commit line existed, code did not).
+
+**1. Counter `$locationId` is now `#[Locked]`** on all four counter components (`CheckInScreen`,
+`DispensaryPos`, `BarPos`, `TillSession`). It is resolved in `mount()` from the operator's OWN available
+sedes (`ResolvesCounterLocation`), and the booted hook re-applies it as the request scope on EVERY request —
+so while it was a plain public property, a client could set it to a sede they were not assigned to and write
+there (staff wrote a check-in at another sede; this is why). `#[Locked]` makes the client unable to mutate it
+post-mount. Guarded by `CounterLocationLockTest` (reflection walk over all four).
+
+**2/3. Void and refund now authorize through the POLICY, not a bare permission.** `VoidDispensation`,
+`VoidOrder` and `RefundDispensation` were checking `->can('dispensation.void' | 'order.void')` — the
+permission, but NOT the location. They now call `$actor->cannot('void'|'refund', $model)`, routing through
+`DispensationPolicy`/`OrderPolicy`, whose `::view` binds the actor to the row's own sede (or org-wide
+`reports.view.all`). A manager at sede A can no longer void/refund a sede-B row. `RefundDispensation` was
+the same-family sibling of the two the audit named and shares the policy, so it was fixed in the same pass.
+
+**Denial tests (CLAUDE.md §Security).** `VoidDispensationTest` + `BarPosTest` each gained
+`test_a_manager_cannot_void_another_sedes_{dispensation,order}` (actor assigned only to a DIFFERENT sede →
+`AuthorizationException`). The existing allow-path helpers now `locations()->sync([...])` the row's sede —
+the correct real-world setup (an operator IS assigned to the sede they work), which the loose check had
+never required.
+
+**Owed:** no browser — counter screens un-screenshotted; MySQL suite not run locally. Owner-authorised merge.
+779 tests, 776 passed, 3 pre-existing concurrency skips, PHPStan 0.

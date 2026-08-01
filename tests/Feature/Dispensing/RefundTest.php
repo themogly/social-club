@@ -92,6 +92,8 @@ class RefundTest extends TestCase
     {
         $user = User::factory()->create();
         $user->assignRole(Role::MANAGER->value); // dispensation.void + stock.merma
+        // The refund policy binds the actor to the row's sede (prompt 75) — assign the one they work.
+        $user->locations()->sync([$this->location->id]);
 
         return $user;
     }
