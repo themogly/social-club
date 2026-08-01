@@ -3534,3 +3534,57 @@ not blocked; sponsor resolved by name or number; consumption guided + stored as 
 application/invite tests updated to the two-consent + `avalador_ref` contract. **Screenshots** (form at 390px,
 both languages, date/consent/confirmation, light/dark) not produced — no browser here. Owner-authorised merge
 (standing "merge all to main"). 761 green (758 passed, 3 concurrency skips).
+
+---
+
+## Prompt 98 — Per-scheme WCAG-AA contrast tokens (+ switcher target size)
+
+**Three of the four semantic tokens failed AA (4.5:1) — each in only ONE scheme**, so a single swap could
+not fix them. The tokens in `resources/css/app.css` now carry PER-SCHEME values, verified against the actual
+surfaces (`#ffffff`, `#f8fafc`, `#0f172a`) AND the `/10` tinted badge/banner backgrounds those states use
+(the tint lowers the ratio ~0.6, and it was the binding constraint — the amber-700/green-700 candidates in
+the prompt cleared the plain surfaces but FAILED the tint, so the values went one step further).
+
+Final values with their worst-case measured ratio (minimum across plain surfaces + tints in that scheme):
+
+| Token | Light (`@theme`) | worst light | Dark (override) | worst dark |
+|---|---|---|---|---|
+| warning | `#92400e` (amber-800) | **5.80:1** | `#d97706` (unchanged) | **5.01:1** |
+| success | `#166534` (green-800) | **5.86:1** | `#16a34a` (unchanged) | **4.81:1** |
+| error | `#b91c1c` (red-700) | **5.24:1** | `#f87171` (red-400) | **5.69:1** |
+| brand | `#2563eb` (unchanged) | 4.94:1 | — | — |
+
+warning/success needed DARKENING on light (they were dark-on-light); error needed LIGHTENING on dark (it was
+dark-on-dark) AND darkening on light for the `/10` tint (`#dc2626` was 3.97:1 there). Semantic meaning is
+preserved — amber-800 still reads amber (a touch deeper), green-800 green, red-700/red-400 red; the deeper
+amber/green is the deliberate, documented cost of clearing the tint.
+
+**Scheme mechanism.** `@theme` holds the LIGHT set (the default). The dark set is applied under
+`@media (prefers-color-scheme: dark)` (the counter follows the OS — no manual toggle) gated by
+`:not(.light):not([data-theme='light'])`, AND under `:root.dark, :root[data-theme='dark'], .dark` (Filament's
+class toggle). The verified worst case — `"Sin operador identificado"` (`.text-warning`, the default state of
+every counter screen) — is now 4.80:1+ on light and 5.60:1 on dark.
+
+**Language switchers** (admin + the prompt-96 PWA control) measured 20×24 / 22×24, below WCAG 2.2 Target Size
+(24×24). Both now carry `min-h-[1.5rem] min-w-[1.75rem] inline-flex items-center justify-center` — ≥24×24.
+
+**The permanent guard.** `ColourContrastTest` (4) reads the token values back OUT of `app.css` and computes
+the WCAG ratio deterministically for every token on both surfaces + `/10` tints in its scheme, asserts ≥4.5,
+pins the operator-warning case in both schemes, asserts brand is not regressed, and checks both switchers meet
+24×24 at the markup level. A token edit that drops below AA fails the suite (prompt-73-style permanent check).
+
+**axe-core NOT wired** — it needs a real browser (Playwright), which this environment does not have (no
+browser anywhere in this project's runs, hence no screenshots). The deterministic token guard is the runnable,
+permanent equivalent for the contrast dimension; axe-core over the four counter screens + an admin screen in
+both schemes remains the recommended follow-up when a browser/CI is available, per the prompt's own steer.
+
+**Out of scope (documented, per the "fix the tokens not the call sites" rule):** a few HARDCODED hexes remain
+outside the token system — Filament chart segment colours (`DashboardChart`, `BreachLogForm` — graphical, not
+text, exempt from text AA), the receipt PDF badge (white-on-red, passes), and the audit-log diff highlight
+(`AuditLogInfolist` uses `#16a34a` green text on white ≈ 3.30:1 — a genuine but minor, admin-only, inline-diff
+gap). These are call-site decisions, left for a focused follow-up so this stays a token branch. No functional
+change — colour and padding only.
+
+**Tests:** `ColourContrastTest` (4). **Screenshots** (four counter screens + an admin screen, both schemes,
+warning/success/error) not produced — no browser here. Owner-authorised merge (standing "merge all to main").
+765 green (762 passed, 3 concurrency skips).
