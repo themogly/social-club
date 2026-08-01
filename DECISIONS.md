@@ -3697,3 +3697,34 @@ allowlist entries keep them honestly visible until then.
 
 **Owed:** no browser — the member limit action + till screens un-screenshotted; MySQL suite not run locally.
 Owner-authorised merge. 787 tests, 784 passed, 3 pre-existing concurrency skips, PHPStan 0.
+
+---
+
+## Prompt 78 — Go-live blockers (HTTPS behind a proxy + no install path)
+
+Re-run after the audit found neither in the tree.
+
+**1. `trustProxies` in `bootstrap/app.php`.** Without it, behind any reverse proxy `isSecure()` is false, so
+on an HTTPS page the panel and POS emit `http://` asset URLs the browser blocks as mixed content — the admin
+panel and POS are unusable on a normal deployment. Added `$middleware->trustProxies(at: ...)` reading
+`TRUSTED_PROXIES` (default `'*'` so it works out of the box behind a managed LB; tighten to the LB addresses
+in production; a comma-list is exploded to an array). Proven functionally (`TrustedProxyTest`: a request with
+`X-Forwarded-Proto: https` is treated as secure) plus a source guard.
+
+**2. `csc:install` command.** There was NO production path to create the Organisation — only the test factory
+and the demo seeder — so after a real deploy the `Organisation` didn't exist: the RAT's data controller
+(`legal_name`) was blank and no one could log in. The command (re)seeds the roles/permissions (idempotent,
+required in every environment), then creates the Organisation (with its `legal_name` — the RAT controller)
+and the first OWNER user in one transaction. It refuses if an organisation already exists (unless `--force`),
+and validates (legal name required so the RAT is never blank; owner email unique; password ≥ 8). Fully
+non-interactive when every option is supplied (deploy automation), prompts otherwise — `??` not `?:` so an
+explicitly-empty option is respected and fails validation rather than triggering an interactive prompt.
+
+`User` has no `organisation_id` (staff are global, scoped to the org via the location pivot), so the owner
+needs only a role to access the panel — asserted in the test (`canAccessPanel`).
+
+**Tests.** `InstallCommandTest` (creates org+owner, the RAT controller now resolves to the legal name, refuses
+when already installed, refuses a blank legal name) + `TrustedProxyTest`.
+
+**Owed:** none material (both are non-visual). Owner-authorised merge. 792 tests, 789 passed, 3 pre-existing
+concurrency skips, PHPStan 0.

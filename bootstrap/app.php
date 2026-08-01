@@ -20,6 +20,13 @@ return Application::configure(basePath: dirname(__DIR__))
         },
     )
     ->withMiddleware(function (Middleware $middleware): void {
+        // Behind a reverse proxy / load balancer (the normal deployment), honour X-Forwarded-* so
+        // isSecure() is true on HTTPS — otherwise the panel and POS emit http:// asset URLs on an https
+        // page and the browser blocks them as mixed content, making the app unusable (prompt 78). Trust the
+        // proxy set from TRUSTED_PROXIES (default '*' — tighten to the load balancer's addresses in prod).
+        $proxies = (string) env('TRUSTED_PROXIES', '*');
+        $middleware->trustProxies(at: $proxies === '*' ? '*' : explode(',', $proxies));
+
         // Baseline security + no-index headers on every response (all surfaces,
         // including the Filament panel which uses its own middleware stack).
         $middleware->append(SecurityHeaders::class);
