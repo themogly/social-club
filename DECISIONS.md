@@ -4292,3 +4292,29 @@ Madrid/Barcelona addresses. A real club sets its own in Ajustes; these exist onl
 generate documents out of the box.
 
 `composer check` green (873 tests, 870 passed, 3 pre-existing skips, PHPStan 0). EN/ES parity gated.
+
+## Prompt 117 — Go-live gaps: install seeding, env docs, CI (landed early so every later branch is CI-checked)
+
+**Install seeds expense categories.** `csc:install` now calls `ExpenseCategorySeeder::seedFor($org->id, locale)`
+inside the create transaction, so a freshly-installed club can record petty cash and overheads from day one
+(previously only the demo seeder created them; a real install had none, and the till expense flow needs the
+TILL category). Idempotent `firstOrCreate`, keyed on the active locale.
+
+**Four production env vars documented in `.env.example`:** VAPID (`VAPID_SUBJECT`/`PUBLIC_KEY`/`PRIVATE_KEY` —
+member push; no keypair ⇒ nothing sent; private key server-only), `TRUSTED_PROXIES` (default `*`; tighten to the
+load balancer in prod), `CSP_ENFORCE`, and `AWS_DOCUMENTS_SSE` (+ `AWS_DOCUMENTS_SSE_KMS_KEY_ID`) for the
+private ID-scan bucket's server-side encryption.
+
+**OVERNIGHT-DEFAULT — CONFIRM: `CSP_ENFORCE=false`** in `.env.example` (report-only) — matching the code
+default. Rationale: ship production report-only first, confirm the report endpoint shows no violations, THEN
+flip to `true` to enforce. Turning enforcement on blind can break legitimate resources; report-only observes
+without risk. A security-conscious club SHOULD enable it after verification.
+
+**CI workflow (`.github/workflows/ci.yml`).** Two jobs on push-to-main and every PR: (1) `composer check` on
+SQLite (Pint → Larastan → PHPUnit `:memory:`), (2) the full suite against a real MySQL 8 service via the
+committed `phpunit.mysql.xml` (root / empty password / `csc_platform_test`) — so driver-divergence bugs (JSON,
+booleans, strict types, string lengths) surface per-branch instead of at the end. PHP 8.3 (the composer floor).
+Not added to `composer check` (that must stay runnable on an empty DB).
+
+`composer check` green (874 tests, 871 passed, 3 pre-existing skips, PHPStan 0). EN/ES parity unaffected (no new
+user-facing copy).

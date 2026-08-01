@@ -1,0 +1,97 @@
+name: CI
+
+# Every branch after prompt 117 is checked on BOTH engines automatically: composer check on SQLite
+# (fast, the same gate developers run), then the full suite against a real MySQL service — production is
+# MySQL and SQLite-only testing hides JSON-column, strict-type, boolean and string-length bugs.
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    name: composer check (Pint · Larastan · PHPUnit/SQLite)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          extensions: mbstring, pdo_sqlite, sqlite3, bcmath, intl, gd, zip
+          coverage: none
+
+      - name: Cache Composer packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/composer
+          key: composer-${{ runner.os }}-${{ hashFiles('composer.lock') }}
+          restore-keys: composer-${{ runner.os }}-
+
+      - run: composer install --no-interaction --prefer-dist --no-progress
+
+      - name: Prepare environment
+        run: |
+          cp .env.example .env
+          php artisan key:generate
+
+      # Pint --test -> Larastan -> php artisan test (SQLite :memory: via phpunit.xml).
+      - run: composer check
+
+  mysql:
+    name: PHPUnit — MySQL driver parity
+    runs-on: ubuntu-latest
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ALLOW_EMPTY_PASSWORD: 'yes'
+          MYSQL_DATABASE: csc_platform_test
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 --silent"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=15
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          extensions: mbstring, pdo_mysql, bcmath, intl, gd, zip
+          coverage: none
+
+      - name: Cache Composer packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/composer
+          key: composer-${{ runner.os }}-${{ hashFiles('composer.lock') }}
+          restore-keys: composer-${{ runner.os }}-
+
+      - run: composer install --no-interaction --prefer-dist --no-progress
+
+      - name: Prepare environment
+        run: |
+          cp .env.example .env
+          php artisan key:generate
+
+      - name: Wait for MySQL
+        run: |
+          for i in $(seq 1 30); do
+            if mysqladmin ping -h 127.0.0.1 -P 3306 -u root --silent; then exit 0; fi
+            sleep 2
+          done
+          echo "MySQL did not become ready" && exit 1
+
+      # The committed profile: root / empty password / 127.0.0.1:3306 / csc_platform_test.
+      - name: Run the suite against MySQL
+        run: php artisan test -c phpunit.mysql.xml

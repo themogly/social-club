@@ -5,6 +5,7 @@ namespace App\Console\Commands;
 use App\Enums\Role;
 use App\Models\Organisation;
 use App\Models\User;
+use Database\Seeders\ExpenseCategorySeeder;
 use Database\Seeders\RolePermissionSeeder;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
@@ -70,12 +71,16 @@ class Install extends Command
         }
 
         $owner = DB::transaction(function () use ($data): User {
-            Organisation::create([
+            $org = Organisation::create([
                 'name' => $data['name'],
                 'legal_name' => $data['legal_name'],
                 'tax_id' => $data['tax_id'] ?: null,
                 'contact_email' => $data['contact_email'] ?: null,
             ]);
+
+            // Seed the default expense categories so the club can record expenses (petty cash, overheads) from
+            // day one — the same set the demo uses; idempotent firstOrCreate, keyed on the active locale (prompt 117).
+            ExpenseCategorySeeder::seedFor($org->id, app()->getLocale());
 
             $owner = User::create([
                 'name' => $data['owner_name'],
