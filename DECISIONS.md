@@ -3907,3 +3907,44 @@ follow-up is closed rather than pending.
 A per-view decrypt is heavier than a static signed URL; if the door proves slow the lever is a smaller stored
 image or a short in-request cache, never dropping the log. Owner-authorised merge (standing "merge + push").
 816 tests, 813 passed, 3 pre-existing concurrency skips, PHPStan 0.
+
+---
+
+## Prompt 110 — The legal stock ceiling: wrong member count, and nothing enforced it
+
+**Arithmetic fixed (the bug).** `StockCeiling::forLocation()` counted every member of the whole association
+(`Member::where('organisation_id', …)`) against one sede's stock, so each sede was credited with the entire
+org's headroom. It now counts members who are ACTIVE **and** hold an ACTIVE membership AT THIS location (via
+`whereHas('memberships', location + status)`), so two sedes with different membership get different ceilings —
+the single assertion that is the bug. An expelled/suspended member (member status) or a lapsed membership no
+longer raises it.
+
+**Settings scope made consistent.** `daily_limit_cg` was location-scoped, `stock_ceiling_days` global — both
+are per-premises concepts, so both now resolve through `ActiveScope::forLocation(...)`.
+
+**"On site" widened (decision).** Was OPEN batches only. A quarantined, closed or expired batch is still
+physically on the premises and still counts legally — so on-site now sums remaining across ALL batches at the
+sede regardless of status/expiry (a depleted batch contributes 0 through its remaining columns). This is the
+number a lawyer reads, so it errs toward counting everything present.
+
+**Now enforced, through the existing machinery.** Added a `stock → ceiling` rule to
+`Settings::DEFAULTS['enforcement']`, default **WARN** (a club legitimately receives a harvest that briefly
+exceeds a rolling figure; a hard block with no way through would push staff into not recording stock at all).
+`IntakeBatch` checks the projected on-site weight after the intake: WARN proceeds; BLOCK/OVERRIDE refuses
+unless a `limits.override` holder authorises with a reason, audited as `stock.ceiling.overridden`.
+`ManageEnforcement` exposes the toggle (owner-only). **Override permission:** reused `limits.override` (the
+existing "authorise a compliance breach" authority — same contract the member limits use) rather than minting
+a new permission.
+
+**Stock take.** Deliberately NOT blocked — a recount records physical reality and must never be refused. The
+overage a recount reveals surfaces on the dashboard's ceiling indicator, which reads the SAME live
+`StockCeiling` intake enforces against (one figure, not two — the dashboard's `ceilingBreaches()` and intake
+share it by construction).
+
+**Seed (decision).** The demo deliberately, labelledly exceeds: the curated 16-member base makes each sede's
+ceiling small, so realistic dispensary stock trips the WARNING on purpose — a demonstration of the feature. A
+genuine fresh install (`csc:install`, prompt 78) has no stock and never alarms.
+
+**Owed:** no browser — the dashboard chart with the corrected ceiling + the intake warning are un-screenshotted.
+A Filament CreateBatch override affordance for BLOCK mode is not built (default is WARN; the Action enforces and
+accepts an override via its options). Owner-authorised merge. 824 tests, 821 passed, 3 pre-existing skips, PHPStan 0.

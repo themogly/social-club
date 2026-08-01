@@ -44,6 +44,7 @@ class ManageEnforcement extends Page
     private const RULES = [
         'door' => ['age', 'membership', 'carencia', 'sanction', 'debt', 'unpaid_fee', 'aforo'],
         'counter' => ['age', 'membership', 'carencia', 'sanction', 'debt', 'unpaid_fee', 'daily_limit', 'monthly_limit'],
+        'stock' => ['ceiling'], // the premises legal stock ceiling at intake (prompt 110)
     ];
 
     /** Rules that are ALWAYS BLOCK and never editable (legal hard floor / hard capacity cap). */
@@ -90,6 +91,10 @@ class ManageEnforcement extends Page
                 Section::make(__('Mostrador (dispensación)'))
                     ->description(__('Qué hace el mostrador ante cada situación al dispensar.'))
                     ->schema($this->surfaceFields('counter'))
+                    ->columns(3),
+                Section::make(__('Stock (entrada de género)'))
+                    ->description(__('Qué hace la entrada de stock cuando el local superaría su techo legal.'))
+                    ->schema($this->surfaceFields('stock'))
                     ->columns(3),
             ]);
     }
@@ -180,6 +185,7 @@ class ManageEnforcement extends Page
             'aforo' => __('Aforo'),
             'daily_limit' => __('Límite diario'),
             'monthly_limit' => __('Límite mensual'),
+            'ceiling' => __('Techo de stock del local'),
             default => $rule,
         };
     }
