@@ -5,6 +5,7 @@ namespace App\ViewModels\Reports;
 use App\Enums\DispensationStatus;
 use App\Enums\FeePaymentMethod;
 use App\Enums\OrderStatus;
+use App\Models\Expense;
 use App\Support\Money;
 use Illuminate\Database\Query\Builder as QueryBuilder;
 use Illuminate\Support\Facades\DB;
@@ -339,11 +340,8 @@ class FinancialReport extends AbstractReport
      */
     private function expensesQuery(): QueryBuilder
     {
-        return DB::table('expenses')
-            ->where('expenses.organisation_id', $this->organisationId)
-            ->whereNull('expenses.deleted_at')
-            ->whereNull('expenses.recurrence')
-            ->where(fn (QueryBuilder $q) => $this->scopeExpenseLocation($q, 'expenses'));
+        // THE one outgoing rule (prompt 107) — the dashboard calls the same Expense::concreteForPeriod().
+        return Expense::concreteForPeriod(DB::table('expenses'), $this->organisationId, $this->resolvedLocationIds(), $this->includesAllLocations());
     }
 
     private function scopeExpenseLocation(QueryBuilder $query, string $table): QueryBuilder

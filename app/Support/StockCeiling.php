@@ -32,6 +32,7 @@ class StockCeiling
         // Members with an ACTIVE membership AT THIS sede whose own status is ACTIVE (so an expelled/suspended
         // member with a stale membership row, or a lapsed membership, does not raise the ceiling).
         $activeMembers = (int) Member::query()->withoutGlobalScopes()
+            ->whereNull('deleted_at') // withoutGlobalScopes strips SoftDeletingScope too (prompt 107)
             ->where('organisation_id', $location->organisation_id)
             ->where('status', MemberStatus::ACTIVE->value)
             ->whereHas('memberships', fn ($q) => $q->withoutGlobalScopes()
@@ -51,6 +52,7 @@ class StockCeiling
         // physically here (a depleted batch contributes 0 through its remaining columns).
         $onSiteCg = (int) Batch::query()->withoutGlobalScopes()
             ->join('genetics', 'batches.genetic_id', '=', 'genetics.id')
+            ->whereNull('batches.deleted_at') // a soft-deleted batch is not on-site (prompt 107)
             ->where('batches.location_id', $location->id)
             ->selectRaw("COALESCE(SUM(CASE WHEN genetics.unit_type = 'UNIT' THEN batches.remaining_units * genetics.grams_per_unit_cg ELSE batches.remaining_cg END), 0) as cg")
             ->value('cg');

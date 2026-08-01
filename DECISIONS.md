@@ -3948,3 +3948,36 @@ genuine fresh install (`csc:install`, prompt 78) has no stock and never alarms.
 **Owed:** no browser — the dashboard chart with the corrected ceiling + the intake warning are un-screenshotted.
 A Filament CreateBatch override affordance for BLOCK mode is not built (default is WARN; the Action enforces and
 accepts an override via its options). Owner-authorised merge. 824 tests, 821 passed, 3 pre-existing skips, PHPStan 0.
+
+---
+
+## Prompt 107 — The dashboard never showed rent, and still counted deleted rows
+
+**One expense rule, expressed once.** The dashboard's outgoings query was a bare
+`DB::table('expenses')->whereIn('location_id', $ids)` — no organisation filter, no soft-delete filter, and
+crucially no org-level fold-in, so every overhead with `location_id = null` (rent, utilities, insurance) was
+dropped and the superávit read healthier than the financial report by the club's largest fixed costs.
+Extracted the rule into `Expense::concreteForPeriod(QueryBuilder, org, locationIds, includesAllLocations)` —
+organisation + NOT deleted + CONCRETE (no recurrence template) + location scope WITH the `orWhereNull(location)`
+fold-in on the all-locations view. `FinancialReport::expensesQuery()` and `DashboardCharts` now both call it,
+so they agree by construction (tested: an org-level overhead makes the two totals equal; a location-scoped
+view does not pick it up).
+
+**Soft-delete filter on the aggregating raw queries.** `DB::table()` bypasses `SoftDeletingScope`, so four
+dashboard aggregates counted deleted rows: expenses (fixed via the shared rule), the stock-levels chart
+(`batches`), the new-joiners series (`members`) and the consumption distribution (`members`). Each now
+`whereNull(...deleted_at)`. **Also fixed `StockCeiling`** (prompt 110) — it uses `withoutGlobalScopes()`, which
+strips `SoftDeletingScope` too, so its member count and on-site batch sum were counting soft-deleted rows; both
+now filter `deleted_at`, so the headroom a club reads against the legal cap excludes deleted stock.
+
+**Aggregate vs lookup (decision).** The label-resolution lookups (`StockReport` genetics, financial/attendance/
+consumption name lookups) are ALSO raw and unfiltered — and that is correct: a name must still resolve after
+its parent row is soft-deleted, or an old report renders blanks. Left untouched; guarded by a test that a
+soft-deleted genetic's name still appears on the stock report.
+
+**Sweep result.** `Dispensation`, `Order`, `CheckIn` and `TillSession` have no `deleted_at` column, so their
+dashboard aggregates need no filter and already agree with the report (identical status/period filters). The
+income streams were verified consistent. The only divergences were the four aggregates above.
+
+**Owed:** no browser — the dashboard/financial-report side-by-side (same superávit, with an org-level overhead)
+is un-screenshotted. Owner-authorised merge. 830 tests, 827 passed, 3 pre-existing skips, PHPStan 0.

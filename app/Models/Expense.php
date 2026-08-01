@@ -14,6 +14,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Database\Query\Builder as QueryBuilder;
 
 /**
  * Money out. May be per-location (TILL petty cash) or org-wide (OVERHEAD, null
@@ -70,6 +71,29 @@ class Expense extends Model
     public function scopeConcrete(Builder $query): Builder
     {
         return $query->whereNull('recurrence');
+    }
+
+    /**
+     * THE single definition of a real outgoing for the period (prompt 107) — organisation, NOT soft-deleted,
+     * CONCRETE (not a recurrence template), and location-scoped WITH the org-level fold-in (rows with a null
+     * location_id — rent, utilities, insurance — belong to the all-locations view). The financial report and
+     * the dashboard both call this instead of each describing an outgoing differently, so they agree. Operates
+     * on a raw QueryBuilder because both callers aggregate over joins; `$table` lets it prefix a join alias.
+     *
+     * @param  list<string>  $locationIds
+     */
+    public static function concreteForPeriod(QueryBuilder $query, string $organisationId, array $locationIds, bool $includesAllLocations, string $table = 'expenses'): QueryBuilder
+    {
+        return $query
+            ->where("{$table}.organisation_id", $organisationId)
+            ->whereNull("{$table}.deleted_at")   // raw DB::table() bypasses SoftDeletingScope — re-apply by hand
+            ->whereNull("{$table}.recurrence")    // concrete outgoings only — a template is a schedule
+            ->where(function (QueryBuilder $q) use ($table, $locationIds, $includesAllLocations): void {
+                $q->whereIn("{$table}.location_id", $locationIds);
+                if ($includesAllLocations) {
+                    $q->orWhereNull("{$table}.location_id"); // org-level overheads live at null location
+                }
+            });
     }
 
     /**
