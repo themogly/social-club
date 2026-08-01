@@ -40,6 +40,20 @@ jobs:
           cp .env.example .env
           php artisan key:generate
 
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+
+      # LOAD-BEARING (prompt 125): prompt 100's Filament theme means any panel-page test resolves the Vite
+      # manifest (resources/css/filament/admin/theme.css). public/build is gitignored, so WITHOUT this build
+      # every CI run fails with ViteException — this is a hard dependency, not an optimisation. Do not remove.
+      - name: Build front-end assets
+        run: |
+          npm ci
+          npm run build
+
       # Pint --test -> Larastan -> php artisan test (SQLite :memory: via phpunit.xml).
       - run: composer check
 
@@ -83,6 +97,20 @@ jobs:
         run: |
           cp .env.example .env
           php artisan key:generate
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+
+      # LOAD-BEARING (prompt 125): prompt 100's Filament theme means any panel-page test resolves the Vite
+      # manifest (resources/css/filament/admin/theme.css). public/build is gitignored, so WITHOUT this build
+      # every CI run fails with ViteException — this is a hard dependency, not an optimisation. Do not remove.
+      - name: Build front-end assets
+        run: |
+          npm ci
+          npm run build
 
       - name: Wait for MySQL
         run: |

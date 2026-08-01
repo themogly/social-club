@@ -4552,3 +4552,35 @@ Tests (`RedisDegradationTest`, 5): counter + dashboard render 200 with the defau
 branch); System Health renders + reports degraded; a Redis failure surfaces the 503 message; permission changes
 apply after `cache-reset` on the new store; recovery. `composer check` green (897 tests, 894 passed, 3
 pre-existing skips, PHPStan 0). EN/ES parity gated.
+
+## Prompt 125 — Harden the temporary-member date assertion (before CI teaches everyone to ignore it)
+
+`TemporaryMemberTest::test_enrolling_a_temporary_member_…` asserted `(int) $joined_at->diffInDays($expires) === 30`
+— fragile twice over: `diffInDays` returns a float and `(int)` truncates (any sub-day drift makes 30→29), and it
+hard-coded the window. Flaky before CI existed; now that prompt 117 runs the suite per push it would go red at
+random, and an intermittently-red build trains everyone to shrug at CI — exactly when 120/121 need the signal.
+
+**What it now asserts.** The RULE, as timestamps: `temporary_expires_at` equals `joined_at + temporary_window_days`
+(`->equalTo($member->joined_at->copy()->addDays($window))`), with the window read from `Settings` not hard-coded,
+and **time frozen** (`freezeTime()`) so the enrolment's internal `now()` cannot race the clock. It still fails if
+the code computes from the wrong base or the wrong window; a new test proves changing `temporary_window_days`
+changes the expectation rather than breaking the test.
+
+**Root cause: truncation, not order-dependence.** Four consecutive `--order-by=random` full runs were green (895
+passed each), plus the default-order `composer check` run — so the ~20 `travelTo(...)`-without-`travelBack()`
+files (incl. `BusinessDayPeriodTest`'s DST dates) are correctly reset by Laravel's `tearDown` and leak no time.
+The assertion fix is the whole answer.
+
+**`diffIn*` truncation sweep.** Only `TemporaryMemberTest:93` was unsafe. `BusinessDayPeriodTest:92/97`
+(`(int) diffInSeconds === 23h/25h`) are SAFE — both sides are computed from a frozen `travelTo` DST date, so the
+values are exact multiples of 3600 and the truncation is lossless. No other `(int) diffIn*` exact-integer
+assertions exist.
+
+**CI asset build (load-bearing).** Prompt 100's Filament theme makes every panel-page test resolve the Vite
+manifest (`resources/css/filament/admin/theme.css`), and `public/build` is gitignored — so CI would fail EVERY
+run with `ViteException` without a build. Added `actions/setup-node` + `npm ci && npm run build` to both CI jobs
+before the test step, commented as required-not-optional. (This is a hard dependency the earlier 117 workflow
+missed, surfaced by 125's clean-checkout note.)
+
+No production code changed. `composer check` green (898 tests, 895 passed, 3 pre-existing skips, PHPStan 0) plus
+four green randomised runs.
