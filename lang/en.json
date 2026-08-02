@@ -2025,5 +2025,12 @@
     "Pantalla bloqueada": "Screen locked",
     "Bloqueo por inactividad (min)": "Idle lock (min)",
     "Minutos sin actividad antes de bloquear el mostrador. 0 lo desactiva.": "Minutes of inactivity before the counter locks. 0 disables it.",
-    "Más opciones": "More options"
+    "Más opciones": "More options",
+    "Aforo completo (:current/:capacity).": "At capacity (:current/:capacity).",
+    "Cuota de socio pendiente: :amount.": "Membership fee due: :amount.",
+    "Debe saldar el monedero para poder continuar.": "They must settle the wallet to continue.",
+    "Deuda de :amount por encima del límite del monedero.": "Debt of :amount over the wallet limit.",
+    "En carencia hasta el :date (puede entrar, aún no dispensarse).": "In carencia until :date (may enter, not yet be dispensed to).",
+    "No se resuelve en el mostrador: consulta con un responsable.": "Not resolvable at the counter: ask a manager.",
+    "Renueva su cuota desde su ficha para poder dispensarle.": "Renew their fee from their record to dispense to them."
 }

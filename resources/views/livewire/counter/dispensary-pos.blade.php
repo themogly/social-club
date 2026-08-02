@@ -211,13 +211,22 @@
                                     <div class="space-y-2">
                                         @foreach ($verdict->rules as $rule)
                                             @continue($rule['satisfied'])
-                                            @php $isBlock = in_array($rule['mode'], ['BLOCK', 'OVERRIDE'], true); @endphp
+                                            @php
+                                                $isBlock = in_array($rule['mode'], ['BLOCK', 'OVERRIDE'], true);
+                                                $remedy = \App\Support\VerdictRemedy::describe($rule, $member, $location);
+                                            @endphp
+                                            {{-- Prompt 135: name the rule in the member's terms + attach the fix; WARN vs BLOCK distinct. --}}
                                             <div @class([
-                                                'flex items-center justify-between gap-3 rounded-xl border px-3 py-2 text-sm',
+                                                'flex items-start justify-between gap-3 rounded-xl border px-3 py-2 text-sm',
                                                 'border-error/30 bg-error/10 text-error' => $isBlock,
                                                 'border-warning/30 bg-warning/10 text-warning' => ! $isBlock,
                                             ])>
-                                                <span>{{ $rule['message'] }}</span>
+                                                <span class="min-w-0">
+                                                    {{ $remedy['detail'] }}
+                                                    @if ($remedy['remedy'])
+                                                        <span class="mt-0.5 block text-[11px] opacity-80">{{ $remedy['remedy'] }}</span>
+                                                    @endif
+                                                </span>
                                                 <span class="shrink-0 rounded-full border border-current px-2 py-0.5 text-[10px] font-semibold uppercase">{{ $isBlock ? __('Bloquea') : __('Aviso') }}</span>
                                             </div>
                                         @endforeach
