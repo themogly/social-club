@@ -73,6 +73,45 @@
                     <x-dashboard.section :title="__('Niveles de stock')">
                         @livewire(\App\Filament\Widgets\StockLevelsChart::class, ['periodKey' => $periodKey, 'customStart' => $customStart, 'customEnd' => $customEnd], 'stock-'.$periodKey.'-'.$customStart.'-'.$customEnd)
                     </x-dashboard.section>
+
+                    {{-- Legal stock headroom (prompt 134): the number nobody else in this market shows — how much
+                         the club can still bring on-site before the compliance ceiling, per sede, with the three
+                         inputs so it is auditable and actionable. Same figure prompt 110 enforces at intake. --}}
+                    @if (! empty($ceilingHeadroom))
+                        @php $gr = fn (int $cg): string => \App\Support\Weight::fromCentigrams($cg)->formatted(); @endphp
+                        <x-dashboard.section :title="__('Techo legal de existencias')">
+                            <div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-3" data-ceiling-headroom>
+                                @foreach ($ceilingHeadroom as $h)
+                                    <div @class([
+                                        'rounded-xl border p-4',
+                                        'border-red-300 bg-red-50 dark:border-red-500/40 dark:bg-red-500/10' => $h['exceeded'],
+                                        'border-gray-200 bg-white dark:border-white/10 dark:bg-gray-900' => ! $h['exceeded'],
+                                    ])>
+                                        <p class="text-sm font-semibold text-gray-950 dark:text-white">{{ $h['location'] }}</p>
+                                        @if ($h['exceeded'])
+                                            <p class="mt-1 text-sm font-semibold text-red-600 dark:text-red-400" data-headroom-over>
+                                                {{ __('Supera el techo en :g.', ['g' => $gr($h['over_cg'])]) }}
+                                            </p>
+                                        @else
+                                            <p class="mt-1 text-sm text-gray-700 dark:text-gray-200" data-headroom-grams>
+                                                {{ __('Puedes dar de alta :g más antes de superar el límite.', ['g' => $gr($h['headroom_cg'])]) }}
+                                            </p>
+                                        @endif
+                                        {{-- The three inputs, so the figure is auditable and the owner sees what would move it. --}}
+                                        <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">
+                                            {{ __(':n socios activos × :d × :days días = techo :ceiling', [
+                                                'n' => $h['active_members'],
+                                                'd' => $gr($h['daily_limit_cg']),
+                                                'days' => $h['ceiling_days'],
+                                                'ceiling' => $gr($h['ceiling_cg']),
+                                            ]) }}
+                                        </p>
+                                        <p class="text-xs text-gray-500 dark:text-gray-400">{{ __('En sede ahora: :g', ['g' => $gr($h['on_site_cg'])]) }}</p>
+                                    </div>
+                                @endforeach
+                            </div>
+                        </x-dashboard.section>
+                    @endif
                 @endif
 
                 {{-- Tables — one reusable table component for both. --}}

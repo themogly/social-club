@@ -4911,3 +4911,34 @@ renders the panic/drill actions and history; (c) the 503 page reads as a mundane
 
 `composer check` green (940 tests, 937 passed, 3 pre-existing skips, PHPStan 0). EN/ES parity gated (50 keys).
 Pushed; **do not merge**.
+## Prompt 134 — Legal stock headroom on the dashboard
+
+Presentation only — `StockCeiling::forLocation()` already computes it and prompt 110 already enforces it at
+intake; this surfaces the number, unchanged.
+
+**Where.** A "Techo legal de existencias" section on the dashboard, in the non-staff block beside stock levels,
+**per sede** (the ceiling is per premises — a combined figure would be meaningless). Scope respected: it walks
+`ceilingHeadroom()` over the actor's `scopeLocations()`, so a manager sees their sede and an owner sees all.
+`ViewModels\Dashboard::ceilingHeadroom()` is the one new method; weight stays centigrams, grams only at the edge.
+
+**Plain language + the three inputs.** Each sede reads *"Puedes dar de alta 340 g más antes de superar el
+límite."*, then the arithmetic that makes it auditable and actionable — *":n socios activos × 3,5 g × 5 días =
+techo :ceiling"* and *"En sede ahora: :g"* — so an owner sees both why it moved and what would change it.
+
+**Over-limit shows the magnitude,** not just a state: *"Supera el techo en :g."* in red, with headroom clamped
+to 0. (An alarm with no magnitude is ignored within a week.)
+
+**One number.** `ceilingHeadroom()` reads the exact `StockCeiling::forLocation()` result the intake guard uses —
+tested that headroom = ceiling − on-site and every input matches StockCeiling, that two sedes differ, that an
+over sede shows the overage, and that adding one active member raises only that sede's headroom by
+`daily_limit_cg × ceiling_days`.
+
+**Verification gap (owed — no browser here):** stat cards were not touched, so prompts 129 (labels readable at
+768/800/1024/1280) and 101 (no overflow) still hold via `DashboardScreenTest`'s stylesheet guard; the new
+section is plain flow below them. Owed screenshots: the dashboard for a sede with comfortable headroom and one
+over the limit, light and dark. A trend sparkline was considered and deferred (OVERNIGHT-DEFAULT — CONFIRM:
+left out of v1; the per-sede figure + inputs is the actionable core, and a sparkline needs a stored series the
+live-only dashboard does not keep).
+
+Tests (`CeilingHeadroomTest`, 4). `composer check` green (933 tests, 930 passed, 3 pre-existing skips, PHPStan 0).
+EN/ES parity gated. Pushed; **do not merge**.

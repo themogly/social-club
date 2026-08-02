@@ -2073,5 +2073,10 @@
     "Rotura de cristal: un operador de la plataforma puede reactivarlo por línea de comandos (php artisan lockdown:reactivate), que exige acceso al servidor.": "Break glass: a platform operator can reactivate it from the command line (php artisan lockdown:reactivate), which needs server access.",
     "Ensayarlo": "Rehearsing it",
     "Haz un simulacro desde Seguridad. El simulacro cierra las pantallas igual que el real para que el equipo lo viva, pero avisa de que es un simulacro y un propietario puede terminarlo desde el panel al momento.": "Run a drill from Security. The drill closes the screens just like the real thing so the team experiences it, but it says it is a drill and an owner can end it from the panel at once.",
-    "Durante el bloqueo no se puede acceder a ningún documento de identidad ni foto de socio: los enlaces firmados dejan de funcionar. Al reabrir, revisa el registro de auditoría (quién activó, cómo se reactivó) y valora denunciar según proceda.": "During the lockdown no ID document or member photo can be reached: signed links stop working. On reopening, review the audit log (who tripped it, how it was reactivated) and consider reporting it as appropriate."
+    "Durante el bloqueo no se puede acceder a ningún documento de identidad ni foto de socio: los enlaces firmados dejan de funcionar. Al reabrir, revisa el registro de auditoría (quién activó, cómo se reactivó) y valora denunciar según proceda.": "During the lockdown no ID document or member photo can be reached: signed links stop working. On reopening, review the audit log (who tripped it, how it was reactivated) and consider reporting it as appropriate.",
+    ":n socios activos × :d × :days días = techo :ceiling": ":n active members × :d × :days days = ceiling :ceiling",
+    "En sede ahora: :g": "On site now: :g",
+    "Puedes dar de alta :g más antes de superar el límite.": "You can bring in :g more before exceeding the limit.",
+    "Supera el techo en :g.": "Over the ceiling by :g.",
+    "Techo legal de existencias": "Legal stock headroom"
 }
