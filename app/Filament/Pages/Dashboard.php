@@ -125,6 +125,7 @@ class Dashboard extends BaseDashboard
             'occupancy' => $occ = $charts->occupancy(),
             'stats' => $this->statCards($data, $charts, $period, $canSeeFinance),
             'alerts' => $this->decorateAlerts($data->alerts()),
+            'ceilingHeadroom' => $data->ceilingHeadroom(),
             'readouts' => $this->readouts($data, $period, $occ, $canSeeFinance),
             'comparisonRows' => $this->comparisonRows($charts->perLocationComparison($period), $canSeeFinance),
             'topDispensedRows' => $this->topDispensedRows($charts->dispensedByGenetic(6, $period), $canSeeFinance),

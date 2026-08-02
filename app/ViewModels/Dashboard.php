@@ -298,6 +298,35 @@ class Dashboard
             ->map(fn (Location $l): string => $l->id)->values()->all();
     }
 
+    /**
+     * Per-sede legal stock HEADROOM (prompt 134) — how many grams the club can still bring on-site before the
+     * compliance ceiling, with the three inputs that make the number auditable and actionable. This is pure
+     * presentation of what StockCeiling already computes (and prompt 110 already enforces at intake); the
+     * figure here and the one intake blocks on are the SAME. Per sede always — the ceiling is per premises;
+     * a combined figure would be meaningless. Weight stays centigrams; grams only at the display edge.
+     *
+     * @return list<array{location: string, headroom_cg: int, over_cg: int, on_site_cg: int, ceiling_cg: int, active_members: int, daily_limit_cg: int, ceiling_days: int, exceeded: bool}>
+     */
+    public function ceilingHeadroom(): array
+    {
+        return $this->scopeLocations()->map(function (Location $location): array {
+            $c = StockCeiling::forLocation($location);
+            $headroom = $c['ceiling_cg'] - $c['on_site_cg'];
+
+            return [
+                'location' => $location->name,
+                'headroom_cg' => max(0, $headroom),
+                'over_cg' => max(0, -$headroom),
+                'on_site_cg' => $c['on_site_cg'],
+                'ceiling_cg' => $c['ceiling_cg'],
+                'active_members' => $c['active_members'],
+                'daily_limit_cg' => $c['daily_limit_cg'],
+                'ceiling_days' => $c['ceiling_days'],
+                'exceeded' => $c['exceeded'],
+            ];
+        })->values()->all();
+    }
+
     public function expiringMemberships(): int
     {
         return $this->scopeByLocation(Membership::query()->withoutGlobalScopes())

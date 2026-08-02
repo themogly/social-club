@@ -2025,5 +2025,10 @@
     "Pantalla bloqueada": "Screen locked",
     "Bloqueo por inactividad (min)": "Idle lock (min)",
     "Minutos sin actividad antes de bloquear el mostrador. 0 lo desactiva.": "Minutes of inactivity before the counter locks. 0 disables it.",
-    "Más opciones": "More options"
+    "Más opciones": "More options",
+    ":n socios activos × :d × :days días = techo :ceiling": ":n active members × :d × :days days = ceiling :ceiling",
+    "En sede ahora: :g": "On site now: :g",
+    "Puedes dar de alta :g más antes de superar el límite.": "You can bring in :g more before exceeding the limit.",
+    "Supera el techo en :g.": "Over the ceiling by :g.",
+    "Techo legal de existencias": "Legal stock headroom"
 }
