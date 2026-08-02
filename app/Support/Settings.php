@@ -126,6 +126,11 @@ class Settings
         // operator out, so commits are refused server-side and an unattended tablet stops showing member data
         // until someone re-enters a PIN. Per-location (a quiet sede may want longer). 0 disables the idle lock.
         'counter_idle_lock_minutes' => 5,
+        // Panic lockdown (prompt 121), all per-org. The safety-net auto-reactivation runs after this many
+        // minutes so a locked-out club — who are the data controller — always regains access to their own
+        // statutory register (default 24h). The owner email "way back" link is valid for this many hours.
+        'lockdown_auto_reactivate_minutes' => 1440,
+        'lockdown_reactivation_link_ttl_hours' => 48,
 
         // Per-location defaults (overridable per premises)
         'aforo_default' => 50,

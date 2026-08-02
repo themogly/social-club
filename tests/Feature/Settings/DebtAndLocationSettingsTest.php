@@ -176,6 +176,9 @@ class DebtAndLocationSettingsTest extends TestCase
             'bar_enabled', 'ring_fenced', 'multiple_tills_enabled',
             // Per-location INTEGER setting, edited on LocationForm (prompt 120): idle-lock minutes.
             'counter_idle_lock_minutes',
+            // Panic-lockdown system settings (prompt 121): the auto-reactivation delay and the owner link TTL are
+            // security constants tuned in config, not front-of-house thresholds on the org settings form.
+            'lockdown_auto_reactivate_minutes', 'lockdown_reactivation_link_ttl_hours',
             // Documented in DECISIONS: forecast_options_g is a preset ARRAY (a tags/repeater
             // input is a later enhancement); low_stock_threshold_cg is a fallback — the operative
             // low-stock threshold is set per-article on the Article resource.

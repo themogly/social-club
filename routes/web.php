@@ -3,7 +3,9 @@
 use App\Http\Controllers\ApplicationController;
 use App\Http\Controllers\BarReceiptController;
 use App\Http\Controllers\CounterLocationController;
+use App\Http\Controllers\CounterPanicController;
 use App\Http\Controllers\DispensationReceiptController;
+use App\Http\Controllers\LockdownReactivationController;
 use App\Http\Controllers\Member\AnnouncementController;
 use App\Http\Controllers\Member\EventController;
 use App\Http\Controllers\Member\NotificationController;
@@ -79,6 +81,17 @@ Route::middleware(['web', 'auth'])
 Route::middleware(['web', 'auth'])
     ->get('/counter/pos/receipt/{dispensation}', [DispensationReceiptController::class, 'show'])
     ->name('counter.pos.receipt');
+
+// Panic lockdown (prompt 121). The counter panic trigger — staff are the ones in a robbery, so this posts from
+// the counter, is gated on lockdown.initiate, and trips the org-wide lockdown. The reactivation link is a plain,
+// unauthenticated, token-based route (the owner's off-terminal way back) that the lockdown gate whitelists.
+Route::middleware(['web', 'auth'])
+    ->post('/counter/panic', [CounterPanicController::class, 'store'])
+    ->name('counter.panic');
+
+Route::middleware('web')
+    ->get('/reactivar/{token}', [LockdownReactivationController::class, 'reactivate'])
+    ->name('lockdown.reactivate');
 
 // Switch the counter's working sede (prompt 89). The ONLY writer of `counter.location_id`, gated by
 // LocationSwitcher's server-side assignment check — never a raw setLocation from client input, and it

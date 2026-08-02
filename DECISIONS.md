@@ -4851,3 +4851,63 @@ inside it); re-run `measure-topbar.mjs` after reconciling, since it changes the 
 
 `composer check` green (915 tests, 912 passed, 3 pre-existing skips, PHPStan 0). EN/ES parity gated (1 key).
 Pushed; **not merged** (the prompt's instruction; a human should eyeball the four screens).
+
+---
+
+## Prompt 121 — Panic lockdown (org-wide), reactivation and the runbook
+
+Built on prompt 120's lock surface, greenfield otherwise. The mechanism is the smaller half; the ways back and
+the runbook are the point.
+
+**State — append-only, not a boolean.** `organisation_lockdowns` is one row per event, closed by
+`reactivated_at`; the org is locked iff `OrganisationLockdown::active()` returns a row (the Action enforces one
+open per org). Keeping the history is what evidences "locked at HH:MM by whom, reactivated by which path".
+
+**The gate is one globally-appended middleware** (`EnforceOrgLockdown`, beside `SecurityHeaders`), so it reaches
+the panel, the counter and the member PWA at once; org resolved via `ActiveScope::organisationId()`. It
+**degrades OPEN** on any DB error (the app can't serve anything without a DB anyway — fail-closed would take the
+app down on a blip; same philosophy as prompt 124).
+
+**Ordinary-looking, deliberately.** A locked org gets a mundane 503 "temporarily unavailable" page — never a
+"SITE LOCKED" banner. Announcing the lockdown to whoever is in the room, while they are still in the room with
+staff, is the dangerous outcome; a glitch is the safer one.
+
+**Audit BEFORE the lock** (`InitiateLockdown`): the `org.lockdown.initiated` audit lands before the row is
+created, so who/when survives even if the rest fails. Owners are then emailed. Idempotent — a second press
+re-opens nothing.
+
+**Signed-doc URLs invalidated for free.** The gate runs before the `signed` middleware, so every sensitive-doc
+endpoint (ID scans, photos, signatures) is dead while locked — outstanding short-lived URLs cannot be replayed,
+and the 300s TTL means any captured before the lock has expired by reactivation. No per-org signing secret was
+needed (tested: `/members/photo/{id}` → 503 while locked).
+
+**Three ways back, at different trust levels (the prompt's core ask):**
+- **Owner link** — a single-use token emailed to each owner (hash-only stored), consumed at `/reactivar/{token}`
+  under a row lock. Reactivate from the owner's OWN inbox, off the (coerced) terminal. Not reversible at the
+  counter.
+- **Auto-delay** — `lockdown:auto-reactivate` (scheduled every 5 min) reopens any org locked longer than
+  `lockdown_auto_reactivate_minutes` (**OVERNIGHT-DEFAULT — CONFIRM: 24h**), so a locked-out club — the data
+  controller — always regains its own statutory register without depending on us.
+- **Break-glass** — `php artisan lockdown:reactivate {org}`, which needs server access (highest trust).
+
+**Drill mode.** A drill trips the identical machinery (staff/members see the real ordinary screen) but the gate
+lets an authenticated owner through to observe and end it in-app (`drill_ended`); the email says "[Simulacro]".
+
+**Trigger + permissions (OVERNIGHT-DEFAULT — CONFIRM):** `lockdown.initiate` is granted to **STAFF** — they are
+the ones in a robbery — via a discreet, confirm-first item in the counter overflow menu, plus a Filament
+`Seguridad` page for managers (initiate/drill/history). `lockdown.manage` (MANAGER/OWNER) gates the page,
+drills and the runbook. A REAL lockdown has **no in-app reactivation permission by design** — off-premises only.
+
+**Runbook** lives in the Manual (`Help::GUIDES['lockdown-runbook']`, gated on `lockdown.manage`) and a `Seguridad`
+page topic — what to do, and the three ways back, in the club's own words.
+
+**Verification gap (owed — no browser here):** the counter panic button, the Filament Seguridad page and the
+ordinary 503 screen are unverified visually; the *mechanism* is fully tested server-side (`PanicLockdownTest`,
+11: audit-before-lock + idempotent; gate blocks counter/PWA with an ordinary screen; owner-link single-use;
+auto-delay after the window and not before; break-glass; drill blocks staff but passes an owner; doc URL refused
+while locked; staff can trip, a no-role user is 403'd). Owed browser assertions: (a) the counter overflow shows
+"Bloqueo de seguridad" only for `lockdown.initiate` holders and confirms before posting; (b) the Seguridad page
+renders the panic/drill actions and history; (c) the 503 page reads as a mundane outage in light and dark.
+
+`composer check` green (940 tests, 937 passed, 3 pre-existing skips, PHPStan 0). EN/ES parity gated (50 keys).
+Pushed; **do not merge**.
