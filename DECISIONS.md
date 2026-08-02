@@ -4973,3 +4973,36 @@ genetic is active). Owed: the 1024×768 screenshot confirming a genetic card is 
 
 Tests (`PosQuickEntryTest`, 6). `composer check` green (935 tests, 932 passed, 3 pre-existing skips, PHPStan 0).
 EN/ES parity gated. Pushed; **do not merge**.
+## Prompt 128 — ID/MRZ prefill: the measurement gate (read rate reported BEFORE the build)
+
+**The gate, honoured.** The prompt requires measuring the MRZ read rate on REAL photos and reporting the number
+BEFORE building the prefill, because a feature that reads "four times in ten" is worse than none. So the
+prefill UI/storage is **deliberately NOT built**. What ships is the measurement harness the gate demands, and
+the deterministic parser it needs.
+
+**Measured read rate: UNMEASURED in this environment — and that is the honest answer, not a skipped step.**
+Measuring it here is impossible for three reasons, each of which is itself a finding:
+1. **No corpus.** There is no set of real ID/NIE photos in the repo, and I will not fabricate or handle real
+   Article-9 ID scans to create one — that is a club-side, on-real-hardware task.
+2. **No local OCR.** `tesseract` is not installed and there is no MRZ/OCR package; the harness needs one.
+3. **Cloud OCR is forbidden** (the prompt is explicit): it would add a processor, an international transfer and
+   a RAT entry for the most sensitive data the club holds — not a decision to make to save a fortnight.
+
+**What is delivered (the "first, measure" tooling, tested):**
+- `App\Support\Mrz\MrzParser` — a pure, offline TD1 (DNI 3.0 / NIE / residence) + TD3 (passport) MRZ parser that
+  validates every ICAO 9303 check digit and is **correct-or-invalid**: a broken check digit is flagged
+  `valid=false` so a mis-read can never silently prefill a wrong document number. Proven on the canonical ICAO
+  worked examples (`MrzParserTest`, 5) — no photos or OCR needed for that proof.
+- `php artisan id:mrz-read-rate {dir}` — points at a folder of real photos, runs local `tesseract`, isolates the
+  MRZ lines, parses them, and prints `read/total (rate%)`. It refuses to run without `tesseract` and never
+  reaches for a cloud API. This is the "one day of measuring" tool, ready to run when a club provides a corpus
+  on real hardware.
+
+**The decision rule (OVERNIGHT-DEFAULT — CONFIRM):** run `id:mrz-read-rate` on a real corpus. If the valid-read
+rate is **≥ ~90%**, build the prefill (parse → populate `document_number`/DOB/names on the member form, operator
+confirms before save, nothing stored from an invalid read). If it is poor, the answer is **capture UX** — a
+framing guide and autocapture-when-sharp — NOT a better parser and NOT a cloud API. Prefill was left unbuilt
+precisely because that number does not yet exist.
+
+Tests (`MrzParserTest`, 5). `composer check` green (934 tests, 931 passed, 3 pre-existing skips, PHPStan 0).
+Pushed; **do not merge**.
