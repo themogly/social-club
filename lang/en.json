@@ -2024,5 +2024,6 @@
     "Introduce tu PIN para continuar. El trabajo en curso se conserva.": "Enter your PIN to continue. Work in progress is kept.",
     "Pantalla bloqueada": "Screen locked",
     "Bloqueo por inactividad (min)": "Idle lock (min)",
-    "Minutos sin actividad antes de bloquear el mostrador. 0 lo desactiva.": "Minutes of inactivity before the counter locks. 0 disables it."
+    "Minutos sin actividad antes de bloquear el mostrador. 0 lo desactiva.": "Minutes of inactivity before the counter locks. 0 disables it.",
+    "Más opciones": "More options"
 }
