@@ -179,6 +179,8 @@ class DebtAndLocationSettingsTest extends TestCase
             // Panic-lockdown system settings (prompt 121): the auto-reactivation delay and the owner link TTL are
             // security constants tuned in config, not front-of-house thresholds on the org settings form.
             'lockdown_auto_reactivate_minutes', 'lockdown_reactivation_link_ttl_hours',
+            // Per-location numeric-LIST setting, edited on LocationForm (prompt 133): POS weight presets.
+            'pos_weight_presets_g',
             // Documented in DECISIONS: forecast_options_g is a preset ARRAY (a tags/repeater
             // input is a later enhancement); low_stock_threshold_cg is a fallback — the operative
             // low-stock threshold is set per-article on the Article resource.

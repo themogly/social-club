@@ -132,6 +132,10 @@ class Settings
         'lockdown_auto_reactivate_minutes' => 1440,
         'lockdown_reactivation_link_ttl_hours' => 48,
 
+        // One-tap weight presets on the dispensary POS (prompt 133), per-location — clubs sell different amounts.
+        // 3.5 g is ResolvePrice::EIGHTH_CG, the button that triggers the eighth break. Grams at the edge.
+        'pos_weight_presets_g' => [1, 2, 3.5, 5],
+
         // Per-location defaults (overridable per premises)
         'aforo_default' => 50,
 

@@ -18,6 +18,9 @@ class CreateLocation extends CreateRecord
     /** @var array<string, int> the per-location integer settings, stashed until the record exists */
     private array $integerState = [];
 
+    /** @var array<string, list<int|float>> the per-location numeric-list settings, stashed until the record exists */
+    private array $arrayState = [];
+
     /**
      * Strip the virtual toggle fields off the model payload (they aren't columns) and stash them
      * to persist as location-scoped Setting rows once the location has an id.
@@ -37,6 +40,11 @@ class CreateLocation extends CreateRecord
             unset($data[$key]);
         }
 
+        foreach (LocationForm::SETTING_ARRAYS as $key) {
+            $this->arrayState[$key] = LocationForm::normalizeNumberList((array) ($data[$key] ?? Settings::DEFAULTS[$key]));
+            unset($data[$key]);
+        }
+
         return $data;
     }
 
@@ -48,6 +56,10 @@ class CreateLocation extends CreateRecord
 
         foreach (LocationForm::SETTING_INTEGERS as $key) {
             Settings::set($key, $this->integerState[$key] ?? (int) Settings::DEFAULTS[$key], SettingType::INT, (string) $this->record->getKey());
+        }
+
+        foreach (LocationForm::SETTING_ARRAYS as $key) {
+            Settings::set($key, $this->arrayState[$key] ?? Settings::DEFAULTS[$key], SettingType::JSON, (string) $this->record->getKey());
         }
     }
 }

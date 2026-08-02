@@ -270,6 +270,33 @@
                             <span class="text-2xl font-bold tabular-nums">{{ $weightInput === '' ? '0' : $weightInput }}{{ $calculatorMode ? ' €' : ' g' }}</span>
                         </div>
 
+                        {{-- One-tap weight presets (prompt 133): each shows its resulting price; 3,5 g shows the
+                             eighth break. A preset over the member's remaining allowance is shown unavailable, not
+                             refused after the tap. It only FILLS the weight input — the same checks apply at add. --}}
+                        @if (! $calculatorMode && ! empty($weightPresets))
+                            <div class="mt-3 grid grid-cols-4 gap-2" data-weight-presets>
+                                @foreach ($weightPresets as $preset)
+                                    <button
+                                        type="button"
+                                        @if ($preset['available']) wire:click="applyWeightPreset({{ $preset['grams_cg'] }})" @else disabled aria-disabled="true" @endif
+                                        data-weight-preset="{{ $preset['grams_cg'] }}"
+                                        @class([
+                                            'flex min-h-11 flex-col items-center justify-center rounded-xl border px-1 py-1 text-sm font-semibold transition',
+                                            'border-line bg-surface text-ink hover:bg-brand-tint hover:text-brand dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100' => $preset['available'],
+                                            'cursor-not-allowed border-line/60 text-ink-muted opacity-40 dark:border-slate-800' => ! $preset['available'],
+                                        ])
+                                    >
+                                        <span>{{ $preset['label'] }} g</span>
+                                        @if ($preset['price_cents'] !== null)
+                                            <span @class(['text-[11px] font-medium', 'text-brand' => $preset['eighth_applied'], 'text-ink-muted dark:text-slate-400' => ! $preset['eighth_applied']])>
+                                                {{ $this->money($preset['price_cents']) }}@if ($preset['eighth_applied']) · ⅛@endif
+                                            </span>
+                                        @endif
+                                    </button>
+                                @endforeach
+                            </div>
+                        @endif
+
                         {{-- numeric pad --}}
                         <div class="mt-3 grid grid-cols-3 gap-2">
                             @foreach (['1','2','3','4','5','6','7','8','9'] as $digit)
@@ -348,6 +375,25 @@
                             class="h-11 w-full rounded-xl border border-line bg-surface px-4 text-sm text-ink placeholder:text-ink-muted focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/40 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 sm:w-56"
                         >
                     </div>
+
+                    {{-- "Their usual" (prompt 133): the member's recent genetics, one tap each, only those
+                         sellable at this sede right now. Combined with a weight preset, a regular's order is one
+                         or two taps. Sourced once on identification. --}}
+                    @if (! empty($usualGenetics))
+                        <div class="mt-3" data-usual-genetics>
+                            <p class="mb-1 text-xs font-medium text-ink-muted dark:text-slate-400">{{ __('Su habitual') }}</p>
+                            <div class="flex flex-wrap gap-2">
+                                @foreach ($usualGenetics as $usual)
+                                    <button
+                                        type="button"
+                                        wire:click="chooseGenetic('{{ $usual['id'] }}')"
+                                        data-usual-genetic="{{ $usual['id'] }}"
+                                        class="inline-flex min-h-11 items-center gap-1.5 rounded-full border border-brand/40 bg-brand-tint px-4 text-sm font-semibold text-brand transition hover:bg-brand hover:text-white dark:bg-slate-800 dark:text-slate-100"
+                                    >{{ $usual['name'] }}</button>
+                                @endforeach
+                            </div>
+                        </div>
+                    @endif
 
                     {{-- Each filter row is LABELLED (prompt 66) — Categoría (club data), Tipo (product type)
                          and Variedad (strain) are different axes; unlabelled, they read as duplicates. --}}

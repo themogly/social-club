@@ -2078,5 +2078,9 @@
     "En sede ahora: :g": "On site now: :g",
     "Puedes dar de alta :g más antes de superar el límite.": "You can bring in :g more before exceeding the limit.",
     "Supera el techo en :g.": "Over the ceiling by :g.",
-    "Techo legal de existencias": "Legal stock headroom"
+    "Techo legal de existencias": "Legal stock headroom",
+    "Atajos de peso (g)": "Weight shortcuts (g)",
+    "Añadir gramos": "Add grams",
+    "Gramos de un toque en el dispensario, p. ej. 1, 2, 3.5, 5.": "One-tap grams on the dispensary, e.g. 1, 2, 3.5, 5.",
+    "Su habitual": "Their usual"
 }

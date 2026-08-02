@@ -37,6 +37,39 @@ class LocationForm
         'counter_idle_lock_minutes',
     ];
 
+    /**
+     * Per-location numeric-LIST settings — stored as a location-scoped JSON Setting row (prompt 133:
+     * pos_weight_presets_g, the one-tap gram amounts on the dispensary POS). Persisted by Create/EditLocation.
+     *
+     * @var list<string>
+     */
+    public const SETTING_ARRAYS = [
+        'pos_weight_presets_g',
+    ];
+
+    /**
+     * Clean a TagsInput list of gram amounts (strings, comma-or-dot decimals) into a sorted, de-duplicated list
+     * of positive numbers for storage — so a fat-fingered "3,5x" or a blank never reaches the POS.
+     *
+     * @param  array<int, mixed>  $values
+     * @return list<int|float>
+     */
+    public static function normalizeNumberList(array $values): array
+    {
+        $numbers = [];
+        foreach ($values as $value) {
+            $normalised = str_replace(',', '.', trim((string) $value));
+            if (is_numeric($normalised) && (float) $normalised > 0) {
+                $float = (float) $normalised;
+                $numbers[] = $float === floor($float) ? (int) $float : $float;
+            }
+        }
+        $numbers = array_values(array_unique($numbers, SORT_NUMERIC));
+        sort($numbers);
+
+        return $numbers;
+    }
+
     public static function configure(Schema $schema): Schema
     {
         return $schema
@@ -117,6 +150,13 @@ class LocationForm
                     ->minValue(0)
                     ->default(fn (): int => (int) Settings::get('counter_idle_lock_minutes', 5))
                     ->helperText(__('Minutos sin actividad antes de bloquear el mostrador. 0 lo desactiva.')),
+
+                // One-tap weight presets on the dispensary POS (prompt 133). Grams; 3,5 g triggers the eighth
+                // break. A sede sets its own list.
+                TagsInput::make('pos_weight_presets_g')
+                    ->label(__('Atajos de peso (g)'))
+                    ->helperText(__('Gramos de un toque en el dispensario, p. ej. 1, 2, 3.5, 5.'))
+                    ->placeholder(__('Añadir gramos')),
 
                 // Terminal CRUD lives here now (prompt 102), not free-typed at the counter: the named tills of
                 // this sede. With one till the name is cosmetic; with several it is what the operator picks.
