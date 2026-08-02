@@ -2007,5 +2007,16 @@
     "No hay caja abierta: un cobro en efectivo debe registrarse en la caja.": "No till is open: a cash payment must be recorded in the till.",
     "No tienes ninguna sede activa. Pide a un responsable que te asigne una.": "You have no active location. Ask a manager to assign you one.",
     "Puedes cobrar el total o una parte.": "You can collect the full amount or part of it.",
-    "Sin caja abierta solo se admite el cobro con monedero.": "With no open till, only wallet collection is allowed."
+    "Sin caja abierta solo se admite el cobro con monedero.": "With no open till, only wallet collection is allowed.",
+    ":created a crear · :skipped duplicados · :errors con errores · :pending sin consentimiento.": ":created to create · :skipped duplicates · :errors with errors · :pending without consent.",
+    ":created creados · :skipped omitidos (duplicados) · :errors con errores · :pending sin consentimiento.": ":created created · :skipped skipped (duplicates) · :errors with errors · :pending without consent.",
+    ":created socios se crearán. :pending llegan sin consentimiento y quedarán marcados como pendientes.": ":created members will be created. :pending arrive without consent and will be flagged as pending.",
+    ":errors filas con errores (p. ej. número de socio repetido) NO se importarán.": ":errors rows with errors (e.g. a repeated member number) will NOT be imported.",
+    "Columnas (todas opcionales salvo el nombre): first_name, last_name, email, phone, date_of_birth, document_type, document_number, declared_monthly_g, member_no, joined_at, left_at, status, location, tier, membership_start, consent_date, consent_text_version.": "Columns (all optional except the name): first_name, last_name, email, phone, date_of_birth, document_type, document_number, declared_monthly_g, member_no, joined_at, left_at, status, location, tier, membership_start, consent_date, consent_text_version.",
+    "Confirmar importación": "Confirm import",
+    "Confirmar importación (:count)": "Confirm import (:count)",
+    "La previsualización caducó. Vuelve a subir el archivo.": "The preview expired. Upload the file again.",
+    "Revisa antes de confirmar": "Review before confirming",
+    "Sede :location: :members socios activos → techo de stock :ceiling.": "Location :location: :members active members → stock ceiling :ceiling.",
+    "Sin consentimiento RGPD registrado. Recoge y registra el consentimiento del socio.": "No GDPR consent on record. Collect and record the member’s consent."
 }

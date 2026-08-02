@@ -273,4 +273,14 @@ class Member extends Model implements Authenticatable, HasLocalePreference
         return $this->memberships()->withoutGlobalScopes()
             ->where('status', MembershipStatus::ACTIVE->value)->exists();
     }
+
+    /**
+     * Derived (prompt 131) — whether the club holds a standing RGPD consent for this member. A member enrolled
+     * on paper and brought across by the CSV import has none until it is collected, so the import flags them
+     * consent-pending rather than fabricating a consent to a text they never saw. Never stored; queried live.
+     */
+    public function hasConsent(): bool
+    {
+        return $this->consents()->whereNull('withdrawn_at')->exists();
+    }
 }

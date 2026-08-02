@@ -77,6 +77,17 @@ class MembersTable
                     ->color('warning')
                     ->state(fn (Member $record): ?string => $record->hasStaleDeclaration() ? __('Desactualizada') : null)
                     ->toggleable(isToggledHiddenByDefault: true),
+                // Prompt 131: DERIVED — a member imported off the paper register carries no RGPD consent until it
+                // is collected. Flags exactly who to chase. Toggleable + hidden by default (it queries each
+                // member's consents), so it is opt-in for a consent sweep rather than an N+1 on the main list.
+                TextColumn::make('consent_pending')
+                    ->label(__('Consentimiento'))
+                    ->badge()
+                    ->placeholder('—')
+                    ->color(fn (?string $state): string => $state === null ? 'success' : 'warning')
+                    ->state(fn (Member $record): ?string => $record->hasConsent() ? null : __('Pendiente'))
+                    ->tooltip(fn (Member $record): ?string => $record->hasConsent() ? null : __('Sin consentimiento RGPD registrado. Recoge y registra el consentimiento del socio.'))
+                    ->toggleable(isToggledHiddenByDefault: true),
                 TextColumn::make('joined_at')->label(__('Alta'))->date()->sortable()->toggleable(),
                 TextColumn::make('wallet_transactions_sum_amount_cents')
                     ->label(__('Monedero'))
