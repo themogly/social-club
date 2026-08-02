@@ -4851,3 +4851,38 @@ inside it); re-run `measure-topbar.mjs` after reconciling, since it changes the 
 
 `composer check` green (915 tests, 912 passed, 3 pre-existing skips, PHPStan 0). EN/ES parity gated (1 key).
 Pushed; **not merged** (the prompt's instruction; a human should eyeball the four screens).
+
+---
+
+## Prompt 133 — One- or two-tap dispensations (weight presets + "their usual")
+
+**Weight presets.** A row of one-tap gram amounts in the dispensary POS weight panel, **default `[1, 2, 3.5, 5]`**,
+per-location via a new `LocationForm::SETTING_ARRAYS` reconciliation (`pos_weight_presets_g`, stored as a JSON
+Setting row alongside the boolean toggles and prompt-120's integers) — so two sedes can differ (tested). Each
+button shows its **resulting price**, and 3.5 g (= `ResolvePrice::EIGHTH_CG`) shows the **eighth break** — the
+price is computed through the exact `ResolvePrice::applyEighthBreaks` path the basket uses, so the button shows
+what the line will actually be charged (tested: the 3.5 g button shows the €30 eighth, not 3.5 × rate).
+
+**Presets are an input, never a fast path.** `applyWeightPreset()` only FILLS the same `weightInput` a typed
+amount would, so eligibility, carencia and the daily/monthly limits are enforced identically at `addLine`
+(tested: tapping 3,5 g == typing 3,50). A preset over the member's remaining allowance is shown **unavailable**
+(disabled), not refused after the tap (tested at a 2 g daily cap: 1 g/2 g available, 3.5 g/5 g disabled).
+
+**"Their usual."** On identification, the member's most recent DISTINCT genetics, filtered to what is sellable
+at this sede right now via the SAME `Genetic::sellableAt()` scope the POS grid and `PwaController::menu()` share
+(prompt 95 — so the three cannot drift): an unpriced/out-of-stock/soft-deleted strain never appears (tested).
+**One query on identification** (the recent-genetic ids), then an in-memory intersect — never a query per
+suggestion (tested: the query count does not scale from one usual to three). A member with no history sees
+nothing and the screen is unbroken (tested).
+
+`CommitDispensation` untouched — this is entry, not committing. The typed path is unchanged; presets are an
+addition. All new controls are 44px.
+
+**Verification gap (owed — no browser here):** the required 1024×768 assertion (a genetic still above the fold
+with the preset row + suggestions visible, light and dark) is a screenshot I cannot run. The preset row sits
+inside the weight panel and "their usual" is a single wrap row above the grid filters, both below existing
+content — the layout budget from prompts 116/130 is not spent on a new persistent row (presets show only when a
+genetic is active). Owed: the 1024×768 screenshot confirming a genetic card is still visible without scrolling.
+
+Tests (`PosQuickEntryTest`, 6). `composer check` green (935 tests, 932 passed, 3 pre-existing skips, PHPStan 0).
+EN/ES parity gated. Pushed; **do not merge**.

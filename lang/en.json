@@ -2025,5 +2025,9 @@
     "Pantalla bloqueada": "Screen locked",
     "Bloqueo por inactividad (min)": "Idle lock (min)",
     "Minutos sin actividad antes de bloquear el mostrador. 0 lo desactiva.": "Minutes of inactivity before the counter locks. 0 disables it.",
-    "Más opciones": "More options"
+    "Más opciones": "More options",
+    "Atajos de peso (g)": "Weight shortcuts (g)",
+    "Añadir gramos": "Add grams",
+    "Gramos de un toque en el dispensario, p. ej. 1, 2, 3.5, 5.": "One-tap grams on the dispensary, e.g. 1, 2, 3.5, 5.",
+    "Su habitual": "Their usual"
 }

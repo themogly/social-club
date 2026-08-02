@@ -127,6 +127,10 @@ class Settings
         // until someone re-enters a PIN. Per-location (a quiet sede may want longer). 0 disables the idle lock.
         'counter_idle_lock_minutes' => 5,
 
+        // One-tap weight presets on the dispensary POS (prompt 133), per-location — clubs sell different amounts.
+        // 3.5 g is ResolvePrice::EIGHTH_CG, the button that triggers the eighth break. Grams at the edge.
+        'pos_weight_presets_g' => [1, 2, 3.5, 5],
+
         // Per-location defaults (overridable per premises)
         'aforo_default' => 50,
 

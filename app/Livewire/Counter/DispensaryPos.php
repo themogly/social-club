@@ -11,6 +11,7 @@ use App\Actions\Members\ResolveMemberByToken;
 use App\Actions\Pricing\ResolveArticleDiscount;
 use App\Actions\Pricing\ResolvePrice;
 use App\Actions\Stock\SelectBatch;
+use App\Enums\DispensationStatus;
 use App\Enums\MembershipStatus;
 use App\Enums\TillSessionStatus;
 use App\Exceptions\DebtLimitExceededException;
@@ -27,6 +28,7 @@ use App\Models\Article;
 use App\Models\Batch;
 use App\Models\CheckIn;
 use App\Models\Dispensation;
+use App\Models\DispensationLine;
 use App\Models\Genetic;
 use App\Models\Location;
 use App\Models\Member;
@@ -37,7 +39,9 @@ use App\Models\User;
 use App\Support\CounterOperator;
 use App\Support\DocumentVault;
 use App\Support\EligibilityVerdict;
+use App\Support\LimitSnapshot;
 use App\Support\Money;
+use App\Support\PriceResult;
 use App\Support\Settings;
 use App\Support\TerminalName;
 use App\Support\VaultUrl;
@@ -988,6 +992,7 @@ class DispensaryPos extends Component
         [$cashPreview, $walletPreview] = $this->tenderSplit($total);
 
         $allGenetics = $this->geneticRows($location, $member);
+        $activeGeneticModel = $this->activeGeneticId !== null ? Genetic::query()->find($this->activeGeneticId) : null;
 
         return view('livewire.counter.dispensary-pos', [
             'location' => $location,
@@ -1010,7 +1015,9 @@ class DispensaryPos extends Component
             'cashPreviewCents' => $cashPreview,
             'walletPreviewCents' => $walletPreview,
             'changeDueCents' => $this->changeDueCents($cashPreview),
-            'activeGenetic' => $this->activeGeneticId !== null ? Genetic::query()->find($this->activeGeneticId) : null,
+            'activeGenetic' => $activeGeneticModel,
+            'weightPresets' => $this->weightPresets($activeGeneticModel, $location, $member, $limits),
+            'usualGenetics' => $this->usualGenetics($member, $allGenetics),
             'activeGeneticBatches' => $this->activeGeneticBatches($location),
             'activeGeneticPriceCents' => $this->activeGeneticRateCents($location, $member),
             'openTill' => $openTill,
@@ -1241,6 +1248,141 @@ class DispensaryPos extends Component
      *
      * @return list<array<string, mixed>>
      */
+    /**
+     * Apply a one-tap weight preset (prompt 133). It only FILLS the same weight input a typed amount would, so
+     * eligibility, carencia and the daily/monthly limits are enforced identically at addLine — a preset is an
+     * input, never a fast path around the checks.
+     */
+    public function applyWeightPreset(int $gramsCg): void
+    {
+        $this->calculatorMode = false;
+        $this->weightInput = str_replace('.', ',', rtrim(rtrim(number_format($gramsCg / 100, 2, '.', ''), '0'), '.'));
+    }
+
+    /**
+     * The weight presets for the CURRENT active genetic + member (component state) — the public entry point the
+     * view and tests share; render passes the already-computed locals to the private logic for efficiency.
+     *
+     * @return list<array{grams_cg: int, label: string, price_cents: ?int, eighth_applied: bool, available: bool}>
+     */
+    public function quickEntryPresets(): array
+    {
+        $location = $this->resolveLocation();
+        $member = $this->resolveMember();
+        $genetic = $this->activeGeneticId !== null ? Genetic::query()->find($this->activeGeneticId) : null;
+        $limits = ($member !== null && $location !== null) ? (new ResolveMemberLimits)->handle($member, $location) : null;
+
+        return $this->weightPresets($genetic, $location, $member, $limits);
+    }
+
+    /**
+     * The current member's "usual" genetics (component state) — public entry point for the view and tests.
+     *
+     * @return list<array<string, mixed>>
+     */
+    public function theirUsual(): array
+    {
+        $location = $this->resolveLocation();
+        $member = $this->resolveMember();
+
+        return $location !== null ? $this->usualGenetics($member, $this->geneticRows($location, $member)) : [];
+    }
+
+    /**
+     * The one-tap weight presets for the active WEIGHT genetic, each with its resulting price (INCLUDING the
+     * eighth break at 3.5 g) and whether it fits the member's remaining allowance — a preset over the cap is
+     * shown unavailable, not refused after the tap.
+     *
+     * @return list<array{grams_cg: int, label: string, price_cents: ?int, eighth_applied: bool, available: bool}>
+     */
+    private function weightPresets(?Genetic $genetic, ?Location $location, ?Member $member, ?LimitSnapshot $limits): array
+    {
+        if ($genetic === null || $location === null || $genetic->isUnitType()) {
+            return [];
+        }
+
+        $remaining = $limits !== null ? min($limits->dailyRemainingCg(), $limits->monthlyRemainingCg()) : PHP_INT_MAX;
+
+        try {
+            $price = (new ResolvePrice)->forGenetic($genetic, $location, $member);
+        } catch (RuntimeException) {
+            $price = null;
+        }
+
+        $presets = [];
+        foreach ((array) Settings::get('pos_weight_presets_g', [1, 2, 3.5, 5]) as $g) {
+            $grams = (float) str_replace(',', '.', (string) $g);
+            if ($grams <= 0) {
+                continue;
+            }
+            $cg = (int) round_half_up($grams * 100);
+            [$priceCents, $eighthApplied] = $this->presetPrice($price, $cg);
+
+            $presets[] = [
+                'grams_cg' => $cg,
+                'label' => rtrim(rtrim(number_format($grams, 2, ',', ''), '0'), ','),
+                'price_cents' => $priceCents,
+                'eighth_applied' => $eighthApplied,
+                'available' => $cg <= $remaining,
+            ];
+        }
+
+        return $presets;
+    }
+
+    /**
+     * The [price, eighth-applied] a single preset line would cost — the SAME path the basket prices with, so
+     * the 3.5 g button shows exactly the eighth price the line will be charged (prompt 83/133).
+     *
+     * @return array{0: ?int, 1: bool}
+     */
+    private function presetPrice(?PriceResult $price, int $cg): array
+    {
+        if ($price === null) {
+            return [null, false];
+        }
+
+        $result = (new ResolvePrice)->applyEighthBreaks([[
+            'grams_cg' => $cg,
+            'rate_cents' => $price->effectiveRatePerGramCents(),
+            'per_gram_total' => $price->lineFor($cg)['total_cents'],
+            'eighth_price' => $price->effectiveEighthPriceCents(),
+        ]]);
+
+        return [$result[0]['total_cents'], $result[0]['eighth_applied']];
+    }
+
+    /**
+     * "Their usual" (prompt 133): the member's most recent DISTINCT genetics, filtered to what is sellable at
+     * THIS sede right now (the SAME $sellableRows the grid uses, prompt 95 — so the two can never drift), most
+     * recent first, up to three. ONE query on identification (the recent ids), then an in-memory intersect —
+     * never a query per suggestion.
+     *
+     * @param  list<array<string, mixed>>  $sellableRows
+     * @return list<array<string, mixed>>
+     */
+    private function usualGenetics(?Member $member, array $sellableRows): array
+    {
+        if ($member === null || $sellableRows === []) {
+            return [];
+        }
+
+        $byId = collect($sellableRows)->keyBy('id');
+
+        return DispensationLine::query()->withoutGlobalScopes()
+            ->join('dispensations', 'dispensation_lines.dispensation_id', '=', 'dispensations.id')
+            ->where('dispensations.member_id', $member->id)
+            ->where('dispensations.status', DispensationStatus::COMPLETED->value)
+            ->orderByDesc('dispensations.dispensed_at')
+            ->pluck('dispensation_lines.genetic_id')
+            ->unique()
+            ->filter(fn ($id): bool => $byId->has($id))
+            ->take(3)
+            ->map(fn ($id) => $byId->get($id))
+            ->values()->all();
+    }
+
+    /** @return list<array<string, mixed>> */
     private function geneticRows(?Location $location, ?Member $member): array
     {
         if ($location === null) {
