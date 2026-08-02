@@ -1,6 +1,7 @@
 <div class="flex flex-col gap-5 lg:grid lg:grid-cols-[minmax(0,1fr)_22rem] lg:items-start">
     <div class="lg:col-span-2">
         @include('livewire.counter.partials.operator-strip')
+        @include('livewire.counter.partials.lock-overlay')
     </div>
 
     {{-- ================= LEFT: the door workflow ================= --}}

@@ -174,6 +174,8 @@ class DebtAndLocationSettingsTest extends TestCase
             'restrict_pos_to_checked_in', 'signature_on_dispensation', 'camera_scan_enabled',
             // Per-location toggles reconciled to Setting rows (prompt 59/102), edited on LocationForm.
             'bar_enabled', 'ring_fenced', 'multiple_tills_enabled',
+            // Per-location INTEGER setting, edited on LocationForm (prompt 120): idle-lock minutes.
+            'counter_idle_lock_minutes',
             // Documented in DECISIONS: forecast_options_g is a preset ARRAY (a tags/repeater
             // input is a later enhancement); low_stock_threshold_cg is a fallback — the operative
             // low-stock threshold is set per-article on the Article resource.

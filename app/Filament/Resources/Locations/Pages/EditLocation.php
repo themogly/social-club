@@ -35,6 +35,10 @@ class EditLocation extends EditRecord
             $data[$key] = (bool) Settings::get($key, Settings::DEFAULTS[$key], (string) $this->record->getKey());
         }
 
+        foreach (LocationForm::SETTING_INTEGERS as $key) {
+            $data[$key] = (int) Settings::get($key, Settings::DEFAULTS[$key], (string) $this->record->getKey());
+        }
+
         return $data;
     }
 
@@ -49,6 +53,11 @@ class EditLocation extends EditRecord
     {
         foreach (LocationForm::SETTING_TOGGLES as $key) {
             Settings::set($key, (bool) ($data[$key] ?? false), SettingType::BOOL, (string) $this->record->getKey());
+            unset($data[$key]);
+        }
+
+        foreach (LocationForm::SETTING_INTEGERS as $key) {
+            Settings::set($key, (int) ($data[$key] ?? Settings::DEFAULTS[$key]), SettingType::INT, (string) $this->record->getKey());
             unset($data[$key]);
         }
 

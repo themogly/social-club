@@ -5,6 +5,7 @@ namespace App\Livewire\Counter\Concerns;
 use App\Actions\UnlockOperator;
 use App\Support\ActiveScope;
 use App\Support\CounterOperator;
+use Livewire\Attributes\On;
 
 /**
  * PIN operator identification, shared by every counter screen (prompt 02/26). A till
@@ -40,6 +41,24 @@ trait IdentifiesOperator
     public function operatorLockedOut(): bool
     {
         return (new UnlockOperator)->isLockedOut($this->operatorThrottleKey());
+    }
+
+    /** Seconds until the pad accepts a PIN again (0 when not locked) — the pad shows the countdown. */
+    public function operatorLockoutSeconds(): int
+    {
+        return (new UnlockOperator)->lockoutSecondsRemaining($this->operatorThrottleKey());
+    }
+
+    /**
+     * Lock the counter (prompt 120): the idle timer or the manual "lock now" button dispatches `counter-lock`,
+     * and locking simply signs the operator OUT. That reuses the existing gate — every commit already calls
+     * requireOperator() and now finds no operator, so writes are refused SERVER-SIDE, not just hidden behind the
+     * overlay. Basket/session state is untouched, so unlocking (any valid PIN) resumes exactly where it left off.
+     */
+    #[On('counter-lock')]
+    public function lockCounter(): void
+    {
+        CounterOperator::clear();
     }
 
     public function openOperatorPanel(): void
@@ -95,6 +114,9 @@ trait IdentifiesOperator
         CounterOperator::set($operator);
         $this->operatorPanelOpen = false;
         $this->operatorFeedback = null;
+        // Tell the idle-lock overlay (prompt 120) to lift — the same PIN pad both identifies a new operator and
+        // unlocks an idle-locked screen, so a successful unlock always clears the overlay.
+        $this->dispatch('counter-unlocked');
         $this->flash(__('Trabajando: :name', ['name' => $operator->name]), 'success');
     }
 
@@ -115,11 +137,15 @@ trait IdentifiesOperator
         return false;
     }
 
-    /** Per-device, per-location throttle bucket — a shared till can't be brute-forced. */
+    /**
+     * LOCATION-WIDE throttle bucket (prompt 120). Was per-device (…:sessionId), but a shared counter has many
+     * devices and a browser session is trivial to rotate — so the count is keyed to the sede only, and every
+     * device at that sede shares one escalating lockout. A wrong-sede/no-sede terminal buckets under 'none'.
+     */
     private function operatorThrottleKey(): string
     {
         $locationId = app(ActiveScope::class)->locationId() ?? 'none';
 
-        return 'counter-pin:'.$locationId.':'.session()->getId();
+        return 'counter-pin:'.$locationId;
     }
 }

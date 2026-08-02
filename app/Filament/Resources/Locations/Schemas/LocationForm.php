@@ -27,6 +27,16 @@ class LocationForm
         'multiple_tills_enabled',
     ];
 
+    /**
+     * Per-location INTEGER settings — same location-scoped-Setting-row mechanism as the toggles, but numeric
+     * (prompt 120: counter_idle_lock_minutes). Filled/persisted by Create/EditLocation as SettingType::INT.
+     *
+     * @var list<string>
+     */
+    public const SETTING_INTEGERS = [
+        'counter_idle_lock_minutes',
+    ];
+
     public static function configure(Schema $schema): Schema
     {
         return $schema
@@ -98,6 +108,15 @@ class LocationForm
                 Toggle::make('multiple_tills_enabled')
                     ->label(__('Varias cajas por sede'))
                     ->helperText(__('Actívalo solo si esta sede abre más de una caja a la vez.')),
+
+                // Idle lock (prompt 120): minutes of no real operator input before a counter screen auto-locks
+                // (signs the operator out, obscures member data). Per-location; 0 disables it.
+                TextInput::make('counter_idle_lock_minutes')
+                    ->label(__('Bloqueo por inactividad (min)'))
+                    ->numeric()
+                    ->minValue(0)
+                    ->default(fn (): int => (int) Settings::get('counter_idle_lock_minutes', 5))
+                    ->helperText(__('Minutos sin actividad antes de bloquear el mostrador. 0 lo desactiva.')),
 
                 // Terminal CRUD lives here now (prompt 102), not free-typed at the counter: the named tills of
                 // this sede. With one till the name is cosmetic; with several it is what the operator picks.

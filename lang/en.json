@@ -2018,5 +2018,11 @@
     "La previsualización caducó. Vuelve a subir el archivo.": "The preview expired. Upload the file again.",
     "Revisa antes de confirmar": "Review before confirming",
     "Sede :location: :members socios activos → techo de stock :ceiling.": "Location :location: :members active members → stock ceiling :ceiling.",
-    "Sin consentimiento RGPD registrado. Recoge y registra el consentimiento del socio.": "No GDPR consent on record. Collect and record the member’s consent."
+    "Sin consentimiento RGPD registrado. Recoge y registra el consentimiento del socio.": "No GDPR consent on record. Collect and record the member’s consent.",
+    "Bloquear pantalla": "Lock screen",
+    "Demasiados intentos. Inténtalo en :s s.": "Too many attempts. Try again in :s s.",
+    "Introduce tu PIN para continuar. El trabajo en curso se conserva.": "Enter your PIN to continue. Work in progress is kept.",
+    "Pantalla bloqueada": "Screen locked",
+    "Bloqueo por inactividad (min)": "Idle lock (min)",
+    "Minutos sin actividad antes de bloquear el mostrador. 0 lo desactiva.": "Minutes of inactivity before the counter locks. 0 disables it."
 }
