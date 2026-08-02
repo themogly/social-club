@@ -20,6 +20,7 @@ use App\Filament\Pages\Reports\FinancialReportPage;
 use App\Filament\Pages\Reports\MembersReportPage;
 use App\Filament\Pages\Reports\StockReportPage;
 use App\Filament\Pages\Reports\TillReportPage;
+use App\Filament\Pages\Seguridad;
 use App\Filament\Pages\SystemHealth;
 use App\Models\Announcement;
 use App\Models\Article;
@@ -223,6 +224,10 @@ class Help
             'La foto del día de tu sede (aforo, caja, dispensaciones) o, si eres propietario/a, la consolidación de toda la organización.',
             'Todas las cifras se consultan en vivo, nunca se guardan en caché.',
         ]],
+        Seguridad::class => ['permission' => 'lockdown.manage', 'title' => 'Seguridad', 'body' => [
+            'Desde aquí se activa el bloqueo de seguridad ante una amenaza, se ensaya con un simulacro y se consulta el historial de activaciones.',
+            'El guion completo de qué hacer y cómo se vuelve a entrar está en el Manual, en «Bloqueo de seguridad».',
+        ]],
         ManageSettings::class => ['permission' => 'settings.manage', 'title' => 'Ajustes de la organización', 'body' => [
             'Los umbrales de cumplimiento del club: edad mínima, carencia, límites de gramos, aforo, política de avalador…',
             'Cada umbral es configurable porque la práctica regional varía y la jurisprudencia cambia. Cambiar uno afecta al mostrador de inmediato.',
@@ -315,6 +320,28 @@ class Help
      * @var array<string, array{title: string, permission: string|null, intro: string, example?: string, steps: list<array{title: string, body: list<string>}>}>
      */
     public const GUIDES = [
+        'lockdown-runbook' => [
+            'permission' => 'lockdown.manage',
+            'title' => 'Bloqueo de seguridad (atraco): qué hacer',
+            'intro' => 'El bloqueo de seguridad cierra el club entero —panel, mostrador y área de socios— y muestra una pantalla anodina de «no disponible», nunca un cartel de «bloqueado»: quien esté en la sala no debe saber que se ha activado. Lo importante no es el botón, es saber cómo se vuelve a entrar.',
+            'steps' => [
+                ['title' => 'Activarlo', 'body' => [
+                    'Cualquier persona del mostrador puede activarlo desde su pantalla; también un responsable desde Seguridad en el panel. Se registra quién y cuándo ANTES de cerrar, y se avisa a los propietarios por correo.',
+                    'Que se vea como una avería es deliberado: protege al personal que sigue en la sala.',
+                ]],
+                ['title' => 'Volver a entrar — hay tres caminos, a propósito', 'body' => [
+                    'Enlace del propietario: cada propietario recibe un enlace de un solo uso en su correo. Se reactiva DESDE SU PROPIO MÓVIL, fuera del terminal, cuando sea seguro. No se puede reactivar desde el mostrador.',
+                    'Plazo automático: si nadie reactiva, el sistema se reabre solo pasado el plazo configurado (por defecto 24 h), para que el club —que es el responsable de los datos— nunca quede fuera de su propio libro de socios.',
+                    'Rotura de cristal: un operador de la plataforma puede reactivarlo por línea de comandos (php artisan lockdown:reactivate), que exige acceso al servidor.',
+                ]],
+                ['title' => 'Ensayarlo', 'body' => [
+                    'Haz un simulacro desde Seguridad. El simulacro cierra las pantallas igual que el real para que el equipo lo viva, pero avisa de que es un simulacro y un propietario puede terminarlo desde el panel al momento.',
+                ]],
+                ['title' => 'Después', 'body' => [
+                    'Durante el bloqueo no se puede acceder a ningún documento de identidad ni foto de socio: los enlaces firmados dejan de funcionar. Al reabrir, revisa el registro de auditoría (quién activó, cómo se reactivó) y valora denunciar según proceda.',
+                ]],
+            ],
+        ],
         'new-location' => [
             'permission' => 'locations.manage',
             'title' => 'Abrir una sede nueva',

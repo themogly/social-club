@@ -254,6 +254,29 @@
                 </button>
             </form>
 
+            {{-- Panic lockdown (prompt 121): a discreet, staff-reachable trigger — they are the ones in the room.
+                 Confirms first (an accidental trip locks the whole club), then trips the org-wide lockdown; the
+                 next request shows the ordinary "unavailable" screen. Gated on lockdown.initiate. --}}
+            @if ($user?->can('lockdown.initiate'))
+                <form
+                    method="POST"
+                    action="{{ route('counter.panic') }}"
+                    @submit="! window.confirm(@js(__('¿Activar el bloqueo de seguridad? Cerrará el club entero.'))) && $event.preventDefault()"
+                >
+                    @csrf
+                    <button
+                        type="submit"
+                        data-counter-panic
+                        class="mt-1 flex min-h-11 w-full items-center gap-2 rounded-lg border-t border-line px-3 pt-2 text-sm font-medium text-error transition hover:bg-error/5 dark:border-slate-800"
+                    >
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" class="h-5 w-5 shrink-0" aria-hidden="true">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 1 0-9 0v3.75m-.75 0h10.5a2.25 2.25 0 0 1 2.25 2.25v6.75a2.25 2.25 0 0 1-2.25 2.25H6.75a2.25 2.25 0 0 1-2.25-2.25v-6.75a2.25 2.25 0 0 1 2.25-2.25Z"/>
+                        </svg>
+                        {{ __('Bloqueo de seguridad') }}
+                    </button>
+                </form>
+            @endif
+
             {{-- Ayuda (prompt 92): the same answers to the blocked states staff hit, folded into the one overflow
                  menu (prompt 132). Static — nothing loads. Rules are NAMED, never a hard-coded value. --}}
             <div class="mt-1 border-t border-line px-1 pt-2 dark:border-slate-800" data-counter-help-content>

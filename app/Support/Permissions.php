@@ -45,6 +45,10 @@ class Permissions
         'data.request.handle', 'data.erase',
         // System
         'locations.manage', 'staff.manage', 'settings.manage', 'settings.manage.location', 'audit.view',
+        // Security (prompt 121): initiate = trip the panic lockdown (staff hold it — they are the ones in the
+        // room); manage = run/observe drills, read the runbook, end a drill. A REAL lockdown is never
+        // reactivated in-app (off-premises paths only), so there is no "reactivate" permission by design.
+        'lockdown.initiate', 'lockdown.manage',
     ];
 
     /** MANAGER — per assigned location. Broad operational power, minus org-wide compliance/privacy. */
@@ -62,6 +66,7 @@ class Permissions
         'documents.generate', 'minutes.manage', 'register.view',
         'comms.manage',
         'settings.manage.location',
+        'lockdown.initiate', 'lockdown.manage',
     ];
 
     /** STAFF — per assigned location. Counter + door + basic member intake only. */
@@ -69,6 +74,7 @@ class Permissions
         'pos.use', 'pos.bar', 'checkin.manage',
         'members.view',
         'expenses.record', 'membership.fee.collect', 'till.open',
+        'lockdown.initiate', // the panic button — staff are the ones in a robbery (prompt 121)
         // members.create is deliberately NOT here (prompt 122): admitting a member is a board/assembly act in a
         // Spanish asociación, and application review is already manager-gated (applications.review) — so the
         // direct enrol route should not be more open than the reviewed one. A club that wants on-the-spot staff

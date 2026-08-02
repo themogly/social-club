@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Middleware\EnforceOrgLockdown;
 use App\Http\Middleware\SecurityHeaders;
 use App\Http\Middleware\SetLocale;
 use Illuminate\Foundation\Application;
@@ -32,6 +33,10 @@ return Application::configure(basePath: dirname(__DIR__))
         // Baseline security + no-index headers on every response (all surfaces,
         // including the Filament panel which uses its own middleware stack).
         $middleware->append(SecurityHeaders::class);
+
+        // Org-wide panic lockdown (prompt 121): appended globally so it gates the panel, the counter and the
+        // member PWA at once. When the org is locked it returns an ordinary "temporarily unavailable" page.
+        $middleware->append(EnforceOrgLockdown::class);
 
         // Apply the session locale on web routes (after StartSession). The panel
         // adds it to its own stack in AdminPanelProvider.
