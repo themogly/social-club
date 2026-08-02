@@ -5006,3 +5006,36 @@ precisely because that number does not yet exist.
 
 Tests (`MrzParserTest`, 5). `composer check` green (934 tests, 931 passed, 3 pre-existing skips, PHPStan 0).
 Pushed; **do not merge**.
+## Prompt 135 — When someone is refused, say why and offer the fix
+
+Pure presentation over the verdicts `ResolveMemberEligibility` / `ResolveMemberLimits` already return — both
+unchanged. A new `App\Support\VerdictRemedy::describe()` turns each fired rule into `{detail, remedy}`: the rule
+named in the member's own terms, plus the fix where one exists or a plain "who/when" where nothing can be done
+at the counter. Both the door (`CheckInScreen`) and the dispensary POS render it in their existing verdict loop,
+so the two tell the same story about the same member.
+
+**The rule-to-remedy map:**
+| Rule | Named as | Remedy shown |
+|---|---|---|
+| unpaid_fee | "Cuota de socio pendiente: 25,00 €" | the inline collect-fee action (already there, prompt 127) |
+| debt | "Deuda de 12,50 € por encima del límite del monedero" | "Debe saldar el monedero para poder continuar" |
+| carencia | "En carencia hasta el 14/08/2026" | none — but the DATE is named |
+| sanction | (generic) | "No se resuelve en el mostrador: consulta con un responsable" |
+| aforo | "Aforo completo (3/10)" | none — the occupancy is named |
+| membership | "Sin membresía activa en esta sede" | "Renueva su cuota desde su ficha…" |
+| age | (generic) | none |
+
+**Kept intact:** the enforcement matrix (WARN reads as a warning that can be proceeded past, BLOCK as a stop —
+the row's error/warning styling and the `Bloquea`/`Aviso` chip are unchanged, and the commit boundary still
+honours the mode); an override still needs its permission, reason and audit entry (untouched); no rule becomes
+easier to pass. No sensitive detail beyond what the operator needs — a sanction's existence and "ask a manager",
+never its conduct notes.
+
+**Verification gap (owed — no browser here):** the door + POS both render `VerdictRemedy` in the same loop
+(asserted structurally by the passing counter tests); owed is the screenshot of the door and the POS for a
+member failing two rules at once, and the same member after the fee is collected, light and dark. The
+WARN-proceeds / BLOCK-stops behaviour at the action boundary is the existing enforcement (prompt 34), unchanged
+here.
+
+Tests (`VerdictRemediesTest`, 6). `composer check` green (935 tests, 932 passed, 3 pre-existing skips, PHPStan
+0). EN/ES parity gated. Pushed; **do not merge**.
