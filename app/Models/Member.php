@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Casts\NormalisedEmail;
 use App\Enums\IdDocumentType;
 use App\Enums\MemberDocumentType;
 use App\Enums\MemberKind;
@@ -69,6 +70,7 @@ class Member extends Model implements Authenticatable, HasLocalePreference
     protected function casts(): array
     {
         return [
+            'email' => NormalisedEmail::class,   // login identifier — normalised lowercase at the boundary (prompt 146)
             'date_of_birth' => 'date',
             'document_type' => IdDocumentType::class,
             'document_number' => 'encrypted',        // special-category data, encrypted at rest

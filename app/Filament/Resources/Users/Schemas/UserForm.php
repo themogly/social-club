@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\Users\Schemas;
 
+use App\Support\Email;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
@@ -23,7 +24,11 @@ class UserForm
                     ->email()
                     ->required()
                     ->unique(ignoreRecord: true)
-                    ->maxLength(255),
+                    ->maxLength(255)
+                    // Normalise on blur so the uniqueness check and the stored value both use the lowercase
+                    // form regardless of driver (prompt 146).
+                    ->live(onBlur: true)
+                    ->afterStateUpdated(fn (?string $state, callable $set) => $set('email', Email::normalise($state))),
 
                 // Password (and PIN) columns carry a 'hashed' cast — set the plain value
                 // and it is hashed on save. Only persisted when filled, so editing a user

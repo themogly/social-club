@@ -5,6 +5,7 @@ namespace App\Console\Commands;
 use App\Enums\Role;
 use App\Models\Organisation;
 use App\Models\User;
+use App\Support\Email;
 use Database\Seeders\ExpenseCategorySeeder;
 use Database\Seeders\RolePermissionSeeder;
 use Illuminate\Console\Command;
@@ -52,6 +53,10 @@ class Install extends Command
             'owner_email' => $this->option('owner-email') ?? $this->ask('First owner — login email'),
             'owner_password' => $this->option('owner-password') ?? $this->secret('First owner — password (min 8 chars)'),
         ];
+
+        // Normalise the login email BEFORE the unique check, so the duplicate-owner refusal is reliable on any
+        // driver (the `unique` rule queries the raw value, ahead of the model cast — prompt 146).
+        $data['owner_email'] = Email::normalise(is_string($data['owner_email']) ? $data['owner_email'] : null);
 
         $validator = Validator::make($data, [
             'name' => ['required', 'string', 'max:255'],

@@ -5039,3 +5039,60 @@ here.
 
 Tests (`VerdictRemediesTest`, 6). `composer check` green (935 tests, 932 passed, 3 pre-existing skips, PHPStan
 0). EN/ES parity gated. Pushed; **do not merge**.
+## Prompt 146 — Email is the username, and its case is only handled by accident
+
+Email is the login identifier for staff and members. Nothing normalised it on write and almost nothing on
+lookup; production only worked because MySQL's `utf8mb4_unicode_ci` collation is case-insensitive, while
+SQLite (and the whole test suite) compares `=` case-sensitively — so behaviour differed by driver and no test
+could catch a regression. `DB_COLLATION` is one env var from breaking it. Correctness now belongs to the
+application, not a collation nobody asserted.
+
+**Normalise on write, at the model boundary.** `App\Support\Email::normalise()` (lowercase + trim; empty →
+null) behind a `App\Casts\NormalisedEmail` cast on `User::email`, `Member::email` and
+`MemberApplication::applicant_email`. Every write path inherits it — Filament forms, `csc:install`,
+`ImportMembers` (goes through `Member::create`), the application-approval `new Member`, and the invite — so a
+normalisation applied at six call sites is not missed at the seventh.
+
+**Normalise on lookup too, driver-independently:**
+- Staff login: a custom `App\Filament\Pages\Auth\Login` normalises the submitted email in
+  `getCredentialsFromFormData()` before `retrieveByCredentials` (Filament's stock page passed it through raw).
+- Staff password reset: matching custom `RequestPasswordReset` (the broker also keys the token by email).
+- Member login-link: `IssueMemberLoginLink` already compared `LOWER(email)` against a lowercased needle — the
+  one place someone had done it right; kept.
+- Duplicate detection: `FindDuplicateMembers` now matches `LOWER(email) = ?` against the normalised needle, so
+  a case-only difference is caught on any driver (it did an exact `orWhere` before → missed on SQLite).
+- `csc:install`: normalises `owner_email` BEFORE the `unique:users,email` rule, so the duplicate-owner refusal
+  is reliable (the rule queries the raw value, ahead of the cast).
+- Filament User/Member email inputs normalise on blur, so the pre-save `unique()` check and the stored value
+  agree regardless of driver.
+
+**RFC 5321** makes the local part technically case-sensitive, but no mainstream provider treats it that way
+and every practical system stores email lowercase — that is the choice here, recorded so it is not reopened.
+Only the email is normalised; names, document numbers and everything else keep their case exactly.
+
+**`members.email` did NOT become unique — a decision, not a default.** Two members legitimately sharing one
+address is plausible (a couple, or a member whose email is their carer's); a unique index would refuse that
+outright and a club would discover it at the counter. Integrity is instead held by reliable duplicate
+DETECTION (now normalised), which surfaces the clash rather than refusing it. `users.email` stays unique — one
+staff login per address — and the backfill protects that index (below).
+
+**Backfill (`2026_08_13_000000_normalise_existing_emails`).** Lowercases existing `users` and `members` rows.
+Because `users.email` is unique, lowercasing could turn two rows into a collision, so it DETECTS any case-only
+pair FIRST — in PHP, so the behaviour is identical on SQLite and MySQL regardless of collation — and aborts
+with a clear report of exactly which addresses clash, rather than throwing a constraint violation halfway
+through and leaving the table half-converted. `members.email` is not unique, so it needs no such guard.
+**Deliberately ONE-WAY:** the original casing is not recoverable, so `down()` cannot restore it — every other
+migration in this project is reversible; this is the stated exception.
+
+**Unchanged:** what login *does* (rate limits, throttles, MFA, the login-link flow) — only how the identifier
+is matched.
+
+Tests (`EmailNormalisationTest`, 9): stored-lowercase, login in all three cases (end-to-end via the Login
+page), CSV import lowercased, duplicate detection on a case-only difference, login-link in any case, invite
+normalised, backfill converts, backfill reports a collision instead of throwing, install refuses a case-only
+duplicate owner. **They pass on SQLite AND the MySQL parity job** — the half that matters, since that job
+exists for exactly this driver-difference class of bug. The one exception is the pre-existing-collision test,
+which is SQLite-only by nature: a `users.email` case-collision cannot exist under a case-insensitive collation
+(MySQL refuses it at insert), so the scenario is only constructible on SQLite (skipped on MySQL with that
+reason). `composer check` green (PHPStan 0). Pushed; **do not merge** — but see the merge note: the owner asked
+for 146 to land on main ahead of the register import.

@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Casts\NormalisedEmail;
 use App\Enums\ApplicationStatus;
 use App\Models\Concerns\BelongsToOrganisation;
 use Database\Factories\MemberApplicationFactory;
@@ -24,6 +25,7 @@ class MemberApplication extends Model
     protected function casts(): array
     {
         return [
+            'applicant_email' => NormalisedEmail::class,   // invite target — normalised at the boundary (prompt 146)
             'payload' => 'array',
             'status' => ApplicationStatus::class,
             'reviewed_at' => 'datetime',

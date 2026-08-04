@@ -2,6 +2,8 @@
 
 namespace App\Providers\Filament;
 
+use App\Filament\Pages\Auth\Login;
+use App\Filament\Pages\Auth\RequestPasswordReset;
 use App\Http\Middleware\SetLocale;
 use App\Livewire\LocaleSwitcher;
 use App\Livewire\LocationSwitcher;
@@ -37,7 +39,7 @@ class AdminPanelProvider extends PanelProvider
             ->path('')
             ->viteTheme('resources/css/filament/admin/theme.css')
             ->brandName(config('app.name'))
-            ->login()
+            ->login(Login::class)   // normalises the email credential (prompt 146)
             // Staff/admins authenticate here and land on the club dashboard at "/".
             // SEAM (prompt 15): members authenticate on a SEPARATE `member` guard and
             // must be routed to the member PWA, NOT this panel. When that guard exists,
@@ -45,7 +47,7 @@ class AdminPanelProvider extends PanelProvider
             // or a middleware that bounces `member`-guarded users to the PWA route). It is
             // deliberately NOT faked now — `User` is staff-only by construction (see
             // DECISIONS prompt 02), so nothing member-shaped can reach this panel yet.
-            ->passwordReset()
+            ->passwordReset(RequestPasswordReset::class)   // normalises the email (prompt 146)
             ->profile()
             // TOTP app authentication, available (not required) on any account, with
             // recovery codes. Setup + challenge UI are Filament's; the secret/recovery

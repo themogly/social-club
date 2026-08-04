@@ -9,6 +9,7 @@ use App\Models\Member;
 use App\Models\User;
 use App\Rules\AvaladorWithinSponseeCap;
 use App\Support\DocumentVault;
+use App\Support\Email;
 use App\Support\MemberEligibility;
 use App\Support\Settings;
 use Filament\Actions\Action;
@@ -47,7 +48,10 @@ class MemberForm
                         TextInput::make('email')
                             ->label(__('Correo electrónico'))
                             ->email()
-                            ->maxLength(255),
+                            ->maxLength(255)
+                            // Normalise on blur so what is saved matches the lowercase form the model stores (prompt 146).
+                            ->live(onBlur: true)
+                            ->afterStateUpdated(fn (?string $state, callable $set) => $set('email', Email::normalise($state))),
 
                         TextInput::make('phone')
                             ->label(__('Teléfono'))

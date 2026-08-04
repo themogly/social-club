@@ -3,6 +3,7 @@
 namespace App\Models;
 
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
+use App\Casts\NormalisedEmail;
 use App\Enums\Role;
 use Database\Factories\UserFactory;
 use Filament\Auth\MultiFactor\App\Contracts\HasAppAuthentication;
@@ -123,6 +124,7 @@ class User extends Authenticatable implements FilamentUser, HasAppAuthentication
     protected function casts(): array
     {
         return [
+            'email' => NormalisedEmail::class,   // login identifier — normalised lowercase at the boundary (prompt 146)
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
             'pin' => 'hashed',
