@@ -7,6 +7,7 @@ use Filament\Forms\Components\ColorPicker;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TagsInput;
 use Filament\Forms\Components\TextInput;
+use Filament\Forms\Components\TimePicker;
 use Filament\Forms\Components\Toggle;
 use Filament\Schemas\Schema;
 
@@ -99,15 +100,34 @@ class LocationForm
                     ])
                     ->default('Europe/Madrid'),
 
-                TextInput::make('business_day_cutoff')
+                // TimePicker, not free-text (prompt 147): a `time` column rejects '' on MySQL (and SQLite
+                // silently stores it), so three plain TextInputs 500'd the whole sede-create. 24-hour, no
+                // seconds. The cut-off is REQUIRED with the schema default pre-filled so it can never be
+                // emptied — half the domain (day boundary, gram cap, till, Z-report) depends on it.
+                TimePicker::make('business_day_cutoff')
                     ->label(__('Corte del día operativo'))
+                    ->native(false)
+                    ->seconds(false)
+                    ->displayFormat('H:i')
+                    ->format('H:i')
+                    ->required()
+                    ->default('06:00')
                     ->helperText(__('Hora en la que se reinicia el día operativo, p. ej. 06:00.')),
 
-                TextInput::make('opening_time')
-                    ->label(__('Hora de apertura')),
+                // Optional. Blank must dehydrate to NULL, not '' (a TimePicker does; a TextInput did not).
+                TimePicker::make('opening_time')
+                    ->label(__('Hora de apertura'))
+                    ->native(false)
+                    ->seconds(false)
+                    ->displayFormat('H:i')
+                    ->format('H:i'),
 
-                TextInput::make('closing_time')
-                    ->label(__('Hora de cierre')),
+                TimePicker::make('closing_time')
+                    ->label(__('Hora de cierre'))
+                    ->native(false)
+                    ->seconds(false)
+                    ->displayFormat('H:i')
+                    ->format('H:i'),
 
                 ColorPicker::make('accent')
                     ->label(__('Color de acento')),
