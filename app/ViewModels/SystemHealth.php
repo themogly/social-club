@@ -22,6 +22,9 @@ class SystemHealth
     /** A daily job (05:00) is stale if unseen within ~26h — one missed run plus grace. */
     public const DAILY_STALE_SECONDS = 93600;
 
+    /** An hourly job is stale if unseen within ~2h — one missed run plus grace. */
+    public const HOURLY_STALE_SECONDS = 7200;
+
     /**
      * The generic scheduler heartbeat (system:heartbeat every 5 min) — proves the cron is alive.
      *
@@ -64,6 +67,18 @@ class SystemHealth
     public function auditRetentionSweep(): array
     {
         return $this->component('audit-retention-sweep', self::DAILY_STALE_SECONDS);
+    }
+
+    /**
+     * The member-import staging sweep (imports:prune-staging). Goes stale — red — if it stops running, so the
+     * declared retention of that plaintext-register scratch space is proven APPLIED, not just configured
+     * (prompt 142). Hourly job, so a tighter stale window than the daily sweeps.
+     *
+     * @return array{last_at: ?CarbonInterface, age_seconds: ?int, stale: bool, threshold_seconds: int}
+     */
+    public function importStagingSweep(): array
+    {
+        return $this->component('import-staging-sweep', self::HOURLY_STALE_SECONDS);
     }
 
     /**

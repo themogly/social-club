@@ -110,6 +110,7 @@ class Settings
 
         // Data retention & privacy
         'data_retention_days' => 1825,      // 5 years after leaving
+        'import_staging_retention_hours' => 4, // abandoned member-import CSV scratch files swept after this (prompt 142)
         'audit_retention_days' => 3650,     // MINIMUM retention only — the audit log is append-only and
         // never auto-purged (the model refuses deletes). Prompt 58.
         'signed_url_ttl_seconds' => 300,    // 5 minutes

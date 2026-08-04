@@ -47,6 +47,7 @@ class Rat
         $memberRetention = $this->retentionText((int) Settings::get('data_retention_days', 1825), true);
         $auditRetention = $this->retentionText((int) Settings::get('audit_retention_days', 3650), false);
         $ttl = (int) Settings::get('signed_url_ttl_seconds', 300);
+        $importStagingHours = (int) Settings::get('import_staging_retention_hours', 4);
         $noTransfer = __('Sin transferencias internacionales.');
         $noRecipients = __('Sin cesiones, salvo obligación legal o requerimiento judicial.');
         // The ONE remaining outbound processor after prompt 61 removed the ui-avatars.com avatar call:
@@ -73,7 +74,7 @@ class Rat
                 'article_9' => false,
                 'recipients' => $emailProcessor,
                 'transfers' => $emailTransfer,
-                'retention' => $memberRetention,
+                'retention' => $memberRetention.' '.__('Los archivos CSV de importación de socios en preparación (datos en tránsito, en un directorio privado fuera de la web) se conservan como máximo :hours horas y un barrido programado los elimina.', ['hours' => $importStagingHours]),
             ],
             [
                 'ref' => 'RAT-02',
