@@ -39,7 +39,7 @@ class Member extends Model implements Authenticatable, HasLocalePreference
     use AuthenticatableTrait, BelongsToOrganisation, HasFactory, HasPushSubscriptions, HasUlids, Notifiable, SoftDeletes;
 
     /** The push channels a member can independently opt out of (prompt 15). */
-    public const PUSH_CHANNELS = ['low_balance', 'membership_expiring', 'new_announcement', 'event_reminder', 'temporary_ending'];
+    public const PUSH_CHANNELS = ['low_balance', 'membership_expiring', 'new_announcement', 'event_reminder', 'temporary_ending', 'new_message'];
 
     protected $fillable = [
         'organisation_id', 'member_no', 'first_name', 'last_name', 'email', 'phone', 'locale',

@@ -41,6 +41,7 @@ use App\Models\Member;
 use App\Models\MemberApplication;
 use App\Models\MemberDocument;
 use App\Models\MembershipTier;
+use App\Models\MessageThread;
 use App\Models\Minute;
 use App\Models\Order;
 use App\Models\Purchase;
@@ -89,6 +90,7 @@ class Help
         Convocatoria::class => ['heading' => 'Sin convocatorias', 'description' => 'Una convocatoria cita a la asamblea general y notifica por email a los socios. Crea una y luego emítela.'],
         Announcement::class => ['heading' => 'Sin avisos', 'description' => 'Los avisos son comunicaciones para los socios en su PWA. Publica el primero para que lo vean.'],
         Event::class => ['heading' => 'Sin eventos', 'description' => 'Los eventos aparecen en la PWA del socio y admiten confirmación de asistencia. Crea el primero.'],
+        MessageThread::class => ['heading' => 'Sin mensajes', 'description' => 'Los mensajes que los socios envían al club desde su app aparecen aquí. Responde, ciérralos o conviértelos en una solicitud RGPD.'],
         DocumentTemplate::class => ['heading' => 'Sin plantillas', 'description' => 'Las plantillas generan documentos formales (altas, certificados) con datos del socio congelados al emitir.'],
         DataRequest::class => ['heading' => 'Sin solicitudes de datos', 'description' => 'Las solicitudes RGPD (acceso o supresión) de los socios se gestionan aquí. Aparecerán cuando lleguen.'],
         AuditLog::class => ['heading' => 'Sin registros', 'description' => 'El registro de auditoría es un histórico de solo lectura, inalterable, de las acciones sensibles del sistema.'],
@@ -195,6 +197,10 @@ class Help
         ]],
         Event::class => ['permission' => 'comms.manage', 'title' => 'Eventos', 'body' => [
             'Los eventos del club que se muestran a los socios en su app. Publicarlos los hace visibles y permite recoger asistencia.',
+        ]],
+        MessageThread::class => ['permission' => 'comms.manage', 'title' => 'Mensajes', 'body' => [
+            'Las conversaciones que los socios inician desde su app. Responde (se avisa al socio), cierra la conversación o conviértela en una solicitud RGPD si el socio pide sus datos o su supresión.',
+            'No es un canal de pedidos. El texto de los mensajes se redacta pasado el periodo de retención; el hilo queda como evidencia del contacto.',
         ]],
         DocumentTemplate::class => ['permission' => 'documents.generate', 'title' => 'Plantillas de documentos', 'body' => [
             'Las plantillas de los documentos que emite el club (certificados, cartas). El documento final lleva los datos del socio y queda guardado como PDF.',
