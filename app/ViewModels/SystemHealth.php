@@ -7,6 +7,7 @@ use App\Support\Settings;
 use Carbon\CarbonInterface;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
+use League\Flysystem\AwsS3V3\AwsS3V3Adapter;
 
 /**
  * The operational health snapshot — because the failure mode of a broken cron or queue is
@@ -33,6 +34,69 @@ class SystemHealth
     public function scheduler(): array
     {
         return $this->component('scheduler', (int) Settings::get('heartbeat_stale_seconds', self::DEFAULT_STALE_SECONDS));
+    }
+
+    /**
+     * Transports that cannot send without an API credential → the config key that must be non-empty.
+     * (log / array / smtp need no API key here, so they are never alarmed on.)
+     *
+     * @var array<string, string>
+     */
+    private const MAILER_CREDENTIALS = [
+        'resend' => 'services.resend.key',
+        'ses' => 'services.ses.key',
+        'postmark' => 'services.postmark.token',
+    ];
+
+    /**
+     * The configured mail transport and whether its required credential is present (prompt 145). A missing key
+     * is otherwise SILENT — mail simply never arrives — so a mailer that needs a credential and lacks one is
+     * surfaced here, in the same family as the scheduler/queue checks. This is a CONFIGURATION check only: it
+     * never sends a probe email (that would spend real quota and put a network call inside a health panel).
+     *
+     * @return array{mailer: string, needs_credential: bool, configured: bool}
+     */
+    public function mailer(): array
+    {
+        $mailer = (string) config('mail.default');
+        $key = self::MAILER_CREDENTIALS[$mailer] ?? null;
+
+        if ($key === null) {
+            return ['mailer' => $mailer, 'needs_credential' => false, 'configured' => true];
+        }
+
+        return ['mailer' => $mailer, 'needs_credential' => true, 'configured' => filled(config($key))];
+    }
+
+    /**
+     * Filesystem drivers whose Flysystem adapter ships as a SEPARATE Composer package → the adapter class name
+     * that must be present. `local` needs none. If the class is absent, the disk cannot be constructed. (Plain
+     * strings, not class-strings: the sftp adapter is intentionally not installed, so it is not a resolvable
+     * class symbol — checked with class_exists() either way.)
+     *
+     * @var array<string, string>
+     */
+    private const DOCUMENTS_ADAPTERS = [
+        's3' => AwsS3V3Adapter::class,
+        // String literal, not ::class — this adapter's package is intentionally NOT installed, so a `::class`
+        // reference would be an unresolvable symbol; it is the genuinely-absent driver the health check catches.
+        'sftp' => 'League\\Flysystem\\PhpseclibV3\\SftpAdapter',
+    ];
+
+    /**
+     * The configured `documents` disk driver and whether its Flysystem adapter is available (prompt 145).
+     * `DOCUMENTS_DRIVER=s3` with `league/flysystem-aws-s3-v3` absent throws `Class "…AwsS3V3…" not found` the
+     * first time a member ID scan / medical certificate is written — the Article 9 object-storage path. This is
+     * a CONFIGURATION check only: it confirms the driver's adapter class exists, never writes a probe object.
+     *
+     * @return array{driver: string, available: bool}
+     */
+    public function documentsDisk(): array
+    {
+        $driver = (string) config('filesystems.disks.documents.driver', 'local');
+        $adapterClass = self::DOCUMENTS_ADAPTERS[$driver] ?? null;
+
+        return ['driver' => $driver, 'available' => $adapterClass === null || class_exists($adapterClass)];
     }
 
     /**

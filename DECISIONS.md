@@ -5344,3 +5344,88 @@ all three parts structurally (source-regex guard, since CI has no browser). `com
 PHPStan 0, 968 passed / 3 skipped). **Verification gap:** the range-rects harness ran locally; a logged-in
 Playwright screenshot of the real dashboard at 1280/1024/800 is owed, as for the other presentation prompts.
 Pushed; **do not merge** (human review).
+## Prompt 145 — Production mail cannot work: the Resend SDK is absent and the key is read from the wrong variable
+
+Two independent defects made `MAIL_MAILER=resend` unusable, one of them silently.
+
+**Defect 1 — the SDK was only suggested.** `laravel/framework` ships a FIRST-PARTY `resend` transport but only
+*suggests* `resend/resend-php`, so it was not in `composer.lock` and the transport could not be constructed.
+Added **`resend/resend-php` (^1.7) to `require`** (not `require-dev`). Deliberately NOT the community
+`resend/resend-laravel` wrapper: the framework already provides the transport, so the wrapper would add a
+service provider + facade this project does not use and a second path to the same transport. The plain SDK is
+exactly what Laravel's own transport consumes.
+
+**Defect 2 — the key was read from a variable nothing set (the silent one).** `config/services.php` reads
+`RESEND_API_KEY` — Laravel's own convention — which is CODE and therefore correct. But `.env.example` and
+`SETUP.md` told operators to set `RESEND_KEY`. Following the docs put a valid key into a variable nothing
+reads, leaving a null key: Resend rejects every request, queued mail lands in failed jobs, synchronous paths
+throw at the counter, and nothing says the key is empty. **Fixed the DOCS to match the code, not the reverse**
+— `RESEND_API_KEY` is canonical and a future developer expects it. Also corrected the `.env.example` + SETUP.md
+comment that named the wrong package. `config/services.php` was left untouched.
+
+**Guard so it cannot recur silently.** `SystemHealth::mailer()` reports the configured transport and whether
+its required credential is present, surfaced in *Salud del sistema* beside the scheduler / queue / sweep
+checks (silence is this system's characteristic failure mode). It is a CONFIGURATION check only — a small map
+of credential-needing transports (`resend`→`services.resend.key`, plus `ses`/`postmark`) checked non-empty;
+`log`/`array`/`smtp` need no API credential here and never false-alarm. It deliberately does **not** send a
+probe email: that would spend real quota and put a synchronous network call inside a health panel. Checking the
+selected mailer's credential is non-empty is enough to have caught this.
+
+**Unchanged:** `MAIL_MAILER` stays `log` in `.env.example` (local dev uses the log mailer + `/dev/mail`); no
+mailable/notification/send-site touched; the `log` and `array` mailers the whole suite depends on are
+unaffected.
+
+**Verification gap (owed — no browser here):** screenshot the health panel in both states — mailer configured
+and mailer missing its key — light and dark.
+
+Tests (`MailerHealthTest`, 4 — transport resolves with a key; health flags resend without a key; resend with a
+key reports configured; log needs no credential). `composer check` green (PHPStan 0). EN/ES parity gated
+(4 new keys). Pushed; **do not merge**.
+## Prompt 145 (expanded) — Two production drivers this app documents are not installable
+
+The earlier 145 fixed the Resend half on this same branch (`fix/resend-transport`). This expands it with the S3
+half: `DOCUMENTS_DRIVER=s3`, which `.env.example`/`SETUP.md` tell operators to set for production, also had no
+installable package — its Flysystem adapter was only a Composer *suggestion* of `laravel/framework`. So the
+entire object-storage path for the Article 9 material (member ID scans, medical certificates, photos, POS
+signatures) had **never once been exercised**: every test, audit and local run used `DOCUMENTS_DRIVER=local`.
+
+**Continued on the existing unmerged branch** rather than a parallel one (per the prompt).
+
+**Seven-item state (verdict each):**
+| # | Item | Verdict |
+|---|---|---|
+| 1 | `resend/resend-php` in require | **done already** (this branch — `composer.json:20`) |
+| 2 | `league/flysystem-aws-s3-v3` in require | **done in this branch** (`composer.json`, `^3.35`) |
+| 3 | `.env.example` says `RESEND_API_KEY` | **done already** (`.env.example:82`) |
+| 4 | `SETUP.md` `RESEND_API_KEY`, no `resend/resend-laravel` instruction | **done already** (SETUP.md — the only `resend/resend-laravel` mention left is the "do **not** add" warning) |
+| 5 | `.env.example` documents `AWS_ENDPOINT` + `AWS_USE_PATH_STYLE_ENDPOINT` | **partly already / completed here**: `AWS_USE_PATH_STYLE_ENDPOINT` was present (`:91`); `AWS_ENDPOINT` was MISSING and is added here with a note (the `documents` disk reads both — `config/filesystems.php:73-74`) |
+| 6 | *Salud del sistema* reports a missing mail credential | **done already** (`SystemHealth::mailer()`) |
+| 7 | *Salud del sistema* reports an unavailable `documents` adapter | **done in this branch** (`SystemHealth::documentsDisk()` + panel row) |
+
+**S3 adapter added** as `league/flysystem-aws-s3-v3` (`require`, not `require-dev`) — the framework's own S3
+driver needs the plain Flysystem adapter, exactly as the Resend half needed the plain SDK, not a wrapper.
+
+**Health check** `SystemHealth::documentsDisk()` reports the configured `documents` driver and whether its
+Flysystem adapter class is present (`s3` → `League\Flysystem\AwsS3V3\AwsS3V3Adapter`; `local` needs none). A
+CONFIGURATION check only — it confirms the adapter class exists, never writes a probe object on a page load,
+just as `mailer()` never sends a probe email. Surfaced on the panel beside the mailer / scheduler / sweep
+checks, because silence is this system's characteristic failure mode.
+
+**`DOCUMENTS_DRIVER=s3` had never been exercised** before this branch — so once a club is on S3, the object-
+storage path (encrypt via DocumentVault → write → signed-URL stream → access log) must be verified end-to-end
+against a real bucket, not assumed from the local disk. `DocumentVault`'s app-key encryption is unchanged and
+stays true on S3 (files are ciphertext before they reach any disk).
+
+**The general rule (for the next person):** anything `.env.example` or `SETUP.md` tells an operator to switch
+on must be an INSTALLED dependency, never a Composer suggestion. The next person to document SFTP, a scoped
+disk or a read-only disk will hit this again — a documented production driver is a required package.
+
+Tests (`DocumentsDiskHealthTest`, 4, + the existing `MailerHealthTest`, 4): the S3 documents disk resolves and
+its adapter class exists (fails against `main`); the health check flags a documents driver whose adapter is
+absent (tested with `sftp`, genuinely uninstalled) and is quiet on `local`; the mailer resolves with a key and
+is flagged without one. Existing document tests still pass on the `local` disk with DocumentVault encryption
+intact. `composer check` green (PHPStan 0). `MAIL_MAILER`/`DOCUMENTS_DRIVER` stay `log`/`local` in
+`.env.example`. Pushed; **do not merge**.
+
+**Verification gap (owed — no browser here):** the health panel in all four states (mailer fine / missing key,
+documents disk fine / adapter missing), light and dark.
