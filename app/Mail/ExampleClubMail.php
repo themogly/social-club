@@ -34,6 +34,7 @@ class ExampleClubMail extends Mailable
     {
         return new Content(
             view: 'mail.example',
+            text: 'mail.text.example',
             with: ['memberName' => $this->memberName],
         );
     }

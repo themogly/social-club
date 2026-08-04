@@ -68,6 +68,6 @@ class ConvocatoriaMail extends Mailable
 
     public function content(): Content
     {
-        return new Content(view: 'mail.convocatoria');
+        return new Content(view: 'mail.convocatoria', text: 'mail.text.convocatoria');
     }
 }

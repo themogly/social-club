@@ -29,6 +29,7 @@ class ApplicationInviteMail extends Mailable
     {
         return new Content(
             view: 'mail.application-invite',
+            text: 'mail.text.application-invite',
             with: ['url' => $this->url, 'expiresOn' => $this->expiresOn],
         );
     }

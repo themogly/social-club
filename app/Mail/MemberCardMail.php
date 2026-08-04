@@ -29,6 +29,7 @@ class MemberCardMail extends Mailable
     {
         return new Content(
             view: 'mail.member-card',
+            text: 'mail.text.member-card',
             with: [
                 'memberName' => $this->member->fullName(),
                 'memberNo' => $this->member->member_no,

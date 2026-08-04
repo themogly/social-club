@@ -24,6 +24,7 @@ class MembershipReminderMail extends Mailable
     {
         return new Content(
             view: 'mail.membership-reminder',
+            text: 'mail.text.membership-reminder',
             with: ['memberName' => $this->memberName, 'expiresOn' => $this->expiresOn],
         );
     }

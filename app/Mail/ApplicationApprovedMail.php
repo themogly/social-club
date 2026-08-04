@@ -27,6 +27,7 @@ class ApplicationApprovedMail extends Mailable
     {
         return new Content(
             view: 'mail.application-approved',
+            text: 'mail.text.application-approved',
             with: [
                 'memberName' => $this->memberName,
                 'memberNo' => $this->memberNo,

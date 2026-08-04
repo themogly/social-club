@@ -39,6 +39,7 @@ class LockdownReactivationMail extends Mailable
     {
         return new Content(
             view: 'mail.lockdown-reactivation',
+            text: 'mail.text.lockdown-reactivation',
             with: [
                 'ownerName' => $this->owner->name,
                 'isDrill' => (bool) $this->lockdown->is_drill,

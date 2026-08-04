@@ -62,6 +62,34 @@ class OrganisationIdentity
         return filled(($organisation ?? self::activeOrganisation())?->legal_name);
     }
 
+    /**
+     * The active org's logo as RAW bytes + mime, for CID-embedding in email ($message->embedData) — email
+     * clients strip `data:` URIs, so the PDF path's data URI is wrong for mail. Null when the club has not
+     * uploaded a logo, in which case the mail shell shows the club NAME as a text wordmark instead — never the
+     * product logo, which renders "CSC platform" and would re-brand the club's email as ours (prompt 150).
+     *
+     * @return array{data: string, mime: string}|null
+     */
+    public static function mailLogo(): ?array
+    {
+        $organisation = self::activeOrganisation();
+
+        if ($organisation === null || blank($organisation->logo_path)) {
+            return null;
+        }
+
+        try {
+            $disk = Storage::disk('public');
+            if (! $disk->exists($organisation->logo_path)) {
+                return null;
+            }
+
+            return ['data' => $disk->get($organisation->logo_path), 'mime' => $disk->mimeType($organisation->logo_path) ?: 'image/png'];
+        } catch (Throwable) {
+            return null;
+        }
+    }
+
     private static function activeOrganisation(): ?Organisation
     {
         $id = app(ActiveScope::class)->organisationId();
