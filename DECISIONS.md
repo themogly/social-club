@@ -5522,5 +5522,59 @@ switcher does not error and the owner can reach the Locations create form. `comp
 
 **Verification gap (owed — no browser here):** the topbar with one location and with two, and the batches list
 in both cases, light and dark.
+## Prompt 149 — Generating an invitation fails, and the invitation is created anyway
+
+`inviteAction()` created the `MemberApplication` FIRST, then did a synchronous, unguarded `Mail::to()->send()`.
+When the send threw (with `resend/resend-php` absent, `Class "Resend" not found` — prompt 145), the invitation
+row was already committed, the persistent notification with the link was never reached, and the operator saw
+Livewire's generic *"Error while loading page"*. Every failed attempt left an orphaned PENDING application with
+a live token nobody had seen — the database's model of reality ("you have created four invitations") and the
+operator's ("that didn't work") allowed to disagree.
+
+**Generating an invitation is now one thing, and mail is never what decides.** A new atomic writer
+`App\Actions\Members\IssueApplicationInvite` creates the row; the caller then QUEUES the mail best-effort
+(`Mail::to()->queue()`, wrapped in try/catch), so a delivery problem belongs in Horizon's failed jobs and can
+never orphan an invitation or hide its link. The link is shown UNCONDITIONALLY (persistent notification),
+whether mail was requested, succeeded, failed or was never attempted; if the queue push itself failed it says
+so IN ADDITION to the link, never instead of it.
+
+**Two explicit invitation paths (a Radio), because "optional email" left the choice implicit.** EMAIL the
+invitation (email required), or generate a LINK to hand over (a required `applicant_reference` — a name, or the
+referring member — new nullable column). Email stays OPTIONAL because a prospective socio is usually introduced
+in person by an avalador at the door and the no-email path is the common CSC flow — making email mandatory
+would break it. But an anonymous invitation is a real weakness (you cannot tell who a circulating link was
+for), so the operator must now CHOOSE, and the hand-over path is attributable. `applicant_email` is *not* made
+unconditionally required — see above for why.
+
+**Every `Mail::to()->send()` site reviewed (verdict each):**
+- `ListMemberApplications::inviteAction` — **REFACTORED**: atomic create + queued best-effort mail + link shown
+  unconditionally.
+- `MemberApplicationsTable::resendAction` — **queued + guarded**: a resend failure is a readable message, not a
+  500.
+- `DispensaryPos::emailReceipt` (the counter) — **queued + guarded**: a mail failure is a readable counter flash
+  mid-service, never an error screen.
+- `SweepMembershipExpiry` (nightly) — **queued + guarded**: the quiet one — a throw mid-loop used to abort the
+  whole run, so one bad address stopped every remaining member's reminder and turned the heartbeat red for
+  reasons nobody would connect to email. Now one address cannot abort the run; queue-push failures are counted
+  and reported, and a real delivery failure surfaces in Horizon's failed jobs.
+- `SendMemberCard` — already `->queue()` (locale-pinned); it is the pattern this branch generalises. Unchanged.
+
+**Inherited / unchanged:** `applicant_email` is normalised by the model cast (prompt 146, on main). The token
+stays 48 random chars, hashed for lookup and encrypted at rest so it is re-copyable; `invite_expiry_days`
+unchanged; existing PENDING applications keep working (the new column is nullable) — including the orphans the
+live install already has.
+
+**Friendlier global save-failure surface — its own branch** (shared finding with 147): other unhandled save
+failures still reach the user as Filament's generic error with `APP_DEBUG=false`. A global report-and-friendly-
+message surface deserves its own branch; this one removes the invite / receipt / sweep failures at the source.
+
+Tests (`ApplicationInviteTest` 5 + `ReceiptMailFailureTest` 1, **on MySQL**): with mail hard-failing the
+invitation still succeeds and the link is still shown (the regression that fails against `main`); the email path
+QUEUES; the hand-over path requires its identifier and produces a link; an invitation is redeemable through the
+public application form; the membership sweep completes when a member's mail throws and reports it; the counter
+receipt reports a mail failure instead of 500ing. `composer check` green (PHPStan 0), suite green on MySQL.
+
+**Verification gap (owed — no browser here):** the invitation dialog in both modes and the resulting link
+notification, light and dark.
 
 Pushed; **do not merge**.

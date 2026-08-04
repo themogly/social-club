@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\MemberApplications\Tables;
 
+use App\Actions\ResolveLocale;
 use App\Enums\ApplicationStatus;
 use App\Filament\Resources\MemberApplications\MemberApplicationResource;
 use App\Mail\ApplicationInviteMail;
@@ -109,12 +110,19 @@ class MemberApplicationsTable
                 && $record->inviteUrl() !== null
                 && (Auth::user()?->can('members.create') ?? false))
             ->action(function (MemberApplication $record): void {
-                Mail::to((string) $record->applicant_email)->send(new ApplicationInviteMail(
-                    (string) $record->inviteUrl(),
-                    $record->invite_expires_at?->format('d/m/Y') ?? '',
-                ));
-
-                Notification::make()->title(__('Invitación reenviada'))->success()->send();
+                // Queued, best-effort (prompt 149): a mail failure belongs in Horizon's failed jobs, never a
+                // 500 on this screen. The invitation already exists; re-sending must not be able to break it.
+                try {
+                    Mail::to((string) $record->applicant_email)
+                        ->locale((new ResolveLocale)->handle())
+                        ->queue(new ApplicationInviteMail(
+                            (string) $record->inviteUrl(),
+                            $record->invite_expires_at?->format('d/m/Y') ?? '',
+                        ));
+                    Notification::make()->title(__('Invitación reenviada (en cola)'))->success()->send();
+                } catch (\Throwable $e) {
+                    Notification::make()->title(__('No se pudo reenviar'))->body($e->getMessage())->danger()->send();
+                }
             });
     }
 

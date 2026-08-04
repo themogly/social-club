@@ -59,7 +59,7 @@ class InviteManagementTest extends TestCase
         $owner = $this->owner();
 
         Livewire::actingAs($owner)->test(ListMemberApplications::class)
-            ->callAction('invite', [])
+            ->callAction('invite', ['invite_mode' => 'handover', 'applicant_reference' => 'Referido en persona'])
             ->assertHasNoActionErrors();
 
         $application = MemberApplication::query()->withoutGlobalScopes()->firstOrFail();

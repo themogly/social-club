@@ -77,7 +77,7 @@ class MembershipLifecycleTest extends TestCase
         $this->artisan('memberships:sweep');
         $this->artisan('memberships:sweep'); // retry
 
-        Mail::assertSent(MembershipReminderMail::class, 1); // exactly once, not twice
+        Mail::assertQueued(MembershipReminderMail::class, 1); // queued exactly once, not twice (prompt 149)
     }
 
     public function test_fee_override_requires_permission_and_records_the_overrider(): void

@@ -126,6 +126,7 @@ class FormCompletenessTest extends TestCase
             'invite_token' => 'system: the encrypted raw token, set at invite generation for re-copy (prompt 29).',
             'invited_by' => 'system: set to the issuing user at invite generation.',
             'applicant_email' => 'set on the invite-generation action (optional email invite), not the edit form (prompt 45).',
+            'applicant_reference' => 'set on the invite-generation action (the hand-over path identifier), not the edit form (prompt 149).',
             'invite_expires_at' => 'system: computed from the invite_expiry_days setting at generation.',
             'opened_at' => 'system: stamped when the prospect first opens the form.',
             'submitted_at' => 'system: stamped when the prospect submits the application.',

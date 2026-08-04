@@ -2,6 +2,7 @@
 
 namespace App\Console\Commands;
 
+use App\Actions\ResolveLocale;
 use App\Enums\MembershipStatus;
 use App\Mail\MembershipReminderMail;
 use App\Models\HeartbeatLog;
@@ -45,12 +46,13 @@ class SweepMembershipExpiry extends Command
 
         // 3) Send renewal reminders once per member per period.
         $reminders = 0;
+        $mailFailures = 0;
         Membership::query()->withoutGlobalScopes()
             ->with('member')
             ->whereNotNull('expires_at')
             ->whereBetween('expires_at', [$now, $now->copy()->addDays($reminderLead)])
             ->whereIn('status', [MembershipStatus::ACTIVE->value, MembershipStatus::EXPIRING_SOON->value])
-            ->each(function (Membership $membership) use (&$reminders): void {
+            ->each(function (Membership $membership) use (&$reminders, &$mailFailures): void {
                 $member = $membership->member;
                 $period = $membership->expires_at?->toDateString() ?? '';
 
@@ -59,7 +61,17 @@ class SweepMembershipExpiry extends Command
                 }
 
                 if (filled($member->email)) {
-                    Mail::to($member->email)->send(new MembershipReminderMail($member->fullName(), $period));
+                    // Queued + guarded (prompt 149): one bad address must NOT abort the nightly run for every
+                    // remaining member. A delivery problem surfaces in Horizon's failed jobs; a queue-push
+                    // failure is reported and counted, never thrown up through the sweep.
+                    try {
+                        Mail::to($member->email)
+                            ->locale((new ResolveLocale)->handle($member))
+                            ->queue(new MembershipReminderMail($member->fullName(), $period));
+                    } catch (\Throwable $e) {
+                        report($e);
+                        $mailFailures++;
+                    }
                 }
 
                 // Push reminder too (prompt 56) — same once-per-period marker, no second sweep. The
@@ -75,7 +87,7 @@ class SweepMembershipExpiry extends Command
         // silently-broken sweep even while the generic scheduler heartbeat stays green.
         HeartbeatLog::beat('memberships-sweep');
 
-        $this->info("Lapsed: {$lapsed}. Reminders sent: {$reminders}.");
+        $this->info("Lapsed: {$lapsed}. Reminders sent: {$reminders}.".($mailFailures > 0 ? " Mail queue failures: {$mailFailures}." : ''));
 
         return self::SUCCESS;
     }

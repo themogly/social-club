@@ -10,6 +10,7 @@ use App\Actions\Dispensing\VoidDispensation;
 use App\Actions\Members\ResolveMemberByToken;
 use App\Actions\Pricing\ResolveArticleDiscount;
 use App\Actions\Pricing\ResolvePrice;
+use App\Actions\ResolveLocale;
 use App\Actions\Stock\SelectBatch;
 use App\Enums\DispensationStatus;
 use App\Enums\MembershipStatus;
@@ -963,8 +964,16 @@ class DispensaryPos extends Component
             return;
         }
 
-        Mail::to($email)->send(DispensationReceiptMail::fromDispensation($dispensation));
-        $this->flash(__('Comprobante enviado al socio.'), 'success');
+        // Queued, best-effort (prompt 149): a mail failure at the counter must be a readable message, not
+        // Livewire's error screen mid-service. Delivery problems belong in Horizon's failed jobs.
+        try {
+            Mail::to($email)
+                ->locale((new ResolveLocale)->handle($dispensation->member))
+                ->queue(DispensationReceiptMail::fromDispensation($dispensation));
+            $this->flash(__('Comprobante enviado al socio (en cola).'), 'success');
+        } catch (\Throwable) {
+            $this->flash(__('No se pudo enviar el comprobante. Inténtalo de nuevo.'), 'error');
+        }
     }
 
     // --- View data (assembled here; the view stays declarative) -----------------

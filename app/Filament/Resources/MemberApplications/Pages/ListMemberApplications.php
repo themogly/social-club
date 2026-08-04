@@ -2,20 +2,22 @@
 
 namespace App\Filament\Resources\MemberApplications\Pages;
 
-use App\Enums\ApplicationStatus;
+use App\Actions\Members\IssueApplicationInvite;
+use App\Actions\ResolveLocale;
 use App\Filament\Resources\MemberApplications\MemberApplicationResource;
 use App\Mail\ApplicationInviteMail;
-use App\Models\MemberApplication;
-use App\Support\Settings;
+use App\Models\User;
 use Filament\Actions\Action;
+use Filament\Forms\Components\Radio;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\ListRecords;
+use Filament\Schemas\Components\Utilities\Get;
 use Filament\Support\Icons\Heroicon;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Mail;
-use Illuminate\Support\Str;
+use Throwable;
 
 class ListMemberApplications extends ListRecords
 {
@@ -33,9 +35,10 @@ class ListMemberApplications extends ListRecords
     }
 
     /**
-     * Generate a tokenised invite link (prompt 04). The prospect opens it on their own
-     * phone and completes the pre-registration form (the ONE public member route). Only
-     * the token HASH is stored; the raw link is shown once here to copy and share.
+     * Generate a tokenised invite link (prompt 04). Two explicit paths (prompt 149): EMAIL the invitation, or
+     * generate a LINK to hand over — every invitation attributable, and mail never able to fail the action.
+     * Creating the invitation and sending its email are separate: the row is created atomically, the mail is
+     * QUEUED best-effort, and the link is shown UNCONDITIONALLY (persistent) whatever happens to the mail.
      */
     protected function inviteAction(): Action
     {
@@ -44,6 +47,15 @@ class ListMemberApplications extends ListRecords
             ->icon(Heroicon::OutlinedLink)
             ->visible(fn (): bool => Auth::user()?->can('members.create') ?? false)
             ->schema([
+                Radio::make('invite_mode')
+                    ->label(__('Cómo enviar la invitación'))
+                    ->options([
+                        'email' => __('Enviar por email'),
+                        'handover' => __('Generar enlace para entregar en mano'),
+                    ])
+                    ->default('email')
+                    ->required()
+                    ->live(),
                 Select::make('location_id')
                     ->label(__('Sede'))
                     ->relationship('location', 'name')
@@ -51,38 +63,54 @@ class ListMemberApplications extends ListRecords
                     ->preload()
                     ->placeholder(__('Sin sede asignada')),
                 TextInput::make('applicant_email')
-                    ->label(__('Correo del solicitante (opcional)'))
+                    ->label(__('Correo del solicitante'))
                     ->email()
-                    ->helperText(__('Si lo indicas, la invitación se envía por email; si no, cópiala y compártela.')),
+                    ->required(fn (Get $get): bool => $get('invite_mode') === 'email')
+                    ->visible(fn (Get $get): bool => $get('invite_mode') === 'email'),
+                TextInput::make('applicant_reference')
+                    ->label(__('¿Para quién es la invitación?'))
+                    ->maxLength(255)
+                    ->required(fn (Get $get): bool => $get('invite_mode') === 'handover')
+                    ->visible(fn (Get $get): bool => $get('invite_mode') === 'handover')
+                    ->helperText(__('Un nombre o referencia (p. ej. el avalador), para saber a quién se entregó el enlace.')),
             ])
             ->action(function (array $data): void {
-                $token = Str::random(48);
-                $days = (int) Settings::get('invite_expiry_days', 14);
-                $email = $data['applicant_email'] ?? null;
+                /** @var User $actor */
+                $actor = Auth::user();
+                $mode = $data['invite_mode'] ?? 'email';
+                $email = $mode === 'email' ? ($data['applicant_email'] ?? null) : null;
+                $reference = $mode === 'handover' ? ($data['applicant_reference'] ?? null) : null;
 
-                $application = MemberApplication::create([
-                    'location_id' => $data['location_id'] ?? null,
-                    'invite_token_hash' => hash('sha256', $token),
-                    'invite_token' => $token,                 // encrypted at rest → re-copyable / re-sendable
-                    'invited_by' => Auth::id(),
-                    'applicant_email' => $email ?: null,
-                    'invite_expires_at' => now()->addDays($days),
-                    'payload' => [],
-                    'status' => ApplicationStatus::PENDING,
-                ]);
+                try {
+                    $application = (new IssueApplicationInvite)->handle($actor, $data['location_id'] ?? null, $email, $reference);
+                } catch (Throwable $e) {
+                    Notification::make()->title(__('No se pudo generar la invitación'))->body($e->getMessage())->danger()->send();
 
-                if (filled($email)) {
-                    Mail::to($email)->send(new ApplicationInviteMail(
-                        (string) $application->inviteUrl(),
-                        $application->invite_expires_at?->format('d/m/Y') ?? '',
-                    ));
+                    return;
                 }
 
-                // Persistent panel so a dismissed toast never loses the link — and it is now
-                // listed with a Copy action, so it is recoverable even after navigating away.
+                // QUEUED, best-effort: a delivery problem belongs in Horizon's failed jobs, never on this
+                // screen, and must never decide whether the invitation exists or its link is shown.
+                $mailFailed = false;
+                if (filled($application->applicant_email)) {
+                    try {
+                        Mail::to((string) $application->applicant_email)
+                            ->locale((new ResolveLocale)->handle())
+                            ->queue(new ApplicationInviteMail(
+                                (string) $application->inviteUrl(),
+                                $application->invite_expires_at?->format('d/m/Y') ?? '',
+                            ));
+                    } catch (Throwable) {
+                        $mailFailed = true;
+                    }
+                }
+
+                // The link IS the deliverable — always shown, persistent so a dismissed toast never loses it.
                 Notification::make()
-                    ->title(filled($email) ? __('Invitación enviada por email') : __('Enlace de invitación generado'))
-                    ->body($application->inviteUrl())
+                    ->title(filled($application->applicant_email)
+                        ? ($mailFailed ? __('Invitación creada — no se pudo encolar el email') : __('Invitación creada y email en cola'))
+                        : __('Enlace de invitación generado'))
+                    ->body((string) $application->inviteUrl())
                     ->success()
                     ->persistent()
                     ->send();
