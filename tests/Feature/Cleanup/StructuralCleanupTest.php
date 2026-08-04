@@ -75,7 +75,7 @@ class StructuralCleanupTest extends TestCase
         Settings::set('carencia_days', 20, SettingType::INT); // non-default → proves it's read live
 
         // Path A — the approval action.
-        $application = MemberApplication::factory()->create([
+        $application = MemberApplication::factory()->submitted()->create([
             'organisation_id' => $this->org->id,
             'payload' => [
                 'first_name' => 'Ana', 'last_name' => 'García',

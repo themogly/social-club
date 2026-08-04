@@ -113,7 +113,7 @@ class MemberImportAndDuplicatesTest extends TestCase
             'organisation_id' => $this->org->id, 'email' => 'dup@test.es',
             'first_name' => 'Dup', 'last_name' => 'Licado', 'date_of_birth' => '1990-01-01',
         ]);
-        $application = MemberApplication::factory()->create([
+        $application = MemberApplication::factory()->submitted()->create([
             'organisation_id' => $this->org->id,
             'payload' => [
                 'first_name' => 'Otro', 'last_name' => 'Nombre',

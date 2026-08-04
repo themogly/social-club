@@ -5669,3 +5669,54 @@ against a 24×24 floor); active-segment `background-color` = `oklch(0.598 0.169 
 the inactive segment (was transparent — the very defect 143 targeted); location `<select>` `padding-left: 12px`
 (was 0); inner ES/EN gap ~2 px, group gaps 16–18 px, no overlap. `composer check` green; MySQL green.
 Pushed; **do not merge** — (owner subsequently authorised the merge).
+
+## Prompt 152 — Approval requires a SUBMISSION, not a completeness audit
+
+**The bug.** A generated invitation is a `MemberApplication` with `status = PENDING`, `payload = []`,
+`submitted_at = null` — created the instant staff press *Generar invitación*, before the applicant types
+anything. `approveAction()` gated visibility on `PENDING && applications.review` only, so **every unredeemed
+invitation showed Approve**. Pressing it ran `ApproveApplication` on an empty payload, whose first line is the
+age gate; `isOldEnough(null)` is false, so the operator was told **"el solicitante es menor de la edad
+mínima"** — a factual claim about a person who does not exist yet. Reachable today: prompt 149's mail failures
+leave orphaned PENDING invitations in the list.
+
+**Fix — require a submission, in two places.**
+- **UI:** all three review decisions (approve / reject / waiting-list) now share `isDecidable()` =
+  `PENDING && submitted_at !== null && can('applications.review')`. An unredeemed invitation offers only invite
+  actions (Copiar enlace / Reenviar / Anular); a submitted application offers the decisions. The available
+  actions now distinguish the two row types — *chase the first, decide the second*.
+- **Action (defence in depth):** `ApproveApplication` refuses an unsubmitted record with a plain "no se ha
+  enviado" message, placed **before** the age gate so the empty-payload age check is never the reason surfaced.
+
+**Reject and waiting-list on an unsubmitted invitation — removed, deliberately.** Revoking an unredeemed
+invite is a real need and already exists (Anular, on the invite). "Rejecting" or "waiting-listing" a person who
+never applied is meaningless — there is no applicant to reject. So all three decisions require a submission;
+ending an invitation is Anular, not Rechazar.
+
+**`?? ''` name defaults made strict.** `ApproveApplication` built the member with `first_name`/`last_name`
+`?? ''`. A partially-populated payload arriving by any route therefore enrolled a **blank name against a valid
+member number** into the libro de socios — a statutory register — silently. Not reachable via the public form
+(`SubmitApplicationRequest` requires both), but `?? ''` is precisely how you get a nameless row, and a nameless
+row in a statutory register is a compliance problem. Now it fails loudly, naming the missing field, and no
+member is created.
+
+**What was deliberately NOT built — a completeness gate at approval.** The prompting request was "you shouldn't
+be able to approve unless they've filled out all the info needed." Rejected, for the reasons the prompt lays
+out: (1) it is already enforced where it belongs — `SubmitApplicationRequest` makes a public-form submission
+complete by construction, so the gate would be inert on the normal path; (2) hard-blocking on completeness
+produces **fabricated data** — staff who cannot proceed invent a value, and an invented-but-complete register
+is worse than one with visible gaps (the trustworthiness of the register is the product); (3) it contradicts
+this codebase's own idiom (`User::setupIncompleteReasons()`, the import's `consent_pending` count) — let the row
+exist, surface the gap, make it actionable. **Where such a rule belongs if it is ever needed:** the enforcement
+matrix (`ResolveMemberEligibility`), per-rule BLOCK/WARN/OVERRIDE — because the real risk is an incomplete
+member being *dispensed to*, not an incomplete record existing, and the club decides whether a missing document
+number blocks/warns/overrides at the counter. Not a hard gate on an admin button. Only the specific
+nameless-register defect above was fixed, and only by failing loudly, not by auditing completeness.
+
+**Unchanged (prompt rule):** the age gate + its message (correct once a real submission carries a real DOB),
+the duplicate search, prompt 97's versioned-consent stamping, `MemberEnrolment::defaults()`, the audit entry
+and the automatic QR card. `applications.review` still gates every decision — no permission changes. The list's
+invitation-vs-submission distinction (the `invite` badge: Sin abrir / Abierta / Enviada, plus the lifecycle
+filter) already existed from prompt 45/149; this branch adds the behavioural half so the two need not be told
+apart by badge alone. Tests: `ApproveRequiresSubmissionTest` (5) + updated onboarding/card/cleanup/duplicate
+suites (fixtures now `->submitted()`). `composer check` green; full MySQL suite green (1045 passed).

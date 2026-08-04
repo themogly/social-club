@@ -31,4 +31,14 @@ class MemberApplicationFactory extends Factory
             'resulting_member_id' => null,
         ];
     }
+
+    /**
+     * A SUBMITTED application — the applicant has sent the form, so submitted_at is stamped (as
+     * ApplicationController does). This is the point at which an invitation becomes a reviewable
+     * application, i.e. when Approve/Reject/Waiting-list are offered (prompt 152).
+     */
+    public function submitted(): static
+    {
+        return $this->state(fn (): array => ['submitted_at' => now()]);
+    }
 }

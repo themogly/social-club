@@ -27,7 +27,7 @@ class MemberOnboardingTest extends TestCase
 
     private function application(string $dob): MemberApplication
     {
-        return MemberApplication::factory()->create([
+        return MemberApplication::factory()->submitted()->create([
             'organisation_id' => $this->org->id,
             'status' => ApplicationStatus::PENDING,
             'payload' => [
@@ -53,9 +53,12 @@ class MemberOnboardingTest extends TestCase
 
     public function test_an_under_age_application_cannot_be_approved(): void
     {
+        // A genuine submission carrying a real, underage date of birth still gets the AGE message unchanged
+        // (prompt 152) — the submission gate is passed, so the reason surfaced is the correct one.
         $application = $this->application(now()->subYears(16)->toDateString());
 
         $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage(__('El solicitante es menor de la edad mínima configurada.'));
         (new ApproveApplication)->handle($application);
     }
 }
