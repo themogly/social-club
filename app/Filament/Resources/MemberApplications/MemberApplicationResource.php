@@ -71,9 +71,10 @@ class MemberApplicationResource extends Resource
     }
 
     /**
-     * Review-queue decisions. Only a PENDING application may be decided, and only
-     * by a reviewer (`applications.review`). Approval routes through the audited
-     * domain action, which re-runs the age gate server-side.
+     * Review-queue decisions. Only a SUBMITTED, PENDING application may be decided, and only by a reviewer
+     * (`applications.review`). An unredeemed invitation (submitted_at = null) is not a decision — it is chased
+     * (Reenviar / Copiar enlace) or killed (Anular), which is why those live on the invite, not here. Approval
+     * routes through the audited domain action, which re-runs the submission + age gates server-side.
      *
      * @return array<int, Action>
      */
@@ -84,6 +85,20 @@ class MemberApplicationResource extends Resource
             self::rejectAction(),
             self::waitingListAction(),
         ];
+    }
+
+    /**
+     * A review DECISION is offered only once the applicant has actually SUBMITTED (submitted_at set). A PENDING
+     * record with submitted_at = null is an outstanding invitation, not an application — approving it would run
+     * the age gate on an empty payload and tell the operator a non-existent applicant is underage (prompt 152).
+     * Rejecting or waiting-listing a person who never applied is meaningless too; to end an unredeemed invite,
+     * revoke it (Anular). `applications.review` still gates every decision.
+     */
+    private static function isDecidable(MemberApplication $record): bool
+    {
+        return $record->status === ApplicationStatus::PENDING
+            && $record->submitted_at !== null
+            && (Auth::user()?->can('applications.review') ?? false);
     }
 
     public static function approveAction(): Action
@@ -99,8 +114,7 @@ class MemberApplicationResource extends Resource
                     ->helperText(__('Sólo si has verificado que es una persona distinta.'))
                     ->default(false),
             ])
-            ->visible(fn (MemberApplication $record): bool => $record->status === ApplicationStatus::PENDING
-                && (Auth::user()?->can('applications.review') ?? false))
+            ->visible(fn (MemberApplication $record): bool => self::isDecidable($record))
             ->action(function (array $data, MemberApplication $record): void {
                 try {
                     $member = (new ApproveApplication)->handle($record, allowDuplicate: (bool) ($data['allow_duplicate'] ?? false));
@@ -129,8 +143,7 @@ class MemberApplicationResource extends Resource
             ->label(__('Rechazar'))
             ->icon(Heroicon::OutlinedXCircle)
             ->color('danger')
-            ->visible(fn (MemberApplication $record): bool => $record->status === ApplicationStatus::PENDING
-                && (Auth::user()?->can('applications.review') ?? false))
+            ->visible(fn (MemberApplication $record): bool => self::isDecidable($record))
             ->schema([
                 Textarea::make('reason')
                     ->label(__('Motivo del rechazo'))
@@ -166,8 +179,7 @@ class MemberApplicationResource extends Resource
             ->icon(Heroicon::OutlinedClock)
             ->color('warning')
             ->requiresConfirmation()
-            ->visible(fn (MemberApplication $record): bool => $record->status === ApplicationStatus::PENDING
-                && (Auth::user()?->can('applications.review') ?? false))
+            ->visible(fn (MemberApplication $record): bool => self::isDecidable($record))
             ->action(function (MemberApplication $record): void {
                 $record->update([
                     'status' => ApplicationStatus::WAITING_LIST,

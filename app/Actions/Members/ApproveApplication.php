@@ -26,8 +26,32 @@ class ApproveApplication
         $payload = $application->payload ?? [];
         $actorId ??= Auth::id();
 
+        // A pre-registration invitation only becomes a reviewable APPLICATION once the applicant submits the
+        // form (ApplicationController stamps submitted_at). Until then there is no applicant to age-gate or
+        // enrol — the row is an outstanding invitation, not a decision to make. Refuse plainly here, so an
+        // operator is never told a person who does not exist yet is underage (prompt 152). This runs BEFORE the
+        // age gate deliberately: the empty-payload age check is exactly the wrong reason to surface.
+        if ($application->submitted_at === null) {
+            throw new RuntimeException(__('La solicitud todavía no se ha enviado: es una invitación pendiente, no una solicitud para revisar.'));
+        }
+
         if (! MemberEligibility::isOldEnough($payload['date_of_birth'] ?? null)) {
             throw new RuntimeException(__('El solicitante es menor de la edad mínima configurada.'));
+        }
+
+        // A row in the libro de socios must carry a name — a nameless statutory record is a compliance defect,
+        // and `?? ''` is exactly how you get one. The public form requires both names (SubmitApplicationRequest),
+        // so this only fires on a payload assembled by some OTHER route; fail loudly naming the gap rather than
+        // enrolling a blank name against a valid member number (prompt 152).
+        $missing = [];
+        if (blank($payload['first_name'] ?? null)) {
+            $missing[] = __('nombre');
+        }
+        if (blank($payload['last_name'] ?? null)) {
+            $missing[] = __('apellidos');
+        }
+        if ($missing !== []) {
+            throw new RuntimeException(__('No se puede crear el socio: faltan datos obligatorios de la solicitud (:fields).', ['fields' => implode(', ', $missing)]));
         }
 
         // Search-before-create — approving into an existing member would split their balance and
@@ -40,8 +64,9 @@ class ApproveApplication
         }
 
         $member = new Member([
-            'first_name' => $payload['first_name'] ?? '',
-            'last_name' => $payload['last_name'] ?? '',
+            // Guaranteed present + non-blank by the guard above — never silently `?? ''` into the register.
+            'first_name' => $payload['first_name'],
+            'last_name' => $payload['last_name'],
             'email' => $payload['email'] ?? null,
             'phone' => $payload['phone'] ?? null,
             'date_of_birth' => $payload['date_of_birth'] ?? null,

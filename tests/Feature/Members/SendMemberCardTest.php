@@ -75,7 +75,7 @@ class SendMemberCardTest extends TestCase
 
     public function test_approving_an_application_queues_the_card_exactly_once(): void
     {
-        $application = MemberApplication::factory()->create([
+        $application = MemberApplication::factory()->submitted()->create([
             'organisation_id' => $this->org->id,
             'payload' => [
                 'first_name' => 'Beto', 'last_name' => 'Ruiz', 'email' => 'beto@example.test',
