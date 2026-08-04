@@ -40,9 +40,11 @@
     .csc-main { display: flex; flex-direction: column; gap: 1.5rem; min-width: 0; }
     .csc-rail { display: flex; flex-direction: column; gap: 1.25rem; min-width: 0; }
     @media (min-width: 1024px) { .csc-rail { position: sticky; top: 1rem; } }
+    /* Prompt 144: auto-fit with a readable min-width instead of a fixed four-up. A four-up row inside the
+       Filament content column made each card too narrow for its label + delta chip, forcing a mid-word break;
+       auto-fit keeps every card >= ~13rem, so labels wrap on whole words (three-up where four won't fit). */
     .csc-cards { display: grid; grid-template-columns: repeat(1, 1fr); gap: 1rem; }
-    @media (min-width: 640px) { .csc-cards { grid-template-columns: repeat(2, 1fr); } }
-    @media (min-width: 1280px) { .csc-cards { grid-template-columns: repeat(4, 1fr); } }
+    @media (min-width: 640px) { .csc-cards { grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr)); } }
     .csc-chart-grid { display: grid; grid-template-columns: 1fr; gap: 1.5rem; }
     @media (min-width: 768px) { .csc-chart-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
     .csc-two { display: grid; grid-template-columns: 1fr; gap: 1.5rem; }
@@ -56,6 +58,8 @@
     .csc-card[data-flag="true"] { border-color: var(--warn); }
     .csc-card-head { display: flex; align-items: flex-start; gap: 0.5rem; min-width: 0; }
     .csc-card-icon { display: inline-flex; align-items: center; justify-content: center; width: 1.9rem; height: 1.9rem; border-radius: 0.55rem; background: var(--brt); color: var(--br); flex: none; }
+    /* Prompt 144: label + delta stack in a column beside the icon, so the label gets the FULL header width. */
+    .csc-card-headmain { display: flex; flex-direction: column; align-items: flex-start; gap: 0.4rem; min-width: 0; flex: 1; }
     .csc-ico { width: 1.05rem; height: 1.05rem; }
     /* Prompt 129: the label WRAPS to two lines and keeps its priority over the delta chip — correcting prompt
        101's single-line ellipsis, which erased "Aportaciones", "Dispensado" and "Transacciones" (the three
@@ -68,7 +72,7 @@
        label the remainder and it shatters mid-word ("Contri butio…"). `break-word` keeps the min-content width
        equal to the longest word, so the flex algorithm reserves that much and the title survives — while a
        genuinely over-long word still breaks rather than overflowing, keeping 129's guarantees. */
-    .csc-card-label { font-size: 0.78rem; font-weight: 600; color: var(--mut); flex: 1; min-width: 0; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; overflow: hidden; overflow-wrap: break-word; }
+    .csc-card-label { font-size: 0.78rem; font-weight: 600; color: var(--mut); max-width: 100%; min-width: 0; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; overflow: hidden; overflow-wrap: break-word; }
     .csc-card-body { display: flex; align-items: flex-end; justify-content: space-between; gap: 0.5rem; }
     /* The value block must be able to shrink beside the ring so a long figure wraps rather than clipping. */
     .csc-card-body > div { min-width: 0; }
@@ -85,7 +89,7 @@
     /* Delta chip */
     /* flex:none so the chip keeps its size and the label wraps beside it rather than being squeezed to an
        ellipsis (prompt 129); it pins to the top of a two-line header. */
-    .csc-delta { margin-inline-start: auto; flex: none; display: inline-flex; align-items: center; gap: 0.15rem; font-size: 0.72rem; font-weight: 700; padding: 0.12rem 0.45rem; border-radius: 999px; }
+    .csc-delta { align-self: flex-start; flex: none; max-width: 100%; display: inline-flex; align-items: center; gap: 0.15rem; font-size: 0.72rem; font-weight: 700; padding: 0.12rem 0.45rem; border-radius: 999px; }
     .csc-delta-ico { width: 0.85rem; height: 0.85rem; }
     .csc-delta-success { color: var(--okt); background: var(--okbg); }
     .csc-delta-error { color: var(--errt); background: var(--errbg); }

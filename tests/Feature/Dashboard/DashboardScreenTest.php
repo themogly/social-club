@@ -237,6 +237,34 @@ class DashboardScreenTest extends TestCase
         $this->assertDoesNotMatchRegularExpression('/\.csc-card-label\s*\{[^}]*white-space:\s*nowrap/', $styles);
     }
 
+    // --- Stat-card labels never break mid-word (prompt 144) --------------------------
+
+    public function test_stat_card_labels_never_break_mid_word(): void
+    {
+        // Prompt 129's two-line wrap left a residue: at four-up, the card was so narrow that
+        // "Contributions"/"Transacciones" broke MID-WORD ("Contri‑butions"). The fix has three
+        // load-bearing parts, each proven necessary by a Playwright range-rects harness (owed in
+        // CI, no browser here) — this is the structural guard that pins all three so a later edit
+        // can't silently revert one:
+        $styles = file_get_contents(resource_path('views/filament/pages/partials/dashboard-styles.blade.php'));
+        $markup = file_get_contents(resource_path('views/components/dashboard/stat-card.blade.php'));
+
+        // (1) break-word, NOT anywhere — `anywhere` collapses the label's min-content width to one
+        //     character, which is what let the flex algorithm shatter the word in the first place.
+        $this->assertMatchesRegularExpression('/\.csc-card-label\s*\{[^}]*overflow-wrap:\s*break-word/', $styles);
+        $this->assertDoesNotMatchRegularExpression('/\.csc-card-label\s*\{[^}]*overflow-wrap:\s*anywhere/', $styles);
+
+        // (2) The delta chip sits BELOW the label in a column wrapper, so the label owns the full
+        //     header width. With the chip beside it, even a 13rem card breaks these two labels.
+        $this->assertMatchesRegularExpression('/\.csc-card-headmain\s*\{[^}]*flex-direction:\s*column/', $styles);
+        $this->assertMatchesRegularExpression('/csc-card-headmain[\s\S]{0,400}?csc-card-label[\s\S]{0,400}?csc-delta/', $markup);
+
+        // (3) auto-fit with a readable min-width instead of a fixed four-up — a four-up row in the
+        //     content column made each card too narrow even with the chip below.
+        $this->assertMatchesRegularExpression('/grid-template-columns:\s*repeat\(auto-fit,\s*minmax\(13rem/', $styles);
+        $this->assertDoesNotMatchRegularExpression('/\.csc-cards\s*\{[^}]*repeat\(4,/', $styles);
+    }
+
     // --- No N+1: the query count is bounded and stable across data volume ------------
 
     public function test_dashboard_query_count_is_bounded_and_does_not_grow_with_volume(): void
