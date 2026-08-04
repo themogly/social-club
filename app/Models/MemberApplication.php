@@ -17,7 +17,7 @@ class MemberApplication extends Model
     use BelongsToOrganisation, HasFactory, HasUlids;
 
     protected $fillable = [
-        'organisation_id', 'location_id', 'invite_token_hash', 'invite_token', 'invited_by', 'applicant_email',
+        'organisation_id', 'location_id', 'invite_token_hash', 'invite_token', 'invited_by', 'applicant_email', 'applicant_reference',
         'invite_expires_at', 'opened_at', 'submitted_at', 'revoked_at', 'payload', 'status',
         'reject_reason', 'reviewed_by', 'reviewed_at', 'resulting_member_id',
     ];

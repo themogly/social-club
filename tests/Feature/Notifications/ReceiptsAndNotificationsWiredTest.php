@@ -134,6 +134,6 @@ class ReceiptsAndNotificationsWiredTest extends TestCase
             ->set('lastDispensationId', $dispensation->id)
             ->call('emailReceipt');
 
-        Mail::assertSent(DispensationReceiptMail::class, fn (DispensationReceiptMail $mail): bool => $mail->hasTo('socio@example.es'));
+        Mail::assertQueued(DispensationReceiptMail::class, fn (DispensationReceiptMail $mail): bool => $mail->hasTo('socio@example.es')); // queued now (prompt 149)
     }
 }

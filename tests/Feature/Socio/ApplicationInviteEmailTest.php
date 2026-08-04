@@ -60,22 +60,24 @@ class ApplicationInviteEmailTest extends TestCase
         Mail::fake();
 
         Livewire::actingAs($this->owner())->test(ListMemberApplications::class)
-            ->callAction('invite', ['applicant_email' => 'prospect@example.es']);
+            ->callAction('invite', ['invite_mode' => 'email', 'applicant_email' => 'prospect@example.es']);
 
         $application = MemberApplication::query()->withoutGlobalScopes()->firstOrFail();
         $this->assertSame('prospect@example.es', $application->applicant_email);
-        Mail::assertSent(ApplicationInviteMail::class, fn (ApplicationInviteMail $m): bool => $m->hasTo('prospect@example.es'));
+        Mail::assertQueued(ApplicationInviteMail::class, fn (ApplicationInviteMail $m): bool => $m->hasTo('prospect@example.es')); // queued now (prompt 149)
     }
 
-    public function test_an_invite_without_an_email_sends_nothing(): void
+    public function test_a_handover_invite_without_an_email_queues_nothing(): void
     {
         Mail::fake();
 
+        // The no-email path is now explicit: a hand-over link with a required reference (prompt 149).
         Livewire::actingAs($this->owner())->test(ListMemberApplications::class)
-            ->callAction('invite', []);
+            ->callAction('invite', ['invite_mode' => 'handover', 'applicant_reference' => 'Referido en persona']);
 
+        Mail::assertNothingQueued();
         Mail::assertNothingSent();
-        $this->assertDatabaseCount('member_applications', 1); // still created for copy/share
+        $this->assertDatabaseCount('member_applications', 1); // created for copy/share, attributable
     }
 
     public function test_resend_reuses_the_same_token(): void
@@ -87,7 +89,7 @@ class ApplicationInviteEmailTest extends TestCase
         Livewire::actingAs($this->owner())->test(ListMemberApplications::class)
             ->callTableAction('resend', $application);
 
-        Mail::assertSent(ApplicationInviteMail::class, fn (ApplicationInviteMail $m): bool => $m->url === $url && $m->hasTo('prospect@example.es'));
+        Mail::assertQueued(ApplicationInviteMail::class, fn (ApplicationInviteMail $m): bool => $m->url === $url && $m->hasTo('prospect@example.es')); // queued now (prompt 149)
     }
 
     public function test_copy_link_confirms_a_copy_instead_of_dumping_the_url(): void
