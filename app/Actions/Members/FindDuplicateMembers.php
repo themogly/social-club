@@ -3,6 +3,7 @@
 namespace App\Actions\Members;
 
 use App\Models\Member;
+use App\Support\Email;
 use Illuminate\Support\Collection;
 
 /**
@@ -37,7 +38,9 @@ class FindDuplicateMembers
                         ->whereDate('date_of_birth', $attributes['date_of_birth']));
                 }
                 if (filled($attributes['email'] ?? null)) {
-                    $query->orWhere('email', $attributes['email']);
+                    // Compare normalised (lowercase) on both sides so a case-only difference is caught on any
+                    // driver, never left to the collation (prompt 146).
+                    $query->orWhereRaw('LOWER(email) = ?', [Email::normalise($attributes['email'])]);
                 }
                 if (filled($attributes['phone'] ?? null)) {
                     $query->orWhere('phone', $attributes['phone']);
