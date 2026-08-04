@@ -61,12 +61,21 @@
        101's single-line ellipsis, which erased "Aportaciones", "Dispensado" and "Transacciones" (the three
        cards that carry a delta) down to unreadable stubs on a narrow card. The 2-line clamp keeps 101's
        no-overflow win: the label never pushes the chip out and the card never clips. A label longer than two
-       lines still ellipsises rather than overflowing. */
-    .csc-card-label { font-size: 0.78rem; font-weight: 600; color: var(--mut); flex: 1; min-width: 0; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; overflow: hidden; overflow-wrap: anywhere; }
+       lines still ellipsises rather than overflowing.
+       Prompt 144: `overflow-wrap: break-word` — NOT `anywhere`. Both let a word break to avoid overflow, but
+       `anywhere` also counts those break points when computing the element's MIN-CONTENT width, collapsing it
+       to ~one character; inside this flex row (label `flex:1`, chip `flex:none`) the algorithm then hands the
+       label the remainder and it shatters mid-word ("Contri butio…"). `break-word` keeps the min-content width
+       equal to the longest word, so the flex algorithm reserves that much and the title survives — while a
+       genuinely over-long word still breaks rather than overflowing, keeping 129's guarantees. */
+    .csc-card-label { font-size: 0.78rem; font-weight: 600; color: var(--mut); flex: 1; min-width: 0; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; overflow: hidden; overflow-wrap: break-word; }
     .csc-card-body { display: flex; align-items: flex-end; justify-content: space-between; gap: 0.5rem; }
     /* The value block must be able to shrink beside the ring so a long figure wraps rather than clipping. */
     .csc-card-body > div { min-width: 0; }
-    .csc-card-value { font-size: 1.6rem; line-height: 1.15; font-weight: 700; letter-spacing: -.01em; color: var(--tx); overflow-wrap: anywhere; }
+    /* Prompt 144: break-word here too — same min-content reasoning as the label. A money/weight value is one
+       long token (no spaces), so break-word keeps it whole until it genuinely cannot fit beside the ring, then
+       breaks; `anywhere` would let it fracture mid-figure even when there is room. */
+    .csc-card-value { font-size: 1.6rem; line-height: 1.15; font-weight: 700; letter-spacing: -.01em; color: var(--tx); overflow-wrap: break-word; }
     .csc-card-sub { font-size: 0.74rem; color: var(--mut); margin-top: 0.2rem; }
     .csc-card-spark { height: 32px; color: var(--br); }
     .csc-spark { width: 100%; height: 100%; display: block; }
