@@ -5096,3 +5096,59 @@ which is SQLite-only by nature: a `users.email` case-collision cannot exist unde
 (MySQL refuses it at insert), so the scenario is only constructible on SQLite (skipped on MySQL with that
 reason). `composer check` green (PHPStan 0). Pushed; **do not merge** — but see the merge note: the owner asked
 for 146 to land on main ahead of the register import.
+## Prompt 147 — A sede cannot be created: three free-text fields over `time` columns
+
+**Cause (one line):** a form field that can be submitted empty into a column that will not take an empty
+value — a `time` column rejects both `null` (for the NOT NULL cut-off) and `''` (for any of the three), and
+the DB default only fires when the column is OMITTED from the INSERT, which Eloquent never does. So three plain
+`TextInput`s over `time` columns 500'd the whole sede-create on MySQL — and SQLite silently stored `''` into
+`business_day_cutoff` (the day-boundary the gram cap, till and Z-report are measured against), which is why the
+suite was green on a form that could not be submitted.
+
+**Fix:** three `TimePicker`s (v5, consistent with the `DateTimePicker`s already in ConvocatoriaForm/EventForm),
+24-hour (`displayFormat('H:i')` + `format('H:i')`), no seconds, `native(false)` so the 24-hour format is
+guaranteed and typed entry stays available on a tablet. `business_day_cutoff` is `required()` with the schema
+default pre-filled (`default('06:00')`), so it arrives filled and cannot be emptied. `opening_time` /
+`closing_time` stay optional and a blank picker dehydrates to `null`, NOT `''` — asserted at the raw DB level,
+because that is the difference between the form working and 500ing and it is invisible in the markup.
+
+**Sweep — every non-nullable column with a DB default, cross-referenced against the forms (verdict per group):**
+- `locations.business_day_cutoff` (time) — **the bug. FIXED** (required TimePicker + default).
+- `locations.opening_time` / `closing_time` (time, nullable) — same `''` risk. **FIXED** (TimePicker → null).
+- Non-nullable date/time set by the system, NOT on any form — **safe, not reachable:** `check_ins.checked_in_at`,
+  `document_access_logs.viewed_at`, `convocatorias.held_at` (also on ConvocatoriaForm, but as a REQUIRED
+  DateTimePicker → never `''`), `failed_jobs.failed_at`, `lockdown_reactivation_tokens.expires_at`,
+  `member_login_tokens.expires_at`, `organisation_lockdowns.locked_at`.
+- Booleans with a default (`active`, `published`, `is_therapeutic`, `auto_checked_out`, `is_drill`,
+  `not_counted`, …) — **safe:** exposed as Toggles, which dehydrate `0`/`1`, never `''`.
+- Integer/cents with a default (`price_cents`, `stock`, `*_cents`, `version`, `member_no_sequence`,
+  `fee_cents`, `float_cents`, `grams_cg`, …) — **safe:** set by domain actions/casts or entered via the
+  `*_eur`/`*_g`/`*_pct` edge fields; none is a raw empty text field over the column.
+- Enum varchar with a default (`status`, `kind`, `method`, `applies_to`, `paid_from`, `default_kind`,
+  `purpose`, `product_type`, `unit_type`, `default_period`, `type`, `timezone`, …) — **safe:** exposed as
+  Selects (or not on a form), which submit a valid value, never `''`.
+- **Nullable date/time columns on forms** were also checked (the `''` problem applies to them too): a grep of
+  every Filament form for a `TextInput` over any date/time column is CLEAN — `date_of_birth`, `held_at`,
+  `second_call_at`, `starts_at`, `held_on`, etc. all use DatePicker/DateTimePicker, which dehydrate `null`.
+
+**Kept deliberately:** the DB default (protects rows created outside the form); `business_day_cutoff` stays
+NOT NULL (not made nullable to dodge the bug — half the domain depends on it, and a nullable column would push
+an invisible fallback into `BusinessDay`); the timezone default; no data migration (existing rows untouched).
+
+**Friendlier global save-failure surface — its own branch.** With `APP_DEBUG=false` a constraint violation
+reaches the user as Filament's generic *"Error while loading page"*, which tells nobody anything. Changing that
+globally (a Filament exception-render override that turns an unhandled save failure into a readable message) is
+out of scope here and deserves its own branch — noted. This branch removes THIS class at the source: a picker
+cannot submit an invalid time, so the failure never occurs.
+
+Tests (`LocationTimeFieldsTest`, 5, **run on MySQL** — SQLite would hide the `''` case): cut-off untouched
+stores `06:00`; blank opening/closing store `null` (asserted raw, not `''`); an emptied cut-off is refused with
+a form-validation error, not a 500; a form-default location resolves correctly in `BusinessDay`; editing without
+touching the times preserves them. `composer check` green (PHPStan 0), and the suite green on the MySQL parity
+profile.
+
+**Verification gap (owed — no browser here):** the Locations create form with the pre-filled cut-off + the
+picker open, and the emptied-cut-off validation message, light and dark at tablet width. The functional fix —
+the form saving, blank→null, emptied→validation-not-500 — is proven headlessly on MySQL.
+
+Pushed; **do not merge**.
