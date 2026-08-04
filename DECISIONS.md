@@ -5096,3 +5096,44 @@ which is SQLite-only by nature: a `users.email` case-collision cannot exist unde
 (MySQL refuses it at insert), so the scenario is only constructible on SQLite (skipped on MySQL with that
 reason). `composer check` green (PHPStan 0). Pushed; **do not merge** — but see the merge note: the owner asked
 for 146 to land on main ahead of the register import.
+
+## Prompt 143 — The admin topbar's top-right read as one word ("DGESEN")
+
+**Symptom.** Avatar initials, the language toggle and the help icon ran together with no separation:
+`DG` + `ES`/`EN` + `?` → "DGESEN". Three defects compounded:
+
+1. **No separation.** The language and help controls were injected via the `TOPBAR_END` render hook, which
+   renders as a *sibling of* Filament's `.fi-topbar-end` div — and `.fi-topbar` (the nav) has NO gap, while the
+   16px `column-gap` that spaces the topbar lives on `.fi-topbar-end` (which holds the avatar). So the two
+   injected controls butted against the avatar and each other with zero space.
+2. **The toggle was two loose letters.** Inactive locale = plain grey text, no boundary — so "EN" visually
+   merged into the avatar initials beside it.
+3. **The active locale was invisible.** It used `bg-primary-600 text-white` — but `.bg-primary-*` is NOT a
+   compiled utility in this Filament build (Filament colours its own components from the `--primary-*` CSS
+   vars; it does not emit generic `bg-primary` utilities). So the active segment had white text on *no* fill.
+
+**Fix.**
+- **Relocate** the language + help hooks from `TOPBAR_END` to `GLOBAL_SEARCH_AFTER`, which renders INSIDE
+  `.fi-topbar-end`, before the user menu. All three controls become flex children of that container and inherit
+  its 16px `column-gap`. This also returns the account avatar to the **far-right corner** — the web-wide
+  convention for a user menu (the "decide the avatar order" call: it was accidentally mid-cluster because the
+  old hook fired after the avatar; rightmost is correct).
+- **Segmented pill.** The toggle is now a bounded grey track holding the two segments, `role="group"` +
+  `aria-label` (Idioma/Language), each segment `aria-pressed`, keeping the ≥24×24 target (`min-h-[1.5rem]
+  min-w-[1.75rem]`). The track edge makes it read as one control, clearly separate from the avatar. Group gap
+  (16px between controls) ≫ inner gap (segments sit tight in the track).
+- **Active fill** = `bg-[var(--primary-600)]` — Filament's panel-primary via its CSS var, so it also honours a
+  per-location accent override (prompt 03); white-on-blue passes AA. NOT `bg-primary-600` (a no-op here).
+
+**Discovered.** `bg-primary-600` silently does nothing in Filament-panel Blade — custom panel markup must
+consume `--primary-600` (or, on the member PWA, `bg-brand`, which the socio switcher already does correctly).
+Only the admin switcher was affected.
+
+**Verified.** `AdminTopbarHarnessTest` renders the REAL authed dashboard topbar and writes it (built CSS
+inlined) to `storage/app/admin-topbar-harness.html`; it also guards the structure (language + help now precede
+the user menu — the ordering flip — as a labelled, pressed-state group). `node tests/Browser/measure-admin-topbar.mjs`
+confirms **16px between every adjacent control, order language → help → avatar, no overlap, none < 24px, at
+1280 / 1024 / 800 × light/dark**. The pill screenshot confirms the blue active segment reads (AA) in both
+themes. `composer check` green (Pint, PHPStan 0, 967 passed / 3 skipped). **Verification gap:** Playwright is
+not a CI dependency (see the README) — the structural guard test + the local measurement stand in for it.
+Pushed; **do not merge** (human review).

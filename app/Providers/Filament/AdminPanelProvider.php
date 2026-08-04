@@ -70,15 +70,21 @@ class AdminPanelProvider extends PanelProvider
                 PanelsRenderHook::TOPBAR_START,
                 fn (): string => Blade::render('@livewire($component)', ['component' => LocationSwitcher::class]),
             )
+            // The language toggle and help sit INSIDE the topbar-end cluster, before the user menu —
+            // the GLOBAL_SEARCH_AFTER hook renders within Filament's `.fi-topbar-end` flex (its 16px
+            // column-gap), whereas TOPBAR_END renders OUTSIDE it as a gapless sibling of the avatar,
+            // which is what jammed "DG" + "ES/EN" + "?" into one run (prompt 143). This also returns the
+            // account avatar to the far-right corner — the web-wide convention for the user menu — with
+            // the language + help utilities grouped to its left.
             ->renderHook(
-                PanelsRenderHook::TOPBAR_END,
+                PanelsRenderHook::GLOBAL_SEARCH_AFTER,
                 fn (): string => Blade::render('@livewire($component)', ['component' => LocaleSwitcher::class]),
             )
             // In-app help (prompt 92): one shared, unobtrusive affordance on EVERY panel page — a help
             // menu linking to the glossary and the per-screen guides. Content-only, static (no queries),
             // so a screen without help is visibly missing this pattern rather than each screen inventing one.
             ->renderHook(
-                PanelsRenderHook::TOPBAR_END,
+                PanelsRenderHook::GLOBAL_SEARCH_AFTER,
                 fn (): string => Blade::render("@include('filament.help-menu')"),
             )
             // Grouped sidebar, in operational order. Every group is deliberate; a group
