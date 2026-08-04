@@ -29,6 +29,7 @@ class MemberLoginLinkMail extends Mailable
     {
         return new Content(
             view: 'mail.member-login-link',
+            text: 'mail.text.member-login-link',
             with: [
                 'memberName' => $this->member->fullName(),
                 'url' => route('socio.login.verify', ['token' => $this->token]),

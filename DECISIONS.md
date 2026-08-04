@@ -5578,3 +5578,40 @@ receipt reports a mail failure instead of 500ing. `composer check` green (PHPSta
 notification, light and dark.
 
 Pushed; **do not merge**.
+
+## Prompt 150 — Every member email was branded with OUR name, not the club's
+
+**Symptom.** All 10 mailables were 10 near-duplicate standalone HTML views, each hard-coding the PRODUCT
+header (`$message->embed(resource_path('mail/logo.png'))`, whose PNG literally reads "CSC platform · asociación
+cannabica") and signing off with `config('app.name')`. A member of *Asociación X* received email branded
+"CSC platform" — and there was no plain-text alternative part at all.
+
+**Fix — one shared shell, club identity, both MIME parts.**
+- **`<x-mail.shell>`** (`resources/views/components/mail/shell.blade.php`): the single mail layout — doctype,
+  table chrome, header, sign-off and footer, defined once. All 10 views are now body-only (the near-copies are
+  gone). Each keeps its own content **verbatim** — the receipt's "…nunca una venta" disclaimer, the QR carné,
+  the convocatoria's agenda; the convocatoria's legal footer is preserved via an overridable `footer` slot.
+- **The header is the CLUB, resolved through `OrganisationIdentity`:** the club's uploaded logo, CID-embedded
+  (new `OrganisationIdentity::mailLogo()` returns RAW bytes + mime — the existing `logo` accessor is a `data:`
+  URI, which is right for dompdf but stripped by email clients), OR — until a club can upload one — the club's
+  NAME as a text wordmark. It **never** falls back to `mail/logo.png`: that image IS our wordmark, so rendering
+  it is exactly the defect this prompt fixes. "Fallback to product" is honoured through the NAME
+  (`OrganisationIdentity['name']` → `config('app.name')` only for a genuinely unconfigured org), not the logo
+  image. The sign-off and footer ("Este mensaje te lo envía :club, tu asociación.") are the club too.
+- **Plain-text alternative for every mailable (multipart/alternative):** 10 `mail/text/*` views, each mailable's
+  `content()` now carries `text:` beside `view:`. The text part is club-branded too.
+- **`LockdownReactivationMail` added to `DevMail`** — it was the 10th mailable and was registered NOWHERE, so it
+  rendered in no preview and no test (the exact gap `DevMail`'s docblock warns about). Now previewed + tested.
+
+**FLAGGED GAP — a club cannot yet upload its logo.** No Filament field writes `organisations.logo_path`, so in
+practice every club sees the NAME wordmark, not a logo. The plumbing is complete and proven: `mailLogo()`
+resolves it, the shell embeds it by CID, and `MailRenderTest::test_an_uploaded_club_logo_is_embedded_by_cid…`
+asserts an uploaded logo is CID-embedded (never hot-linked). The missing piece is a single logo-upload field on
+the organisation settings form — the owed follow-up, called out here so it is not mistaken for done.
+
+**Verified.** `MailRenderTest` now sends every registered mailable through the array transport (so BOTH parts
+are built as a recipient gets them) and asserts each is club-branded in HTML **and** text, carries a non-empty
+plain-text part, never leaks "CSC platform", and never hot-links an image. Screenshots of the receipt, carné and
+convocatoria show the club wordmark header, the verbatim bodies, and the convocatoria's legal footer override;
+the plain-text parts render cleanly (no leaked Blade directives). `composer check` green (Pint, PHPStan 0, 968
+passed / 3 skipped; +46 assertions). Pushed; **do not merge** (human review).

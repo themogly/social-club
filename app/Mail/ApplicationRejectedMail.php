@@ -27,6 +27,7 @@ class ApplicationRejectedMail extends Mailable
     {
         return new Content(
             view: 'mail.application-rejected',
+            text: 'mail.text.application-rejected',
             with: [
                 'applicantName' => $this->applicantName,
                 'reason' => $this->reason,

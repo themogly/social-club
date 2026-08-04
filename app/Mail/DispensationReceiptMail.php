@@ -49,6 +49,7 @@ class DispensationReceiptMail extends Mailable
     {
         return new Content(
             view: 'mail.dispensation-receipt',
+            text: 'mail.text.dispensation-receipt',
             with: [
                 'memberName' => $this->memberName,
                 'dispensedOn' => $this->dispensedOn,

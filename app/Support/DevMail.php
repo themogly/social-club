@@ -8,10 +8,13 @@ use App\Mail\ApplicationRejectedMail;
 use App\Mail\ConvocatoriaMail;
 use App\Mail\DispensationReceiptMail;
 use App\Mail\ExampleClubMail;
+use App\Mail\LockdownReactivationMail;
 use App\Mail\MemberCardMail;
 use App\Mail\MemberLoginLinkMail;
 use App\Mail\MembershipReminderMail;
 use App\Models\Member;
+use App\Models\OrganisationLockdown;
+use App\Models\User;
 use Illuminate\Mail\Mailable;
 
 /**
@@ -56,6 +59,11 @@ class DevMail
                 body: 'Se ruega puntualidad. La documentación estará disponible en la sede desde una semana antes.',
                 noticeDays: 15,
                 quorumRequired: 42,
+            ),
+            'lockdown-reactivation' => new LockdownReactivationMail(
+                new User(['name' => 'Ana Ruiz']),
+                new OrganisationLockdown(['is_drill' => false]),
+                'preview-token-not-a-real-link',
             ),
         ];
     }
