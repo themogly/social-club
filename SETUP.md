@@ -91,8 +91,10 @@ Everything used in code/config appears in `.env.example`. Highlights:
     sistema** renders and reports the cache as *No accesible*. Recovery is automatic — Redis returning restores
     everything with no restart. `database` (not `file`/`array`) so a role edit + `php artisan
     permission:cache-reset` still propagates across workers; use `file` only on a single-server box.
-- **Mail:** local `MAIL_MAILER=log`. Production uses **Resend** — `composer require resend/resend-laravel`,
-  set `MAIL_MAILER=resend` and `RESEND_KEY`, and a verified `MAIL_FROM_ADDRESS`.
+- **Mail:** local `MAIL_MAILER=log`. Production uses **Resend** via Laravel's first-party transport — the
+  `resend/resend-php` package is already required (do **not** add `resend/resend-laravel`); set
+  `MAIL_MAILER=resend` and `RESEND_API_KEY` (Laravel's own convention — `config/services.php` reads it), and a
+  verified `MAIL_FROM_ADDRESS`.
 - **Storage:** `FILESYSTEM_DISK` for general uploads. **ID documents & member photos use the separate
   private `documents` disk** — `DOCUMENTS_DRIVER=local` in dev; production sets `s3` with a dedicated
   private `AWS_DOCUMENTS_BUCKET`. Encrypted at rest, signed-URL access only, access-logged (prompt 04).

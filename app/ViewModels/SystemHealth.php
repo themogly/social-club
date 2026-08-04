@@ -33,6 +33,38 @@ class SystemHealth
     }
 
     /**
+     * Transports that cannot send without an API credential → the config key that must be non-empty.
+     * (log / array / smtp need no API key here, so they are never alarmed on.)
+     *
+     * @var array<string, string>
+     */
+    private const MAILER_CREDENTIALS = [
+        'resend' => 'services.resend.key',
+        'ses' => 'services.ses.key',
+        'postmark' => 'services.postmark.token',
+    ];
+
+    /**
+     * The configured mail transport and whether its required credential is present (prompt 145). A missing key
+     * is otherwise SILENT — mail simply never arrives — so a mailer that needs a credential and lacks one is
+     * surfaced here, in the same family as the scheduler/queue checks. This is a CONFIGURATION check only: it
+     * never sends a probe email (that would spend real quota and put a network call inside a health panel).
+     *
+     * @return array{mailer: string, needs_credential: bool, configured: bool}
+     */
+    public function mailer(): array
+    {
+        $mailer = (string) config('mail.default');
+        $key = self::MAILER_CREDENTIALS[$mailer] ?? null;
+
+        if ($key === null) {
+            return ['mailer' => $mailer, 'needs_credential' => false, 'configured' => true];
+        }
+
+        return ['mailer' => $mailer, 'needs_credential' => true, 'configured' => filled(config($key))];
+    }
+
+    /**
      * The nightly membership expiry sweep SPECIFICALLY (memberships:sweep). It stamps its own
      * heartbeat on success, so this goes stale — red — if the sweep silently stops running even
      * while the generic scheduler heartbeat above stays fresh. That gap is the whole point.

@@ -17,6 +17,7 @@
         "laravel/tinker": "^3.0",
         "openspout/openspout": "^4.32",
         "predis/predis": "^3.5",
+        "resend/resend-php": "^1.7",
         "sentry/sentry-laravel": "^4.27",
         "spatie/laravel-permission": "^8.3"
     },

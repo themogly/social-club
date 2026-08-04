@@ -5039,3 +5039,40 @@ here.
 
 Tests (`VerdictRemediesTest`, 6). `composer check` green (935 tests, 932 passed, 3 pre-existing skips, PHPStan
 0). EN/ES parity gated. Pushed; **do not merge**.
+## Prompt 145 — Production mail cannot work: the Resend SDK is absent and the key is read from the wrong variable
+
+Two independent defects made `MAIL_MAILER=resend` unusable, one of them silently.
+
+**Defect 1 — the SDK was only suggested.** `laravel/framework` ships a FIRST-PARTY `resend` transport but only
+*suggests* `resend/resend-php`, so it was not in `composer.lock` and the transport could not be constructed.
+Added **`resend/resend-php` (^1.7) to `require`** (not `require-dev`). Deliberately NOT the community
+`resend/resend-laravel` wrapper: the framework already provides the transport, so the wrapper would add a
+service provider + facade this project does not use and a second path to the same transport. The plain SDK is
+exactly what Laravel's own transport consumes.
+
+**Defect 2 — the key was read from a variable nothing set (the silent one).** `config/services.php` reads
+`RESEND_API_KEY` — Laravel's own convention — which is CODE and therefore correct. But `.env.example` and
+`SETUP.md` told operators to set `RESEND_KEY`. Following the docs put a valid key into a variable nothing
+reads, leaving a null key: Resend rejects every request, queued mail lands in failed jobs, synchronous paths
+throw at the counter, and nothing says the key is empty. **Fixed the DOCS to match the code, not the reverse**
+— `RESEND_API_KEY` is canonical and a future developer expects it. Also corrected the `.env.example` + SETUP.md
+comment that named the wrong package. `config/services.php` was left untouched.
+
+**Guard so it cannot recur silently.** `SystemHealth::mailer()` reports the configured transport and whether
+its required credential is present, surfaced in *Salud del sistema* beside the scheduler / queue / sweep
+checks (silence is this system's characteristic failure mode). It is a CONFIGURATION check only — a small map
+of credential-needing transports (`resend`→`services.resend.key`, plus `ses`/`postmark`) checked non-empty;
+`log`/`array`/`smtp` need no API credential here and never false-alarm. It deliberately does **not** send a
+probe email: that would spend real quota and put a synchronous network call inside a health panel. Checking the
+selected mailer's credential is non-empty is enough to have caught this.
+
+**Unchanged:** `MAIL_MAILER` stays `log` in `.env.example` (local dev uses the log mailer + `/dev/mail`); no
+mailable/notification/send-site touched; the `log` and `array` mailers the whole suite depends on are
+unaffected.
+
+**Verification gap (owed — no browser here):** screenshot the health panel in both states — mailer configured
+and mailer missing its key — light and dark.
+
+Tests (`MailerHealthTest`, 4 — transport resolves with a key; health flags resend without a key; resend with a
+key reports configured; log needs no credential). `composer check` green (PHPStan 0). EN/ES parity gated
+(4 new keys). Pushed; **do not merge**.

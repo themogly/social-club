@@ -67,6 +67,7 @@ class SystemHealth extends Page
             'auditRetentionSweep' => $health->auditRetentionSweep(),
             'queue' => $health->queue(),
             'cache' => $health->cache(),
+            'mailer' => $health->mailer(),
             'backups' => $health->backups(),
             'auditRetentionDays' => $health->auditRetentionDays(),
             'dataRetentionDays' => $health->dataRetentionDays(),
