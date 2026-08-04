@@ -4,6 +4,16 @@
 @import '../../tokens.css';
 
 /* Scan the custom panel views so their hand-written Tailwind utilities actually compile — this is the whole
-   point (the help pages had markup but no stylesheet serving these classes). */
+   point (the help pages had markup but no stylesheet serving these classes). The RULE: any Blade rendered
+   INSIDE the panel must be scanned here, or its utilities compile only into app.css (which the panel never
+   loads) and silently do nothing in the browser. */
 @source '../../../../app/Filament/**/*';
 @source '../../../../resources/views/filament/**/*';
+/* The topbar switchers are Livewire views rendered inside the panel by render hooks in AdminPanelProvider
+   (TOPBAR_START → LocationSwitcher, GLOBAL_SEARCH_AFTER → LocaleSwitcher). Their hand-written utilities
+   (min-h-[1.5rem], bg-[var(--primary-600)], pl-3 …) were compiling only into app.css — the same miss as the
+   help pages above (prompt 151). Scan the whole livewire dir so a future panel-rendered Livewire view is
+   covered too, but EXCLUDE counter/: the counter apps run on their OWN layout served by app.css and never
+   render in the panel, so their large utility set has no business bloating the theme loaded on every admin page. */
+@source '../../../../resources/views/livewire/**/*';
+@source not '../../../../resources/views/livewire/counter/**/*';

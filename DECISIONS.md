@@ -5615,3 +5615,57 @@ plain-text part, never leaks "CSC platform", and never hot-links an image. Scree
 convocatoria show the club wordmark header, the verbatim bodies, and the convocatoria's legal footer override;
 the plain-text parts render cleanly (no leaked Blade directives). `composer check` green (Pint, PHPStan 0, 968
 passed / 3 skipped; +46 assertions). Pushed; **do not merge** (human review).
+
+## Prompt 151 — 143's topbar styling never reached the browser: utilities compiled into a stylesheet the panel doesn't load
+
+**143 was right about the layer, blocked underneath it.** `--primary-600` resolves, Filament's theme uses it,
+and `bg-[var(--primary-600)]` was the correct replacement for the non-existent `bg-primary-600`. But NONE of
+the switchers' hand-written utilities applied in the panel, because they compiled only into **`app.css`** — which
+the panel never loads. The Filament panel serves Filament's `index.css` + the compiled **`theme.css`**; `app.css`
+is for the counter and the member PWA. And `resources/css/filament/admin/theme.css` scanned only
+`app/Filament/**` and `resources/views/filament/**` — **not `resources/views/livewire/`**, where
+`locale-switcher.blade.php` and `location-switcher.blade.php` live (both rendered *inside* the panel by render
+hooks). So `text-xs`/`font-semibold`/`transition` (which Filament's own theme emits anyway) applied, and
+everything else — `min-h-[1.5rem]`, `min-w-[1.75rem]`, `bg-[var(--primary-600)]`, `pl-3` — silently did not. The
+theme file's own comment already recorded this bug being fixed once (the help pages); two dirs were added then,
+this one missed. **Third occurrence of one bug class.**
+
+**Why 143's own verification missed it.** The 143 harness inlined ALL of `public/build/assets/*.css` — including
+`app.css` — so the utilities were present in the harness and absent in the real panel. A render-to-HTML harness
+is structurally blind to this: the markup was always correct; only the *served* stylesheet was wrong.
+
+**Fix — one line, in the scan list, not the component.** Added to `theme.css`:
+`@source '.../resources/views/livewire/**/*'` + `@source not '.../resources/views/livewire/counter/**/*'`.
+**Scope chosen deliberately:** scan the whole `livewire/` dir (so any *future* panel-rendered Livewire view is
+covered too — that is what closes the bug class) but EXCLUDE `counter/`, which runs on its own layout served by
+`app.css` and never renders in the panel, so its large utility set has no business bloating the theme loaded on
+every admin page. Verified in the rebuilt theme (+~2 KB, not the whole of counter/): `bg-[var(--primary-600)]`
+compiles to `{background-color:var(--primary-600)}`; the switcher utilities are present; the counter class
+`grid-cols-[minmax(0,1fr)_22rem]` is absent.
+
+**Nothing from 143 reverted** — the `GLOBAL_SEARCH_AFTER` relocation, segmented-pill markup, `aria-pressed`, and
+16 px group gaps were all correct and remain.
+
+**Every render-hook view in `AdminPanelProvider`, with a verdict:**
+| Hook | View | Directory | Verdict |
+| --- | --- | --- | --- |
+| `TOPBAR_START` → `LocationSwitcher` | `resources/views/livewire/location-switcher.blade.php` | `resources/views/livewire/` | was UNSCANNED → **fixed** |
+| `GLOBAL_SEARCH_AFTER` → `LocaleSwitcher` | `resources/views/livewire/locale-switcher.blade.php` | `resources/views/livewire/` | was UNSCANNED → **fixed** |
+| `GLOBAL_SEARCH_AFTER` → `@include('filament.help-menu')` | `resources/views/filament/help-menu.blade.php` | `resources/views/filament/` | covered ✓ |
+
+The 14 custom Page `$view` are all `filament.pages.*` (covered); the dashboard chart widgets extend Filament's
+`ChartWidget` (vendor view, covered by the theme's `@import`); `filament.batch-recall` + the partials are under
+`resources/views/filament/` (covered). The only gap was the two switchers.
+
+**Guard (`PanelThemeSourceTest`).** Source-level: each panel-rendered view resolves under a theme `@source`
+include and not a `@source not` exclude (no build needed — catches a missing scan). Built-CSS: the built theme
+contains `min-h-\[1\.5rem\]`, `min-w-\[1\.75rem\]`, `bg-\[var\(--primary-600\)\]`, `pl-3` — utilities Filament's
+own theme does not emit, so their presence proves the scan reached the switchers. CI runs `npm run build` before
+both jobs, so the built-CSS assertion actually guards. This would have caught all three occurrences.
+
+**Verified LOGGED IN against the running app** (not a harness — the whole lesson): a real owner session, `/` at
+1280/1024/800 × light/dark × es/en. Computed styles: both locale segments **31–32 × 24 px** (was 15×16/16×16
+against a 24×24 floor); active-segment `background-color` = `oklch(0.598 0.169 262.881)`, non-transparent and ≠
+the inactive segment (was transparent — the very defect 143 targeted); location `<select>` `padding-left: 12px`
+(was 0); inner ES/EN gap ~2 px, group gaps 16–18 px, no overlap. `composer check` green; MySQL green.
+Pushed; **do not merge** — (owner subsequently authorised the merge).
