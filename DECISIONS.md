@@ -5096,3 +5096,44 @@ which is SQLite-only by nature: a `users.email` case-collision cannot exist unde
 (MySQL refuses it at insert), so the scenario is only constructible on SQLite (skipped on MySQL with that
 reason). `composer check` green (PHPStan 0). Pushed; **do not merge** — but see the merge note: the owner asked
 for 146 to land on main ahead of the register import.
+## Prompt 148 — "All locations" when there is one location, and a batch that guesses which sede it is at
+
+Three faces of one problem: the active sede must never be ambiguous, and stock must always show where it is.
+
+**1. A single-sede org is no longer offered a rollup.** `LocationSwitcher::canSwitchToAll()` was
+`hasRole(OWNER)`, unconditionally — so a one-sede club's owner got an "All locations" rollup of a single row,
+AND (because the session starts with no `scope.location_id`) that rollup was the DEFAULT state. It now also
+requires `available()->count() > 1`. A new `defaultLocationId()` returns the single reachable sede when the
+user cannot roll up (a one-sede owner, or a manager with one assigned sede), and the topbar switcher's `mount()`
+applies it when no choice has been made — so the sede is named and the scope IS that sede (what is shown
+matches what is scoped). A genuine multi-sede owner still defaults to the rollup, unchanged. Zero locations
+stays graceful (no default, no error — the owner's first act is to create one).
+
+**2. `CreateBatch` refuses instead of guessing.** It was
+`ActiveScope::locationId() ?? Location::query()->value('id')` — in the rollup, `locationId()` is null, so it
+took the first row the database happened to return. **This is a compliance failure, not cosmetic:**
+`batches.location_id` drives `StockCeiling::forLocation()` (the per-premises legal ceiling) and the registro de
+dispensación's truth about where material is; an arbitrary attribution breaches one ceiling and understates the
+other. It now uses `locationId()` with no fallback and, when null, REFUSES with a clear message telling the
+operator to pick a sede. Confirmed the `?? value('id')` guess appears nowhere else in the codebase.
+
+**3. The batches list shows the sede when it is meaningful.** `BatchesTable` gained a `location.name` column,
+`->visible()` only when the org has more than one active location — a column that reads the same on every row
+in a one-sede club is noise; it is essential the moment there are two.
+
+**Unchanged:** the owner rollup + org-wide member search for genuine multi-sede owners (why this project does
+not use Filament tenancy) stays exactly as it is; managers/staff still switch only among their assignments;
+the active location is still persisted in the session — this branch changes what the DEFAULT is and what is
+OFFERED, not the mechanism.
+
+Tests (`ActiveSedeTest`, 8, on MySQL): one-sede owner defaults to the sede with no rollup; two-sede owner keeps
+the rollup and defaults to it; deactivating a location collapses the switcher to the one remaining; a manager
+with one assigned sede sees it named and cannot roll up; **creating a batch with no active sede is refused, not
+guessed**; a batch is created at the ACTIVE sede, asserted against a second location existing (the regression
+that matters); the batches list shows the location column when more than one exists; zero locations — the
+switcher does not error and the owner can reach the Locations create form. `composer check` green (PHPStan 0).
+
+**Verification gap (owed — no browser here):** the topbar with one location and with two, and the batches list
+in both cases, light and dark.
+
+Pushed; **do not merge**.

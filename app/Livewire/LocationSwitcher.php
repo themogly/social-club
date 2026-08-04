@@ -18,7 +18,20 @@ class LocationSwitcher extends Component
 
     public function mount(): void
     {
-        $this->active = app(Switcher::class)->current();
+        $switcher = app(Switcher::class);
+        $user = Auth::user();
+
+        // A one-sede user (or a manager with one assigned sede) has no choice to make: default the session to
+        // that single sede so the topbar NAMES it and scoping matches, instead of an ambiguous rollup of one
+        // (prompt 148). A genuine multi-sede owner still defaults to the rollup (defaultLocationId → null).
+        if ($user !== null && $switcher->current() === null) {
+            $default = $switcher->defaultLocationId($user);
+            if ($default !== null) {
+                $switcher->switch($user, $default);
+            }
+        }
+
+        $this->active = $switcher->current();
     }
 
     public function switchTo(?string $locationId): void
