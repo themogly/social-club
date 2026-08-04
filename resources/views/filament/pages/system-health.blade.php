@@ -161,6 +161,27 @@
             @endif
         </x-filament::section>
 
+        {{-- Documents disk adapter (prompt 145). DOCUMENTS_DRIVER=s3 with its Flysystem adapter absent throws
+             the first time an Article 9 ID scan is written — a silent go-live failure. Config check only. --}}
+        <x-filament::section :heading="__('Disco de documentos')" icon="heroicon-o-lock-closed">
+            <div style="display:flex;align-items:center;gap:.5rem;margin-bottom:.5rem;">
+                <x-filament::badge :color="$documentsDisk['available'] ? 'success' : 'danger'">
+                    {{ $documentsDisk['available'] ? __('Disponible') : __('Adaptador no instalado') }}
+                </x-filament::badge>
+            </div>
+            <dl style="font-size:.875rem;display:grid;gap:.35rem;">
+                <div style="display:flex;justify-content:space-between;gap:1rem;">
+                    <dt style="opacity:.65;">{{ __('Controlador') }}</dt>
+                    <dd>{{ $documentsDisk['driver'] }}</dd>
+                </div>
+            </dl>
+            @unless ($documentsDisk['available'])
+                <div style="margin-top:.5rem;color:#dc2626;font-size:.85rem;">
+                    {{ __('El controlador del disco de documentos no tiene su adaptador instalado. No se podrán guardar documentos de identidad hasta instalarlo.') }}
+                </div>
+            @endunless
+        </x-filament::section>
+
         {{-- Cache / Redis reachability (prompt 124). This page is designed to SURVIVE what it reports on:
              authorisation runs off the database store, so it renders and simply shows the cache as degraded. --}}
         <x-filament::section :heading="__('Caché')" icon="heroicon-o-circle-stack">
