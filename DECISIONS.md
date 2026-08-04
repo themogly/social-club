@@ -5096,3 +5096,55 @@ which is SQLite-only by nature: a `users.email` case-collision cannot exist unde
 (MySQL refuses it at insert), so the scenario is only constructible on SQLite (skipped on MySQL with that
 reason). `composer check` green (PHPStan 0). Pushed; **do not merge** — but see the merge note: the owner asked
 for 146 to land on main ahead of the register import.
+## Prompt 136 — Give a member a way to reach the club, and make it evidence
+
+A member↔club threaded messaging channel, built so the conversation is EVIDENCE (kept, attributable,
+erasable) and can escalate into a formal RGPD request. It is deliberately NOT an ordering channel.
+
+**Data model — two tables.** `message_threads` (belongs to a member; subject, status OPEN|CLOSED,
+last_message_at, closed_by, `data_request_id` evidence link) + `messages` (hang off the thread; an `author`
+discriminator MEMBER|STAFF, `user_id` for the staff author, free-text `body`, `read_at`). Messages carry NO
+member_id — member/org scope derives from the thread. There is no product/quantity column anywhere: a message
+is free text, so this can never become a back-door sales channel.
+
+**Member side (PWA).** `MessageController` is scoped entirely to the authenticated socio on the `member`
+guard; a thread is resolved by its ULID AND a `member_id` ownership check (`findOrFail` → 404), so there is no
+id in any URL and one member can never reach another's thread (denial tests: other member → 404, other org →
+404). New "Mensajes" tab (the bottom nav went `grid-cols-4` → `grid-cols-5`). A member writing again REOPENS a
+closed thread — the club considered it done, the member did not.
+
+**Club side (admin).** `MessageThreadResource` in "Comunicaciones", read + act, never raw-edit: staff REPLY,
+CLOSE or CONVERT, each through a domain Action re-checking `comms.manage` (OWNER + MANAGER; STAFF excluded).
+The nav badge is a LIVE count of threads with an unread member message (never cached). A reply marks the
+member's outstanding messages read, appends a STAFF message, optionally closes, and pushes the member.
+
+**DataRequest bridge.** `ConvertThreadToDataRequest` turns "please delete my data" in words into a logged
+row in the subject-rights register (`data_request_id` linked, thread closed). It only RECORDS the request;
+FULFILLING it stays the owner-gated DataRequest flow (`data.request.handle` / `data.erase`), untouched.
+**OVERNIGHT-DEFAULT — CONFIRM:** conversion is gated on `comms.manage` (a manager can log a member's request)
+rather than owner-only. Rationale: logging an obligation is less sensitive than discharging it. Confirm.
+
+**Push.** New `new_message` channel added to `Member::PUSH_CHANNELS`; `ReplyToThread` notifies the member
+(best-effort — the existing per-channel opt-out + VAPID gate apply). `MemberPushTest`'s every-channel
+completeness assertion is updated so the channel can't ship without a render case.
+
+**Retention.** `message_retention_days` (default 730 = 2 years) on the settings form; `messages:prune-retention`
+REDACTS message bodies past retention while keeping the thread, authorship and timestamps as evidence of
+contact — the same redact-not-delete discipline and per-job heartbeat + *Salud del sistema* row as the
+audit-retention sweep (prompt 112). Idempotent. **OVERNIGHT-DEFAULT — CONFIRM:** the 730-day default, and that
+the sweep redacts message BODIES only — the short subject label is left until the member's own erasure, exactly
+as the audit sweep keeps a row's identity while redacting its payload.
+
+**RGPD erasure.** `message_threads` added to `AnonymiseMember::COVERED_MEMBER_TABLES`; erasure redacts the
+member-authored subject to `[borrado]` and scrubs the member's OWN message bodies, while STAFF replies (the
+club's record) and the thread skeleton survive as evidence. `messages` holds no member_id so the schema-driven
+guard does not flag it — it is handled explicitly and asserted (a staff reply is kept, a member body is gone).
+
+**Verification gap (owed — no browser here):** the PWA messages list + thread view (chat bubbles, compose /
+reply, the 5-tab nav) and the admin thread view + reply/convert modals are screenshot-owed across
+1440/1280/1024/390 + a short height, light AND dark. All LOGIC is proven headlessly: `MemberMessagesTest` (7,
+ownership + denial + unauth redirect) and `MessagingTest` (9, reply/close/convert/reopen + RGPD scrub +
+retention sweep + admin access).
+
+Tests (`MemberMessagesTest` 7, `MessagingTest` 9, `MemberPushTest` +1 channel). `composer check` green
+(PHPStan 0). EN/ES parity gated (35 new keys, both files). Pushed; **do not merge**.

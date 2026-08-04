@@ -4,8 +4,11 @@ namespace App\Actions\Members;
 
 use App\Actions\RecordAuditLog;
 use App\Enums\MemberDocumentType;
+use App\Enums\MessageAuthor;
 use App\Models\ConvocatoriaRecipient;
 use App\Models\Member;
+use App\Models\Message;
+use App\Models\MessageThread;
 use Illuminate\Support\Facades\Storage;
 
 /**
@@ -54,6 +57,7 @@ class AnonymiseMember
         'dispensations' => 'reference + amounts/weights, the Art. 9 ledger kept intact (no name/DNI).',
         'refunds' => 'reference + amount/reason (no name/DNI).',
         'convocatoria_recipients' => 'HANDLED here: the frozen roll keeps the row + status as assembly evidence; the name/email SNAPSHOT it holds is redacted.',
+        'message_threads' => 'HANDLED here: the thread + timestamps stay as evidence of contact; the member-authored subject is redacted and their message bodies scrubbed (messages hang off the thread, no member_id of their own).',
     ];
 
     public function handle(Member $member): Member
@@ -114,6 +118,13 @@ class AnonymiseMember
         // 5. Convocatoria rolls snapshot the member's name + email. Keep the row (and its NOTIFIED/NO_EMAIL
         //    status) as the assembly's legal evidence that they were convened, but redact the personal data.
         ConvocatoriaRecipient::query()->where('member_id', $member->id)->update(['name' => '[borrado]', 'email' => null]);
+
+        // Message threads keep the member's subject; their own messages hold free-text PII. Keep the threads +
+        // timestamps as evidence of contact, redact the subject and scrub the member-authored message bodies
+        // (staff replies are the club's own record and stay).
+        $threadIds = MessageThread::query()->withoutGlobalScopes()->where('member_id', $member->id)->pluck('id');
+        MessageThread::query()->withoutGlobalScopes()->where('member_id', $member->id)->update(['subject' => '[borrado]']);
+        Message::query()->whereIn('thread_id', $threadIds)->where('author', MessageAuthor::MEMBER->value)->update(['body' => '[borrado]']);
 
         // 6. Record the erasure itself WITHOUT any of the scrubbed values — the fact, not the data.
         (new RecordAuditLog)->handle('member.anonymised', $member, null, ['fields_cleared' => $clearedFields]);

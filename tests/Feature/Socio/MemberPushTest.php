@@ -10,12 +10,14 @@ use App\Models\Location;
 use App\Models\Member;
 use App\Models\Membership;
 use App\Models\MembershipTier;
+use App\Models\MessageThread;
 use App\Models\Organisation;
 use App\Models\PushSubscription;
 use App\Notifications\EventReminderNotification;
 use App\Notifications\LowBalanceNotification;
 use App\Notifications\MembershipExpiringNotification;
 use App\Notifications\NewAnnouncementNotification;
+use App\Notifications\NewMemberMessageNotification;
 use App\Notifications\TemporaryAccessEndingNotification;
 use App\Support\ActiveScope;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -154,6 +156,7 @@ class MemberPushTest extends TestCase
         $member = $this->member();
         $announcement = Announcement::factory()->create(['organisation_id' => $this->org->id, 'published_at' => now()->subHour()]);
         $event = Event::factory()->create(['organisation_id' => $this->org->id]);
+        $thread = MessageThread::factory()->create(['organisation_id' => $this->org->id, 'member_id' => $member->id]);
 
         $cases = [
             'low_balance' => new LowBalanceNotification(500),
@@ -161,6 +164,7 @@ class MemberPushTest extends TestCase
             'new_announcement' => new NewAnnouncementNotification($announcement),
             'event_reminder' => new EventReminderNotification($event),
             'temporary_ending' => new TemporaryAccessEndingNotification('2026-12-31'),
+            'new_message' => new NewMemberMessageNotification($thread),
         ];
 
         // Completeness: every declared push channel needs a render case here, so a new channel can't ship

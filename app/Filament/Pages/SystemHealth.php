@@ -65,6 +65,7 @@ class SystemHealth extends Page
             // Only surfaced when temporary members are enabled — otherwise the sweep is idle by design.
             'temporarySweep' => (bool) Settings::get('temporary_members_enabled', false) ? $health->temporarySweep() : null,
             'auditRetentionSweep' => $health->auditRetentionSweep(),
+            'messageRetentionSweep' => $health->messageRetentionSweep(),
             'queue' => $health->queue(),
             'cache' => $health->cache(),
             'backups' => $health->backups(),

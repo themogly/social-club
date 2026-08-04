@@ -63,6 +63,7 @@ class ManageSettings extends Page
         'discounts_stack' => SettingType::BOOL,
         'data_retention_days' => SettingType::INT,
         'audit_retention_days' => SettingType::INT,
+        'message_retention_days' => SettingType::INT,
         'signed_url_ttl_seconds' => SettingType::INT,
         'qr_scan_max_failures_per_minute' => SettingType::INT,
         // Locale (prompt 44) — actively read by ResolveLocale / LocaleSwitcher / SetLocale, but had
@@ -225,6 +226,8 @@ class ManageSettings extends Page
                         TextInput::make('data_retention_days')->label(__('Retención de datos de socio (días)'))->numeric()->required(),
                         TextInput::make('audit_retention_days')->label(__('Retención del registro de auditoría (días)'))->numeric()->required()
                             ->helperText(__('Retención MÍNIMA. El registro de auditoría es inalterable y no se purga automáticamente; esta cifra se comunica (panel, RAT), no borra nada.')),
+                        TextInput::make('message_retention_days')->label(__('Retención de mensajes (días)'))->numeric()->minValue(1)->required()
+                            ->helperText(__('El texto de los mensajes con socios se redacta pasado este plazo; queda el hilo como evidencia del contacto.')),
                         TextInput::make('signed_url_ttl_seconds')->label(__('Caducidad de URLs firmadas (seg.)'))->numeric()->required(),
                         TextInput::make('qr_scan_max_failures_per_minute')->label(__('Máx. escaneos fallidos por minuto'))->numeric()->minValue(1)->required()
                             ->helperText(__('Tras tantos escaneos de tarjeta fallidos por operador en un minuto, se bloquea temporalmente (anti fuerza bruta).')),

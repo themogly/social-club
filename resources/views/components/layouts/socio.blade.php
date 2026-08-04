@@ -76,7 +76,7 @@
         <nav class="fixed inset-x-0 bottom-0 z-20 border-t border-line bg-surface/95 backdrop-blur dark:border-slate-800 dark:bg-slate-950/95"
              style="padding-bottom: env(safe-area-inset-bottom);"
              aria-label="{{ __('Navegación de socio/a') }}">
-            <div class="mx-auto grid w-full max-w-md grid-cols-4">
+            <div class="mx-auto grid w-full max-w-md grid-cols-5">
                 <a href="{{ route('socio.home') }}" class="flex flex-col items-center gap-1 py-2.5 text-xs font-medium {{ $item('socio.home', request()->routeIs('socio.home')) }}">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" class="h-6 w-6" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M2.25 12 12 2.25 21.75 12M4.5 9.75v9.75a.75.75 0 0 0 .75.75H9.75V15.75a1.5 1.5 0 0 1 1.5-1.5h1.5a1.5 1.5 0 0 1 1.5 1.5v4.5h4.5a.75.75 0 0 0 .75-.75V9.75"/></svg>
                     {{ __('Inicio') }}
@@ -92,6 +92,10 @@
                 <a href="{{ route('socio.announcements') }}" class="relative flex flex-col items-center gap-1 py-2.5 text-xs font-medium {{ $item('socio.announcements', request()->routeIs('socio.announcements') || request()->routeIs('socio.events')) }}">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" class="h-6 w-6" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M14.857 17.082a23.85 23.85 0 0 0 5.454-1.31A8.97 8.97 0 0 1 18 9.75V9A6 6 0 0 0 6 9v.75a8.97 8.97 0 0 1-2.312 6.022c1.733.64 3.56 1.085 5.455 1.31m6.714 0a24.25 24.25 0 0 1-6.714 0m6.714 0a3 3 0 1 1-6.714 0"/></svg>
                     {{ __('Avisos') }}
+                </a>
+                <a href="{{ route('socio.messages') }}" class="flex flex-col items-center gap-1 py-2.5 text-xs font-medium {{ $item('socio.messages', request()->routeIs('socio.messages')) }}">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" class="h-6 w-6" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M8.625 12h.008v.008h-.008V12Zm3.375 0h.008v.008H12V12Zm3.375 0h.008v.008h-.008V12ZM21 12c0 4.556-4.03 8.25-9 8.25a9.764 9.764 0 0 1-2.555-.337A5.972 5.972 0 0 1 5.41 20.97a5.969 5.969 0 0 1-.474-.065 4.48 4.48 0 0 0 .978-2.025c.09-.457-.133-.901-.467-1.226C3.93 16.178 3 14.189 3 12c0-4.556 4.03-8.25 9-8.25s9 3.694 9 8.25Z"/></svg>
+                    {{ __('Mensajes') }}
                 </a>
             </div>
         </nav>

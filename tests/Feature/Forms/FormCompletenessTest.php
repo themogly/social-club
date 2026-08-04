@@ -19,6 +19,7 @@ use App\Filament\Resources\MemberApplications\MemberApplicationResource;
 use App\Filament\Resources\MemberDocuments\MemberDocumentResource;
 use App\Filament\Resources\Members\MemberResource;
 use App\Filament\Resources\MembershipTiers\MembershipTierResource;
+use App\Filament\Resources\MessageThreads\MessageThreadResource;
 use App\Filament\Resources\Minutes\MinuteResource;
 use App\Filament\Resources\Orders\OrderResource;
 use App\Filament\Resources\Purchases\PurchaseResource;
@@ -57,6 +58,7 @@ class FormCompletenessTest extends TestCase
         TillSessionResource::class => 'Read-only till oversight — sessions open/close at the counter terminal, not a form.',
         OrderResource::class => 'Read-only bar-sales oversight — orders are committed/voided at the bar POS, never a form (prompt 43).',
         DispensationResource::class => 'Read-only dispensation oversight — withdrawals happen at the dispensary POS; the only action is the refund modal (prompt 71).',
+        MessageThreadResource::class => 'Read-only messaging oversight — threads are started by members from the PWA; staff only reply/close/convert via actions, never a form (prompt 136).',
     ];
 
     /**

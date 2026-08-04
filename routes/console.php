@@ -34,6 +34,10 @@ Schedule::command('expenses:materialise-recurring')->dailyAt('05:30');
 // this and nothing applied it. Idempotent (a redacted row holds nothing left to redact).
 Schedule::command('audit:redact-retention')->dailyAt('05:45');
 
+// Apply the declared message retention (prompt 136): redact the bodies of member↔club messages past
+// message_retention_days, keeping the thread as evidence of contact. Idempotent (redacted rows are skipped).
+Schedule::command('messages:prune-retention')->dailyAt('05:50');
+
 // Cross-location wallet settlement — credit at one unfenced sede clears debt at another.
 // Reads live balances; a no-op when nothing to settle, so a double-fire moves no extra money.
 Schedule::command('wallet:settle-cross-location')->dailyAt('03:30');

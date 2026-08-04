@@ -8,6 +8,7 @@ use App\Http\Controllers\DispensationReceiptController;
 use App\Http\Controllers\LockdownReactivationController;
 use App\Http\Controllers\Member\AnnouncementController;
 use App\Http\Controllers\Member\EventController;
+use App\Http\Controllers\Member\MessageController;
 use App\Http\Controllers\Member\NotificationController;
 use App\Http\Controllers\MemberDocumentController;
 use App\Http\Controllers\MemberMediaController;
@@ -153,5 +154,11 @@ Route::middleware('web')->prefix('socio')->name('socio.')->group(function () {
         Route::post('notificaciones/preferencias', [NotificationController::class, 'updatePreferences'])->name('notifications.prefs');
         Route::post('push/suscribir', [NotificationController::class, 'subscribe'])->name('push.subscribe');
         Route::post('push/cancelar', [NotificationController::class, 'unsubscribe'])->name('push.unsubscribe');
+
+        // Messages to the club (prompt 136). Threads are resolved by ULID + member ownership — no id leaks.
+        Route::get('mensajes', [MessageController::class, 'index'])->name('messages');
+        Route::post('mensajes', [MessageController::class, 'store'])->middleware('throttle:20,1')->name('messages.store');
+        Route::get('mensajes/{thread}', [MessageController::class, 'show'])->name('messages.show');
+        Route::post('mensajes/{thread}/responder', [MessageController::class, 'reply'])->middleware('throttle:20,1')->name('messages.reply');
     });
 });

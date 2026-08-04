@@ -67,6 +67,17 @@ class SystemHealth
     }
 
     /**
+     * The message retention sweep (messages:prune-retention). Goes stale — red — if it stops running, so the
+     * declared message retention is proven APPLIED, not just configured (prompt 136).
+     *
+     * @return array{last_at: ?CarbonInterface, age_seconds: ?int, stale: bool, threshold_seconds: int}
+     */
+    public function messageRetentionSweep(): array
+    {
+        return $this->component('message-retention-sweep', self::DAILY_STALE_SECONDS);
+    }
+
+    /**
      * @return array{last_at: ?CarbonInterface, age_seconds: ?int, stale: bool, threshold_seconds: int}
      */
     private function component(string $component, int $threshold): array
