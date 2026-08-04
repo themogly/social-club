@@ -5303,4 +5303,44 @@ confirms **16px between every adjacent control, order language → help → avat
 1280 / 1024 / 800 × light/dark**. The pill screenshot confirms the blue active segment reads (AA) in both
 themes. `composer check` green (Pint, PHPStan 0, 967 passed / 3 skipped). **Verification gap:** Playwright is
 not a CI dependency (see the README) — the structural guard test + the local measurement stand in for it.
+
+## Prompt 144 — Dashboard stat-card labels broke mid-word ("Contri‑butions")
+
+**Symptom.** At four-up (the desktop content column), the three delta-bearing cards showed a label
+snapped mid-word: `Contri‑butions`, `Transac‑ciones`. This is the residue prompt 129 could not reach.
+
+**Why 129's one property wasn't the whole fix.** 129 correctly moved `.csc-card-label` from a single-line
+ellipsis to a two-line wrap and changed `overflow-wrap: anywhere` → `break-word` (kept — `anywhere` also
+counts a mid-word break-point when computing the element's MIN-CONTENT width, collapsing it to one character,
+so the flex algorithm then hands the label the remainder and it shatters). But `break-word` only stops the
+label breaking a word *when there is room for the word*. In a four-up row the card was ~154px, and the label
+was sharing that row with the icon AND the delta chip — so the space left for the word was smaller than the
+word, and even `break-word` had to break it. **Three parts, each proven load-bearing by a Playwright
+range-rects harness** (renders a card at exactly the min card width — the worst case under `auto-fit`, since
+`1fr` only ever makes a card wider — and flags any single word whose client-rects span two lines; a 44px
+negative control confirms the detector fires):
+
+| Part | What | Proven necessary because |
+| --- | --- | --- |
+| 1 | `overflow-wrap: break-word` on the label (and value), NOT `anywhere` | 129's reasoning; `anywhere` re-collapses min-content and re-shatters the word |
+| 2 | Delta chip moves BELOW the label — `.csc-card-headmain` column wraps label + chip, label gets the FULL header width | With the chip beside it, a 13rem (208px) card STILL breaks "Contributions"/"Transacciones"; clean only at ≥232px — which would force two-up at 1280 |
+| 3 | `.csc-cards` → `repeat(auto-fit, minmax(13rem, 1fr))` instead of a fixed four-up | With the chip below but the old four-up (~154px cards), the same two labels STILL break; clean from ~176px, floor set at 13rem/208px for margin |
+
+**Column count: four-up → up to three-up in the content column.** `auto-fit` fills as many ≥13rem cards as
+the row holds (three where four won't fit, two in the narrower column, one on a phone). This is the trade the
+prompt sanctioned ("the row that held four can hold three and wrap, or the cards can be a touch wider").
+Chip-below (part 2) was chosen over the alternative — keeping the chip beside and widening the floor to 14.5rem
+— precisely because it keeps the denser three-up rather than dropping to two-up.
+
+**129's guarantees still hold (strengthened).** The two-line clamp stays (`-webkit-line-clamp: 2`, ellipsis on
+a genuinely over-long third line); the chip can no longer be pushed out (it is below, not beside); the card
+still cannot clip (`overflow: hidden`, no horizontal overflow). Giving the label the full width makes its
+priority over the chip absolute, not merely "wins the squeeze".
+
+**Verified.** All 8 labels × EN/ES × light/dark render with zero mid-word breaks at and above the 13rem floor
+(harness clean from 176px; shipped floor 208px). Screenshots at the min width, light and dark, confirm the
+chip reads cleanly beneath the label. `DashboardScreenTest::test_stat_card_labels_never_break_mid_word` pins
+all three parts structurally (source-regex guard, since CI has no browser). `composer check` green (Pint,
+PHPStan 0, 968 passed / 3 skipped). **Verification gap:** the range-rects harness ran locally; a logged-in
+Playwright screenshot of the real dashboard at 1280/1024/800 is owed, as for the other presentation prompts.
 Pushed; **do not merge** (human review).

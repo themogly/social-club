@@ -14,23 +14,28 @@
     @class(['csc-card', 'csc-card-link' => $isLink])
     @if ($card['flag'] ?? false) data-flag="true" @endif
 >
+    {{-- Prompt 144: the delta chip sits BELOW the label, not beside it, so the label owns the full header
+         width and never has to share a narrow row with the chip (which is what forced the mid-word break on
+         "Contributions"/"Dispensed"/"Transactions" at four-up). --}}
     <div class="csc-card-head">
         <span class="csc-card-icon"><x-filament::icon :icon="$card['icon']" class="csc-ico" /></span>
-        <span class="csc-card-label">{{ $card['label'] }}</span>
+        <div class="csc-card-headmain">
+            <span class="csc-card-label">{{ $card['label'] }}</span>
 
-        @if ($delta)
-            <span @class(['csc-delta', 'csc-delta-'.$delta['tone']])>
-                {{-- Direction is carried by the arrow shape AND the number — never colour alone. --}}
-                @if ($delta['dir'] === 'up')
-                    <svg class="csc-delta-ico" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M4 10l4-4 4 4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-                @elseif ($delta['dir'] === 'down')
-                    <svg class="csc-delta-ico" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M4 6l4 4 4-4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-                @else
-                    <svg class="csc-delta-ico" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M4 8h8" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
-                @endif
-                <span>{{ $delta['label'] }}</span>
-            </span>
-        @endif
+            @if ($delta)
+                <span @class(['csc-delta', 'csc-delta-'.$delta['tone']])>
+                    {{-- Direction is carried by the arrow shape AND the number — never colour alone. --}}
+                    @if ($delta['dir'] === 'up')
+                        <svg class="csc-delta-ico" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M4 10l4-4 4 4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                    @elseif ($delta['dir'] === 'down')
+                        <svg class="csc-delta-ico" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M4 6l4 4 4-4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                    @else
+                        <svg class="csc-delta-ico" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M4 8h8" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+                    @endif
+                    <span>{{ $delta['label'] }}</span>
+                </span>
+            @endif
+        </div>
     </div>
 
     <div class="csc-card-body">
