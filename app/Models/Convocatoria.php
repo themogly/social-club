@@ -85,6 +85,18 @@ class Convocatoria extends Model
         return $this->hasMany(ConvocatoriaRecipient::class);
     }
 
+    /** @return HasMany<AssemblyAttendance, $this> */
+    public function attendances(): HasMany
+    {
+        return $this->hasMany(AssemblyAttendance::class);
+    }
+
+    /** @return HasMany<AssemblyResolution, $this> */
+    public function resolutions(): HasMany
+    {
+        return $this->hasMany(AssemblyResolution::class);
+    }
+
     /** @return HasMany<Minute, $this> */
     public function minutes(): HasMany
     {

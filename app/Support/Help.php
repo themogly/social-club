@@ -3,6 +3,7 @@
 namespace App\Support;
 
 use App\Actions\Pricing\ResolvePrice;
+use App\Filament\Pages\Asamblea;
 use App\Filament\Pages\Dashboard;
 use App\Filament\Pages\ExportacionContable;
 use App\Filament\Pages\FailedJobs;
@@ -257,6 +258,10 @@ class Help
         ]],
         AgmPackReportPage::class => ['permission' => 'reports.view.all', 'title' => 'Dossier de asamblea', 'body' => [
             'El paquete para la asamblea general: socios, cuentas y actividad del período reunidos en un solo dossier.',
+        ]],
+        Asamblea::class => ['permission' => 'minutes.manage', 'title' => 'Asamblea', 'body' => [
+            'Celebra la asamblea de una convocatoria emitida: registra la asistencia (presente o representado) sobre la lista fijada y observa el quórum en vivo.',
+            'Anota el resultado de cada punto del orden del día y luego redacta el acta a partir de lo registrado — no se reescribe a mano. Firmarla la archiva de forma inmutable.',
         ]],
         AttendanceReportPage::class => ['permission' => 'reports.view', 'title' => 'Informe de asistencia', 'body' => [
             'Cuánta gente pasó por la sede y cuándo. Ayuda a dimensionar turnos y a respetar el aforo.',

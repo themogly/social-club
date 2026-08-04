@@ -129,6 +129,10 @@ class ManageSettings extends Page
                             ->label(__('Quórum de actas (%)'))
                             ->numeric()->minValue(1)->maxValue(100)->required()
                             ->helperText(__('% de socios activos necesario para el quórum de una asamblea.')),
+                        TextInput::make('assembly_second_call_quorum_pct')
+                            ->label(__('Quórum en segunda convocatoria (%)'))
+                            ->numeric()->minValue(0)->maxValue(100)->required()
+                            ->helperText(__('% para el quórum en segunda convocatoria. 0 = queda constituida sea cual sea la asistencia.')),
                         TextInput::make('assembly_notice_days')
                             ->label(__('Plazo de convocatoria (días)'))
                             ->numeric()->minValue(0)->required()
@@ -259,6 +263,7 @@ class ManageSettings extends Page
 
         // Quórum shown as a percentage at the edge, stored as basis points (50% → 5000 bp).
         Settings::set('minute_quorum_fraction_bp', (int) round_half_up(((float) ($state['minute_quorum_fraction_pct'] ?? 0)) * 100), SettingType::BP);
+        Settings::set('assembly_second_call_quorum_bp', (int) round_half_up(((float) ($state['assembly_second_call_quorum_pct'] ?? 0)) * 100), SettingType::BP);
 
         (new RecordAuditLog)->handle('settings.updated', null, $before, $this->currentValues());
 
@@ -282,6 +287,7 @@ class ManageSettings extends Page
         $values['arqueo_variance_tolerance_eur'] = ((int) Settings::get('arqueo_variance_tolerance_cents')) / 100;
         $values['expense_approval_threshold_eur'] = ((int) Settings::get('expense_approval_threshold_cents')) / 100;
         $values['minute_quorum_fraction_pct'] = ((int) Settings::get('minute_quorum_fraction_bp')) / 100;
+        $values['assembly_second_call_quorum_pct'] = ((int) Settings::get('assembly_second_call_quorum_bp')) / 100;
 
         return $values;
     }

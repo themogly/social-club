@@ -76,7 +76,7 @@
         <ol>
             @foreach ($resolutions as $r)
                 <li>
-                    {{ data_get($r, 'texto') }}
+                    {{ data_get($r, 'texto') }}@if (data_get($r, 'resultado')) — <strong>{{ data_get($r, 'resultado') }}</strong>@endif
                     <span class="votes">({{ __('A favor') }} {{ (int) data_get($r, 'favor', 0) }} · {{ __('En contra') }} {{ (int) data_get($r, 'contra', 0) }} · {{ __('Abstención') }} {{ (int) data_get($r, 'abstencion', 0) }})</span>
                 </li>
             @endforeach
