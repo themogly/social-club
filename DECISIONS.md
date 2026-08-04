@@ -5211,3 +5211,55 @@ its Action via Livewire method calls). What a browser would add is layout/contra
 
 Tests (`AssemblyTest` 13, `AsambleaPageTest` 4). `composer check` green (PHPStan 0). EN/ES parity gated
 (37 new keys, both files). Pushed; **do not merge**.
+## Prompt 142 — An abandoned import leaves the club's whole register on disk
+
+`ListMembers::importAction()` copies the uploaded CSV to `storage/app/member-imports/{ulid}.csv` so it
+survives from the preview request into the confirm request. `resetImport()` deletes it on commit, on cancel,
+and when the stash is missing — but NOT when the operator walks away (closes the tab, navigates elsewhere).
+That file is the club's entire paper register in plaintext — names, emails, phones, **dates of birth and
+document numbers**. The directory is `0700` and outside the webroot, so this is not an exposure; it is
+**undeclared, unbounded retention of personal data**, in a product whose distinguishing claim is that its
+retention periods are applied rather than merely configured.
+
+**The fix is a scheduled sweep — the guarantee — exactly as the unique index (not a check-then-insert) is what
+makes idempotency hold elsewhere.** `imports:prune-staging` (hourly) deletes staged files older than
+`import_staging_retention_hours`, and ONLY those: a stash for an import currently mid-flow was just written, so
+it is newer than the cutoff and is left untouched (worth an explicit test — it is the one way this fix could
+cause harm). Idempotent, safe when the directory is empty or absent, heartbeat stamped so a silently stopped
+sweep goes red on *Salud del sistema* ("Barrido de importaciones"), following prompt 112's pattern.
+
+**Window = 4 hours.** This is scratch space for a multi-step form, not a record: long enough that a slow
+operator who leaves the preview open over lunch does not lose their work (and even if a stash is swept
+mid-review, `confirmImport` already degrades gracefully to "la previsualización caducó, vuelve a subir" — no
+crash, no data loss), short enough that nothing lingers overnight. It is a **Setting**
+(`import_staging_retention_hours`) alongside the other retention periods, but a system constant (a TTL for
+scratch space), so it is read via `Settings::get` and excluded from the org settings form (documented in the
+settings-coverage test).
+
+**Navigate-away immediate catch — deliberately none added.** There is no reliable server-side hook for a
+closed tab or a navigation: the browser sends nothing. `resetImport()` already catches the two cases it can —
+commit and explicit cancel — immediately. A `beforeunload` beacon is unreliable and is exactly the "elaborate
+lifecycle dance" the brief warns against; the scheduled sweep is what makes the guarantee. So the walk-away
+case is closed by the sweep, not by a speculative hook.
+
+**Encryption via DocumentVault — deferred, as a stated decision, not an oversight.** `ImportMembers::preview()`
+and `import()` read a plaintext filesystem PATH, so routing the stash through `DocumentVault` (encrypt at rest)
+would mean decrypting to a plaintext temp file in BOTH the preview and the confirm request — reintroducing a
+plaintext copy at read time regardless — and moving the stash onto the `documents` disk (S3 in production),
+complicating a preview→confirm handoff whose behaviour must not change. The directory is already `0700` and
+off the webroot, and the sweep now bounds the file's lifetime to hours; the actual defect was retention, which
+the sweep closes. If register-in-transit at-rest encryption is later judged necessary, the path is
+`DocumentVault::put`/`get` with a decrypt-to-temp shim — but it is not added speculatively against the
+behaviour-preservation rule.
+
+**RAT.** RAT-01 (Gestión de socios y membresías) now names the member-import staging directory, its retention
+window and its automatic deletion — the half of this branch that is not code, and the half that matters if
+anyone ever asks.
+
+**Verification gap (owed — no browser here):** the *Salud del sistema* panel showing the new "Barrido de
+importaciones" sweep, light and dark.
+
+Tests (`ImportStagingRetentionTest`, 8): a stale file is swept; an in-flight file is left; idempotent; safe
+when the directory is absent; heartbeat stamped and health goes stale without it; a successful import and an
+explicit cancel each still delete their own stash immediately; the preview carries the ceiling + consent counts
+intact. `composer check` green (PHPStan 0). Pushed; **do not merge**.

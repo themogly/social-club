@@ -166,6 +166,9 @@ class DebtAndLocationSettingsTest extends TestCase
         // matrix (its own editor), per-location settings, and system/compliance constants.
         // (default_locale + enabled_locales are now ON the form — prompt 44 — so they left this list.)
         $excluded = ['enforcement', 'aforo_default', 'data_retention_days', 'audit_retention_days', 'signed_url_ttl_seconds', 'consent_text_version', 'consent_privacy_text', 'consent_statutes_text', 'heartbeat_stale_seconds', 'monthly_window',
+            // System constant, not a front-of-house threshold: how many hours abandoned member-import scratch
+            // CSVs live before the imports:prune-staging sweep deletes them (prompt 142).
+            'import_staging_retention_hours',
             // Scheduler constant, not a front-of-house threshold: how many hours before an event to push
             // its reminder (prompt 56 — the events:remind command reads it).
             'event_reminder_lead_hours',

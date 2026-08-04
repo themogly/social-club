@@ -38,6 +38,11 @@ Schedule::command('audit:redact-retention')->dailyAt('05:45');
 // message_retention_days, keeping the thread as evidence of contact. Idempotent (redacted rows are skipped).
 Schedule::command('messages:prune-retention')->dailyAt('05:50');
 
+// Sweep abandoned member-import staging CSVs (prompt 142): they hold the club's whole register in plaintext,
+// and resetImport() misses the walk-away case. Hourly, because the window is hours — the scratch space of a
+// multi-step form, not a record. Idempotent and safe on an empty/absent directory.
+Schedule::command('imports:prune-staging')->hourly();
+
 // Cross-location wallet settlement — credit at one unfenced sede clears debt at another.
 // Reads live balances; a no-op when nothing to settle, so a double-fire moves no extra money.
 Schedule::command('wallet:settle-cross-location')->dailyAt('03:30');
