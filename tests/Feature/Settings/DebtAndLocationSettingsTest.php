@@ -160,7 +160,7 @@ class DebtAndLocationSettingsTest extends TestCase
 
         // Money/weight/percent values edited via *_eur / *_g / *_pct virtual fields → cover their stored keys.
         // minute_quorum_fraction_bp is entered as a percentage (prompt 44).
-        $edgeCovered = ['daily_limit_cg', 'monthly_limit_cg', 'wallet_debt_limit_cents', 'wallet_door_debt_threshold_cents', 'low_balance_threshold_cents', 'arqueo_variance_tolerance_cents', 'expense_approval_threshold_cents', 'minute_quorum_fraction_bp'];
+        $edgeCovered = ['daily_limit_cg', 'monthly_limit_cg', 'wallet_debt_limit_cents', 'wallet_door_debt_threshold_cents', 'low_balance_threshold_cents', 'arqueo_variance_tolerance_cents', 'expense_approval_threshold_cents', 'minute_quorum_fraction_bp', 'assembly_second_call_quorum_bp'];
 
         // Deliberately NOT on the org settings form (documented in DECISIONS): the enforcement
         // matrix (its own editor), per-location settings, and system/compliance constants.

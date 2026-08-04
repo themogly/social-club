@@ -5,6 +5,7 @@ namespace App\Actions\Members;
 use App\Actions\RecordAuditLog;
 use App\Enums\MemberDocumentType;
 use App\Enums\MessageAuthor;
+use App\Models\AssemblyAttendance;
 use App\Models\ConvocatoriaRecipient;
 use App\Models\Member;
 use App\Models\Message;
@@ -58,6 +59,7 @@ class AnonymiseMember
         'refunds' => 'reference + amount/reason (no name/DNI).',
         'convocatoria_recipients' => 'HANDLED here: the frozen roll keeps the row + status as assembly evidence; the name/email SNAPSHOT it holds is redacted.',
         'message_threads' => 'HANDLED here: the thread + timestamps stay as evidence of contact; the member-authored subject is redacted and their message bodies scrubbed (messages hang off the thread, no member_id of their own).',
+        'assembly_attendances' => 'HANDLED here: the attendance register keeps the row + mode/proxy as assembly evidence; the name SNAPSHOT it holds is redacted.',
     ];
 
     public function handle(Member $member): Member
@@ -125,6 +127,9 @@ class AnonymiseMember
         $threadIds = MessageThread::query()->withoutGlobalScopes()->where('member_id', $member->id)->pluck('id');
         MessageThread::query()->withoutGlobalScopes()->where('member_id', $member->id)->update(['subject' => '[borrado]']);
         Message::query()->whereIn('thread_id', $threadIds)->where('author', MessageAuthor::MEMBER->value)->update(['body' => '[borrado]']);
+        // The assembly attendance register snapshots the member's name too. Keep the row (and its present/proxy
+        // mode) as evidence they attended a given assembly, but redact the name.
+        AssemblyAttendance::query()->withoutGlobalScopes()->where('member_id', $member->id)->update(['name' => '[borrado]']);
 
         // 6. Record the erasure itself WITHOUT any of the scrubbed values — the fact, not the data.
         (new RecordAuditLog)->handle('member.anonymised', $member, null, ['fields_cleared' => $clearedFields]);

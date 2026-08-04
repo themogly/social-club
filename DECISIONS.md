@@ -5148,3 +5148,66 @@ retention sweep + admin access).
 
 Tests (`MemberMessagesTest` 7, `MessagingTest` 9, `MemberPushTest` +1 channel). `composer check` green
 (PHPStan 0). EN/ES parity gated (35 new keys, both files). Pushed; **do not merge**.
+## Prompt 137 — The assembly, end to end
+
+Convening already existed (`IssueConvocatoria` freezes the roll + notifies; `CreateMinute`/`SignMinute` draft
+and file an acta). What was missing was the MEETING between them: recording who attended, watching quorum,
+recording each agenda item's outcome, and drafting the acta FROM that instead of retyping it into the acta
+form. This branch adds exactly that middle, reusing the existing writers unchanged.
+
+**Two new tables as the live working state, snapshotted into the acta.** `assembly_attendances`
+(convocatoria_id, member_id, name snapshot, mode PRESENT|PROXY, proxy_holder, recorded_by; unique per member)
+and `assembly_resolutions` (position, title, result APPROVED|REJECTED|DEFERRED, votes_for/against/abstain).
+These are the *working* record during the meeting. `DraftAssemblyMinute` SNAPSHOTS them into `CreateMinute`'s
+existing JSON columns (`attendees`, `resolutions`) — so the acta stands alone as the immutable record and
+`CreateMinute` is **unchanged**. The alternative (make CreateMinute read the tables) was rejected: it would
+couple the one acta writer to this feature and break the acta's self-containment.
+
+**Entry point is a custom Filament Page (`Asamblea`), not a relation manager.** There is no writable-relation-
+manager precedent that routes through a domain Action, and the page is the natural home for the "end to end"
+flow the prompt asks for. It is a THIN shell: every write goes through `RecordAttendance` / `RecordResolution`
+/ `DraftAssemblyMinute` (single-writer preserved), and `AsambleaPageTest` proves each button reaches its
+Action (guarding against the unreachable-Action defect). Gated on `minutes.manage`.
+
+**Both PRESENT and PROXY count toward quorum** — representation is valid presence in a Spanish asociación.
+Roll and quorum use the SAME temporal predicate (`joined_at`/`left_at` as-at) as `IssueConvocatoria` /
+`CreateMinute`, so a member who joins or leaves after issue is excluded, matching the frozen roll.
+
+**New setting `assembly_second_call_quorum_bp`** (on the org settings form, entered as %, stored as bp).
+Second-call quorum did not exist — only a single first-call fraction + a `second_call_at` timestamp.
+`AssemblyQuorum` computes first-call (frozen `quorum_required`) and second-call thresholds live and reports
+`isConstituted()`.
+
+**OVERNIGHT-DEFAULT — CONFIRM:**
+- `assembly_second_call_quorum_bp` default **0** = the assembly is validly constituted on second call whatever
+  the attendance (common Spanish asociación statute practice). Configurable; confirm this is the club's rule.
+- **No proxy-per-holder LIMIT** is enforced (e.g. "max 2 proxies per attendee"). Statute-driven and varies;
+  deferred as a later configurable cap rather than guessed. Confirm whether a cap is needed.
+- **Drafting is NOT hard-blocked on quorum.** The acta records present vs required and states the constitution
+  in its body ("quórum alcanzado…/no alcanzado"); whether to hold or adjourn is the club's judgment, not the
+  software's. Confirm this is right vs. blocking a sub-quorum acta.
+
+**Immutability / corrections unchanged.** `DraftAssemblyMinute` refuses a second draft while an unsigned one
+exists; a signed acta's correction still supersedes via `CreateMinute` directly (`supersedes_id`), untouched.
+
+**Locale-stable acta content.** An acta is a Spanish legal document, so its STORED text must not shift with the
+drafting user's UI locale: `ResolutionResult::actaTerm()`, the fixed "Asamblea general ordinaria/extraordinaria"
+type, and the body preamble are deliberately not `__()`. The acta's resolutions JSON gained a `resultado` key,
+surfaced in `MinuteInfolist` + `documents.minute` (both degrade if absent).
+
+**RGPD.** `assembly_attendances` added to `AnonymiseMember::COVERED_MEMBER_TABLES`; the `name` snapshot is
+redacted to `[borrado]` while the row + mode/proxy survive as attendance evidence (mirrors
+`convocatoria_recipients`). `assembly_resolutions` holds no member PII (recorded_by = user), so it is not
+member-linked. The schema-driven `RgpdCompletenessTest` guard is satisfied.
+
+**AGM pack fed.** `AgmPackReport` gained an "Asambleas del período" table (convocados / asistentes / quórum /
+acta nº) drawn straight from what this feature records — evidence, never retyped.
+
+**Verification gap (owed — no browser here):** the `Asamblea` page (roll table with present/proxy/clear
+controls, live quorum card, agenda→resolution rows, draft button) is screenshot-owed across 1440/1280/1024/390
++ a short laptop height, light AND dark, motion reduced AND allowed. All LOGIC is proven headlessly:
+`AssemblyTest` (13, the Actions + quorum + RGPD) and `AsambleaPageTest` (4, page access + each button reaches
+its Action via Livewire method calls). What a browser would add is layout/contrast confirmation, not behaviour.
+
+Tests (`AssemblyTest` 13, `AsambleaPageTest` 4). `composer check` green (PHPStan 0). EN/ES parity gated
+(37 new keys, both files). Pushed; **do not merge**.

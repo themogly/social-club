@@ -64,7 +64,9 @@ class MinuteInfolist
                             ->listWithLineBreaks()
                             ->bulleted()
                             ->state(fn (Minute $record): array => array_map(
-                                fn (array $r): string => (string) ($r['texto'] ?? '').' ('.__('A favor').' '.(int) ($r['favor'] ?? 0).' · '.__('En contra').' '.(int) ($r['contra'] ?? 0).' · '.__('Abstención').' '.(int) ($r['abstencion'] ?? 0).')',
+                                fn (array $r): string => (string) ($r['texto'] ?? '')
+                                    .(isset($r['resultado']) ? ' — '.$r['resultado'] : '')
+                                    .' ('.__('A favor').' '.(int) ($r['favor'] ?? 0).' · '.__('En contra').' '.(int) ($r['contra'] ?? 0).' · '.__('Abstención').' '.(int) ($r['abstencion'] ?? 0).')',
                                 array_values(array_filter((array) $record->resolutions, 'is_array')),
                             ))
                             ->placeholder(__('Sin acuerdos')),

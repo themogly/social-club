@@ -38,6 +38,7 @@ class AgmPackReport extends AbstractReport
             $this->byLocation(),
             $this->membersByStatus(),
             $this->expensesByCategory(),
+            $this->assemblies(),
         ];
     }
 
@@ -198,6 +199,63 @@ class AgmPackReport extends AbstractReport
             rows: $rows,
             totals: ['importe' => array_sum(array_column($rows, 'importe'))],
             empty: __('Sin gastos en este período'),
+        );
+    }
+
+    // --- Assemblies held in the period (governance evidence) ------------------------
+
+    /**
+     * Every assembly convened AND held in the period, with its attendance, whether the first-call quorum was
+     * reached, and whether its acta is filed (signed). This is the evidence the pack exists to present:
+     * fed straight from what prompt 137 records, never retyped.
+     */
+    private function assemblies(): ReportTable
+    {
+        [$start, $end] = $this->bounds();
+
+        $convocatorias = DB::table('convocatorias')
+            ->where('organisation_id', $this->organisationId)
+            ->whereNull('deleted_at')
+            ->whereNotNull('issued_at')
+            ->where('held_at', '>=', $start)->where('held_at', '<', $end)
+            ->orderBy('held_at')
+            ->get(['id', 'title', 'roll_count', 'quorum_required']);
+
+        $ids = $convocatorias->pluck('id')->all();
+        $present = DB::table('assembly_attendances')->whereIn('convocatoria_id', $ids)
+            ->groupBy('convocatoria_id')->pluck(DB::raw('COUNT(*) as agg'), 'convocatoria_id');
+        $actas = DB::table('minutes')->whereIn('convocatoria_id', $ids)
+            ->whereNotNull('signed_at')->pluck('number', 'convocatoria_id');
+
+        $rows = [];
+        $totals = ['convocados' => 0, 'asistentes' => 0];
+        foreach ($convocatorias as $c) {
+            $p = (int) ($present[$c->id] ?? 0);
+            $totals['convocados'] += (int) $c->roll_count;
+            $totals['asistentes'] += $p;
+            $rows[] = [
+                'asamblea' => (string) $c->title,
+                'convocados' => (int) $c->roll_count,
+                'asistentes' => $p,
+                'quorum' => $p >= (int) $c->quorum_required ? __('Alcanzado') : __('No alcanzado'),
+                'acta' => isset($actas[$c->id]) ? '#'.$actas[$c->id] : __('Pendiente de firma'),
+            ];
+        }
+
+        return new ReportTable(
+            key: 'assemblies',
+            title: __('Asambleas del período'),
+            columns: [
+                ReportColumn::text('asamblea', __('Asamblea'), sortable: false),
+                ReportColumn::number('convocados', __('Convocados')),
+                ReportColumn::number('asistentes', __('Asistentes')),
+                ReportColumn::text('quorum', __('Quórum'), sortable: false),
+                ReportColumn::text('acta', __('Acta'), sortable: false),
+            ],
+            rows: $rows,
+            totals: $totals,
+            empty: __('Sin asambleas celebradas en este período'),
+            emptyHint: __('Aparecerán aquí las asambleas convocadas y celebradas dentro de las fechas del dossier.'),
         );
     }
 

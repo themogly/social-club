@@ -101,7 +101,8 @@ class Settings
         'ring_fenced' => false,
 
         // Governance / actas
-        'minute_quorum_fraction_bp' => 5000,  // quorum = 50% of active members (basis points)
+        'minute_quorum_fraction_bp' => 5000,  // first-call quorum = 50% of active members (basis points)
+        'assembly_second_call_quorum_bp' => 0, // second-call quorum (0 = constituted whatever the attendance)
         'assembly_notice_days' => 15,         // minimum days between issuing a convocatoria and the assembly
 
         // Till / cash
