@@ -47,13 +47,16 @@ class RecordWalletTransaction
             // Low-balance reminder (prompt 56): only when a DEBIT crosses the threshold from above to
             // below — so it warns once on the drop, never repeatedly while already low. Dispatched after
             // commit (below) so a rolled-back movement never pushes.
-            $threshold = (int) Settings::get('low_balance_threshold_cents', 500);
+            $threshold = (int) Settings::get('low_balance_threshold_cents', 500, $location->id);
             $crossedLow = $amountCents < 0 && $oldBalance >= $threshold && $newBalance < $threshold;
             $balanceAfter = $newBalance;
 
             if ($newBalance < 0 && ! ($options['allow_debt'] ?? false)) {
-                $debtAllowed = (bool) Settings::get('wallet_debt_allowed', false);
-                $limit = (int) Settings::get('wallet_debt_limit_cents', 0);
+                // Scope the debt policy to the MOVEMENT's sede (the balance already is), not whatever is ambient
+                // — this writer is reachable cross-location (the wallet relation-manager's all-sedes picker), so
+                // an ambient read could gate a movement by another sede's policy. Matches RefundDispensation.
+                $debtAllowed = (bool) Settings::get('wallet_debt_allowed', false, $location->id);
+                $limit = (int) Settings::get('wallet_debt_limit_cents', 0, $location->id);
 
                 if (! $debtAllowed || $newBalance < -$limit) {
                     throw new DebtLimitExceededException(__('Este movimiento superaría el límite de deuda del socio.'));
