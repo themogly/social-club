@@ -44,7 +44,7 @@
        Filament content column made each card too narrow for its label + delta chip, forcing a mid-word break;
        auto-fit keeps every card >= ~13rem, so labels wrap on whole words (three-up where four won't fit). */
     .csc-cards { display: grid; grid-template-columns: repeat(1, 1fr); gap: 1rem; }
-    @media (min-width: 640px) { .csc-cards { grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr)); } }
+    @media (min-width: 640px) { .csc-cards { grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr)); } }
     .csc-chart-grid { display: grid; grid-template-columns: 1fr; gap: 1.5rem; }
     @media (min-width: 768px) { .csc-chart-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
     .csc-two { display: grid; grid-template-columns: 1fr; gap: 1.5rem; }

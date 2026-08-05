@@ -261,7 +261,7 @@ class DashboardScreenTest extends TestCase
 
         // (3) auto-fit with a readable min-width instead of a fixed four-up — a four-up row in the
         //     content column made each card too narrow even with the chip below.
-        $this->assertMatchesRegularExpression('/grid-template-columns:\s*repeat\(auto-fit,\s*minmax\(13rem/', $styles);
+        $this->assertMatchesRegularExpression('/grid-template-columns:\s*repeat\(auto-fit,\s*minmax\(12rem/', $styles);
         $this->assertDoesNotMatchRegularExpression('/\.csc-cards\s*\{[^}]*repeat\(4,/', $styles);
     }
 
