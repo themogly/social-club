@@ -38,6 +38,25 @@ class ResolveMemberEligibility
                 $rules[] = $this->rule('door', 'aforo', $this->aforoAvailable($location), __('Aforo completo.'));
             }
 
+            // Photo-on-file (prompt 157): the counter verifies identity by comparing a face to a photo, so a
+            // member with none cannot be checked. Appended ONLY when a club has opted in (WARN or OVERRIDE);
+            // when OFF the rule is absent, so the verdict is byte-identical to a club that never configured it —
+            // no surprise block on upgrade. Read OFF-safe (photoEnforcement, NOT enforcement, which would
+            // fail-safe a legacy matrix to BLOCK). Never a DOOR rule: the door is where a missing photo gets
+            // TAKEN, so blocking entry over it would be self-defeating.
+            if ($surface === 'counter') {
+                $photoMode = Settings::photoEnforcement('counter');
+
+                if ($photoMode !== 'OFF') {
+                    $rules[] = [
+                        'rule' => 'photo',
+                        'satisfied' => filled($member->photo_path),
+                        'mode' => $photoMode,
+                        'message' => __('Sin foto en ficha para verificar su identidad.'),
+                    ];
+                }
+            }
+
             return new EligibilityVerdict($rules);
         });
     }

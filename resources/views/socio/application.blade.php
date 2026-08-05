@@ -25,7 +25,7 @@
                 </div>
             @endif
 
-            <form method="POST" action="{{ route('socio.application.store', ['token' => $token]) }}"
+            <form method="POST" action="{{ route('socio.application.store', ['token' => $token]) }}" enctype="multipart/form-data"
                   class="space-y-3 rounded-2xl border border-line bg-surface p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
                 @csrf
 
@@ -88,6 +88,15 @@
                         <label class="mb-1 block text-sm font-medium" for="document_number">{{ __('Nº documento') }} <x-socio.required-mark /></label>
                         <input id="document_number" name="document_number" type="text" required value="{{ old('document_number', data_get($payload, 'document_number')) }}" class="{{ $input }}">
                     </div>
+                </div>
+
+                {{-- Optional identity photo (prompt 157). Never required — helps staff recognise the applicant
+                     on arrival and shortens the first visit. The copy is honest about what it is for. --}}
+                <div>
+                    <label class="mb-1 block text-sm font-medium" for="photo">{{ __('Foto (opcional)') }}</label>
+                    <input id="photo" name="photo" type="file" accept="image/*" capture="user"
+                           class="block w-full text-sm text-ink file:mr-3 file:rounded-lg file:border-0 file:bg-brand-tint file:px-3 file:py-2 file:text-sm file:font-medium file:text-brand dark:text-slate-200 dark:file:bg-slate-800 dark:file:text-slate-100">
+                    <p class="mt-1 text-xs text-ink-muted dark:text-slate-500">{{ __('Ayuda a que te reconozcan al llegar. Se comparará contigo en el mostrador. Puedes omitirla y hacerla en la sede.') }}</p>
                 </div>
 
                 <div>

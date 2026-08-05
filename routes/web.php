@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\ApplicationController;
 use App\Http\Controllers\BarReceiptController;
+use App\Http\Controllers\Counter\MemberPhotoController;
 use App\Http\Controllers\CounterLocationController;
 use App\Http\Controllers\CounterPanicController;
 use App\Http\Controllers\DispensationReceiptController;
@@ -82,6 +83,14 @@ Route::middleware(['web', 'auth'])
 Route::middleware(['web', 'auth'])
     ->get('/counter/pos/receipt/{dispensation}', [DispensationReceiptController::class, 'show'])
     ->name('counter.pos.receipt');
+
+// Capture a member's identity photo at the counter (prompt 157) — the face the door/POS compares to the
+// person. Camera capture and the upload fallback both POST here; authorised object-level (capturePhoto policy:
+// a counter operator on the member's own org), stored encrypted on the private disk via CaptureMemberPhoto.
+// Throttled: it is a write behind auth, but a fat-fingered retry loop should not hammer the disk.
+Route::middleware(['web', 'auth', 'throttle:30,1'])
+    ->post('/counter/members/{member}/photo', [MemberPhotoController::class, 'store'])
+    ->name('counter.members.photo');
 
 // Panic lockdown (prompt 121). The counter panic trigger — staff are the ones in a robbery, so this posts from
 // the counter, is gated on lockdown.initiate, and trips the org-wide lockdown. The reactivation link is a plain,

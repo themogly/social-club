@@ -168,6 +168,12 @@ class Settings
                 'age' => 'BLOCK', 'membership' => 'BLOCK', 'carencia' => 'BLOCK',
                 'sanction' => 'BLOCK', 'debt' => 'BLOCK', 'unpaid_fee' => 'BLOCK',
                 'daily_limit' => 'BLOCK', 'monthly_limit' => 'BLOCK',
+                // Photo-on-file (prompt 157) is the ONE rule that ships OFF, not BLOCK: a club mid-migration has
+                // hundreds of paper members with no photo, and a hard block on day one is a system they switch
+                // off. OFF = no check (behaviour unchanged). A club opts in to WARN or OVERRIDE. There is no hard
+                // BLOCK mode for photo by design — its strict setting is OVERRIDE (blocked, manager may force
+                // with a reason + audit). Read it ONLY via self::photoEnforcement(), never enforcement().
+                'photo' => 'OFF',
             ],
             // The premises legal stock ceiling at intake (prompt 110). Defaults to WARN, not BLOCK: a club
             // legitimately receives a harvest that briefly exceeds a rolling figure, and a hard block with no
@@ -249,6 +255,23 @@ class Settings
         $value = data_get($matrix, "{$surface}.{$rule}");
 
         return is_string($value) ? $value : 'BLOCK';
+    }
+
+    /**
+     * Photo-on-file enforcement mode (OFF | WARN | OVERRIDE) for a surface (prompt 157). Deliberately NOT
+     * routed through enforcement(), which fail-safes UNKNOWN combinations to BLOCK — the correct default for
+     * age/membership, but the WRONG one for photo: a club that customised its enforcement matrix before this
+     * rule existed has a stored matrix with no `photo` key, and a BLOCK fallback there is exactly the
+     * surprise-block-on-upgrade the prompt forbids. So this treats anything that is not an explicit WARN or
+     * OVERRIDE — no matrix, a legacy matrix, an 'OFF', even a stray 'BLOCK' — as OFF. Photo has no hard-BLOCK
+     * mode: its strict setting is OVERRIDE (dispensing is blocked, but a manager may force it with a reason
+     * and an audit row, so a paper-member migration is never wedged).
+     */
+    public static function photoEnforcement(string $surface = 'counter'): string
+    {
+        $value = data_get(self::get('enforcement', self::DEFAULTS['enforcement']), "{$surface}.photo");
+
+        return in_array($value, ['WARN', 'OVERRIDE'], true) ? $value : 'OFF';
     }
 
     /** Format a member number from the configured prefix + zero-padded sequence. */

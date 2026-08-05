@@ -58,6 +58,19 @@ class MemberPolicy
     }
 
     /**
+     * Capture (or replace) a member's identity PHOTO at the counter (prompt 157). This happens at the door and
+     * the POS, performed by the STAFF who run them — so it is gated on operating one of those surfaces
+     * (`checkin.manage` OR `pos.use`, both STAFF-held), NOT on the manager-only `members.edit`. Gating it on
+     * `members.edit` would mean the very people at the counter could not take the photo, defeating the point.
+     * It is still a mutation of identity data, so it stays org-scoped and every write is audited.
+     */
+    public function capturePhoto(User $user, Member $model): bool
+    {
+        return ($user->can('checkin.manage') || $user->can('pos.use'))
+            && $model->organisation_id === app(ActiveScope::class)->organisationId();
+    }
+
+    /**
      * Set a per-member limit override (prompt 81) — the daily/monthly gram caps that sit at the TOP of the
      * precedence chain (member → tier → location → org, ResolveMemberLimits). A distinct, higher authority
      * than a plain member edit: `member.limits.set` (manager+), never bundled into `members.edit`. The

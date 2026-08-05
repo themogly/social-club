@@ -36,6 +36,9 @@ class SubmitApplicationRequest extends FormRequest
             'address' => ['nullable', 'string', 'max:500'],
             'document_type' => ['required', Rule::enum(IdDocumentType::class)],
             'document_number' => ['required', 'string', 'max:64'],
+            // Optional identity photo (prompt 157) — NEVER required (an applicant who cannot upload must still
+            // be able to apply). It is checked against them at the counter; the form copy says so.
+            'photo' => ['nullable', 'image', 'mimes:jpeg,jpg,png,webp', 'max:8192'],
             'is_therapeutic' => ['sometimes', 'boolean'],
             'declared_monthly_g' => ['nullable', 'numeric', 'min:0', 'max:1000'],
             // Sponsor by NAME or number (prompt 97): a prospect knows the person, not their member number.

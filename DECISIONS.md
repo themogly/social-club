@@ -5897,3 +5897,74 @@ something OTHER than its key, so a channel added tomorrow without copy fails the
 as a raw key. New string `Respuestas del club a tus mensajes` → EN `Club replies to your messages` (prompt-19
 parity gate then covers both languages). Verified on MySQL (full suite green) and by phone-width screenshots,
 light + dark, of the message form and the six-row notifications screen.
+
+## Prompt 157 — Member photo capture at the counter (the face check finally has a face)
+
+**The gap.** The check-in screen and the dispensary POS already render a member photo (prompt 113: encrypted
+private disk, signed + access-logged URL) — but ONLY the admin `MemberForm` ever captured one. An
+invitation-flow member arrived with `photo_path` null, so the operator saw an empty square at exactly the
+moment they were meant to be checking that the person is the member. The realistic CSC fraud is a member
+lending their card; the control against it is a human comparing a face to a photo. This branch feeds that
+control; it did not rebuild it.
+
+### Capture is at the counter, and why a remote selfie is not the control
+
+Capture happens **on first visit, at the door or the POS**, when the person is physically present with their
+identity document and staff can see both at once. That is the moment identity is actually established. A photo
+uploaded remotely is a photo of *someone* — it verifies nothing, because nobody watched it being taken next to
+the document. So the primary path is **`App\Actions\Members\CaptureMemberPhoto`** (the ONE writer:
+`DocumentVault::storeUpload(…, 'member-photos')` → the same encrypted private-disk column the admin form
+writes, prior file deleted on replace, audit row `member.photo.captured`), reached by a thin
+`Counter\MemberPhotoController` (`POST /counter/members/{member}/photo`, object-gated by a new
+`MemberPolicy::capturePhoto` = `checkin.manage OR pos.use` + org — the counter operators, NOT the manager-only
+`members.edit`, or the people at the counter couldn't take the photo). The UI is
+`resources/views/components/counter/photo-capture.blade.php` + an Alpine `photoCapture` component modelled on
+the prompt-35 `camera-scan`: a live-camera trigger gated behind `supported` (getUserMedia), and an **upload
+fallback that is ALWAYS present** — a camera-less tablet, a denied permission or an unsupported browser still
+captures by upload; the counter is never blocked. Display is UNCHANGED (VaultUrl → MemberMediaController).
+
+### The application form has an OPTIONAL photo — never a control, never required
+
+`socio/application.blade.php` gained an optional `<input type="file">` (honest copy: "checked against you at
+the counter"). On submit it is encrypted to the private disk and only its path rides the payload;
+`ApproveApplication` points the new member at it. It is NEVER required (an applicant who can't upload still
+applies, exactly as with the ID in 155). It helps staff recognise someone and shortens the first visit — it
+is not, and must not be presented as, the identity check. An abandoned/rejected application's photo is the
+same retention question the ID scan raised (prompt 142's staging sweep).
+
+### The enforcement rule: `counter.photo`, default OFF, no hard block — and why
+
+Added one rule to the **counter** surface: OFF / WARN / OVERRIDE. **The default is OFF**, and this is the
+whole point: `Settings::enforcement()` fail-safes UNKNOWN combinations to BLOCK — correct for age/membership,
+catastrophic for photo, because a club mid-migration has hundreds of paper members with no photos and a hard
+block on day one is a system they switch off. So photo is read ONLY through **`Settings::photoEnforcement()`**,
+which treats anything that is not an explicit WARN/OVERRIDE — no matrix, a **legacy matrix saved before this
+rule existed**, an 'OFF', even a stray 'BLOCK' — as OFF. There is **no hard-BLOCK mode for photo**: its
+strictest setting is OVERRIDE (dispensing is blocked, but a manager forces it with a reason + an audit row —
+`dispensation.photo.override`, reusing the `limits.override` authority and the POS's existing override panel).
+`ResolveMemberEligibility` appends the photo rule to the counter verdict ONLY when a club has opted in, so when
+OFF the verdict is byte-identical to before 157. Enforced transactionally too (CommitDispensation.assertEligible),
+not just in the Livewire pre-check — the compliance boundary is the DB transaction, as everywhere else.
+
+**The door was considered and deliberately does NOT enforce photo.** Blocking entry over a missing photo is
+self-defeating — the door is precisely where the missing photo gets TAKEN. So the door shows a capture prompt
+when `photo_path` is null and never gates on it; only the counter (the dispensing moment) can WARN/OVERRIDE.
+
+### The Article 9 framing, and the boundary written down now while it is cheap
+
+This photo is compared **by a human eye** at the counter. That is identity verification, NOT the technical
+biometric *processing* (facial-recognition templates) that turns Article 9 on — so the photo is not, today,
+Article 9 special-category data. But the PURPOSE is identity, and the RAT says so honestly: RAT-03's photo
+category now reads "Fotografía del socio (verificación VISUAL de identidad en el mostrador; comparación humana,
+no reconocimiento facial)" — not "profile picture". **The boundary, stated now:** this must NEVER quietly
+become automated face matching. If anyone ever wants that, it is a SEPARATE treatment with its own lawful
+basis, its own RAT entry and almost certainly a DPIA — not an incremental change to this feature. The code
+comments on `CaptureMemberPhoto` and the RAT carry the same sentence, so the constraint travels with the code.
+
+**Retention & erasure unchanged:** the photo is `member.photo_path` on the existing `documents` disk, so
+`AnonymiseMember` already deletes it and the `COVERED_MEMBER_TABLES` guard stays green — no new table. Tests
+(MySQL): capture lands ciphertext on the private disk (never public); serves through the signed, access-logged
+URL; denied for a non-counter actor and across orgs; OFF/legacy-matrix don't block; WARN dispenses with the
+warning; OVERRIDE blocks then allows with a reason + audit; a member with a photo is unaffected; the door
+never enforces; the application submits without a photo and an uploaded one is applied on approval. Screenshots
+at tablet width, light + dark: the capture step, POS with/without a photo, and the WARN + BLOCKS verdicts.

@@ -76,6 +76,10 @@ class ApproveApplication
             'is_therapeutic' => (bool) ($payload['is_therapeutic'] ?? false),
             'avalador_member_id' => $payload['avalador_member_id'] ?? null,
             'declared_monthly_cg' => $payload['declared_monthly_cg'] ?? null,
+            // Optional photo the applicant uploaded (prompt 157) — already encrypted on the private disk at
+            // submit time; approval only points the member at it. Retention now follows the member's, and
+            // AnonymiseMember disposes of it. Null when they skipped it — never a hard requirement.
+            'photo_path' => $payload['photo_path'] ?? null,
         ]);
         $member->organisation_id = $application->organisation_id;
         // Shared enrolment defaults — the SAME source the direct-create form fills, so the

@@ -86,7 +86,7 @@ class CommitDispensation
                 // Serialise per member so concurrent tills cannot jointly breach the limit.
                 Member::withoutGlobalScopes()->whereKey($member->id)->lockForUpdate()->first();
 
-                $this->assertEligible($member, $location);
+                $this->assertEligible($member, $location, $options);
 
                 // Normalise every line to a stored grams_cg (computed for UNIT lines) BEFORE the
                 // limit check, so the daily/monthly ceiling arithmetic is fed the same figure it
@@ -196,7 +196,10 @@ class CommitDispensation
         return $key !== null ? Dispensation::withoutGlobalScopes()->where('idempotency_key', $key)->first() : null;
     }
 
-    private function assertEligible(Member $member, Location $location): void
+    /**
+     * @param  CommitOptions  $options
+     */
+    private function assertEligible(Member $member, Location $location, array $options): void
     {
         $hasActiveMembership = $member->memberships()->withoutGlobalScopes()
             ->where('location_id', $location->id)
@@ -210,6 +213,36 @@ class CommitDispensation
         if (! MemberEligibility::carenciaPassed($member) && Settings::enforcement('counter', 'carencia') !== 'WARN') {
             throw new DispensationBlockedException(__('En periodo de carencia (puede entrar, no puede dispensarse).'));
         }
+
+        // Photo-on-file (prompt 157). OFF: no check. WARN: proceed (the counter shows the warning, not a
+        // block). OVERRIDE: blocked unless a manager forces it with a reason — the SAME override path a limit
+        // breach uses, so a club mid-migration with paper members is never wedged. photoEnforcement() reads
+        // OFF-safe: a legacy enforcement matrix with no `photo` key resolves to OFF, never a surprise BLOCK.
+        if (Settings::photoEnforcement('counter') === 'OVERRIDE' && blank($member->photo_path)) {
+            $this->authorisePhotoOverride($member, $location, $options);
+        }
+    }
+
+    /**
+     * @param  CommitOptions  $options
+     */
+    private function authorisePhotoOverride(Member $member, Location $location, array $options): void
+    {
+        $overrideBy = $options['override_by'] ?? null;
+
+        if (! ($options['override'] ?? false) || $overrideBy === null) {
+            throw new DispensationBlockedException(__('Sin foto en ficha: se requiere la autorización de un responsable.'));
+        }
+
+        if (! $overrideBy->can('limits.override')) {
+            throw new AuthorizationException('Overriding a missing member photo requires the limits.override permission.');
+        }
+
+        (new RecordAuditLog)->handle('dispensation.photo.override', $member, null, [
+            'location_id' => $location->id,
+            'authorised_by' => $overrideBy->id,
+            'reason' => $options['override_reason'] ?? null,
+        ]);
     }
 
     /**

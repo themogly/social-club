@@ -8,6 +8,7 @@ use App\Http\Requests\SubmitApplicationRequest;
 use App\Models\Member;
 use App\Models\MemberApplication;
 use App\Support\ApplicationSpamGuard;
+use App\Support\DocumentVault;
 use App\Support\Settings;
 use App\Support\Weight;
 use Illuminate\Http\RedirectResponse;
@@ -96,6 +97,14 @@ class ApplicationController extends Controller
             'consent_version' => (string) Settings::get('consent_text_version', '1.0'),
             'consent_locale' => app()->getLocale(),
         ];
+
+        // Optional identity photo (prompt 157): encrypt it onto the private disk NOW (never the public disk,
+        // never an unsigned path), and carry only the path on the payload — ApproveApplication points the new
+        // member at it. Skipped is fine; the form never requires it. An abandoned/rejected application's photo
+        // is cleaned by the staging sweep (prompt 142), the same retention question the ID scan raised.
+        if ($request->hasFile('photo')) {
+            $payload['photo_path'] = DocumentVault::storeUpload($request->file('photo'), 'member-photos');
+        }
 
         // Still PENDING — it now carries the applicant's details and enters the review queue.
         $application->update(['payload' => $payload, 'submitted_at' => now()]);
