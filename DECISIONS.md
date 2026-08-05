@@ -6028,3 +6028,45 @@ new docs but not old snapshots, recorded with both values; consent edit without 
 so old records resolve; contact_email is the member-mail Reply-To and absent from the lockdown mail; oversized /
 wrong-type logo rejected; owner-only (manager + staff denied); the RAT still needs a legal name. Screenshots,
 light + dark: the identity screen, the letterhead with a logo and with the wordmark, and the RAT controller header.
+
+## Prompt 141 — CI runtime parity: PHP 8.5 + MySQL 8.4 (the versions production actually runs)
+
+**The gap.** The production box was provisioned on PHP **8.5.9** + MySQL **8.4.10**, but CI ran PHP **8.3** +
+`mysql:8.0` — including the driver-parity job whose whole purpose is to catch what SQLite hides. So the green
+suite described a runtime nobody runs. `composer.json` is `"php": "^8.3"`, so nothing refuses an 8.5 install —
+the first place a difference would show is production.
+
+**What CI now runs.** Both jobs moved TOGETHER (a parity job on a different DB major-minor than production is
+pointless): `check` and `mysql` both on **PHP 8.5**, and the MySQL service image on **`mysql:8.4`**. The
+`composer.json` `^8.3` floor is UNTOUCHED (it is the minimum a dev may install, not a lever for a green build).
+Node stays at 20 — this task is scoped to the PHP + MySQL runtime; prod's Node 24 is a separate concern already
+flagged in `PRE-STAGING-CHECKLIST.md`, not smuggled into a "PHP/MySQL parity" branch.
+
+**Every failure/deprecation the bump surfaced, and how each resolved.**
+
+- **PHP 8.5 deprecations: ZERO.** Local dev has in fact been on PHP **8.5.6** the whole time, so the suite has
+  been running on 8.5 all along — the "bump" surfaced nothing in application code. Confirmed deliberately (not
+  just by a green pass): ran the full suite with `--display-deprecations --display-phpunit-deprecations
+  --display-warnings --display-notices` — no `Deprecated:` / `was deprecated` / deprecation-summary line anywhere.
+- **The only red was a LOCAL dirty-database artifact, not a runtime or code issue.** Two `IntegrityHarnessTest`
+  cases failed with "No organisation found — seed the database first." Diagnosed one variable at a time: same
+  PHP (8.5.6) on both the passing MySQL run and the failing SQLite run, and it reproduced in ISOLATION — so not
+  ordering, not the PHP bump. Root cause: an earlier Phase-D `migrate:fresh --database=sqlite` (no `--seed`) had
+  left a 958 KB **unseeded** `database/database.sqlite`, and that test uses "file > 50 KB" as its
+  "is-the-dev-DB-seeded?" heuristic, so instead of skipping it ran the harness against a DB with no
+  organisation. Fixed by `migrate:fresh --seed` (restoring the dev DB) — **no application code, no test, and no
+  config changed.** The file is gitignored; CI never has it, so the test SKIPs there. This was my workspace
+  state, recorded here so the diagnosis isn't repeated.
+- **No dependency moved.** `composer.lock` is unchanged — nothing needed bumping for 8.5 support. No fallback to
+  8.4 was required; PHP 8.5 is fully green.
+
+**Verified on 8.5.6 before pushing:** `composer check` green (Pint · PHPStan L6 · full suite, 1097 passed / 3
+skipped); `composer audit:integrity` **31/31**; `php artisan csc:install` runs end to end (exit 0, org + owner
+created) — the production entry point the suite does not cover.
+
+**MySQL parity — an honest note.** `phpunit.mysql.xml` was reviewed for 8.0-era assumptions and has none (root /
+empty password / 127.0.0.1:3306 / `csc_platform_test`; no charset, collation or auth-plugin hardcoding), so it
+connects to 8.4 unchanged. Locally the parity suite was proven green against MySQL **9.6** (Homebrew) — NEWER
+than production's 8.4.10, and there is no Docker on this machine to spin an exact `mysql:8.4`. The exact 8.4
+verification therefore happens in **CI**, which this branch points at `mysql:8.4`; that is the intended proof and
+it is stated plainly rather than implied. Nothing about application behaviour changed in this branch.

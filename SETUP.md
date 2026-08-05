@@ -4,10 +4,13 @@ Local development, testing, and deployment for the CSC platform.
 
 ## Requirements
 
-- **PHP 8.3+** with extensions: `gd` (WebP/PNG/FreeType), `bcmath`, `intl`, `zip`, `mbstring`,
-  `pdo_sqlite` (dev), `pdo_mysql` (prod/CI). No `imagick` needed (QR/PDF/image paths use gd/pure-PHP).
-- **Composer 2**, **Node 20+ / npm**, **Redis** (queue + cache, via Horizon), **MySQL 8+** (production
-  and CI). SQLite is used for local dev only.
+- **PHP 8.5** — the version the project is PROVEN on and the one CI + production run (production **8.5.9**,
+  dev **8.5.6**; the `composer.json` floor stays `^8.3`, the minimum a dev may install). Extensions: `gd`
+  (WebP/PNG/FreeType), `bcmath`, `intl`, `zip`, `mbstring`, `pdo_sqlite` (dev), `pdo_mysql` (prod/CI). No
+  `imagick` needed (QR/PDF/image paths use gd/pure-PHP).
+- **Composer 2**, **Node 20+ / npm**, **Redis** (queue + cache, via Horizon), **MySQL 8.4** (production
+  **8.4.10**; CI runs the parity suite against `mysql:8.4`; local dev may use any MySQL 8.x/9.x). SQLite is
+  used for local dev only. See prompt 141 — CI runs the production PHP + MySQL versions on purpose.
 - No headless Chromium required — PDFs render with dompdf (pure-PHP).
 
 ## Local setup
