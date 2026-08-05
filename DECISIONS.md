@@ -6172,3 +6172,72 @@ runs the TEST MySQL session in UTC: `config/database.php` gains an env-driven `t
 sets `DB_TIMEZONE=+00:00`. UTC has no DST transitions, so no generated datetime can land in a gap — proven by
 inserting `2027-03-28 02:30:00` (inside the gap) under the UTC session. No-op in production (the connector skips
 `SET time_zone` when the value is unset); a production DB should run UTC anyway. No factory or test was changed.
+
+## Prompt 163 — browser autofill silently rewrote passwords on the staff form
+
+**The mechanism.** `UserForm`'s password input was correct on its own terms: Filament leaves it empty on
+edit, and `->dehydrated(fn ($state) => filled($state))` meant an untouched field never persisted. But it
+carried **no `autocomplete` attribute at all** — Filament's `CanBeAutocompleted` defaults to `null` and
+renders nothing — so Chrome treated it as an ordinary password field and filled it with the credentials it
+holds for the domain: **the signed-in admin's own**. The field was then non-empty, `filled($state)` was
+true, the value dehydrated, and the `hashed` cast produced a **new bcrypt hash — salted, so the same
+plaintext yields a different hash every time**. `AuthenticateSession` (registered on the panel) compares
+the session's stored hash against the user's current one, saw the mismatch, and invalidated every session
+including the editing admin's own. That is the reported symptom — *"saving a PIN signs me out"* — with the
+password still working afterwards, because the plaintext never changed, only the hash.
+
+**The logout was the harmless half.** Chrome fills with the ADMIN'S credentials, so an owner opening a
+staff member's row — to set a PIN, attach a sede, correct a name — silently overwrote **that staff
+member's password with the owner's**, with no warning and nothing visible on screen. The staff member's
+password stopped working; the owner's worked on their account. Nobody would notice until someone could not
+log in, and the trail showed a routine user edit.
+`test_editing_another_users_record_never_rewrites_their_password` is that case, and it fails against `main`.
+
+**The mechanism chosen — an intent toggle, not just the attribute.** Two independent defences:
+(1) `autocomplete="new-password"` on both credential inputs — `off` is ignored by Chrome on a password
+field, `new-password` is the hint it honours, and it is semantically right here because this input sets a
+NEW password, never the current one. (2) An explicit **"Establecer una contraseña nueva" / "Establecer un
+PIN nuevo"** toggle on edit: the value is dehydrated only when the operator asked to set it **in this
+session**, so a populated-but-untouched field cannot persist even if an extension ignores the hint, and
+until the toggle is on the input is not rendered at all — there is nothing for a filler to reach. Filament
+already declines to dehydrate a hidden field (`HasState::isDehydrated`), so that is belt and braces, but
+the guard is written **explicitly** rather than inherited, because the guarantee belongs in our code. The
+original `filled($state)` guard is **kept and AND-ed with the intent, not replaced**; asking to set a
+credential and leaving the box empty is now a validation error rather than a silent no-op.
+
+**A confirmation field was considered and rejected.** Filament's own `EditProfile` pairs the password with
+a confirmation, but against *this* threat it earns nothing — a filler that ignores `new-password` would
+populate both boxes identically and sail through. The toggle is the actual guarantee; a second box adds
+friction and copy for no defence. (`EditProfile` also requires the CURRENT password, which is the right
+answer there and unavailable here: an admin resetting someone else's password does not know it.)
+
+**Should a password change be a separate audited action rather than a form field?** Partly, and the
+missing half was the *trail*, not the control. The field stays — the toggle already makes the change
+deliberate rather than a side effect of editing a row — but the prompt's complaint that "the audit trail
+shows a routine user edit" was true. `EditUser` now compares the raw credential hashes across the save and
+writes a **distinct `user.password.updated` / `user.pin.updated` entry**, so resetting someone's password
+can never again be indistinguishable from a name change. Deliberately **no before/after payload**: the
+entry records that it happened, to whom, by whom and when — a password hash in an audit row is credential
+material and must never be stored (asserted, and the existing
+`test_no_audit_row_ever_contains_credential_material` still passes).
+
+**`AuthenticateSession` was left completely alone**, and a test asserts it is still registered on the
+panel. It was doing exactly its job: the password changed, so the sessions died. It is the reason a
+compromised session dies when a password is reset, and removing it to stop the logout would have been the
+tempting wrong fix — it would have kept the real defect and deleted a control.
+
+**Every credential input in the product, enumerated, with a verdict:**
+
+| input | where | verdict |
+|---|---|---|
+| `password` | `UserForm` (staff create/edit) | **The defect.** Fixed: `new-password` + intent toggle. |
+| `pin` | `UserForm` | **Same exposure** — a password-type input on the same form. Fixed identically. A silently rewritten counter PIN means an operator who cannot identify at the till, and transactions attributed to nobody. |
+| `password` | staff login (`App\Filament\Pages\Auth\Login` → Filament) | **Correct.** `autocomplete="current-password"`; autofill here is desirable and the page writes no credential. |
+| `password` / `passwordConfirmation` / `currentPassword` | Filament `EditProfile` (`->profile()`) | **Correct, no change.** `new-password` ×2 + `current-password`, and a change *requires* the current password. It also edits only the signed-in user's own account, so there is no third party to overwrite. |
+| `password` / `passwordConfirmation` | Filament password reset | **Correct.** `new-password` on both; the flow is token-gated. |
+| `code` / `recoveryCode` | MFA (`AppAuthentication`) | **Correct.** `OneTimeCodeInput` and `autocomplete="one-time-code"`; neither is a stored credential field. |
+| counter PIN pad | `operator-strip.blade.php`, `lock-overlay.blade.php` | **No exposure — there is no `<input>`.** An Alpine keypad pushes digits into component state, so there is nothing for a password manager to fill. |
+| member login | `socio/login.blade.php` | **N/A.** Members have no password at all (passwordless magic link); the only field is `email`, `autocomplete="email"`. |
+
+`OperatorUnlockTest`'s end-to-end "a PIN set through the Users form unlocks at the counter" now flips
+`set_pin` — a value arriving without the intent is exactly what this branch refuses.
