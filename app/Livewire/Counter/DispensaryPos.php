@@ -615,7 +615,16 @@ class DispensaryPos extends Component
                 return;
             }
 
-            $entered = (int) round_half_up(((float) str_replace(',', '.', trim($this->priceOverrideEuros))) * 100);
+            // Parse through the shared validating helper: a non-numeric entry returns null and is REJECTED,
+            // never silently coerced to 0 (which, permission + reason aside, would be a free dispensation).
+            $entered = $this->parseCents($this->priceOverrideEuros);
+
+            if ($entered === null) {
+                $this->flash(__('El precio ajustado no es válido.'), 'error');
+
+                return;
+            }
+
             $priceOverrideCents = max(0, min($entered, $resolvedTotal)); // reduce only: 0 (free) .. resolved
             $total = $priceOverrideCents;
         }
