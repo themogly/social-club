@@ -3,6 +3,7 @@
 namespace App\Filament\Resources\MemberApplications;
 
 use App\Actions\Members\ApproveApplication;
+use App\Actions\ResolveLocale;
 use App\Enums\ApplicationStatus;
 use App\Filament\Resources\MemberApplications\Pages\CreateMemberApplication;
 use App\Filament\Resources\MemberApplications\Pages\EditMemberApplication;
@@ -12,6 +13,7 @@ use App\Filament\Resources\MemberApplications\Schemas\MemberApplicationForm;
 use App\Filament\Resources\MemberApplications\Schemas\MemberApplicationInfolist;
 use App\Filament\Resources\MemberApplications\Tables\MemberApplicationsTable;
 use App\Mail\ApplicationApprovedMail;
+use App\Mail\ApplicationInviteMail;
 use App\Mail\ApplicationRejectedMail;
 use App\Models\MemberApplication;
 use BackedEnum;
@@ -25,6 +27,7 @@ use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Table;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Mail;
+use Livewire\Component;
 use RuntimeException;
 
 class MemberApplicationResource extends Resource
@@ -192,6 +195,105 @@ class MemberApplicationResource extends Resource
                     ->success()
                     ->send();
             });
+    }
+
+    /**
+     * Invitation lifecycle actions — shared by the list table AND the View page (prompt 154), so an operator
+     * gets them wherever they land. All three gate on `isInviteLive()`: a revoked/expired/decided invite offers
+     * none of them (a dead link is never offered for copying). `inviteUrl()` is the ONE way to derive the link
+     * (from the retained encrypted token) — never re-derived elsewhere.
+     *
+     * @return array<int, Action>
+     */
+    public static function inviteActions(): array
+    {
+        return [self::copyLinkAction(), self::resendAction(), self::revokeAction()];
+    }
+
+    /**
+     * An OUTSTANDING invitation: the link is still live AND nobody has submitted yet. Copy/resend/revoke only
+     * make sense here — a SUBMITTED application (even while still PENDING) is a decision to make, not a link to
+     * chase, so the invite actions drop off it on both the list and the View page (prompt 154).
+     */
+    private static function isOutstandingInvite(MemberApplication $record): bool
+    {
+        return $record->isInviteLive() && $record->submitted_at === null;
+    }
+
+    /** Re-display the shareable link (recoverable after the toast is gone — prompt 45). */
+    public static function copyLinkAction(): Action
+    {
+        return Action::make('copyLink')
+            ->label(__('Copiar enlace'))
+            ->icon(Heroicon::OutlinedLink)
+            ->visible(fn (MemberApplication $record): bool => self::isOutstandingInvite($record)
+                && $record->inviteUrl() !== null
+                && (Auth::user()?->can('members.create') ?? false)) // revealing the invite link is invite management
+            ->action(function (MemberApplication $record, Component $livewire): void {
+                $livewire->js('navigator.clipboard.writeText('.json_encode((string) $record->inviteUrl()).')');
+
+                Notification::make()->title(__('Enlace copiado'))->success()->send();
+            });
+    }
+
+    /** Reenviar invitación — re-email the SAME token to the applicant's email (prompts 45 + 149: queued, best-effort). */
+    public static function resendAction(): Action
+    {
+        return Action::make('resend')
+            ->label(__('Reenviar'))
+            ->icon(Heroicon::OutlinedEnvelope)
+            ->requiresConfirmation()
+            ->visible(fn (MemberApplication $record): bool => self::isOutstandingInvite($record)
+                && filled($record->applicant_email)
+                && $record->inviteUrl() !== null
+                && (Auth::user()?->can('members.create') ?? false))
+            ->action(function (MemberApplication $record): void {
+                try {
+                    Mail::to((string) $record->applicant_email)
+                        ->locale((new ResolveLocale)->handle())
+                        ->queue(new ApplicationInviteMail(
+                            (string) $record->inviteUrl(),
+                            $record->invite_expires_at?->format('d/m/Y') ?? '',
+                        ));
+                    Notification::make()->title(__('Invitación reenviada (en cola)'))->success()->send();
+                } catch (\Throwable $e) {
+                    Notification::make()->title(__('No se pudo reenviar'))->body($e->getMessage())->danger()->send();
+                }
+            });
+    }
+
+    /** Revoke an invite — its link is refused immediately (the controller checks revoked_at). */
+    public static function revokeAction(): Action
+    {
+        return Action::make('revoke')
+            ->label(__('Anular'))
+            ->icon(Heroicon::OutlinedNoSymbol)
+            ->color('danger')
+            ->requiresConfirmation()
+            ->visible(fn (MemberApplication $record): bool => self::isOutstandingInvite($record)
+                && (Auth::user()?->can('members.create') ?? false))
+            ->action(function (MemberApplication $record): void {
+                $record->update(['revoked_at' => now()]);
+
+                Notification::make()->title(__('Invitación anulada'))->success()->send();
+            });
+    }
+
+    /** The invite's lifecycle as a human label — Anulada / Caducada / Enviada / Abierta / Sin abrir. */
+    public static function inviteLabel(MemberApplication $record): string
+    {
+        if ($record->isInviteRevoked()) {
+            return __('Anulada');
+        }
+        if ($record->isInviteExpired()) {
+            return __('Caducada');
+        }
+
+        return match ($record->inviteStatus()) {
+            'submitted' => __('Enviada'),
+            'started' => __('Abierta'),
+            default => __('Sin abrir'),
+        };
     }
 
     public static function getRelations(): array

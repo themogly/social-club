@@ -2,22 +2,14 @@
 
 namespace App\Filament\Resources\MemberApplications\Tables;
 
-use App\Actions\ResolveLocale;
 use App\Enums\ApplicationStatus;
 use App\Filament\Resources\MemberApplications\MemberApplicationResource;
-use App\Mail\ApplicationInviteMail;
 use App\Models\MemberApplication;
-use Filament\Actions\Action;
 use Filament\Actions\EditAction;
 use Filament\Actions\ViewAction;
-use Filament\Notifications\Notification;
-use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
-use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Mail;
-use Livewire\Component;
 
 class MemberApplicationsTable
 {
@@ -40,7 +32,7 @@ class MemberApplicationsTable
                 TextColumn::make('invite')
                     ->label(__('Invitación'))
                     ->badge()
-                    ->state(fn (MemberApplication $record): string => self::inviteLabel($record))
+                    ->state(fn (MemberApplication $record): string => MemberApplicationResource::inviteLabel($record))
                     ->color(fn (MemberApplication $record): string => match (true) {
                         $record->isInviteRevoked() || $record->isInviteExpired() => 'danger',
                         $record->submitted_at !== null => 'success',
@@ -71,9 +63,8 @@ class MemberApplicationsTable
                     }),
             ])
             ->recordActions([
-                self::copyLinkAction(),
-                self::resendAction(),
-                self::revokeAction(),
+                // Invitation lifecycle actions shared with the View page (prompt 154) — copy link / resend / revoke.
+                ...MemberApplicationResource::inviteActions(),
                 ViewAction::make(),
                 ...MemberApplicationResource::recordActions(),
                 EditAction::make(),
@@ -82,88 +73,11 @@ class MemberApplicationsTable
         // invite/review record, not disposable) — the action would have been inert (prompt 37).
     }
 
-    /** Re-display the shareable link (the fix: recoverable after the toast is gone). */
-    private static function copyLinkAction(): Action
-    {
-        return Action::make('copyLink')
-            ->label(__('Copiar enlace'))
-            ->icon(Heroicon::OutlinedLink)
-            ->visible(fn (MemberApplication $record): bool => $record->isInviteLive() && $record->inviteUrl() !== null)
-            ->action(function (MemberApplication $record, Component $livewire): void {
-                // Prompt 45: ACTUALLY copy to the clipboard (it used to just re-show the URL in a toast).
-                // $livewire->js runs client-side within the click's transient activation.
-                $livewire->js('navigator.clipboard.writeText('.json_encode((string) $record->inviteUrl()).')');
-
-                Notification::make()->title(__('Enlace copiado'))->success()->send();
-            });
-    }
-
-    /** Reenviar invitación — re-email the SAME token to the applicant's email (prompt 45). */
-    private static function resendAction(): Action
-    {
-        return Action::make('resend')
-            ->label(__('Reenviar'))
-            ->icon(Heroicon::OutlinedEnvelope)
-            ->requiresConfirmation()
-            ->visible(fn (MemberApplication $record): bool => $record->isInviteLive()
-                && filled($record->applicant_email)
-                && $record->inviteUrl() !== null
-                && (Auth::user()?->can('members.create') ?? false))
-            ->action(function (MemberApplication $record): void {
-                // Queued, best-effort (prompt 149): a mail failure belongs in Horizon's failed jobs, never a
-                // 500 on this screen. The invitation already exists; re-sending must not be able to break it.
-                try {
-                    Mail::to((string) $record->applicant_email)
-                        ->locale((new ResolveLocale)->handle())
-                        ->queue(new ApplicationInviteMail(
-                            (string) $record->inviteUrl(),
-                            $record->invite_expires_at?->format('d/m/Y') ?? '',
-                        ));
-                    Notification::make()->title(__('Invitación reenviada (en cola)'))->success()->send();
-                } catch (\Throwable $e) {
-                    Notification::make()->title(__('No se pudo reenviar'))->body($e->getMessage())->danger()->send();
-                }
-            });
-    }
-
-    /** Revoke an invite — its link is refused immediately (the controller checks revoked_at). */
-    private static function revokeAction(): Action
-    {
-        return Action::make('revoke')
-            ->label(__('Anular'))
-            ->icon(Heroicon::OutlinedNoSymbol)
-            ->color('danger')
-            ->requiresConfirmation()
-            ->visible(fn (MemberApplication $record): bool => $record->isInviteLive()
-                && (Auth::user()?->can('members.create') ?? false))
-            ->action(function (MemberApplication $record): void {
-                $record->update(['revoked_at' => now()]);
-
-                Notification::make()->title(__('Invitación anulada'))->success()->send();
-            });
-    }
-
     private static function applicantName(MemberApplication $record): string
     {
         $first = data_get($record->payload, 'first_name');
         $last = data_get($record->payload, 'last_name');
 
         return $first !== null ? trim($first.' '.$last) : '—';
-    }
-
-    private static function inviteLabel(MemberApplication $record): string
-    {
-        if ($record->isInviteRevoked()) {
-            return __('Anulada');
-        }
-        if ($record->isInviteExpired()) {
-            return __('Caducada');
-        }
-
-        return match ($record->inviteStatus()) {
-            'submitted' => __('Enviada'),
-            'started' => __('Abierta'),
-            default => __('Sin abrir'),
-        };
     }
 }
