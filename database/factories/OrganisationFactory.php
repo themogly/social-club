@@ -25,7 +25,6 @@ class OrganisationFactory extends Factory
             'logo_path' => null,
             'contact_email' => fake()->unique()->companyEmail(),
             'contact_phone' => fake()->phoneNumber(),
-            'settings' => [],
         ];
     }
 }
