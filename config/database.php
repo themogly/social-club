@@ -55,6 +55,12 @@ return [
             'unix_socket' => env('DB_SOCKET', ''),
             'charset' => env('DB_CHARSET', 'utf8mb4'),
             'collation' => env('DB_COLLATION', 'utf8mb4_unicode_ci'),
+            // Session time zone. Null (unset) leaves the server on its own default — Laravel's connector skips
+            // the `SET time_zone` entirely, so this is a no-op in production unless deliberately set. The MySQL
+            // test profile sets it to '+00:00' (UTC has no DST transitions), so a faker datetime that lands in a
+            // spring-forward gap can never be rejected under strict mode — the CI parity flake this fixes. A
+            // production database should also run UTC (best practice); set DB_TIMEZONE=+00:00 there too.
+            'timezone' => env('DB_TIMEZONE'),
             'prefix' => '',
             'prefix_indexes' => true,
             'strict' => true,
@@ -75,6 +81,12 @@ return [
             'unix_socket' => env('DB_SOCKET', ''),
             'charset' => env('DB_CHARSET', 'utf8mb4'),
             'collation' => env('DB_COLLATION', 'utf8mb4_unicode_ci'),
+            // Session time zone. Null (unset) leaves the server on its own default — Laravel's connector skips
+            // the `SET time_zone` entirely, so this is a no-op in production unless deliberately set. The MySQL
+            // test profile sets it to '+00:00' (UTC has no DST transitions), so a faker datetime that lands in a
+            // spring-forward gap can never be rejected under strict mode — the CI parity flake this fixes. A
+            // production database should also run UTC (best practice); set DB_TIMEZONE=+00:00 there too.
+            'timezone' => env('DB_TIMEZONE'),
             'prefix' => '',
             'prefix_indexes' => true,
             'strict' => true,

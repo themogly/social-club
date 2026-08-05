@@ -1,6 +1,7 @@
 # CMS / editable-field usage audit — Phase D gate 11b
 
-**Ran against:** `main` @ `7769d47`.
+**Ran against:** `main` @ `7769d47`; **re-run @ `d54e55b`** — still GO, 59 settings keys, 0 orphans; the
+`organisations.settings` column flagged below is now DROPPED (prompt 161).
 **Question this gate answers:** is any club-editable field an ORPHAN — writable in an admin form but read by
 nothing (so a club sets it and it silently does nothing), or read from a hardcoded default with no way to set it?
 The archetype was `contact_email` (collected at install, consumed nowhere) and `logo_path` (read by the mail

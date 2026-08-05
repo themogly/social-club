@@ -100,8 +100,10 @@ class ApplicationController extends Controller
 
         // Optional identity photo (prompt 157): encrypt it onto the private disk NOW (never the public disk,
         // never an unsigned path), and carry only the path on the payload — ApproveApplication points the new
-        // member at it. Skipped is fine; the form never requires it. An abandoned/rejected application's photo
-        // is cleaned by the staging sweep (prompt 142), the same retention question the ID scan raised.
+        // member at it. Skipped is fine; the form never requires it. A rejected/abandoned application (one never
+        // approved) is anonymised and this photo deleted by `applications:prune-retention` past
+        // application_retention_days — the retention the ID scan raised, now actually enforced (not prompt 142's
+        // sweep, which only prunes member-import CSVs — that claim was wrong; a security audit caught it).
         if ($request->hasFile('photo')) {
             $payload['photo_path'] = DocumentVault::storeUpload($request->file('photo'), 'member-photos');
         }

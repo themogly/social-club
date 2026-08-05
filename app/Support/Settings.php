@@ -115,6 +115,8 @@ class Settings
         'audit_retention_days' => 3650,     // MINIMUM retention only — the audit log is append-only and
         // never auto-purged (the model refuses deletes). Prompt 58.
         'message_retention_days' => 730,    // member↔club message bodies redacted after this (2 years; prompt 136)
+        'application_retention_days' => 180, // rejected/abandoned member applications anonymised + their ID photo
+        //                                      deleted after this (6 months; security-audit finding on prompt 157)
         'signed_url_ttl_seconds' => 300,    // 5 minutes
         // Consent (prompts 97 + 153): the version stamped on every consent record, AND the two texts it refers
         // to — shown to the applicant so the consent is INFORMED (Art. 7(2): clear and plain language). The
