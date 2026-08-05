@@ -10,6 +10,7 @@ use App\Filament\Pages\FailedJobs;
 use App\Filament\Pages\LibroSocios;
 use App\Filament\Pages\ManageConsentText;
 use App\Filament\Pages\ManageEnforcement;
+use App\Filament\Pages\ManageOrganisationIdentity;
 use App\Filament\Pages\ManageSettings;
 use App\Filament\Pages\Rat;
 use App\Filament\Pages\RegistroDispensacion;
@@ -239,6 +240,10 @@ class Help
         ManageSettings::class => ['permission' => 'settings.manage', 'title' => 'Ajustes de la organización', 'body' => [
             'Los umbrales de cumplimiento del club: edad mínima, carencia, límites de gramos, aforo, política de avalador…',
             'Cada umbral es configurable porque la práctica regional varía y la jurisprudencia cambia. Cambiar uno afecta al mostrador de inmediato.',
+        ]],
+        ManageOrganisationIdentity::class => ['permission' => 'settings.manage', 'title' => 'Identidad del club', 'body' => [
+            'Los datos del propio club: nombre comercial y legal, CIF/NIF, domicilio, correo y teléfono de contacto, y el logotipo que aparece en el membrete de los correos y en los PDF.',
+            'El nombre legal es el responsable del tratamiento que se imprime en los documentos estatutarios. Cambiarlo no reescribe los ya emitidos; el cambio queda registrado con el valor anterior y el nuevo.',
         ]],
         ManageConsentText::class => ['permission' => 'settings.consent', 'title' => 'Textos de consentimiento', 'body' => [
             'Las dos declaraciones que el aspirante acepta al solicitar el alta —el aviso de privacidad y el resumen de los estatutos— en español (texto auténtico) e inglés.',

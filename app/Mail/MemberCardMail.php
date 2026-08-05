@@ -3,6 +3,7 @@
 namespace App\Mail;
 
 use App\Models\Member;
+use App\Support\OrganisationIdentity;
 use App\Support\Qr;
 use Illuminate\Bus\Queueable;
 use Illuminate\Mail\Mailable;
@@ -22,7 +23,8 @@ class MemberCardMail extends Mailable
 
     public function envelope(): Envelope
     {
-        return new Envelope(subject: __('Tu carné de socio/a'));
+        return new Envelope(
+            replyTo: OrganisationIdentity::replyTo(), subject: __('Tu carné de socio/a'));
     }
 
     public function content(): Content

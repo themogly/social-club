@@ -4,6 +4,7 @@ namespace App\Support;
 
 use App\Models\Organisation;
 use App\ViewModels\Rat;
+use Illuminate\Mail\Mailables\Address;
 use Illuminate\Support\Facades\Storage;
 use Throwable;
 
@@ -95,6 +96,28 @@ class OrganisationIdentity
         $id = app(ActiveScope::class)->organisationId();
 
         return $id !== null ? Organisation::query()->whereKey($id)->first() : null;
+    }
+
+    /**
+     * The Reply-To for MEMBER-FACING mail (prompt 159): the club's contact email, in the club's name, so a
+     * member replying to their receipt or convocatoria reaches the club rather than the unattended no-reply.
+     * Empty when no contact email is set (the mail simply carries no Reply-To). Deliberately NOT applied to
+     * operational mail such as the lockdown reactivation link, which must not invite a reply.
+     *
+     * @return list<Address>
+     */
+    public static function replyTo(): array
+    {
+        $organisation = self::activeOrganisation();
+        $email = filled($organisation?->contact_email) ? (string) $organisation->contact_email : null;
+
+        if ($email === null) {
+            return [];
+        }
+
+        $name = filled($organisation->name) ? (string) $organisation->name : (string) config('app.name');
+
+        return [new Address($email, $name)];
     }
 
     /**

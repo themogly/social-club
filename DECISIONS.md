@@ -5968,3 +5968,63 @@ URL; denied for a non-counter actor and across orgs; OFF/legacy-matrix don't blo
 warning; OVERRIDE blocks then allows with a reason + audit; a member with a photo is unaffected; the door
 never enforces; the application submits without a photo and an uploaded one is applied on approval. Screenshots
 at tablet width, light + dark: the capture step, POS with/without a photo, and the WARN + BLOCKS verdicts.
+
+## Prompt 159 — The club can edit its own identity (and four features stop waiting on it)
+
+**The gap.** `ManageSettings` exposed 40+ thresholds but nothing about the ORGANISATION itself, and no Filament
+resource edited the `Organisation` model at all. That blocked four things: `legal_name` (the data controller on
+the RAT + every statutory document) was fixable only with tinker; `logo_path` was read by OrganisationIdentity
+but written by nothing, so prompt 150's club-branded email letterhead always fell back to the name wordmark;
+`contact_email` was collected at install and consumed nowhere, so member mail had no Reply-To; and the consent
+texts had an editor (prompt 153's ManageConsentText) but no way to preserve superseded versions.
+
+### Where identity is edited, and why NOT one single screen
+
+A new owner-gated Filament page **`ManageOrganisationIdentity`** (`settings.manage`) edits the Organisation
+COLUMNS: trading name, legal name, CIF/NIF, registered address, contact email + phone, logo. **Consent text was
+deliberately left on its own page** rather than folded in. The prompt allowed either, but 153 established a
+SEPARATE owner-level permission for consent (`settings.consent`) precisely because it is club-authored legal
+content, not a routine setting — a documented decision this branch must not undo. So the identity page handles
+the columns; `ManageConsentText` (settings.consent) handles the declarations; the identity page's description
+points the owner to it. Everything still reads back through **OrganisationIdentity** (the single source, its
+legal-name → trading-name → `config('app.name')` fallback intact), so the PDFs, the RAT header and the email
+letterhead all agree — no second identity path was introduced. All writes go through `UpdateOrganisationIdentity`
+(one writer, audits `organisation.identity.updated` with before/after). The logo is a Filament FileUpload to the
+**public disk** where `mailLogo()`/`logoDataUri()` already read it, constrained to image types, **1 MB and 512 px**
+(a 4 MB PNG in every email is a deliverability problem, not just a slow page). `csc:install` is unchanged — still
+the only way to CREATE the org; this screen CORRECTS it afterwards.
+
+### `legal_name` after documents exist: ALLOW + audit, never rewrite
+
+Decision: a `legal_name` change is **allowed even once statutory documents exist**, is recorded in the audit log
+with both values, and does NOT touch already-generated documents. Those documents are immutable snapshots (the
+libro de socios issued last month named the controller it named; a `MemberDocument` carries a frozen `snapshot`).
+New documents read the new name via OrganisationIdentity; old ones are untouched. **Refusing** the change once a
+document exists was rejected: it would wedge a genuine typo fix for every future document — the worse failure,
+since the point of this screen is to correct install mistakes. Prompt 115's rule still holds: the RAT refuses to
+generate without a legal name (OrganisationIdentity::hasLegalName), and the identity page never makes legal_name
+required (a half-configured org must not break).
+
+### The consent-version rule: a text edit REQUIRES a bump, and the old text is ARCHIVED
+
+This is the branch's most important decision. Editing a consent declaration without raising
+`consent_text_version` is **REFUSED** (`ConsentVersionRequiredException`, surfaced as "raise the version"):
+reusing a version would silently rewrite what already-consented members are recorded as having read. 153 already
+refused this — 159 adds the missing half: on a bump, `UpdateConsentText` **archives the outgoing version's text**
+(`ConsentText::ARCHIVE_KEY`) before writing the new, so `ConsentText::privacyForVersion()/statutesForVersion()`
+can resolve exactly what an OLD record's member saw, in the language they saw it. Without the archive, 153's
+version number pointed at text that had moved on — the reproducibility a consent record exists to give was
+already lost. (Implementation note: the archive is indexed directly, NOT via `data_get`, because a version like
+`"1.0"` contains a dot that `data_get` would misread as nesting — a real bug the test caught.)
+
+### Reply-To scope: member-facing mail only
+
+With `contact_email` editable, **member-facing** mail now carries it as Reply-To in the club's name
+(`OrganisationIdentity::replyTo()` → the 8 member mailables: card, receipt, reminder, convocatoria, the three
+application mails, the login link). Empty when no contact email is set (no Reply-To, not a broken one). The
+**lockdown reactivation mail is deliberately excluded** — it is operational, not a conversation, and must not
+invite a reply. Tests (MySQL): logo → letterhead + PDF data URI, wordmark fallback without one; legal_name feeds
+new docs but not old snapshots, recorded with both values; consent edit without a bump refused; a bump archives
+so old records resolve; contact_email is the member-mail Reply-To and absent from the lockdown mail; oversized /
+wrong-type logo rejected; owner-only (manager + staff denied); the RAT still needs a legal name. Screenshots,
+light + dark: the identity screen, the letterhead with a logo and with the wordmark, and the RAT controller header.

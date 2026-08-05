@@ -2,6 +2,7 @@
 
 namespace App\Mail;
 
+use App\Support\OrganisationIdentity;
 use Illuminate\Bus\Queueable;
 use Illuminate\Mail\Mailable;
 use Illuminate\Mail\Mailables\Content;
@@ -20,7 +21,8 @@ class ApplicationApprovedMail extends Mailable
 
     public function envelope(): Envelope
     {
-        return new Envelope(subject: __('Tu solicitud ha sido aprobada'));
+        return new Envelope(
+            replyTo: OrganisationIdentity::replyTo(), subject: __('Tu solicitud ha sido aprobada'));
     }
 
     public function content(): Content

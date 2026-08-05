@@ -3,6 +3,7 @@
 namespace App\Mail;
 
 use App\Models\Member;
+use App\Support\OrganisationIdentity;
 use App\Support\Settings;
 use Illuminate\Bus\Queueable;
 use Illuminate\Mail\Mailable;
@@ -22,7 +23,8 @@ class MemberLoginLinkMail extends Mailable
 
     public function envelope(): Envelope
     {
-        return new Envelope(subject: __('Tu enlace de acceso'));
+        return new Envelope(
+            replyTo: OrganisationIdentity::replyTo(), subject: __('Tu enlace de acceso'));
     }
 
     public function content(): Content

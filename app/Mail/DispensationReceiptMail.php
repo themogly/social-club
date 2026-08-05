@@ -4,6 +4,7 @@ namespace App\Mail;
 
 use App\Models\Dispensation;
 use App\Support\Money;
+use App\Support\OrganisationIdentity;
 use App\Support\Weight;
 use Illuminate\Bus\Queueable;
 use Illuminate\Mail\Mailable;
@@ -42,7 +43,8 @@ class DispensationReceiptMail extends Mailable
 
     public function envelope(): Envelope
     {
-        return new Envelope(subject: __('Tu comprobante de aportación'));
+        return new Envelope(
+            replyTo: OrganisationIdentity::replyTo(), subject: __('Tu comprobante de aportación'));
     }
 
     public function content(): Content
