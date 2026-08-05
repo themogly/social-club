@@ -39,19 +39,25 @@
                 </div>
                 <input type="hidden" name="{{ \App\Support\ApplicationSpamGuard::TIMESTAMP }}" value="{{ $formToken }}">
 
+                {{-- The required-field convention, stated in instructions (WCAG 3.3.2, prompt 155): fields marked
+                     with * are required. The programmatic signal lives on each input's `required` attribute. --}}
+                <p class="text-xs text-ink-muted dark:text-slate-400">
+                    <span aria-hidden="true" class="font-medium text-error">*</span> {{ __('Campos obligatorios') }}
+                </p>
+
                 <div class="grid grid-cols-2 gap-3">
                     <div>
-                        <label class="mb-1 block text-sm font-medium" for="first_name">{{ __('Nombre') }}</label>
+                        <label class="mb-1 block text-sm font-medium" for="first_name">{{ __('Nombre') }} <x-socio.required-mark /></label>
                         <input id="first_name" name="first_name" type="text" required value="{{ old('first_name', data_get($payload, 'first_name')) }}" class="{{ $input }}">
                     </div>
                     <div>
-                        <label class="mb-1 block text-sm font-medium" for="last_name">{{ __('Apellidos') }}</label>
+                        <label class="mb-1 block text-sm font-medium" for="last_name">{{ __('Apellidos') }} <x-socio.required-mark /></label>
                         <input id="last_name" name="last_name" type="text" required value="{{ old('last_name', data_get($payload, 'last_name')) }}" class="{{ $input }}">
                     </div>
                 </div>
 
                 <div>
-                    <label class="mb-1 block text-sm font-medium" for="email">{{ __('Correo electrónico') }}</label>
+                    <label class="mb-1 block text-sm font-medium" for="email">{{ __('Correo electrónico') }} <x-socio.required-mark /></label>
                     <input id="email" name="email" type="email" required inputmode="email" value="{{ old('email', data_get($payload, 'email')) }}" class="{{ $input }}">
                 </div>
 
@@ -61,7 +67,7 @@
                 </div>
 
                 <div>
-                    <label class="mb-1 block text-sm font-medium" for="date_of_birth">{{ __('Fecha de nacimiento') }}</label>
+                    <label class="mb-1 block text-sm font-medium" for="date_of_birth">{{ __('Fecha de nacimiento') }} <x-socio.required-mark /></label>
                     <input id="date_of_birth" name="date_of_birth" type="date" required value="{{ old('date_of_birth', data_get($payload, 'date_of_birth')) }}" class="{{ $input }}">
                     {{-- Explicit format hint (prompt 97): the native picker's displayed order follows the
                          document language, but the submitted value is always ISO — the hint removes any doubt
@@ -71,7 +77,7 @@
 
                 <div class="grid grid-cols-2 gap-3">
                     <div>
-                        <label class="mb-1 block text-sm font-medium" for="document_type">{{ __('Tipo de documento') }}</label>
+                        <label class="mb-1 block text-sm font-medium" for="document_type">{{ __('Tipo de documento') }} <x-socio.required-mark /></label>
                         <select id="document_type" name="document_type" required class="{{ $input }}">
                             @foreach (\App\Enums\IdDocumentType::cases() as $type)
                                 <option value="{{ $type->value }}" @selected(old('document_type', data_get($payload, 'document_type')) === $type->value)>{{ $type->label() }}</option>
@@ -79,7 +85,7 @@
                         </select>
                     </div>
                     <div>
-                        <label class="mb-1 block text-sm font-medium" for="document_number">{{ __('Nº documento') }}</label>
+                        <label class="mb-1 block text-sm font-medium" for="document_number">{{ __('Nº documento') }} <x-socio.required-mark /></label>
                         <input id="document_number" name="document_number" type="text" required value="{{ old('document_number', data_get($payload, 'document_number')) }}" class="{{ $input }}">
                     </div>
                 </div>
@@ -158,6 +164,14 @@
 
                 <x-button type="submit" size="md" class="w-full">{{ __('Enviar solicitud') }}</x-button>
             </form>
+
+            {{-- On a failed submit, land the applicant ON the first problem field — not at the top of a long form
+                 on a phone (prompt 155). The field ids/names match the validation keys. --}}
+            @if ($errors->any())
+                <script>
+                    document.querySelector({{ \Illuminate\Support\Js::from('[name="'.$errors->keys()[0].'"]') }})?.focus?.();
+                </script>
+            @endif
 
             <p class="mt-4 text-center text-xs text-ink-muted dark:text-slate-500">{{ __('Espacio privado. No es un servicio público ni una tienda.') }}</p>
         @endif

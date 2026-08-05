@@ -5807,3 +5807,53 @@ A fresh invitation is the existing, correct path.
 
 Approval gating (152) is untouched and its tests still pass. Tests: `InvitationViewPageTest` (5). `composer
 check` green; full MySQL suite green (1057 passed). New copy in both lang files.
+
+## Prompt 155 — Required fields marked on the application form (part A); ID capture decided, not built (part B)
+
+### Part A — required fields are marked (SHIPPED)
+
+**The gap.** Every label on the public application form looked identical, so an applicant filled what they felt
+like, submitted, and got bounced — on a phone, having typed a passport number, with no idea which of ten fields
+was the problem (WCAG 3.3.2: required fields must be identified in the label/instructions, not only in the error).
+
+**The convention chosen: mark REQUIRED with `*`, hold it, state it.** The six fields the request requires
+(first_name, last_name, email, date_of_birth, document_type, document_number) carry a red `*` in their label
+(`<x-socio.required-mark>`, one reusable component so the next field inherits the convention) plus a stated legend
+("* Campos obligatorios"). Optional fields carry no marker — one convention, held. The `*` is `aria-hidden`
+because the **programmatic** signal is each input's own `required` attribute, which AT already announces — a
+visual marker alone would be half the job; doubling it as text would announce "required asterisk". The two
+consents are `required` too (a checkbox you must tick is self-evidently required, so no `*` on their sentences).
+
+**Error state now helps.** A failed submit re-renders the form with a one-line script focusing the FIRST errored
+field (`querySelector('[name="…"]')` on `$errors->keys()[0]`), so an applicant lands ON the problem, not at the
+top of a long form on a phone. Tests assert the marking against `SubmitApplicationRequest::rules()` DIRECTLY
+(every required rule → a `required` attribute; every optional rule → none), so the form and the rules cannot
+drift, plus the focus-first-error behaviour.
+
+### Part B — ID capture: DECIDED, deliberately NOT built this branch
+
+**Part B is NOT done, and this records why — as the prompt requires.** Two facts settle it:
+
+1. **The MRZ read rate is still UNMEASURED** (128's gate: measure ≥~90% on a real corpus BEFORE building the
+   prefill, because a feature that reads 4-in-10 is worse than none). Nothing measured it; building the
+   prefill blind is the exact anti-pattern 128 named. The prefill stays deferred — 128's decision stands and is
+   not mine to override.
+2. **The ID-scan compliance artefact already exists, and more strongly, at the counter.** `MemberForm` captures
+   `document_scan_path` through `DocumentVault::storeUpload` (encrypted, private disk, signed/access-logged
+   serving). A member of staff seeing the physical document on first visit is *stronger* verification than a
+   photo uploaded from anywhere by anyone holding the link — the prompt says so, and it is right.
+
+**The open question — should an unauthenticated public form accept an upload of someone's identity document —
+is a CONTROLLER decision, not a defect, so it is escalated, not committed.** The arguments against are real: an
+unauthenticated file-upload endpoint for Article 9 material; the file exists before the person is a member, so
+retention for **abandoned and rejected** applications must be decided; and the counter check is stronger anyway.
+A defensible answer is *optional on the public form, mandatory in practice at the counter* — never a hard public
+requirement (an applicant who cannot upload must still be able to apply). **If/when the controller agrees to the
+public upload, it needs, and this is the spec:** strict MIME + size limits; rate limiting on the unauthenticated
+route; the private encrypted `documents` disk via `DocumentVault` (never the public disk); a retention rule for
+never-completed applications, paired with prompt 142's staging sweep (an abandoned application's ID must not sit
+indefinitely). **Measuring the read rate first needs a corpus of real ID photos, itself sensitive:** it must be
+gathered only with the controller's explicit agreement, held on the encrypted `documents` disk for the duration
+of the measurement run, never drawn from a live club's member scans without that controller's sign-off, and
+destroyed immediately after `id:mrz-read-rate` reports. None of that is built here — Part A shipped; Part B is a
+recorded, specified decision awaiting the controller.
