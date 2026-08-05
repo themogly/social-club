@@ -768,6 +768,7 @@
     "El personal con acceso al panel y al mostrador. Cada usuario necesita un ROL (sin él no entra) y una o más SEDES asignadas; para identificarse en el mostrador necesita un PIN.": "The staff with access to the panel and the counter. Each user needs a ROLE (without it they cannot enter) and one or more assigned LOCATIONS; to identify at the counter they need a PIN.",
     "El período de espera obligatorio desde el alta antes de la primera dispensación.": "The mandatory waiting period from joining before a first dispensing.",
     "El plazo legal de conservación contable y fiscal (con carácter general, varios años).": "The legal accounting and tax retention period (generally several years).",
+    "El precio ajustado no es válido.": "The adjusted price is not valid.",
     "El precio por octavo no puede superar 3,5 × el precio por gramo (:max €).": "The eighth price cannot exceed 3.5 × the per-gram price (:max €).",
     "El producto vuelto en buen estado se puede vender; el no vendible se registra como merma. Elección obligatoria.": "Product returned in good condition can be sold; unsellable product is recorded as waste. Choice required.",
     "El proveedor de correo puede tratar datos fuera del EEE, sujeto a sus garantías contractuales.": "The email provider may process data outside the EEA, subject to its contractual safeguards.",

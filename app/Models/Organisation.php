@@ -20,13 +20,12 @@ class Organisation extends Model
 
     protected $fillable = [
         'name', 'legal_name', 'tax_id', 'address', 'logo_path',
-        'contact_email', 'contact_phone', 'settings', 'member_no_sequence',
+        'contact_email', 'contact_phone', 'member_no_sequence',
     ];
 
     protected function casts(): array
     {
         return [
-            'settings' => 'array',
             'member_no_sequence' => 'integer',
         ];
     }
@@ -41,11 +40,5 @@ class Organisation extends Model
     public function members(): HasMany
     {
         return $this->hasMany(Member::class);
-    }
-
-    /** @return HasMany<Setting, $this> */
-    public function settings(): HasMany
-    {
-        return $this->hasMany(Setting::class);
     }
 }

@@ -188,6 +188,30 @@ class DispensaryPosScreenTest extends TestCase
         $this->assertSame(99650, $batch->fresh()->remaining_cg->centigrams); // −350 cg
     }
 
+    public function test_a_non_numeric_price_override_is_rejected_not_a_free_dispensation(): void
+    {
+        // Code-style audit: a garbage price-override entry used to (float)-cast to 0 → a €0 dispensation.
+        $this->priceAt(1000); // €10,00/g
+        $this->batch(100000);
+        $this->openTill();
+        $operator = $this->operator();
+        $operator->givePermissionTo('dispensation.price.override'); // the override is permissioned
+        $member = $this->eligibleMember();
+
+        Livewire::test(DispensaryPos::class)
+            ->call('selectMember', $member->id)
+            ->call('chooseGenetic', $this->genetic->id)
+            ->set('weightInput', '3.5')
+            ->call('addLine')
+            ->assertCount('basket', 1)
+            ->set('priceOverrideEuros', 'abc')            // not a number
+            ->set('priceOverrideReason', 'Producto defectuoso')
+            ->call('commit')
+            ->assertSet('flashType', 'error');            // rejected, never priced at zero
+
+        $this->assertSame(0, Dispensation::query()->withoutGlobalScopes()->count());
+    }
+
     public function test_a_block_ineligible_member_cannot_commit_and_the_reason_is_shown(): void
     {
         $this->priceAt(1000);
