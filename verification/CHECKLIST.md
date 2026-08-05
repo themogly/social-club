@@ -1,75 +1,93 @@
-# Pre-Launch Verification Checklist (human-run launch gate)
+# Go-live verification checklist — Phase D gate 13 (TAILORED to this project)
 
-**Purpose:** confirm that what the test suite proves in mocks actually works in REALITY, before a single real customer touches the site. Green tests cannot see the gap between a mocked payment/inbox and the real one — this checklist closes that gap. Work top to bottom; the money and email sections matter most. **Tailor this to the project** — add/remove items to match the actual features (this is a template; copy it into the repo as `verification/CHECKLIST.md` and adapt).
+A HUMAN walk-through of the highest-risk flows on **staging with realistic data**, before real members. This
+REPLACES the generic template (which assumed a payment provider + a public marketing site — this app has neither:
+money is **cash + integer-cent wallet, no Stripe**, and a Spanish CSC has **no public/indexable surface at all**).
+Tailored to this app's real risk profile — Article-9 health data, cash reconciliation, and compliance that must
+**BLOCK, not warn**. The suite proves units work in mocks; this proves the *system* does the right thing end to end.
 
-**Before you start:**
-- [ ] Run on a near-production setup: real cache/queue store, the queue worker running, the scheduler running, queue NOT synchronous.
-- [ ] Use the payment provider's **test mode** keys and test cards — never live keys for this pass.
-- [ ] Have your real email inbox open (and a second address for customer-side emails).
-- [ ] Note anything that fails as a bug to fix BEFORE going live — don't fix-and-continue from memory, write it down.
-
----
-
-## 1. Money paths (highest risk — READ the amounts, don't assume)
-For EACH paid flow (purchases, deposits, balance settlements, vouchers/credits, etc.):
-- [ ] Complete the flow on the public site with a test card.
-- [ ] **In the payment dashboard, confirm the charged amount is EXACTLY right** — the major/minor-unit (pounds/pence) check. £x.xx must show as the correct minor-unit value, not 100× too big or small.
-- [ ] The resulting record (booking/order) appears correctly in admin with the right data, date, and status.
-- [ ] Capacity/stock/availability decrements correctly; over-booking/over-selling is refused.
-- [ ] Confirmation email (customer) + notification (admin) arrive with correct amounts and details.
-- [ ] **Abandoned checkout:** start a flow, reach the payment page, close/cancel → no record is created, and any held slot/stock is released (immediately or by the expiry sweep).
-- [ ] **Declined payment** (test decline card) → no record created.
-- [ ] **Manual/offline payment** (if supported, e.g. bank transfer recorded in admin) → converts the record the same way as an online payment.
-- [ ] **Credits/vouchers** (if any): created ONLY after payment succeeds; full-coverage redeems with no charge; partial-coverage charges only the remainder; a code can't be redeemed twice; abandoning mid-redeem does NOT burn the code.
-
-## 2. Email paths (mocks never render templates — LOOK at every real one)
-- [ ] Any local mail-preview route returns 404 in production config — it must never be public.
-- [ ] Eyeball EVERY email template rendered for real: on-brand, no framework default text in headers, links absolute (not localhost).
-- [ ] Transactional emails (confirmations, receipts, notifications, password/magic-link, etc.) each arrive and render.
-- [ ] Any messaging-with-attachments feature → arrives, attachment opens, history logged.
-- [ ] **Idempotency in reality:** trigger any scheduled/reminder email, then trigger it AGAIN → it does NOT send twice (prove it in reality, not just in tests).
-- [ ] Newsletter (if any): double-opt-in confirm works; unsubscribe removes immediately and subsequent sends skip that address.
-- [ ] Any opt-in checkbox at checkout behaves (ticked enters pipeline, unticked doesn't).
-
-## 3. Enquiry / contact / lead paths
-- [ ] Submit each public form → lands in admin, acknowledgement to customer, notification to admin.
-- [ ] Admin reply → customer receives it; thread stored.
-- [ ] Any "payments-off / enquiry-first" mode toggles correctly and creates no payment session when off.
-
-## 4. Feature toggles & empty states
-- [ ] Each feature toggle ON/OFF behaves (menu, routes, links all respect it).
-- [ ] Fresh/zero-data states render intentionally (no broken/empty-looking sections); create one record → the relevant UI appears.
-
-## 5. Domain rules & validation
-- [ ] Exercise every business rule with real input (clash/overlap validation, min/max constraints, date logic, capacity) → confirm refusals show clear, correct messages.
-
-## 6. Public site sweep (design + content)
-- [ ] Walk EVERY page at mobile (~390) and desktop (~1440): all marketing pages, every form, every step of any multi-step flow, success/empty/404.
-- [ ] No off-palette/off-brand elements; hierarchy reads; no awkward empty gaps where optional content is blank.
-- [ ] Fill the EMPTY content fields the design depends on (hero images, portraits, gallery, real copy) — placeholders must be replaced with real owner content.
-- [ ] Images optimised, no layout shift, no broken images.
-- [ ] Run the CMS field usage check (see `../gates/`) so no admin field is orphaned and no expected-editable content is hardcoded.
-- [ ] Admin sanity as the owner: create/edit a record end to end, upload a non-matching-shape image to a fixed-ratio field (it should crop, not distort), and attempt an invalid save (it should be blocked, not silently break the site). Consider running the admin audit (`../audits/admin-audit.md`) if the admin hasn't been reviewed.
-
-## 7. Production-readiness (do NOT skip — these break SILENTLY)
-- [ ] **The scheduler cron is set** to run every minute on the production server — without it, sweeps, reminders, and dispatchers never fire. The #1 silent-failure risk.
-- [ ] The queue worker runs under a supervisor that restarts it on crash/deploy.
-- [ ] Payment webhooks registered at the PRODUCTION URL with ALL required events (e.g. completed AND expired/cancelled). Send a test event and confirm receipt.
-- [ ] `APP_ENV=production`, `APP_DEBUG=false`, real `APP_URL` (email links depend on it), real app name.
-- [ ] All real keys present and correct (payment, email, cache/queue). Use LIVE payment keys only when truly ready.
-- [ ] Email sending domain verified (SPF/DKIM) or mail lands in spam.
-- [ ] A real admin user exists; default/seeded credentials removed or changed.
-- [ ] Config cached; one full deploy rehearsal (migrate, build, cache) on a staging copy first.
-- [ ] HTTPS enforced (payment + secure cookies depend on it).
-- [ ] A database backup exists AND you have tested restoring it.
-
-## 8. The flip to live
-- [ ] Swap test payment keys for LIVE keys ONLY after sections 1–2 pass in test mode.
-- [ ] Do ONE real low-value transaction with a real card end to end → confirm it lands in the real payment account and the real confirmation email arrives → then refund it.
-- [ ] Watch the queue worker and logs for the first few real transactions.
+**Before you start:** near-production setup (real Redis, Horizon + scheduler running, queue NOT sync); real inbox +
+a second member address open; `MAIL_MAILER=resend` with a verified sending domain; the private `documents` disk on
+its real S3 bucket. Write down every failure as a numbered-prompt fix — never fix-and-continue from memory.
 
 ---
 
-**If anything in sections 1, 2, or 7 fails, you are not ready to go live.** Sections 3–6 failing are bugs to fix but not money/trust/silent-failure risks. Fix the criticals, re-run that section, then proceed.
+## A. Security & access — the leak this product exists to avoid (do NOT skip)
+- [ ] Only three routes are reachable unauthenticated: the member magic-link, the tokenised application, the lockdown
+  reactivation link. Everything else 302s to login.
+- [ ] A **wrong-location** and a **wrong-role** operator are BLOCKED (403), not just hidden, from members, tills,
+  reports, and each Filament resource. Prove a denial, not only an allow.
+- [ ] An **ID scan / member photo** serves ONLY via a short-lived signed URL bound to the viewer: a copied URL fails
+  for a second user (403), a guessed path 404s, and **every view writes a `document_access_logs` row**.
+- [ ] MFA enables on an admin account and is enforced next login. Seeded/default credentials removed.
+- [ ] Panic lockdown trips org-wide from the counter; the off-terminal reactivation token works once and is throttled.
+- [ ] View-source a member page: **no secret / VAPID private key / API key** in the bundle. `X-Robots-Tag: noindex`
+  on every response; `/robots.txt` disallows all; no local `/dev/mail` preview reachable in production.
 
-**Why this exists:** tests and audits gate *code*; this gates *launch*. It is run by a human, by hand, because no automated check can verify a real card charged the right amount in the real dashboard or a real email arrived looking right in a real inbox. Never skip it because the suite is green.
+## B. Money & weight — READ the stored values, don't assume (highest risk after security)
+- [ ] A **€12,50** contribution stores **1250 cents**; a **3,5 g** dispensation stores **350 cg** — check the row, not
+  the screen. No float anywhere in the amount.
+- [ ] Cash + wallet tender split reconciles to the total; an **under-tender is refused**; over-tender gives change.
+- [ ] The contribution receipt reads **aportación / contribución** — never *venta/precio de venta*. Bar income shows as
+  **"Barra y tienda"** in reports and never lands in `cash_contributions`.
+- [ ] A **price override** needs the permission + a reason; a **non-numeric** entry is rejected (never a €0 dispense).
+
+## C. Counter compliance — must BLOCK inside the transaction
+- [ ] **No member ⇒ no dispensation** (server-enforced).
+- [ ] Push a member over the **daily/monthly gram cap** → refused; a `limits.override` holder forces it with a reason →
+  an audit row is written. Repeat for **carencia / age / membership / sanction** per the enforcement matrix.
+- [ ] **Photo (157):** `counter.photo`=OFF → a photo-less member dispenses normally; =WARN → dispenses with the warning
+  shown; =OVERRIDE → blocked until a manager forces it with a reason + audit. No-photo member at the door/POS shows the
+  capture prompt; a captured photo lands encrypted and renders via the signed URL.
+- [ ] FEFO picks the oldest non-expired batch; an expired batch is refused. Signature captured where the sede mandates it.
+- [ ] **Void / refund** returns stock to the originating batch and reverses the wallet off-till; a correction is a void +
+  a fresh linked row, never a silent edit.
+- [ ] Offline: the commit is refused client AND server (fail-closed); the basket survives until reconnect.
+
+## D. Cash & till (arqueo)
+- [ ] Open a till, record movements, **blind close** — the expected figure is withheld until the count is entered; a
+  variance beyond tolerance demands a note; the Z-report totals match the ledger (expected cash is DERIVED, not stored).
+
+## E. Email — mocks never render templates; LOOK at every real one
+- [ ] Every member mailable renders on-brand with the **club letterhead** (logo CID-embedded, or the name wordmark with
+  no logo); links absolute, no framework-default text; `contact_email` is the **Reply-To** (and is ABSENT on the lockdown
+  mail). Send one live to a real inbox.
+- [ ] **Idempotency in reality:** fire a scheduled reminder twice → it does NOT double-send.
+
+## F. Member lifecycle & PWA
+- [ ] Invite → application (required fields marked; submits with **no photo/ID**; underage refused) → approval creates the
+  member, mails the QR card, stamps consent with the **version + locale actually shown**.
+- [ ] Magic-link login (single-use, throttled); wallet + history live; offline QR card works; messages send/reply in the
+  bordered padded inputs with a visible focus ring; notifications list all channels with real labels; web-push delivers
+  and a per-channel opt-out is honoured.
+
+## G. Governance, documents & organisation identity (159)
+- [ ] Announcement + event publish to the PWA; RSVP works; a convocatoria mails with the letterhead.
+- [ ] Statutory PDFs (libro de socios, registro de dispensación) generate; the **RAT refuses without a legal name**.
+- [ ] Edit the club identity (owner only; manager/staff 403; audit row with before/after). Set a logo → it appears in the
+  email + PDFs; remove it → the wordmark shows. Edit a consent text **without** a version bump → refused; bump → an
+  already-consented member still resolves to the exact text they read; the new legal name shows on new documents, old
+  ones unchanged.
+
+## H. Privacy / RGPD & i18n
+- [ ] A data-export request produces the member's data; **right-to-erasure** anonymises the row AND deletes their photo /
+  ID scan / signature from the private disk (retention-obligation docs redacted, not destroyed).
+- [ ] Switch UI EN ⇄ ES (persists to the user, effective next request); the applicant's consent is shown + recorded in
+  the language they read.
+
+## I. Production-readiness — these break SILENTLY
+- [ ] **The scheduler cron runs every minute** on the host — without it, sweeps/reminders/dispatchers never fire (#1 silent
+  risk). Horizon runs under a supervisor. `APP_ENV=production`, `APP_DEBUG=false`, real `APP_URL` (email links depend on it).
+- [ ] Redis reachable; Resend domain verified (SPF/DKIM); Sentry DSN set + errors arrive; VAPID keys set + push delivers.
+- [ ] **A DB + encrypted-`documents` backup exists AND a restore has been rehearsed** (Article-9 data — mandatory).
+- [ ] Config/route/event caches built on deploy AND all caches busted on deploy. One full deploy rehearsal on staging first.
+- [ ] The suite has been run once on the **production PHP/Node version** (CI is 8.3/20; prod 8.5/24 — see PRE-STAGING gate).
+
+## J. Design / a11y spot-check on the real host
+- [ ] Dark mode across admin + counter + PWA (dim interiors); tablet widths on the counter apps; above-the-fold text visible
+  without JS; effects respect `prefers-reduced-motion`; AA button contrast.
+
+---
+**If any box in A, B, C or I fails, you are not ready to go live.** Everything else is a bug to fix (a numbered prompt /
+branch, never a checklist edit). Re-walk A–C after every fix — those are the ones that end the association's legal
+position if wrong. Tests and audits gate *code*; this gates *launch*, and only a human can run it.
