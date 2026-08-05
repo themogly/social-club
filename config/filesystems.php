@@ -61,7 +61,18 @@ return [
         // so a lost/failed ID-scan write fails loud, never silently.
         'documents' => [
             'driver' => env('DOCUMENTS_DRIVER', 'local'),
-            'root' => storage_path('app/private/documents'),
+            // `root` is a LOCAL-driver concept — a real filesystem path. Laravel's createS3Driver() passes the
+            // SAME `root` to the S3 adapter as the object-KEY PREFIX (prompt 162), so a storage_path() there
+            // prefixes every ID scan / photo with the server's absolute path (e.g. /home/…/storage/app/private/
+            // documents/…): it leaks the server layout into the bucket and — fatally for a disk with no second
+            // copy — makes every existing object unreachable after any move, rename, redeploy or restore, because
+            // storage_path() resolves from wherever the app now lives. So: LOCAL keeps its path; S3 gets an
+            // EXPLICIT, configurable prefix that DEFAULTS TO EMPTY (a flat bucket root — the app already
+            // namespaces every write by directory: member-id-scans/…, member-photos/…, org-logos/…). Never a
+            // derived path. Set DOCUMENTS_S3_PREFIX only for a deliberate shared-bucket / per-club layout.
+            'root' => env('DOCUMENTS_DRIVER', 'local') === 's3'
+                ? env('DOCUMENTS_S3_PREFIX', '')
+                : storage_path('app/private/documents'),
             'visibility' => 'private',
             'serve' => false,
             'throw' => true,
