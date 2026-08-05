@@ -117,6 +117,16 @@ class PanicLockdownTest extends TestCase
         $this->get(route('lockdown.reactivate', ['token' => $raw]))->assertSee(__('Enlace no válido'));
     }
 
+    public function test_the_reactivation_route_is_rate_limited(): void
+    {
+        // Security audit (Phase C): the reactivation route is throttled like login/verify, so a token-guessing
+        // sweep is capped even though the sha256 token is unguessable. The throttle runs before token validation.
+        for ($i = 0; $i < 10; $i++) {
+            $this->get(route('lockdown.reactivate', ['token' => 'nope-'.$i]))->assertStatus(200); // invalid token → "Enlace no válido", but not throttled yet
+        }
+        $this->get(route('lockdown.reactivate', ['token' => 'nope-11']))->assertStatus(429);
+    }
+
     public function test_the_auto_delay_command_reactivates_after_the_window(): void
     {
         $lockdown = $this->lock();

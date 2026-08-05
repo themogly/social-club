@@ -90,7 +90,10 @@ Route::middleware(['web', 'auth'])
     ->post('/counter/panic', [CounterPanicController::class, 'store'])
     ->name('counter.panic');
 
-Route::middleware('web')
+// Throttled like login/verify (security audit, Phase C): an unauthenticated route that consumes a single-use
+// token and lifts an org-wide lockdown gets the same rate limit as the member magic-link verify — the token is
+// an unguessable sha256, so this is defence-in-depth, not a live hole, but it should not be the one exception.
+Route::middleware(['web', 'throttle:10,1'])
     ->get('/reactivar/{token}', [LockdownReactivationController::class, 'reactivate'])
     ->name('lockdown.reactivate');
 

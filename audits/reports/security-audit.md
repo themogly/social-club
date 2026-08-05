@@ -23,8 +23,10 @@ token actions, `AnonymiseMember`, `SecurityHeaders`; ran the existing access-con
   unauthenticated token route with no throttle while its sibling `login/verify/{token}` has `throttle:10,1`. An
   un-throttled route that consumes a single-use token and lifts an org-wide lockdown should not be the exception.
   Defense-in-depth, and it removes an inconsistency. **This is the only code finding.**
+  **FIXED** — `throttle:10,1` added; `PanicLockdownTest::test_the_reactivation_route_is_rate_limited` proves the
+  11th request/min returns 429 (single-use is separately proven by `…is_single_use`).
 
-Review:
+Review: One finding, fixed with a test. Everything else confirmed secure against existing, passing tests.
 
 ### Confirmed secure this round (verified, not assumed — no change needed)
 
