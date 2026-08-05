@@ -1,12 +1,6 @@
 <x-layouts.socio :title="__('Avisos y notificaciones')">
-    @php($labels = [
-        'low_balance' => __('Saldo bajo en el monedero'),
-        'membership_expiring' => __('Vencimiento de la membresía'),
-        'new_announcement' => __('Nuevos avisos del club'),
-        'event_reminder' => __('Recordatorios de eventos'),
-        'temporary_ending' => __('Fin del acceso temporal'),
-    ])
-
+    {{-- Labels come from Member::pushChannelLabel (prompt 156) — a channel with no copy fails the guard test
+         rather than shipping its raw key to a member, which is how `new_message` slipped in as a raw row. --}}
     <header class="mb-4">
         <h1 class="text-xl font-semibold">{{ __('Avisos y notificaciones') }}</h1>
         <p class="mt-0.5 text-sm text-ink-muted dark:text-slate-400">{{ __('Decide qué avisos quieres recibir y en qué dispositivo.') }}</p>
@@ -40,7 +34,7 @@
         <div class="mt-3 space-y-1">
             @foreach ($channels as $channel)
                 <label class="flex items-center justify-between gap-3 rounded-lg px-1 py-2.5">
-                    <span class="text-sm">{{ $labels[$channel] ?? $channel }}</span>
+                    <span class="text-sm">{{ \App\Models\Member::pushChannelLabel($channel) }}</span>
                     <input type="checkbox" name="channels[]" value="{{ $channel }}"
                            @checked(! in_array($channel, $optOuts, true))
                            class="h-5 w-5 rounded border-line text-brand focus:ring-brand/40 dark:border-slate-600 dark:bg-slate-950">

@@ -7,14 +7,12 @@
     {{-- Start a new thread --}}
     <form method="POST" action="{{ route('socio.messages.store') }}" class="rounded-2xl border border-line bg-surface p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
         @csrf
-        <label class="block text-sm font-medium">{{ __('Asunto') }}</label>
-        <input type="text" name="subject" value="{{ old('subject') }}" maxlength="150" required
-               class="mt-1 block w-full rounded-lg border-line bg-surface text-sm shadow-sm focus:border-brand focus:ring-brand dark:border-slate-700 dark:bg-slate-950" />
+        <label for="subject" class="block text-sm font-medium">{{ __('Asunto') }}</label>
+        <x-socio.input type="text" id="subject" name="subject" value="{{ old('subject') }}" maxlength="150" required class="mt-1" />
         @error('subject')<p class="mt-1 text-xs text-error">{{ $message }}</p>@enderror
 
-        <label class="mt-3 block text-sm font-medium">{{ __('Mensaje') }}</label>
-        <textarea name="body" rows="3" maxlength="4000" required
-                  class="mt-1 block w-full rounded-lg border-line bg-surface text-sm shadow-sm focus:border-brand focus:ring-brand dark:border-slate-700 dark:bg-slate-950">{{ old('body') }}</textarea>
+        <label for="body" class="mt-3 block text-sm font-medium">{{ __('Mensaje') }}</label>
+        <x-socio.textarea id="body" name="body" rows="3" maxlength="4000" required class="mt-1">{{ old('body') }}</x-socio.textarea>
         @error('body')<p class="mt-1 text-xs text-error">{{ $message }}</p>@enderror
 
         <button type="submit" class="mt-3 w-full rounded-lg bg-brand px-4 py-2.5 text-sm font-semibold text-white hover:bg-brand-dark">

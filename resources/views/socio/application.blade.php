@@ -1,5 +1,5 @@
 <x-layouts.socio :title="__('Solicitud de alta')" :nav="false">
-    @php($input = 'w-full rounded-lg border border-line bg-surface px-3 py-2.5 text-ink outline-none focus:border-brand focus:ring-2 focus:ring-brand/30 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100')
+    @php($input = \App\Support\SocioForm::FIELD)
     @php($declaredG = data_get($payload, 'declared_monthly_cg') !== null ? (float) data_get($payload, 'declared_monthly_cg') / 100 : null)
 
     <div class="mx-auto max-w-sm">

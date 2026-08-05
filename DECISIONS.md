@@ -5857,3 +5857,43 @@ gathered only with the controller's explicit agreement, held on the encrypted `d
 of the measurement run, never drawn from a live club's member scans without that controller's sign-off, and
 destroyed immediately after `id:mrz-read-rate` reports. None of that is built here — Part A shipped; Part B is a
 recorded, specified decision awaiting the controller.
+
+## Prompt 156 — Two defects on the member PWA's newest screens (form-field style + a raw channel key)
+
+**Defect 1 — the message form's inputs had lost their shape.** `messages.blade.php`/`message.blade.php` (prompt
+136) carried a hand-copied field class that had dropped `px-3 py-2.5` (padding collapsed to line-height), the
+`border` **width** (a `border-line` colour with no width renders as nothing) and `focus:ring-2` (a `ring-brand`
+colour with no width = no visible focus ring). It was invisible in review because each missing piece is a
+*colour without its width* — the class string looks complete.
+
+**Defect 2 — a channel rendered its raw key.** `notifications.blade.php` held a local `@php($labels = [...])` map
+of five channels; `new_message` (added with 136) was never added to it, so the preferences screen showed a row
+literally labelled `new_message`.
+
+### Where the shared definition lives, and why it cannot drift
+
+- **`App\Support\SocioForm::FIELD`** is the ONE member-PWA field style (real border, `px-3 py-2.5`, the prompt-98
+  AA-contrast tokens, a visible 2px focus ring). **`<x-socio.input>` and `<x-socio.textarea>`** (new) render it via
+  `$attributes->merge(['class' => …])`, so a caller's own class is *added*, never replaces it. The message forms
+  use the components; `application.blade.php` (`@php($input = SocioForm::FIELD)`) and `login.blade.php`
+  (`class="{{ SocioForm::FIELD }}"`) reference the same constant. There is no longer a hand-written field class on
+  any socio screen. **Why a constant AND components:** the two message forms wanted components (clean call site);
+  the application form builds ~10 controls off one `$input` alias and a select can't be a text-input component, so
+  it references the constant directly. Both paths resolve to the same string — that is the point.
+- **Drift is now a failing test, not a review risk.** `MemberPwaFormStyleTest`: (a) the constant itself carries
+  padding + a border *width* + `focus:ring-2`; (b) both components emit it; (c) a **coverage guard** scans every
+  `views/socio/*.blade.php` and fails if any text-like control (`input[type=text|email|tel|date|number]`,
+  `textarea`, `select`) carries a `class="…"` that is not the constant or the `$input` alias — this is the test
+  that would have caught the original bug. The focus ring is additionally proven at the browser level (computed
+  `box-shadow` on a focused `#subject` = a non-zero 2px ring, in light AND dark), because a class assertion alone
+  cannot tell a real ring from a colour-only one.
+
+### The channel label can no longer be missing
+
+Labels moved off the view into **`Member::pushChannelLabel(string $channel): string`** — a `match` with an arm for
+every `PUSH_CHANNELS` entry and `default => $channel`. The view calls it directly; the local map is gone.
+`test_every_push_channel_has_a_member_facing_label` iterates `PUSH_CHANNELS` and asserts each resolves to
+something OTHER than its key, so a channel added tomorrow without copy fails the build here rather than shipping
+as a raw key. New string `Respuestas del club a tus mensajes` → EN `Club replies to your messages` (prompt-19
+parity gate then covers both languages). Verified on MySQL (full suite green) and by phone-width screenshots,
+light + dark, of the message form and the six-row notifications screen.
