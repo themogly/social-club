@@ -3,6 +3,10 @@ name: CI
 # Every branch after prompt 117 is checked on BOTH engines automatically: composer check on SQLite
 # (fast, the same gate developers run), then the full suite against a real MySQL service — production is
 # MySQL and SQLite-only testing hides JSON-column, strict-type, boolean and string-length bugs.
+#
+# BOTH jobs run the PRODUCTION runtime (prompt 141): PHP 8.5 (prod 8.5.9) and mysql:8.4 (prod 8.4.10). They
+# move together on purpose — a parity job on a different DB major-minor than production defeats its point.
+# composer.json stays "php": "^8.3" (the minimum a dev may install); CI proves the version prod actually runs.
 on:
   push:
     branches: [main]
@@ -22,7 +26,7 @@ jobs:
       - name: Set up PHP
         uses: shivammathur/setup-php@v2
         with:
-          php-version: '8.3'
+          php-version: '8.5'
           extensions: mbstring, pdo_sqlite, sqlite3, bcmath, intl, gd, zip
           coverage: none
 
@@ -62,7 +66,7 @@ jobs:
     runs-on: ubuntu-latest
     services:
       mysql:
-        image: mysql:8.0
+        image: mysql:8.4
         env:
           MYSQL_ALLOW_EMPTY_PASSWORD: 'yes'
           MYSQL_DATABASE: csc_platform_test
@@ -80,7 +84,7 @@ jobs:
       - name: Set up PHP
         uses: shivammathur/setup-php@v2
         with:
-          php-version: '8.3'
+          php-version: '8.5'
           extensions: mbstring, pdo_mysql, bcmath, intl, gd, zip
           coverage: none
 
