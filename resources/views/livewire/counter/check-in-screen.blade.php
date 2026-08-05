@@ -121,6 +121,15 @@
                             </div>
                             <p class="mt-0.5 text-sm text-ink-muted dark:text-slate-400">{{ $member->member_no }}</p>
 
+                            {{-- No photo on file (prompt 157): the door is the moment to take it — the member is
+                                 here, with their document, and staff can see both. Never blocks entry. --}}
+                            @unless ($photoUrl)
+                                <div class="mt-3 rounded-xl border border-warning/30 bg-warning/5 p-3">
+                                    <p class="text-xs font-medium text-warning">{{ __('Este socio no tiene foto. Hazla ahora, con el documento delante — se comparará en el mostrador.') }}</p>
+                                    <x-counter.photo-capture :member="$member" source="door" class="mt-2" />
+                                </div>
+                            @endunless
+
                             <dl class="mt-3 grid grid-cols-2 gap-x-4 gap-y-1.5 text-sm">
                                 <div>
                                     <dt class="text-ink-muted dark:text-slate-400">{{ __('Cuota / tier') }}</dt>

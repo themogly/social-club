@@ -58,6 +58,10 @@ class VerdictRemedy
                 'detail' => self::aforoDetail($location),
                 'remedy' => null,
             ],
+            'photo' => [
+                'detail' => $rule['message'],
+                'remedy' => __('Haz la foto ahora, con el documento delante.'),
+            ],
             default => ['detail' => $rule['message'], 'remedy' => null],
         };
     }

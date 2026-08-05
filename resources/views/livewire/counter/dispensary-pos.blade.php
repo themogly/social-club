@@ -151,6 +151,15 @@
                             <button type="button" wire:click="clearMember" class="shrink-0 rounded-lg px-2 py-1.5 text-sm text-ink-muted transition hover:bg-black/5 dark:text-slate-400 dark:hover:bg-white/5">{{ __('Cerrar') }}</button>
                         </div>
 
+                        {{-- No photo on file (prompt 157): identity can't be verified against a face that isn't
+                             there. The verdict below drives WARN/OVERRIDE enforcement; this is the fix — take it. --}}
+                        @unless ($photoUrl)
+                            <div class="mt-3 rounded-xl border border-warning/30 bg-warning/5 p-3">
+                                <p class="text-xs font-medium text-warning">{{ __('Sin foto en ficha. Verifica con el documento y hazla ahora.') }}</p>
+                                <x-counter.photo-capture :member="$member" source="counter" class="mt-2" />
+                            </div>
+                        @endunless
+
                         {{-- Wallet + carencia --}}
                         <dl class="mt-3 grid grid-cols-2 gap-x-4 gap-y-1.5 text-sm">
                             <div>

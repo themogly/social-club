@@ -98,7 +98,11 @@ class Rat
                 'legal_basis' => __('Obligación de verificar la mayoría de edad, consentimiento del interesado y consentimiento explícito para el certificado médico (Art. 9.2.a RGPD).'),
                 'data_categories' => [
                     __('Copia del documento de identidad (cifrada, disco privado)'),
-                    __('Fotografía del socio'),
+                    // Prompt 157: state honestly what the photo is FOR — a human visual identity check at the
+                    // counter — and draw the boundary. It is compared by eye, not by facial-recognition
+                    // processing, so it is not Article 9 biometric data; if that ever changed it would be a
+                    // separate treatment with its own legal basis and DPIA.
+                    __('Fotografía del socio (verificación VISUAL de identidad en el mostrador; comparación humana, no reconocimiento facial)'),
                     __('Certificado médico del socio terapéutico (dato de salud, cifrado, disco privado)'),
                 ],
                 // Art. 9: the medical certificate store is HEALTH data (finding: it was flagged false).

@@ -43,7 +43,7 @@ class ManageEnforcement extends Page
     /** @var array<string, list<string>> The rules that apply at each surface (order = display order). */
     private const RULES = [
         'door' => ['age', 'membership', 'carencia', 'sanction', 'debt', 'unpaid_fee', 'aforo'],
-        'counter' => ['age', 'membership', 'carencia', 'sanction', 'debt', 'unpaid_fee', 'daily_limit', 'monthly_limit'],
+        'counter' => ['age', 'membership', 'carencia', 'sanction', 'debt', 'unpaid_fee', 'daily_limit', 'monthly_limit', 'photo'],
         'stock' => ['ceiling'], // the premises legal stock ceiling at intake (prompt 110)
     ];
 
@@ -51,6 +51,14 @@ class ManageEnforcement extends Page
     private const LOCKED = ['age', 'aforo'];
 
     private const MODES = ['BLOCK', 'WARN', 'OVERRIDE'];
+
+    /**
+     * Photo-on-file (prompt 157) is the exception to the matrix. It has NO hard-BLOCK mode — its strict
+     * setting is OVERRIDE (blocked, but a manager may force it) — and it DEFAULTS to OFF (no check at all),
+     * NOT the fail-safe BLOCK the other rules take, so a club mid-migration with paper members and no photos
+     * is never surprise-blocked on upgrade. Read at the counter via Settings::photoEnforcement().
+     */
+    private const PHOTO_MODES = ['OFF', 'WARN', 'OVERRIDE'];
 
     public static function getNavigationLabel(): string
     {
@@ -109,9 +117,9 @@ class ManageEnforcement extends Page
             $locked = in_array($rule, self::LOCKED, true);
             $fields[] = Select::make("{$surface}.{$rule}")
                 ->label(self::ruleLabel($rule))
-                ->options(self::modeOptions())
+                ->options(self::modeOptionsFor($rule))
                 ->disabled($locked)
-                ->helperText($locked ? __('Siempre BLOQUEAR (requisito legal / aforo).') : null)
+                ->helperText($this->fieldHelp($rule, $locked))
                 ->selectablePlaceholder(false);
         }
 
@@ -132,8 +140,8 @@ class ManageEnforcement extends Page
             foreach ($rules as $rule) {
                 $mode = in_array($rule, self::LOCKED, true)
                     ? 'BLOCK'
-                    : ($state[$surface][$rule] ?? 'BLOCK');
-                $matrix[$surface][$rule] = in_array($mode, self::MODES, true) ? $mode : 'BLOCK';
+                    : ($state[$surface][$rule] ?? self::defaultMode($rule));
+                $matrix[$surface][$rule] = in_array($mode, self::validModes($rule), true) ? $mode : self::defaultMode($rule);
             }
         }
 
@@ -153,8 +161,10 @@ class ManageEnforcement extends Page
         $values = [];
         foreach (self::RULES as $surface => $rules) {
             foreach ($rules as $rule) {
-                $current = is_array($matrix) ? ($matrix[$surface][$rule] ?? 'BLOCK') : 'BLOCK';
-                $values[$surface][$rule] = in_array($rule, self::LOCKED, true) ? 'BLOCK' : (is_string($current) ? $current : 'BLOCK');
+                $current = is_array($matrix) ? ($matrix[$surface][$rule] ?? self::defaultMode($rule)) : self::defaultMode($rule);
+                $values[$surface][$rule] = in_array($rule, self::LOCKED, true)
+                    ? 'BLOCK'
+                    : (in_array($current, self::validModes($rule), true) ? $current : self::defaultMode($rule));
             }
         }
 
@@ -173,6 +183,51 @@ class ManageEnforcement extends Page
         ];
     }
 
+    /**
+     * The mode options a given rule may take. Photo (prompt 157) offers OFF instead of a hard BLOCK.
+     *
+     * @return array<string, string>
+     */
+    private static function modeOptionsFor(string $rule): array
+    {
+        if ($rule === 'photo') {
+            return [
+                'OFF' => __('No comprobar'),
+                'WARN' => __('Avisar'),
+                'OVERRIDE' => __('Permitir con permiso'),
+            ];
+        }
+
+        return self::modeOptions();
+    }
+
+    /**
+     * @return list<string>
+     */
+    private static function validModes(string $rule): array
+    {
+        return $rule === 'photo' ? self::PHOTO_MODES : self::MODES;
+    }
+
+    /** Photo defaults to OFF (no surprise block); every other rule fails safe to BLOCK. */
+    private static function defaultMode(string $rule): string
+    {
+        return $rule === 'photo' ? 'OFF' : 'BLOCK';
+    }
+
+    private function fieldHelp(string $rule, bool $locked): ?string
+    {
+        if ($locked) {
+            return __('Siempre BLOQUEAR (requisito legal / aforo).');
+        }
+
+        if ($rule === 'photo') {
+            return __('Por defecto sin comprobar. No tiene bloqueo duro: su modo estricto es «permitir con permiso».');
+        }
+
+        return null;
+    }
+
     private static function ruleLabel(string $rule): string
     {
         return match ($rule) {
@@ -185,6 +240,7 @@ class ManageEnforcement extends Page
             'aforo' => __('Aforo'),
             'daily_limit' => __('Límite diario'),
             'monthly_limit' => __('Límite mensual'),
+            'photo' => __('Foto en ficha'),
             'ceiling' => __('Techo de stock del local'),
             default => $rule,
         };
