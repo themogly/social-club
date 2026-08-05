@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\DocumentTemplates;
 
+use App\Actions\Documents\SaveDocumentTemplateVersion;
 use App\Enums\MemberDocumentType;
 use App\Filament\Resources\DocumentTemplates\Pages\CreateDocumentTemplate;
 use App\Filament\Resources\DocumentTemplates\Pages\EditDocumentTemplate;
@@ -14,7 +15,6 @@ use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Table;
-use Illuminate\Support\Facades\DB;
 
 /**
  * Plantillas de documentos — the per-org, versioned bodies that member documents render
@@ -66,28 +66,12 @@ class DocumentTemplateResource extends Resource
     }
 
     /**
-     * Persist a new version of a template type, deactivating any prior active version of
-     * the same type (so exactly one is active). Versions are never reused — the next
-     * number counts trashed rows too — and history is never mutated in place.
+     * Thin passthrough to the domain writer — the multi-step versioning logic lives in the Action, not on the
+     * Resource (code-style audit). The Create/Edit pages call this; nothing here builds queries.
      */
     public static function persistVersion(string $type, string $body, bool $active): DocumentTemplate
     {
-        return DB::transaction(function () use ($type, $body, $active): DocumentTemplate {
-            $next = (int) DocumentTemplate::query()->withTrashed()
-                ->where('type', $type)->max('version') + 1;
-
-            if ($active) {
-                DocumentTemplate::query()->where('type', $type)->where('active', true)
-                    ->update(['active' => false]);
-            }
-
-            return DocumentTemplate::create([
-                'type' => $type,
-                'body' => $body,
-                'version' => $next,
-                'active' => $active,
-            ]);
-        });
+        return app(SaveDocumentTemplateVersion::class)->handle($type, $body, $active);
     }
 
     public static function form(Schema $schema): Schema
