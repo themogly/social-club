@@ -6028,3 +6028,31 @@ new docs but not old snapshots, recorded with both values; consent edit without 
 so old records resolve; contact_email is the member-mail Reply-To and absent from the lockdown mail; oversized /
 wrong-type logo rejected; owner-only (manager + staff denied); the RAT still needs a legal name. Screenshots,
 light + dark: the identity screen, the letterhead with a logo and with the wordmark, and the RAT controller header.
+
+## Prompt 161 — Retire the dead `organisations.settings` JSON column (completing prompt 59)
+
+**Confirmed dead, by evidence — not assumed.** The column is declared in the original
+`create_organisation_and_scope_tables` migration and read by NOTHING: no model accessor (its `'settings' =>
+'array'` cast + `settings()` relation were removed in the code-style audit), no `Settings::get()` path (that
+resolves the `settings` TABLE, never this column), and `grep -rn '->settings' app/` on an Organisation returns
+nothing. It is the organisation-level twin of `locations.settings`, which prompt 59 retired for the identical
+reason — a second, disconnected settings store beside the one `Settings::get()` actually reads.
+
+**Rows carrying any value at migration time: 0.** Verified on the live shape rather than assumed — the one
+seeded organisation has `settings = NULL`, and on a fresh migrate the `organisations` table is empty when this
+migration runs (migrations precede seeders). Since the code-style audit removed the factory's only write, no new
+row can acquire a value either.
+
+**Where this migration DIFFERS from prompt 59, and why.** `locations.settings` held five DOCUMENTED booleans
+(bar_enabled / signature_on_dispensation / …), so prompt 59 moved them into `Setting` rows before dropping.
+`organisations.settings` has NO documented keys — there is nothing to map. So the migration does the honest
+thing the prompt asked for: it counts non-empty rows at run time and, if any carry content, THROWS ("investigate
+and map it deliberately… do NOT invent a Setting-key mapping") rather than silently discarding an undocumented
+blob. On a clean/empty column it drops; `down()` restores it nullable (reversible, like every migration here).
+
+**Behaviour is identical before and after** — nothing read the column, so nothing changed. Zero existing tests
+moved (a new `OrganisationSettingsRetirementTest` was added, no others touched); it asserts the column + cast are
+gone, `down()`/`up()` round-trip, a drop preserves the org rows, `up()` refuses when a row carries content, and
+an ORG-scoped `Settings::get()` key resolves identically through the settings table. `Settings::get()`'s
+location→org→DEFAULTS resolution order is unchanged; this column was never part of it, which is the whole reason
+it was dead. This completes the retirement prompt 59 began for locations.
