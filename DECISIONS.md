@@ -6028,3 +6028,41 @@ new docs but not old snapshots, recorded with both values; consent edit without 
 so old records resolve; contact_email is the member-mail Reply-To and absent from the lockdown mail; oversized /
 wrong-type logo rejected; owner-only (manager + staff denied); the RAT still needs a legal name. Screenshots,
 light + dark: the identity screen, the letterhead with a logo and with the wordmark, and the RAT controller header.
+
+## Prompt 162 — `root` is a local-driver concept and was leaking into every S3 object key
+
+**The defect.** `config/filesystems.php`'s `documents` disk set `'root' => storage_path('app/private/documents')`
+— correct for the LOCAL driver, but Laravel's `FilesystemManager::createS3Driver()` reads the SAME `root` and
+hands it to the S3 adapter as the object-KEY PREFIX. So under `DOCUMENTS_DRIVER=s3` every ID scan, medical
+certificate and member photo was keyed under the server's ABSOLUTE filesystem path. Confirmed by writing through
+`DocumentVault` against a real S3 config and reading the key back — before/after, literally:
+
+```
+BEFORE (bug):  /home/ploi/dg.padron.app/storage/app/private/documents/member-id-scans/01KZ…jpg
+AFTER  (fix):  member-id-scans/01KZ…jpg
+```
+
+**Why it is a defect, not an eyesore.** The prefix is ENVIRONMENT-DERIVED — `storage_path()` resolves from
+wherever the app lives on disk. Move the site, rename the directory, deploy under a new path, or restore onto a
+new server, and the app looks for objects under a prefix that no longer matches the one they were written with —
+**and this disk has no second copy, because it holds the originals.** Every existing Article-9 object becomes
+unreachable. Secondary: it publishes the server layout into keys and wastes ~60 bytes each.
+
+**The fix.** `root` now applies to the local driver ONLY:
+`env('DOCUMENTS_DRIVER','local') === 's3' ? env('DOCUMENTS_S3_PREFIX','') : storage_path('app/private/documents')`.
+Local keeps its path (behaviour unchanged — asserted); S3 gets a flat bucket root, because the app already
+namespaces every write by directory (`member-id-scans/`, `member-medical-certs/`, `member-photos/`, `org-logos/`)
+— those render as folders in the R2 dashboard, since a folder is just a key prefix; nothing needs creating.
+
+**The seam — added, defaulting to empty.** `DOCUMENTS_S3_PREFIX` (new, in `.env.example`, empty by default) is an
+EXPLICIT, configurable prefix for a deliberate shared-bucket or per-club layout — NEVER a derived path. Left flat
+by default because a single dedicated bucket needs no prefix. **The general `s3` disk was reviewed too:** it never
+set a `root`, so it never leaked — left flat (asserted).
+
+**Untouched:** `DocumentVault`'s `APP_KEY` encryption, the signed-URL serving path, the `DocumentAccessLog`, and
+`VaultUrl`; `throw => true` stays on the disk (a failed ID-scan write keeps failing loudly). **No data migration**
+— the bucket is empty, so this is free; fixed now precisely so it never becomes a migration of Article-9 data.
+Tests (MySQL): the literal S3 key is the bare `member-id-scans/<ulid>.jpg` (asserted via a key-capturing S3
+client), no key contains `storage`/`home`/an absolute segment, the local driver still lands under
+`storage/app/private/documents` and reads back, a round trip on EACH driver decrypts to the exact original bytes,
+the signed-URL endpoint still serves and writes an access-log row, and the general `s3` disk has no `root`.
