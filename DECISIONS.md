@@ -6164,3 +6164,11 @@ the 156/157/159 UI clean (shared `x-button` focus rings, progressive-enhancement
 **Gates re-run @ `d54e55b`:** COMPLETENESS (still GO — 0 stubs), CMS-FIELD (still GO — 59 keys, 0 orphans; the
 `organisations.settings` column it flagged is now DROPPED by 161), PRE-STAGING (141 closed the PHP/MySQL
 version-skew blocker, 162 the S3-key leak — automated backups remain the one real NO-GO before real data).
+
+**MySQL parity flake fixed (found by the re-run).** The full MySQL suite intermittently rejected a faker-generated
+membership `expires_at` on `2027-03-28` (Europe DST spring-forward day — a wall-clock time in the 02:00→03:00 gap
+is invalid under a DST-carrying session tz + strict mode). Rather than pin five factories' datetimes, the root fix
+runs the TEST MySQL session in UTC: `config/database.php` gains an env-driven `timezone`, and `phpunit.mysql.xml`
+sets `DB_TIMEZONE=+00:00`. UTC has no DST transitions, so no generated datetime can land in a gap — proven by
+inserting `2027-03-28 02:30:00` (inside the gap) under the UTC session. No-op in production (the connector skips
+`SET time_zone` when the value is unset); a production DB should run UTC anyway. No factory or test was changed.

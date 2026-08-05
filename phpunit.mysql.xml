@@ -35,6 +35,9 @@
         <env name="DB_DATABASE" value="csc_platform_test"/>
         <env name="DB_USERNAME" value="root"/>
         <env name="DB_PASSWORD" value=""/>
+        <!-- UTC session: no DST transitions, so a faker datetime in a spring-forward gap can't be rejected
+             under strict mode (a real intermittent parity flake). Production DBs should run UTC too. -->
+        <env name="DB_TIMEZONE" value="+00:00"/>
         <env name="MAIL_MAILER" value="array"/>
         <env name="QUEUE_CONNECTION" value="sync"/>
         <env name="SESSION_DRIVER" value="array"/>

@@ -47,6 +47,18 @@ socio forms have `for`/`id` labels, a visible focus ring and AA-token contrast. 
 overlay has no focus TRAP (consistent with the camera-scan precedent) and the preview `<img alt="">` is
 decorative — both defensible.
 
+## CI reliability — a MySQL parity flake found during the re-run (FIXED)
+
+The full MySQL parity run intermittently failed inserting a membership: `Incorrect datetime value: '2027-03-28
+01:13:46' for column expires_at`. Root cause: five factories generate datetimes with `fake()->dateTimeBetween()`
+(random time-of-day), and `2027-03-28` is the Europe DST spring-forward day — a value in/near the 02:00→03:00 gap
+is rejected by MySQL strict mode under a DST-carrying session time zone. Pre-existing (nothing to do with the
+156→162 surface), but a real intermittent red that blocks merges. → **Fixed at the root:** the MySQL connection
+now takes an env-driven `timezone` (`config/database.php`), and the test profile sets `DB_TIMEZONE=+00:00`
+(`phpunit.mysql.xml`). **UTC has no DST transitions**, so no generated datetime can ever land in a gap — proven
+by inserting `2027-03-28 02:30:00` (inside the gap) successfully under the UTC session. No-op in production
+unless `DB_TIMEZONE` is set (a production DB should run UTC anyway). No factory changed; no test changed.
+
 ## Gates (re-run @ `d54e55b`)
 - **Completeness (11a):** GO — 0 TODO/stubs, `UnreachableCodeGuardTest` green, no empty resources/views/routes.
 - **CMS-field (11b):** GO — 59 settings keys, 0 orphans; the `organisations.settings` column it flagged is now
