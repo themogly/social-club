@@ -5720,3 +5720,54 @@ invitation-vs-submission distinction (the `invite` badge: Sin abrir / Abierta / 
 filter) already existed from prompt 45/149; this branch adds the behavioural half so the two need not be told
 apart by badge alone. Tests: `ApproveRequiresSubmissionTest` (5) + updated onboarding/card/cleanup/duplicate
 suites (fixtures now `->submitted()`). `composer check` green; full MySQL suite green (1045 passed).
+
+## Prompt 153 — Consent text is per-locale, versioned as a set, with the locale read recorded
+
+**The tension.** An English applicant saw English labels but was asked to tick two boxes under Spanish consent
+paragraphs — arguably not *informed* consent (Art. 7(2): clear and plain language), and these are Article 9
+special-category purposes. But consent must also be *reproducible*: the club must show exactly what a member
+agreed to on the day (why `consent_text_version` exists, and why prompt 97 stamps the version the applicant
+SAW). Naively wrapping the texts in `__()` fixes the first and destroys the second — two texts, no record of
+which was read, and a translation free to drift from the Spanish without the version changing.
+
+**Resolution — author both languages, version them together, record which was read.**
+- The two texts (`consent_privacy_text`, `consent_statutes_text`) are now **per-locale arrays** `{es, en}` in
+  `Settings::DEFAULTS`, stored as JSON. One `consent_text_version` covers the whole SET, so the es and en of a
+  version are by construction the same declaration. Read only through **`App\Support\ConsentText`** (es
+  fallback, legacy-single-string safe — a missing locale degrades to the Spanish, never to a blank declaration).
+- **`consent_records.locale`** records the language the applicant was READING at submit — the same class of
+  fact as the version, captured in the payload by `ApplicationController` (`app()->getLocale()`) and stamped by
+  `RecordMemberConsent` at approval. Prompt 97's guarantee extends unchanged: both the version AND the locale
+  stamped are the ones seen at submit, never a later revision or an admin-side language switch.
+- **Both facts are needed:** the locale answers "in what language was this consent informed?", the version
+  answers "to which text?" — together they make an inspection's "what did this member agree to, and could they
+  read it?" answerable.
+
+**Spanish is authoritative.** The club is a Spanish asociación with Spanish estatutos; the English is a
+translation of a specific version. The form says so, on the form, in non-es locales ("La versión auténtica … está
+en español; esta es una traducción de la versión :v."). The fallback is to the Spanish, never blank.
+
+**The second gap: no club could edit these.** They had a Spanish default and no editor — every club was
+presenting a summary of statutes it did not write and could not correct. This is CLUB-AUTHORED legal content,
+not product copy, which is exactly why `__()` was the wrong mechanism. New page **`ManageConsentText`** edits
+both languages of both texts + the version. Gated on a NEW **`settings.consent`** permission (OWNER only), held
+SEPARATELY from the routine `settings.manage` thresholds — editing the text everyone consents to is not routine.
+**A changed text under the same version is refused** (persistent error, no save): a silent edit would leave
+already-consented members recorded against a version whose text no longer says what it said. Bumping the version
+is the whole point of `consent_text_version`, so the edit forces it.
+
+**Consent records predating this change.** `locale` is nullable and left NULL for existing rows — members who
+consented under 1.0 did so before this was recorded, and **absent means absent**; the migration does not invent a
+Spanish that was never observed. The string→array settings conversion (folding a club's existing Spanish wording
+into `{es: <theirs>, en: <shipped default>}`) is deliberately **one-way** — any English a club later authors has
+no single-string home, so `down()` does not reverse it (same stance as prompt 146).
+
+**RAT — decided YES, a brief note.** The RAT's consent legal-basis asserts *valid* consent; that the declaration
+is provided in the applicant's language (Spanish authoritative) and the version + language read are recorded
+directly evidences that, so RAT-01's legal basis now says so. **AnonymiseMember** is unchanged in behaviour —
+`locale` is not PII (no name/DNI), the `consent_records` coverage note just adds it, and the
+`COVERED_MEMBER_TABLES` guard stays green. Locale resolution on the form is untouched (SetLocale → ResolveLocale,
+session override honoured); only the two consent texts moved to per-locale storage — no other setting did.
+Tests: `ConsentTextPerLocaleTest` (7, incl. the reported switch bug, locale recorded, prompt-97-extended-to-locale,
+no-locale-not-rewritten, editor + version-bump + denial) + the prompt-97 version test updated to the resolver.
+`composer check` green; full MySQL suite green (1052 passed).

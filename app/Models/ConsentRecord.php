@@ -15,7 +15,7 @@ class ConsentRecord extends Model
     use HasFactory, HasUlids;
 
     protected $fillable = [
-        'member_id', 'purpose', 'consent_text_version', 'granted_at', 'withdrawn_at', 'ip',
+        'member_id', 'purpose', 'consent_text_version', 'locale', 'granted_at', 'withdrawn_at', 'ip',
     ];
 
     protected function casts(): array

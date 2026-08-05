@@ -116,13 +116,23 @@ class Settings
         // never auto-purged (the model refuses deletes). Prompt 58.
         'message_retention_days' => 730,    // member↔club message bodies redacted after this (2 years; prompt 136)
         'signed_url_ttl_seconds' => 300,    // 5 minutes
-        // Consent (prompt 97): the version stamped on every consent record, AND the two texts it refers to —
-        // shown to the applicant so the consent is INFORMED. Whoever revises a text bumps the version; the
-        // version stamped at capture is the one the applicant actually saw. Plain text, displayed inline
-        // (there is no public page to link to — NOTES §A).
+        // Consent (prompts 97 + 153): the version stamped on every consent record, AND the two texts it refers
+        // to — shown to the applicant so the consent is INFORMED (Art. 7(2): clear and plain language). The
+        // texts are PER-LOCALE and versioned AS A SET, so the es and en of a version are by construction the
+        // same declaration; the version stamped at capture is the one the applicant actually saw, and the LOCALE
+        // they read it in is stamped alongside. SPANISH is the authoritative text (Spanish asociación, Spanish
+        // estatutos) — the others are translations of a specific version, and the form says so in non-es locales.
+        // Read only through App\Support\ConsentText (es fallback, legacy-string safe); a missing locale degrades
+        // to the Spanish, never blank. Plain text, displayed inline (no public page to link to — NOTES §A).
         'consent_text_version' => '1.0',
-        'consent_privacy_text' => 'Tratamos tus datos personales para gestionar tu condición de socio/a (alta, cuota, control de acceso y dispensación) conforme al RGPD. El consumo de cannabis y el uso terapéutico son datos de categoría especial (art. 9 RGPD) y reciben protección reforzada. No cedemos tus datos a terceros salvo obligación legal. Puedes ejercer tus derechos de acceso, rectificación y supresión desde tu área de socio/a.',
-        'consent_statutes_text' => 'Solicitar el alta implica aceptar los estatutos de la asociación: es una asociación privada sin ánimo de lucro de consumidores de cannabis, no un comercio; el cannabis se dispensa a coste como aportación al consumo compartido entre socios, nunca como venta. La asociación opera bajo tolerancia judicial, no autorización. Pide una copia íntegra de los estatutos a la asociación.',
+        'consent_privacy_text' => [
+            'es' => 'Tratamos tus datos personales para gestionar tu condición de socio/a (alta, cuota, control de acceso y dispensación) conforme al RGPD. El consumo de cannabis y el uso terapéutico son datos de categoría especial (art. 9 RGPD) y reciben protección reforzada. No cedemos tus datos a terceros salvo obligación legal. Puedes ejercer tus derechos de acceso, rectificación y supresión desde tu área de socio/a.',
+            'en' => 'We process your personal data to manage your membership (registration, fees, access control and dispensing) in accordance with the GDPR. Cannabis consumption and therapeutic use are special-category data (Art. 9 GDPR) and receive reinforced protection. We do not share your data with third parties except where legally required. You may exercise your rights of access, rectification and erasure from your member area.',
+        ],
+        'consent_statutes_text' => [
+            'es' => 'Solicitar el alta implica aceptar los estatutos de la asociación: es una asociación privada sin ánimo de lucro de consumidores de cannabis, no un comercio; el cannabis se dispensa a coste como aportación al consumo compartido entre socios, nunca como venta. La asociación opera bajo tolerancia judicial, no autorización. Pide una copia íntegra de los estatutos a la asociación.',
+            'en' => 'Applying for membership entails accepting the association\'s statutes: it is a private, non-profit association of cannabis consumers, not a business; cannabis is dispensed at cost as a contribution to shared consumption among members, never as a sale. The association operates under judicial tolerance, not authorisation. Request a full copy of the statutes from the association.',
+        ],
         // Brute-force guard on QR-card scans (failed scans per minute, per operator). Prompt 58.
         'qr_scan_max_failures_per_minute' => 10,
         // Minutes of NO real operator input before a counter screen auto-locks (prompt 120). Locking signs the

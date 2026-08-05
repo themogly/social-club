@@ -89,9 +89,12 @@ class ApplicationController extends Controller
                 ? Weight::fromGrams($data['declared_monthly_g'])->centigrams
                 : null,
             'consents' => ['membership', 'data_processing'],
-            // The consent-text version the applicant ACTUALLY saw, captured now — RecordMemberConsent stamps
-            // THIS at approval, so the recorded version can never be a later revision they never read.
+            // The consent-text version AND the locale the applicant ACTUALLY saw, captured now — RecordMemberConsent
+            // stamps THESE at approval, so neither the recorded version nor the language can become a later revision
+            // they never read (prompts 97 + 153). The locale is the resolved request locale (SetLocale → ResolveLocale),
+            // i.e. the one the form's consent block was rendered in.
             'consent_version' => (string) Settings::get('consent_text_version', '1.0'),
+            'consent_locale' => app()->getLocale(),
         ];
 
         // Still PENDING — it now carries the applicant's details and enters the review queue.

@@ -23,11 +23,15 @@ use Carbon\CarbonInterface;
  */
 class RecordMemberConsent
 {
-    public function handle(Member $member, string $purpose = 'membership', ?string $ip = null, ?string $version = null, ?CarbonInterface $grantedAt = null): ConsentRecord
+    public function handle(Member $member, string $purpose = 'membership', ?string $ip = null, ?string $version = null, ?CarbonInterface $grantedAt = null, ?string $locale = null): ConsentRecord
     {
         return $member->consents()->create([
             'purpose' => $purpose,
             'consent_text_version' => $version ?? (string) Settings::get('consent_text_version', '1.0'),
+            // The locale the person actually READ the declaration in (prompt 153). Like the version, it is
+            // whatever the caller captured at submit — NOT the current app locale. Left null when unknown (a
+            // paper-register import, or a caller that did not observe one): absent means absent, never guessed.
+            'locale' => $locale,
             'granted_at' => $grantedAt ?? now(),
             'ip' => $ip,
         ]);

@@ -8,6 +8,7 @@ use App\Filament\Pages\Dashboard;
 use App\Filament\Pages\ExportacionContable;
 use App\Filament\Pages\FailedJobs;
 use App\Filament\Pages\LibroSocios;
+use App\Filament\Pages\ManageConsentText;
 use App\Filament\Pages\ManageEnforcement;
 use App\Filament\Pages\ManageSettings;
 use App\Filament\Pages\Rat;
@@ -238,6 +239,10 @@ class Help
         ManageSettings::class => ['permission' => 'settings.manage', 'title' => 'Ajustes de la organización', 'body' => [
             'Los umbrales de cumplimiento del club: edad mínima, carencia, límites de gramos, aforo, política de avalador…',
             'Cada umbral es configurable porque la práctica regional varía y la jurisprudencia cambia. Cambiar uno afecta al mostrador de inmediato.',
+        ]],
+        ManageConsentText::class => ['permission' => 'settings.consent', 'title' => 'Textos de consentimiento', 'body' => [
+            'Las dos declaraciones que el aspirante acepta al solicitar el alta —el aviso de privacidad y el resumen de los estatutos— en español (texto auténtico) e inglés.',
+            'Un número de versión cubre ambos idiomas. Si cambias un texto, sube la versión: cada socio queda registrado contra la versión y el idioma que leyó.',
         ]],
         ManageEnforcement::class => ['permission' => 'settings.manage', 'title' => 'Aplicación de límites', 'body' => [
             'Aquí decides si cada límite BLOQUEA en el mostrador o solo avisa, y quién puede autorizar una excepción.',
