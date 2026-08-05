@@ -46,7 +46,7 @@ class AnonymiseMember
         'member_documents' => 'HANDLED here: files deleted; retention-obligation docs redacted, others destroyed.',
         'member_tokens' => 'reference + hash-only credential (no PII); revoked here.',
         'member_login_tokens' => 'reference + hash-only credential (no PII).',
-        'consent_records' => 'reference + consent version/date (no name/DNI); the identity is the member row.',
+        'consent_records' => 'reference + consent version/date/locale (no name/DNI); the identity is the member row.',
         'member_sanctions' => 'reference + conduct free-text about the sanction, not identity.',
         'member_discounts' => 'reference + discount assignment (no PII).',
         'memberships' => 'reference + tier/dates/fee (no PII).',

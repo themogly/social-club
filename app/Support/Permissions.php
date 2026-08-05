@@ -43,8 +43,9 @@ class Permissions
         'comms.manage',
         // Privacy
         'data.request.handle', 'data.erase',
-        // System
-        'locations.manage', 'staff.manage', 'settings.manage', 'settings.manage.location', 'audit.view',
+        // System ('settings.consent' — edit the org-wide consent declarations everyone ticks: a sensitive,
+        // legal-content capability held separately from the routine thresholds of 'settings.manage'; prompt 153)
+        'locations.manage', 'staff.manage', 'settings.manage', 'settings.manage.location', 'settings.consent', 'audit.view',
         // Security (prompt 121): initiate = trip the panic lockdown (staff hold it — they are the ones in the
         // room); manage = run/observe drills, read the runbook, end a drill. A REAL lockdown is never
         // reactivated in-app (off-premises paths only), so there is no "reactivate" permission by design.

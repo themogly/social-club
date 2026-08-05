@@ -119,14 +119,19 @@
                 {{-- Informed consent (prompt 97): the two texts the applicant is agreeing to are SHOWN here,
                      tagged with the exact version stamped on their consent record. Two SEPARATE ticks — data
                      processing and the statutes are different agreements. --}}
-                @php($consentVersion = (string) \App\Support\Settings::get('consent_text_version', '1.0'))
+                @php($consentVersion = \App\Support\ConsentText::version())
                 <div class="space-y-3 rounded-lg border border-line bg-surface-alt p-3 text-sm dark:border-slate-700 dark:bg-slate-950">
                     <p class="text-xs text-ink-muted dark:text-slate-500">{{ __('Textos legales · versión :v', ['v' => $consentVersion]) }}</p>
+                    @unless (\App\Support\ConsentText::isAuthoritative())
+                        {{-- The honest position (prompt 153): the club is a Spanish asociación with Spanish estatutos;
+                             the text below is a translation of a specific version of the authoritative Spanish. --}}
+                        <p class="text-xs text-ink-muted dark:text-slate-500">{{ __('La versión auténtica de estas declaraciones está en español; esta es una traducción de la versión :v.', ['v' => $consentVersion]) }}</p>
+                    @endunless
 
                     <div>
                         <details class="mb-2" data-consent-privacy>
                             <summary class="cursor-pointer font-medium">{{ __('Información sobre el tratamiento de tus datos') }}</summary>
-                            <p class="mt-2 whitespace-pre-line text-ink-muted dark:text-slate-400">{{ \App\Support\Settings::get('consent_privacy_text', '') }}</p>
+                            <p class="mt-2 whitespace-pre-line text-ink-muted dark:text-slate-400">{{ \App\Support\ConsentText::privacy() }}</p>
                         </details>
                         <label class="flex items-start gap-2">
                             <input type="checkbox" name="consent_data" value="1" required @checked(old('consent_data')) class="mt-0.5 h-5 w-5 rounded border-line text-brand dark:border-slate-600 dark:bg-slate-900">
@@ -137,7 +142,7 @@
                     <div>
                         <details class="mb-2" data-consent-statutes>
                             <summary class="cursor-pointer font-medium">{{ __('Estatutos de la asociación') }}</summary>
-                            <p class="mt-2 whitespace-pre-line text-ink-muted dark:text-slate-400">{{ \App\Support\Settings::get('consent_statutes_text', '') }}</p>
+                            <p class="mt-2 whitespace-pre-line text-ink-muted dark:text-slate-400">{{ \App\Support\ConsentText::statutes() }}</p>
                         </details>
                         <label class="flex items-start gap-2">
                             <input type="checkbox" name="consent_statutes" value="1" required @checked(old('consent_statutes')) class="mt-0.5 h-5 w-5 rounded border-line text-brand dark:border-slate-600 dark:bg-slate-900">

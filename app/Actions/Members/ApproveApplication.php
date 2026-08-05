@@ -83,11 +83,13 @@ class ApproveApplication
         $member->fill(MemberEnrolment::defaults($application->organisation_id));
         $member->save();
 
-        // Stamp the version the applicant actually SAW at submit (prompt 97), not the current one, so a text
-        // revision between application and approval can never rewrite what they agreed to.
+        // Stamp the version AND the locale the applicant actually SAW at submit (prompts 97 + 153), not the
+        // current ones, so a text revision — or a language switch on the admin side — between application and
+        // approval can never rewrite what they agreed to or the language they read it in.
         $consentVersion = isset($payload['consent_version']) && is_string($payload['consent_version']) ? $payload['consent_version'] : null;
+        $consentLocale = isset($payload['consent_locale']) && is_string($payload['consent_locale']) ? $payload['consent_locale'] : null;
         foreach (($payload['consents'] ?? ['membership', 'data_processing']) as $purpose) {
-            (new RecordMemberConsent)->handle($member, $purpose, request()->ip(), $consentVersion);
+            (new RecordMemberConsent)->handle($member, $purpose, request()->ip(), $consentVersion, locale: $consentLocale);
         }
 
         $application->update([

@@ -64,7 +64,7 @@ class Rat
                 'ref' => 'RAT-01',
                 'name' => __('Gestión de socios y membresías'),
                 'purpose' => __('Alta, mantenimiento y baja de socios; control de avales, cuotas y estado de la membresía.'),
-                'legal_basis' => __('Ejecución de la relación asociativa (estatutos) y consentimiento del interesado.'),
+                'legal_basis' => __('Ejecución de la relación asociativa (estatutos) y consentimiento del interesado. La declaración de consentimiento se facilita en el idioma del solicitante (el español es el texto auténtico, con traducción a los idiomas habilitados) y se registran la versión y el idioma en que la leyó.'),
                 'data_categories' => [
                     __('Identificativos (nombre, nº de socio)'),
                     __('Documento de identidad (cifrado)'),

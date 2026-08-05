@@ -11,6 +11,7 @@ use App\Models\MemberApplication;
 use App\Models\Organisation;
 use App\Support\ActiveScope;
 use App\Support\ApplicationSpamGuard;
+use App\Support\ConsentText;
 use App\Support\Settings;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -99,11 +100,12 @@ class PublicApplicationFormTest extends TestCase
         app()->setLocale('es');
         $this->invite('t');
 
-        // The texts (and their version) are ON the page — consent cannot be informed otherwise.
+        // The texts (and their version) are ON the page — consent cannot be informed otherwise. Default locale
+        // is es (prompt 96), so the authoritative Spanish declarations render (prompt 153).
         $this->get(route('socio.application', ['token' => 't']))
             ->assertOk()
-            ->assertSee((string) Settings::get('consent_privacy_text'))
-            ->assertSee((string) Settings::get('consent_statutes_text'))
+            ->assertSee(ConsentText::privacy('es'))
+            ->assertSee(ConsentText::statutes('es'))
             ->assertSee('1.0');
 
         // Submit at v1.0, then a later revision bumps the version…
