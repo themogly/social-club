@@ -5771,3 +5771,39 @@ session override honoured); only the two consent texts moved to per-locale stora
 Tests: `ConsentTextPerLocaleTest` (7, incl. the reported switch bug, locale recorded, prompt-97-extended-to-locale,
 no-locale-not-rewritten, editor + version-bump + denial) + the prompt-97 version test updated to the resolver.
 `composer check` green; full MySQL suite green (1052 passed).
+
+## Prompt 154 — The View page of an unredeemed invitation now reads as an invitation, not a broken form
+
+Completes prompt 152's presentation half. 152 gated the *actions* (approve requires `submitted_at`, covering the
+View page via `recordActions()`), but never touched `MemberApplicationInfolist`, so `/member-applications/{id}`
+on an unredeemed invitation still showed **Status: Pending** and an empty *Formulario* key-value panel that reads
+as a table that failed to load.
+
+**What the page now shows.** When `submitted_at === null` the infolist renders an **Invitación** section instead
+of the payload panel — the three lifecycle facts the work order named, because they are three different operator
+actions: **Enviada** (`created_at`, when the link went out → *is it worth chasing*), **Abierta por el
+solicitante** (`opened_at`, "Todavía no" until they open it → *they opened it and stalled vs never looked*), and
+**Caduca** (`invite_expires_at` → *the link is dying/dead*). The empty payload section is `->visible(submitted_at
+!== null)`, so it simply is not rendered for an invitation. A **submitted** application's page is unchanged — the
+payload KeyValueEntry renders exactly as before (pinned by a test).
+
+**Actions carried, not copied.** `copyLinkAction` / `resendAction` / `revokeAction` and `inviteLabel()` moved
+from `MemberApplicationsTable` to `MemberApplicationResource` as shared statics (`inviteActions()`), so the list
+and the View page use the *same* actions — the next surface inherits them. `inviteUrl()` remains the one and only
+way the link is derived (from the retained encrypted `invite_token`); no second derivation was written.
+
+**Tightened to an OUTSTANDING invitation.** The invite actions now gate on `isInviteLive() && submitted_at ===
+null` (new `isOutstandingInvite()`), not `isInviteLive()` alone — a *submitted* application is still PENDING and
+therefore still `isInviteLive()`, but copying/resending an invite to someone who already applied is meaningless.
+So a submitted application's page offers no invite actions (only the review decisions), and the list does the
+same. `copyLink` also gained the `members.create` gate the other two already had — revealing the invite link is
+invite management, so the denial test ("no permission → neither action") is now true of all three.
+
+**The expired case is its own dead end.** All invite actions gate on `isInviteLive()`, which excludes expired, so
+no copyable *dead* link is ever offered; the Invitación section adds a danger note telling the operator the link
+has expired and to **generate a new invitation from the list**. Deliberately NOT an "extend expiry / reissue"
+capability — the invite never had one, and adding it is new behaviour, not the presentation fix this prompt is.
+A fresh invitation is the existing, correct path.
+
+Approval gating (152) is untouched and its tests still pass. Tests: `InvitationViewPageTest` (5). `composer
+check` green; full MySQL suite green (1057 passed). New copy in both lang files.
