@@ -1,6 +1,7 @@
 # Completeness check — Phase D gate 11a
 
-**Ran against:** `main` @ `7769d47` (after 156/157/159 + all five Phase-C audits merged).
+**Ran against:** `main` @ `7769d47`; **re-run @ `d54e55b`** (after 141/161/162 merged) — still GO, 0 stubs/TODO,
+`UnreachableCodeGuardTest` green.
 **Question this gate answers:** is anything shipped as a placeholder, stub or unreachable shell — a feature that
 LOOKS built (green tests, a rendered screen) but does nothing? Tests prove correctness, not completeness, so this
 is a separate, deliberate pass.
@@ -38,8 +39,8 @@ letterhead with a logo and with the wordmark; the RAT controller header). Every 
 
 - **`155` Part B (ID MRZ prefill)** and **`157` remote-selfie-as-control** are DEFERRED with a full spec in
   `DECISIONS.md`, gated on an unmeasured read rate / a deliberate control choice — a decision, not an unfinished stub.
-- **`organisations.settings` column** is now dead (retired in the code-style audit at the model + factory level); the
-  empty nullable column awaits a drop migration (locations precedent). Tracked in the code-style audit report — not a
+- **`organisations.settings` column** — DROPPED (prompt 161's migration, re-run @ `d54e55b`). Was dead (retired at
+  the model + factory level in the code-style audit); the column itself is now gone. Tracked in DECISIONS 161 — not a
   hidden placeholder.
 
 ## Residual (for the owner, not a blocker)

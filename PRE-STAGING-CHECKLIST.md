@@ -1,14 +1,17 @@
 # Pre-staging gate — Phase D gate 12 (GO / NO-GO)
 
-**Ran against:** `main` @ `7769d47`. **Re-run this gate** after any infra change and immediately before the
-first real-data deploy — the app-layer rows are code-verifiable now; the infra rows can only be confirmed on the
-target host.
+**Ran against:** `main` @ `7769d47`; **re-run @ `d54e55b`** (after prompts 141/161/162 merged). **Re-run this
+gate** after any infra change and immediately before the first real-data deploy — the app-layer rows are
+code-verifiable now; the infra rows can only be confirmed on the target host.
 
-## Verdict: **CONDITIONAL GO**
+## Verdict: **CONDITIONAL GO** (one real blocker remaining)
 
-The application is staging-ready. Nothing in the code blocks a deploy. **Two items must be arranged before a
-REAL-DATA launch** (not before staging with synthetic data): automated **backups**, and running the suite on the
-**production PHP/Node versions**. Everything else is a confirm-at-staging checklist.
+The application is staging-ready. Nothing in the code blocks a deploy. **Closed since the first run:** prompt 141
+moved CI to the production runtime (PHP **8.5** + `mysql:8.4`), so the version-parity blocker is largely resolved
+— only the server's own PHP flip to 8.5 (the coordinated action 141 was gated on) and Node (CI 20 vs prod 24)
+remain; prompt 162 removed the S3 object-key path leak; prompt 161 dropped the dead `organisations.settings`
+column (migrations still run clean on a fresh DB, verified). **The one item that still gates a REAL-DATA launch
+is automated, tested backups.** Everything else is a confirm-at-staging checklist.
 
 ## GREEN — verified in code (GO)
 
@@ -23,6 +26,9 @@ REAL-DATA launch** (not before staging with synthetic data): automated **backups
   job (`php artisan test -c phpunit.mysql.xml`) — the prompt-141 "SQLite-only CI" concern is CLOSED.
 - [x] **S3 endpoint env present.** `.env.example` carries `AWS_ENDPOINT` + `AWS_USE_PATH_STYLE_ENDPOINT` (the
   work-order gap is CLOSED); `FILESYSTEM_DISK=local` in the example (prod overrides to s3).
+- [x] **Documents-disk S3 keys are clean (prompt 162).** The `documents` disk no longer leaks `storage_path()`
+  into object keys — under `s3` the key is the bare `member-id-scans/…` (no absolute path), with an empty-by-
+  default `DOCUMENTS_S3_PREFIX` seam. Safe to cut over to R2/S3; existing local files are untouched.
 - [x] **Full suite green on MySQL** (1096 passed, 4 skipped, 0 failed) at this SHA.
 
 ## CONFIRM AT STAGING — infra, cannot verify from the repo (owner)
@@ -45,9 +51,10 @@ REAL-DATA launch** (not before staging with synthetic data): automated **backups
 - [ ] **Automated, tested backups.** No `spatie/laravel-backup` or backup command exists in the repo — the DB AND
   the encrypted `documents` disk must have scheduled backups WITH a rehearsed restore. For a system holding Article-9
   special-category health data, an untested backup is a NO-GO. (Infra-level; not a code defect, but it gates launch.)
-- [ ] **Run the suite on the production runtime.** CI is PHP **8.3** / Node **20**; prod target is PHP **8.5** /
-  Node **24**. CI does not exercise the prod runtime, so a version-specific break could ship green. Either bump CI to
-  8.5/24 or run `composer check` + `php artisan test -c phpunit.mysql.xml` once on 8.5 before go-live.
+- [x] **Run the suite on the production runtime — DONE for PHP/MySQL (prompt 141).** CI now runs PHP **8.5** +
+  `mysql:8.4` on both jobs, matching prod (8.5.9 / 8.4.10). The suite is green on 8.5 (also proven locally on
+  8.5.6). Remaining, minor: **Node** is CI 20 vs prod 24 (a separate follow-up), and the **server's PHP must be
+  flipped to 8.5** to match CI — the coordinated action 141's merge was gating, to do in the same sitting.
 
 ## How to re-run
 `git checkout main && git pull`, then re-verify the GREEN rows (`php artisan migrate:fresh` on a scratch DB;

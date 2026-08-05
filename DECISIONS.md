@@ -6134,3 +6134,33 @@ Tests (MySQL): the literal S3 key is the bare `member-id-scans/<ulid>.jpg` (asse
 client), no key contains `storage`/`home`/an absolute segment, the local driver still lands under
 `storage/app/private/documents` and reads back, a round trip on EACH driver decrypts to the exact original bytes,
 the signed-URL endpoint still serves and writes an access-log row, and the general `s3` disk has no `root`.
+
+## Verify pass (post-162) — application-photo retention gap closed (security-audit finding)
+
+**The finding.** A fresh security audit over the new 156→162 surface found ONE real defect, on prompt 157's own
+code: `ApplicationController::store` encrypted an applicant's optional ID photo onto the private disk and its
+comment claimed "an abandoned/rejected application's photo is cleaned by the staging sweep (prompt 142)" — but
+that sweep (`imports:prune-staging`) only prunes member-IMPORT CSVs. Nothing pruned `MemberApplication` rows or
+their `payload['photo_path']`, so every rejected or walked-away prospect's photo + full plaintext payload (name,
+DOB, email, document number) sat indefinitely — a GDPR data-minimisation gap on Article-9-adjacent data, directly
+contradicting the retention concern prompt 155 (Part B) recorded. Not exploitable (encrypted at rest, never
+served without a member), so a retention/compliance defect, not a breach vector.
+
+**The fix.** A scheduled `applications:prune-retention` command (mirroring `messages:prune-retention` /
+`members:purge`): past `application_retention_days` (new Setting, default **180 days** — the owner tunes it; the
+duration is a policy choice, the mechanism is the defect) it ANONYMISES every rejected/abandoned application —
+`Storage::disk('documents')->delete()` the photo, scrub `payload` + `applicant_email` + `applicant_reference` —
+keeping the row shell (status + timestamps) so the outcome is still countable without the personal data (the
+AnonymiseMember ethos). **APPROVED applications are NEVER touched:** `ApproveApplication` points the new
+member's `photo_path` at the SAME file, so pruning it would blank the member's counter photo — approved
+applicants are governed by the member's own retention. Idempotent, `--dry-run`, heartbeat, audited; wired
+`dailyAt('05:55')`. The false comment is corrected to name the real sweep. Tests (MySQL): a rejected app past the
+window is anonymised + its photo deleted; an APPROVED app is untouched (photo survives); a recent app is
+untouched; idempotent; dry-run writes nothing. The rest of the audit was CONFIRMATION — photo-capture authz +
+IDOR closed both ways, photos encrypted on the private disk and served only via the signed/logged endpoint, the
+unauthenticated application upload MIME/size/rate-limited, no biometric matching, org-identity owner-gated, and
+the 156/157/159 UI clean (shared `x-button` focus rings, progressive-enhancement capture, `role=dialog` overlay).
+
+**Gates re-run @ `d54e55b`:** COMPLETENESS (still GO — 0 stubs), CMS-FIELD (still GO — 59 keys, 0 orphans; the
+`organisations.settings` column it flagged is now DROPPED by 161), PRE-STAGING (141 closed the PHP/MySQL
+version-skew blocker, 162 the S3-key leak — automated backups remain the one real NO-GO before real data).

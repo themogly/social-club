@@ -38,6 +38,11 @@ Schedule::command('audit:redact-retention')->dailyAt('05:45');
 // message_retention_days, keeping the thread as evidence of contact. Idempotent (redacted rows are skipped).
 Schedule::command('messages:prune-retention')->dailyAt('05:50');
 
+// Apply the declared APPLICATION retention (security-audit finding on prompt 157): anonymise rejected/abandoned
+// member applications past application_retention_days and DELETE their optional ID photo from the encrypted
+// disk — never approved ones (the member shares that photo). Idempotent (scrubbed rows are skipped).
+Schedule::command('applications:prune-retention')->dailyAt('05:55');
+
 // Sweep abandoned member-import staging CSVs (prompt 142): they hold the club's whole register in plaintext,
 // and resetImport() misses the walk-away case. Hourly, because the window is hours — the scratch space of a
 // multi-step form, not a record. Idempotent and safe on an empty/absent directory.
