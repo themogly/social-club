@@ -2,6 +2,7 @@
 
 namespace App\Mail;
 
+use App\Support\OrganisationIdentity;
 use Illuminate\Bus\Queueable;
 use Illuminate\Mail\Mailable;
 use Illuminate\Mail\Mailables\Content;
@@ -17,7 +18,8 @@ class MembershipReminderMail extends Mailable
 
     public function envelope(): Envelope
     {
-        return new Envelope(subject: __('Tu membresía vence pronto'));
+        return new Envelope(
+            replyTo: OrganisationIdentity::replyTo(), subject: __('Tu membresía vence pronto'));
     }
 
     public function content(): Content

@@ -15,6 +15,14 @@ class ConsentText
     /** The authoritative language: the club is a Spanish asociación; the others are translations of a versioned Spanish text. */
     public const AUTHORITATIVE = 'es';
 
+    /**
+     * The archive setting: every past consent-text version's text, kept so a member's consent record resolves
+     * to the EXACT wording they agreed to even after the club bumps the version (prompt 159). Shape:
+     * `{ "1.0": { consent_privacy_text: {es,en}, consent_statutes_text: {es,en} }, ... }`. The CURRENT version
+     * is never read from here — it reads the live settings — so the archive only ever needs superseded versions.
+     */
+    public const ARCHIVE_KEY = 'consent_text_archive';
+
     public static function privacy(?string $locale = null): string
     {
         return self::resolve('consent_privacy_text', $locale);
@@ -34,6 +42,40 @@ class ConsentText
     public static function isAuthoritative(?string $locale = null): bool
     {
         return ($locale ?? app()->getLocale()) === self::AUTHORITATIVE;
+    }
+
+    /**
+     * The privacy text a member agreed to under a SPECIFIC version (prompt 159). The current version reads the
+     * live setting; a superseded version reads the archive, falling back to the authoritative Spanish of that
+     * version and finally to the current live text — never blank. This is what lets an inspection answer "show
+     * me exactly what THIS member consented to" after the wording has since moved on.
+     */
+    public static function privacyForVersion(string $version, ?string $locale = null): string
+    {
+        return self::resolveVersion('consent_privacy_text', $version, $locale);
+    }
+
+    public static function statutesForVersion(string $version, ?string $locale = null): string
+    {
+        return self::resolveVersion('consent_statutes_text', $version, $locale);
+    }
+
+    private static function resolveVersion(string $key, string $version, ?string $locale): string
+    {
+        $locale ??= app()->getLocale();
+
+        if ($version === self::version()) {
+            return self::resolve($key, $locale); // the current version is the live text
+        }
+
+        // Index the archive DIRECTLY, not via data_get: a version like "1.0" contains a dot, which data_get
+        // would wrongly read as nesting (`['1']['0']`) and never find the entry.
+        $archive = Settings::get(self::ARCHIVE_KEY, []);
+        $versionTexts = is_array($archive) ? ($archive[$version] ?? []) : [];
+        $archived = is_array($versionTexts) ? ($versionTexts[$key] ?? []) : [];
+        $texts = is_array($archived) ? array_map(fn ($v): string => (string) $v, $archived) : [];
+
+        return $texts[$locale] ?? $texts[self::AUTHORITATIVE] ?? self::resolve($key, $locale);
     }
 
     /**

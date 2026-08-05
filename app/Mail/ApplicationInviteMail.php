@@ -2,6 +2,7 @@
 
 namespace App\Mail;
 
+use App\Support\OrganisationIdentity;
 use Illuminate\Bus\Queueable;
 use Illuminate\Mail\Mailable;
 use Illuminate\Mail\Mailables\Content;
@@ -22,7 +23,8 @@ class ApplicationInviteMail extends Mailable
 
     public function envelope(): Envelope
     {
-        return new Envelope(subject: __('Invitación para asociarte'));
+        return new Envelope(
+            replyTo: OrganisationIdentity::replyTo(), subject: __('Invitación para asociarte'));
     }
 
     public function content(): Content

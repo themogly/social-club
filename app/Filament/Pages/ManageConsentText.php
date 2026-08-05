@@ -2,10 +2,9 @@
 
 namespace App\Filament\Pages;
 
-use App\Actions\RecordAuditLog;
-use App\Enums\SettingType;
+use App\Actions\Organisation\UpdateConsentText;
+use App\Exceptions\ConsentVersionRequiredException;
 use App\Support\ConsentText;
-use App\Support\Settings;
 use BackedEnum;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
@@ -95,16 +94,16 @@ class ManageConsentText extends Page
         abort_unless(static::canAccess(), 403);
 
         $state = $this->form->getState();  // validates (all four texts + version required)
-        $before = $this->currentValues();
 
-        $textsChanged = $state['privacy_es'] !== $before['privacy_es']
-            || $state['privacy_en'] !== $before['privacy_en']
-            || $state['statutes_es'] !== $before['statutes_es']
-            || $state['statutes_en'] !== $before['statutes_en'];
-
-        // A text change under the SAME version is refused: it would silently rewrite what already-consented
-        // members are recorded as having read. Bumping the version is the whole point of consent_text_version.
-        if ($textsChanged && (string) $state['consent_text_version'] === (string) $before['consent_text_version']) {
+        // The version-bump rule AND the version archiving (so an already-consented member's record still
+        // resolves to the exact text they read) both live in the Action — the page only surfaces the refusal.
+        try {
+            app(UpdateConsentText::class)->handle(
+                ['es' => $state['privacy_es'], 'en' => $state['privacy_en']],
+                ['es' => $state['statutes_es'], 'en' => $state['statutes_en']],
+                (string) $state['consent_text_version'],
+            );
+        } catch (ConsentVersionRequiredException) {
             Notification::make()
                 ->title(__('Sube la versión'))
                 ->body(__('Has cambiado un texto de consentimiento sin cambiar la versión. Sube el número de versión: los socios ya registrados quedaron vinculados a la versión anterior, y reutilizarla borraría lo que realmente aceptaron.'))
@@ -115,11 +114,7 @@ class ManageConsentText extends Page
             return;
         }
 
-        Settings::set('consent_privacy_text', ['es' => $state['privacy_es'], 'en' => $state['privacy_en']], SettingType::JSON);
-        Settings::set('consent_statutes_text', ['es' => $state['statutes_es'], 'en' => $state['statutes_en']], SettingType::JSON);
-        Settings::set('consent_text_version', (string) $state['consent_text_version'], SettingType::STRING);
-
-        (new RecordAuditLog)->handle('consent_text.updated', null, $before, $this->currentValues());
+        $this->form->fill($this->currentValues());
 
         Notification::make()->title(__('Textos de consentimiento guardados'))->success()->send();
     }

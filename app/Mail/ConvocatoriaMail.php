@@ -3,6 +3,7 @@
 namespace App\Mail;
 
 use App\Models\Convocatoria;
+use App\Support\OrganisationIdentity;
 use Illuminate\Bus\Queueable;
 use Illuminate\Mail\Mailable;
 use Illuminate\Mail\Mailables\Content;
@@ -62,6 +63,7 @@ class ConvocatoriaMail extends Mailable
     public function envelope(): Envelope
     {
         return new Envelope(
+            replyTo: OrganisationIdentity::replyTo(),
             subject: __('Convocatoria de asamblea :type — :title', ['type' => $this->typeLabel, 'title' => $this->title]),
         );
     }
