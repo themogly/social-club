@@ -42,6 +42,25 @@ class Member extends Model implements Authenticatable, HasLocalePreference
     /** The push channels a member can independently opt out of (prompt 15). */
     public const PUSH_CHANNELS = ['low_balance', 'membership_expiring', 'new_announcement', 'event_reminder', 'temporary_ending', 'new_message'];
 
+    /**
+     * The member-facing label for a push channel (prompt 156). EVERY entry in PUSH_CHANNELS MUST have an arm
+     * here, or the preferences screen shows the channel as its raw key — which is exactly how `new_message`
+     * (added with 136) shipped as a row labelled "new_message". The default returns the key so the guard test
+     * fails the build for any channel added without copy; prompt 19's parity test then covers the two languages.
+     */
+    public static function pushChannelLabel(string $channel): string
+    {
+        return match ($channel) {
+            'low_balance' => __('Saldo bajo en el monedero'),
+            'membership_expiring' => __('Vencimiento de la membresía'),
+            'new_announcement' => __('Nuevos avisos del club'),
+            'event_reminder' => __('Recordatorios de eventos'),
+            'temporary_ending' => __('Fin del acceso temporal'),
+            'new_message' => __('Respuestas del club a tus mensajes'),
+            default => $channel,
+        };
+    }
+
     protected $fillable = [
         'organisation_id', 'member_no', 'first_name', 'last_name', 'email', 'phone', 'locale',
         'date_of_birth', 'address', 'photo_path', 'document_type', 'document_number', 'document_hash',

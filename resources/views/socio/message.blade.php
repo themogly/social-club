@@ -25,8 +25,7 @@
     <form method="POST" action="{{ route('socio.messages.reply', ['thread' => $thread->id]) }}"
           class="sticky bottom-24 mt-6 rounded-2xl border border-line bg-surface p-3 shadow-sm dark:border-slate-800 dark:bg-slate-900">
         @csrf
-        <textarea name="body" rows="2" maxlength="4000" required placeholder="{{ __('Escribe tu respuesta…') }}"
-                  class="block w-full rounded-lg border-line bg-surface text-sm shadow-sm focus:border-brand focus:ring-brand dark:border-slate-700 dark:bg-slate-950">{{ old('body') }}</textarea>
+        <x-socio.textarea name="body" rows="2" maxlength="4000" required placeholder="{{ __('Escribe tu respuesta…') }}">{{ old('body') }}</x-socio.textarea>
         @error('body')<p class="mt-1 text-xs text-error">{{ $message }}</p>@enderror
         <button type="submit" class="mt-2 w-full rounded-lg bg-brand px-4 py-2.5 text-sm font-semibold text-white hover:bg-brand-dark">
             {{ __('Responder') }}
