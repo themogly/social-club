@@ -7421,3 +7421,69 @@ sized around the model rather than the UI.
 
 **MySQL was left to CI**, per the running order: `composer check` green on SQLite. No migration and no
 column — the setting is a row in the existing settings table.
+
+## Prompt 177 — look a member up and see who they are, not just what they owe
+
+**Prompt 127's boundary was kept, and only reading was added.** `MembershipCounter`'s own docblock is
+explicit that it was deliberately small — *"collect a fee and see what's owed. Renewals, tier changes,
+suspensions and limits stay in the admin panel where they carry real authorisation weight."* That is still
+true after this branch. Telling a socio when their membership expires or what they collected last week is
+not an authorisation-weighted act; it is the most ordinary question asked at a counter, and answering it
+used to mean leaving the counter for the admin panel — which is exactly what the counter-first design
+exists to stop.
+
+**A test asserts the boundary rather than trusting the description.** It reflects over the component's
+public methods and fails if `renew`, `suspend`, `setTier`, `changeTier`, `expel`, `setLimit`,
+`overrideLimit`, `updateMember` or `saveMember` ever appears. The one write is still `collectFee`, still
+the shared `CollectsMembershipFees` → `RecordFeePayment` path the till uses, and a fee taken here still
+produces the same record — asserted against the real table, in cents.
+
+**Every figure has one source, and the tests compare against the source rather than a literal.** The
+allowance comes from `ResolveMemberLimits`, the blockers from `ResolveMemberEligibility` (rendered through
+the same `VerdictRemedy::describe()` the dispensary and the door use), the wallet from `Wallet::balance`,
+the owed figure from the existing `owedCents()`. The limit assertions call the resolver and look for its
+output in the HTML, so if this screen ever computed its own figure the test fails. **If a number here ever
+disagrees with the dispensary, this screen is wrong and the resolver is right** — that is the rule, and it is
+now enforced rather than stated.
+
+**Consumption history: closed by default, capped at five, bound to its socio.** This was the decision the
+prompt asked for. What a named person collected is Article 9 data on a tablet in a room with the next socio
+standing behind them, so:
+
+- the **summary** (remaining today, month against limit) is on screen by default — it answers the usual
+  question and identifies nothing on its own;
+- the **itemised list** takes one deliberate tap, shows the last **five** COMPLETED dispensations (a counter
+  answers a question, it is not an export; voided rows are excluded because a voided dispensation did not
+  happen);
+- it **closes itself when the socio changes**. Implemented by binding the disclosure to the id it was opened
+  for (`historyIsForCurrentMember()`), NOT by a reset in `selectFeeMember`: three code paths assign
+  `$feeMemberId`, and `updatedFeeMemberId()` would not fire at all because Livewire's update hooks are for
+  client-side model updates while `selectFeeMember()` assigns in PHP. Binding to an id cannot be got wrong by
+  a future caller. The idle lock (prompt 120) covers the abandoned tablet; this covers the queue.
+
+**Documents stay unreachable, and the denial test includes the OWNER.** No DNI, no scan path, no medical
+certificate is rendered in any state, for any role — asserted directly by searching the output for the
+document number, `member-id-scans`, `document_scan` and `medical_cert`, in all three states, with the owner
+included deliberately: permission is not the question, a public-facing screen is. The photo (prompt 157) is
+already at the counter and stays, served through the authorised, access-logged endpoint via `VaultUrl::photo`
+— never a raw path.
+
+**The three empty states are designed, not blank.** A socio with no membership says *"Sin membresía activa en
+esta sede"* and still shows the record; a lapsed one renders the same way; one who has collected nothing says
+so rather than showing an empty list. Screenshotted in all three states at both orientations and both themes.
+
+**The layout language is 176's, reused not reinvented.** The allowance block is the same gauge, wording and
+`data-member-allowance` hook as the POS cart, so an operator who has learned one screen has learned this one.
+
+**Is the lookup reusable by Recepción and the dispensary? Yes, and it should be — but not in this branch.**
+The search here is already the shared `CollectsMembershipFees::feeSearchResults()`, which is the same
+by-name/member_no query the dispensary POS uses, so the *query* is one implementation today. What is not
+shared is the rendered control: the dispensary has `partials/member-identify.blade.php` (extracted by prompt
+175), Recepción has its own, and this screen has a third. Extracting one `x-counter.member-lookup` is a real
+simplification and would pay for itself in prompt 174, which needs the same lookup again. Recording it as
+worth its own small branch rather than smuggling a fourth caller's refactor into this one. The stronger
+version the prompt sketches — landing the register on a queue of people, as both cannabis systems do — is a
+bigger change than a component extraction and Recepción is already that queue; it deserves its own prompt.
+
+**MySQL was left to CI**, per the running order: `composer check` green on SQLite (1340 tests). No migration,
+no column — this branch reads through existing resolvers and adds one Livewire property.

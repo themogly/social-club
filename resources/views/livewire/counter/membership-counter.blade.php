@@ -48,12 +48,28 @@
 
                 @if ($feeMember)
                     <div class="mt-3 flex items-start justify-between gap-3 rounded-xl bg-surface-alt p-3 dark:bg-slate-800">
-                        <div class="min-w-0">
+                        {{-- The photo is already at the counter (prompt 157) and stays. Served through the
+                             authorised, access-logged endpoint — never a raw path. --}}
+                        @if ($photoUrl)
+                            <img src="{{ $photoUrl }}" alt="" class="h-14 w-14 shrink-0 rounded-xl object-cover">
+                        @else
+                            <div class="flex h-14 w-14 shrink-0 items-center justify-center rounded-xl bg-brand-tint text-base font-bold text-brand dark:bg-slate-700 dark:text-slate-200">
+                                {{ mb_strtoupper(mb_substr($feeMember->first_name, 0, 1).mb_substr($feeMember->last_name, 0, 1)) }}
+                            </div>
+                        @endif
+
+                        <div class="min-w-0 flex-1">
                             <p class="truncate font-semibold">{{ $feeMember->fullName() }}</p>
-                            <p class="text-sm text-ink-muted dark:text-slate-400">{{ $feeMember->member_no }}</p>
+                            <p class="text-sm text-ink-muted dark:text-slate-400">
+                                {{ $feeMember->member_no }}
+                                <span class="rounded-full border px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide">{{ $feeMember->status->label() }}</span>
+                            </p>
                             @if ($membership)
                                 <p class="mt-1 text-sm">
-                                    {{ __('Cuota') }}: <span class="font-medium">{{ $this->money($membership->fee_cents->cents) }}</span>
+                                    {{-- Prompt 177: the TIER is named, not just its price — "what tier am I on"
+                                         is one of the questions this screen exists to answer. --}}
+                                    {{ __('Cuota') }}: <span class="font-medium">{{ $membership->tier?->name ?? '—' }}</span>
+                                    · <span class="font-medium">{{ $this->money($membership->fee_cents->cents) }}</span>
                                     @if ($membership->expires_at)
                                         · {{ __('Vence') }} {{ $membership->expires_at->format('d/m/Y') }}
                                     @endif
@@ -67,6 +83,115 @@
                             @endif
                         </div>
                         <button type="button" wire:click="clearFeeMember" class="flex h-11 shrink-0 items-center rounded-lg px-3 text-sm text-ink-muted transition hover:bg-black/5 dark:text-slate-400 dark:hover:bg-white/5">{{ __('Cambiar') }}</button>
+                    </div>
+
+                    {{-- ============ Prompt 177 — the member RECORD. Reading only. ============
+
+                         Prompt 127 kept this screen deliberately small (collect a fee, see what is owed) and
+                         that boundary stands: renewals, tier changes, suspensions and limits remain in the
+                         admin panel where they carry real authorisation weight. What is added here is
+                         READING. Telling a socio when their membership expires or what they collected last
+                         week is the most ordinary question asked at a counter, and answering it should not
+                         require leaving the counter — which is the whole point of the counter-first design.
+
+                         Every figure below comes from the resolver that already owns it
+                         (ResolveMemberLimits, ResolveMemberEligibility, Wallet). If one ever disagrees with
+                         the dispensary, this screen is wrong and the resolver is right. --}}
+                    <div data-member-record class="mt-3 space-y-3">
+                        {{-- What they may still have — the same figures the POS puts on its cart. --}}
+                        @if ($limits)
+                            @php
+                                $pct = $limits->monthlyPercent();
+                                $gaugeBar = match ($limits->gaugeState()) { 'alert' => 'bg-error', 'warning' => 'bg-warning', default => 'bg-success' };
+                                $gaugeText = match ($limits->gaugeState()) { 'alert' => 'text-error', 'warning' => 'text-warning', default => 'text-success' };
+                            @endphp
+                            <div data-member-allowance class="rounded-xl border border-line p-3 dark:border-slate-700">
+                                <div class="flex items-baseline justify-between gap-2">
+                                    <span class="text-xs font-medium text-ink-muted dark:text-slate-400">{{ __('Restante hoy') }}</span>
+                                    <span class="text-base font-bold {{ $gaugeText }}">{{ $this->grams($limits->dailyRemainingCg()) }}</span>
+                                </div>
+                                <div class="mt-1.5 h-2 w-full overflow-hidden rounded-full bg-slate-200 dark:bg-slate-700">
+                                    <div class="h-full rounded-full {{ $gaugeBar }}" style="width: {{ min($pct, 100) }}%"></div>
+                                </div>
+                                <p class="mt-1 text-[11px] text-ink-muted dark:text-slate-400">
+                                    {{ __('Mes') }}: {{ $this->grams($limits->monthlyUsedCg) }} / {{ $this->grams($limits->monthlyLimitCg) }} · {{ $pct }}%
+                                </p>
+                            </div>
+                        @endif
+
+                        <dl class="grid grid-cols-2 gap-x-4 gap-y-1.5 text-sm">
+                            <div>
+                                <dt class="text-ink-muted dark:text-slate-400">{{ __('Monedero') }}</dt>
+                                <dd class="font-semibold {{ $walletCents < 0 ? 'text-error' : '' }}">{{ $this->money($walletCents) }}</dd>
+                            </div>
+                            <div>
+                                <dt class="text-ink-muted dark:text-slate-400">{{ __('Carencia') }}</dt>
+                                <dd class="font-medium">
+                                    @if ($feeMember->carencia_ends_at !== null && $feeMember->carencia_ends_at->isFuture())
+                                        <span class="text-warning">{{ __('Hasta') }} {{ $feeMember->carencia_ends_at->format('d/m/Y') }}</span>
+                                    @else
+                                        {{ __('Cumplida') }}
+                                    @endif
+                                </dd>
+                            </div>
+                        </dl>
+
+                        {{-- Why they might be blocked — asked BEFORE being refused, which is the point. Same
+                             shared resolver the door and the dispensary use, so the three tell one story. --}}
+                        @if ($verdict)
+                            <div data-member-verdict class="rounded-xl border p-3 text-sm {{ $verdict->isClear() ? 'border-success/30 bg-success/10' : 'border-warning/30 bg-warning/5' }}">
+                                @if ($verdict->isClear())
+                                    <p class="font-semibold text-success">✓ {{ __('Apto para dispensar.') }}</p>
+                                @else
+                                    <p class="font-semibold text-warning">{{ __('Motivos que pueden impedir dispensar') }}</p>
+                                    <ul class="mt-1 space-y-1">
+                                        @foreach ($verdict->rules as $rule)
+                                            @continue($rule['satisfied'])
+                                            @php $remedy = \App\Support\VerdictRemedy::describe($rule, $feeMember, $location); @endphp
+                                            <li>
+                                                <span class="{{ in_array($rule['mode'], ['BLOCK', 'OVERRIDE'], true) ? 'text-error' : 'text-warning' }}">·</span>
+                                                <span class="text-ink dark:text-slate-200">{{ $remedy['detail'] ?? $rule['message'] }}</span>
+                                                @if (! empty($remedy['remedy']))
+                                                    <span class="block pl-3 text-xs text-ink-muted dark:text-slate-400">{{ $remedy['remedy'] }}</span>
+                                                @endif
+                                            </li>
+                                        @endforeach
+                                    </ul>
+                                @endif
+                            </div>
+                        @endif
+
+                        {{-- Collections. CLOSED by default: what a named person collected is Article 9 data on
+                             a screen in a room with the next socio behind them, and the summary above already
+                             answers the usual question. One deliberate tap, bound to this socio — change
+                             socio and it closes itself. --}}
+                        <div>
+                            <button
+                                type="button"
+                                wire:click="toggleHistory"
+                                data-history-toggle
+                                aria-expanded="{{ $this->historyIsForCurrentMember() ? 'true' : 'false' }}"
+                                class="inline-flex h-11 items-center gap-2 rounded-xl border border-line px-4 text-sm font-medium text-ink-muted transition hover:bg-surface-alt dark:border-slate-700 dark:text-slate-400 dark:hover:bg-slate-800"
+                            >
+                                {{ $this->historyIsForCurrentMember() ? __('Ocultar dispensaciones') : __('Ver últimas dispensaciones') }}
+                            </button>
+
+                            @if ($recent !== null)
+                                <ul data-member-history class="mt-2 divide-y divide-line overflow-hidden rounded-xl border border-line text-sm dark:divide-slate-800 dark:border-slate-800">
+                                    @forelse ($recent as $dispensation)
+                                        <li class="flex items-center justify-between gap-3 px-3 py-2">
+                                            <span class="min-w-0">
+                                                <span class="block truncate">{{ $dispensation->lines->pluck('genetic_name_snapshot')->filter()->implode(', ') ?: __('Dispensación') }}</span>
+                                                <span class="block text-xs text-ink-muted dark:text-slate-400">{{ $dispensation->created_at->format('d/m/Y H:i') }}</span>
+                                            </span>
+                                            <span class="shrink-0 font-medium tabular-nums">{{ $this->grams((int) $dispensation->lines->sum(fn ($line) => (int) $line->getRawOriginal('grams_cg'))) }}</span>
+                                        </li>
+                                    @empty
+                                        <li class="px-3 py-3 text-ink-muted dark:text-slate-400">{{ __('Todavía no ha recogido nada en esta sede.') }}</li>
+                                    @endforelse
+                                </ul>
+                            @endif
+                        </div>
                     </div>
 
                     @if (($owedCents ?? 0) > 0)
