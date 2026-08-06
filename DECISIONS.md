@@ -7233,3 +7233,66 @@ harnesses' own assertions that were dark.
 **MySQL was left to CI**, per the running order: `composer check` green on SQLite. This branch adds no
 migration and no column — `members.document_scan_path` has existed since the initial member tables — so there
 is no driver-difference surface a local MySQL run would find that CI will not.
+
+## Prompt 179 — MRZ prefill: NOT BUILT, and the blocking dependency the owner has to decide
+
+**Stopped at a clean point, with nothing half-built.** The branch `feat/mrz-prefill` carries this entry and
+no code. The reason is a premise failure, found by reading the files the prompt names before building —
+which is the standard the running order sets.
+
+**The prompt assumes an OCR path that does not exist.** It says "Reuse `MrzParser` and `id:mrz-read-rate`.
+They exist and 128 built them carefully." Both do exist, and neither can prefill a form:
+
+- **`MrzParser` does not read images.** Its own docblock: *"NO cloud, NO OCR here — it takes already-OCR'd"*
+  text. `parse()` takes a string of MRZ lines. It is a pure, offline, check-digit-validating parser and it is
+  excellent at that, but it is the second half of the job.
+- **The first half exists only inside a CLI command.** `MeasureMrzReadRate` shells out to a locally-installed
+  `tesseract` binary (`Process::run(['tesseract', …])`) and **refuses to run when it is absent**. It is a
+  measurement harness, not a service; nothing in `app/` can turn an uploaded photo into MRZ text.
+- **`MrzParser` is referenced by exactly one non-test caller** — that command. Verified by grep, not assumed.
+
+**And `tesseract` is not a dependency of this project.** Not in `composer.json`, not in `package.json`, not in
+`SETUP.md`, not in the CI workflow. It is not installed on this machine either. Prompt 128 recorded the same
+fact as one of its three findings: *"No local OCR. `tesseract` is not installed and there is no MRZ/OCR
+package; the harness needs one."* That has not changed.
+
+**So the feature cannot fire, and building it anyway would be the defect CLAUDE.md names as most-repeated
+here.** Without OCR the read rate is not low, it is **zero**: every upload would take the "unreadable — fill
+the form as you do today" path, forever. The confirmation mechanism, the unconfirmed-field gate and the
+correction metric are all buildable and testable in isolation — but shipping them would mean a complete,
+tested, permissioned feature that **nothing can reach**, which is exactly the trap
+`UnreachableCodeGuardTest` exists to catch and which CLAUDE.md calls "the single most-repeated defect here".
+A green suite would certify a feature no applicant could ever trigger.
+
+**What 179 gets right, and should keep.** Its answer to 128's gate is sound and should not be lost: making
+the prefill *provisional and confirmed* removes the assumption that a prefilled value is trusted, which is
+what made the read rate load-bearing — and measuring correction rate from real use is a better instrument
+than a corpus nobody can lawfully assemble. None of that is in question. The dependency is.
+
+**The decision the owner has to make — and why it is not mine to take.** Prefill needs OCR on the server,
+running over Article 9 material. That is:
+
+1. **An infrastructure dependency** — a system binary (`tesseract` + language data) installed on the
+   production host, in the deploy image, and in CI, or the feature silently does nothing in production while
+   passing every test locally.
+2. **A DPIA-relevant processing decision** — where the image is decoded, by what, and with what retention of
+   intermediate text. Prompt 128 treated the OCR choice at exactly this level, refusing a cloud API because
+   it *"would add a processor, an international transfer and a RAT entry for the most sensitive data the club
+   holds — not a decision to make to save a fortnight."* Adding a local binary is the better answer, but it is
+   the same class of decision and it belongs to the controller.
+3. **Slow, and on the request path** — tesseract on a phone photo is seconds, not milliseconds, so the flow
+   also needs deciding: a separate "read my document" step before submit, or a queued read the applicant
+   waits for. That shapes the UI 179 specifies and cannot be picked without (1).
+
+**Recommendation, for the morning.** Install `tesseract` (plus `spa`/`eng` traineddata) on the host, in CI
+and in the deploy image, and say so in `SETUP.md`; then 179 is a normal build and I would do it as: extract
+the OCR shell-out from `MeasureMrzReadRate` into one `App\Actions\Mrz\ReadMrzFromImage` action that both the
+command and the form call (one implementation, per the prompt's own rule), returning null when the binary is
+missing so a failed read stays an ordinary outcome; add the "read my document" step to the application form;
+mark every parsed field unconfirmed and gate submission on confirmation **server-side**; never overwrite a
+typed value; and record correction counts per field with no document content.
+
+**What was NOT done, explicitly:** no parser change, no second parser, no form change, no cloud OCR, and no
+`composer require` of an OCR package on my own initiative. Prompt 178's upload (the compliance artefact) is
+merged and stands on its own — which is exactly why 155 and 178 insisted the two ship separately: the
+compliance half did not have to wait for the convenience half, and it has not.
