@@ -191,4 +191,55 @@ class Genetic extends Model
     {
         return $remainingCg <= $this->lowStockThresholdCg($locationId);
     }
+
+    /** The member-facing availability states (prompt 185). A STATE, never a quantity. */
+    public const AVAILABLE = 'available';
+
+    public const LOW = 'low';
+
+    public const UNAVAILABLE = 'unavailable';
+
+    /**
+     * On-hand gram-equivalent at a location, across OPEN, in-date batches.
+     *
+     * Expired batches are excluded because `SelectBatch` refuses them — counting them would let the menu
+     * tell a member something is available that the counter would then refuse, which is the exact failure
+     * this is meant to prevent. A UNIT genetic reports units × grams-per-unit so one figure serves both
+     * kinds, matching the rule `isLowStockAt()` already documents.
+     */
+    public function onHandCgAt(string $locationId): int
+    {
+        $batches = $this->batches()->withoutGlobalScopes()
+            ->where('location_id', $locationId)
+            ->where('status', BatchStatus::OPEN->value)
+            ->where(fn (Builder $q) => $q->whereNull('expires_on')->orWhereDate('expires_on', '>=', now()->toDateString()))
+            ->get(['remaining_cg', 'remaining_units']);
+
+        if ($this->isUnitType()) {
+            $units = (int) $batches->sum(fn ($b): int => (int) $b->getRawOriginal('remaining_units'));
+
+            return $units * (int) $this->grams_per_unit_cg;
+        }
+
+        return (int) $batches->sum(fn ($b): int => (int) $b->getRawOriginal('remaining_cg'));
+    }
+
+    /**
+     * What a MEMBER is told about this genetic at their sede: available, low, or unavailable (prompt 185).
+     *
+     * A state, never a number. Publishing a gram count of cannabis held at a named address is not something
+     * a Spanish asociación should put on the open internet, and a precise figure invites a race to the
+     * counter. The `low` band reuses the threshold that already exists (`lowStockThresholdCg`, per-sede
+     * falling back to the org setting) rather than introducing a second one.
+     */
+    public function availabilityAt(string $locationId): string
+    {
+        $onHand = $this->onHandCgAt($locationId);
+
+        if ($onHand <= 0) {
+            return self::UNAVAILABLE;
+        }
+
+        return $this->isLowStockAt($onHand, $locationId) ? self::LOW : self::AVAILABLE;
+    }
 }

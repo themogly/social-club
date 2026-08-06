@@ -7487,3 +7487,53 @@ bigger change than a component extraction and Recepción is already that queue; 
 
 **MySQL was left to CI**, per the running order: `composer check` green on SQLite (1340 tests). No migration,
 no column — this branch reads through existing resolvers and adds one Livewire property.
+
+## Prompt 185 — the member menu showed a price for something that might not be there
+
+**Three states, not two: available / quedan pocas / sin existencias.** *Available* and *unavailable* is the
+honest minimum, but the middle band is the one that changes a member's behaviour — it is the difference
+between "come today" and "come this week" — and the threshold it needs **already exists** and was already
+resolved per sede. Adding a state cost nothing; adding a second threshold would have.
+
+**Quantities are deliberately not published — anywhere.** Not in the text, not in an attribute, not in a
+payload. The controller never passes a figure to the view at all, so none can leak by accident. Two reasons,
+and the first is the serious one: a gram count of cannabis held at a named address is not a document a
+Spanish asociación wants on the open internet, whatever the login in front of it (NOTES §A). The second is
+operational — a precise figure invites a race to the counter. A test asserts against the **raw response
+body** for the stored figure in every form it could appear (`47350`, `473.5`, `473,5`, `remaining_cg`,
+`remaining_units`, `onHand`, `stock`), because asserting on rendered text would miss exactly the leak that
+matters.
+
+**Scoping: the menu was already per sede, and this was checked rather than assumed.** `PwaController::menu`
+filters through `Genetic::sellableAt($location->id)` for the member's own sede. `availabilityAt()` takes the
+same location id, so a genetic in stock at Sede Norte and empty at Sede Centro reads as unavailable to
+someone walking into Centro — asserted with one genetic priced at two sedes.
+
+**An unavailable genetic stays on the menu.** Disappearing teaches a member nothing: someone who has been
+asking for a strain every week sees only its absence, which reads as the club having stopped carrying it.
+Saying *"Sin existencias"* answers the question and is what a future "tell me when it's back" would hang off.
+`sellableAt()` already filtered on price rather than stock, so nothing had to change for this — the state
+does the work.
+
+**Expired batches do not count as available**, which is a correction the prompt did not ask for but the
+honest answer requires. `SelectBatch` refuses expired batches at the counter, so counting them here would let
+the menu promise something the counter would then refuse — the exact failure this branch exists to prevent.
+
+**Reuse, not reimplementation.** `Genetic::onHandCgAt()` and `Genetic::availabilityAt()` sit on the model
+beside the existing `lowStockThresholdCg()` and `isLowStockAt()`, and the per-sede-then-org fallback is
+untouched. A UNIT genetic reports units × grams-per-unit so one figure serves both kinds, matching the rule
+`isLowStockAt()` already documented. Nothing touching stock, the ledger, `RecordStockMovement` or
+`StockCeiling` was changed: this reads a figure that already exists and renders a word.
+
+**One naming note for the record:** the prompt refers to `Genetic::lowStockThreshold()`; the method is
+`lowStockThresholdCg(?string $locationId)`. Same method, and it is the one reused.
+
+**A test-fixture trap worth recording, because it would have made these tests lie.** `GeneticPriceFactory`
+seeds `low_stock_threshold_cg` with a **random** value between 1000 and 10000cg. Any availability assertion
+built on the plain factory therefore depends on a dice roll — a genetic with 6000cg would read as `low` or
+`available` depending on the run. The tests pin it to `null` explicitly, which is also the case that
+matters, since null is what makes the org default apply. This is the same class of hazard as the seeder
+drift CLAUDE.md records: a fixture that does not say what it means produces a green test that proves nothing.
+
+**MySQL was left to CI**, per the running order: `composer check` green on SQLite (1350 tests). No migration,
+no column, no query change — two model methods and a chip.

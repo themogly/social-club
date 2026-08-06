@@ -93,6 +93,11 @@ class PwaController extends Controller
                 ->map(fn (Genetic $g): array => [
                     'genetic' => $g,
                     'price' => $resolver->forGenetic($g, $location, $member),
+                    // Prompt 185 — a STATE, never a quantity. Resolved per SEDE (the member's own), because a
+                    // genetic in stock at Sede Norte and empty at Sede Centro must not read as available to
+                    // someone walking into Centro. No gram figure is passed to the view at all, so none can
+                    // leak into the markup, an attribute or a payload.
+                    'availability' => $g->availabilityAt($location->id),
                 ]);
         }
 
