@@ -6739,3 +6739,58 @@ rail widths are Filament panel settings, not reimplemented in CSS. `theme.css`'s
 **Honest limit:** the layout numbers above are measured in a real browser because this repo has **no Dusk
 harness**; the PHP suite pins the structural guarantees that would silently revert them — the panel
 setting, the grouping, the pinned column, the 44px floor and the access check.
+
+## Prompt 172 — the counter was four sidebar links; it is one application
+
+**The finding, confirmed in the code.** `AdminPanelProvider` registered **four** `NavigationItem`s pointing
+into the counter, one in each of four different navigation groups — *Acceso / Check-in* under Socios, *TPV
+dispensario* under Dispensario, *TPV barra* under Barra y tienda, *Terminal de caja* under Caja. The
+counter is one application with **five** permission-gated destinations and its own tab strip. The fifth,
+Socios (`counter.members`), had never had a sidebar link at all: four of five is not a policy, it is drift.
+
+**One link, in Resumen.** It is no longer a member of any operational group, because it is not one
+operational thing — it is a front door, and once inside, the counter's own strip is the navigation. Sorted
+first, so it reads as the way out of the back office rather than as another admin screen.
+
+### The rule the prompt forbade duplicating lived in the file the prompt forbade touching
+
+Two instructions pulled against each other: *"the tab strip already computes exactly that set; do not write
+a second copy of the rule"*, and *"do not touch the counter's own tab strip"*. The screen list — five
+routes with their gates, including `bar_enabled` on Barra — was declared inline inside
+`top-bar.blade.php`.
+
+**Extracted to `App\Support\CounterScreens`, consumed by both.** I read "do not touch the tab strip" as
+protecting its **behaviour** — its five destinations, their gates and the portrait-tablet layout that
+prompts 116, 130 and 132 produced — not its literal bytes; none of those changed, and tests assert the
+destinations and each gate are identical. The no-second-copy rule is the stronger constraint, and this
+codebase has direct evidence of what ignoring it costs: prompt 173 is about to delete a **second PIN pad**
+that already exists, because `operator-strip` and `lock-overlay` each grew their own. A duplicated
+permission map would have been the same mistake with worse consequences — the copy that drifts would be the
+one deciding what a user is shown they may do.
+
+### The landing screen, and the trap in it
+
+**Recepción, because that is where a shift starts** — but resolved **per user**, which is the one real trap
+here. A user with `till.open` and not `checkin.manage` previously had a direct link to the till and nothing
+else; giving them one link to Recepción would 403 them on arrival, turning a tidy link into a broken one.
+`CounterScreens::landingRouteFor()` returns Recepción when they can be there and otherwise the first
+counter screen they may open — so that operator lands on Caja. Asserted directly, including that the route
+they are given actually returns 200. No new screen and no new route: the alternative, giving the counter a
+front door of its own, would have been a sixth destination to build and gate for a problem that resolves in
+four lines.
+
+**The link renders only when the user can reach at least one counter screen**, and not at all when they can
+reach none — the same rule, from the same list, so it cannot drift from what the strip shows.
+
+**Nothing left behind.** Removing four items could have left a navigation group whose only member was one
+of them; a test walks every declared group against every visible item, resource and page and fails if one
+would render empty. None does — each of Socios, Dispensario, Barra y tienda and Caja still holds its own
+resources.
+
+**Untouched:** no route, permission or screen changed; the counter's own Panel link in its overflow menu
+stays exactly as it is (the owner confirmed staff keep a way back to a member's full record); the tab
+strip's five destinations and gates are unchanged. No new copy was needed — *Mostrador* already existed in
+both locales.
+
+This is **step 1 of the counter-first design** (`DESIGN-counter-first.md`): staff live in the counter and
+treat the panel as back office. Steps 2 and 3 are the lock surface (173) and the Alta wizard (174).

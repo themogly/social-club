@@ -7,6 +7,7 @@ use App\Filament\Pages\Auth\RequestPasswordReset;
 use App\Http\Middleware\SetLocale;
 use App\Livewire\LocaleSwitcher;
 use App\Livewire\LocationSwitcher;
+use App\Support\CounterScreens;
 use App\Support\InitialsAvatarProvider;
 use Filament\Auth\MultiFactor\App\AppAuthentication;
 use Filament\Http\Middleware\Authenticate;
@@ -130,34 +131,28 @@ class AdminPanelProvider extends PanelProvider
                 NavigationGroup::make(fn (): string => __('Comunicaciones')),
                 NavigationGroup::make(fn (): string => __('Sistema')),
             ])
-            // The counter apps run OUTSIDE the panel (tablet-first full-page Livewire),
-            // but each is a REAL, permission-gated route — so it earns a sidebar link into
-            // its operational group. Nothing here points at a route that does not exist.
+            // ONE link into the counter (prompt 172). There were FOUR, scattered across four different
+            // navigation groups — Acceso/Check-in under Socios, TPV dispensario under Dispensario, TPV
+            // barra under Barra y tienda, Terminal de caja under Caja — which presented one application
+            // as four tools reached from four places, and put the counter's navigation in two places that
+            // had to agree. The fifth destination, Socios (counter.members), never had a link at all:
+            // four of five is not a policy, it is drift.
+            //
+            // The counter is one application with its own permission-filtered tab strip. Once inside, that
+            // strip is the navigation. So this is a front door, not a member of any operational group —
+            // it sits in Resumen, which is where "where do I go" belongs.
+            //
+            // Gate and destination both come from App\Support\CounterScreens, the same list the tab strip
+            // reads: the link renders when the user can reach AT LEAST ONE counter screen, and lands on
+            // Recepción when they can be there or on the first screen they are allowed to open otherwise.
+            // A user with till.open and not checkin.manage therefore lands on Caja, not on a 403.
             ->navigationItems([
-                NavigationItem::make(fn (): string => __('Acceso / Check-in'))
-                    ->url(fn (): string => route('counter.checkin'))
-                    ->icon(Heroicon::OutlinedClipboardDocumentList)
-                    ->group(fn (): string => __('Socios'))
-                    ->sort(40)
-                    ->visible(fn (): bool => Auth::user()?->can('checkin.manage') ?? false),
-                NavigationItem::make(fn (): string => __('TPV dispensario'))
-                    ->url(fn (): string => route('counter.pos'))
-                    ->icon(Heroicon::OutlinedShoppingCart)
-                    ->group(fn (): string => __('Dispensario'))
+                NavigationItem::make(fn (): string => __('Mostrador'))
+                    ->url(fn (): string => route(CounterScreens::landingRouteFor(Auth::user()) ?? 'counter.checkin'))
+                    ->icon(Heroicon::OutlinedComputerDesktop)
+                    ->group(fn (): string => __('Resumen'))
                     ->sort(1)
-                    ->visible(fn (): bool => Auth::user()?->can('pos.use') ?? false),
-                NavigationItem::make(fn (): string => __('TPV barra'))
-                    ->url(fn (): string => route('counter.bar'))
-                    ->icon(Heroicon::OutlinedShoppingBag)
-                    ->group(fn (): string => __('Barra y tienda'))
-                    ->sort(1)
-                    ->visible(fn (): bool => Auth::user()?->can('pos.bar') ?? false),
-                NavigationItem::make(fn (): string => __('Terminal de caja'))
-                    ->url(fn (): string => route('counter.till'))
-                    ->icon(Heroicon::OutlinedCalculator)
-                    ->group(fn (): string => __('Caja'))
-                    ->sort(1)
-                    ->visible(fn (): bool => (Auth::user()?->can('till.open') ?? false) || (Auth::user()?->can('till.close') ?? false)),
+                    ->visible(fn (): bool => CounterScreens::reachableByAny(Auth::user())),
             ])
             ->discoverResources(in: app_path('Filament/Resources'), for: 'App\Filament\Resources')
             // App\Filament\Pages\Dashboard (our custom home) is discovered here and mounted
