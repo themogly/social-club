@@ -6331,3 +6331,52 @@ documented scope — they are not Article 9). Both are pre-existing and outside 
 resource schemas AND statically scans `app/` for any `FileUpload` chain targeting that disk, so one added
 later on a Filament Page or inside an action form — where the schema walk cannot reach — fails the suite
 unless it declares both the limit and the helper text.
+
+## Prompt 165 — a member's temporary status could be set at creation and never changed
+
+**Half of this already existed, and the prompt's framing was out of date on that half.** `MemberResource`
+already exposed `convertTemporaryAction` (temporary → standard, clearing the expiry) and
+`extendTemporaryAction`, both routed through `ManageTemporaryMember` and both audited — so "a temporary
+member who joins properly" did NOT require a second member record, and the duplicate-member concern was
+already answered. Saying so rather than rebuilding it: the branch is smaller than the prompt assumed.
+
+**What genuinely had no path at all was the other direction** — a standard member made temporary. That is
+what a flag set in error at the counter needs (there was no undo), and what a member asking to be treated
+as a short-stay visitor needs. `ManageTemporaryMember::convertToTemporary()` is the new half, on the same
+Action as its opposite; no second writer.
+
+**The window starts at the CONVERSION, never at the join date.** This is the load-bearing decision.
+Counting `temporary_window_days` from an old `joined_at` would expire a long-standing member the instant
+they were converted — and the sweep does not merely hide an expired temporary member, `AnonymiseMember`
+**erases their personal data**. A retroactive window is therefore not a cosmetic bug, it is silent data
+loss triggered from a counter. Tested by converting a three-year member and running
+`members:remove-temporary` immediately: no anonymisation.
+
+**`temporary_reminder_sent_at` is cleared with the new window.** It is the sweep's one-reminder-per-window
+marker, so a stale value from an earlier temporary stint would have silently swallowed the new window's
+"your access ends soon" warning — a member erased with no heads-up. Found while writing the conversion,
+not after.
+
+**An action with a reason, not a form toggle.** The prompt's recommendation, and the right one: converting
+a member's kind schedules their automatic anonymisation, which is at least as consequential as a status
+change (`TransitionMemberStatus` carries a reason for exactly that reason), and nothing that consequential
+should be flippable while someone is editing a phone number. The reason is required on **this** direction
+only — making someone temporary schedules an erasure; converting them back merely removes an expiry, and
+demanding a justification to *stop* a deletion would be friction pointing the wrong way.
+
+**Gating: the feature flag applies to one direction only.** `makeTemporary` is gated on `members.create`
+**and** `temporary_members_enabled`, as the create-time toggle is. The two pre-existing actions are
+deliberately **not** gated on the setting: a club that switches the feature off must still be able to
+rescue the temporary members it already has — otherwise turning it off strands everyone currently carrying
+an auto-expiry and the sweep erases them anyway. Asserted in both directions.
+
+**Effect on the counts, measured.** `StockCeiling::forLocation()` counts members who are ACTIVE and hold
+an ACTIVE membership at the location — **it never reads `kind`**. So a conversion cannot move the premises
+ceiling in either direction; it is invariant by construction. That is pinned by a test, so a future change
+to the ceiling query cannot silently make a conversion shift a legal limit. The **member cap** is
+different: `temporary_count_toward_cap` (default on) decides whether temporary members count, so with it
+OFF a conversion does move the headroom — asserted in both directions under both settings.
+
+**Unchanged, as required:** nothing about verification. Age, avalador, carencia and limits apply to a
+temporary member exactly as before — `MemberKind`'s own docblock says the distinction affects only list
+visibility and retention timing, and the action's helper text repeats it to the operator.

@@ -115,6 +115,7 @@ class MemberResource extends Resource
             self::reactivateAction(),
             self::convertTemporaryAction(),
             self::extendTemporaryAction(),
+            self::makeTemporaryAction(),
             self::exportDataAction(),
         ];
     }
@@ -405,6 +406,39 @@ class MemberResource extends Resource
                 (new ManageTemporaryMember)->convertToStandard($record);
 
                 Notification::make()->title(__('Socio convertido a estándar'))->success()->send();
+            });
+    }
+
+    /**
+     * Manager action: make a standard member temporary (prompt 165) — an ACTION with a reason, not a
+     * form toggle. Converting a member's kind schedules their automatic anonymisation, which is at least
+     * as consequential as a status change, and nothing that consequential should be flippable while
+     * someone is editing a phone number. Gated additionally on `temporary_members_enabled`, unlike the
+     * two actions below: a club that has switched the feature OFF must still be able to rescue the
+     * temporary members it already has, but must not be able to create new ones.
+     */
+    public static function makeTemporaryAction(): Action
+    {
+        return Action::make('makeTemporary')
+            ->label(__('Convertir a socio temporal'))
+            // Mirrors the up-circle on "convertir a estándar" — the two directions read as a pair.
+            ->icon(Heroicon::OutlinedArrowDownCircle)
+            ->color('warning')
+            ->requiresConfirmation()
+            ->modalDescription(__('La estancia empieza hoy, no en la fecha de alta. Al vencer, el socio se anonimiza automáticamente.'))
+            ->visible(fn (Member $record): bool => ! $record->isTemporary()
+                && (bool) Settings::get('temporary_members_enabled', false)
+                && (Auth::user()?->can('members.create') ?? false))
+            ->schema([
+                TextInput::make('days')->label(__('Días de estancia'))->numeric()->minValue(1)->required()
+                    ->default(fn (): int => (int) Settings::get('temporary_window_days', 30))
+                    ->helperText(__('Se cuentan desde hoy. No relaja ninguna verificación (edad, aval, carencia, límites).')),
+                Textarea::make('reason')->label(__('Motivo'))->required()->maxLength(500),
+            ])
+            ->action(function (Member $record, array $data): void {
+                (new ManageTemporaryMember)->convertToTemporary($record, (string) $data['reason'], (int) $data['days']);
+
+                Notification::make()->title(__('Socio convertido a temporal'))->success()->send();
             });
     }
 
