@@ -6935,3 +6935,38 @@ and the invariant holds.
 **Scope.** All five counter screens are wired. The till-open screen itself and its default float were split
 out to **prompt 182** — bundling them made the branch unlandable, which is what stalled the first attempt.
 When the till blocker is resolved the operator arrives at the existing Caja screen, unchanged.
+
+**Verified by looking, and it caught a stale build.** `tests/Browser/BlockingStatesHarnessTest` writes each
+blocking state as real authed HTML and `tests/Browser/shoot-blocking-states.mjs` photographs all three at
+1180×820 and 820×1180, light and dark, motion reduced and allowed — 24 captures — while asserting exactly one
+blocking state, no destructive colour, and no action under 44×44. Cold start measured **3 statements before,
+1 after**, in both themes, composed side by side.
+
+The first run **failed**: `Ir a la caja` measured 116×**20**, not 44 tall. The cause was not the markup but a
+**stale local CSS bundle** — `min-h-[2.75rem]` was absent from `public/build`, which predated prompt 173
+merging, so every control depending on that class (including 173's own PIN pad) measured at its content
+height. `npm run build` fixed it; after the rebuild the action measures **116×44** in brand blue
+(`rgb(37, 99, 235)`). Nothing shipped broken — `public/build` is gitignored and production builds on deploy —
+but it is worth recording that **a browser check is only as honest as the bundle it inlines**: rebuild before
+measuring, or the numbers describe an old commit. The README's run instructions now say so.
+
+One harness detail worth keeping: the artifacts are written **before** the assertions run, so the same file
+can be executed against an older commit (where the assertions cannot pass) to capture the "before" side.
+
+**The sede state has no button, and that is deliberate.** "One button that fixes it" cannot mean inventing a
+button that fixes nothing. When several sedes are available the fix is the topbar switcher, which is already
+on screen and at the touch floor; when **no** sede is assigned at all, only a responsable can fix it and no
+control at the counter would. The state says so and offers nothing, which is the honest form of the pattern.
+Asserted across all five screens (zero `data-blocker-action` in that state), alongside the till and member
+states asserting exactly one.
+
+**Reconciled against the prompt text after the fact.** The first pass through this branch weakened one
+required assertion: "on every screen, with everything missing, exactly one blocking state renders" was
+implemented as `assertLessThanOrEqual(1, …)`, on the reasoning that with everything missing the first unmet
+link is the OPERATOR step, which renders zero in-page blockers by design. That reasoning was wrong — with
+**everything** missing the first unmet link is SEDE, not OPERATOR, so the literal assertion is satisfiable
+and now holds on all five screens. Both regression tests were then run against `e8c68cd`'s blades to prove
+they FAIL there (`0 is identical to 1`), which is what makes them regression tests rather than descriptions.
+Two further gaps were closed at the same time: the bar's till state now asserts its single action, and the
+bar gets the same per-precondition server-refusal proof as the dispensary (sede / operator / till, each
+asserting no `Order` row).

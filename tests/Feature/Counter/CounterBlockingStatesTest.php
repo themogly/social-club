@@ -6,21 +6,25 @@ use App\Actions\Till\OpenTill;
 use App\Enums\MembershipStatus;
 use App\Enums\MemberStatus;
 use App\Enums\Role;
+use App\Enums\SettingType;
 use App\Livewire\Counter\BarPos;
 use App\Livewire\Counter\CheckInScreen;
 use App\Livewire\Counter\DispensaryPos;
 use App\Livewire\Counter\MembershipCounter;
 use App\Livewire\Counter\TillSession;
+use App\Models\Article;
 use App\Models\Dispensation;
 use App\Models\Location;
 use App\Models\Member;
 use App\Models\Membership;
 use App\Models\MembershipTier;
+use App\Models\Order;
 use App\Models\Organisation;
 use App\Models\User;
 use App\Support\ActiveScope;
 use App\Support\CounterBlocker;
 use App\Support\CounterOperator;
+use App\Support\Settings;
 use Database\Seeders\RolePermissionSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
@@ -46,6 +50,15 @@ use Tests\TestCase;
 class CounterBlockingStatesTest extends TestCase
 {
     use RefreshDatabase;
+
+    /** The five counter screens this branch wires. */
+    private const SCREENS = [
+        DispensaryPos::class,
+        BarPos::class,
+        TillSession::class,
+        CheckInScreen::class,
+        MembershipCounter::class,
+    ];
 
     private Organisation $org;
 
@@ -76,9 +89,32 @@ class CounterBlockingStatesTest extends TestCase
         return $user;
     }
 
+    /**
+     * Signed in with NO sede at all, and no PIN — the cold start, everything missing.
+     *
+     * MANAGER rather than OWNER on purpose: an owner has org-wide access, so with one sede in the org the
+     * resolver adopts it and this state becomes unreachable.
+     */
+    private function operatorWithoutSede(): User
+    {
+        $user = User::factory()->create();
+        $user->assignRole(Role::MANAGER->value);
+        $this->actingAs($user);
+
+        return $user;
+    }
+
     private function openTill(): void
     {
         (new OpenTill)->handle($this->location, 'POS-1', 10000);
+    }
+
+    private function article(): Article
+    {
+        return Article::factory()->create([
+            'organisation_id' => $this->org->id, 'location_id' => $this->location->id,
+            'price_cents' => 150, 'stock' => 10, 'active' => true,
+        ]);
     }
 
     private function eligibleMember(): Member
@@ -127,10 +163,56 @@ class CounterBlockingStatesTest extends TestCase
         $this->assertStringNotContainsString(__('Identifica a un socio para poder registrar.'), $html);
     }
 
-    /** Every screen wired in this branch shows at most one, in every combination of missing preconditions. */
+    /**
+     * The prompt's regression test, taken literally: on EVERY screen wired in this branch, with EVERYTHING
+     * missing — no sede, no operator, no till, no member — exactly one blocking state renders, and it is the
+     * first link in the chain. Fails against main, which has no `data-counter-blocker` at all.
+     *
+     * (173's surface is also up, in `unidentified` mode. That is the point of the split: the operator step is
+     * drawn by the surface and never in-page, so the count of IN-PAGE blocking states stays exactly one.)
+     */
+    public function test_every_screen_renders_exactly_one_blocking_state_when_everything_is_missing(): void
+    {
+        $this->operatorWithoutSede();
+
+        foreach (self::SCREENS as $screen) {
+            $html = Livewire::test($screen)->html();
+
+            $this->assertSame(1, $this->blockerCount($html), $screen.' must render exactly one blocking state');
+            $this->assertSame('sede', $this->blockerKind($html), $screen.' must render the FIRST unmet link');
+            $this->assertStringNotContainsString('data-blocker="operator"', $html, $screen); // 173 owns it
+        }
+    }
+
+    /** With the sede and operator met, the till is the next link — on both screens that have one. */
+    public function test_the_screens_with_a_till_step_render_exactly_one_when_only_the_till_is_missing(): void
+    {
+        $this->operator();
+
+        foreach ([DispensaryPos::class, BarPos::class] as $screen) {
+            $html = Livewire::test($screen)->html();
+
+            $this->assertSame(1, $this->blockerCount($html), $screen);
+            $this->assertSame('till', $this->blockerKind($html), $screen);
+        }
+    }
+
+    /** And the screens WITHOUT a till or member step are simply usable at that point — nothing blocks. */
+    public function test_the_screens_with_no_till_step_are_unblocked_once_the_sede_is_resolved(): void
+    {
+        $this->operator();
+
+        foreach ([TillSession::class, CheckInScreen::class, MembershipCounter::class] as $screen) {
+            $html = Livewire::test($screen)->html();
+
+            $this->assertSame(0, $this->blockerCount($html), $screen.' has no till or member step to block on');
+        }
+    }
+
+    /** Every screen shows at most one, in every combination of missing preconditions. */
     public function test_no_screen_ever_renders_more_than_one_blocking_state(): void
     {
-        $screens = [DispensaryPos::class, BarPos::class, TillSession::class, CheckInScreen::class, MembershipCounter::class];
+        $screens = self::SCREENS;
 
         $assertAtMostOne = function (bool $withTill) use ($screens): void {
             foreach ([true, false] as $withPin) {
@@ -243,6 +325,54 @@ class CounterBlockingStatesTest extends TestCase
         $this->assertStringContainsString(__('Ir a la caja'), $html);
     }
 
+    /** The bar's till state carries the same one action to the same place. */
+    public function test_the_bars_till_blocking_state_has_one_action_that_resolves_it(): void
+    {
+        $this->operator();
+        $html = Livewire::test(BarPos::class)->html();
+
+        $this->assertSame('till', $this->blockerKind($html));
+        $this->assertSame(1, substr_count($html, 'data-blocker-action'));
+        $this->assertStringContainsString(route('counter.till'), $html);
+    }
+
+    /**
+     * The sede state has NO action, deliberately, and that is the honest state rather than a missing button.
+     * When several sedes are available the fix is the topbar switcher, which is already on screen; when none
+     * is assigned only a responsable can fix it, and no control at the counter would. "One button that fixes
+     * it" cannot mean inventing a button that does not.
+     */
+    public function test_the_sede_blocking_state_offers_no_action_because_none_would_resolve_it(): void
+    {
+        $this->operatorWithoutSede();
+
+        foreach (self::SCREENS as $screen) {
+            $html = Livewire::test($screen)->html();
+
+            $this->assertSame('sede', $this->blockerKind($html), $screen);
+            $this->assertSame(0, substr_count($html, 'data-blocker-action'), $screen.' must not offer a button that resolves nothing');
+        }
+    }
+
+    /**
+     * "Barra desactivada" takes the one visual language but is NOT in the chain — it is a per-location
+     * setting, not a precondition an operator can meet at the counter, so it has no action either.
+     */
+    public function test_the_bar_disabled_state_uses_the_pattern_but_is_not_in_the_chain(): void
+    {
+        $this->operator();
+        Settings::set('bar_enabled', false, SettingType::BOOL, $this->location->id);
+
+        $html = Livewire::test(BarPos::class)->html();
+
+        $this->assertSame(1, $this->blockerCount($html));
+        $this->assertSame('bar-disabled', $this->blockerKind($html));
+        $this->assertSame(0, substr_count($html, 'data-blocker-action'));
+
+        // It is not a link in the chain: CounterBlocker knows nothing about it.
+        $this->assertNotContains('bar-disabled', CounterBlocker::CHAIN);
+    }
+
     /**
      * The member state is the one whose fix lives ON the blocked screen, so its single action is the lookup
      * itself rather than a link. A blocking state that removed the only means of resolving it would be a
@@ -352,6 +482,42 @@ class CounterBlockingStatesTest extends TestCase
             ->assertSee(__('Identifica a un socio antes de registrar una dispensación.'));
 
         $this->assertSame(0, Dispensation::query()->count());
+    }
+
+    // The bar shares the sede → operator → till chain (it has no member step), so it gets the same proof.
+
+    public function test_a_bar_charge_without_a_sede_is_still_refused(): void
+    {
+        $this->operatorWithoutSede();
+
+        Livewire::test(BarPos::class)->call('commit')->assertSet('flashType', 'error');
+
+        $this->assertSame(0, Order::query()->count());
+    }
+
+    public function test_a_bar_charge_without_a_pin_identified_operator_is_still_refused(): void
+    {
+        $this->operator(withPin: false);
+        $this->openTill();
+
+        Livewire::test(BarPos::class)
+            ->call('addArticle', $this->article()->id)
+            ->call('commit')
+            ->assertSet('flashType', 'error');
+
+        $this->assertSame(0, Order::query()->count());
+    }
+
+    public function test_a_bar_charge_without_an_open_till_is_still_refused(): void
+    {
+        $this->operator();
+
+        Livewire::test(BarPos::class)
+            ->call('addArticle', $this->article()->id)
+            ->call('commit')
+            ->assertSet('flashType', 'error');
+
+        $this->assertSame(0, Order::query()->count());
     }
 
     /** A refusal must still reach the operator when a blocking state is what is on screen. */
