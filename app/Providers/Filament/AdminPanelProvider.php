@@ -87,6 +87,19 @@ class AdminPanelProvider extends PanelProvider
                 PanelsRenderHook::GLOBAL_SEARCH_AFTER,
                 fn (): string => Blade::render("@include('filament.help-menu')"),
             )
+            // The panel's tablet pass (prompt 170) — the counter got three rounds of this (116, 130,
+            // 132) and the panel had never had one. Filament's default sidebar is 320px and PERMANENTLY
+            // open from 1024px up, with no toggle: every iPad in landscape, and a 12.9" in portrait,
+            // sits above that line. Measured on /members before this: 243px of the table off the right
+            // at 1180 and 399px at 1024, taking the row-actions column — where Ver/Editar live — with it.
+            //
+            // The ICON RAIL, not the fully-collapsible variant: staff move between Socios, Dispensario
+            // and Caja constantly, so keeping every destination one tap away beats reclaiming a further
+            // 87px they do not need. The measurements say the rail is not what breaks these tables —
+            // after collapsing, /members is 12px short of fitting at 1180, not 87px. The collapsed state
+            // persists per browser, which is what a fixed counter tablet wants: collapse once, stays
+            // collapsed.
+            ->sidebarCollapsibleOnDesktop()
             // Grouped sidebar, in operational order. Every group is deliberate; a group
             // renders only when the actor can see at least one item in it (so STAFF never
             // sees Sistema, and Informes/Documentos/Audit are omitted until they exist —

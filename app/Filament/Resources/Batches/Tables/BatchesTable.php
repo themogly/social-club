@@ -10,6 +10,7 @@ use App\Models\Location;
 use App\Support\Spreadsheet\ReportExport;
 use App\Support\Weight;
 use App\ViewModels\BatchRecall;
+use Filament\Actions\ActionGroup;
 use Filament\Actions\Action;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteBulkAction;
@@ -67,11 +68,16 @@ class BatchesTable
             ->filters([
                 TrashedFilter::make(),
             ])
+            // The worst offender: four labelled buttons, a 335px actions column — a third of the whole
+            // table. Retirada, Ajuste and Merma are all destructive or rare, which is exactly what
+            // belongs behind a trigger (prompt 170).
             ->recordActions([
-                self::recallAction(),
-                self::adjustAction(),
-                self::mermaAction(),
-                EditAction::make(),
+                ActionGroup::make([
+                    self::recallAction(),
+                    self::adjustAction(),
+                    self::mermaAction(),
+                    EditAction::make(),
+                ]),
             ])
             ->toolbarActions([
                 BulkActionGroup::make([
