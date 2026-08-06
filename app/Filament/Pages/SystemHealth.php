@@ -71,7 +71,6 @@ class SystemHealth extends Page
             'cache' => $health->cache(),
             'mailer' => $health->mailer(),
             'documentsDisk' => $health->documentsDisk(),
-            'backups' => $health->backups(),
             'auditRetentionDays' => $health->auditRetentionDays(),
             'dataRetentionDays' => $health->dataRetentionDays(),
         ];
