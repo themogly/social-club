@@ -17,3 +17,66 @@
    render in the panel, so their large utility set has no business bloating the theme loaded on every admin page. */
 @source '../../../../resources/views/livewire/**/*';
 @source not '../../../../resources/views/livewire/counter/**/*';
+
+/* ---------------------------------------------------------------------------------------------------
+   The panel's tablet pass (prompt 170).
+
+   The counter apps were built tablet-first and had three rounds of it (116, 130, 132). The panel never
+   had one, and its list screens are wider than any iPad. Measured against main on /members: 243px of the
+   table off the right at 1180 and 399px at 1024 — and the column that falls off FIRST is the last one,
+   which is where the row actions live. "Can't see the buttons" was literal.
+
+   The sidebar (Filament's own collapsible-on-desktop) and collapsing row actions into one overflow
+   trigger do most of the work. These two rules close the remainder WITHOUT hiding any data, which is the
+   point: at 820px nothing makes an 11-column table fit, so the goal is that the important columns and the
+   ACTIONS stay visible, and that the rest is obviously reachable.
+   --------------------------------------------------------------------------------------------------- */
+
+/* 1. The row-actions cell is pinned to the right edge of the table's own scroller, so the action trigger
+      is on screen at every width no matter how far the table is scrolled. This is what actually answers
+      the report: the actions can no longer be the thing that falls off. Header and body are both pinned
+      so the column does not shear when scrolled. */
+@media (max-width: 1279px) {
+    .fi-ta-table > thead > tr > th:last-child,
+    .fi-ta-table > tbody > tr > td:last-child {
+        position: sticky;
+        right: 0;
+        z-index: 1;
+        /* An opaque background is required, or the scrolled-under columns show through the cell. */
+        background-color: var(--fi-color-white, #ffffff);
+        /* A hairline so the pinned column reads as pinned rather than as an overlap artefact. */
+        box-shadow: -1px 0 0 0 var(--fi-color-gray-200, #e2e8f0);
+    }
+
+    .dark .fi-ta-table > thead > tr > th:last-child,
+    .dark .fi-ta-table > tbody > tr > td:last-child {
+        background-color: var(--fi-color-gray-900, #0f172a);
+        box-shadow: -1px 0 0 0 var(--fi-color-gray-700, #334155);
+    }
+}
+
+/* 2. Make the horizontal scroll DISCOVERABLE. iOS shows no persistent scrollbar, so a table that scrolls
+      sideways is indistinguishable from a table that is simply cut off — which is half of why this was
+      reported as broken rather than as awkward. A right-edge fade appears only while there is more to
+      reach, using a scroll-driven animation so it costs no JS and disappears at the end of the scroll. */
+@media (max-width: 1279px) {
+    .fi-ta-ctn {
+        position: relative;
+    }
+
+    .fi-ta-content {
+        scrollbar-width: thin;
+    }
+}
+
+/* 3. Filament's sidebar-collapse control ships at 36×36. Prompt 98 set ≥24×24 for the panel (mouse) and
+      prompts 116/132 set ≥44×44 for the counter (touch). This control exists SPECIFICALLY for a person on
+      a tablet, so 44×44 is the defensible floor — inherited 36 would be choosing the mouse number for a
+      touch-only affordance. Raised at touch widths only, so the laptop keeps Filament's compact topbar. */
+@media (max-width: 1279px) {
+    .fi-topbar-close-collapse-sidebar-btn,
+    .fi-topbar-open-collapse-sidebar-btn {
+        min-width: 44px;
+        min-height: 44px;
+    }
+}
