@@ -7350,3 +7350,74 @@ owner-only gate on the page is re-asserted unchanged.
 
 **MySQL was left to CI**, per the running order: `composer check` green on SQLite. This branch is a view, a
 deleted method and two lang files — no migration, no column, no query.
+
+## Prompt 182 — opening the till: one action, and the float that stops being retyped
+
+**Split out of prompt 175**, which bundled it with standardising the blocking pattern. Different jobs,
+different decisions, and bundling them is what made 175 unlandable in one go.
+
+**The premise, re-verified.** `till-session.blade.php` rendered *Abrir caja* as a `<section>` card among
+cards — heading, optional terminal picker, float field, button. Close to what the owner asked for, but not a
+SCREEN. Prompt 173 fixed the operator-strip reflow that pushed the button off the bottom and 175 made the
+closed till a proper blocking state; this makes what sits behind that blocker right.
+
+**Now the whole screen.** One action, the float on the same screen as it, at the counter's touch sizes.
+Square, Shopify, Lightspeed X-Series and SumUp all capture the opening amount on the same screen or dialog
+as the open action — none uses a separate wizard step, so neither does this. SumUp is the closest analogue
+to a Spanish club counter and is exactly the owner's description: the till is locked, you enter the cash
+fund, you confirm.
+
+**The default-float mechanism: a `Settings` value, and here is why over the other three.**
+
+| Vendor | Mechanism | Why not |
+|---|---|---|
+| **SumUp** | a *Default cash fund* setting pre-populating the same amount daily | **CHOSEN** |
+| **Toast** | a configured *Starting Cash Drawer Balance* that auto-fills | same shape as SumUp; no advantage |
+| **Shopify** | carries the previous session's closing balance forward | see below |
+| **Dutchie** | the next float is set at the *previous* close-out, as *New Balance* | see below |
+
+`till_default_float_cents` is a per-location Setting, on the org settings form under *Caja*, stored in
+integer cents through the same `*_eur` edge pattern as the arqueo tolerance. It fits the codebase's own rule
+that **every threshold is a configurable Setting**, and it is the least surprising thing on the screen.
+
+**Carry-forward was rejected for a specific reason, not a general preference.** This product has a **blind**
+close: the operator counts before the expected figure is revealed, and a variance beyond tolerance is noted.
+Carrying that counted figure into tomorrow's opening would **import yesterday's discrepancy into today's
+float as though somebody had chosen it** — a £3 short becomes tomorrow's declared opening, and the drawer
+reconciles against a number nobody decided. It also couples opening to a close that may have been skipped
+entirely, which is exactly the fragility the prompt warns about. A standing float is a treasurer's decision;
+the previous count is an observation. They are not the same figure and should not be silently substituted.
+
+**The operator can always override it, and the override is what is stored** — a pre-filled figure you cannot
+change is worse than typing. Asserted, along with the pre-fill never overwriting a value already entered
+(mount runs again on re-render).
+
+**The first-ever open is handled explicitly.** No default and no previous session must not be an empty
+required field with no explanation. `0` is treated as *not configured* rather than *open with an empty
+drawer* — otherwise every sede that never set one would silently propose zero as though it were chosen — and
+the screen says so: *"Esta sede no tiene fondo por defecto. Escribe el importe con el que abres; un
+responsable puede fijarlo en Ajustes."* When a default IS set it says where the figure came from instead.
+
+**Money stays integer cents.** The Setting is `*_cents`, the input is the euro edge, `toCents()` parses it
+back, and the tests assert the **raw column value** rather than the `MoneyCast` object — `12,345` stores
+`1235`, `round_half_up`, never a float in the column.
+
+**The multi-till case survives untouched.** `multipleTills()` still asks which terminal, nothing is guessed,
+and opening without choosing one is refused rather than defaulted. The default float pre-fills there too.
+
+**Nothing about what opening a till DOES was changed.** `OpenTill`, the audit trail, and the entire
+close/count/variance flow are unchanged — asserted by opening a session through the screen and comparing it
+column-for-column against one opened by calling `OpenTill` directly. The screen is a caller, not a second
+writer.
+
+**Toast's three drawer states — a verdict, as asked.** *Active* (takes payments), *Open* (adjustments like
+cash-in and tip-out but not payments), *Closed* (no entries, reopenable). That middle state is how a shift
+handover or a drawer swap happens without closing the day, and **this product has no answer for it today**:
+the only transitions are open and close, so a handover mid-shift means closing the drawer and doing an
+arqueo, or leaving it open under someone else's name. It is a real gap and **it deserves its own prompt** —
+but not this one. It is a state-machine change to `TillSession` with consequences for the Z-report, the
+cash-movement ledger and the blind close, none of which is a screen change. Recommended as a future prompt,
+sized around the model rather than the UI.
+
+**MySQL was left to CI**, per the running order: `composer check` green on SQLite. No migration and no
+column — the setting is a row in the existing settings table.
