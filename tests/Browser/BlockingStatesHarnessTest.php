@@ -105,8 +105,12 @@ class BlockingStatesHarnessTest extends TestCase
 
     private function write(string $name, string $html): void
     {
+        // ONLY app-*.css. The counter layout loads `resources/css/app.css` and nothing else; `theme-*.css`
+        // is the Filament PANEL theme and is never on a counter page. Globbing `*.css` appends it AFTER
+        // app.css and corrupts the cascade — found in prompt 176, where it silently defeated `md:flex-row`
+        // and made a two-pane layout measure as a stack.
         $css = '';
-        foreach (glob(public_path('build/assets/*.css')) ?: [] as $file) {
+        foreach (glob(public_path('build/assets/app-*.css')) ?: [] as $file) {
             $css .= (string) file_get_contents($file);
         }
 

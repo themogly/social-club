@@ -6997,3 +6997,141 @@ follows a green `composer check`, never precedes one.
 **Judgment calls are recorded, not silently taken.** Every decision that would ordinarily have been a
 checkpoint is written into this file with its alternatives and its reasoning, so it can be overturned in the
 morning at the cost of reading, not of archaeology.
+
+## Prompt 176 — the button that takes the money was off the bottom of the screen
+
+**The premise was re-measured, and it had moved.** The prompt's figures were taken on `e8c68cd`, before 175
+merged; 175 removed the in-page blockers, which changed both selling screens. Re-measured on `592c93c`
+after `npm run build`, at the two tablet orientations, with the commit action's y-position against the fold:
+
+| screen | viewport | page | commit | verdict |
+|---|---|---|---|---|
+| Dispensario, basket empty | 1180×820 | 1222 | 348–412 | inside |
+| Dispensario, basket empty | 820×1180 | 1538 | 1437–1501 | **321px below** |
+| Dispensario, basket FULL | 1180×820 | 1222 | 942–1006 | **186px below** |
+| Dispensario, basket FULL | 820×1180 | 2156 | 2055–2119 | **939px below** |
+| Barra, basket empty | 1180×820 | 997 | 631–695 | inside |
+| Barra, basket empty | 820×1180 | 1636 | 1535–1599 | **419px below** |
+| Barra, basket FULL | 1180×820 | 1006 | 905–969 | **149px below** |
+| Barra, basket FULL | 820×1180 | 1910 | 1809–1873 | **693px below** |
+
+**Two discrepancies against the prompt, both reported rather than quietly absorbed.** The prompt's headline
+— *Barra at 1180×820, `Cobrar` 30px below the fold* — **no longer holds with an empty basket**: 175's
+removal of the in-page blockers shortened that screen enough to pull the action into view (631–695 of 820).
+It holds, and worse, once there is anything to charge: 149px below with three lines. So the defect is real
+and the prompt understated it, because the prompt measured the state where the button is least needed. The
+tests therefore assert the FULL-basket case as well as the empty one; a fix validated only on an empty
+basket would have regressed the moment an operator did any work.
+
+**The fix: two panes, one of which scrolls.** The selection pane (identify, weight entry, products) is the
+only scroll container. The cart column is fixed and carries identity + the allowance at its head, the basket
+and payment apparatus in a scrolling middle, and the commit at its foot. After the change the page height is
+**exactly the viewport** (820 / 1180) on every screen and the commit sits at the **same y whether the basket
+is empty or full** — 736–800 landscape, 1096–1160 portrait. That invariance is the point: the old layout
+moved the button further away the more there was to commit.
+
+**Explicitly NOT a bottom bar.** A full-width action bar pinned to the viewport bottom is a phone
+convention. On a tablet — rested on a surface in roughly two thirds of sessions, 88% of use seated — the
+bottom edge is the hostile zone: never near the thumbs, and occluded by a standing operator's own wrist.
+Toast, Treez and Flowhub all put the commit at the foot of the CART COLUMN, not of the screen. So does this.
+
+**The allowance is on the cart, not on the profile.** Flowhub renders the remaining limit persistently in
+the cart's upper right; Treez puts a Purchase Limits control at the top of the cart. The reason is
+operational: an operator must never leave the sale to find out whether the socio may have what they are
+asking for. `Restante hoy` is the headline figure rather than month-to-date, because it is the number that
+decides the next line. It is **shown, never recomputed** — the value comes from `ResolveMemberLimits`, and a
+test asserts the rendered figure against the resolver rather than against a hard-coded string, which is what
+would catch a second read model appearing.
+
+**The member card was split, not deleted.** It measured 403px, on top of a 194px identify panel, both full
+width — the audit's finding 3. Identity and the allowance (a compact 150px head) go to the top of the cart
+where they stay visible for the whole sale; the wallet, carencia, sanction and counter verdict go to the
+cart's scrolling middle, beside the payment apparatus they inform. Nothing was dropped.
+
+**The filters were reclaimed by collapsing them, with search as the primary route.** Three labelled rows
+(Categoría, Tipo, Variedad) stood between the heading and the first genetic. They are now behind one
+`Filtros` control, closed by default, and the search box is always visible — which is Treez's answer, and
+Treez is the cannabis one: a genetic carries THC, CBD, category, strain and live stock, five figures no row
+of pills summarises. The disclosure **opens itself when a filter is already applied**, because an active
+filter the operator cannot see is worse than one that costs a tap. Result: **6 of 6 products visible without
+scrolling** on both screens at both orientations, against 0 before.
+
+**List for genetics, grid for articles — the default argued, not just the toggle shipped.** Loyverse is the
+only vendor publishing guidance and it says grid when items carry images and you want density, list when
+names are long or the operator needs prices without an extra tap. A genetic is the second case and an
+article is the first. The choice is remembered **per screen** via `#[Session]` under two distinct keys, so
+one screen's preference never becomes the other's — asserted. `#[Session]` rather than a column because it
+is a per-operator display preference, not club data, and it must survive a reload without a migration.
+
+**A browser check is only as honest as the page it assembles — twice over.** Two harness bugs of mine
+produced confidently wrong numbers before either was caught:
+
+1. **The harness inlined every built CSS file**, including `theme-*.css`, the Filament PANEL theme, which is
+   never on a counter page. Concatenated after `app.css` it corrupted the cascade and silently defeated
+   `md:flex-row`, so a correctly-built two-pane layout measured as a stack and the numbers said the change
+   had made things *worse* (commit 1126px below the fold). `BlockingStatesHarnessTest` had the identical
+   glob and was corrected with it; re-run afterwards it is still ALL PASS, so **prompt 175's recorded
+   figures stand**.
+2. **The harness did not pass the layout params the real page passes** (`fullHeight`), so it photographed a
+   shell no operator ever sees.
+
+This is the same lesson prompt 175 recorded about a stale bundle, one level up: rebuilding is necessary but
+not sufficient — the harness must assemble the page the way the app does. Both rules are now written into
+`tests/Browser/README.md`.
+
+**A third self-inflicted bug worth recording because it was invisible in review.** The restructure was
+scripted, and Python's `str.format()` consumed the doubled braces in every Blade construct in the new
+wrapper — `{{--` became `{--`, so ten comment blocks rendered as *visible text* on the page, 192px of it,
+which read as a layout bug rather than a templating one. Caught only by enumerating the DOM. Scripted edits
+to Blade must not go through a formatter that treats `{}` as syntax.
+
+**Touch targets: the audit's list did not survive re-measurement, and a different list replaced it.** The
+running order flagged the audit's figures as possibly stale-bundle artefacts and asked for a re-measure
+after `npm run build`. Correct call — none of the four reproduced, but four others did:
+
+- `Identificarse` 109×32 — **does not render**; 173 moved it to the full-screen surface.
+- `Desbloquear` 155×42, `Cancelar` 157×42 — the PIN pad, inside 173's surface. **Not 176's scope**; they did
+  not reproduce here, and if they ever do it is a 173 regression, not a cart-column one.
+- The bar's category pills 66×30 / 48×30 — **real, and fixed**. The dispensary's equivalents already carried
+  `min-h-11`; the bar's had never been given it.
+- **Newly found and fixed:** `Cerrar` 52×32, `Vaciar` 57×28, and the line-remove `✕` at 28×32 (three per full
+  basket). None was in the audit, all were under the floor on a screen an operator uses all evening.
+
+**What was deliberately not touched.** `CommitDispensation`, `CommitOrder`, `ResolvePrice`,
+`ResolveArticleDiscount` and `ResolveMemberEligibility` are unchanged — this is layout and presentation, and
+the shown total is still the charged total, which prompt 55 settled and this branch does not renegotiate.
+Member-first stays: identity still gates the aportación, it simply no longer occupies the top half of the
+screen permanently.
+
+**Three existing layout tests were re-pointed, not weakened.** `BarPosLayoutTest`, `CounterStaffDayTest` and
+one assertion in `CounterBlockingStatesTest` pinned prompt 91's `lg:grid-cols-[minmax(0,1fr)_22rem]` grid,
+which 176 replaces. Prompt 91's guarantee was that the basket can never drop below the products into dead
+space; the two-pane layout defends that more strongly — the cart is a *sibling* of the selection pane, so
+neither can push the other, and the commit is inside the cart rather than at the end of a page. Each test
+now asserts that structure.
+
+**The full-height shell is opt-in and guarded at `md:`.** Only the two selling screens declare
+`#[Layout(..., ['fullHeight' => true])]`. Below `md` the two-pane layout collapses to a stack, which must
+scroll normally or it would be clipped with no way to reach the rest, so the pinning is `md:`-only. Recepción,
+Socios and Caja are untouched.
+
+**Four defects the measurements passed and only LOOKING caught.** `measure-cart-column.mjs` reported ALL
+PASS — commit inside the viewport, nothing under 44×44, no horizontal page scroll — while the screenshots
+showed:
+
+- the view-toggle rendering as the literal text `u2630` / `u25a6`, because a PHP single-quoted string does
+  not interpret `\u`;
+- `+ Importe manual` **clipped** at 820 portrait: the selection pane is ~470px there and title + toggle +
+  search + button do not fit a row. The headers now stack until `lg` rather than squeezing;
+- the toggle group stretching to full width once stacked (a flex child under `align-items: stretch`);
+- the list rows cramming five figures into 470px, so the breakpoint for the row layout moved from `sm:` to
+  `lg:` — portrait gets stacked cards, landscape gets rows.
+
+None of these is measurable as a number, and a green harness said nothing about any of them. This is why
+CLAUDE.md requires UI to be verified by looking, and it is worth restating that a pixel harness proves the
+absence of the defects it was written to detect and nothing else.
+
+**MySQL was left to CI**, per the running order: `composer check` green on SQLite (Pint, Larastan 0 errors,
+full suite). This branch is Blade, two Livewire properties and tests — no migration, no column, no JSON cast
+and no raw expression, so there is no driver-difference surface for a local MySQL run to find that CI will
+not.

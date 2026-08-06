@@ -62,3 +62,50 @@ blue (`rgb(37, 99, 235)`). Cold start: **3 statements before, 1 after**, in both
 local `public/build` predated prompt 173 and did not contain `min-h-[2.75rem]` at all. `public/build` is
 gitignored and production builds on deploy, so nothing had shipped broken — but a browser check is only as
 honest as the bundle it inlines. `npm run build` is a step in the sequence above for that reason.
+
+## The cart column (prompt 176)
+
+Measures the two SELLING screens in their resolved states — a socio identified, a basket empty and full —
+at both tablet orientations, and screenshots them in both themes. The measurement that justifies the
+branch is **where the commit button is**: on `main` it was below the fold on both screens.
+
+```bash
+npm install --no-save playwright
+node_modules/.bin/playwright install chromium-headless-shell
+npm run build                                              # the harness inlines the BUILT css — rebuild it
+php artisan test tests/Browser/CartColumnHarnessTest.php   # writes storage/app/cart-*.html
+node tests/Browser/measure-cart-column.mjs                 # → storage/app/screenshots/176/
+```
+
+It exits non-zero if a commit action is outside the viewport, if no product is visible without scrolling,
+if the cart column moves when the selection pane scrolls, if the page scrolls sideways at 820/1024/1180/
+1440, or if any control on a selling screen is under 44×44.
+
+**Before** (`main` at `592c93c`, after a rebuild) and **after**, commit action y-position:
+
+| screen | viewport | before | after |
+|---|---|---|---|
+| Dispensario, basket full | 1180×820 | 942–1006 — **186px below** | 736–800 — inside |
+| Dispensario, basket full | 820×1180 | 2055–2119 — **939px below** | 1096–1160 — inside |
+| Barra, basket full | 1180×820 | 905–969 — **149px below** | 736–800 — inside |
+| Barra, basket full | 820×1180 | 1809–1873 — **693px below** | 1096–1160 — inside |
+
+After the change the page height is exactly the viewport (820 / 1180) on every screen, the commit sits at
+the same y whether the basket is empty or full, and the cart does not move when the pane is scrolled to
+its end.
+
+### Two fidelity rules these harnesses depend on
+
+**Inline `app-*.css` only, never `*.css`.** The counter layout loads `resources/css/app.css` and nothing
+else. `theme-*.css` is the Filament PANEL theme and is never on a counter page; globbing `*.css`
+concatenates it *after* app.css and corrupts the cascade. This is not hypothetical — it silently defeated
+`md:flex-row`, so a correctly-built two-pane layout measured as a stacked one and the numbers said the
+change had made things worse. `BlockingStatesHarnessTest` had the same glob and was corrected with it
+(re-run after the fix: still ALL PASS, so prompt 175's recorded figures stand).
+
+**Pass the layout params the real page passes.** The selling screens declare
+`#[Layout('components.layouts.counter', ['fullHeight' => true])]`. A harness that renders the layout
+without them photographs a shell the operator never sees.
+
+Both rules have the same shape as the rebuild rule above: **a browser check is only as honest as the page
+it assembles.**

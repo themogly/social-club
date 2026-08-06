@@ -14,6 +14,10 @@
             this.$watch(() => JSON.stringify($wire.basket), value => { try { localStorage.setItem('pos.basket', value); } catch (e) {} });
         },
     }"
+    {{-- Prompt 176: the component root carries the height so the two-pane child can resolve `h-full`
+         against a DEFINITE height and the cart column can be constrained instead of overflowing.
+         `md:` only — below that the layout is a normal stacking, scrolling page. --}}
+    class="md:h-full"
 >
     @include('livewire.counter.partials.counter-surface')
 
@@ -100,156 +104,48 @@
              column 1 with no dead space and the primary action stays top-right. At xl the RIGHT div resets
              to auto-placement for the 3-column sidebar layout. Kept identical to bar-pos on purpose — one
              layout, asserted by both PosLayout tests. --}}
-        <div class="grid gap-4 lg:grid-cols-[minmax(0,1fr)_22rem] lg:items-start xl:grid-cols-[19rem_minmax(0,1fr)_21rem]">
+        {{-- Prompt 176 — TWO PANES, and only one of them scrolls.
 
-            {{-- ================= LEFT: the socio ================= --}}
-            <div class="flex flex-col gap-4">
+             Measured on `main` (592c93c, after `npm run build`) at the two tablet orientations: with a
+             socio identified and three lines in the basket, `Registrar aportación` sat 186px below the
+             fold at 1180x820 and 939px below it at 820x1180. The bar was 149px and 693px below. The
+             counter was a single vertical stack that got longer as work was added, so the button that
+             takes the money moved further away the more there was to take.
+
+             A POS is two panes and one of them never moves. The SELECTION pane scrolls; the CART column
+             is fixed, carries identity and the allowance at its top, the basket in its middle, and the
+             commit action at its foot where it is always reachable.
+
+             Deliberately NOT a bottom bar pinned to the viewport: that is a phone convention. On a tablet
+             — rested on a surface in about two thirds of sessions — the bottom edge is the hostile zone,
+             never near the thumbs and occluded by a standing operator's own wrist. Toast, Treez and
+             Flowhub all put the commit at the foot of the CART COLUMN, not of the screen. --}}
+        {{-- Hoisted (prompt 176): the member card was split between the cart's fixed head and its scroll
+             region, so the two values both halves need are computed once, above the split, and guarded —
+             the OPERATOR step renders this branch with the 173 surface over it and no socio resolved. --}}
+        @php
+            $inCarencia = $member !== null && $member->carencia_ends_at !== null && $member->carencia_ends_at->isFuture();
+            $statusColour = $member === null ? '' : match ($member->status) {
+                \App\Enums\MemberStatus::ACTIVE => 'border-success/30 bg-success/10 text-success',
+                \App\Enums\MemberStatus::APPLICANT => 'border-warning/30 bg-warning/10 text-warning',
+                \App\Enums\MemberStatus::SUSPENDED, \App\Enums\MemberStatus::EXPELLED => 'border-error/30 bg-error/10 text-error',
+                default => 'border-line bg-surface-alt text-ink-muted dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300',
+            };
+        @endphp
+
+        <div class="flex h-full min-h-0 flex-col gap-4 md:flex-row">
+
+            {{-- ================= SELECTION: the only thing that scrolls ================= --}}
+            <div
+                data-selection-pane
+                class="flex min-h-0 flex-1 flex-col gap-4 md:overflow-y-auto md:pr-1"
+            >
                 {{-- Identify — the same partial the member blocking state uses, wrapped in this column's card
                      chrome. Kept here so an operator can scan the next socio without clearing the current one
                      first; the audit's finding 3 (this column eating the top of the screen) is prompt 176. --}}
                 <section class="rounded-2xl border border-line bg-surface p-4 dark:border-slate-800 dark:bg-slate-900">
                     @include('livewire.counter.partials.member-identify')
                 </section>
-
-                {{-- Member card OR prompt --}}
-                @if ($member)
-                    @php
-                        $inCarencia = $member->carencia_ends_at !== null && $member->carencia_ends_at->isFuture();
-                        $statusColour = match ($member->status) {
-                            \App\Enums\MemberStatus::ACTIVE => 'border-success/30 bg-success/10 text-success',
-                            \App\Enums\MemberStatus::APPLICANT => 'border-warning/30 bg-warning/10 text-warning',
-                            \App\Enums\MemberStatus::SUSPENDED, \App\Enums\MemberStatus::EXPELLED => 'border-error/30 bg-error/10 text-error',
-                            default => 'border-line bg-surface-alt text-ink-muted dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300',
-                        };
-                    @endphp
-
-                    <section class="rounded-2xl border border-line bg-surface p-4 dark:border-slate-800 dark:bg-slate-900">
-                        <div class="flex items-start gap-3">
-                            @if ($photoUrl)
-                                <img src="{{ $photoUrl }}" alt="" class="h-20 w-20 shrink-0 rounded-2xl object-cover">
-                            @else
-                                <div class="flex h-20 w-20 shrink-0 items-center justify-center rounded-2xl bg-brand-tint text-2xl font-bold text-brand dark:bg-slate-800 dark:text-slate-200">
-                                    {{ mb_strtoupper(mb_substr($member->first_name, 0, 1).mb_substr($member->last_name, 0, 1)) }}
-                                </div>
-                            @endif
-
-                            <div class="min-w-0 flex-1">
-                                <div class="flex flex-wrap items-center gap-2">
-                                    <h2 class="truncate text-lg font-bold">{{ $member->fullName() }}</h2>
-                                    <span class="rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide {{ $statusColour }}">{{ $member->status->label() }}</span>
-                                </div>
-                                <p class="mt-0.5 text-sm text-ink-muted dark:text-slate-400">{{ $member->member_no }}</p>
-                                <p class="mt-1 text-sm">
-                                    <span class="text-ink-muted dark:text-slate-400">{{ __('Cuota / tier') }}:</span>
-                                    <span class="font-medium">{{ $membership?->tier?->name ?? '—' }}</span>
-                                </p>
-                            </div>
-
-                            <button type="button" wire:click="clearMember" class="shrink-0 rounded-lg px-2 py-1.5 text-sm text-ink-muted transition hover:bg-black/5 dark:text-slate-400 dark:hover:bg-white/5">{{ __('Cerrar') }}</button>
-                        </div>
-
-                        {{-- No photo on file (prompt 157): identity can't be verified against a face that isn't
-                             there. The verdict below drives WARN/OVERRIDE enforcement; this is the fix — take it. --}}
-                        @unless ($photoUrl)
-                            <div class="mt-3 rounded-xl border border-warning/30 bg-warning/5 p-3">
-                                <p class="text-xs font-medium text-warning">{{ __('Sin foto en ficha. Verifica con el documento y hazla ahora.') }}</p>
-                                <x-counter.photo-capture :member="$member" source="counter" class="mt-2" />
-                            </div>
-                        @endunless
-
-                        {{-- Wallet + carencia --}}
-                        <dl class="mt-3 grid grid-cols-2 gap-x-4 gap-y-1.5 text-sm">
-                            <div>
-                                <dt class="text-ink-muted dark:text-slate-400">{{ __('Monedero') }}</dt>
-                                <dd class="font-semibold {{ $walletCents < 0 ? 'text-error' : '' }}">{{ $this->money($walletCents) }}</dd>
-                            </div>
-                            <div>
-                                <dt class="text-ink-muted dark:text-slate-400">{{ __('Carencia') }}</dt>
-                                <dd class="font-medium">
-                                    @if ($inCarencia)
-                                        <span class="text-warning">{{ __('Hasta') }} {{ $member->carencia_ends_at->format('d/m/Y') }}</span>
-                                    @else
-                                        {{ __('Cumplida') }}
-                                    @endif
-                                </dd>
-                            </div>
-                        </dl>
-
-                        {{-- Consumption gauge (MTD grams / monthly limit) — colour + numbers, never colour alone. --}}
-                        @if ($limits)
-                            @php
-                                $pct = $limits->monthlyPercent();
-                                $gaugeState = $limits->gaugeState();
-                                $gaugeBar = match ($gaugeState) { 'alert' => 'bg-error', 'warning' => 'bg-warning', default => 'bg-success' };
-                                $gaugeText = match ($gaugeState) { 'alert' => 'text-error', 'warning' => 'text-warning', default => 'text-success' };
-                            @endphp
-                            <div class="mt-4">
-                                <div class="flex items-baseline justify-between text-sm">
-                                    <span class="font-medium">{{ __('Consumo del mes') }}</span>
-                                    <span class="font-semibold {{ $gaugeText }}">{{ $this->grams($limits->monthlyUsedCg) }} / {{ $this->grams($limits->monthlyLimitCg) }} · {{ $pct }}%</span>
-                                </div>
-                                <div class="mt-1.5 h-3 w-full overflow-hidden rounded-full bg-slate-200 dark:bg-slate-700">
-                                    <div class="h-full rounded-full {{ $gaugeBar }}" style="width: {{ min($pct, 100) }}%"></div>
-                                </div>
-                                <p class="mt-1 text-xs text-ink-muted dark:text-slate-400">
-                                    {{ __('Hoy') }}: {{ $this->grams($limits->dailyUsedCg) }} / {{ $this->grams($limits->dailyLimitCg) }}
-                                    · {{ __('Restante hoy') }}: <span class="font-medium">{{ $this->grams($limits->dailyRemainingCg()) }}</span>
-                                </p>
-                            </div>
-                        @endif
-
-                        {{-- Active sanction --}}
-                        @if ($sanction)
-                            <div class="mt-3 rounded-xl border border-error/30 bg-error/10 px-3 py-2 text-sm text-error">
-                                <p class="font-semibold">{{ __('Sanción activa') }} · {{ __($sanction->type->value) }}</p>
-                                @if ($sanction->reason)<p class="mt-0.5">{{ $sanction->reason }}</p>@endif
-                            </div>
-                        @endif
-
-                        {{-- Counter verdict (same shared resolver as the door). --}}
-                        @if ($verdict)
-                            <div class="mt-4 border-t border-line pt-3 dark:border-slate-800">
-                                @if ($verdict->isClear())
-                                    <div class="flex items-center gap-2 rounded-xl border border-success/30 bg-success/10 px-3 py-2 text-sm font-semibold text-success">
-                                        <span>✓</span><span>{{ __('Apto para dispensar.') }}</span>
-                                    </div>
-                                @else
-                                    <div class="space-y-2">
-                                        @foreach ($verdict->rules as $rule)
-                                            @continue($rule['satisfied'])
-                                            @php
-                                                $isBlock = in_array($rule['mode'], ['BLOCK', 'OVERRIDE'], true);
-                                                $remedy = \App\Support\VerdictRemedy::describe($rule, $member, $location);
-                                            @endphp
-                                            {{-- Prompt 135: name the rule in the member's terms + attach the fix; WARN vs BLOCK distinct. --}}
-                                            <div @class([
-                                                'flex items-start justify-between gap-3 rounded-xl border px-3 py-2 text-sm',
-                                                'border-error/30 bg-error/10 text-error' => $isBlock,
-                                                'border-warning/30 bg-warning/10 text-warning' => ! $isBlock,
-                                            ])>
-                                                <span class="min-w-0">
-                                                    {{ $remedy['detail'] }}
-                                                    @if ($remedy['remedy'])
-                                                        <span class="mt-0.5 block text-[11px] opacity-80">{{ $remedy['remedy'] }}</span>
-                                                    @endif
-                                                </span>
-                                                <span class="shrink-0 rounded-full border border-current px-2 py-0.5 text-[10px] font-semibold uppercase">{{ $isBlock ? __('Bloquea') : __('Aviso') }}</span>
-                                            </div>
-                                        @endforeach
-                                        @if (! empty($hardBlockRules))
-                                            <p class="text-sm font-medium text-error">{{ __('No se puede dispensar a este socio.') }}</p>
-                                        @endif
-                                        @include('livewire.counter.partials.inline-fee')
-                                    </div>
-                                @endif
-                            </div>
-                        @endif
-                    </section>
-                @endif
-            </div>
-
-            {{-- ================= CENTRE: weight entry + genetics grid ================= --}}
-            <div class="flex flex-col gap-4">
                 {{-- Weight entry panel (opens when a genetic is chosen). --}}
                 @if ($activeGenetic)
                     <section class="rounded-2xl border border-brand/40 bg-brand-tint/40 p-4 dark:border-brand/40 dark:bg-slate-900">
@@ -374,8 +270,28 @@
 
                 {{-- Genetics grid --}}
                 <section class="rounded-2xl border border-line bg-surface p-4 dark:border-slate-800 dark:bg-slate-900">
-                    <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                    {{-- Prompt 176: stacks until lg. At 820 portrait the selection pane is ~470px and
+                         title + view toggle + search do not fit on one row without clipping. --}}
+                    <div class="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
                         <h2 class="text-base font-semibold">{{ __('Genéticas') }}</h2>
+                        {{-- List / grid. LIST is the default for genetics — see DispensaryPos::$geneticLayout. --}}
+                        <div role="group" aria-label="{{ __('Vista') }}" class="flex w-fit shrink-0 gap-1 self-start rounded-xl border border-line p-1 dark:border-slate-700">
+                            @foreach ([['list', __('Lista'), '☰'], ['grid', __('Cuadrícula'), '▦']] as [$mode, $label, $glyph])
+                                <button
+                                    type="button"
+                                    wire:click="setGeneticLayout('{{ $mode }}')"
+                                    data-layout-option="{{ $mode }}"
+                                    aria-label="{{ $label }}"
+                                    aria-pressed="{{ $geneticLayout === $mode ? 'true' : 'false' }}"
+                                    @class([
+                                        'inline-flex h-11 w-11 items-center justify-center rounded-lg text-base transition',
+                                        'bg-brand text-white' => $geneticLayout === $mode,
+                                        'text-ink-muted hover:bg-surface-alt dark:text-slate-400 dark:hover:bg-slate-800' => $geneticLayout !== $mode,
+                                    ])
+                                >{{ $glyph }}</button>
+                            @endforeach
+                        </div>
+
                         <input
                             type="text"
                             wire:model.live.debounce.300ms="geneticSearch" aria-label="{{ __('Buscar genética…') }}"
@@ -404,6 +320,31 @@
                         </div>
                     @endif
 
+                    {{-- Prompt 176 — the filters are COLLAPSED by default, and search is the primary route.
+
+                         Three labelled filter rows (Categoría, Tipo, Variedad) stood between the heading and
+                         the first genetic; measured on main, the list began past y=1190 in an 820px viewport.
+                         Treez, the cannabis POS, is search-first for exactly this reason: a genetic carries
+                         lab figures, a category and live stock that no row of pills summarises. So search is
+                         at the top, always visible, and the axes are one tap away — labelled as before
+                         (prompt 66: unlabelled, the three read as duplicates), and opened automatically when
+                         a filter is already applied so an active filter is never hidden from the operator. --}}
+                    @php $activeFilters = collect([$categoryId, $productType, $strainType])->filter()->count(); @endphp
+                    <div x-data="{ open: {{ $activeFilters > 0 ? 'true' : 'false' }} }" class="mt-3">
+                        <button
+                            type="button"
+                            x-on:click="open = ! open"
+                            x-bind:aria-expanded="open ? 'true' : 'false'"
+                            class="inline-flex h-11 items-center gap-2 rounded-xl border border-line px-4 text-sm font-medium text-ink-muted transition hover:bg-surface-alt dark:border-slate-700 dark:text-slate-400 dark:hover:bg-slate-800"
+                        >
+                            {{ __('Filtros') }}
+                            @if ($activeFilters > 0)
+                                <span class="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-brand px-1.5 text-[11px] font-bold text-white">{{ $activeFilters }}</span>
+                            @endif
+                            <span aria-hidden="true" x-text="open ? '\u25b4' : '\u25be'"></span>
+                        </button>
+
+                        <div x-show="open" x-cloak>
                     {{-- Each filter row is LABELLED (prompt 66) — Categoría (club data), Tipo (product type)
                          and Variedad (strain) are different axes; unlabelled, they read as duplicates. --}}
                     @if (! empty($categories))
@@ -441,16 +382,25 @@
                             </div>
                         </div>
                     @endif
+                        </div>
+                    </div>
 
-                    <div class="mt-4 grid gap-3 sm:grid-cols-2">
+                    <div @class([
+                        'mt-4',
+                        'flex flex-col gap-2' => $geneticLayout === 'list',
+                        'grid gap-3 sm:grid-cols-2' => $geneticLayout === 'grid',
+                    ])>
                         @forelse ($genetics as $g)
                             @php $disabledCard = $member === null || ! $g['has_batch']; @endphp
                             <button
                                 type="button"
                                 @if (! $disabledCard) wire:click="chooseGenetic('{{ $g['id'] }}')" @endif
                                 @disabled($disabledCard)
+                                data-product
                                 @class([
-                                    'flex flex-col rounded-xl border p-3 text-left transition',
+                                    'flex rounded-xl border p-3 text-left transition',
+                                    'flex-col' => $geneticLayout === 'grid',
+                                    'flex-col gap-1 lg:flex-row lg:items-center lg:justify-between lg:gap-4' => $geneticLayout === 'list',
                                     'border-line bg-surface hover:border-brand hover:bg-brand-tint/40 dark:border-slate-700 dark:bg-slate-950 dark:hover:border-brand' => ! $disabledCard,
                                     'cursor-not-allowed border-dashed border-line bg-surface-alt opacity-60 dark:border-slate-800 dark:bg-slate-900' => $disabledCard,
                                 ])
@@ -487,15 +437,100 @@
                 </section>
             </div>
 
-            {{-- ================= RIGHT: the basket + contribution ================= --}}
-            {{-- Pinned to column 2 spanning both rows at lg so it never drops below the genetics grid into
-                 dead space; auto-placement at xl for the 3-column sidebar (prompt 91, mirrors bar-pos). --}}
-            <div class="flex flex-col gap-4 lg:col-start-2 lg:row-start-1 lg:row-span-2 xl:col-auto xl:row-auto">
+            {{-- ================= CART: fixed. Identity + allowance, basket, commit. ================= --}}
+            <aside
+                data-cart-column
+                class="flex min-h-0 shrink-0 flex-col gap-3 md:w-[19rem] lg:w-[21rem]"
+            >
+                {{-- TOP — who is being served and what they may still have. Never scrolls away. --}}
+                <div class="shrink-0">
+                    @include('livewire.counter.partials.member-cart-summary')
+                </div>
+
+                {{-- MIDDLE — the basket and the payment apparatus, plus the member detail that informs it
+                     (wallet, carencia, sanction, the counter verdict). This is the cart's scroll region:
+                     a long basket lengthens THIS, never the page, so the commit below cannot be pushed off. --}}
+                <div class="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto">
+                    @if ($member)
+                        <section class="rounded-2xl border border-line bg-surface p-4 dark:border-slate-800 dark:bg-slate-900">
+                        {{-- No photo on file (prompt 157): identity can't be verified against a face that isn't
+                             there. The verdict below drives WARN/OVERRIDE enforcement; this is the fix — take it. --}}
+                        @unless ($photoUrl)
+                            <div class="mt-3 rounded-xl border border-warning/30 bg-warning/5 p-3">
+                                <p class="text-xs font-medium text-warning">{{ __('Sin foto en ficha. Verifica con el documento y hazla ahora.') }}</p>
+                                <x-counter.photo-capture :member="$member" source="counter" class="mt-2" />
+                            </div>
+                        @endunless
+                        {{-- Wallet + carencia --}}
+                        <dl class="mt-3 grid grid-cols-2 gap-x-4 gap-y-1.5 text-sm">
+                            <div>
+                                <dt class="text-ink-muted dark:text-slate-400">{{ __('Monedero') }}</dt>
+                                <dd class="font-semibold {{ $walletCents < 0 ? 'text-error' : '' }}">{{ $this->money($walletCents) }}</dd>
+                            </div>
+                            <div>
+                                <dt class="text-ink-muted dark:text-slate-400">{{ __('Carencia') }}</dt>
+                                <dd class="font-medium">
+                                    @if ($inCarencia)
+                                        <span class="text-warning">{{ __('Hasta') }} {{ $member->carencia_ends_at->format('d/m/Y') }}</span>
+                                    @else
+                                        {{ __('Cumplida') }}
+                                    @endif
+                                </dd>
+                            </div>
+                        </dl>
+                        {{-- Active sanction --}}
+                        @if ($sanction)
+                            <div class="mt-3 rounded-xl border border-error/30 bg-error/10 px-3 py-2 text-sm text-error">
+                                <p class="font-semibold">{{ __('Sanción activa') }} · {{ __($sanction->type->value) }}</p>
+                                @if ($sanction->reason)<p class="mt-0.5">{{ $sanction->reason }}</p>@endif
+                            </div>
+                        @endif
+                        {{-- Counter verdict (same shared resolver as the door). --}}
+                        @if ($verdict)
+                            <div class="mt-4 border-t border-line pt-3 dark:border-slate-800">
+                                @if ($verdict->isClear())
+                                    <div class="flex items-center gap-2 rounded-xl border border-success/30 bg-success/10 px-3 py-2 text-sm font-semibold text-success">
+                                        <span>✓</span><span>{{ __('Apto para dispensar.') }}</span>
+                                    </div>
+                                @else
+                                    <div class="space-y-2">
+                                        @foreach ($verdict->rules as $rule)
+                                            @continue($rule['satisfied'])
+                                            @php
+                                                $isBlock = in_array($rule['mode'], ['BLOCK', 'OVERRIDE'], true);
+                                                $remedy = \App\Support\VerdictRemedy::describe($rule, $member, $location);
+                                            @endphp
+                                            {{-- Prompt 135: name the rule in the member's terms + attach the fix; WARN vs BLOCK distinct. --}}
+                                            <div @class([
+                                                'flex items-start justify-between gap-3 rounded-xl border px-3 py-2 text-sm',
+                                                'border-error/30 bg-error/10 text-error' => $isBlock,
+                                                'border-warning/30 bg-warning/10 text-warning' => ! $isBlock,
+                                            ])>
+                                                <span class="min-w-0">
+                                                    {{ $remedy['detail'] }}
+                                                    @if ($remedy['remedy'])
+                                                        <span class="mt-0.5 block text-[11px] opacity-80">{{ $remedy['remedy'] }}</span>
+                                                    @endif
+                                                </span>
+                                                <span class="shrink-0 rounded-full border border-current px-2 py-0.5 text-[10px] font-semibold uppercase">{{ $isBlock ? __('Bloquea') : __('Aviso') }}</span>
+                                            </div>
+                                        @endforeach
+                                        @if (! empty($hardBlockRules))
+                                            <p class="text-sm font-medium text-error">{{ __('No se puede dispensar a este socio.') }}</p>
+                                        @endif
+                                        @include('livewire.counter.partials.inline-fee')
+                                    </div>
+                                @endif
+                            </div>
+                        @endif
+                        </section>
+                    @endif
+
                 <section class="rounded-2xl border border-line bg-surface p-4 dark:border-slate-800 dark:bg-slate-900">
                     <div class="flex items-center justify-between">
                         <h2 class="text-base font-semibold">{{ __('Cesta') }}</h2>
                         @if (! empty($basketLines))
-                            <button type="button" wire:click="clearBasket" class="rounded-lg px-2 py-1 text-sm text-ink-muted hover:bg-black/5 dark:text-slate-400 dark:hover:bg-white/5">{{ __('Vaciar') }}</button>
+                            <button type="button" wire:click="clearBasket" class="inline-flex h-11 min-w-[2.75rem] items-center justify-center rounded-lg px-3 text-sm text-ink-muted hover:bg-black/5 dark:text-slate-400 dark:hover:bg-white/5">{{ __('Vaciar') }}</button>
                         @endif
                     </div>
 
@@ -520,7 +555,7 @@
                                 </div>
                                 <div class="flex shrink-0 items-center gap-2">
                                     <span class="font-semibold tabular-nums">{{ $this->money($line['total_cents']) }}</span>
-                                    <button type="button" wire:click="removeLine({{ $line['index'] }})" class="rounded-md px-2 py-1 text-ink-muted hover:bg-black/5 dark:text-slate-400 dark:hover:bg-white/5">✕</button>
+                                    <button type="button" wire:click="removeLine({{ $line['index'] }})" aria-label="{{ __('Quitar de la cesta') }}" class="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-md text-ink-muted hover:bg-black/5 dark:text-slate-400 dark:hover:bg-white/5">✕</button>
                                 </div>
                             </li>
                         @empty
@@ -555,7 +590,7 @@
                                             <span>{{ $line['qty'] }}× {{ $line['name'] }}</span>
                                             <span class="flex items-center gap-2 tabular-nums">
                                                 {{ $this->money($line['line_total_cents']) }}
-                                                <button type="button" wire:click="removeBarItem({{ $line['index'] }})" aria-label="{{ __('Quitar') }}" class="rounded-md px-1.5 text-ink-muted hover:bg-black/5 dark:text-slate-400 dark:hover:bg-white/5">✕</button>
+                                                <button type="button" wire:click="removeBarItem({{ $line['index'] }})" aria-label="{{ __('Quitar') }}" class="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-md text-ink-muted hover:bg-black/5 dark:text-slate-400 dark:hover:bg-white/5">✕</button>
                                             </span>
                                         </li>
                                     @endforeach
@@ -714,21 +749,6 @@
                             {{ __('Identifica a un socio y añade una genética para empezar.') }}
                         </p>
                     @endif
-
-                    {{-- Commit — ALWAYS shown and disabled ONLY when offline (prompt 60). Every other blocked
-                         state (no socio, empty basket, a hard block, missing signature) stays CLICKABLE, and
-                         commit() flashes its reason into the colocated block above — never a silent dead control. --}}
-                    <button
-                        type="button"
-                        wire:click="commit"
-                        wire:loading.attr="disabled"
-                        wire:target="commit"
-                        x-bind:disabled="! online"
-                        class="mt-4 h-16 w-full rounded-xl bg-brand text-lg font-bold text-white transition hover:bg-brand-dark focus:outline-none focus:ring-2 focus:ring-brand/40 disabled:cursor-not-allowed disabled:opacity-50"
-                    >
-                        <span wire:loading.remove wire:target="commit">{{ __('Registrar aportación') }}</span>
-                        <span wire:loading wire:target="commit">{{ __('Registrando…') }}</span>
-                    </button>
                 </section>
 
                 {{-- Just committed → receipt + void affordance. --}}
@@ -750,7 +770,28 @@
                         </div>
                     </section>
                 @endif
-            </div>
+                </div>
+
+                {{-- BOTTOM — the commit, at the foot of the column. Fixed, so it is on screen with an
+                     empty basket, a full one, and after the selection pane has been scrolled to its end. --}}
+                <div class="shrink-0">
+                    {{-- Commit — ALWAYS shown and disabled ONLY when offline (prompt 60). Every other blocked
+                         state (no socio, empty basket, a hard block, missing signature) stays CLICKABLE, and
+                         commit() flashes its reason into the colocated block above — never a silent dead control. --}}
+                    <button
+                        type="button"
+                        wire:click="commit"
+                        data-commit-action
+                        wire:loading.attr="disabled"
+                        wire:target="commit"
+                        x-bind:disabled="! online"
+                        class="mt-4 h-16 w-full rounded-xl bg-brand text-lg font-bold text-white transition hover:bg-brand-dark focus:outline-none focus:ring-2 focus:ring-brand/40 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                        <span wire:loading.remove wire:target="commit">{{ __('Registrar aportación') }}</span>
+                        <span wire:loading wire:target="commit">{{ __('Registrando…') }}</span>
+                    </button>
+                </div>
+            </aside>
         </div>
     @endif
 @endif

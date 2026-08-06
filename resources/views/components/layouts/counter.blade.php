@@ -79,8 +79,19 @@
 
         @livewireStyles
     </head>
-    <body class="min-h-full bg-surface-alt text-ink antialiased dark:bg-slate-950 dark:text-slate-100">
-        <div class="mx-auto flex min-h-screen w-full max-w-6xl flex-col">
+    {{-- Prompt 176: the two SELLING screens opt into a full-height shell, so the PAGE does not scroll and the
+         cart column can hold the commit action at its foot where it is always reachable. Guarded at `md:`
+         — below that the two-pane layout collapses to a stack, which must scroll normally or it would be
+         clipped with no way to reach the rest. Every other counter screen is unaffected. --}}
+    @php($fills = $fullHeight ?? false)
+    <body @class([
+        'min-h-full bg-surface-alt text-ink antialiased dark:bg-slate-950 dark:text-slate-100',
+        'md:overflow-hidden' => $fills,
+    ])>
+        <div @class([
+            'mx-auto flex min-h-screen w-full max-w-6xl flex-col',
+            'md:h-screen md:min-h-0' => $fills,
+        ])>
             {{-- One shared header for every counter terminal (brand + title + a
                  permission-filtered Panel link + Log out). See x-counter.top-bar. --}}
             {{-- Handed over (prompt 173): the counter's chrome is ABSENT from the DOM, not hidden by CSS.
@@ -91,7 +102,10 @@
                 <x-counter.top-bar :title="$title ?? null" />
             @endunless
 
-            <main class="flex-1 px-4 py-5 sm:px-6">
+            <main @class([
+                'flex-1 px-4 py-5 sm:px-6',
+                'md:min-h-0 md:overflow-hidden' => $fills,
+            ])>
                 {{ $slot }}
             </main>
         </div>

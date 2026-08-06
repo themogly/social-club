@@ -57,6 +57,7 @@ use Illuminate\Support\Str;
 use InvalidArgumentException;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Locked;
+use Livewire\Attributes\Session;
 use Livewire\Component;
 use RuntimeException;
 
@@ -77,7 +78,7 @@ use RuntimeException;
  * @phpstan-type Line array{genetic_id: string, batch_id: string, grams_cg: int, units: ?int}
  * @phpstan-type Rule array{rule: string, satisfied: bool, mode: string, message: string}
  */
-#[Layout('components.layouts.counter')]
+#[Layout('components.layouts.counter', ['fullHeight' => true])] // prompt 176: the page must not scroll; the selection pane does
 class DispensaryPos extends Component
 {
     use CollectsMembershipFees, HandlesTender, IdentifiesOperator, ResolvesCounterLocation;
@@ -92,6 +93,21 @@ class DispensaryPos extends Component
 
     /** Live filter over the genetics grid (name). */
     public string $geneticSearch = '';
+
+    /**
+     * Genetics: LIST by default, grid available, remembered per screen (prompt 176).
+     *
+     * Loyverse is the only vendor publishing guidance on this and it says grid when items carry images and
+     * you want density, list when names are long or the operator needs to see prices without an extra tap.
+     * A genetic carries THC, CBD, category, strain and remaining stock — five figures that do not fit a
+     * tile, which is exactly why Treez (the cannabis one) is search-first. So the default is LIST here and
+     * GRID on the bar, where an article is a name and a price.
+     *
+     * #[Session] rather than a column: it is a per-operator display preference, not club data, and it must
+     * survive a reload without a migration or a write on every toggle.
+     */
+    #[Session(key: 'counter.pos.genetic_layout')]
+    public string $geneticLayout = 'list';
 
     /** Category filter over the genetics grid (null = all). */
     public ?string $categoryId = null;
@@ -360,6 +376,14 @@ class DispensaryPos extends Component
     public function filterStrainType(?string $strainType): void
     {
         $this->strainType = $strainType;
+    }
+
+    /** List or grid for the genetics pane. Anything else is ignored rather than stored (prompt 176). */
+    public function setGeneticLayout(string $layout): void
+    {
+        if (in_array($layout, ['list', 'grid'], true)) {
+            $this->geneticLayout = $layout;
+        }
     }
 
     public function toggleCalculator(): void

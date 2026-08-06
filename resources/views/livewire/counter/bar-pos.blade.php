@@ -15,6 +15,10 @@
             this.$watch(() => JSON.stringify($wire.basket), value => { try { localStorage.setItem('bar.basket', value); } catch (e) {} });
         },
     }"
+    {{-- Prompt 176: the component root carries the height so the two-pane child can resolve `h-full`
+         against a DEFINITE height and the cart column can be constrained instead of overflowing.
+         `md:` only — below that the layout is a normal stacking, scrolling page. --}}
+    class="md:h-full"
 >
     @include('livewire.counter.partials.counter-surface')
 
@@ -92,88 +96,53 @@
              dedicated column 2 spanning both rows, so socio (LEFT) + articles (CENTRE) stack in column 1
              with no dead space and the primary action stays top-right. At xl the RIGHT div resets to
              auto-placement for the 3-column sidebar layout. --}}
-        <div class="grid gap-4 lg:grid-cols-[minmax(0,1fr)_22rem] lg:items-start xl:grid-cols-[19rem_minmax(0,1fr)_21rem]">
+        {{-- Prompt 176 — the same two panes as the dispensary, for the same measured reason: with three
+             articles in the basket `Cobrar` sat 149px below the fold at 1180x820 and 693px below it at
+             820x1180. A dispensary that scrolls correctly and a bar that does not is the same
+             inconsistency this programme exists to remove.
 
-            {{-- ================= LEFT: the socio (OPTIONAL) ================= --}}
-            <div class="flex flex-col gap-4">
-                <section class="rounded-2xl border border-line bg-surface p-4 dark:border-slate-800 dark:bg-slate-900">
-                    <h2 class="text-base font-semibold">{{ __('Socio (opcional)') }}</h2>
-                    <p class="mt-1 text-xs text-ink-muted dark:text-slate-400">{{ __('Atribuye un socio para pagar con monedero. Cobrar en efectivo a un invitado también es válido.') }}</p>
+             The bar has no member step (it serves for cash) and no gram allowance, so its cart has no
+             fixed head — the optional socio attribution rides at the top of the scrolling region, above
+             the basket it pays for. The column, and the commit at its foot, are identical. --}}
+        <div class="flex h-full min-h-0 flex-col gap-4 md:flex-row">
 
-                    @if ($member)
-                        <div class="mt-3 flex items-start gap-3">
-                            <div class="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-brand-tint text-lg font-bold text-brand dark:bg-slate-800 dark:text-slate-200">
-                                {{ mb_strtoupper(mb_substr($member->first_name, 0, 1).mb_substr($member->last_name, 0, 1)) }}
-                            </div>
-                            <div class="min-w-0 flex-1">
-                                <h3 class="truncate font-bold">{{ $member->fullName() }}</h3>
-                                <p class="text-sm text-ink-muted dark:text-slate-400">{{ $member->member_no }}</p>
-                                <p class="mt-1 text-sm">
-                                    <span class="text-ink-muted dark:text-slate-400">{{ __('Monedero') }}:</span>
-                                    <span class="font-semibold {{ $walletCents < 0 ? 'text-error' : '' }}">{{ $this->money($walletCents) }}</span>
-                                </p>
-                            </div>
-                            <button type="button" wire:click="clearMember" class="shrink-0 rounded-lg px-2 py-1.5 text-sm text-ink-muted transition hover:bg-black/5 dark:text-slate-400 dark:hover:bg-white/5">{{ __('Quitar') }}</button>
-                        </div>
-                    @else
-                        <div class="mt-3">
-                            <label for="member-search" class="sr-only">{{ __('Buscar socio por nombre / nº de socio') }}</label>
-                            <input
-                                id="member-search"
-                                type="text"
-                                autofocus
-                                wire:model.live.debounce.300ms="search"
-                                autocomplete="off"
-                                placeholder="{{ __('Buscar socio (nombre o nº)') }}"
-                                class="h-11 w-full rounded-xl border border-line bg-surface px-4 text-base text-ink placeholder:text-ink-muted focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/40 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
-                            >
-
-                            @if ($searchResults !== null)
-                                <ul class="mt-2 divide-y divide-line overflow-hidden rounded-xl border border-line dark:divide-slate-800 dark:border-slate-800">
-                                    @forelse ($searchResults as $result)
-                                        <li>
-                                            <button type="button" wire:click="selectMember('{{ $result->id }}')" class="flex w-full items-center justify-between gap-3 bg-surface px-4 py-3 text-left transition hover:bg-surface-alt dark:bg-slate-900 dark:hover:bg-slate-800">
-                                                <span class="font-medium">{{ $result->fullName() }}</span>
-                                                <span class="text-sm text-ink-muted dark:text-slate-400">{{ $result->member_no }}</span>
-                                            </button>
-                                        </li>
-                                    @empty
-                                        <li class="bg-surface px-4 py-3 text-sm text-ink-muted dark:bg-slate-900 dark:text-slate-400">{{ __('Sin resultados.') }}</li>
-                                    @endforelse
-                                </ul>
-                            @endif
-                        </div>
-                    @endif
-                </section>
-
-                {{-- Order-level reference (guests / rollout / event). --}}
-                <section class="rounded-2xl border border-line bg-surface p-4 dark:border-slate-800 dark:bg-slate-900">
-                    <label for="reference" class="block text-sm font-medium text-ink-muted dark:text-slate-400">{{ __('Referencia del ticket (opcional)') }}</label>
-                    <input
-                        id="reference"
-                        type="text"
-                        wire:model.blur="reference"
-                        autocomplete="off"
-                        placeholder="{{ __('Ej. Invitado, evento…') }}"
-                        class="mt-2 h-11 w-full rounded-xl border border-line bg-surface px-4 text-base text-ink placeholder:text-ink-muted focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/40 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
-                    >
-                </section>
-            </div>
-
-            {{-- ================= CENTRE: article grid + misc line ================= --}}
-            {{-- Prompt 126: the manual-line entry is reachable from a button in THIS header (always visible at
-                 1024×768), opening a modal — it is no longer a section buried below the article grid. --}}
+            {{-- ================= SELECTION: the only thing that scrolls ================= --}}
+            <div
+                data-selection-pane
+                class="flex min-h-0 flex-1 flex-col gap-4 md:overflow-y-auto md:pr-1"
+            >
             <div class="flex flex-col gap-4" x-data="{ showMisc: false }" x-on:misc-added.window="showMisc = false">
                 <section class="rounded-2xl border border-line bg-surface p-4 dark:border-slate-800 dark:bg-slate-900">
-                    <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                    {{-- Prompt 176: wraps rather than clips. At 820 portrait the selection pane is ~470px
+                         and title + view toggle + search + manual-line did not fit on one row. --}}
+                    <div class="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
                         <h2 class="text-base font-semibold">{{ __('Artículos') }}</h2>
-                        <div class="flex items-center gap-2">
+                        {{-- List / grid. GRID is the default for articles — a name and a price fit a tile,
+                             which is the case Loyverse describes; the dispensary defaults the other way. --}}
+                        <div role="group" aria-label="{{ __('Vista') }}" class="flex w-fit shrink-0 gap-1 self-start rounded-xl border border-line p-1 dark:border-slate-700">
+                            @foreach ([['list', __('Lista'), '☰'], ['grid', __('Cuadrícula'), '▦']] as [$mode, $label, $glyph])
+                                <button
+                                    type="button"
+                                    wire:click="setArticleLayout('{{ $mode }}')"
+                                    data-layout-option="{{ $mode }}"
+                                    aria-label="{{ $label }}"
+                                    aria-pressed="{{ $articleLayout === $mode ? 'true' : 'false' }}"
+                                    @class([
+                                        'inline-flex h-11 w-11 items-center justify-center rounded-lg text-base transition',
+                                        'bg-brand text-white' => $articleLayout === $mode,
+                                        'text-ink-muted hover:bg-surface-alt dark:text-slate-400 dark:hover:bg-slate-800' => $articleLayout !== $mode,
+                                    ])
+                                >{{ $glyph }}</button>
+                            @endforeach
+                        </div>
+
+                        <div class="flex min-w-0 flex-1 items-center gap-2">
                             <input
                                 type="text"
                                 wire:model.live.debounce.300ms="articleSearch" aria-label="{{ __('Buscar artículo…') }}"
                                 autocomplete="off"
                                 placeholder="{{ __('Buscar artículo…') }}"
-                                class="h-11 w-full rounded-xl border border-line bg-surface px-4 text-sm text-ink placeholder:text-ink-muted focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/40 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 sm:w-48"
+                                class="h-11 w-full min-w-0 rounded-xl border border-line bg-surface px-4 text-sm text-ink placeholder:text-ink-muted focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/40 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 sm:w-48"
                             >
                             <button type="button" @click="showMisc = true" class="inline-flex h-11 shrink-0 items-center gap-1 rounded-xl border border-brand/40 bg-brand-tint/40 px-3 text-sm font-semibold text-brand transition hover:bg-brand-tint dark:border-brand/40 dark:bg-slate-800 dark:text-slate-100">
                                 <span aria-hidden="true">＋</span>{{ __('Importe manual') }}
@@ -183,22 +152,29 @@
 
                     @if (! empty($categories))
                         <div class="mt-3 flex flex-wrap gap-2">
-                            <button type="button" wire:click="filterCategory(null)" @class(['rounded-full border px-3 py-1 text-sm', 'border-brand bg-brand text-white' => $categoryId === null, 'border-line text-ink-muted dark:border-slate-700 dark:text-slate-400' => $categoryId !== null])>{{ __('Todas') }}</button>
+                            <button type="button" wire:click="filterCategory(null)" @class(['inline-flex items-center rounded-full border min-h-11 px-4 text-sm', 'border-brand bg-brand text-white' => $categoryId === null, 'border-line text-ink-muted dark:border-slate-700 dark:text-slate-400' => $categoryId !== null])>{{ __('Todas') }}</button>
                             @foreach ($categories as $category)
-                                <button type="button" wire:click="filterCategory('{{ $category['id'] }}')" @class(['rounded-full border px-3 py-1 text-sm', 'border-brand bg-brand text-white' => $categoryId === $category['id'], 'border-line text-ink-muted dark:border-slate-700 dark:text-slate-400' => $categoryId !== $category['id']])>{{ $category['name'] }}</button>
+                                <button type="button" wire:click="filterCategory('{{ $category['id'] }}')" @class(['inline-flex items-center rounded-full border min-h-11 px-4 text-sm', 'border-brand bg-brand text-white' => $categoryId === $category['id'], 'border-line text-ink-muted dark:border-slate-700 dark:text-slate-400' => $categoryId !== $category['id']])>{{ $category['name'] }}</button>
                             @endforeach
                         </div>
                     @endif
 
-                    <div class="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                    <div @class([
+                        'mt-4',
+                        'flex flex-col gap-2' => $articleLayout === 'list',
+                        'grid gap-3 sm:grid-cols-2 lg:grid-cols-3' => $articleLayout === 'grid',
+                    ])>
                         @forelse ($articles as $a)
                             @php $soldOut = $a['stock'] <= 0; @endphp
                             <button
                                 type="button"
                                 @if (! $soldOut) wire:click="addArticle('{{ $a['id'] }}')" @endif
                                 @disabled($soldOut)
+                                data-product
                                 @class([
-                                    'flex flex-col overflow-hidden rounded-xl border text-left transition',
+                                    'flex overflow-hidden rounded-xl border text-left transition',
+                                    'flex-col' => $articleLayout === 'grid',
+                                    'flex-col lg:flex-row lg:items-center lg:justify-between' => $articleLayout === 'list',
                                     'border-line bg-surface hover:border-brand hover:bg-brand-tint/40 dark:border-slate-700 dark:bg-slate-950 dark:hover:border-brand' => ! $soldOut,
                                     'cursor-not-allowed border-dashed border-line bg-surface-alt opacity-60 dark:border-slate-800 dark:bg-slate-900' => $soldOut,
                                 ])
@@ -269,14 +245,82 @@
                     </div>
                 </div>
             </div>
+            </div>
 
-            {{-- ================= RIGHT: the basket + payment ================= --}}
-            <div class="flex flex-col gap-4 lg:col-start-2 lg:row-start-1 lg:row-span-2 xl:col-auto xl:row-auto">
+            {{-- ================= CART: fixed. Socio, basket, commit. ================= --}}
+            <aside
+                data-cart-column
+                class="flex min-h-0 shrink-0 flex-col gap-3 md:w-[19rem] lg:w-[21rem]"
+            >
+                <div class="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto">
+                <section class="rounded-2xl border border-line bg-surface p-4 dark:border-slate-800 dark:bg-slate-900">
+                    <h2 class="text-base font-semibold">{{ __('Socio (opcional)') }}</h2>
+                    <p class="mt-1 text-xs text-ink-muted dark:text-slate-400">{{ __('Atribuye un socio para pagar con monedero. Cobrar en efectivo a un invitado también es válido.') }}</p>
+
+                    @if ($member)
+                        <div class="mt-3 flex items-start gap-3">
+                            <div class="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-brand-tint text-lg font-bold text-brand dark:bg-slate-800 dark:text-slate-200">
+                                {{ mb_strtoupper(mb_substr($member->first_name, 0, 1).mb_substr($member->last_name, 0, 1)) }}
+                            </div>
+                            <div class="min-w-0 flex-1">
+                                <h3 class="truncate font-bold">{{ $member->fullName() }}</h3>
+                                <p class="text-sm text-ink-muted dark:text-slate-400">{{ $member->member_no }}</p>
+                                <p class="mt-1 text-sm">
+                                    <span class="text-ink-muted dark:text-slate-400">{{ __('Monedero') }}:</span>
+                                    <span class="font-semibold {{ $walletCents < 0 ? 'text-error' : '' }}">{{ $this->money($walletCents) }}</span>
+                                </p>
+                            </div>
+                            <button type="button" wire:click="clearMember" class="shrink-0 rounded-lg px-2 py-1.5 text-sm text-ink-muted transition hover:bg-black/5 dark:text-slate-400 dark:hover:bg-white/5">{{ __('Quitar') }}</button>
+                        </div>
+                    @else
+                        <div class="mt-3">
+                            <label for="member-search" class="sr-only">{{ __('Buscar socio por nombre / nº de socio') }}</label>
+                            <input
+                                id="member-search"
+                                type="text"
+                                autofocus
+                                wire:model.live.debounce.300ms="search"
+                                autocomplete="off"
+                                placeholder="{{ __('Buscar socio (nombre o nº)') }}"
+                                class="h-11 w-full rounded-xl border border-line bg-surface px-4 text-base text-ink placeholder:text-ink-muted focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/40 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
+                            >
+
+                            @if ($searchResults !== null)
+                                <ul class="mt-2 divide-y divide-line overflow-hidden rounded-xl border border-line dark:divide-slate-800 dark:border-slate-800">
+                                    @forelse ($searchResults as $result)
+                                        <li>
+                                            <button type="button" wire:click="selectMember('{{ $result->id }}')" class="flex w-full items-center justify-between gap-3 bg-surface px-4 py-3 text-left transition hover:bg-surface-alt dark:bg-slate-900 dark:hover:bg-slate-800">
+                                                <span class="font-medium">{{ $result->fullName() }}</span>
+                                                <span class="text-sm text-ink-muted dark:text-slate-400">{{ $result->member_no }}</span>
+                                            </button>
+                                        </li>
+                                    @empty
+                                        <li class="bg-surface px-4 py-3 text-sm text-ink-muted dark:bg-slate-900 dark:text-slate-400">{{ __('Sin resultados.') }}</li>
+                                    @endforelse
+                                </ul>
+                            @endif
+                        </div>
+                    @endif
+                </section>
+
+                {{-- Order-level reference (guests / rollout / event). --}}
+                <section class="rounded-2xl border border-line bg-surface p-4 dark:border-slate-800 dark:bg-slate-900">
+                    <label for="reference" class="block text-sm font-medium text-ink-muted dark:text-slate-400">{{ __('Referencia del ticket (opcional)') }}</label>
+                    <input
+                        id="reference"
+                        type="text"
+                        wire:model.blur="reference"
+                        autocomplete="off"
+                        placeholder="{{ __('Ej. Invitado, evento…') }}"
+                        class="mt-2 h-11 w-full rounded-xl border border-line bg-surface px-4 text-base text-ink placeholder:text-ink-muted focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/40 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
+                    >
+                </section>
+
                 <section class="rounded-2xl border border-line bg-surface p-4 dark:border-slate-800 dark:bg-slate-900">
                     <div class="flex items-center justify-between">
                         <h2 class="text-base font-semibold">{{ __('Cesta') }}</h2>
                         @if (! empty($basketLines))
-                            <button type="button" wire:click="clearBasket" class="rounded-lg px-2 py-1 text-sm text-ink-muted hover:bg-black/5 dark:text-slate-400 dark:hover:bg-white/5">{{ __('Vaciar') }}</button>
+                            <button type="button" wire:click="clearBasket" class="inline-flex h-11 min-w-[2.75rem] items-center justify-center rounded-lg px-3 text-sm text-ink-muted hover:bg-black/5 dark:text-slate-400 dark:hover:bg-white/5">{{ __('Vaciar') }}</button>
                         @endif
                     </div>
 
@@ -297,7 +341,7 @@
                                 </div>
                                 <div class="flex shrink-0 flex-col items-end gap-2">
                                     <span class="font-semibold tabular-nums">{{ $this->money($line['line_total_cents']) }}</span>
-                                    <button type="button" wire:click="removeLine({{ $line['index'] }})" aria-label="{{ __('Quitar de la cesta') }}" class="rounded-md px-2 py-1 text-ink-muted hover:bg-black/5 dark:text-slate-400 dark:hover:bg-white/5">✕</button>
+                                    <button type="button" wire:click="removeLine({{ $line['index'] }})" aria-label="{{ __('Quitar de la cesta') }}" class="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-md text-ink-muted hover:bg-black/5 dark:text-slate-400 dark:hover:bg-white/5">✕</button>
                                 </div>
                             </li>
                         @empty
@@ -391,22 +435,6 @@
                             {{ $flashMessage }}
                         </div>
                     @endif
-
-                    {{-- Commit — disabled ONLY when offline (prompt 60). The offline banner above is driven
-                         by the SAME `online`, so a disabled button always shows its reason. Every other
-                         blocked state (no till, empty basket, wallet-without-socio…) stays CLICKABLE and
-                         commit() flashes its reason into the colocated block above — never a silent dead control. --}}
-                    <button
-                        type="button"
-                        wire:click="commit"
-                        wire:loading.attr="disabled"
-                        wire:target="commit"
-                        x-bind:disabled="! online"
-                        class="mt-4 h-16 w-full rounded-xl bg-brand text-lg font-bold text-white transition hover:bg-brand-dark focus:outline-none focus:ring-2 focus:ring-brand/40 disabled:cursor-not-allowed disabled:opacity-50"
-                    >
-                        <span wire:loading.remove wire:target="commit">{{ __('Cobrar') }}</span>
-                        <span wire:loading wire:target="commit">{{ __('Cobrando…') }}</span>
-                    </button>
                 </section>
 
                 {{-- Just committed → ticket + void affordance. --}}
@@ -426,7 +454,28 @@
                         </div>
                     </section>
                 @endif
-            </div>
+                </div>
+
+                {{-- BOTTOM — the commit, at the foot of the column. --}}
+                <div class="shrink-0">
+                    {{-- Commit — disabled ONLY when offline (prompt 60). The offline banner above is driven
+                         by the SAME `online`, so a disabled button always shows its reason. Every other
+                         blocked state (no till, empty basket, wallet-without-socio…) stays CLICKABLE and
+                         commit() flashes its reason into the colocated block above — never a silent dead control. --}}
+                    <button
+                        type="button"
+                        wire:click="commit"
+                        data-commit-action
+                        wire:loading.attr="disabled"
+                        wire:target="commit"
+                        x-bind:disabled="! online"
+                        class="mt-4 h-16 w-full rounded-xl bg-brand text-lg font-bold text-white transition hover:bg-brand-dark focus:outline-none focus:ring-2 focus:ring-brand/40 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                        <span wire:loading.remove wire:target="commit">{{ __('Cobrar') }}</span>
+                        <span wire:loading wire:target="commit">{{ __('Cobrando…') }}</span>
+                    </button>
+                </div>
+            </aside>
         </div>
     @endif
 @endif
