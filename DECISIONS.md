@@ -6380,3 +6380,50 @@ OFF a conversion does move the headroom — asserted in both directions under bo
 **Unchanged, as required:** nothing about verification. Age, avalador, carencia and limits apply to a
 temporary member exactly as before — `MemberKind`'s own docblock says the distinction affects only list
 visibility and retention timing, and the action's helper text repeats it to the operator.
+
+## Prompt 166 — opening a batch for editing threw a 500
+
+**The cause.** `Batch` casts `initial_cg` and `remaining_cg` through `WeightCast`. `EditBatch` was a bare
+`EditRecord`, and Filament seeds form state from the **whole record** (`attributesToArray()`), not from the
+fields the form declares — so two `Weight` value objects landed in a public Livewire array property and
+`dehydrateProperties()` threw during `mount`: *Property type not supported: [{"centigrams":10000}]*.
+Neither column is on the form at all: `grams`/`units` are create-only and edit offers dates, lab report and
+notes. So the batch saved correctly, its data was sound, and it simply **could not be opened** — reproduced
+verbatim against `main` before the fix, and the reported error string matches to the byte.
+
+**The fix is the one seven other pages already have** — `mutateFormDataBeforeFill()` dropping the cast
+keys, matching `EditPurchase`. Unlike the money pages there is no virtual counterpart to seed: batch stock
+is deliberately read-only here (quantity is set once by `IntakeBatch` and moves only through
+`RecordStockMovement`), so the columns are dropped rather than round-tripped through a grams field, and
+`remaining_cg` was NOT surfaced as a field while in there.
+
+**Verified rather than assumed.** The prompt said five resources were already guarded; the actual count is
+**seven** (`Articles`, `Discounts`, `Expenses`, `Genetics`, `Locations`, `MembershipTiers`, `Purchases`) —
+though two of those guard something else entirely (`EditGenetic` seeds virtual percentage fields,
+`EditLocation` seeds per-location Settings), so **six** resources carry an object-cast model with an Edit
+page and `Batches` was the only unguarded one. Confirmed by deriving the set from the models' own casts,
+not by reading the prompt's table.
+
+**The guard against recurrence is the more valuable half, and it already existed — pointed the wrong way.**
+`EditPageMountTest` was written for exactly this failure mode, but it **hand-listed five money-backed
+pages**. `Batch` is weight-backed; nobody revisited the list when `WeightCast` arrived; the defect shipped
+through a green suite. That is the same lesson as the fixture rule in `CLAUDE.md`, learned again: a
+hand-maintained list of what to check is a list that drifts. The test now **derives** the set — every
+Filament resource with an Edit page whose model casts a column to `MoneyCast`/`WeightCast` — and fails if
+any derived resource has no mount fixture. A new object-cast column on a model whose Edit page nobody
+revisited now fails in milliseconds instead of 500ing in front of staff. The derivation asserts it detects
+`BatchResource` specifically, so the guard cannot quietly stop looking.
+
+**A Livewire synthesizer for `Money`/`Weight` was considered and rejected.** It would make the whole class
+of bug disappear, which is tempting, but it is a much bigger decision than this defect warrants and it
+points the wrong way on two counts: it would put value objects into **client-visible Livewire state**,
+where money and weight figures do not belong, and it would make it *normal* for a cast object to reach a
+form rather than an error — removing the pressure that keeps virtual euro/gram fields explicit at the edge.
+The house rule is that money and weight cross the edge as euros/grams through a named field, and a
+synthesizer would quietly erode it.
+
+**Untouched, as required:** `WeightCast`, `MoneyCast`, `Weight`, `Money` and `IntakeBatch`. No new copy was
+needed. Tests (MySQL): an existing batch's edit page returns 200 (fails against `main` with the exact
+reported exception), a **per-unit** batch opens too (cg columns null — proving the fix is not something
+that only works when the weight columns are populated), editing dates/notes leaves `initial_cg` and
+`remaining_cg` byte-identical, and the fill drops exactly the two cast keys and nothing else.
