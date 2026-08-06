@@ -153,7 +153,7 @@ class DemoDataSeeder extends Seeder
         // The petty-cash category is identified by KIND (TILL), never by its localised name (prompt 70).
         $pettyCashCat = ExpenseCategory::where('default_kind', ExpenseKind::TILL)->first();
 
-        Discount::create(['organisation_id' => $org->id, 'name' => $strings['discounts']['staff'], 'kind' => DiscountKind::STAFF, 'mode' => DiscountMode::PERCENT, 'value_bp' => 1000, 'applies_to' => DiscountAppliesTo::BOTH, 'active' => true]);
+        Discount::create(['organisation_id' => $org->id, 'name' => $strings['discounts']['staff'], 'kind' => DiscountKind::STAFF, 'mode' => DiscountMode::PERCENT, 'value_bp' => 1000, 'applies_to' => DiscountAppliesTo::GENETIC, 'active' => true]);
         Discount::create(['organisation_id' => $org->id, 'name' => $strings['discounts']['therapeutic'], 'kind' => DiscountKind::THERAPEUTIC, 'mode' => DiscountMode::PERCENT, 'value_bp' => 1500, 'applies_to' => DiscountAppliesTo::GENETIC, 'active' => true]);
 
         // Members BEFORE the catalogue (prompt 106): the opening-stock intake is sized to each sede's live

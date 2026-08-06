@@ -273,9 +273,26 @@ class ResolvePrice
         }
 
         // Default: the single discount that saves the member the most on one gram.
+        //
+        // A FIXED amount cannot be ranked against a PERCENT here (prompt 168). Candidates are compared
+        // on ONE GRAM's rate, but PriceResult::discountAmount() applies the winner to the WHOLE
+        // subtotal — so a percentage scales with the order and a fixed amount does not, and the
+        // comparison systematically over-values the fixed one. Measured against the real classes:
+        // rate €10/g, 10 g, subtotal €100, candidates 10% vs €3 fixed → the €3 won and the member was
+        // charged €7.00 more than the best discount available to them.
+        //
+        // The quantity is not known at price resolution, so there is no basis on which the two CAN be
+        // compared here. A fixed amount therefore never COMPETES: it applies only when it is the sole
+        // candidate, which keeps a legacy row pricing (nothing can author one since prompt 168) without
+        // letting it beat a better percentage.
+        $comparable = array_values(array_filter($candidates, fn (array $c): bool => $c['mode'] === DiscountMode::PERCENT));
+        if ($comparable === []) {
+            $comparable = $candidates;
+        }
+
         $best = null;
         $bestSave = 0;
-        foreach ($candidates as $candidate) {
+        foreach ($comparable as $candidate) {
             $save = $candidate['mode'] === DiscountMode::PERCENT
                 ? (int) round_half_up($rate * (int) $candidate['value_bp'] / 10_000)
                 : min((int) $candidate['value_cents'], $rate);

@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\Discounts\Pages;
 
+use App\Enums\DiscountMode;
 use App\Filament\Resources\Discounts\DiscountResource;
 use App\Models\Discount;
 use Filament\Actions\DeleteAction;
@@ -45,6 +46,21 @@ class EditDiscount extends EditRecord
      */
     protected function mutateFormDataBeforeSave(array $data): array
     {
+        $record = $this->getRecord();
+
+        // A legacy fixed-amount row keeps its amount and its scope. The form cannot express a fixed
+        // amount any more (prompt 168), so editing one must round-trip its value untouched rather than
+        // convert it to a percentage of whatever happens to be in the box.
+        if ($record instanceof Discount && $record->mode !== DiscountMode::PERCENT) {
+            unset($data['value_pct'], $data['value_eur'], $data['value_bp'], $data['value_cents'], $data['mode'], $data['applies_to']);
+
+            return $data;
+        }
+
+        // Editing never restamps mode/applies_to either — an existing BOTH/ARTICLE row must keep
+        // discounting the bar after somebody corrects its name.
+        unset($data['mode'], $data['applies_to']);
+
         return CreateDiscount::normalise($data);
     }
 }

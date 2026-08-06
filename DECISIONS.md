@@ -6536,3 +6536,78 @@ order. The docblock now says plainly that it is a developer convenience and name
 **No translation content changed anywhere in this branch** — asserted by a test that no run of the command
 alters a value, and by the normalisation commit's own before/after comparison. `LocalizationTest`'s
 assertions are untouched; this branch makes the command agree with them, not the other way round.
+
+## Prompt 168 — creating a discount did nothing at all, or created one worth zero
+
+All five findings reproduced against `main` before building. Measurements below are from a real browser.
+
+**a. The primary button was dying in the browser, and the fix is panel-wide.** `name`, `kind` and `mode`
+were `->required()`, so Filament rendered the native HTML `required` attribute and the primary button — a
+plain `type="submit"` — was refused by the browser's own constraint check. **0 Livewire requests, 0 error
+nodes**, nothing red, nothing scrolled: the screen did not change. The secondary *"Crear y crear otro"*
+(`wire:click`, bypassing native submission) showed three errors on the *same* empty form.
+
+Chosen fix: **stop relying on native constraint validation**, via a single
+`Form::configureUsing(… extraAttributes(['novalidate' => 'novalidate']))` in `AppServiceProvider` — so
+every form in the panel inherits it, not just this one. The decisive argument is not that native validation
+is unhelpful but that it is **structurally incapable** of covering this app's fields: the browser can
+report on a text input, but not on a Filament `Select` left on its placeholder (**the reported case**), a
+file upload, a repeater or a rich editor. Filament's server-side validation already covers every field,
+renders the message beside it and scrolls to the first — `novalidate` is simply what lets it run.
+
+Measured after, on the same empty form: `novalidate` present, **1 Livewire POST**, and three visible
+messages — *"The name field is required"*, *"The type field is required"*, *"The percentage (%) field is
+required"*. Note `checkValidity()` is still `false`: the constraints are unchanged, they just no longer
+silently block. No PHP test can catch this class of defect (Livewire tests never touch a browser), so the
+regression test asserts `novalidate` on the rendered form and the browser measurement is recorded here.
+
+**b. A discount can no longer be worth nothing.** `value_pct` is `required`, `min 0.01`, `max 100`.
+`normalise()` used to cast a missing value through `(float) ($data['value_eur'] ?? 0)` and store
+`value_bp = 0` — active, assignable, on the templates list, taking nothing off anything for ever. **No data
+fix shipped:** zero such rows exist locally (`value_bp = 0` → 0), a zero-value discount is inert rather
+than harmful, and the owner can delete the one in the sandbox. A migration to hunt for them would touch
+live rows for no benefit.
+
+**c. Fixed-amount authoring removed; the reading path kept, and the overcharge fixed.** `mode` is no longer
+a question at all — not a one-option dropdown, which would be the same mistake as two money fields — and is
+**stamped** in `mutateFormDataBeforeCreate`, which also closes the crafted-request route (asserted: a POST
+naming `mode=FIXED` produces a PERCENT row).
+
+I did **not** retire `DiscountMode::FIXED` outright, deviating from the prompt's preference, and the reason
+is evidence I do not have: my sandbox has zero `FIXED` rows in `discounts` **and** `member_discounts`, but
+I cannot inspect the production database from here, and the enum cast throws on an unknown stored value —
+so removing the case risks 500ing a live install to save one `match` arm. The prompt is explicit that if
+the reading path stays, `chooseDiscount` must compare like for like. It now does, and the fix is more
+interesting than a rescale:
+
+> Candidates are ranked on **one gram's** rate, but `PriceResult::discountAmount()` applies the winner to
+> the **whole subtotal**. A percentage scales with the order; a fixed amount does not. And the quantity is
+> **not known at price resolution** — so there is no basis on which the two *can* be compared there.
+
+So a fixed amount **never competes**: it applies only when it is the sole candidate. That removes the
+overcharge (a member holding 10% and €3 fixed on a 10 g/€100 order was given the €3 and charged **€7.00
+more**) while a legacy row with no percentage alongside it still prices. Both cases are pinned by tests.
+
+**A hazard the prompt did not mention, and the worst thing in this branch.** `EditDiscount` shares
+`normalise()` with create. Stamping `mode`/`applies_to` inside it — the obvious place — would have
+**silently converted every legacy `FIXED` and `BOTH`/`ARTICLE` row the moment somebody corrected its
+name**, taking the bar's discounts out with it. Stamping happens in `mutateFormDataBeforeCreate` only;
+`EditDiscount` strips `mode`/`applies_to` and round-trips a legacy fixed amount untouched (the percentage
+field is hidden on such a row, so a required box cannot make it uneditable). Three tests cover it.
+
+**d. Flower only — the choice is hidden, the capability is not deleted.** `applies_to` is stamped
+`GENETIC`; the **column, the enum and both resolvers are untouched**. The cost, stated plainly:
+`App\Actions\Pricing\ResolveArticleDiscount` exists solely to discount bar/merch orders, so **every new
+discount returns 0 there** and the bar POS will only discount via rows created before this branch. That is
+the owner's instruction and it is a one-line reversal if a bar discount is ever wanted; deleting the column
+and the resolver would save nothing and could not be undone. Existing `BOTH`/`ARTICLE` rows keep working
+and `BarArticleDiscountTest` passes untouched. **The seeder's `BOTH` staff discount became `GENETIC`** —
+demo data that no longer matches what the product can author is its own kind of lie, and the bar path stays
+proven by `BarArticleDiscountTest`'s own fixture rather than by pretending it is authorable.
+
+**e. The category picker is filtered to `GENETIC`**, as `ArticleForm` and `GeneticForm` already filter
+theirs. Unfiltered it offered bar categories, so a flower-only discount could be pointed at one, match
+nothing, and still look configured.
+
+`FormCompletenessTest`'s allowlist now documents `mode`, `applies_to` and `value_cents` with reasons — it
+caught their removal from the form immediately, which is exactly its job.
