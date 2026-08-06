@@ -6173,6 +6173,19 @@ sets `DB_TIMEZONE=+00:00`. UTC has no DST transitions, so no generated datetime 
 inserting `2027-03-28 02:30:00` (inside the gap) under the UTC session. No-op in production (the connector skips
 `SET time_zone` when the value is unset); a production DB should run UTC anyway. No factory or test was changed.
 
+## Merge authorisation for prompts 163 onward
+
+Each of these prompts ends "push the branch; **do not merge**", and CLAUDE.md's normal rule is that a
+human reviews and merges. **Merged to `main` per the project owner's EXPLICIT instruction** ("can you
+merge all to main"), which overrides the prompts' default — the owner is the reviewer authorising it, the
+same basis recorded for prompt 32. Recorded here for the audit trail, since 163 is a security change.
+
+Practical reason it matters beyond permission: every prompt in this queue appends to `DECISIONS.md` and
+both locale files, so seven simultaneous open branches would conflict in exactly those three files. Merging
+each as it lands keeps every later branch building on a `main` that already contains the earlier ones.
+Prompt 171 (`lang:sync` ordering) is deliberately run **last**, because normalising the locale files would
+conflict with every branch still in flight.
+
 ## Prompt 163 — browser autofill silently rewrote passwords on the staff form
 
 **The mechanism.** `UserForm`'s password input was correct on its own terms: Filament leaves it empty on
