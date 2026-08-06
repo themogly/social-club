@@ -99,7 +99,9 @@ class FormCompletenessTest extends TestCase
         ],
         DiscountResource::class => [
             'value_bp' => 'entered as percent via value_pct (basis points at the edge).',
-            'value_cents' => 'entered as euros via value_eur.',
+            'value_cents' => 'legacy fixed-amount column; no longer authorable, kept so old rows still price (prompt 168).',
+            'mode' => 'stamped PERCENT on create (prompt 168) — a fixed amount cannot be ranked against a percentage, so it is not offered.',
+            'applies_to' => 'stamped GENETIC on create (prompt 168) — discounts apply to flower; existing rows keep their scope.',
         ],
         DocumentTemplateResource::class => [
             'version' => 'system: auto-incremented per generated template version.',
