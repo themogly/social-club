@@ -136,12 +136,17 @@ Route::middleware('web')->prefix('socio')->name('socio.')->group(function () {
     Route::post('login', [SocioAuthController::class, 'sendLink'])->middleware('throttle:5,1')->name('login.send');
     Route::get('login/verify/{token}', [SocioAuthController::class, 'verify'])->middleware('throttle:10,1')->name('login.verify');
 
+    // Choosing a language is NOT a member-only act (prompt 167). It sat behind auth:member, so even
+    // once the switcher was rendered for an applicant it would have bounced them to the login page.
+    // It persists to the member row only when there IS one; for an applicant it is a session choice.
+    // Throttled because it is now unauthenticated, and it writes nothing but a session key.
+    Route::post('idioma', [PwaController::class, 'switchLocale'])->middleware('throttle:30,1')->name('locale');
+
     Route::middleware('auth:member')->group(function () {
         Route::get('/', [PwaController::class, 'home'])->name('home');
         Route::get('menu', [PwaController::class, 'menu'])->name('menu');
         Route::get('historial', [PwaController::class, 'history'])->name('history');
         Route::get('mis-datos', [PwaController::class, 'export'])->name('export');
-        Route::post('idioma', [PwaController::class, 'switchLocale'])->name('locale');
         Route::post('logout', [SocioAuthController::class, 'logout'])->name('logout');
     });
 });

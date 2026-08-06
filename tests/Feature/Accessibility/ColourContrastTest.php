@@ -110,7 +110,9 @@ class ColourContrastTest extends TestCase
         // WCAG 2.2 Target Size (Minimum) 24×24 — asserted at the markup level (min-w ≥ 28px, min-h ≥ 24px),
         // since there is no browser here to measure rendered pixels.
         foreach ([
-            'resources/views/components/layouts/socio.blade.php',
+            // The socio switcher moved out of the layout into its own component (prompt 167) so it can
+            // render on screens with no member chrome — the target-size floor moved with it.
+            'resources/views/components/socio/locale-switcher.blade.php',
             'resources/views/livewire/locale-switcher.blade.php',
         ] as $file) {
             $markup = (string) file_get_contents(base_path($file));
