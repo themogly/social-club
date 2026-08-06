@@ -6611,3 +6611,55 @@ nothing, and still look configured.
 
 `FormCompletenessTest`'s allowlist now documents `mode`, `applies_to` and `value_cents` with reasons — it
 caught their removal from the form immediately, which is exactly its job.
+
+## Prompt 169 — every validation message in the Spanish product was a raw key
+
+**The finding, reproduced.** `lang/` held only `en.json` and `es.json`, neither carrying a single
+`validation.*` key, and there was no `lang/es/validation.php` **or** `lang/en/validation.php`.
+`.env.example` ships `APP_LOCALE=es` **with** `APP_FALLBACK_LOCALE=es`, so Laravel's own bundled English
+file was never consulted either. Run against `main`:
+
+```
+locale=es fallback=es   ->   validation.required · validation.integer · validation.accepted
+```
+
+The worst surface is the one facing the public: an applicant who did not tick the statutes box was told
+**`validation.accepted`** — on an Article 9 consent control, on their phone, from an emailed link, with no
+member of staff beside them. Prompts 153 and 167 went to real trouble to make that consent informed and
+reachable in both languages; this undid a good part of it at the last step.
+
+**Prompt 168 turned this from latent into the normal path, which is why it was promoted above 170.** That
+branch's panel-wide `novalidate` means every required field now round-trips to the server instead of being
+stopped by a browser bubble. Roughly 130 `->required()` calls across the Filament schemas alone went from
+"fails with a browser-localised message" to "fails with a raw key". Fixing 168 without this would have been
+a net regression for a Spanish operator.
+
+**The full framework set, published and translated — not a partial file.** `php artisan lang:publish`
+wrote the English lines; `lang/es/validation.php` is the actual work (110 rules, every size variant of
+`between`/`gt`/`gte`/`lt`/`lte`/`max`/`min`/`size`, and the five `password` sub-rules). Hand-writing only
+the rules in use today would silently print a key again the next time anybody adds one — which is the
+failure being fixed. Both files ship, so the app is correct under **any** combination of `APP_LOCALE` and
+`APP_FALLBACK_LOCALE`; production's `.env` is not this repo's.
+
+**Where the field names live: the shared file.** `SubmitApplicationRequest::attributes()` already held a
+curated map — *nombre, apellidos, correo, fecha de nacimiento, consentimiento de tratamiento de datos,
+aceptación de los estatutos* — and it was **completely inert**, because `:attribute` is interpolated from
+the validation lines and that file did not exist. Somebody had done the harder half and it was invisible.
+It has moved into `lang/*/validation.php`'s `attributes` and been extended to the fields every form shares,
+so *"El campo número de documento es obligatorio"* is now the default everywhere rather than on one form.
+The per-request override remains available for anything genuinely context-specific.
+
+**Deliberate widening, stated rather than smuggled.** `lang:publish` publishes `auth.php`,
+`passwords.php` and `pagination.php` alongside `validation.php`, and **all three had the identical
+defect** — measured: `auth.failed` rendered as `auth.failed` on a Spanish login. Shipping only the
+validation half would have left the same bug on the most visible unauthenticated screen in the product,
+with the English files already published beside it. All four are translated. This is one defect (missing
+locale files under `fallback=es`), not two features.
+
+**No validation rule was touched** — not one added, removed, relaxed or tightened. The branch changes only
+what a failure *says*. `AvaladorWithinSponseeCap` already emitted a proper `__()` string and needed
+nothing; Filament's own Spanish UI chrome is untouched.
+
+**The guard that stops it recurring:** `ValidationMessageTest` drives the validator across the 23 rules the
+app actually uses, in **both** locales under `fallback=locale`, and asserts no message contains
+`validation.` — plus that both files cover the same rule set. All seven tests fail against `main`.
