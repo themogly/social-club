@@ -6427,3 +6427,69 @@ needed. Tests (MySQL): an existing batch's edit page returns 200 (fails against 
 reported exception), a **per-unit** batch opens too (cg columns null — proving the fix is not something
 that only works when the weight columns are populated), editing dates/notes leaves `initial_cg` and
 `remaining_cg` byte-identical, and the fill drops exactly the two cast keys and nothing else.
+
+## Prompt 167 — the one person who most needs the language switcher was the only one who could not see it
+
+**The cause: two unrelated conditions conflated by accident.** The socio layout wrapped its whole header
+— and with it the language switcher — in `@if ($authed && $nav)`. But `$nav` controls the **bottom tab
+bar** (a member's navigation) and `$authed` controls **member-specific chrome** (the home link, the
+notification settings). Neither has anything to do with whether a human can choose a language. The
+application form is unauthenticated *and* passes `nav="false"`, so both halves failed and the switcher
+went with the header.
+
+**The audience was exactly inverted.** A signed-in member — who has already joined, already consented, and
+can ask a member of staff — got the switcher. A prospective applicant, who has never interacted with the
+club, may not read Spanish, and is being asked to tick two boxes agreeing to the privacy declaration and
+the statutes (**Article 9 consent**), got nothing. The switcher is now a shared component
+(`components/socio/locale-switcher.blade.php`) and the header renders whenever it has anything to hold, so
+the application form, the member login and every other `nav="false"` screen offer it. Its ≥24×24 target
+floor moved with it, and `ColourContrastTest` now guards it at its new home.
+
+**A second half of the defect that the prompt did not mention, and which would have made the fix inert:**
+`socio.locale` — the POST the switcher submits to — sat **inside `Route::middleware('auth:member')`**. So
+even a rendered switcher would have bounced an applicant to the member login. It is now outside the guard
+(throttled, since it is unauthenticated) and `switchLocale` persists to the member row **only when there is
+one**; for an applicant it is a session choice, which is all one form needs. It also honours an explicit
+same-origin `return_to`, because an applicant arrives from an emailed link where `back()` has no referer to
+work with and would drop them on the PWA home — i.e. straight into the login they cannot pass.
+
+**This is what makes prompt 153 reachable.** That branch made the consent declarations per-locale and
+recorded which locale the applicant actually read, precisely so consent is informed and reproducible. On
+this screen the other locale could never be shown, so the English text existed and could not be reached.
+Asserted directly: switching changes the labels **and** the consent declarations.
+
+### The `Accept-Language` decision: built, measured, and rejected
+
+The prompt's own view was to honour the browser hint for anonymous visitors as well as showing the
+switcher. **I implemented it and then took it out**, and the measurements are the reason.
+
+Placed in `SetLocale` (never in `ResolveLocale`, so queued jobs and notifications — which have no request —
+were untouched by construction rather than by care), gated on the header being present, it worked. It also
+**broke three existing tests that encode a deliberate earlier decision**:
+
+- `PublicApplicationFormTest::test_the_form_renders_in_the_club_default_language` — *"A prospect cannot
+  have a preference, so the ONLY lever is the club default"* (prompt 96).
+- `PublicApplicationFormTest::test_the_consent_texts_are_shown_and_the_recorded_version_matches_the_displayed_one`.
+- `LocaleTest::test_middleware_applies_an_enabled_session_locale_and_ignores_others` — *"stays the org
+  default"*.
+
+So the hint does not add a missing capability; it **reverses prompt 96's recorded choice** about who
+decides the language for a visitor with no preference, across every anonymous page in the product, not just
+this form. And the argument for it — that an applicant who cannot read the form cannot give informed
+consent — is now **fully answered by the switcher**, which is on the page, meets the target-size floor, and
+changes the consent declarations in one tap. A guess that silently overrides a Spanish asociación's
+configured default earns nothing once the override is one tap away.
+
+Two further points that made the call easier. Symfony's `getPreferredLanguage()` returns the **first
+offered locale** when there is no `Accept-Language` at all, so an ungated version would have replaced the
+club default on every header-less request — and `Request::create()` (which Laravel's own test client uses)
+injects a default `Accept-Language: en-us`, which is how the blast radius surfaced in the first place. A
+mechanism whose default-off behaviour depends on a header nobody controls is a poor lever for a legal
+default.
+
+`ResolveLocale` and the resolution chain are therefore **unchanged**, and `SetLocale` carries a comment
+recording that the hint is deliberately not consulted. If the owner wants browser-language detection later
+it should be its own prompt, scoped and decided on its own terms, not smuggled in behind a display fix.
+
+**Untouched, as required:** consent capture (prompt 153's test passes unaltered), the switcher's persistence
+behaviour for members, and the one-locale case (no switcher renders when only one locale is enabled).

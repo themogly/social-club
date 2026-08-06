@@ -123,8 +123,24 @@ class PwaController extends Controller
         $enabled = Settings::get('enabled_locales', ['es', 'en']);
 
         if (is_array($enabled) && in_array($locale, $enabled, true)) {
-            $this->member()->forceFill(['locale' => $locale])->save();
+            // A member's choice follows them across devices; an APPLICANT has no row to persist to
+            // (prompt 167), so for them it is a session choice — which is all they need for the one
+            // form they are filling in. The session override is written either way, so the change
+            // applies on the very next request.
+            $member = Auth::guard('member')->user();
+            if ($member instanceof Member) {
+                $member->forceFill(['locale' => $locale])->save();
+            }
+
             $request->session()->put('locale', $locale);
+        }
+
+        // An applicant arrives from an emailed link, where a referer is often absent — `back()` alone
+        // would drop them on the PWA home and straight into the member login. Only a same-origin
+        // in-app URL is honoured, never an arbitrary redirect target from the request.
+        $returnTo = (string) $request->input('return_to');
+        if ($returnTo !== '' && str_starts_with($returnTo, url('/'))) {
+            return redirect()->to($returnTo);
         }
 
         return back();

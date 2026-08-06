@@ -27,39 +27,48 @@
     @vite(['resources/css/app.css'])
 </head>
 <body class="min-h-full bg-surface-alt text-ink antialiased dark:bg-slate-950 dark:text-slate-100">
-    @if ($authed && $nav)
+    {{-- Two INDEPENDENT concerns, which were conflated by accident (prompt 167):
+
+         `$nav` controls the bottom tab bar — a member's navigation.
+         `$authed` controls member-specific chrome — the home link, the notification settings.
+
+         Neither has anything to do with whether a human can choose a language, but the switcher sat
+         inside a block gated on BOTH. The result was exactly inverted: a signed-in member, who has
+         already joined and can ask staff, got the switcher; a prospective applicant reading the
+         statutes and an Article 9 consent declaration on their own phone, with nobody to ask, did
+         not. So the header renders whenever it has ANYTHING to hold. --}}
+    @php($memberChrome = $authed && $nav)
+    @php($showsLocale = count(array_intersect(['es', 'en'], (array) \App\Support\Settings::get('enabled_locales', ['es', 'en']))) > 1)
+
+    @if ($memberChrome || $showsLocale)
         <header class="sticky top-0 z-20 border-b border-line/80 bg-surface/85 backdrop-blur dark:border-slate-800 dark:bg-slate-950/85">
             <div class="mx-auto flex w-full max-w-md items-center justify-between px-4 py-3">
-                <a href="{{ route('socio.home') }}" class="flex items-center gap-2 font-semibold">
-                    <img src="/socio-icons/favicon-32.png" width="24" height="24" alt="" class="rounded-md">
-                    <span>{{ config('app.name') }}</span>
-                </a>
-                <div class="flex items-center gap-1.5">
-                    {{-- Language switcher (prompt 96): persistent on every screen, so a member who lands in
-                         the wrong language can escape it immediately. Reuses the admin switcher's pattern —
-                         persists to the member row AND drops a session override for the very next request. --}}
-                    @php($localeOptions = array_values(array_intersect(['es', 'en'], (array) \App\Support\Settings::get('enabled_locales', ['es', 'en']))))
-                    @if (count($localeOptions) > 1)
-                        <form method="POST" action="{{ route('socio.locale') }}" data-locale-switcher class="flex items-center rounded-lg border border-line p-0.5 dark:border-slate-800">
-                            @csrf
-                            @foreach ($localeOptions as $loc)
-                                <button type="submit" name="locale" value="{{ $loc }}" data-locale="{{ $loc }}"
-                                        @class([
-                                            // ≥ 24×24 CSS px target (WCAG 2.2 Target Size, prompt 98) — a control non-native speakers depend on.
-                                            'inline-flex min-h-[1.5rem] min-w-[1.75rem] items-center justify-center rounded-md px-2 py-1 text-xs font-semibold uppercase transition',
-                                            'bg-brand text-white' => app()->getLocale() === $loc,
-                                            'text-ink-muted hover:text-brand dark:text-slate-400' => app()->getLocale() !== $loc,
-                                        ])>{{ $loc }}</button>
-                            @endforeach
-                        </form>
-                    @endif
-                    <a href="{{ route('socio.notifications') }}"
-                       aria-label="{{ __('Ajustes de avisos') }}"
-                       class="rounded-lg p-2 text-ink-muted hover:bg-brand-tint hover:text-brand dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-white {{ request()->routeIs('socio.notifications') ? 'text-brand dark:text-white' : '' }}">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" class="h-5 w-5" aria-hidden="true">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M14.857 17.082a23.85 23.85 0 0 0 5.454-1.31A8.97 8.97 0 0 1 18 9.75V9A6 6 0 0 0 6 9v.75a8.97 8.97 0 0 1-2.312 6.022c1.733.64 3.56 1.085 5.455 1.31m6.714 0a24.25 24.25 0 0 1-6.714 0m6.714 0a3 3 0 1 1-6.714 0"/>
-                        </svg>
+                @if ($memberChrome)
+                    <a href="{{ route('socio.home') }}" class="flex items-center gap-2 font-semibold">
+                        <img src="/socio-icons/favicon-32.png" width="24" height="24" alt="" class="rounded-md">
+                        <span>{{ config('app.name') }}</span>
                     </a>
+                @else
+                    {{-- No member yet: the club's name reassures an applicant they are in the right
+                         place, but it is not a link — socio.home would be a dead end for them. --}}
+                    <span class="flex items-center gap-2 font-semibold">
+                        <img src="/socio-icons/favicon-32.png" width="24" height="24" alt="" class="rounded-md">
+                        <span>{{ config('app.name') }}</span>
+                    </span>
+                @endif
+
+                <div class="flex items-center gap-1.5">
+                    <x-socio.locale-switcher />
+
+                    @if ($memberChrome)
+                        <a href="{{ route('socio.notifications') }}"
+                           aria-label="{{ __('Ajustes de avisos') }}"
+                           class="rounded-lg p-2 text-ink-muted hover:bg-brand-tint hover:text-brand dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-white {{ request()->routeIs('socio.notifications') ? 'text-brand dark:text-white' : '' }}">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" class="h-5 w-5" aria-hidden="true">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M14.857 17.082a23.85 23.85 0 0 0 5.454-1.31A8.97 8.97 0 0 1 18 9.75V9A6 6 0 0 0 6 9v.75a8.97 8.97 0 0 1-2.312 6.022c1.733.64 3.56 1.085 5.455 1.31m6.714 0a24.25 24.25 0 0 1-6.714 0m6.714 0a3 3 0 1 1-6.714 0"/>
+                            </svg>
+                        </a>
+                    @endif
                 </div>
             </div>
         </header>

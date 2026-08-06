@@ -38,6 +38,12 @@ class SetLocale
             $locale = $session;
         }
 
+        // NOT consulted: the browser's Accept-Language. Prompt 167 weighed it and decided against —
+        // prompt 96 deliberately made the club default the only lever for a visitor with no
+        // preference, the switcher (now reachable on every screen) already lets an applicant change
+        // language in one tap, and honouring the hint would silently override a club's configured
+        // default on every anonymous page. See DECISIONS for the measurements.
+
         app()->setLocale($locale);
 
         return $next($request);
