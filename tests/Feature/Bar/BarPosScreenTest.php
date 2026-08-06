@@ -86,6 +86,7 @@ class BarPosScreenTest extends TestCase
     {
         $this->article('Agua con gas', 150, 20);
         $this->operator();
+        $this->openTill(); // prompt 175: without one the screen is the till blocking state
 
         Livewire::test(BarPos::class)
             ->assertOk()
@@ -135,6 +136,7 @@ class BarPosScreenTest extends TestCase
     public function test_only_articles_are_offered_and_a_genetic_can_never_be_added(): void
     {
         $this->operator();
+        $this->openTill(); // prompt 175: without one the screen is the till blocking state
         $article = $this->article('Bocadillo', 300, 10);
         // A genetic exists in the org but must NEVER surface on the bar POS.
         $genetic = Genetic::factory()->create(['organisation_id' => $this->org->id, 'name' => 'Amnesia Test']);

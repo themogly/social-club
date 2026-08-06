@@ -23,6 +23,7 @@ use Database\Seeders\DatabaseSeeder;
 use Database\Seeders\RolePermissionSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Notification;
+use Livewire\Features\SupportTesting\Testable;
 use Livewire\Livewire;
 use Tests\TestCase;
 
@@ -162,11 +163,23 @@ class CounterStaffDayTest extends TestCase
         $this->assertStringNotContainsString('data-needs-operator', $html);
     }
 
+    /**
+     * Prompt 175 put the preconditions on full-screen blocking states, so the POS layout only exists once the
+     * screen is usable — a till open and a socio identified. These assertions are about that screen.
+     */
+    private function usableDispensary(): Testable
+    {
+        (new OpenTill)->handle($this->location, 'POS-1', 10000);
+        $member = Member::factory()->create(['organisation_id' => $this->org->id]);
+
+        return Livewire::test(DispensaryPos::class)->call('selectMember', $member->id);
+    }
+
     // 4) The dispensary basket is pinned to its own column at 1024 (the batch-2 bar POS fix, now shared).
     public function test_the_dispensary_basket_is_pinned_to_its_own_column_at_the_tablet_width(): void
     {
         $this->actingAs($this->operator());
-        $html = Livewire::test(DispensaryPos::class)->html();
+        $html = $this->usableDispensary()->html();
 
         $this->assertStringContainsString('lg:grid-cols-[minmax(0,1fr)_22rem]', $html);
         $this->assertStringContainsString('lg:col-start-2 lg:row-start-1 lg:row-span-2', $html);
@@ -176,7 +189,7 @@ class CounterStaffDayTest extends TestCase
     public function test_the_payment_apparatus_is_hidden_until_the_basket_has_a_line(): void
     {
         $this->actingAs($this->operator());
-        $html = Livewire::test(DispensaryPos::class)->html();
+        $html = $this->usableDispensary()->html();
 
         // Empty basket → the next-step hint, not the tender/signature apparatus.
         $this->assertStringContainsString('data-empty-basket-hint', $html);
@@ -189,6 +202,9 @@ class CounterStaffDayTest extends TestCase
     public function test_a_name_typed_into_the_scan_field_routes_to_the_member_search(): void
     {
         $this->actingAs($this->operator());
+        // Prompt 175: the member step's blocking state carries the lookup itself, so the search is reachable
+        // — but only once the till step above it in the chain is met.
+        (new OpenTill)->handle($this->location, 'POS-1', 10000);
         Member::factory()->create([
             'organisation_id' => $this->org->id, 'first_name' => 'Lucía', 'last_name' => 'García', 'member_no' => 'M-00099',
         ]);

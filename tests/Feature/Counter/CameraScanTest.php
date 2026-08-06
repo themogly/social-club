@@ -3,6 +3,7 @@
 namespace Tests\Feature\Counter;
 
 use App\Actions\Members\IssueMemberToken;
+use App\Actions\Till\OpenTill;
 use App\Enums\MembershipStatus;
 use App\Enums\MemberStatus;
 use App\Enums\Role;
@@ -98,6 +99,10 @@ class CameraScanTest extends TestCase
             ->assertOk()
             ->assertSee(__('Escanear con cámara'))
             ->assertSee('cameraScan(', false); // the Alpine behaviour is wired in
+
+        // Prompt 175: on the dispensary the camera lives in the member-identify partial, which the member
+        // blocking state carries — reachable once the till step above it in the chain is met.
+        (new OpenTill)->handle($this->location, 'POS-1', 10000);
 
         Livewire::test(DispensaryPos::class)
             ->assertOk()

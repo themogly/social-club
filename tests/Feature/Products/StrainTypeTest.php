@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\Products;
 
+use App\Actions\Till\OpenTill;
 use App\Enums\BatchStatus;
 use App\Enums\MembershipStatus;
 use App\Enums\MemberStatus;
@@ -21,6 +22,7 @@ use App\Support\ActiveScope;
 use App\Support\CounterOperator;
 use Database\Seeders\RolePermissionSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Livewire\Features\SupportTesting\Testable;
 use Livewire\Livewire;
 use Tests\TestCase;
 
@@ -74,6 +76,18 @@ class StrainTypeTest extends TestCase
         CounterOperator::set($user);
     }
 
+    /**
+     * Prompt 175: the genetics grid and its filter rows only render on the usable screen — a till open and a
+     * socio identified. Below those links in the chain the dispensary is a blocking state, with no grid.
+     */
+    private function pos(): Testable
+    {
+        (new OpenTill)->handle($this->location, 'POS-1', 10000);
+        $member = Member::factory()->create(['organisation_id' => $this->org->id]);
+
+        return Livewire::test(DispensaryPos::class)->call('selectMember', $member->id);
+    }
+
     public function test_it_persists_and_translates_in_both_locales(): void
     {
         $genetic = Genetic::factory()->create(['organisation_id' => $this->org->id, 'strain_type' => StrainType::HYBRID]);
@@ -91,7 +105,7 @@ class StrainTypeTest extends TestCase
         $this->genetic('IndicaOne', StrainType::INDICA);
         $this->operator();
 
-        Livewire::test(DispensaryPos::class)
+        $this->pos()
             // Labelled rows (a11y): each filter group carries its axis label.
             ->assertSeeHtml('aria-label="'.e(__('Variedad')).'"')
             ->assertSee('SativaOne')
@@ -109,7 +123,7 @@ class StrainTypeTest extends TestCase
         $this->genetic('IndicaTwo', StrainType::INDICA);
         $this->operator();
 
-        Livewire::test(DispensaryPos::class)
+        $this->pos()
             ->call('filterProductType', 'FLOWER')
             ->assertSee('SativaTwo')->assertSee('IndicaTwo')   // product type: both
             ->call('filterProductType', null)
@@ -122,7 +136,7 @@ class StrainTypeTest extends TestCase
         $this->genetic('NoVariety', null);
         $this->operator();
 
-        Livewire::test(DispensaryPos::class)->assertSee('NoVariety'); // renders under "all", no badge
+        $this->pos()->assertSee('NoVariety'); // renders under "all", no badge
     }
 
     public function test_strain_type_shows_on_the_member_menu(): void

@@ -19,16 +19,20 @@
 
     @if (! $this->handoverActive())
 
-    @if ($noLocation)
-        {{-- Intentional empty state: an operator with no assigned sede. Still a 200. --}}
-        <div class="rounded-2xl border border-line bg-surface p-8 text-center dark:border-slate-800 dark:bg-slate-900">
-            <div class="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-surface-alt text-2xl dark:bg-slate-800">📍</div>
-            <h2 class="mt-4 text-lg font-semibold">{{ $mustChooseLocation ? __('Elige tu sede') : __('Sin sede asignada') }}</h2>
-            <p class="mt-1 text-sm text-ink-muted dark:text-slate-400">
-                {{ $mustChooseLocation ? __('Trabajas en varias sedes. Selecciona en la barra superior en cuál estás.') : __('No tienes ninguna sede activa. Pide a un responsable que te asigne una para dispensar.') }}
-            </p>
-        </div>
-    @else
+    {{-- Prompt 175 — the four preconditions resolved to ONE, in dependency order. The operator step is in the
+         chain (so till and member cannot jump it) but is rendered by 173's surface, never here. --}}
+    @php
+        $blocker = \App\Support\CounterBlocker::first([
+            \App\Support\CounterBlocker::SEDE => ! $noLocation,
+            \App\Support\CounterBlocker::OPERATOR => $this->hasOperator(),
+            \App\Support\CounterBlocker::TILL => $openTill !== null,
+            \App\Support\CounterBlocker::MEMBER => $member !== null,
+        ]);
+    @endphp
+
+    {{-- Above the branch on purpose: losing the connection, or the reason a commit was refused, must reach the
+         operator whichever state the screen is in. A blocking state replaces the work, not the warnings. --}}
+    @if (! $noLocation)
         {{-- Offline banner — unmistakable, fail closed. --}}
         <div x-show="! online" x-cloak role="alert" aria-live="assertive" class="mb-4 flex items-center gap-3 rounded-xl border border-error/40 bg-error/10 px-4 py-3 text-sm font-semibold text-error">
             <span class="text-lg">⚠️</span>
@@ -52,7 +56,44 @@
                 <button type="button" wire:click="$set('flashMessage', null)" aria-label="{{ __('Descartar aviso') }}" class="shrink-0 rounded-md px-2 py-1 opacity-70 hover:opacity-100">✕</button>
             </div>
         @endif
+    @endif
 
+    @if (\App\Support\CounterBlocker::rendersInPage($blocker))
+        @if ($blocker === \App\Support\CounterBlocker::SEDE)
+            {{-- The fix is the topbar sede switcher, which is already on screen — so no button here. When no
+                 sede is assigned at all only a responsable can fix it, and saying so is the honest state. --}}
+            <x-counter.blocking-state
+                data-blocker="sede"
+                icon="📍"
+                :heading="$mustChooseLocation ? __('Elige tu sede') : __('Sin sede asignada')"
+                :body="$mustChooseLocation ? __('Trabajas en varias sedes. Selecciona en la barra superior en cuál estás.') : __('No tienes ninguna sede activa. Pide a un responsable que te asigne una para dispensar.')"
+            />
+        @elseif ($blocker === \App\Support\CounterBlocker::TILL)
+            {{-- Was a red card with a dark-red button among the basket's cards. The reason it gave is kept,
+                 said once; the button is navigation, so it is the brand button. Prompt 182 redesigns the
+                 screen it leads to — this branch only stops lying about the colour. --}}
+            <x-counter.blocking-state
+                data-blocker="till"
+                icon="🧾"
+                :heading="__('No hay caja abierta')"
+                :body="__('Abre una caja en este terminal antes de dispensar.')"
+                :action-label="__('Ir a la caja')"
+                :action-href="route('counter.till')"
+            />
+        @else
+            {{-- The member step carries its own fix — see the partial. Replaced BOTH the grey empty state in
+                 the left column and the grey helper text under the commit button, which said the same thing
+                 twice in two styles. --}}
+            <x-counter.blocking-state
+                data-blocker="member"
+                icon="🪪"
+                :heading="__('Identifica a un socio')"
+                :body="__('Sin socio no se puede registrar ninguna dispensación.')"
+            >
+                @include('livewire.counter.partials.member-identify')
+            </x-counter.blocking-state>
+        @endif
+    @else
         {{-- Prompt 91 — the SAME basket-column pattern batch 2 gave the bar POS (the dispensary was never
              given it): at lg (1024, the counter's tablet-first width) the basket + contribution (RIGHT) is
              pinned to a dedicated column 2 spanning both rows, so socio (LEFT) + genetics (CENTRE) stack in
@@ -63,56 +104,11 @@
 
             {{-- ================= LEFT: the socio ================= --}}
             <div class="flex flex-col gap-4">
-                {{-- Identify --}}
+                {{-- Identify — the same partial the member blocking state uses, wrapped in this column's card
+                     chrome. Kept here so an operator can scan the next socio without clearing the current one
+                     first; the audit's finding 3 (this column eating the top of the screen) is prompt 176. --}}
                 <section class="rounded-2xl border border-line bg-surface p-4 dark:border-slate-800 dark:bg-slate-900">
-                    <form wire:submit="submitScan">
-                        <label for="scan" class="block text-sm font-medium text-ink-muted dark:text-slate-400">{{ __('Escanear tarjeta o buscar socio') }}</label>
-                        <input
-                            id="scan"
-                            type="text"
-                            wire:model="scan"
-                            autofocus
-                            autocomplete="off"
-                            spellcheck="false"
-                            placeholder="{{ __('Escanea la tarjeta, o escribe nombre / nº y pulsa Enter') }}"
-                            class="mt-2 h-12 w-full rounded-xl border border-line bg-surface px-4 text-base text-ink placeholder:text-ink-muted focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/40 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
-                        >
-                    </form>
-
-                    @if ($cameraScanEnabled)
-                        <x-counter.camera-scan />
-                    @endif
-
-                    <div class="mt-3">
-                        <label for="member-search" class="block text-sm font-medium text-ink-muted dark:text-slate-400">{{ __('o busca por nombre / nº de socio') }}</label>
-                        <input
-                            id="member-search"
-                            type="text"
-                            wire:model.live.debounce.300ms="search"
-                            autocomplete="off"
-                            placeholder="{{ __('Ej. García o M-00042') }}"
-                            class="mt-2 h-11 w-full rounded-xl border border-line bg-surface px-4 text-base text-ink placeholder:text-ink-muted focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/40 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
-                        >
-
-                        @if ($searchResults !== null)
-                            <ul class="mt-2 divide-y divide-line overflow-hidden rounded-xl border border-line dark:divide-slate-800 dark:border-slate-800">
-                                @forelse ($searchResults as $result)
-                                    <li>
-                                        <button type="button" wire:click="selectMember('{{ $result->id }}')" class="flex w-full items-center justify-between gap-3 bg-surface px-4 py-3 text-left transition hover:bg-surface-alt dark:bg-slate-900 dark:hover:bg-slate-800">
-                                            <span class="font-medium">{{ $result->fullName() }}</span>
-                                            <span class="text-sm text-ink-muted dark:text-slate-400">{{ $result->member_no }}</span>
-                                        </button>
-                                    </li>
-                                @empty
-                                    <li class="bg-surface px-4 py-3 text-sm text-ink-muted dark:bg-slate-900 dark:text-slate-400">{{ __('Sin resultados.') }}</li>
-                                @endforelse
-                            </ul>
-                        @endif
-
-                        @if ($requireCheckedIn)
-                            <p class="mt-2 text-xs text-ink-muted dark:text-slate-500">{{ __('Esta sede solo permite dispensar a socios que han registrado su entrada.') }}</p>
-                        @endif
-                    </div>
+                    @include('livewire.counter.partials.member-identify')
                 </section>
 
                 {{-- Member card OR prompt --}}
@@ -249,12 +245,6 @@
                             </div>
                         @endif
                     </section>
-                @else
-                    <div class="rounded-2xl border border-dashed border-line bg-surface p-8 text-center dark:border-slate-700 dark:bg-slate-900">
-                        <div class="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-surface-alt text-xl dark:bg-slate-800">🪪</div>
-                        <p class="mt-3 font-medium">{{ __('Identifica a un socio') }}</p>
-                        <p class="mt-1 text-sm text-ink-muted dark:text-slate-400">{{ __('Sin socio no se puede registrar ninguna dispensación.') }}</p>
-                    </div>
                 @endif
             </div>
 
@@ -501,15 +491,6 @@
             {{-- Pinned to column 2 spanning both rows at lg so it never drops below the genetics grid into
                  dead space; auto-placement at xl for the 3-column sidebar (prompt 91, mirrors bar-pos). --}}
             <div class="flex flex-col gap-4 lg:col-start-2 lg:row-start-1 lg:row-span-2 xl:col-auto xl:row-auto">
-                {{-- No open till → unmistakable, blocks commit. --}}
-                @unless ($openTill)
-                    <div class="rounded-2xl border border-error/40 bg-error/10 p-4 text-sm">
-                        <p class="font-semibold text-error">{{ __('No hay caja abierta') }}</p>
-                        <p class="mt-1 text-error/90">{{ __('Abre una caja en este terminal antes de dispensar.') }}</p>
-                        <a href="{{ route('counter.till') }}" wire:navigate class="mt-3 inline-flex h-11 items-center rounded-lg bg-error px-4 text-sm font-semibold text-white transition hover:opacity-90">{{ __('Ir a la caja') }}</a>
-                    </div>
-                @endunless
-
                 <section class="rounded-2xl border border-line bg-surface p-4 dark:border-slate-800 dark:bg-slate-900">
                     <div class="flex items-center justify-between">
                         <h2 class="text-base font-semibold">{{ __('Cesta') }}</h2>
@@ -748,9 +729,6 @@
                         <span wire:loading.remove wire:target="commit">{{ __('Registrar aportación') }}</span>
                         <span wire:loading wire:target="commit">{{ __('Registrando…') }}</span>
                     </button>
-                    @if ($member === null)
-                        <p class="mt-2 text-center text-xs text-ink-muted dark:text-slate-500">{{ __('Identifica a un socio para poder registrar.') }}</p>
-                    @endif
                 </section>
 
                 {{-- Just committed → receipt + void affordance. --}}

@@ -3,15 +3,23 @@
 
     @if (! $this->handoverActive())
 
-    @if ($noLocation)
-        {{-- Intentional empty state: an operator with no assigned sede. Still a 200. --}}
-        <div class="rounded-2xl border border-line bg-surface p-8 text-center dark:border-slate-800 dark:bg-slate-900">
-            <div class="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-surface-alt text-2xl dark:bg-slate-800">📍</div>
-            <h2 class="mt-4 text-lg font-semibold">{{ $mustChooseLocation ? __('Elige tu sede') : __('Sin sede asignada') }}</h2>
-            <p class="mt-1 text-sm text-ink-muted dark:text-slate-400">
-                {{ $mustChooseLocation ? __('Trabajas en varias sedes. Selecciona en la barra superior en cuál estás.') : __('No tienes ninguna sede activa. Pide a un responsable que te asigne una para gestionar la caja.') }}
-            </p>
-        </div>
+    {{-- Prompt 175 — the same chain, resolved to one. The Caja screen's only counter precondition is a sede:
+         opening the till IS the work here, so the till step cannot block it. The operator step is reported so
+         the ordering stays the chain's, and rendered by 173's surface. Prompt 182 redesigns this screen. --}}
+    @php
+        $blocker = \App\Support\CounterBlocker::first([
+            \App\Support\CounterBlocker::SEDE => ! $noLocation,
+            \App\Support\CounterBlocker::OPERATOR => $this->hasOperator(),
+        ]);
+    @endphp
+
+    @if (\App\Support\CounterBlocker::rendersInPage($blocker))
+        <x-counter.blocking-state
+            data-blocker="sede"
+            icon="📍"
+            :heading="$mustChooseLocation ? __('Elige tu sede') : __('Sin sede asignada')"
+            :body="$mustChooseLocation ? __('Trabajas en varias sedes. Selecciona en la barra superior en cuál estás.') : __('No tienes ninguna sede activa. Pide a un responsable que te asigne una para gestionar la caja.')"
+        />
     @else
         {{-- Flash --}}
         @if ($flashMessage)

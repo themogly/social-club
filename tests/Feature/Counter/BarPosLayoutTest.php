@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\Counter;
 
+use App\Actions\Till\OpenTill;
 use App\Enums\Role;
 use App\Livewire\Counter\BarPos;
 use App\Models\Article;
@@ -40,6 +41,10 @@ class BarPosLayoutTest extends TestCase
         $this->actingAs($user);
         app(ActiveScope::class)->setLocation($location->id);
         CounterOperator::set($user);
+
+        // Prompt 175: without an open till the screen IS the till blocking state, so there is no layout
+        // to assert. These two defects live on the usable screen — put the screen in that state.
+        (new OpenTill)->handle($location, 'POS-1', 10000);
 
         Article::factory()->create([
             'organisation_id' => $org->id, 'location_id' => $location->id,

@@ -6859,3 +6859,79 @@ Asserted that a wrong PIN **in handover mode** hits the same lockout, so no mode
 And the surface is **not** the security boundary: beginning a handover signs the operator out, so
 `requireOperator()` still refuses every write — asserted by attempting to open a till during a handover and
 finding zero rows. 44×44 on every control in the surface, including the confirm that was 155×42.
+
+---
+
+## Prompt 175 — four blockers, four styles, no order
+
+**The premise, re-verified before building.** On `main` the dispensary drew its preconditions in four visual
+languages at four places: the operator strip (l.22 region), a **red `bg-error` card with a dark-red
+"Ir a la caja"** in the basket column (l.507), a grey member empty state in the left column (l.255), and
+grey helper text under the commit button restating that same member blocker (l.752). With a sede and an
+operator but nothing else, **three of them rendered simultaneously**. Nothing said which to fix first.
+
+**The chain, and why that order.** `App\Support\CounterBlocker` resolves the preconditions to exactly one,
+in dependency order — **sede → operator → till → member**. Without a sede nothing resolves at all; without
+an operator nothing may be *written* (`requireOperator()`); without an open till nothing may be *dispensed*;
+without a member there is nothing to dispense. Each link is a precondition of the next, so showing the
+fourth while the first is unmet asks the operator to fix something they cannot yet act on. A precondition
+that does not apply to a screen is **absent from the array, not `false`** — Recepción has no till or member
+step, and the bar has no member step (it serves for cash), so they are never blocked on them.
+
+**Where the one pattern lives.** `x-counter.blocking-state` — one heading naming what is missing, one
+sentence of consequence, one action, full-screen, 44×44. Used by all five screens.
+
+**The operator step is reported but never rendered in-page.** Prompt 173 built the full-screen surface that
+owns it; `CounterBlocker::rendersInPage()` returns `false` for that step so the chain still *orders*
+correctly (the till and member steps cannot jump ahead of it) while the surface remains the only thing that
+draws it. Two implementations of one state is precisely what 173 spent a branch deleting; a test asserts no
+screen emits `data-blocker="operator"`.
+
+**The member step keeps its fix inside the blocking state — a correction to the audit's fourth standard.**
+The audit says "one button that fixes it", which assumes the fix is elsewhere. For sede and till it is (the
+topbar switcher, the Caja screen). For the member step *the thing that fixes it is the member search on the
+blocked screen*, so a blocker that merely says "identify a socio" would remove the only means of doing so —
+a dead end. The identify controls are extracted to `partials/member-identify.blade.php` and rendered
+**inside** the member blocking state via its slot; the same partial is included in the left column of the
+usable screen so an operator can scan the next socio without clearing the current one. It is still one
+pattern and still one action; the action is a control rather than a link. (A previous session concluded
+from this that the member step could not be full-screen at all. That does not follow — it only means the
+state must carry its own control.)
+
+**Colour has one meaning.** `Ir a la caja` was `bg-error` — a destructive style, on a navigation control, on
+a screen that was already blocked, which reads as an error the operator caused. It is navigation, so it is
+the brand button. Asserted on both screens that had the red card.
+
+**"Barra desactivada en esta sede" takes the pattern but stays out of the chain.** It is a per-location
+setting (`bar_enabled`, prompt 59), not a precondition an operator can meet at the counter, and it has no
+action for that reason. It gets the one visual language so the counter reads as one product, but
+`CounterBlocker` remains a chain of *preconditions*, not of settings.
+
+**The server-side gates are untouched — and that is the assertion that matters.** This branch is
+presentation and sequencing only. The risk it carries is turning four real refusals into four pictures of
+refusals, so `CounterBlockingStatesTest` bypasses the screen entirely and calls `commit()` directly for each
+precondition (no sede, no PIN operator, no till, no member), asserting a refusal **and** that no
+`Dispensation` row exists. `requireOperator()`, the till check and the member check are unchanged.
+
+**Warnings are hoisted above the blocker branch.** The offline banner and the flash message now render
+whichever state the screen is in. A blocking state replaces *the work*, not the warnings — otherwise a
+commit refused from inside a blocking state would state its reason into a region that no longer renders.
+
+**Prompt 60's charge-button test was re-pointed, not weakened.** It asserted that the commit button is
+disabled only when offline; it did so on a screen with no till and no member, which is now a blocking state
+with no commit button. The guarantee it defends — the button is never a silent dead control **when it is on
+screen** — is now asserted in exactly that state (till open, socio identified). The reason a commit cannot
+happen is now stated *up front, with its fix*, instead of on a click, which is strictly more observable.
+
+**Fixture updates across ten existing tests, and one that needed real diagnosis.** Tests that rendered the
+POS with a precondition unmet and then asserted on the genetics grid, the article grid or the filter rows
+now open a till (and identify a socio) first, because that markup only exists on the usable screen.
+`PosQuickEntryTest::test_their_usual_does_not_add_a_query_per_suggestion` failed differently: its *absolute*
+query counts **fell** (76→71 and 78→75) but its delta rose from 2 to 4, because it was measuring a budget
+for the "their usual" chips across a render that no longer drew them. Measured against `main` before
+changing it, rather than assumed. With a till open it measures the render that actually contains the chips,
+and the invariant holds.
+
+**Scope.** All five counter screens are wired. The till-open screen itself and its default float were split
+out to **prompt 182** — bundling them made the branch unlandable, which is what stalled the first attempt.
+When the till blocker is resolved the operator arrives at the existing Caja screen, unchanged.
