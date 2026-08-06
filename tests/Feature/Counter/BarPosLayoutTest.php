@@ -62,14 +62,24 @@ class BarPosLayoutTest extends TestCase
         $this->assertStringContainsString('min-w-0 font-semibold leading-tight line-clamp-2', $html);
     }
 
+    /**
+     * Re-pointed by prompt 176, not weakened. Prompt 91 pinned the basket to a dedicated grid column so it
+     * could never drop below the articles into dead space; 176 replaced that grid with two panes, which
+     * defends the same thing more strongly — the cart is a sibling of the selection pane, so it cannot be
+     * pushed anywhere by the article list, and the commit is inside it rather than at the end of a page.
+     */
     public function test_the_basket_column_is_pinned_beside_the_grid_at_the_tablet_width(): void
     {
         $this->bootOperatorWithArticle();
         $html = Livewire::test(BarPos::class)->html();
 
-        // lg (1024) is two columns with a dedicated basket column…
-        $this->assertStringContainsString('lg:grid-cols-[minmax(0,1fr)_22rem]', $html);
-        // …and the RIGHT (basket + Charge) spans both rows in column 2, so it never drops below the articles.
-        $this->assertStringContainsString('lg:col-start-2 lg:row-start-1 lg:row-span-2', $html);
+        // Two panes, the cart beside the selection pane rather than after it…
+        $this->assertStringContainsString('data-selection-pane', $html);
+        $this->assertStringContainsString('data-cart-column', $html);
+        $this->assertStringContainsString('md:flex-row', $html);
+
+        // …and the commit lives INSIDE the cart column, which is what stops it leaving the viewport.
+        $cart = substr($html, strpos($html, 'data-cart-column'));
+        $this->assertStringContainsString('data-commit-action', $cart);
     }
 }

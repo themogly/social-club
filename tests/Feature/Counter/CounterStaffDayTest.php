@@ -181,8 +181,11 @@ class CounterStaffDayTest extends TestCase
         $this->actingAs($this->operator());
         $html = $this->usableDispensary()->html();
 
-        $this->assertStringContainsString('lg:grid-cols-[minmax(0,1fr)_22rem]', $html);
-        $this->assertStringContainsString('lg:col-start-2 lg:row-start-1 lg:row-span-2', $html);
+        // Prompt 176 replaced prompt 91's pinned grid column with two panes. Same guarantee, stronger: the
+        // cart is a sibling of the selection pane and carries the commit, so neither can push the other.
+        $this->assertStringContainsString('data-selection-pane', $html);
+        $this->assertStringContainsString('data-cart-column', $html);
+        $this->assertStringContainsString('data-commit-action', substr($html, strpos($html, 'data-cart-column')));
     }
 
     // 5) The payment apparatus is disclosed only once the basket has a line.

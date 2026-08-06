@@ -268,7 +268,7 @@ class CounterBlockingStatesTest extends TestCase
 
         $html = Livewire::test(DispensaryPos::class)->call('selectMember', $this->eligibleMember()->id)->html();
         $this->assertSame(0, $this->blockerCount($html));
-        $this->assertStringContainsString('lg:grid-cols-[minmax(0,1fr)_22rem]', $html); // the work
+        $this->assertStringContainsString('data-cart-column', $html); // the work (prompt 176's two panes)
     }
 
     /** No sede outranks everything below it — the till card never appears over the top of it. */

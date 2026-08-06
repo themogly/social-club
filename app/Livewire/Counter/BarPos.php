@@ -30,6 +30,7 @@ use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Locked;
+use Livewire\Attributes\Session;
 use Livewire\Component;
 use RuntimeException;
 use Throwable;
@@ -58,7 +59,7 @@ use Throwable;
  *
  * @phpstan-type BasketLine array{type: string, article_id?: string, description?: string, unit_price_cents?: int, qty: int, reference?: string}
  */
-#[Layout('components.layouts.counter')]
+#[Layout('components.layouts.counter', ['fullHeight' => true])] // prompt 176: the page must not scroll; the selection pane does
 class BarPos extends Component
 {
     use HandlesTender, IdentifiesOperator, ResolvesCounterLocation;
@@ -73,6 +74,10 @@ class BarPos extends Component
 
     /** Live filter over the article grid (name). */
     public string $articleSearch = '';
+
+    /** Articles: GRID by default (a name and a price fit a tile), list available — see DispensaryPos. */
+    #[Session(key: 'counter.bar.article_layout')]
+    public string $articleLayout = 'grid';
 
     /** Category filter over the article grid (null = all). */
     public ?string $categoryId = null;
@@ -187,6 +192,14 @@ class BarPos extends Component
     }
 
     // --- Article grid → basket --------------------------------------------------
+
+    /** Grid or list for the articles pane. Anything else is ignored rather than stored (prompt 176). */
+    public function setArticleLayout(string $layout): void
+    {
+        if (in_array($layout, ['list', 'grid'], true)) {
+            $this->articleLayout = $layout;
+        }
+    }
 
     public function filterCategory(?string $categoryId): void
     {
