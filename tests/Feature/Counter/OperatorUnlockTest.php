@@ -279,10 +279,13 @@ class OperatorUnlockTest extends TestCase
         $fresh = $this->staff('Sin Pin Todavía', null);       // no PIN yet, assigned to the sede
         $this->assertNull($fresh->fresh()->pin);
 
-        // Set the PIN through the actual Filament Users edit form (owner-gated).
+        // Set the PIN through the actual Filament Users edit form (owner-gated). Since prompt 163 a
+        // credential is only written when the operator asked for it in this session — a value present
+        // without `set_pin` is what a password manager's autofill looks like and is refused. See
+        // Tests\Feature\Auth\UserCredentialAutofillTest.
         $this->actingAs($this->owner());
         Livewire::test(EditUser::class, ['record' => $fresh->getRouteKey()])
-            ->fillForm(['pin' => '5678'])
+            ->fillForm(['set_pin' => true, 'pin' => '5678'])
             ->call('save')
             ->assertHasNoFormErrors();
 
