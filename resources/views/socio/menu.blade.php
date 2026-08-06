@@ -13,6 +13,27 @@
             <p class="mt-1 text-xs text-ink-muted dark:text-slate-400">
                 THC {{ $item['genetic']->thc_pct ?? '—' }}% · CBD {{ $item['genetic']->cbd_pct ?? '—' }}%@if ($item['genetic']->strain_type) · {{ $item['genetic']->strain_type->label() }}@endif
             </p>
+
+            {{-- Prompt 185 — availability at THIS member's sede, as a state and never a quantity.
+
+                 An unavailable genetic stays on the menu rather than disappearing: a member who has been
+                 asking for it every week learns nothing from its absence, and a strain vanishing reads as
+                 the club having stopped carrying it. Saying "sin existencias" is the useful answer and is
+                 what a future "tell me when it's back" would hang off. --}}
+            @php
+                $availability = $item['availability'];
+                $availabilityChip = match ($availability) {
+                    \App\Models\Genetic::AVAILABLE => ['border-success/30 bg-success/10 text-success', __('Disponible')],
+                    \App\Models\Genetic::LOW => ['border-warning/30 bg-warning/10 text-warning', __('Quedan pocas')],
+                    default => ['border-line bg-surface-alt text-ink-muted dark:border-slate-700 dark:bg-slate-800 dark:text-slate-400', __('Sin existencias')],
+                };
+            @endphp
+            <p class="mt-2">
+                <span
+                    data-availability="{{ $availability }}"
+                    class="inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-semibold {{ $availabilityChip[0] }}"
+                >{{ $availabilityChip[1] }}</span>
+            </p>
         </article>
     @empty
         <div class="mt-6 rounded-2xl border border-dashed border-line bg-surface p-8 text-center dark:border-slate-800 dark:bg-slate-900">
