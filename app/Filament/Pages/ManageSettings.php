@@ -222,6 +222,8 @@ class ManageSettings extends Page
 
                 Section::make(__('Caja'))
                     ->schema([
+                        TextInput::make('till_default_float_eur')->label(__('Fondo de caja por defecto (€)'))->numeric()->minValue(0)->required()
+                            ->helperText(__('Se propone al abrir la caja cada mañana. El operador siempre puede cambiarlo. 0 = sin fondo por defecto.')),
                         TextInput::make('arqueo_variance_tolerance_eur')->label(__('Tolerancia de descuadre (€)'))->numeric()->minValue(0)->required(),
                         TextInput::make('expense_approval_threshold_eur')->label(__('Umbral de aprobación de gasto (€)'))->numeric()->minValue(0)->required(),
                     ])->columns(2),
@@ -264,6 +266,7 @@ class ManageSettings extends Page
         // The door threshold is a SEPARATE figure from the hard limit — never derived from it.
         Settings::set('wallet_door_debt_threshold_cents', (int) round_half_up(((float) ($state['wallet_door_debt_threshold_eur'] ?? 0)) * 100), SettingType::CENTS);
         Settings::set('low_balance_threshold_cents', (int) round_half_up(((float) ($state['low_balance_threshold_eur'] ?? 0)) * 100), SettingType::CENTS);
+        Settings::set('till_default_float_cents', (int) round_half_up(((float) ($state['till_default_float_eur'] ?? 0)) * 100), SettingType::CENTS);
         Settings::set('arqueo_variance_tolerance_cents', (int) round_half_up(((float) ($state['arqueo_variance_tolerance_eur'] ?? 0)) * 100), SettingType::CENTS);
         Settings::set('expense_approval_threshold_cents', (int) round_half_up(((float) ($state['expense_approval_threshold_eur'] ?? 0)) * 100), SettingType::CENTS);
 
@@ -290,6 +293,7 @@ class ManageSettings extends Page
         $values['wallet_debt_limit_eur'] = ((int) Settings::get('wallet_debt_limit_cents')) / 100;
         $values['wallet_door_debt_threshold_eur'] = ((int) Settings::get('wallet_door_debt_threshold_cents')) / 100;
         $values['low_balance_threshold_eur'] = ((int) Settings::get('low_balance_threshold_cents')) / 100;
+        $values['till_default_float_eur'] = ((int) Settings::get('till_default_float_cents')) / 100;
         $values['arqueo_variance_tolerance_eur'] = ((int) Settings::get('arqueo_variance_tolerance_cents')) / 100;
         $values['expense_approval_threshold_eur'] = ((int) Settings::get('expense_approval_threshold_cents')) / 100;
         $values['minute_quorum_fraction_pct'] = ((int) Settings::get('minute_quorum_fraction_bp')) / 100;

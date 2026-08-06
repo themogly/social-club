@@ -106,6 +106,13 @@ class Settings
         'assembly_notice_days' => 15,         // minimum days between issuing a convocatoria and the assembly
 
         // Till / cash
+        // The standing opening float for this sede's drawer (prompt 182), pre-filled every morning so
+        // opening is one tap. 0 = no default set, which the open screen states rather than presenting an
+        // unexplained empty field. Always overridable at the counter — a figure you cannot change is worse
+        // than typing. Deliberately a SETTING rather than a carry-forward from the previous close: see
+        // DECISIONS (a carried-forward count imports yesterday's variance into today's opening as if it
+        // were intended).
+        'till_default_float_cents' => 0,
         'arqueo_variance_tolerance_cents' => 500,
         'expense_approval_threshold_cents' => 10000,
 

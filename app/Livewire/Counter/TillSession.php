@@ -144,6 +144,9 @@ class TillSession extends Component
         // scope, never a silent guess. One assigned sede is adopted; several ⇒ ask (mustChooseLocation).
         $this->resolveCounterLocation();
 
+        // Prompt 182 — pre-fill the standing float so an ordinary morning is ONE TAP.
+        $this->prefillDefaultFloat();
+
         // Single-till sede (the default, prompt 102): there is one drawer, so preset its terminal — the open
         // form then asks only for the float, and there is no picker to get wrong.
         if ($this->locationId !== null && ! $this->multipleTills()) {
@@ -163,6 +166,37 @@ class TillSession extends Component
             if ($terminals->count() === 1) {
                 $this->terminal = (string) $terminals->first();
             }
+        }
+    }
+
+    /**
+     * The sede's standing opening float in integer cents, or null when none is configured (prompt 182).
+     *
+     * Read through the Settings accessor with a safe default, never a raw property — a stale or missing
+     * value must degrade to "no default" and let the operator type, never throw on a counter screen at
+     * nine in the morning.
+     */
+    public function defaultFloatCents(): ?int
+    {
+        $cents = (int) Settings::get('till_default_float_cents', 0);
+
+        return $cents > 0 ? $cents : null;
+    }
+
+    /**
+     * Put the standing float in the box, formatted the way the operator would type it.
+     *
+     * Only when the box is EMPTY: a pre-filled figure must never overwrite something a person entered, and
+     * mount() runs again on a re-render. Money stays integer cents everywhere but this input, which is the
+     * euro edge — `toCents()` parses it back on submit, so a decimal typed over the default rounds exactly
+     * as it always did.
+     */
+    private function prefillDefaultFloat(): void
+    {
+        $cents = $this->defaultFloatCents();
+
+        if ($cents !== null && $this->floatInput === '') {
+            $this->floatInput = number_format($cents / 100, 2, ',', '');
         }
     }
 

@@ -84,12 +84,29 @@
                 </button>
             </section>
         @elseif ($session === null)
-            {{-- ============ No open session: the OPEN form ============ --}}
-            <section class="rounded-2xl border border-line bg-surface p-5 dark:border-slate-800 dark:bg-slate-900 sm:p-6">
-                <h2 class="text-lg font-semibold">{{ __('Abrir caja') }}</h2>
-                <p class="mt-0.5 text-sm text-ink-muted dark:text-slate-400">{{ __('No hay ninguna caja abierta en este terminal.') }}</p>
+            {{-- ============ No open session: the OPEN SCREEN ============
 
-                <form wire:submit="open" class="mt-5 space-y-4">
+                 Prompt 182 — one action, and the float on the same screen as it.
+
+                 This was a card among cards, and on the till at iPad landscape the button sat at 50% of the
+                 fold before prompt 173 and off the bottom once the PIN pad opened. 173 fixed the reflow and
+                 175 made the closed till a proper blocking state; this makes what is BEHIND that right. It
+                 is now the whole screen: the one thing to do, the one number it needs, and the button.
+
+                 Square, Shopify, Lightspeed X-Series and SumUp all capture the opening amount on the same
+                 screen or dialog as the open action — none uses a separate wizard step. SumUp is the closest
+                 analogue to a Spanish club counter and is exactly the owner's description: the till is
+                 locked, you enter the cash fund, you confirm. --}}
+            <section
+                data-till-open-screen
+                class="mx-auto flex min-h-[60vh] w-full max-w-md flex-col justify-center rounded-2xl border border-line bg-surface p-6 text-center dark:border-slate-800 dark:bg-slate-900"
+            >
+                <div class="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-surface-alt text-3xl dark:bg-slate-800" aria-hidden="true">💶</div>
+
+                <h2 class="mt-5 text-xl font-semibold">{{ __('Abrir caja') }}</h2>
+                <p class="mt-2 text-sm text-ink-muted dark:text-slate-400">{{ __('No hay ninguna caja abierta en este terminal.') }}</p>
+
+                <form wire:submit="open" class="mt-6 space-y-4 text-left">
                     @if ($this->multipleTills())
                         {{-- Multi-till sede (prompt 102): pick one of this sede's CONFIGURED terminals. Terminals
                              are managed in admin now, never free-typed here — no phantom-till typos. --}}
@@ -114,6 +131,7 @@
                         <label for="float" class="block text-sm font-medium text-ink-muted dark:text-slate-400">{{ __('Fondo de caja (€)') }}</label>
                         <input
                             id="float"
+                            data-till-float
                             type="text"
                             inputmode="decimal"
                             wire:model="floatInput"
@@ -121,9 +139,18 @@
                             placeholder="0,00"
                             class="mt-2 h-12 w-full rounded-xl border border-line bg-surface px-4 text-base text-ink placeholder:text-ink-muted focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/40 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
                         >
+                        {{-- The first-ever open has no default and no previous session. That must not be an
+                             empty required field with no explanation — so it says why it is empty and where
+                             the figure comes from once someone sets one. --}}
+                        @if ($this->defaultFloatCents() !== null)
+                            <p data-float-default class="mt-1.5 text-xs text-ink-muted dark:text-slate-500">{{ __('Fondo habitual de la sede. Puedes cambiarlo.') }}</p>
+                        @else
+                            <p data-float-no-default class="mt-1.5 text-xs text-ink-muted dark:text-slate-500">{{ __('Esta sede no tiene fondo por defecto. Escribe el importe con el que abres; un responsable puede fijarlo en Ajustes.') }}</p>
+                        @endif
                     </div>
                     <button
                         type="submit"
+                        data-till-open-action
                         wire:loading.attr="disabled"
                         class="h-14 w-full rounded-xl bg-brand text-base font-semibold text-white transition hover:bg-brand-dark focus:outline-none focus:ring-2 focus:ring-brand/40 disabled:opacity-60"
                     >
