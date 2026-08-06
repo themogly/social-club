@@ -6493,3 +6493,46 @@ it should be its own prompt, scoped and decided on its own terms, not smuggled i
 
 **Untouched, as required:** consent capture (prompt 153's test passes unaltered), the switcher's persistence
 behaviour for members, and the one-locale case (no switcher renders when only one locale is enabled).
+
+## Prompt 171 — `lang:sync --check` failed on a clean repo and reported nothing wrong
+
+**The bug.** `$ok = … && array_keys($en) == array_keys($es)`. `array_keys()` returns a **list**, and `==`
+on two lists is **order-sensitive**. The two files hold identical key SETS in different orders, so on a
+clean tree the command printed *"Keys used: 1989 · missing es: 0 · missing en: 0"* and then exited **1**,
+with nothing in its output explaining why. Reproduced verbatim before the fix. `--check` now compares the
+key sets in both directions and names any key present in only one locale, which is what
+`LocalizationTest` — the gate that actually runs in `composer check` — has always done. Order is not a
+translation defect and no longer fails anything.
+
+**And the writing mode could not resolve the mismatch it was complaining about.** It `ksort()`ed (byte
+order) while the committed files were maintained in case-insensitive order, so every run produced ~230
+lines of pure reordering, and it never wrote `en.json` at all. That is not theoretical: while building
+prompts 163 and 165 the command's output had to be thrown away and the new keys hand-inserted, twice.
+
+**Canonical order chosen: case-insensitive, ties broken by the raw key.** Deliberately the order the files
+were *already* maintained in, rather than imposing byte order. That choice is what makes the cost of
+adopting it **five lines** (`acta`/`Acta`, `evento`/`Evento`, `solicitud RGPD`/`Solicitud RGPD`) instead of
+~230 — landed as its own commit with nothing else in it, with key sets and every value asserted
+byte-identical before and after. `lang:sync` now writes **both** files in that order, so the ordering is
+self-maintaining and a new key's diff is one line rather than one line buried in a reshuffle. Pinned by a
+test that running the command on a clean tree changes nothing at all, and by an idempotence test.
+
+**It writes `en.json`'s ORDER but never its VALUES — no English placeholders.** The prompt floated writing
+a placeholder that the completeness test then fails on. Rejected: a placeholder is an `en.json` entry, so
+it would **satisfy the parity check while shipping Spanish to an English reader** — precisely the leak
+`CLAUDE.md` says the gate exists to prevent. And the omission is already impossible to miss:
+`LocalizationTest::test_every_key_used_in_code_is_translated_in_both_locales` fails on a missing English
+key inside `composer check` — it caught five of them during prompt 165 in this very queue. Adding
+placeholders would trade a loud failure for a silent one. `lang:sync` reports the gap and leaves the
+English to a human, which is prompt 19's instinct and it was right.
+
+**The docblock claimed a CI role the command does not have.** It said `--check` was *"used by the
+completeness test / CI"*. It is not: `composer check` runs pint, phpstan and `artisan test`, and
+`LocalizationTest` does its own sorted comparison. So the real gate was green while the command
+advertising itself as that gate was red for a cosmetic reason — the worst available arrangement, because
+anyone running it got a false failure and anyone wiring it into CI would have got a build that fails on key
+order. The docblock now says plainly that it is a developer convenience and names the actual gate.
+
+**No translation content changed anywhere in this branch** — asserted by a test that no run of the command
+alters a value, and by the normalisation commit's own before/after comparison. `LocalizationTest`'s
+assertions are untouched; this branch makes the command agree with them, not the other way round.
