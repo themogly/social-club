@@ -21,3 +21,44 @@ node tests/Browser/measure-topbar.mjs                # measures; exits non-zero 
 
 Last run (owner-authorised branch `fix/nav-overlap-remainder`): **ALL PASS** at all four widths — 7 controls
 (five destinations + sede chip + overflow trigger), zero overlaps, none under 44 px, no horizontal page scroll.
+
+## Counter blocking states (prompt 175)
+
+Screenshots each dispensary blocking state — **sede, till, member** — at 1180×820 and 820×1180, light and
+dark, motion reduced and allowed (24 captures), and asserts the three things a picture cannot: **exactly one**
+blocking state per screen, no **destructive colour** on a blocked state, and no action under **44×44**.
+
+It also composes the **cold start before and after** side by side, which is the argument for the branch.
+
+```bash
+npm install --no-save playwright
+node_modules/.bin/playwright install chromium-headless-shell
+npm run build                                                  # the harness inlines the BUILT css — rebuild it
+php artisan test tests/Browser/BlockingStatesHarnessTest.php   # writes storage/app/blocker-{sede,till,member}.html
+node tests/Browser/shoot-blocking-states.mjs                   # → storage/app/screenshots/175/
+```
+
+To regenerate the "before" side, check out the pre-175 dispensary blade, run the harness (its assertions will
+fail — the artifacts are written first, deliberately, so this works), keep the file, and restore:
+
+```bash
+git show e8c68cd:resources/views/livewire/counter/dispensary-pos.blade.php \
+  > resources/views/livewire/counter/dispensary-pos.blade.php
+php artisan test tests/Browser/BlockingStatesHarnessTest.php   # fails; writes the artifacts anyway
+cp storage/app/blocker-till.html storage/app/blocker-before-coldstart.html
+git checkout -- resources/views/livewire/counter/dispensary-pos.blade.php
+```
+
+**Note on fidelity.** These are static captures with no Alpine running, so every `x-show` element would
+render *visible* (the offline banner, the top bar's overflow menu, the 173 surface). The script hides them,
+reproducing what an operator actually sees. The blocking states are plain server-rendered markup with no
+`x-show`, so nothing being photographed is suppressed by that rule.
+
+Last run (branch `feat/counter-blocking-states`): **ALL PASS** — 24 captures, one blocking state in every
+state at both orientations and both themes, no destructive colour, `Ir a la caja` measured 116×44 in brand
+blue (`rgb(37, 99, 235)`). Cold start: **3 statements before, 1 after**, in both themes.
+
+**Rebuild before measuring.** The first run of this check reported `Ir a la caja` at 116×**20**, because the
+local `public/build` predated prompt 173 and did not contain `min-h-[2.75rem]` at all. `public/build` is
+gitignored and production builds on deploy, so nothing had shipped broken — but a browser check is only as
+honest as the bundle it inlines. `npm run build` is a step in the sequence above for that reason.

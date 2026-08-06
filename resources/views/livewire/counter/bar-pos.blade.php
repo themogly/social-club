@@ -20,25 +20,20 @@
 
     @if (! $this->handoverActive())
 
-    @if ($noLocation)
-        {{-- Intentional empty state: an operator with no assigned sede. Still a 200. --}}
-        <div class="rounded-2xl border border-line bg-surface p-8 text-center dark:border-slate-800 dark:bg-slate-900">
-            <div class="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-surface-alt text-2xl dark:bg-slate-800">📍</div>
-            <h2 class="mt-4 text-lg font-semibold">{{ $mustChooseLocation ? __('Elige tu sede') : __('Sin sede asignada') }}</h2>
-            <p class="mt-1 text-sm text-ink-muted dark:text-slate-400">
-                {{ $mustChooseLocation ? __('Trabajas en varias sedes. Selecciona en la barra superior en cuál estás.') : __('No tienes ninguna sede activa. Pide a un responsable que te asigne una para vender en barra.') }}
-            </p>
-        </div>
-    @elseif ($barDisabled)
-        {{-- The bar is turned off for this sede (per-location bar_enabled, prompt 59). Still a 200. --}}
-        <div class="rounded-2xl border border-line bg-surface p-8 text-center dark:border-slate-800 dark:bg-slate-900">
-            <div class="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-surface-alt text-2xl dark:bg-slate-800">🚫</div>
-            <h2 class="mt-4 text-lg font-semibold">{{ __('Barra desactivada en esta sede') }}</h2>
-            <p class="mt-1 text-sm text-ink-muted dark:text-slate-400">
-                {{ __('Un responsable puede activarla desde la ficha de la sede.') }}
-            </p>
-        </div>
-    @else
+    {{-- Prompt 175 — one blocking state at a time, in dependency order. The bar has no member step (it can
+         serve for cash), so MEMBER is absent from the chain rather than false. The operator step is reported
+         so the till cannot jump it, and rendered by 173's surface. --}}
+    @php
+        $blocker = \App\Support\CounterBlocker::first([
+            \App\Support\CounterBlocker::SEDE => ! $noLocation,
+            \App\Support\CounterBlocker::OPERATOR => $this->hasOperator(),
+            \App\Support\CounterBlocker::TILL => $openTill !== null,
+        ]);
+    @endphp
+
+    {{-- Above the branch on purpose: losing the connection, or the reason a charge was refused, must reach the
+         operator whichever state the screen is in. A blocking state replaces the work, not the warnings. --}}
+    @if (! $noLocation)
         {{-- Offline banner — unmistakable, fail closed. --}}
         <div x-show="! online" x-cloak role="alert" aria-live="assertive" class="mb-4 flex items-center gap-3 rounded-xl border border-error/40 bg-error/10 px-4 py-3 text-sm font-semibold text-error">
             <span class="text-lg">⚠️</span>
@@ -62,7 +57,37 @@
                 <button type="button" wire:click="$set('flashMessage', null)" aria-label="{{ __('Descartar aviso') }}" class="shrink-0 rounded-md px-2 py-1 opacity-70 hover:opacity-100">✕</button>
             </div>
         @endif
+    @endif
 
+    @if ($blocker === \App\Support\CounterBlocker::SEDE)
+        <x-counter.blocking-state
+            data-blocker="sede"
+            icon="📍"
+            :heading="$mustChooseLocation ? __('Elige tu sede') : __('Sin sede asignada')"
+            :body="$mustChooseLocation ? __('Trabajas en varias sedes. Selecciona en la barra superior en cuál estás.') : __('No tienes ninguna sede activa. Pide a un responsable que te asigne una para vender en barra.')"
+        />
+    @elseif ($barDisabled)
+        {{-- Not a chain precondition: the bar being off for this sede (per-location bar_enabled, prompt 59) is
+             a config fact no operator can fix at the counter, so it has no action. It takes the one visual
+             language, but it stays out of CounterBlocker — that chain is preconditions, not settings. --}}
+        <x-counter.blocking-state
+            data-blocker="bar-disabled"
+            icon="🚫"
+            :heading="__('Barra desactivada en esta sede')"
+            :body="__('Un responsable puede activarla desde la ficha de la sede.')"
+        />
+    @elseif (\App\Support\CounterBlocker::rendersInPage($blocker))
+        {{-- The till, the bar's only remaining precondition — it shares the one drawer. Was a red card with a
+             dark-red button in the basket column; same reason, said once, in navigation colour. --}}
+        <x-counter.blocking-state
+            data-blocker="till"
+            icon="🧾"
+            :heading="__('No hay caja abierta')"
+            :body="__('Abre una caja en este terminal antes de cobrar en barra.')"
+            :action-label="__('Ir a la caja')"
+            :action-href="route('counter.till')"
+        />
+    @else
         {{-- At lg (1024, the counter's tablet-first width) the basket+Charge (RIGHT) is pinned to a
              dedicated column 2 spanning both rows, so socio (LEFT) + articles (CENTRE) stack in column 1
              with no dead space and the primary action stays top-right. At xl the RIGHT div resets to
@@ -247,15 +272,6 @@
 
             {{-- ================= RIGHT: the basket + payment ================= --}}
             <div class="flex flex-col gap-4 lg:col-start-2 lg:row-start-1 lg:row-span-2 xl:col-auto xl:row-auto">
-                {{-- No open till → unmistakable, blocks commit (the bar shares the one drawer). --}}
-                @unless ($openTill)
-                    <div class="rounded-2xl border border-error/40 bg-error/10 p-4 text-sm">
-                        <p class="font-semibold text-error">{{ __('No hay caja abierta') }}</p>
-                        <p class="mt-1 text-error/90">{{ __('Abre una caja en este terminal antes de cobrar en barra.') }}</p>
-                        <a href="{{ route('counter.till') }}" wire:navigate class="mt-3 inline-flex h-11 items-center rounded-lg bg-error px-4 text-sm font-semibold text-white transition hover:opacity-90">{{ __('Ir a la caja') }}</a>
-                    </div>
-                @endunless
-
                 <section class="rounded-2xl border border-line bg-surface p-4 dark:border-slate-800 dark:bg-slate-900">
                     <div class="flex items-center justify-between">
                         <h2 class="text-base font-semibold">{{ __('Cesta') }}</h2>

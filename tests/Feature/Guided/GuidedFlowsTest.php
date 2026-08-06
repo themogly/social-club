@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\Guided;
 
+use App\Actions\Till\OpenTill;
 use App\Enums\BatchStatus;
 use App\Enums\MembershipStatus;
 use App\Enums\Role;
@@ -118,7 +119,12 @@ class GuidedFlowsTest extends TestCase
         $this->assertNull($g->fresh()->completenessReason()); // ready — not flagged (regression: no false alarm)
 
         $this->operatorAt($this->a);
-        Livewire::test(DispensaryPos::class)->assertSee('Amnesia Test');
+        // Prompt 175: the genetics grid only renders on the usable screen — a till open and a socio
+        // identified. Without them the dispensary is a blocking state and there is no grid to assert on.
+        (new OpenTill)->handle($this->a, 'POS-1', 10000);
+        $member = Member::factory()->create(['organisation_id' => $this->org->id]);
+
+        Livewire::test(DispensaryPos::class)->call('selectMember', $member->id)->assertSee('Amnesia Test');
     }
 
     public function test_a_member_without_a_membership_is_flagged(): void

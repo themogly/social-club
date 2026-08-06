@@ -152,6 +152,7 @@ class ChargeAlwaysObservableTest extends TestCase
     public function test_the_bar_charge_button_is_disabled_only_when_offline(): void
     {
         $this->operator();
+        $this->openTill(); // prompt 175: without a till the screen IS the till blocker, so there is no button
         $html = Livewire::test(BarPos::class)->html();
 
         $this->assertStringContainsString('x-bind:disabled="! online"', $html);
@@ -182,10 +183,19 @@ class ChargeAlwaysObservableTest extends TestCase
             ->assertSee(__('La cesta está vacía.'));
     }
 
+    /**
+     * Prompt 175 moved the preconditions to full-screen blocking states, so the commit button only exists once
+     * the screen is usable — a till open and a socio identified. That is not a weakening of prompt 60: the
+     * reason is now stated up front, with the fix, instead of on a click. The guarantee this test defends —
+     * that the button is never silently dead when it IS on screen — is asserted in exactly that state.
+     */
     public function test_the_dispensary_charge_button_is_disabled_only_when_offline(): void
     {
         $this->operator();
-        $html = Livewire::test(DispensaryPos::class)->html();
+        $this->openTill();
+        $html = Livewire::test(DispensaryPos::class)
+            ->call('selectMember', $this->eligibleMember()->id)
+            ->html();
 
         $this->assertStringContainsString('x-bind:disabled="! online"', $html);
         $this->assertStringNotContainsString('! online ||', $html);

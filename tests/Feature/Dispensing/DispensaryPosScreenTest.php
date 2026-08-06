@@ -124,8 +124,12 @@ class DispensaryPosScreenTest extends TestCase
         $this->priceAt(1000);
         $this->batch(100000);
         $this->operator();
+        // Prompt 175: the genetics grid only renders on the usable screen — a till open and a socio
+        // identified. Without them the dispensary is a blocking state and there is no grid to assert on.
+        $this->openTill();
 
         Livewire::test(DispensaryPos::class)
+            ->call('selectMember', $this->eligibleMember()->id)
             ->assertOk()
             ->assertSet('noLocation', false)
             ->assertSee(__('Escanear tarjeta o buscar socio'))

@@ -65,6 +65,7 @@ class BarMiscLineTest extends TestCase
     public function test_the_manual_line_control_is_present_on_the_screen(): void
     {
         $this->operator();
+        $this->till(); // prompt 175: without one the screen is the till blocking state
         // The header button (always rendered, not a section below the grid). The "visible without scrolling at
         // 1024×768" measurement is the owed screenshot; its PRESENCE + header placement is asserted here.
         Livewire::test(BarPos::class)->assertSee(__('Importe manual'));

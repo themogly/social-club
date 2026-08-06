@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\Socio;
 
+use App\Actions\Till\OpenTill;
 use App\Enums\BatchStatus;
 use App\Enums\MembershipStatus;
 use App\Enums\MemberStatus;
@@ -146,7 +147,12 @@ class MemberMenuCrashTest extends TestCase
         app(ActiveScope::class)->setLocation($this->a->id);
         session(['counter.location_id' => $this->a->id]);
 
+        // Prompt 175: the grid only renders on the usable screen — a till open and a socio identified. The
+        // member here is the same one the menu was checked against, so both sides read the same sede.
+        (new OpenTill)->handle($this->a, 'POS-1', 10000);
+
         Livewire::test(DispensaryPos::class)
+            ->call('selectMember', $member->id)
             ->assertSee('Available Here')->assertDontSee('Available At B')->assertDontSee('Never Priced');
     }
 

@@ -6859,3 +6859,141 @@ Asserted that a wrong PIN **in handover mode** hits the same lockout, so no mode
 And the surface is **not** the security boundary: beginning a handover signs the operator out, so
 `requireOperator()` still refuses every write — asserted by attempting to open a till during a handover and
 finding zero rows. 44×44 on every control in the surface, including the confirm that was 155×42.
+
+---
+
+## Prompt 175 — four blockers, four styles, no order
+
+**The premise, re-verified before building.** On `main` the dispensary drew its preconditions in four visual
+languages at four places: the operator strip (l.22 region), a **red `bg-error` card with a dark-red
+"Ir a la caja"** in the basket column (l.507), a grey member empty state in the left column (l.255), and
+grey helper text under the commit button restating that same member blocker (l.752). With a sede and an
+operator but nothing else, **three of them rendered simultaneously**. Nothing said which to fix first.
+
+**The chain, and why that order.** `App\Support\CounterBlocker` resolves the preconditions to exactly one,
+in dependency order — **sede → operator → till → member**. Without a sede nothing resolves at all; without
+an operator nothing may be *written* (`requireOperator()`); without an open till nothing may be *dispensed*;
+without a member there is nothing to dispense. Each link is a precondition of the next, so showing the
+fourth while the first is unmet asks the operator to fix something they cannot yet act on. A precondition
+that does not apply to a screen is **absent from the array, not `false`** — Recepción has no till or member
+step, and the bar has no member step (it serves for cash), so they are never blocked on them.
+
+**Where the one pattern lives.** `x-counter.blocking-state` — one heading naming what is missing, one
+sentence of consequence, one action, full-screen, 44×44. Used by all five screens.
+
+**The operator step is reported but never rendered in-page.** Prompt 173 built the full-screen surface that
+owns it; `CounterBlocker::rendersInPage()` returns `false` for that step so the chain still *orders*
+correctly (the till and member steps cannot jump ahead of it) while the surface remains the only thing that
+draws it. Two implementations of one state is precisely what 173 spent a branch deleting; a test asserts no
+screen emits `data-blocker="operator"`.
+
+**The member step keeps its fix inside the blocking state — a correction to the audit's fourth standard.**
+The audit says "one button that fixes it", which assumes the fix is elsewhere. For sede and till it is (the
+topbar switcher, the Caja screen). For the member step *the thing that fixes it is the member search on the
+blocked screen*, so a blocker that merely says "identify a socio" would remove the only means of doing so —
+a dead end. The identify controls are extracted to `partials/member-identify.blade.php` and rendered
+**inside** the member blocking state via its slot; the same partial is included in the left column of the
+usable screen so an operator can scan the next socio without clearing the current one. It is still one
+pattern and still one action; the action is a control rather than a link. (A previous session concluded
+from this that the member step could not be full-screen at all. That does not follow — it only means the
+state must carry its own control.)
+
+**Colour has one meaning.** `Ir a la caja` was `bg-error` — a destructive style, on a navigation control, on
+a screen that was already blocked, which reads as an error the operator caused. It is navigation, so it is
+the brand button. Asserted on both screens that had the red card.
+
+**"Barra desactivada en esta sede" takes the pattern but stays out of the chain.** It is a per-location
+setting (`bar_enabled`, prompt 59), not a precondition an operator can meet at the counter, and it has no
+action for that reason. It gets the one visual language so the counter reads as one product, but
+`CounterBlocker` remains a chain of *preconditions*, not of settings.
+
+**The server-side gates are untouched — and that is the assertion that matters.** This branch is
+presentation and sequencing only. The risk it carries is turning four real refusals into four pictures of
+refusals, so `CounterBlockingStatesTest` bypasses the screen entirely and calls `commit()` directly for each
+precondition (no sede, no PIN operator, no till, no member), asserting a refusal **and** that no
+`Dispensation` row exists. `requireOperator()`, the till check and the member check are unchanged.
+
+**Warnings are hoisted above the blocker branch.** The offline banner and the flash message now render
+whichever state the screen is in. A blocking state replaces *the work*, not the warnings — otherwise a
+commit refused from inside a blocking state would state its reason into a region that no longer renders.
+
+**Prompt 60's charge-button test was re-pointed, not weakened.** It asserted that the commit button is
+disabled only when offline; it did so on a screen with no till and no member, which is now a blocking state
+with no commit button. The guarantee it defends — the button is never a silent dead control **when it is on
+screen** — is now asserted in exactly that state (till open, socio identified). The reason a commit cannot
+happen is now stated *up front, with its fix*, instead of on a click, which is strictly more observable.
+
+**Fixture updates across ten existing tests, and one that needed real diagnosis.** Tests that rendered the
+POS with a precondition unmet and then asserted on the genetics grid, the article grid or the filter rows
+now open a till (and identify a socio) first, because that markup only exists on the usable screen.
+`PosQuickEntryTest::test_their_usual_does_not_add_a_query_per_suggestion` failed differently: its *absolute*
+query counts **fell** (76→71 and 78→75) but its delta rose from 2 to 4, because it was measuring a budget
+for the "their usual" chips across a render that no longer drew them. Measured against `main` before
+changing it, rather than assumed. With a till open it measures the render that actually contains the chips,
+and the invariant holds.
+
+**Scope.** All five counter screens are wired. The till-open screen itself and its default float were split
+out to **prompt 182** — bundling them made the branch unlandable, which is what stalled the first attempt.
+When the till blocker is resolved the operator arrives at the existing Caja screen, unchanged.
+
+**Verified by looking, and it caught a stale build.** `tests/Browser/BlockingStatesHarnessTest` writes each
+blocking state as real authed HTML and `tests/Browser/shoot-blocking-states.mjs` photographs all three at
+1180×820 and 820×1180, light and dark, motion reduced and allowed — 24 captures — while asserting exactly one
+blocking state, no destructive colour, and no action under 44×44. Cold start measured **3 statements before,
+1 after**, in both themes, composed side by side.
+
+The first run **failed**: `Ir a la caja` measured 116×**20**, not 44 tall. The cause was not the markup but a
+**stale local CSS bundle** — `min-h-[2.75rem]` was absent from `public/build`, which predated prompt 173
+merging, so every control depending on that class (including 173's own PIN pad) measured at its content
+height. `npm run build` fixed it; after the rebuild the action measures **116×44** in brand blue
+(`rgb(37, 99, 235)`). Nothing shipped broken — `public/build` is gitignored and production builds on deploy —
+but it is worth recording that **a browser check is only as honest as the bundle it inlines**: rebuild before
+measuring, or the numbers describe an old commit. The README's run instructions now say so.
+
+One harness detail worth keeping: the artifacts are written **before** the assertions run, so the same file
+can be executed against an older commit (where the assertions cannot pass) to capture the "before" side.
+
+**The sede state has no button, and that is deliberate.** "One button that fixes it" cannot mean inventing a
+button that fixes nothing. When several sedes are available the fix is the topbar switcher, which is already
+on screen and at the touch floor; when **no** sede is assigned at all, only a responsable can fix it and no
+control at the counter would. The state says so and offers nothing, which is the honest form of the pattern.
+Asserted across all five screens (zero `data-blocker-action` in that state), alongside the till and member
+states asserting exactly one.
+
+**Reconciled against the prompt text after the fact.** The first pass through this branch weakened one
+required assertion: "on every screen, with everything missing, exactly one blocking state renders" was
+implemented as `assertLessThanOrEqual(1, …)`, on the reasoning that with everything missing the first unmet
+link is the OPERATOR step, which renders zero in-page blockers by design. That reasoning was wrong — with
+**everything** missing the first unmet link is SEDE, not OPERATOR, so the literal assertion is satisfiable
+and now holds on all five screens. Both regression tests were then run against `e8c68cd`'s blades to prove
+they FAIL there (`0 is identical to 1`), which is what makes them regression tests rather than descriptions.
+Two further gaps were closed at the same time: the bar's till state now asserts its single action, and the
+bar gets the same per-precondition server-refusal proof as the dispensary (sede / operator / till, each
+asserting no `Order` row).
+
+**MySQL was left to CI.** The suite was run locally on SQLite only (`composer check` — Pint, Larastan 0
+errors, 1263 tests / 10929 assertions, 3 pre-existing environmental skips). Prompt 141 put PHP 8.5 +
+MySQL 8.4 in CI, which runs the production runtime, and that is where driver parity is proven. This branch
+is Blade, one `App\Support` class and tests — it adds no migration, no column, no JSON cast and no raw
+expression, so there is no driver-difference surface for a MySQL run to find that CI will not.
+
+## Overnight autonomous run from 175 — merge authorisation
+
+**The owner authorised merging each branch himself, in session, on 2026-08-06:** *"i will start sending the
+prompts in, im going to change the way we work and ask you to merge each branch as im going to sleep. if you
+need to make a decision what is best and make notes in the decisions so i can pick it up in the morning."*
+
+This **overrides the `Push the branch; do not merge` line carried by every prompt in the queue** (176, 177,
+178, 179 and any that follow). Recording it because CLAUDE.md's workflow rule is *"push the branch, do NOT
+self-merge — a human reviews and merges"*, with the overnight autonomous run named as the one explicit,
+logged exception. This is that exception, and this is the log of it.
+
+**What it does not authorise.** The instruction is about *merging*, not about scope or risk. Unchanged:
+irreversible or destructive operations still require human action; a prompt whose premise proves wrong is
+reported and stopped rather than built around (the running order's "verify the premise" protocol); and a
+branch that cannot be finished cleanly is left unmerged at a clean point rather than half-landed. Merging
+follows a green `composer check`, never precedes one.
+
+**Judgment calls are recorded, not silently taken.** Every decision that would ordinarily have been a
+checkpoint is written into this file with its alternatives and its reasoning, so it can be overturned in the
+morning at the cost of reading, not of archaeology.

@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\Products;
 
+use App\Actions\Till\OpenTill;
 use App\Enums\BatchStatus;
 use App\Enums\Role;
 use App\Enums\SettingType;
@@ -10,6 +11,7 @@ use App\Models\Batch;
 use App\Models\Genetic;
 use App\Models\GeneticPrice;
 use App\Models\Location;
+use App\Models\Member;
 use App\Models\Organisation;
 use App\Models\User;
 use App\Support\ActiveScope;
@@ -91,7 +93,11 @@ class GeneticLowStockTest extends TestCase
         $this->actingAs($user);
         app(ActiveScope::class)->setLocation($this->location->id);
         CounterOperator::set($user);
+        // Prompt 175: the genetics grid only renders on the usable screen — a till open and a socio
+        // identified. Without them the dispensary is a blocking state and there is no grid to assert on.
+        (new OpenTill)->handle($this->location, 'POS-1', 10000);
+        $member = Member::factory()->create(['organisation_id' => $this->org->id]);
 
-        Livewire::test(DispensaryPos::class)->assertSee(__('Stock bajo'));
+        Livewire::test(DispensaryPos::class)->call('selectMember', $member->id)->assertSee(__('Stock bajo'));
     }
 }

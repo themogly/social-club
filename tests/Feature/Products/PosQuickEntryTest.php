@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\Products;
 
+use App\Actions\Till\OpenTill;
 use App\Enums\BatchStatus;
 use App\Enums\DispensationStatus;
 use App\Enums\MembershipStatus;
@@ -187,6 +188,10 @@ class PosQuickEntryTest extends TestCase
     public function test_their_usual_does_not_add_a_query_per_suggestion(): void
     {
         $this->operator();
+        // Prompt 175: the suggestions only RENDER on the usable screen — without an open till the dispensary
+        // is the till blocking state, and this budget would be measured across a render that omits the very
+        // thing it is budgeting. Put the screen in the state where the chips are actually drawn.
+        (new OpenTill)->handle($this->location, 'POS-1', 10000);
         $one = $this->genetic('One', 1000);
         [$two, $three] = [$this->genetic('Two', 1000), $this->genetic('Three', 1000)];
         $member = $this->member();
