@@ -16,8 +16,9 @@
         },
     }"
 >
-    @include('livewire.counter.partials.operator-strip')
-    @include('livewire.counter.partials.lock-overlay')
+    @include('livewire.counter.partials.counter-surface')
+
+    @if (! $this->handoverActive())
 
     @if ($noLocation)
         {{-- Intentional empty state: an operator with no assigned sede. Still a 200. --}}
@@ -412,6 +413,7 @@
             </div>
         </div>
     @endif
+@endif
 </div>
 
 {{-- Prompt 23: flag unsaved counter work so the header's Panel/Log out confirm before leaving. --}}

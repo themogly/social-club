@@ -1,6 +1,7 @@
 <div class="mx-auto flex w-full max-w-2xl flex-col gap-5">
-    @include('livewire.counter.partials.operator-strip')
-    @include('livewire.counter.partials.lock-overlay')
+    @include('livewire.counter.partials.counter-surface')
+
+    @if (! $this->handoverActive())
 
     @if ($noLocation)
         {{-- Intentional empty state: an operator with no assigned sede. Still a 200. --}}
@@ -562,6 +563,7 @@
             @endcan
         @endif
     @endif
+@endif
 </div>
 
 {{-- Prompt 23: flag an in-progress blind count / cash entry as unsaved work. --}}

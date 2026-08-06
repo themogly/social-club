@@ -83,7 +83,13 @@
         <div class="mx-auto flex min-h-screen w-full max-w-6xl flex-col">
             {{-- One shared header for every counter terminal (brand + title + a
                  permission-filtered Panel link + Log out). See x-counter.top-bar. --}}
-            <x-counter.top-bar :title="$title ?? null" />
+            {{-- Handed over (prompt 173): the counter's chrome is ABSENT from the DOM, not hidden by CSS.
+                 The tab strip, the overflow menu with its Panel link and Log out, the sede switcher and the
+                 panic button are all inside this component — while an applicant holds the tablet there is no
+                 element to find, no link to follow and nothing for a keyboard to reach. --}}
+            @unless (\App\Support\CounterHandover::active())
+                <x-counter.top-bar :title="$title ?? null" />
+            @endunless
 
             <main class="flex-1 px-4 py-5 sm:px-6">
                 {{ $slot }}

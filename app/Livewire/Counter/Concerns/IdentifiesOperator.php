@@ -2,8 +2,10 @@
 
 namespace App\Livewire\Counter\Concerns;
 
+use App\Actions\RecordAuditLog;
 use App\Actions\UnlockOperator;
 use App\Support\ActiveScope;
+use App\Support\CounterHandover;
 use App\Support\CounterOperator;
 use Livewire\Attributes\On;
 
@@ -27,6 +29,50 @@ trait IdentifiesOperator
 
     /** Last unlock feedback for the panel (wrong PIN / locked out); never the PIN itself. */
     public ?string $operatorFeedback = null;
+
+    /**
+     * Which mode the counter's one full-screen surface is in, resolved SERVER-side (prompt 173).
+     * `locked` is client-state (the idle timer) and is layered on top of this in the surface itself.
+     *
+     *   handover      an applicant is holding the tablet — outranks everything
+     *   unidentified  no operator yet: start of a shift, or after a switch
+     *   null          an operator is working; the counter is usable
+     */
+    public function surfaceMode(): ?string
+    {
+        if (CounterHandover::active()) {
+            return 'handover';
+        }
+
+        return $this->hasOperator() ? null : 'unidentified';
+    }
+
+    /** Is the tablet currently in an applicant's hands? Drives DOM-absence of the counter's chrome. */
+    public function handoverActive(): bool
+    {
+        return CounterHandover::active();
+    }
+
+    /**
+     * Hand the tablet over. Entered ONLY from the counter, by an identified operator, at a resolved sede —
+     * never by URL, because nothing routes here. Signing the operator out is deliberate and mirrors
+     * lockCounter(): while an applicant holds the device, requireOperator() refuses every write
+     * server-side, so the surface is not the only thing standing between a tap and a commit.
+     */
+    public function beginHandover(): void
+    {
+        if (! $this->requireOperator()) {
+            return;
+        }
+
+        $operator = CounterOperator::current();
+        $location = $this->resolveLocation();
+
+        CounterHandover::begin((string) $operator?->id, $location?->id);
+        (new RecordAuditLog)->handle('counter.handover.started', $location);
+
+        CounterOperator::clear();
+    }
 
     public function currentOperatorName(): ?string
     {
@@ -58,6 +104,14 @@ trait IdentifiesOperator
     #[On('counter-lock')]
     public function lockCounter(): void
     {
+        // If the applicant wandered off holding the tablet, the timer must land on the LOCK screen, not
+        // return an abandoned device to a live till (prompt 173). Ending the handover here also disposes
+        // of whatever they had typed, which is the same guarantee as completing or aborting.
+        if (CounterHandover::active()) {
+            (new RecordAuditLog)->handle('counter.handover.timed_out', $this->resolveLocation());
+            CounterHandover::end();
+        }
+
         CounterOperator::clear();
     }
 
@@ -109,6 +163,13 @@ trait IdentifiesOperator
                 : __('PIN no reconocido.');
 
             return;
+        }
+
+        // The PIN is how EVERY mode ends — locked, unidentified and handed over alike. Ending a handover
+        // here is what makes "there is no way out except the PIN" true rather than aspirational.
+        if (CounterHandover::active()) {
+            (new RecordAuditLog)->handle('counter.handover.ended', $this->resolveLocation());
+            CounterHandover::end();
         }
 
         CounterOperator::set($operator);

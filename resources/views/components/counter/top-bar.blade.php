@@ -161,6 +161,18 @@
         </nav>
     @endif
 
+    {{-- WHO IS WORKING (prompt 173). The inline operator strip is retired — it was a normal-flow block that
+         pushed the page down when its PIN pad opened — so the operator's name lives here instead, in the
+         chrome that is already on every screen and already at the 44px floor. Reading only: identifying and
+         switching both happen on the full-screen surface, so there is exactly ONE route to the pad. --}}
+    @if ($user !== null && \App\Support\CounterOperator::current() !== null)
+        <p data-operator-name-chip class="hidden items-center gap-2 rounded-lg bg-surface-alt px-3 py-2 text-sm sm:flex dark:bg-slate-800">
+            <span class="inline-block h-2.5 w-2.5 rounded-full bg-success" aria-hidden="true"></span>
+            <span class="text-ink-muted dark:text-slate-400">{{ __('Trabajando') }}:</span>
+            <span data-operator-name class="font-semibold">{{ \App\Support\CounterOperator::current()?->name }}</span>
+        </p>
+    @endif
+
     {{-- Trailing controls (prompts 120 + 132): the "lock now" button plus ONE overflow control that collapses
          the non-destination actions (Help, Panel, Log out). Both are 44px; the overflow is what lets the widened
          five-destination nav be one flow that cannot overlap a wide fixed group — there isn't one any more. --}}

@@ -73,16 +73,20 @@ class OperatorUnlockTest extends TestCase
 
     public function test_a_correct_pin_unlocks_the_operator_and_shows_who_is_working(): void
     {
+        // No operator yet -> the full-screen surface is in its "unidentified" mode (prompt 173).
         Livewire::actingAs($this->device)->test(CheckInScreen::class)
-            ->assertSee(__('Sin operador identificado'))
-            ->call('openOperatorPanel')
-            ->assertSet('operatorPanelOpen', true)
+            ->assertSee('data-surface-mode="unidentified"', false)
             ->set('operatorPin', '4321')
             ->call('unlockOperator')
-            ->assertSet('operatorPanelOpen', false)
-            ->assertSee('Marta Operadora');   // the "currently working" indicator
+            ->assertSee('data-surface-mode="none"', false);
 
         $this->assertSame($this->operator->id, CounterOperator::id());
+
+        // "Who is working" moved to the top bar when the inline strip was retired — it renders in the
+        // layout, so it is asserted through a real request rather than on the component.
+        $this->actingAs($this->device)->get(route('counter.checkin'))
+            ->assertSee('data-operator-name', false)
+            ->assertSee('Marta Operadora');
     }
 
     public function test_a_wrong_pin_is_rejected_and_never_retained(): void
@@ -116,16 +120,19 @@ class OperatorUnlockTest extends TestCase
         CounterOperator::set($this->operator);
         $other = $this->staff('Otro Turno', '9999');
 
+        $this->actingAs($this->device)->get(route('counter.checkin'))->assertSee('Marta Operadora');
+
         Livewire::actingAs($this->device)->test(CheckInScreen::class)
-            ->assertSee('Marta Operadora')
             ->call('switchOperator')
-            ->assertSet('operatorPanelOpen', true)
+            ->assertSee('data-surface-mode="unidentified"', false)
             ->set('operatorPin', '9999')
-            ->call('unlockOperator')
-            ->assertSee('Otro Turno')
-            ->assertDontSee('Marta Operadora');
+            ->call('unlockOperator');
 
         $this->assertSame($other->id, CounterOperator::id());
+
+        $this->actingAs($this->device)->get(route('counter.checkin'))
+            ->assertSee('Otro Turno')
+            ->assertDontSee('Marta Operadora');
     }
 
     // --- Attribution: the PIN operator, never the device login ----------------------
@@ -264,11 +271,13 @@ class OperatorUnlockTest extends TestCase
             ->assertDispatched('counter-unlocked');
     }
 
-    public function test_every_counter_screen_carries_the_idle_lock_overlay(): void
+    public function test_every_counter_screen_carries_the_full_screen_surface(): void
     {
         foreach ([CheckInScreen::class, DispensaryPos::class, BarPos::class, TillSession::class] as $screen) {
             Livewire::actingAs($this->device)->test($screen)
-                ->assertSee('data-counter-lock', false);
+                // The idle lock is now one of three modes on the counter's single full-screen surface
+            // (prompt 173) — same primitive, same PIN, same throttle.
+                ->assertSee('data-counter-surface', false);
         }
     }
 
