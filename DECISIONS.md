@@ -7296,3 +7296,57 @@ typed value; and record correction counts per field with no document content.
 `composer require` of an OCR package on my own initiative. Prompt 178's upload (the compliance artefact) is
 merged and stands on its own — which is exactly why 155 and 178 insisted the two ship separately: the
 compliance half did not have to wait for the convenience half, and it has not.
+
+## Prompt 180 — the health panel said backups were not configured. They are.
+
+**The premise, re-verified.** `system-health.blade.php` (lines 240–252 on `main`) rendered a permanent
+section: *Copias de seguridad — Última copia: Sin configurar · Última restauración: Sin configurar ·
+Pendiente de conectar una canalización de copias.* It was fed by `SystemHealth::backups()`, which read
+`Settings::get('last_backup_at')` and `last_restore_at` — two keys **absent from `Settings::DEFAULTS`** and
+written by nothing in the codebase. Confirmed by grep, not assumed: the only references anywhere were the
+view model method and the page binding that called it.
+
+**Why it had to change.** With prompt 160 dropped — the owner handles backups on his own infrastructure and
+no backup mechanism belongs in this application — nothing will ever write those keys. So the section was not
+merely empty, it was **permanently asserting something false**. Backups are configured; the application has
+no visibility of them. Those are different statements, and the one on screen was the damaging one: on a page
+titled *Salud del sistema*, a club officer, an auditor or an inspector reading "Sin configurar / pendiente de
+conectar" concludes the club is not backing up.
+
+**Chosen: a statement of fact, not removal.** The two options were to delete the section (honest by omission)
+or to replace it with one line saying where responsibility sits. Taken the second, which was the prompt's
+recommendation and is the right one: a health page with a silent gap invites the same question from the other
+direction, and the next person to notice it may refill it with another placeholder. Saying so closes the
+question permanently and costs nothing.
+
+**The wording reports no status, deliberately.** *"Se gestionan fuera de la aplicación, en la infraestructura
+del club."* / *"Esta aplicación no las realiza ni comprueba su estado."* The second sentence is the load-
+bearing one: it states plainly that nothing here has checked anything, so the section cannot be read as a
+green light. This follows CLAUDE.md's honesty rule — the software evidences what it did, and it must not
+imply it did something it did not.
+
+**Everything else went with it.** `SystemHealth::backups()` is deleted (no method left returning nulls that
+nothing consumes), the page's `'backups' =>` binding is gone, and the two placeholder Settings keys are
+retired. `Settings::DEFAULTS` is unchanged — they were never in it, so the settings-form completeness gate
+(prompt 20) is untouched, which was checked rather than assumed.
+
+**Four strings of retired copy removed from BOTH lang files** — `Pendiente de conectar una canalización de
+copias.`, `Última copia`, `Última restauración` and `Sin configurar`. Each was verified unused first; after
+the change the only occurrences anywhere were inside the blade comment recording why they went.
+
+**No backup mechanism was added, in any form** — no command, no scheduler entry, no package, no settings key
+waiting to be filled. A test enumerates the registered Artisan commands and fails if one containing "backup"
+appears. The owner's decision on 160 is settled and this branch exists to clean up after it, not to
+relitigate it.
+
+**The tests are mostly absence assertions, on purpose.** The page no longer renders any of the retired
+strings; `SystemHealth::backups()` no longer exists; and a filesystem search across `app`, `resources`,
+`database`, `config` and `routes` fails if `last_backup_at` or `last_restore_at` is referenced again — so the
+placeholder cannot come back through a different door (a new view model, a command, a settings row). Every
+other section of the shared view is asserted explicitly, since this branch edits a file ten other sections
+live in. `Bajas de temporales` is deliberately excluded from that list: it is conditional on
+`$temporarySweep`, so asserting it unconditionally would test the fixture rather than the view. The
+owner-only gate on the page is re-asserted unchanged.
+
+**MySQL was left to CI**, per the running order: `composer check` green on SQLite. This branch is a view, a
+deleted method and two lang files — no migration, no column, no query.

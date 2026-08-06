@@ -139,3 +139,25 @@ pass vacuously.
 
 Last run: **ALL PASS** — 4 captures, `#document_scan` 316×36 at 390px, `required=false` in both locales, no
 horizontal scroll.
+
+## The health page's backup section (prompt 180)
+
+```bash
+npm run build
+php artisan test tests/Browser/BackupSlotHarnessTest.php   # writes storage/app/system-health.html
+node tests/Browser/shoot-backup-slot.mjs                   # → storage/app/screenshots/180/
+```
+
+Fails if the page renders any of the retired claims (`Sin configurar`, `Pendiente de conectar`, `Última
+copia`, `Última restauración`) or loses the section heading.
+
+**Two rules here are the INVERSE of the counter harnesses, and both follow from the same principle —
+reproduce what the user actually sees:**
+
+- **Inline `theme-*.css`, not `app-*.css`.** This is a Filament PANEL page, so the panel theme is exactly
+  what it loads. Prompt 176's lesson is not "always app.css"; it is *inline what the page itself loads, and
+  nothing else*.
+- **Un-cloak instead of hiding.** The counter captures hide `[x-show]` elements because Alpine would hide
+  them on boot. A Filament page is the other way round: its shell stays cloaked until Alpine runs, so a raw
+  capture photographs an empty topbar — which looks like a broken page rather than a missing script. The
+  script reveals the main region and suppresses the dropdown panels Alpine would have kept closed.

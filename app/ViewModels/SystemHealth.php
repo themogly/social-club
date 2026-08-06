@@ -207,23 +207,6 @@ class SystemHealth
         return ['store' => $store, 'reachable' => $reachable];
     }
 
-    /**
-     * Last backup / restore. No backup system is wired in-app, so these are placeholders
-     * (Settings keys that stay null until a backup pipeline writes them).
-     *
-     * @return array{last_backup: ?string, last_restore: ?string}
-     */
-    public function backups(): array
-    {
-        $backup = Settings::get('last_backup_at');
-        $restore = Settings::get('last_restore_at');
-
-        return [
-            'last_backup' => is_string($backup) ? $backup : null,
-            'last_restore' => is_string($restore) ? $restore : null,
-        ];
-    }
-
     public function auditRetentionDays(): int
     {
         return (int) Settings::get('audit_retention_days', 3650);

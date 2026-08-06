@@ -237,18 +237,25 @@
             @endunless
         </x-filament::section>
 
+        {{-- Prompt 180 — a statement of fact, not a status.
+
+             This section used to report "Última copia — Sin configurar / Pendiente de conectar una
+             canalización de copias", fed by two Settings keys (`last_backup_at`, `last_restore_at`) that were
+             not in `Settings::DEFAULTS` and that nothing in the codebase ever wrote. With prompt 160 dropped
+             — the owner handles backups on his own infrastructure and no backup mechanism belongs in this
+             application — nothing ever would. So the claim was permanent, and it was FALSE: backups are
+             configured; the application simply has no visibility of them, which is a different statement and
+             the far less damaging one. On a page titled Salud del sistema, read by an officer or an
+             inspector, "not configured" is worse than saying nothing at all.
+
+             Removing the section outright was the alternative. This says it instead, because a health page
+             with a silent gap invites the same question from the other direction and the next person to
+             notice may refill it with another placeholder. The wording states where RESPONSIBILITY sits and
+             deliberately reports no status — the application has not checked anything and must not imply it
+             has. --}}
         <x-filament::section :heading="__('Copias de seguridad')" icon="heroicon-o-server-stack">
-            <dl style="font-size:.875rem;display:grid;gap:.35rem;">
-                <div style="display:flex;justify-content:space-between;gap:1rem;">
-                    <dt style="opacity:.65;">{{ __('Última copia') }}</dt>
-                    <dd>{{ $backups['last_backup'] ?? __('Sin configurar') }}</dd>
-                </div>
-                <div style="display:flex;justify-content:space-between;gap:1rem;">
-                    <dt style="opacity:.65;">{{ __('Última restauración') }}</dt>
-                    <dd>{{ $backups['last_restore'] ?? __('Sin configurar') }}</dd>
-                </div>
-            </dl>
-            <p style="font-size:.75rem;opacity:.6;margin-top:.5rem;">{{ __('Pendiente de conectar una canalización de copias.') }}</p>
+            <p style="font-size:.875rem;">{{ __('Se gestionan fuera de la aplicación, en la infraestructura del club.') }}</p>
+            <p style="font-size:.75rem;opacity:.6;margin-top:.5rem;">{{ __('Esta aplicación no las realiza ni comprueba su estado.') }}</p>
         </x-filament::section>
     </div>
 
