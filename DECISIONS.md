@@ -6794,3 +6794,68 @@ both locales.
 
 This is **step 1 of the counter-first design** (`DESIGN-counter-first.md`): staff live in the counter and
 treat the panel as back office. Steps 2 and 3 are the lock surface (173) and the Alta wizard (174).
+
+## Prompt 173 — the counter's one full-screen surface: locked, unidentified, handed over
+
+**The measurement that justifies it.** The operator strip was a plain normal-flow block —
+`<div data-operator-strip class="border-b … px-4 py-2">` — and `@if ($operatorPanelOpen)` rendered the PIN
+pad *inside it*. 49px closed, 521px open, so opening the pad pushed everything below it down by 36% of the
+viewport. On the till at 1180×820, `Abrir caja` moved from **y=381 (50% down) to y=805 (102%)** and never
+came back: you tapped *Identificarse* in order to be allowed to press the button, and the button left the
+screen. Every mature tablet POS uses a full-screen surface for this; nobody uses an expanding inline panel.
+
+**The drift had already happened — this branch deletes a duplicate rather than avoiding one.**
+`operator-strip.blade.php` and `lock-overlay.blade.php` each carried their own PIN pad with
+**character-identical** Alpine state, and both were `@include`d by all five screens, so both were on every
+page. Consolidated onto the **lock overlay's** pad, because it was already `fixed inset-0 z-50` and its own
+confirm was already `h-12` where the strip's was `py-2.5` (measured 155×42). The compliant one was the one
+to keep. A test now asserts by enumeration that **exactly one PIN pad exists in the codebase**.
+
+**One surface, three modes, because two that must behave identically is how they drift** — which this
+codebase has now demonstrated twice (the pads here, and the near-miss of a duplicated permission map in
+172). `locked` is client state (the idle timer), `unidentified` and `handover` are resolved server-side by
+`IdentifiesOperator::surfaceMode()`, and **handover outranks both** — an applicant mid-form must never be
+shown a lock screen. They share opacity, the counter being unreachable beneath, and the PIN as the way
+back; they differ only in what fills them and what ends them.
+
+**The opacity claim is now true.** Prompt 120's entry said it *"paints an OPAQUE full-viewport surface"*
+while the markup painted `bg-surface-alt/95` with `backdrop-blur-sm`. That is a readability problem on an
+unattended tablet and a real one in handed-over mode, where a person who is not a member holds the device
+with the counter behind them. The surface is opaque and a test pins it.
+
+**Where "who is working" went.** The strip is retired outright, so the operator's name moved to the
+**top bar** — the chrome that is already on every counter screen, already at the 44px floor, and already
+where the sede and the lock button live. It is **read-only**: identifying and switching both happen on the
+surface, so there is exactly one route to the pad. (The two tests that asserted the name on the Livewire
+component now assert it through a real request, because it renders in the layout.)
+
+**Handed-over guarantees, each asserted.** The counter's chrome is **absent from the DOM, not hidden by
+CSS** — the layout skips `x-counter.top-bar` entirely, taking the tab strip, the overflow menu, the Panel
+link, Log out, the sede switcher and the panic button with it — and each screen's own body is wrapped so
+its content does not render either. Asserted for all five routes: no operator name, no sede name, no
+`data-counter-topbar`, no logout URL. Because the state is **session-backed**, a full page load or the back
+button cannot return to the counter; a client-side flag could not have given that.
+
+**The panic button is NOT reachable in handed-over mode.** Prompt 121 put it in staff hands deliberately —
+they are the ones in the room during a robbery — but during a handover the tablet is *not* in staff hands,
+and an applicant who found it could lock the entire club. Staff take the tablet back with their PIN first,
+which is one action away. Recorded because it is a genuine trade-off against the case 121 was built for.
+
+**The idle timer lands on `locked`, never back on the counter.** If the applicant wanders off holding the
+tablet, `lockCounter()` ends the handover *and* signs the operator out, so the surface stays up in
+`unidentified` mode. Returning an abandoned device to a live till would have been worse than not having the
+mode at all.
+
+**Nothing survives a handover.** Ending it — completed, aborted or timed out — clears the applicant's
+draft with it, so the next person handed the tablet cannot see the last one's half-typed document number.
+
+**Identify-once-per-shift kept, deliberately.** No PIN prompt per transaction. Of the products reviewed
+only Lightspeed S-Series offers that, as an option; Toast explicitly keeps staff signed in through a shift.
+The existing model — identify once, idle timeout, manual lock — is right and only its presentation was
+wrong.
+
+**Untouched:** `UnlockOperator`, its hashing, its Cache throttle keys and its escalating lockout windows.
+Asserted that a wrong PIN **in handover mode** hits the same lockout, so no mode became a softer way in.
+And the surface is **not** the security boundary: beginning a handover signs the operator out, so
+`requireOperator()` still refuses every write — asserted by attempting to open a till during a handover and
+finding zero rows. 44×44 on every control in the surface, including the confirm that was 155×42.
