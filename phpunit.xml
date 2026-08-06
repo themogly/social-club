@@ -11,6 +11,16 @@
         <testsuite name="Feature">
             <directory>tests/Feature</directory>
         </testsuite>
+        <!--
+            Prompt 178: tests/Browser was never collected, so the STRUCTURAL half of every browser harness
+            (the assertions the .mjs scripts cannot make, and which tests/Browser/README.md claimed ran in
+            composer check) had never run in CI. They are ordinary PHPUnit tests — they render real authed
+            HTML and assert against it; only the .mjs measurement side needs Playwright, and that stays
+            out of CI. Each guards its own artifact-writing against a missing asset build.
+        -->
+        <testsuite name="Browser">
+            <directory>tests/Browser</directory>
+        </testsuite>
     </testsuites>
     <source>
         <include>

@@ -12,6 +12,7 @@ use App\Support\DocumentVault;
 use App\Support\Settings;
 use App\Support\Weight;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\View\View;
 
 /**
@@ -24,6 +25,9 @@ use Illuminate\View\View;
  */
 class ApplicationController extends Controller
 {
+    /** File-bearing submissions per IP per hour — bounds vault writes, not bandwidth (see store()). */
+    private const UPLOADS_PER_HOUR = 5;
+
     public function show(string $token): View
     {
         $application = $this->find($token);
@@ -104,8 +108,40 @@ class ApplicationController extends Controller
         // approved) is anonymised and this photo deleted by `applications:prune-retention` past
         // application_retention_days — the retention the ID scan raised, now actually enforced (not prompt 142's
         // sweep, which only prunes member-import CSVs — that claim was wrong; a security audit caught it).
-        if ($request->hasFile('photo')) {
+        // Rate limiting, and what it does and does not defend (prompt 178).
+        //
+        // The uploads are NOT a separate endpoint — they ride the same POST, so the route's `throttle:10,1`
+        // and ApplicationSpamGuard already apply to them unchanged. What that does not bound is STORAGE: ten
+        // submissions a minute, each up to the shared 12 MB ceiling, is ~120 MB/min of encrypted vault writes
+        // per IP, sustained, on an unauthenticated route. So file-bearing submissions get their own, tighter
+        // limit on top. It is honest about its scope — the bytes have already crossed the wire and been parsed
+        // by PHP before this runs, so this bounds what reaches the DISK, not bandwidth; bandwidth is nginx's
+        // `client_max_body_size` and PHP's `upload_max_filesize` (prompt 164 reconciled those three numbers).
+        //
+        // Five an hour is far above a genuine applicant (who uploads once, twice if they mis-picked a file)
+        // and far below anything worth doing to a disk. Over the limit the application still SUBMITS — the
+        // files are simply not stored, because an upload is optional and losing it must never cost someone
+        // their application.
+        $filesPresent = $request->hasFile('photo') || $request->hasFile('document_scan');
+        $storageAllowed = ! $filesPresent || RateLimiter::attempt(
+            'application-upload:'.$request->ip(),
+            self::UPLOADS_PER_HOUR,
+            fn () => true,
+            3600,
+        );
+
+        if ($storageAllowed && $request->hasFile('photo')) {
             $payload['photo_path'] = DocumentVault::storeUpload($request->file('photo'), 'member-photos');
+        }
+
+        // Optional identity DOCUMENT (prompt 178 — 155's part B). Same vault, same private encrypted disk, same
+        // `member-id-scans` directory the staff MemberForm already writes to, so an application's scan and a
+        // member's scan are one kind of object with one serving path (signed, access-logged). A DIFFERENT
+        // artefact from the photo above — a face is not a document — so it gets its own payload key and its own
+        // member column, and the two are never merged. On approval the member points at THIS SAME FILE rather
+        // than a copy; until then `applications:prune-retention` deletes it with the rest of the payload.
+        if ($storageAllowed && $request->hasFile('document_scan')) {
+            $payload['document_scan_path'] = DocumentVault::storeUpload($request->file('document_scan'), 'member-id-scans');
         }
 
         // Still PENDING — it now carries the applicant's details and enters the review queue.

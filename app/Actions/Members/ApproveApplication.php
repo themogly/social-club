@@ -80,6 +80,11 @@ class ApproveApplication
             // submit time; approval only points the member at it. Retention now follows the member's, and
             // AnonymiseMember disposes of it. Null when they skipped it — never a hard requirement.
             'photo_path' => $payload['photo_path'] ?? null,
+            // The SAME vault object the applicant uploaded (prompt 178), not a copy: one file, one path, so the
+            // member's ID scan and the application's are never two divergent artefacts — and so that
+            // `applications:prune-retention` correctly leaves APPROVED applications alone, because deleting
+            // theirs would blank a real member's document.
+            'document_scan_path' => $payload['document_scan_path'] ?? null,
         ]);
         $member->organisation_id = $application->organisation_id;
         // Shared enrolment defaults — the SAME source the direct-create form fills, so the
