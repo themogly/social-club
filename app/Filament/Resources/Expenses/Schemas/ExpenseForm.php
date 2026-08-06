@@ -3,6 +3,7 @@
 namespace App\Filament\Resources\Expenses\Schemas;
 
 use App\Enums\ExpensePaidFrom;
+use App\Support\DocumentUpload;
 use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\FileUpload;
 use Filament\Forms\Components\Placeholder;
@@ -93,6 +94,8 @@ class ExpenseForm
                             ->label(__('Justificante'))
                             ->disk('documents')
                             ->visibility('private')
+                            ->maxSize(DocumentUpload::maxKilobytes())
+                            ->helperText(DocumentUpload::helperText())
                             ->columnSpanFull(),
 
                         Placeholder::make('staff_payment_notice')

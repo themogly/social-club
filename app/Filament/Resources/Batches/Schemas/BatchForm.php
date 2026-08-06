@@ -3,6 +3,7 @@
 namespace App\Filament\Resources\Batches\Schemas;
 
 use App\Models\Genetic;
+use App\Support\DocumentUpload;
 use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\FileUpload;
 use Filament\Forms\Components\Select;
@@ -63,7 +64,9 @@ class BatchForm
                         FileUpload::make('lab_report_path')
                             ->label(__('Informe de laboratorio'))
                             ->disk('documents')
-                            ->visibility('private'),
+                            ->visibility('private')
+                            ->maxSize(DocumentUpload::maxKilobytes())
+                            ->helperText(DocumentUpload::helperText()),
 
                         Textarea::make('notes')
                             ->label(__('Notas'))

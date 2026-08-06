@@ -3,6 +3,7 @@
 namespace App\Http\Requests;
 
 use App\Enums\IdDocumentType;
+use App\Support\DocumentUpload;
 use App\Support\MemberEligibility;
 use Illuminate\Contracts\Validation\Validator;
 use Illuminate\Foundation\Http\FormRequest;
@@ -38,7 +39,9 @@ class SubmitApplicationRequest extends FormRequest
             'document_number' => ['required', 'string', 'max:64'],
             // Optional identity photo (prompt 157) — NEVER required (an applicant who cannot upload must still
             // be able to apply). It is checked against them at the counter; the form copy says so.
-            'photo' => ['nullable', 'image', 'mimes:jpeg,jpg,png,webp', 'max:8192'],
+            // The size ceiling is the SHARED one (prompt 164) — it used to be its own hardcoded 8 MB, a
+            // seventh number nobody could see next to the six on the staff forms.
+            'photo' => ['nullable', 'image', 'mimes:jpeg,jpg,png,webp', DocumentUpload::maxRule()],
             'is_therapeutic' => ['sometimes', 'boolean'],
             'declared_monthly_g' => ['nullable', 'numeric', 'min:0', 'max:1000'],
             // Sponsor by NAME or number (prompt 97): a prospect knows the person, not their member number.
@@ -62,6 +65,23 @@ class SubmitApplicationRequest extends FormRequest
                 ]));
             }
         });
+    }
+
+    /**
+     * The applicant is on a phone, on an emailed link, with nobody to ask. A rejected photo has to
+     * say what was wrong and what to do about it (prompt 164) — and it must read as a sentence
+     * whatever the state of the framework's validation lines, which is why it is spelled out here
+     * rather than left to `validation.max.file`.
+     *
+     * @return array<string, string>
+     */
+    public function messages(): array
+    {
+        return [
+            'photo.max' => __('La foto es demasiado grande (máximo :size). Prueba con una foto más pequeña.', [
+                'size' => DocumentUpload::limitLabel(),
+            ]),
+        ];
     }
 
     /**
