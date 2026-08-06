@@ -42,6 +42,13 @@ class SubmitApplicationRequest extends FormRequest
             // The size ceiling is the SHARED one (prompt 164) — it used to be its own hardcoded 8 MB, a
             // seventh number nobody could see next to the six on the staff forms.
             'photo' => ['nullable', 'image', 'mimes:jpeg,jpg,png,webp', DocumentUpload::maxRule()],
+            // Optional identity DOCUMENT (prompt 178 — 155's part B, decided by the controller: capture at
+            // the counter plus an optional upload here). A DIFFERENT artefact from `photo` above: that is a
+            // FACE for the counter check, this is the compliance record of the document itself. Never merged,
+            // never required — an applicant who cannot or will not upload must still be able to apply, and a
+            // test asserts exactly that. PDF is allowed because a DNI is two-sided and people scan both to one
+            // file; the ceiling is the same shared one (prompt 164), not a new number.
+            'document_scan' => ['nullable', 'file', 'mimes:jpeg,jpg,png,webp,pdf', DocumentUpload::maxRule()],
             'is_therapeutic' => ['sometimes', 'boolean'],
             'declared_monthly_g' => ['nullable', 'numeric', 'min:0', 'max:1000'],
             // Sponsor by NAME or number (prompt 97): a prospect knows the person, not their member number.
@@ -81,6 +88,10 @@ class SubmitApplicationRequest extends FormRequest
             'photo.max' => __('La foto es demasiado grande (máximo :size). Prueba con una foto más pequeña.', [
                 'size' => DocumentUpload::limitLabel(),
             ]),
+            'document_scan.max' => __('El documento es demasiado grande (máximo :size). Prueba con un archivo más pequeño.', [
+                'size' => DocumentUpload::limitLabel(),
+            ]),
+            'document_scan.mimes' => __('El documento debe ser una imagen (JPG, PNG, WEBP) o un PDF.'),
         ];
     }
 

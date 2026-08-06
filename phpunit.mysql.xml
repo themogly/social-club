@@ -17,6 +17,11 @@
         <testsuite name="Feature">
             <directory>tests/Feature</directory>
         </testsuite>
+        <!-- Kept in step with phpunit.xml (prompt 178) — the production runtime is where parity is proven,
+             so the browser harnesses' structural assertions have to run HERE above all. -->
+        <testsuite name="Browser">
+            <directory>tests/Browser</directory>
+        </testsuite>
     </testsuites>
     <source>
         <include>

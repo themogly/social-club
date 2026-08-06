@@ -1,8 +1,14 @@
 # Browser checks
 
 Pixel-level checks that a headless PHPUnit render cannot make. Playwright is **not** a CI dependency (it needs a
-~100 MB browser), so these are run by hand and their result recorded in `DECISIONS.md`. The PHP side
-(`TopbarHarnessTest`) runs in `composer check` and guards the STRUCTURE; the `.mjs` scripts measure the pixels.
+~100 MB browser), so the `.mjs` scripts are run by hand and their result recorded in `DECISIONS.md`.
+
+**The PHP half of every harness runs in `composer check`** and guards the STRUCTURE; the `.mjs` scripts
+measure the pixels. That was previously only *claimed*: `tests/Browser` was not in either phpunit config's
+`<testsuites>`, so none of the harnesses' structural assertions had ever run in CI — they passed only when
+someone pointed PHPUnit at the directory by hand. Fixed in prompt 178; both `phpunit.xml` and
+`phpunit.mysql.xml` now collect it. Each harness guards its own artifact-writing against a missing asset
+build, so a run without `npm run build` degrades rather than failing.
 
 ## Counter top-bar bounding boxes (prompt 132)
 
@@ -109,3 +115,27 @@ without them photographs a shell the operator never sees.
 
 Both rules have the same shape as the rebuild rule above: **a browser check is only as honest as the page
 it assembles.**
+
+## The application form's ID upload (prompt 178)
+
+Photographs the public application form at **phone width** — where an applicant actually opens an emailed
+invite link — in both locales and both themes, and asserts the upload is present and NOT required.
+
+```bash
+npm run build
+php artisan test tests/Browser/ApplicationFormHarnessTest.php   # writes storage/app/application-form-*.html
+node tests/Browser/shoot-application-form.mjs                   # → storage/app/screenshots/178/
+```
+
+**Rendering this route in a chosen locale needs the applicant's own switcher.** `app()->setLocale()` does
+nothing: `SetLocale` resolves the locale again on the way in, and for an unauthenticated prospect that means
+the club default (prompt 96 — a prospect cannot have a preference, so the only lever is the club default).
+Prompt 167's switcher drops an in-session override, so the harness uses `withSession(['locale' => …])`.
+
+This mattered: the first version of the feature test set the app locale and then asserted with a bare
+`__()`, which compares the response's locale against itself and passes without testing anything. It now
+asserts `trans($key, [], $locale)` per locale, plus that the two locales differ — so neither assertion can
+pass vacuously.
+
+Last run: **ALL PASS** — 4 captures, `#document_scan` 316×36 at 390px, `required=false` in both locales, no
+horizontal scroll.

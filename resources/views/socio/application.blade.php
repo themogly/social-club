@@ -99,6 +99,22 @@
                     <p class="mt-1 text-xs text-ink-muted dark:text-slate-500">{{ \App\Support\DocumentUpload::helperText(__('Ayuda a que te reconozcan al llegar. Se comparará contigo en el mostrador. Puedes omitirla y hacerla en la sede.')) }}</p>
                 </div>
 
+                {{-- Optional identity DOCUMENT (prompt 178 — 155's part B, decided by the controller: capture
+                     at the counter PLUS an optional upload here). Deliberately a separate field from the photo
+                     above: a face is checked against a person, a document is the compliance record, and merging
+                     them would merge two purposes and two lawful bases.
+
+                     Optional means optional — there is no `required` here and no validation rule that adds one.
+                     The copy states what happens to the file (encrypted, signed link, deleted if the
+                     application is never approved), because for Article 9 material that is a transparency
+                     obligation, not a courtesy. --}}
+                <div>
+                    <label class="mb-1 block text-sm font-medium" for="document_scan">{{ __('Documento de identidad (opcional)') }}</label>
+                    <input id="document_scan" name="document_scan" type="file" accept="image/*,application/pdf"
+                           class="block w-full text-sm text-ink file:mr-3 file:rounded-lg file:border-0 file:bg-brand-tint file:px-3 file:py-2 file:text-sm file:font-medium file:text-brand dark:text-slate-200 dark:file:bg-slate-800 dark:file:text-slate-100">
+                    <p class="mt-1 text-xs text-ink-muted dark:text-slate-500">{{ \App\Support\DocumentUpload::helperText(__('Foto o PDF de tu DNI, NIE o pasaporte. Se guarda cifrado, solo se abre con un enlace firmado y cada consulta queda registrada. Si tu solicitud no se aprueba, se borra. Puedes omitirlo y enseñarlo en el mostrador.')) }}</p>
+                </div>
+
                 <div>
                     <label class="mb-1 block text-sm font-medium" for="address">{{ __('Dirección') }}</label>
                     <input id="address" name="address" type="text" value="{{ old('address', data_get($payload, 'address')) }}" class="{{ $input }}">

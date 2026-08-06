@@ -7135,3 +7135,101 @@ absence of the defects it was written to detect and nothing else.
 full suite). This branch is Blade, two Livewire properties and tests — no migration, no column, no JSON cast
 and no raw expression, so there is no driver-difference surface for a local MySQL run to find that CI will
 not.
+
+## Prompt 178 — capturing the ID: the compliance artefact (155 part B, executed)
+
+**The controller's decision, and its date.** Prompt 155 shipped part A and *escalated* part B rather than
+building it: whether an unauthenticated public form should accept an upload of someone's identity document
+is a data-controller decision, not a defect. **The controller decided on 2026-08-06: capture at the counter,
+plus an optional upload on the emailed form.** This branch executes the spec already recorded in 155's entry
+and does not re-derive it.
+
+**The premise was re-verified first, and most of the machinery already existed.** Reported because the
+prompt reads as though this is a larger build than it is:
+
+- **The shared upload limit (164) was already applied** to the applicant `photo` rule — `DocumentUpload::maxRule()`.
+  No seventh number was written; the ID rule reads the same ceiling.
+- **The rate limit already existed** — `throttle:10,1` on `socio.application.store`, plus `ApplicationSpamGuard`
+  (honeypot + minimum submit time, silently discarding).
+- **The retention sweep already existed and already covered rejected AND abandoned applications** —
+  `applications:prune-retention` (`PruneApplications`), added by a security-audit finding on prompt 157, with
+  its interval already a Setting (`application_retention_days`, default 180) and an APPROVED carve-out.
+  The prompt asks for this to be *designed*; it was already built, and what it needed was extending to a
+  second artefact. **Note the correction it carries:** prompt 157's comment claiming prompt 142's sweep
+  covered applications was wrong — 142 only prunes member-import CSVs — and that was already fixed.
+
+So the actual work was: a second optional field, its storage, its carry-over on approval, its deletion in the
+existing sweep, and a tighter limit on file-bearing submissions.
+
+**The face photo and the identity document are two artefacts, and are kept apart.** Prompt 157's `photo` is a
+FACE, captured `capture="user"`, checked against the person at the counter. The ID is the compliance record of
+the document itself. They get separate form fields, separate payload keys (`photo_path` /
+`document_scan_path`), separate vault directories (`member-photos` / `member-id-scans`) and separate member
+columns. Merging them would merge two purposes, and a test asserts they never resolve to the same path.
+
+**Optional is enforced as optional.** `['nullable', 'file', 'mimes:jpeg,jpg,png,webp,pdf', DocumentUpload::maxRule()]`
+— no `required`, no rule that implies one, nothing on the form marked with the part-A required `*`. Asserted
+three ways: the rule contains `nullable` and not `required`; a submission with no file succeeds and stays
+PENDING with its payload intact; and the rendered field carries no `required` attribute. PDF is allowed
+because a DNI is two-sided and people scan both sides into one file.
+
+**Rate limiting: the existing route limit covers the upload, and a second one covers what it does not.**
+The uploads are not a separate endpoint — they ride the same POST, so `throttle:10,1` and the spam guard
+already apply. What that does not bound is **storage**: ten submissions a minute at up to the 12 MB ceiling
+is ~120 MB/min of encrypted vault writes per IP, sustained, unauthenticated. So file-bearing submissions get
+a dedicated **5 per IP per hour** limit. Its scope is stated honestly in the code: the bytes have already
+crossed the wire and been parsed by PHP before it runs, so it bounds what reaches the DISK, not bandwidth —
+bandwidth is nginx's `client_max_body_size` and PHP's `upload_max_filesize`, which prompt 164 reconciled.
+**Over the limit the application still submits**; only the file is dropped. An upload is optional, so losing
+one must never cost somebody their application.
+
+**Retention, extended rather than reinvented.** `PruneApplications` now deletes the ID scan alongside the
+photo and counts them **separately** in its audit entry (`photos_deleted`, `id_scans_deleted`) — a silent
+deletion of Article 9 material is as bad as an indefinite retention of it, so the log has to say how many of
+*which* artefact went. Idempotent as before (an already-scrubbed row no longer matches), and the APPROVED
+carve-out still holds and now matters more: an approved member points at the **same file object**, so
+sweeping it would blank a real member's document. Tested for abandoned, rejected, live-and-inside-retention,
+approved-and-therefore-exempt, and a second run being a no-op.
+
+**Approval hands over the same object, not a copy.** `ApproveApplication` sets
+`member.document_scan_path = payload['document_scan_path']`. One file, one path — asserted by identity, not
+by existence, because a copy would be two artefacts that can diverge and would defeat the sweep's carve-out.
+
+**The mechanism is untouched.** `DocumentVault`, its encryption, the disks and the signed/access-logged
+serving are unchanged. This branch is a new CALLER. The scan goes to the same `member-id-scans` directory the
+staff `MemberForm` already writes to, so an application's scan and a member's scan are one kind of object
+with one serving path. Prompt 162's fix (the disk root leaking into S3 keys) is not reintroduced — nothing
+here constructs a path.
+
+**The form says what happens to the file, in the applicant's language.** "Stored encrypted, opens only
+through a signed link, every viewing is logged, deleted if your application is not approved, and you can skip
+it and show it at the counter instead" — plus the size ceiling before they pick a file (164). For Article 9
+material that is a transparency obligation, not a courtesy, and it is asserted in both locales.
+
+**No MRZ, no parsing, no prefill here** — that is prompt 179, and 155's framing is the reason: the scan is a
+compliance artefact worth having whether or not anything ever reads it, and shipping them together would make
+the compliance half wait on the convenience half.
+
+**Test isolation worth noting.** These tests `Storage::fake('documents')`. `DocumentVault` encrypts *before*
+it writes, so faking the disk keeps the encryption assertions honest (ciphertext is still ciphertext) while
+stopping the suite from leaving real ID scans in `storage/`. The repo already contains one such stray file
+from earlier work; new tests will not add to it.
+
+**A defect found while adding this branch's harness, and fixed with it: `tests/Browser` was never
+collected.** Neither `phpunit.xml` nor `phpunit.mysql.xml` listed it in `<testsuites>`, so the STRUCTURAL
+half of every browser harness — `TopbarHarnessTest`, `AdminTopbarHarnessTest`, `BlockingStatesHarnessTest`
+(prompt 175), `CartColumnHarnessTest` (prompt 176) — had **never run in CI**. They passed only when someone
+pointed PHPUnit at the directory by hand, which is exactly the "a green test can certify code nothing
+reaches" failure CLAUDE.md calls the most-repeated defect here, one level up: assertions written explicitly
+to be the CI guard, never wired to the gate. `tests/Browser/README.md` asserted the opposite in its first
+paragraph, which is why nobody looked.
+
+Both configs now collect it (+5 tests, ~1s) and the README says what actually runs where. Nothing was
+weakened to make them pass — they were already green, just never asked. Note this does NOT change what the
+prompt-175 and prompt-176 branches proved: each shipped a `tests/Feature` counterpart carrying the same
+guarantees (`CounterBlockingStatesTest`, `CartColumnTest`), so the invariants were gated; it is the
+harnesses' own assertions that were dark.
+
+**MySQL was left to CI**, per the running order: `composer check` green on SQLite. This branch adds no
+migration and no column — `members.document_scan_path` has existed since the initial member tables — so there
+is no driver-difference surface a local MySQL run would find that CI will not.

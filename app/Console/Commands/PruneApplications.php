@@ -13,10 +13,10 @@ use Illuminate\Support\Facades\Storage;
 /**
  * Scheduled application-retention sweep (closes a security-audit finding on prompt 157). A member APPLICATION is
  * pre-membership Article-9-adjacent data: its `payload` holds the applicant's name, DOB, email and document
- * number, and — since prompt 157 — an OPTIONAL identity photo on the encrypted `documents` disk. An application
+ * number, and — since prompts 157 and 178 — an OPTIONAL face photo AND an OPTIONAL identity document, both on the encrypted `documents` disk. An application
  * that was REJECTED or abandoned (invited or submitted but never approved) must not keep that indefinitely; the
  * prompt-157 comment that claimed prompt 142's sweep covered it was wrong (that sweep only prunes member-import
- * CSVs). This ANONYMISES every such application past `application_retention_days` — deletes its vault photo and
+ * CSVs). This ANONYMISES every such application past `application_retention_days` — deletes BOTH vault files and
  * scrubs the payload + invite email/reference — keeping the row shell (status + timestamps) so the club can
  * still count that an application happened and its outcome, without the personal data (the AnonymiseMember ethos).
  *
@@ -57,12 +57,23 @@ class PruneApplications extends Command
 
         $anonymised = 0;
         $photosDeleted = 0;
-        $due()->chunkById(500, function ($rows) use (&$anonymised, &$photosDeleted): void {
+        $scansDeleted = 0;
+        $due()->chunkById(500, function ($rows) use (&$anonymised, &$photosDeleted, &$scansDeleted): void {
             foreach ($rows as $application) {
                 $photo = data_get($application->payload, 'photo_path');
                 if (is_string($photo) && $photo !== '') {
                     Storage::disk('documents')->delete($photo);
                     $photosDeleted++;
+                }
+
+                // The identity DOCUMENT (prompt 178) goes the same way as the photo, and counted separately —
+                // a silent deletion of Article 9 material is as bad as an indefinite retention of it, so the
+                // audit log has to say how many of WHICH artefact went. Same APPROVED carve-out applies: an
+                // approved member points at this same file, and approved rows never reach this loop.
+                $scan = data_get($application->payload, 'document_scan_path');
+                if (is_string($scan) && $scan !== '') {
+                    Storage::disk('documents')->delete($scan);
+                    $scansDeleted++;
                 }
 
                 $application->forceFill([
@@ -78,12 +89,13 @@ class PruneApplications extends Command
             (new RecordAuditLog)->handle(self::ACTION, null, null, [
                 'anonymised' => $anonymised,
                 'photos_deleted' => $photosDeleted,
+                'id_scans_deleted' => $scansDeleted,
                 'up_to' => $cutoff->toDateString(),
             ]);
         }
 
         HeartbeatLog::beat(self::HEARTBEAT);
-        $this->info("Anonymised {$anonymised} application(s) past retention ({$photosDeleted} photo(s) deleted, up to {$cutoff->toDateString()}).");
+        $this->info("Anonymised {$anonymised} application(s) past retention ({$photosDeleted} photo(s), {$scansDeleted} ID scan(s) deleted, up to {$cutoff->toDateString()}).");
 
         return self::SUCCESS;
     }
