@@ -6970,3 +6970,30 @@ they FAIL there (`0 is identical to 1`), which is what makes them regression tes
 Two further gaps were closed at the same time: the bar's till state now asserts its single action, and the
 bar gets the same per-precondition server-refusal proof as the dispensary (sede / operator / till, each
 asserting no `Order` row).
+
+**MySQL was left to CI.** The suite was run locally on SQLite only (`composer check` — Pint, Larastan 0
+errors, 1263 tests / 10929 assertions, 3 pre-existing environmental skips). Prompt 141 put PHP 8.5 +
+MySQL 8.4 in CI, which runs the production runtime, and that is where driver parity is proven. This branch
+is Blade, one `App\Support` class and tests — it adds no migration, no column, no JSON cast and no raw
+expression, so there is no driver-difference surface for a MySQL run to find that CI will not.
+
+## Overnight autonomous run from 175 — merge authorisation
+
+**The owner authorised merging each branch himself, in session, on 2026-08-06:** *"i will start sending the
+prompts in, im going to change the way we work and ask you to merge each branch as im going to sleep. if you
+need to make a decision what is best and make notes in the decisions so i can pick it up in the morning."*
+
+This **overrides the `Push the branch; do not merge` line carried by every prompt in the queue** (176, 177,
+178, 179 and any that follow). Recording it because CLAUDE.md's workflow rule is *"push the branch, do NOT
+self-merge — a human reviews and merges"*, with the overnight autonomous run named as the one explicit,
+logged exception. This is that exception, and this is the log of it.
+
+**What it does not authorise.** The instruction is about *merging*, not about scope or risk. Unchanged:
+irreversible or destructive operations still require human action; a prompt whose premise proves wrong is
+reported and stopped rather than built around (the running order's "verify the premise" protocol); and a
+branch that cannot be finished cleanly is left unmerged at a clean point rather than half-landed. Merging
+follows a green `composer check`, never precedes one.
+
+**Judgment calls are recorded, not silently taken.** Every decision that would ordinarily have been a
+checkpoint is written into this file with its alternatives and its reasoning, so it can be overturned in the
+morning at the cost of reading, not of archaeology.
