@@ -9,6 +9,7 @@ use App\Models\Location;
 use App\Models\Member;
 use App\Models\Scopes\LocationScope;
 use App\Support\Money;
+use Filament\Actions\ActionGroup;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteBulkAction;
 use Filament\Actions\EditAction;
@@ -124,9 +125,15 @@ class MembersTable
                     ->default(MemberKind::STANDARD->value),
                 TrashedFilter::make(),
             ])
+            // One overflow trigger instead of two labelled buttons (prompt 170). The actions column
+            // is the LAST column, so it is the first thing to fall off a narrow viewport — and at 1440
+            // this table had 17px of headroom, meaning the next action added anywhere would push it off
+            // for everyone. ~150px becomes ~50px; Ver/Editar stay one tap away.
             ->recordActions([
-                ViewAction::make(),
-                EditAction::make(),
+                ActionGroup::make([
+                    ViewAction::make(),
+                    EditAction::make(),
+                ]),
             ])
             ->toolbarActions([
                 BulkActionGroup::make([

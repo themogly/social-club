@@ -6,6 +6,7 @@ use App\Enums\BatchStatus;
 use App\Enums\ProductType;
 use App\Enums\StrainType;
 use App\Models\Genetic;
+use Filament\Actions\ActionGroup;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteBulkAction;
 use Filament\Actions\EditAction;
@@ -83,9 +84,13 @@ class GeneticsTable
                         ->all()),
                 TrashedFilter::make(),
             ])
+            // 13 columns needing 1147px in a 1056px holder — six row-action controls were measured
+            // OFF the viewport and not clickable at 1440 (prompt 170), on a laptop, today.
             ->recordActions([
-                ViewAction::make(),
-                EditAction::make(),
+                ActionGroup::make([
+                    ViewAction::make(),
+                    EditAction::make(),
+                ]),
             ])
             ->toolbarActions([
                 BulkActionGroup::make([

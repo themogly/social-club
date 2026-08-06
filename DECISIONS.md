@@ -6663,3 +6663,79 @@ nothing; Filament's own Spanish UI chrome is untouched.
 **The guard that stops it recurring:** `ValidationMessageTest` drives the validator across the 23 rules the
 app actually uses, in **both** locales under `fallback=locale`, and asserts no message contains
 `validation.` — plus that both files cover the same rule set. All seven tests fail against `main`.
+
+## Prompt 170 — the panel on a tablet, and on a laptop
+
+**The panel never had the tablet pass the counter got.** Prompts 116, 130 and 132 put the counter through
+three rounds of portrait-tablet work; the panel had none. Filament's default sidebar is **320px and
+permanently open from 1024px up, with no toggle of any kind** — and every iPad in landscape, plus a 12.9"
+in portrait, sits above that line.
+
+**Measured against `main` before building** (real browser, real iPad viewports), which also confirmed the
+prompt's own numbers to within 2px:
+
+| screen | 1440 laptop | 1180 landscape | 1024 portrait | 820 portrait |
+|---|---|---|---|---|
+| members | 0 hidden | 243 hidden | 399 hidden | 267 hidden |
+| batches | **44 hidden** | 304 hidden | 460 hidden | 328 hidden |
+| genetics | **91 hidden, 6 row-action controls not clickable** | 351 hidden | 507 hidden | 375 hidden |
+
+Two findings beyond the report. **`/batches` is broken on a laptop too**, not just `/genetics`. And
+`/members`' minimum content width is 1041px in a 1056px holder — **15px of headroom** — which is why the
+prompt's warning is exact: any branch adding one row action tips another table off screen. Prompt 165 added
+a third member action against precisely that margin.
+
+**(a) The icon rail, not the fully-collapsible variant.** `sidebarCollapsibleOnDesktop()` leaves 87px;
+`sidebarFullyCollapsibleOnDesktop()` removes it. Chosen the rail because staff move between Socios,
+Dispensario and Caja constantly and the rail keeps every destination one tap away, where fully collapsing
+costs a tap before every move. The measurements say the 87px is not what breaks these tables: after
+collapsing, `/genetics` is **12px** short of fitting at 1180, not 87. The collapsed state persists per
+browser, which is what a fixed counter tablet wants — collapse once, stays collapsed.
+
+**Touch target: 44×44, chosen rather than inherited.** Filament ships the collapse control at 36×36. Prompt
+98 set ≥24×24 for the panel (mouse) and prompts 116/132 set ≥44×44 for the counter (touch). This control
+exists *specifically* for a person on a tablet, so 44 is the defensible floor — 36 would be choosing the
+mouse number for a touch-only affordance. Raised at touch widths only, so the laptop keeps Filament's
+compact topbar. Measured: **44×44 at 1180 and 1024, 36×36 at 1440**.
+
+**(b) Row actions into one `ActionGroup` — the rule applied.** `ActionGroup::make` for *row* actions was
+used in **zero** files (the ten matches were `BulkActionGroup`, a different class for the toolbar). The rule
+I applied: **group where the table's minimum content width is measured to exceed what a landscape iPad
+gives it, and always put destructive or rare actions behind the trigger.** That selected members (1041),
+batches (1100) and genetics (1147) — batches most of all, whose four labelled buttons were a **335px**
+actions column, a third of the table, and whose Retirada/Ajuste/Merma are exactly the destructive-and-rare
+case. Result at 1440: **every list now 0 hidden and 0 unclickable**, closing the laptop regression outright.
+
+This is also the **headroom guard**, and it is why the test asserts the group rather than a pixel width:
+inside a group an extra action costs 0px of column width instead of 85–100px, so the next feature cannot
+reintroduce this.
+
+**(c) Portrait: pin the actions, do not hide the data.** At 820px nothing makes an 11-column table fit and
+the prompt is right that forcing it would wreck the laptop view. Rather than change which columns are
+visible — which would remove information from every device to fix one — the **row-actions cell is pinned to
+the right edge of the table's own scroller** (`position: sticky`), so the action trigger is on screen at
+every width no matter how far the table is scrolled. Measured: row-action controls outside the viewport
+went from **10–40 per screen to ZERO at every width**, including 820 portrait where nothing else helps.
+The remaining columns are reached by scrolling, and that scroll is made **discoverable** — iOS shows no
+persistent scrollbar, so a sideways-scrolling table is indistinguishable from one that is simply cut off,
+which is half of why this was reported as broken rather than as awkward.
+
+**Final state, measured, sidebar collapsed:**
+
+| | 1440 | 1180 | 1024 | 820 |
+|---|---|---|---|---|
+| members | 0 hidden | 0 hidden | 60 hidden | 176 hidden |
+| batches | 0 hidden | 0 hidden | 0 hidden | 31 hidden |
+| genetics | 0 hidden | 12 hidden | 168 hidden | 284 hidden |
+| **row actions off-viewport** | **0** | **0** | **0** | **0** |
+| page scrolls horizontally | no | no | no | no |
+
+**Untouched, as required:** no column added or removed from any table's data, no permission changed, no
+action removed — asserted, including that STAFF still holds none of the permissions the grouped actions
+require. The counter screens and `layouts.counter` are not in scope and were not touched. The sidebar and
+rail widths are Filament panel settings, not reimplemented in CSS. `theme.css`'s `@source` rules (prompts
+143/151) are asserted intact, since this branch added rules to that file.
+
+**Honest limit:** the layout numbers above are measured in a real browser because this repo has **no Dusk
+harness**; the PHP suite pins the structural guarantees that would silently revert them — the panel
+setting, the grouping, the pinned column, the 44px floor and the access check.
