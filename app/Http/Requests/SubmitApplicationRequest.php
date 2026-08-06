@@ -84,20 +84,8 @@ class SubmitApplicationRequest extends FormRequest
         ];
     }
 
-    /**
-     * @return array<string, string>
-     */
-    public function attributes(): array
-    {
-        return [
-            'first_name' => __('nombre'),
-            'last_name' => __('apellidos'),
-            'email' => __('correo'),
-            'date_of_birth' => __('fecha de nacimiento'),
-            'document_type' => __('tipo de documento'),
-            'document_number' => __('número de documento'),
-            'consent_data' => __('consentimiento de tratamiento de datos'),
-            'consent_statutes' => __('aceptación de los estatutos'),
-        ];
-    }
+    // Field names moved to lang/*/validation.php `attributes` (prompt 169). They lived here and were
+    // INERT — `:attribute` is interpolated from the validation lines, and that file did not exist — so
+    // the work was invisible. In the shared file they apply to every form in the product, not just this
+    // one, which is what a prospect reading "El campo número de documento es obligatorio" needs.
 }
