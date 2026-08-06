@@ -96,7 +96,7 @@
                     <label class="mb-1 block text-sm font-medium" for="photo">{{ __('Foto (opcional)') }}</label>
                     <input id="photo" name="photo" type="file" accept="image/*" capture="user"
                            class="block w-full text-sm text-ink file:mr-3 file:rounded-lg file:border-0 file:bg-brand-tint file:px-3 file:py-2 file:text-sm file:font-medium file:text-brand dark:text-slate-200 dark:file:bg-slate-800 dark:file:text-slate-100">
-                    <p class="mt-1 text-xs text-ink-muted dark:text-slate-500">{{ __('Ayuda a que te reconozcan al llegar. Se comparará contigo en el mostrador. Puedes omitirla y hacerla en la sede.') }}</p>
+                    <p class="mt-1 text-xs text-ink-muted dark:text-slate-500">{{ \App\Support\DocumentUpload::helperText(__('Ayuda a que te reconozcan al llegar. Se comparará contigo en el mostrador. Puedes omitirla y hacerla en la sede.')) }}</p>
                 </div>
 
                 <div>

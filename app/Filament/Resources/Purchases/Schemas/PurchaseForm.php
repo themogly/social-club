@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\Purchases\Schemas;
 
+use App\Support\DocumentUpload;
 use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\FileUpload;
 use Filament\Forms\Components\KeyValue;
@@ -65,6 +66,8 @@ class PurchaseForm
                             ->label(__('Factura'))
                             ->disk('documents')
                             ->visibility('private')
+                            ->maxSize(DocumentUpload::maxKilobytes())
+                            ->helperText(DocumentUpload::helperText())
                             ->columnSpanFull(),
                     ])
                     ->columns(2),

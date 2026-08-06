@@ -8,6 +8,7 @@ use App\Enums\MemberDocumentType;
 use App\Models\Member;
 use App\Models\User;
 use App\Rules\AvaladorWithinSponseeCap;
+use App\Support\DocumentUpload;
 use App\Support\DocumentVault;
 use App\Support\Email;
 use App\Support\MemberEligibility;
@@ -97,8 +98,9 @@ class MemberForm
                             ->directory('member-id-scans')
                             ->saveUploadedFileUsing(fn (TemporaryUploadedFile $file): string => DocumentVault::storeUpload($file, 'member-id-scans'))
                             ->acceptedFileTypes(['application/pdf', 'image/*'])
+                            ->maxSize(DocumentUpload::maxKilobytes())
                             ->previewable(false)
-                            ->helperText(__('PDF o imagen. Se guarda cifrado y solo se puede ver mediante un enlace firmado y registrado.'))
+                            ->helperText(DocumentUpload::helperText(__('PDF o imagen. Se guarda cifrado y solo se puede ver mediante un enlace firmado y registrado.')))
                             ->hintAction(self::viewScanAction('id', MemberDocumentType::ID))
                             ->columnSpanFull(),
                     ])
@@ -144,8 +146,9 @@ class MemberForm
                             ->directory('member-medical-certs')
                             ->saveUploadedFileUsing(fn (TemporaryUploadedFile $file): string => DocumentVault::storeUpload($file, 'member-medical-certs'))
                             ->acceptedFileTypes(['application/pdf', 'image/*'])
+                            ->maxSize(DocumentUpload::maxKilobytes())
                             ->previewable(false)
-                            ->helperText(__('Solo socios terapéuticos. PDF o imagen; mismo tratamiento seguro que el escaneo del documento.'))
+                            ->helperText(DocumentUpload::helperText(__('Solo socios terapéuticos. PDF o imagen; mismo tratamiento seguro que el escaneo del documento.')))
                             ->hintAction(self::viewScanAction('medical', MemberDocumentType::MEDICAL))
                             ->columnSpanFull(),
                     ])
@@ -162,8 +165,9 @@ class MemberForm
                             // Encrypted at rest through the vault, like the ID scan (prompt 113) — so no inline
                             // preview of the raw file; it is viewed only via the signed, logged endpoint.
                             ->saveUploadedFileUsing(fn (TemporaryUploadedFile $file): string => DocumentVault::storeUpload($file, 'member-photos'))
+                            ->maxSize(DocumentUpload::maxKilobytes())
                             ->previewable(false)
-                            ->helperText(__('Se guarda cifrada y solo se puede ver mediante un enlace firmado y registrado.')),
+                            ->helperText(DocumentUpload::helperText(__('Se guarda cifrada y solo se puede ver mediante un enlace firmado y registrado.'))),
                     ]),
 
                 Section::make(__('Declaraciones'))

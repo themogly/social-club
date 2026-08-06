@@ -6172,3 +6172,81 @@ runs the TEST MySQL session in UTC: `config/database.php` gains an env-driven `t
 sets `DB_TIMEZONE=+00:00`. UTC has no DST transitions, so no generated datetime can land in a gap — proven by
 inserting `2027-03-28 02:30:00` (inside the gap) under the UTC session. No-op in production (the connector skips
 `SET time_zone` when the value is unset); a production DB should run UTC anyway. No factory or test was changed.
+
+## Prompt 164 — three upload limits disagreed and the application had no opinion at all
+
+**The defect.** nginx's `client_max_body_size`, PHP's `upload_max_filesize`/`post_max_size` and Livewire's
+12 MB all applied to the same upload and none of them agreed — and the **application declared nothing**.
+Not one `FileUpload` on the private `documents` disk carried a `maxSize()`. So the smallest server limit
+fired first, *before PHP ran*: nothing reached the Laravel log, and a member photographing their DNI on a
+phone got Livewire's generic "failed to upload" for an entirely ordinary 3.86 MB file.
+
+**The limit chosen: 12 MB (12288 KB), and why that number.** It must sit **below the smallest server
+limit or it never fires** — an app ceiling above nginx's changes nothing at all. nginx is being set to
+20 MB, so 12 MB leaves 8 MB of headroom for multipart overhead and for the server limit to be tightened a
+little without silently re-breaking this. It is also **exactly Livewire's own default temporary-upload
+rule** (`max:12288`), which matters more than it looks: a higher app ceiling would leave a band in which
+the app told the member a file was acceptable and Livewire then refused it generically — the same class of
+failure, one layer up. And it comfortably covers the real inputs: a phone photo is 3–8 MB and a scanned
+multi-page PDF more. Deployment must satisfy all three, recorded in `config/documents.php` and
+`.env.example`: nginx `client_max_body_size >= 20M`, PHP `upload_max_filesize >= 12M` (stock default 2M)
+and `post_max_size >= 12M` (stock default 8M). The PHP defaults are BOTH below the app ceiling today.
+
+**Where it is defined — one place.** `config/documents.php` (`max_upload_kb`, env-tunable via
+`DOCUMENTS_MAX_UPLOAD_KB`) read through **`App\Support\DocumentUpload`**, which exposes the kilobytes, the
+`max:` rule fragment and the human label. All seven call sites use it: the six documents-disk uploads (ID
+scan, medical certificate, member photo, batch lab report, purchase invoice, expense receipt) and the
+applicant photo rule in `SubmitApplicationRequest`, which had its **own hardcoded `max:8192`** — a seventh
+number, on the one surface facing a person with no staff member next to them. Unifying it is the point of
+the branch; leaving the applicant on a different ceiling from the staff form is precisely the drift being
+fixed. `limitLabel()` rounds **down** deliberately: a stated limit larger than the real one sends someone
+off to choose a file that is then refused, which is the failure being removed.
+
+**It is env-tunable but deliberately NOT a database Setting.** Every *domain* threshold in this product is
+a Setting because regional practice varies (age, carencia, gram caps, aforo). This one is not a domain
+threshold — it is **coupled to infrastructure the owner cannot see**. An owner raising it above nginx's
+limit in the admin UI would reinstate the exact silent failure, with no feedback that they had. Env means
+it moves in the same deploy as the server config that constrains it. `DocumentUpload::maxKilobytes()`
+falls back to 12288 on a missing/zero/stale config rather than throwing — a config read must degrade
+gracefully, least of all over an upload limit.
+
+**Saying it before they choose a file.** Every one of the seven now states the ceiling in its helper text
+via `DocumentUpload::helperText()`, including the applicant form at phone width. `maxSize()` also gives
+FilePond a client-side `maxFileSize`, so an oversize file is refused **in the browser, before any request**
+— the server is never asked, which is the real fix for "silent rejection after a long wait on a bad
+connection". Measured in a real browser at 390px: attaching a 13 MB file to the member form fires
+**0 upload requests** and shows *"File is too large — Maximum file size is 12.3 MB"*. FilePond counts an
+MB as 10⁶ bytes where our label counts 2²⁰, so it says 12.3 where we say 12; the two never contradict
+because ours rounds down, so the stated limit is always the conservative one. FilePond's own message is
+untranslated (its labels are not wired through `__()`), which is the other half of why the **helper text**
+carries the translated limit — that is the string a Spanish-speaking member actually reads, and it is
+shown before they pick a file rather than after.
+
+**Where the server still refuses, and the honest limit of what the app can do.** For the applicant form
+(a plain POST, no FilePond) the Form Request now carries an explicit `photo.max` message naming the limit
+and telling them to try a smaller photo — spelled out in `messages()` rather than left to
+`validation.max.file`, so it reads as a sentence **regardless of prompt 169's missing validation lines**.
+For a genuine nginx 413, though, **the application cannot render anything**: the request never reaches
+PHP. That is not a gap this branch can close from inside the app, and it is exactly why the app's ceiling
+must be documented and below the server's. Overriding Filament's FilePond error labels to improve the
+Livewire-side message was **considered and rejected** — it means forking vendor JS or the field view,
+brittle across upgrades, to improve a message that the client-side ceiling now prevents anyone seeing.
+
+**Verdict on browser-side resizing: worth its own prompt, and a good one.** A phone camera produces 4–8 MB
+of a document that is legible at a fraction of that. Resizing before upload would remove this class of
+problem outright, make the upload work on a bad connection at the counter, and — the part that matters
+most here — **cut what the club stores of the most sensitive material it holds**, which is a
+data-minimisation win on Article 9 data, not just a performance one. It is genuinely more work
+(client-side canvas resize, quality floor so a DNI stays legible, a non-JS fallback, and a decision about
+whether staff uploads resize too) and it does not belong in a branch about declaring a limit. Recommended
+as a standalone prompt.
+
+**Untouched, as required:** `DocumentVault`, the encryption, the disks, the signed-URL serving path, and
+every `acceptedFileTypes` — asserted. Noted while in the file, NOT changed: the purchase invoice, expense
+receipt and lab report declare no type restriction at all and are not vault-encrypted (prompt 32's
+documented scope — they are not Article 9). Both are pre-existing and outside this branch.
+
+**Guarded against recurrence.** `UploadLimitsTest` enumerates every documents-disk upload from the real
+resource schemas AND statically scans `app/` for any `FileUpload` chain targeting that disk, so one added
+later on a Filament Page or inside an action form — where the schema walk cannot reach — fails the suite
+unless it declares both the limit and the helper text.
