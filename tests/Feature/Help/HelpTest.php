@@ -154,8 +154,10 @@ class HelpTest extends TestCase
 
         foreach (['es', 'en'] as $locale) {
             app()->setLocale($locale);
-            // The counter help lives in the shared top-bar (the layout), so assert on the full-page render.
-            $this->get(route('counter.pos'))->assertOk()->assertSee('data-counter-help', false);
+            // Prompt 205 moved the counter help off the top bar's overflow (which went with the overflow) and
+            // onto the HUB, where somebody has a moment to read it: it is reference content, not a terminal
+            // operation. Still on a counter screen, still in both locales, still static.
+            $this->get(route('counter.home'))->assertOk()->assertSee('data-counter-help', false);
         }
     }
 }

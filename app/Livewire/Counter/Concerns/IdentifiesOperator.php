@@ -177,7 +177,16 @@ trait IdentifiesOperator
         $this->operatorPin = '';
     }
 
-    /** Sign the current operator out and reopen the pad for the next person. */
+    /**
+     * Sign the current operator out and reopen the pad for the next person.
+     *
+     * Listening for a browser-dispatched event as well (prompt 205): the operator chip now lives in the
+     * shared top bar, which renders in the LAYOUT and is therefore outside every Livewire component's DOM —
+     * `$wire` is not reachable from there. `Livewire.dispatch` is the same mechanism the idle lock already
+     * uses for `counter-lock`, and it keeps 173's rule that there is exactly one PIN pad: this reopens that
+     * surface rather than drawing a second one.
+     */
+    #[On('counter-switch-operator')]
     public function switchOperator(): void
     {
         CounterOperator::clear();

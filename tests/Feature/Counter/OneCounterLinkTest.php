@@ -148,15 +148,21 @@ class OneCounterLinkTest extends TestCase
     {
         // The tab strip declared this list inline; the sidebar needed the same answer. A second copy is
         // exactly the drift that produced two PIN pads (prompt 173), so the list was extracted and both
-        // consume it. If the strip ever declares its own again, this fails.
-        $strip = (string) file_get_contents(base_path('resources/views/components/counter/top-bar.blade.php'));
+        // consume it. Prompt 205 retired the strip — the HUB is the second consumer now, and the rule is
+        // unchanged: exactly one declaration, and neither surface may re-declare its own.
+        $hub = (string) file_get_contents(base_path('app/Livewire/Counter/CounterHome.php'));
+        $bar = (string) file_get_contents(base_path('resources/views/components/counter/top-bar.blade.php'));
 
-        $this->assertStringContainsString('CounterScreens::reachableFor($user)', $strip);
-        $this->assertStringNotContainsString("'route' => 'counter.checkin'", $strip,
-            'The tab strip has re-declared its own screen list — there must be exactly one.');
+        $this->assertStringContainsString('CounterScreens::reachableFor($this->currentUser())', $hub);
+        foreach ([$hub, $bar] as $consumer) {
+            $this->assertStringNotContainsString("'route' => 'counter.checkin'", $consumer,
+                'A consumer has re-declared the screen list — there must be exactly one.');
+        }
+        // …and the bar no longer reads it at all, because it no longer carries destinations.
+        $this->assertStringNotContainsString('CounterScreens::reachableFor', $bar);
     }
 
-    public function test_the_tab_strip_still_offers_the_same_five_destinations(): void
+    public function test_the_hub_still_offers_the_same_five_destinations(): void
     {
         $this->actor(Role::OWNER);
 

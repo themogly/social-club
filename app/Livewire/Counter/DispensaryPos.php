@@ -22,6 +22,7 @@ use App\Livewire\Counter\Concerns\CollectsMembershipFees;
 use App\Livewire\Counter\Concerns\FindsMembers;
 use App\Livewire\Counter\Concerns\HandlesTender;
 use App\Livewire\Counter\Concerns\IdentifiesOperator;
+use App\Livewire\Counter\Concerns\PersistsBasket;
 use App\Livewire\Counter\Concerns\ResolvesCounterLocation;
 use App\Livewire\Counter\Concerns\ShowsSettledOutcome;
 use App\Mail\DispensationReceiptMail;
@@ -81,7 +82,7 @@ use RuntimeException;
 #[Layout('components.layouts.counter', ['fullHeight' => true])] // prompt 176: the page must not scroll; the selection pane does
 class DispensaryPos extends Component
 {
-    use CollectsMembershipFees, FindsMembers, HandlesTender, IdentifiesOperator, ResolvesCounterLocation, ShowsSettledOutcome;
+    use CollectsMembershipFees, FindsMembers, HandlesTender, IdentifiesOperator, PersistsBasket, ResolvesCounterLocation, ShowsSettledOutcome;
 
     // --- Identity ---------------------------------------------------------------
     // The ONE lookup field ($lookup) and everything behind it live in FindsMembers (prompt 194). This screen
@@ -238,6 +239,14 @@ class DispensaryPos extends Component
         }
 
         $this->idempotencyKey = (string) Str::ulid();
+
+        // Prompt 205 — a basket left on this screen comes back. Last, because it needs the sede above.
+        $this->restoreBasket();
+    }
+
+    protected function basketScreen(): string
+    {
+        return 'pos';
     }
 
     // --- Identify ---------------------------------------------------------------

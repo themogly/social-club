@@ -9270,3 +9270,125 @@ enrolment case, none under 44px, no horizontal scroll at either orientation.
 ficha"*. The rules forbid touching `ResolveMemberEligibility`, and the sentence is shared with the door and
 the dispensary where no such control exists — but it is now *true* on this screen for the first time, rather
 than an instruction nobody could follow.
+
+## Prompt 205 — the counter home: one menu, one status strip
+
+**Both of the owner's complaints checked out.**
+
+*"You go to it and can't get back to it."* There was a way back and it was **a 44×44 brand-blue square with
+one letter in it** — an `<a>` to `counter.home` with an `aria-label` and no visible label. The words beside it
+that looked like they belonged to it were in a separate, unclickable `div`. **The route home was a logo**,
+which is why it read as missing. It is now one labelled control carrying the brand mark and the word *Inicio*,
+and it is the most-used control in the product.
+
+*"Just duplicate data."* After prompt 189, the five destinations were in the bar **and** on the hub — and so
+were the sede, the working operator, Panel and Log out. 189's prompt said non-transaction operations belong on
+the home screen; they were added there and never removed from the bar.
+
+### The model the owner chose, and the trade he accepted
+
+| | carries |
+|---|---|
+| **the bar** | a labelled Home link · the sede · who is working (and Switch) · Lock screen · Panel · Log out · the panic trigger |
+| **the hub** | the destination tiles, and the live rail |
+
+The tab strip is gone. The overflow is gone. Nothing renders in both — asserted by **counting** each hook
+across a full page render, not by asserting that it appears (every one of them appeared before; the question
+was how many times).
+
+**The measured price: Recepción → Dispensario is 2 taps** (Home in the bar, then the Dispensario tile), where
+the strip made it 1. That is the trade, stated rather than implied. It is only payable because of the basket
+work below.
+
+### The five decisions
+
+**1. Takings — a security judgement, not a layout one.** This screen is the landing page *and* the only route
+between screens, so it is on display all shift in a room with members and visitors in it, in a cash business
+that has a panic button because robbery is a real risk (121). The idle lock covers an abandoned tablet; it
+does nothing about the person standing at the counter, and tap-to-reveal reveals at exactly the wrong moment.
+So the day's takings follow `Dashboard::canSeeFinance` — the **existing** rule (`reports.view` /
+`reports.view.all`), which STAFF hold neither of — and for them the panel is **absent**, not blurred and not
+zeroed. No new rule was invented for a mockup.
+
+**2. "4 waiting" does not exist and was dropped.** Check-in records who is *inside*, not who is waiting, and
+there is no queue concept anywhere in this application. The panel states the two things that are real:
+`insideNow()`, and today's `checkInsToday()` / `transactionCount()`. **A number invented to fill a shape is
+decoration.**
+
+**3. Recepción earns the hero tile, on frequency rather than revenue.** Every visit starts at the door, and
+`DESIGN-counter-first.md`'s research is that these products land on a queue of people rather than a menu; the
+mockup made Dispensario large because dispensing is the act that takes the money. It is derived as *"the first
+destination this operator may open, in `CounterScreens` order"* rather than named, so it **degrades by role
+for free** — a till-only operator's hero is Caja, and nobody ever gets a hole where their hero should be.
+
+**4. Query budget: 32, bounded at 40, no N+1.** The dashboard's own entry records ~85 bounded queries for a
+screen opened a few times a day; this one renders on every navigation, all shift, on a tablet. Asserted twice
+— a ceiling, and equality across 20 added rows.
+
+**5. The hub does not poll, which answers 4 and 5 together.** Prompt 120's rule is that only genuine pointer,
+key or touch input resets the idle timer, and *"Livewire polling and re-renders never do"*. A refreshing hub
+is exactly the thing that would quietly break that. It is fresh because real navigation re-renders it — which,
+now that it is the only route between screens, is constantly. Asserted: no `wire:poll`, no `setInterval`.
+
+### The basket persistence was write-only, and is now real
+
+Both POS screens wrote the basket to `localStorage` on every change and **nothing in the entire `resources/`
+tree ever called `getItem`.** It read like a safety net for two years and caught nothing. 205 made that matter:
+with hub-only navigation, a basket that does not survive the trip makes the model unusable.
+
+Replaced by **`App\Support\CounterBasket`** — session-backed, because the basket is already server state that
+the commit Actions read; restoring it from the client would mean a second source of truth for the thing the
+compliance boundary acts on, plus a rule for whose copy wins. Keyed **(screen · sede · operator)**, and that
+scoping is the safety property: it deliberately outlives a **lock** (198 is explicit that work survives one)
+but the next person to identify at this terminal starts empty. Saving is a `dehydrate` hook rather than a line
+in each of a dozen mutations — a rule that must be remembered in twelve places will be forgotten in a
+thirteenth. Stale after four hours.
+
+The unsaved-work confirm now fires **only where work would be lost**: Panel and Log out keep it, Home keeps it
+for a genuinely dirty screen, and no tile carries it — asserted per tile, not per page.
+
+### Where the panic trigger went
+
+The hardest sub-problem: the overflow it lived in is gone, and 121 requires it to stay **discreet and fast** —
+a labelled button on a hub is neither. It is now an **icon-only 44×44 control at the end of the bar**: one tap
+plus the confirm, which is one tap *fewer* than the overflow it replaces, and it carries no wording that
+announces itself to a room (the accessible name is there for a screen reader; a shield is not a word anyone
+reads across a counter). Everything 121 guarantees is untouched — gated on `lockdown.initiate`, absent from
+the DOM without it, confirms before firing, never announced.
+
+**Prompt 198 is closed by this.** 198 existed because the only lock was on the hub, so locking mid-sale meant
+crossing 196's confirm and losing the basket; it patched that with an overflow menu item. The lock is now a
+first-class control on the row: one tap, on every screen, no navigation, no confirm.
+
+### Two instruments that were wrong, and one real defect they eventually found
+
+Recording these because the branch's own measurements failed three times before the product did:
+
+- **`measure-topbar.mjs` reported ALL PASS while measuring ONE control** — its selector list was written for
+  the row that 205 deleted. Updated, and given a `MIN_CONTROLS` floor so an empty measurement can never pass
+  again. Now: **7 controls, no overlaps, none under 44px, at 768 / 800 / 1024 / 1280.**
+- **The query-count tests read an N+1 that was not there, then a saving that was not there.**
+  `DB::disableQueryLog()` stops recording but does not flush, so the second measurement was "first render +
+  second render"; and the first render of a process also pays for cold caches. Both fixed in the test.
+- **The contrast check parsed `oklch()` / `oklab()` with an `rgb()` regex**, reporting 1.10:1 for near-white on
+  near-black (really ~15:1) and 3.89:1 for 80% white on brand blue by coincidence. Colours are now resolved
+  **in the browser on a canvas**, which converts any CSS colour to sRGB and composites alpha properly.
+
+And with a working instrument it found a **real** AA failure in this branch's own markup: the hero tile's
+subtitle at `text-white/80` measured **3.89:1**, under AA for 14px — behind a comment I had written asserting
+6.3:1. Full white is **5.17:1**. Fixed, and the comment now carries the measured figure.
+
+### Verification
+
+`composer check` green — **1581 tests**, Larastan 0, Pint clean. **MySQL left to CI**, per the running order.
+
+Screenshots at 1180×820 and 820×1180, light and dark, motion reduced and allowed
+(`storage/app/screenshots/205/`): 5 tiles, 7 bar controls, worst contrast **5.17:1**, no control under 44×44,
+no horizontal page scroll at either orientation.
+
+**Guards re-pointed, not deleted.** `CounterScreenSwitcherTest` (42's rules, now on the tiles — permission
+filtering, the current screen marked, the touch floor), `LockInPlaceTest` (198's, now on the bar's control),
+`OneCounterLinkTest` (172's one-list rule, now with the hub as the second consumer and the bar asserted to read
+it not at all), `HelpTest` (92's content, now on the hub) and `AlpineScopeTest` (196's confirm, now on the links
+that leave). The one rule that genuinely retired is the per-tab-link confirm, because the work it protected no
+longer dies.

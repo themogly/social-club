@@ -370,3 +370,29 @@ under 44×44, no horizontal page scroll.
 
 Last run (branch `feat/membership-at-the-counter`): before **0** controls at both orientations; lapsed **1**;
 none **2**; elsewhere **2**; no horizontal scroll anywhere. **PASS**.
+
+## The counter hub and the terminal strip (prompt 205)
+
+```bash
+npm run build
+php artisan test tests/Browser/CounterHomeHarnessTest.php tests/Browser/TopbarHarnessTest.php
+node tests/Browser/shoot-counter-hub.mjs      # → storage/app/screenshots/205/  (DEBUG_CONTRAST=1 for per-sample ratios)
+node tests/Browser/measure-topbar.mjs         # the row's geometry, on its new contents
+```
+
+`shoot-counter-hub.mjs` asserts what a picture cannot: the **tap count** for Recepción → Dispensario, **AA
+contrast** on the hero tile and every rail figure, the 44×44 floor on tiles and bar controls, and no horizontal
+page scroll — at both orientations, both themes, motion reduced and allowed.
+
+**Its contrast check resolves colours in the browser, on a canvas.** Parsing `getComputedStyle().color` with an
+`rgb()` regex is wrong on a Tailwind v4 page: colours come back as `oklch(...)` and `oklab(... / 0.8)`, and the
+first draft read a lightness of 0.968 as a red channel — reporting 1.10:1 for near-white on near-black and
+3.89:1 for 80% white on brand blue by coincidence. Copy this pattern rather than the regex.
+
+`measure-topbar.mjs` was **updated, not deleted**: the five-destination row it was written for is gone, and left
+unchanged its selector list matched one element and reported ALL PASS. It now carries a `MIN_CONTROLS` floor so
+an empty measurement fails loudly.
+
+Last run (branch `feat/counter-home`): topbar **7 controls, zero overlaps, none under 44px** at 768/800/1024/1280;
+hub **5 tiles, 7 bar controls, worst contrast 5.17:1**, no horizontal scroll at 1180×820 and 820×1180, light and
+dark; **Recepción → Dispensario = 2 taps**. **PASS**.

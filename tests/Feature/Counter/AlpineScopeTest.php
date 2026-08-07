@@ -171,14 +171,24 @@ class AlpineScopeTest extends TestCase
         $this->assertNull(CounterOperator::id());
     }
 
-    public function test_the_unsaved_work_guard_is_present_on_every_tab_strip_link(): void
+    /**
+     * The unsaved-work guard is on the links that LEAVE the counter — re-pointed by prompt 205, not dropped.
+     *
+     * 196's rule is unchanged: these are real `<a href>`s, so an unbound `@click.prevent` does not merely
+     * fail to warn, it follows the link. What changed is which links carry it. The tab strip is gone (the
+     * hub is the menu now), and the trip home no longer loses anything because the basket survives
+     * navigation — so Home keeps the guard for the case where a screen genuinely IS dirty, while Panel and
+     * Log out keep it because leaving the counter still loses work.
+     */
+    public function test_the_unsaved_work_guard_is_present_on_the_links_that_leave(): void
     {
-        // The nav items are real <a href>s, so an unbound @click.prevent does not merely fail to warn — the
-        // browser follows the link and the basket is gone. The guard renders; the scope is what makes it run.
         $html = $this->get(route('counter.checkin'))->assertOk()->getContent();
 
-        preg_match_all('/data-counter-screen="[^"]*"/', $html, $links);
-        $this->assertGreaterThan(1, count($links[0]), 'expected a tab strip with several destinations');
+        $this->assertStringContainsString('data-counter-home-link', $html, 'expected the labelled Home link');
         $this->assertStringContainsString('$store.counter?.dirty', $html, 'The unsaved-work guard is missing.');
+
+        // And the strip it used to guard is really gone, rather than merely unasserted.
+        preg_match_all('/data-counter-screen="[^"]*"/', $html, $links);
+        $this->assertCount(0, $links[0], 'the tab strip is gone — the hub is the menu (prompt 205)');
     }
 }
