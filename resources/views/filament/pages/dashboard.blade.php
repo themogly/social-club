@@ -121,6 +121,7 @@
                             :headers="$canSeeFinance ? [__('Genética'), __('Tx'), __('Gramos'), __('Total')] : [__('Genética'), __('Tx'), __('Gramos')]"
                             :numeric="[1, 2, 3]"
                             :rows="$topDispensedRows"
+                            :label="__('Top dispensado')"
                             :empty="__('Nada dispensado en este período')"
                         />
                     </x-dashboard.section>
@@ -130,6 +131,7 @@
                             :headers="$canSeeFinance ? [__('Tipo'), __('Socio'), __('Operador'), __('Importe')] : [__('Tipo'), __('Socio'), __('Operador')]"
                             :numeric="[3]"
                             :rows="$recentRows"
+                            :label="__('Últimas transacciones')"
                             :empty="__('Sin transacciones en este período')"
                         />
                     </x-dashboard.section>
@@ -147,6 +149,7 @@
                             :headers="[__('Sede'), __('Aportaciones'), __('Dispensado'), __('Dentro')]"
                             :numeric="[1, 2, 3]"
                             :rows="$comparisonRows"
+                            :label="__('Comparativa por sede')"
                             :empty="__('Sin sedes')"
                         />
                     </x-dashboard.section>

@@ -7,7 +7,9 @@
     <section class="overflow-hidden rounded-2xl border border-line bg-surface shadow-sm dark:border-slate-800 dark:bg-slate-900"
              data-offline-card>
         <div class="bg-brand px-5 py-4 text-white">
-            <p class="text-xs font-medium uppercase tracking-wide text-white/80">{{ __('Carné de socio/a') }}</p>
+            {{-- text-white (not /80): on the brand blue an 80% white is 3.89:1, under AA, on the PWA's
+                 most-used screen. The a11y audit's finding. --}}
+            <p class="text-xs font-medium uppercase tracking-wide text-white">{{ __('Carné de socio/a') }}</p>
             <p class="mt-0.5 text-lg font-semibold leading-tight">{{ $member->fullName() }}</p>
             <p class="text-sm text-white/85">{{ __('Nº :no', ['no' => $member->member_no]) }}</p>
         </div>

@@ -306,7 +306,7 @@
                             <div>
                                 <label for="fee-amount" class="block text-xs font-medium text-ink-muted dark:text-slate-400">{{ __('Importe (€)') }}</label>
                                 <input id="fee-amount" type="text" inputmode="decimal" wire:model="feeAmount" autocomplete="off" placeholder="{{ number_format(($owedCents ?? 0) / 100, 2, ',', '') }}" class="mt-1 h-12 w-full rounded-xl border border-line bg-surface px-4 text-base text-ink placeholder:text-ink-muted focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/40 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100">
-                                <p class="mt-1 text-[11px] text-ink-muted dark:text-slate-500">{{ __('Puedes cobrar el total o una parte.') }}</p>
+                                <p class="mt-1 text-[11px] text-ink-muted dark:text-slate-400">{{ __('Puedes cobrar el total o una parte.') }}</p>
                             </div>
                             <div>
                                 <span class="block text-xs font-medium text-ink-muted dark:text-slate-400">{{ __('Método') }}</span>

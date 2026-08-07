@@ -25,6 +25,6 @@
             </form>
         </div>
 
-        <p class="mt-6 text-center text-xs text-ink-muted dark:text-slate-500">{{ __('Espacio privado para personas socias. No es un servicio público.') }}</p>
+        <p class="mt-6 text-center text-xs text-ink-muted dark:text-slate-400">{{ __('Espacio privado para personas socias. No es un servicio público.') }}</p>
     </div>
 </x-layouts.socio>

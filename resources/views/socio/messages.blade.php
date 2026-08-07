@@ -32,7 +32,7 @@
                     {{ $thread->status->label() }}
                 </span>
             </div>
-            <p class="mt-1 text-xs text-ink-muted dark:text-slate-500">{{ optional($thread->last_message_at)->format('d/m/Y H:i') }}</p>
+            <p class="mt-1 text-xs text-ink-muted dark:text-slate-400">{{ optional($thread->last_message_at)->format('d/m/Y H:i') }}</p>
         </a>
     @empty
         <div class="mt-3 rounded-2xl border border-dashed border-line bg-surface p-8 text-center dark:border-slate-800 dark:bg-slate-900">

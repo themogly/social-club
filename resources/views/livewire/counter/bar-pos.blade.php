@@ -291,7 +291,7 @@
                                     @endforeach
                                 </div>
                                 <input id="misc-ref" type="text" wire:model="miscReference" autocomplete="off" placeholder="{{ __('… o escribe un motivo') }}" class="mt-2 h-11 w-full rounded-xl border border-line bg-surface px-3 text-base text-ink placeholder:text-ink-muted focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/40 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100">
-                                <p class="mt-1 text-[11px] text-ink-muted dark:text-slate-500">{{ __('Justifica por qué es una línea sin catálogo — se revisa al cerrar la caja.') }}</p>
+                                <p class="mt-1 text-[11px] text-ink-muted dark:text-slate-400">{{ __('Justifica por qué es una línea sin catálogo — se revisa al cerrar la caja.') }}</p>
                             </div>
                             <button type="button" wire:click="addMiscLine" class="h-11 w-full rounded-xl bg-brand text-sm font-semibold text-white transition hover:bg-brand-dark focus:outline-none focus:ring-2 focus:ring-brand/40">{{ __('Añadir importe manual') }}</button>
                         </div>
@@ -416,7 +416,7 @@
                                 class="mt-1 h-11 w-full rounded-xl border border-line bg-surface px-3 text-base text-ink placeholder:text-ink-muted focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/40 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
                             >
                             @if ($member === null)
-                                <p class="mt-1 text-xs text-ink-muted dark:text-slate-500">{{ __('Atribuye un socio para pagar con monedero.') }}</p>
+                                <p class="mt-1 text-xs text-ink-muted dark:text-slate-400">{{ __('Atribuye un socio para pagar con monedero.') }}</p>
                             @endif
                         </div>
                         @endif

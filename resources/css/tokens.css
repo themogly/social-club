@@ -31,6 +31,7 @@
         --color-success: #16a34a; /* min 4.81:1 on dark incl tint */
         --color-warning: #d97706; /* min 5.01:1 on dark incl tint */
         --color-error: #f87171;   /* red-400 · min 5.69:1 on dark incl tint */
+        --color-ink-muted: #94a3b8;
     }
 }
 :root.dark,
@@ -39,4 +40,11 @@
     --color-success: #16a34a;
     --color-warning: #d97706;
     --color-error: #f87171;
+    /* The a11y audit's finding: ink-muted had NO dark value, so #475569 stayed put on a slate-950 counter
+       at 2.35:1 — and it only shows where a usage forgot its own `dark:text-…`, which is exactly where
+       nobody looks. Two real controls relied on it (Cerrar sesión on the counter home, Borrar on the PIN
+       pad). slate-400 clears 4.5:1 on both #0f172a and #020618, so a forgotten override now degrades to
+       readable rather than invisible. Usages that DO carry a dark: utility are unaffected — the utility
+       wins over the token. */
+    --color-ink-muted: #94a3b8;
 }

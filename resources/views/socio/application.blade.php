@@ -75,7 +75,7 @@
                     {{-- Explicit format hint (prompt 97): the native picker's displayed order follows the
                          document language, but the submitted value is always ISO — the hint removes any doubt
                          about which number is the day, since DOB drives the minimum-age check. --}}
-                    <p class="mt-1 text-xs text-ink-muted dark:text-slate-500">{{ __('Formato: día / mes / año') }}</p>
+                    <p class="mt-1 text-xs text-ink-muted dark:text-slate-400">{{ __('Formato: día / mes / año') }}</p>
                 </div>
 
                 <div class="grid grid-cols-2 gap-3">
@@ -100,7 +100,7 @@
                     <label class="mb-1 block text-sm font-medium" for="photo">{{ __('Foto (opcional)') }}</label>
                     <input id="photo" name="photo" type="file" accept="image/*" capture="user"
                            class="block w-full text-sm text-ink file:mr-3 file:rounded-lg file:border-0 file:bg-brand-tint file:px-3 file:py-2 file:text-sm file:font-medium file:text-brand dark:text-slate-200 dark:file:bg-slate-800 dark:file:text-slate-100">
-                    <p class="mt-1 text-xs text-ink-muted dark:text-slate-500">{{ \App\Support\DocumentUpload::helperText(__('Ayuda a que te reconozcan al llegar. Se comparará contigo en el mostrador. Puedes omitirla y hacerla en la sede.')) }}</p>
+                    <p class="mt-1 text-xs text-ink-muted dark:text-slate-400">{{ \App\Support\DocumentUpload::helperText(__('Ayuda a que te reconozcan al llegar. Se comparará contigo en el mostrador. Puedes omitirla y hacerla en la sede.')) }}</p>
                 </div>
 
                 {{-- Optional identity DOCUMENT (prompt 178 — 155's part B, decided by the controller: capture
@@ -116,7 +116,7 @@
                     <label class="mb-1 block text-sm font-medium" for="document_scan">{{ __('Documento de identidad (opcional)') }}</label>
                     <input id="document_scan" name="document_scan" type="file" accept="image/*,application/pdf"
                            class="block w-full text-sm text-ink file:mr-3 file:rounded-lg file:border-0 file:bg-brand-tint file:px-3 file:py-2 file:text-sm file:font-medium file:text-brand dark:text-slate-200 dark:file:bg-slate-800 dark:file:text-slate-100">
-                    <p class="mt-1 text-xs text-ink-muted dark:text-slate-500">{{ \App\Support\DocumentUpload::helperText(__('Foto o PDF de tu DNI, NIE o pasaporte. Se guarda cifrado, solo se abre con un enlace firmado y cada consulta queda registrada. Si tu solicitud no se aprueba, se borra. Puedes omitirlo y enseñarlo en el mostrador.')) }}</p>
+                    <p class="mt-1 text-xs text-ink-muted dark:text-slate-400">{{ \App\Support\DocumentUpload::helperText(__('Foto o PDF de tu DNI, NIE o pasaporte. Se guarda cifrado, solo se abre con un enlace firmado y cada consulta queda registrada. Si tu solicitud no se aprueba, se borra. Puedes omitirlo y enseñarlo en el mostrador.')) }}</p>
 
                     {{-- Prompt 179 — read it here, on this device. `hidden` until the script mounts, so a
                          browser that cannot run the reader never shows a control that would do nothing.
@@ -133,8 +133,8 @@
                             data-needs-file="{{ __('Elige primero una foto de tu documento.') }}"
                             class="inline-flex min-h-11 items-center rounded-xl border border-brand/40 bg-brand-tint px-4 text-sm font-semibold text-brand transition hover:bg-brand-tint/70 disabled:opacity-60 dark:bg-slate-800 dark:text-slate-100"
                         >{{ __('Rellenar mis datos desde el documento') }}</button>
-                        <p data-mrz-status role="status" aria-live="polite" class="mt-1 text-xs text-ink-muted dark:text-slate-500"></p>
-                        <p class="mt-1 text-xs text-ink-muted dark:text-slate-500">{{ __('Del DNI o NIE, fotografía el REVERSO (las tres líneas de letras y símbolos). Del pasaporte, la página de la foto.') }}</p>
+                        <p data-mrz-status role="status" aria-live="polite" class="mt-1 text-xs text-ink-muted dark:text-slate-400"></p>
+                        <p class="mt-1 text-xs text-ink-muted dark:text-slate-400">{{ __('Del DNI o NIE, fotografía el REVERSO (las tres líneas de letras y símbolos). Del pasaporte, la página de la foto.') }}</p>
                     </div>
                 </div>
 
@@ -154,7 +154,7 @@
                             <option value="{{ $opt }}" @selected((string) old('declared_monthly_g', $declaredG !== null ? (int) $declaredG : '') === (string) $opt)>{{ __(':n g al mes', ['n' => $opt]) }}</option>
                         @endforeach
                     </select>
-                    <p class="mt-1 text-xs text-ink-muted dark:text-slate-500">{{ __('Una estimación orientativa. Podrás ajustarla con la asociación.') }}</p>
+                    <p class="mt-1 text-xs text-ink-muted dark:text-slate-400">{{ __('Una estimación orientativa. Podrás ajustarla con la asociación.') }}</p>
                 </div>
 
                 {{-- Avalador: a NAME or a number (prompt 97) — a prospect knows the person, not the number,
@@ -162,7 +162,7 @@
                 <div>
                     <label class="mb-1 block text-sm font-medium" for="avalador_ref">{{ __('Tu avalador/a (nombre o nº de socio/a)') }}</label>
                     <input id="avalador_ref" name="avalador_ref" type="text" value="{{ old('avalador_ref', data_get($payload, 'avalador_ref')) }}" class="{{ $input }}">
-                    <p class="mt-1 text-xs text-ink-muted dark:text-slate-500">{{ __('El socio/a que te presenta. Si no lo sabes, déjalo en blanco y la asociación te orientará.') }}</p>
+                    <p class="mt-1 text-xs text-ink-muted dark:text-slate-400">{{ __('El socio/a que te presenta. Si no lo sabes, déjalo en blanco y la asociación te orientará.') }}</p>
                 </div>
 
                 <label class="flex items-start gap-2 rounded-lg bg-surface-alt p-3 text-sm dark:bg-slate-950">
@@ -175,11 +175,11 @@
                      processing and the statutes are different agreements. --}}
                 @php($consentVersion = \App\Support\ConsentText::version())
                 <div class="space-y-3 rounded-lg border border-line bg-surface-alt p-3 text-sm dark:border-slate-700 dark:bg-slate-950">
-                    <p class="text-xs text-ink-muted dark:text-slate-500">{{ __('Textos legales · versión :v', ['v' => $consentVersion]) }}</p>
+                    <p class="text-xs text-ink-muted dark:text-slate-400">{{ __('Textos legales · versión :v', ['v' => $consentVersion]) }}</p>
                     @unless (\App\Support\ConsentText::isAuthoritative())
                         {{-- The honest position (prompt 153): the club is a Spanish asociación with Spanish estatutos;
                              the text below is a translation of a specific version of the authoritative Spanish. --}}
-                        <p class="text-xs text-ink-muted dark:text-slate-500">{{ __('La versión auténtica de estas declaraciones está en español; esta es una traducción de la versión :v.', ['v' => $consentVersion]) }}</p>
+                        <p class="text-xs text-ink-muted dark:text-slate-400">{{ __('La versión auténtica de estas declaraciones está en español; esta es una traducción de la versión :v.', ['v' => $consentVersion]) }}</p>
                     @endunless
 
                     <div>
@@ -236,7 +236,7 @@
                 </script>
             @endif
 
-            <p class="mt-4 text-center text-xs text-ink-muted dark:text-slate-500">{{ __('Espacio privado. No es un servicio público ni una tienda.') }}</p>
+            <p class="mt-4 text-center text-xs text-ink-muted dark:text-slate-400">{{ __('Espacio privado. No es un servicio público ni una tienda.') }}</p>
         @endif
     </div>
 </x-layouts.socio>

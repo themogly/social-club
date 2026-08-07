@@ -19,7 +19,10 @@
         @endif
     </div>
 @else
-    <div class="csc-table-wrap">
+    {{-- tabindex + role=region: the wrapper scrolls horizontally and nothing inside takes focus, so without
+         this a keyboard user cannot reach the columns past the fold (a11y audit). Named by the table's own
+         title, because a report page can carry several. --}}
+    <div class="csc-table-wrap" tabindex="0" role="region" aria-label="{{ $table->title }}">
         <table class="csc-table csc-rep-table">
             <thead>
                 <tr>

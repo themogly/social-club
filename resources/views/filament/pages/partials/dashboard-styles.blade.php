@@ -4,10 +4,19 @@
 <style>
     .csc-dash {
         --s: #ffffff; --s2: #f8fafc; --bd: #e2e8f0; --tx: #0f172a; --mut: #475569;
-        --br: #2563eb; --brd: #1d4ed8; --brt: #eff6ff;
+        /* --br is the brand as a FILL / stroke / border; --brtx is the brand as TEXT on a surface; --brfill
+           is the brand behind WHITE text. They are one colour on light and three on dark, and that is the
+           whole point: on a dark surface brand text has to go LIGHTER to be read, while a brand fill under
+           white text has to go DARKER. Collapsing them into one var is what put the active period toggle at
+           3.67:1 and the info alert at 3.24:1 in dark mode (a11y audit). */
+        --br: #2563eb; --brd: #1d4ed8; --brt: #eff6ff; --brtx: #2563eb; --brfill: #2563eb;
         --ok: #16a34a; --warn: #d97706; --err: #dc2626;
         --okbg: #dcfce7; --warnbg: #ffedd5; --errbg: #fee2e2;
-        --okt: #15803d; --warnt: #b45309; --errt: #b91c1c;
+        /* --warnt is amber-800, not amber-700: on --warnbg (#ffedd5) amber-700 measures 4.38:1, under the
+           4.5:1 floor, and this is the strip that says "1 caja abierta sin cuadrar". amber-800 is 6.16:1 and
+           is the same value prompt 98 settled on for --color-warning, so the dashboard's private palette now
+           agrees with the shared tokens instead of quietly undercutting them. */
+        --okt: #15803d; --warnt: #92400e; --errt: #b91c1c;
         --shadow: 0 1px 2px rgba(15, 23, 42, .04), 0 4px 14px rgba(15, 23, 42, .06);
         --radius: 0.85rem;
         color: var(--tx);
@@ -15,7 +24,9 @@
     }
     .dark .csc-dash {
         --s: #1e293b; --s2: #0f172a; --bd: #334155; --tx: #e2e8f0; --mut: #94a3b8;
-        --br: #3b82f6; --brd: #60a5fa; --brt: rgba(59, 130, 246, .16);
+        /* blue-400 as text (6.58:1 on --s, 5.25:1 on the tinted alert background); blue-700 as the fill
+           behind white text (6.48:1). See the light block above for why these are three variables. */
+        --br: #3b82f6; --brd: #60a5fa; --brt: rgba(59, 130, 246, .16); --brtx: #60a5fa; --brfill: #1d4ed8;
         --ok: #22c55e; --warn: #f59e0b; --err: #f87171;
         --okbg: rgba(34, 197, 94, .16); --warnbg: rgba(245, 158, 11, .16); --errbg: rgba(248, 113, 113, .16);
         --okt: #4ade80; --warnt: #fbbf24; --errt: #fca5a5;
@@ -27,12 +38,12 @@
     .csc-segmented { display: inline-flex; background: var(--s2); border: 1px solid var(--bd); border-radius: 999px; padding: 0.2rem; gap: 0.15rem; }
     .csc-seg { appearance: none; border: 0; background: transparent; color: var(--mut); font-size: 0.82rem; font-weight: 600; padding: 0.42rem 0.9rem; border-radius: 999px; cursor: pointer; transition: background .15s, color .15s; }
     .csc-seg:hover { color: var(--tx); }
-    .csc-seg-active { background: var(--br); color: #fff; box-shadow: 0 1px 2px rgba(37, 99, 235, .35); }
+    .csc-seg-active { background: var(--brfill); color: #fff; box-shadow: 0 1px 2px rgba(37, 99, 235, .35); }
     .csc-seg:focus-visible { outline: 2px solid var(--br); outline-offset: 2px; }
     .csc-dates { display: inline-flex; gap: 0.6rem; }
     .csc-date { display: inline-flex; flex-direction: column; font-size: 0.7rem; color: var(--mut); gap: 0.2rem; font-weight: 600; }
     .csc-date input { border: 1px solid var(--bd); background: var(--s); color: var(--tx); border-radius: 0.5rem; padding: 0.3rem 0.5rem; font-size: 0.82rem; }
-    .csc-scope-pill { margin-inline-start: auto; font-size: 0.72rem; font-weight: 700; letter-spacing: .02em; text-transform: uppercase; color: var(--br); background: var(--brt); border: 1px solid var(--bd); padding: 0.3rem 0.7rem; border-radius: 999px; }
+    .csc-scope-pill { margin-inline-start: auto; font-size: 0.72rem; font-weight: 700; letter-spacing: .02em; text-transform: uppercase; color: var(--brtx); background: var(--brt); border: 1px solid var(--bd); padding: 0.3rem 0.7rem; border-radius: 999px; }
 
     /* Layout */
     .csc-grid { display: grid; grid-template-columns: 1fr; gap: 1.5rem; align-items: start; }
@@ -57,7 +68,7 @@
     .csc-card-link:focus-visible { outline: 2px solid var(--br); outline-offset: 2px; }
     .csc-card[data-flag="true"] { border-color: var(--warn); }
     .csc-card-head { display: flex; align-items: flex-start; gap: 0.5rem; min-width: 0; }
-    .csc-card-icon { display: inline-flex; align-items: center; justify-content: center; width: 1.9rem; height: 1.9rem; border-radius: 0.55rem; background: var(--brt); color: var(--br); flex: none; }
+    .csc-card-icon { display: inline-flex; align-items: center; justify-content: center; width: 1.9rem; height: 1.9rem; border-radius: 0.55rem; background: var(--brt); color: var(--brtx); flex: none; }
     /* Prompt 144: label + delta stack in a column beside the icon, so the label gets the FULL header width. */
     .csc-card-headmain { display: flex; flex-direction: column; align-items: flex-start; gap: 0.4rem; min-width: 0; flex: 1; }
     .csc-ico { width: 1.05rem; height: 1.05rem; }
@@ -81,7 +92,7 @@
        breaks; `anywhere` would let it fracture mid-figure even when there is room. */
     .csc-card-value { font-size: 1.6rem; line-height: 1.15; font-weight: 700; letter-spacing: -.01em; color: var(--tx); overflow-wrap: break-word; }
     .csc-card-sub { font-size: 0.74rem; color: var(--mut); margin-top: 0.2rem; }
-    .csc-card-spark { height: 32px; color: var(--br); }
+    .csc-card-spark { height: 32px; color: var(--brtx); }
     .csc-spark { width: 100%; height: 100%; display: block; }
     .csc-spark-line { fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; vector-effect: non-scaling-stroke; }
     .csc-spark-area { fill: var(--brt); stroke: none; }
@@ -113,7 +124,7 @@
     .csc-section-ico { width: 1.05rem; height: 1.05rem; color: var(--mut); }
     .csc-section-title { font-size: 0.9rem; font-weight: 700; color: var(--tx); margin: 0; }
     .csc-section-sub { font-size: 0.74rem; color: var(--mut); margin: -0.35rem 0 0; }
-    .csc-section-link { font-size: 0.75rem; font-weight: 600; color: var(--br); text-decoration: none; }
+    .csc-section-link { font-size: 0.75rem; font-weight: 600; color: var(--brtx); text-decoration: none; }
     .csc-section-link:hover { text-decoration: underline; }
     .csc-section-body { min-width: 0; }
     .csc-count { font-size: 0.72rem; font-weight: 700; color: var(--tx); background: var(--s2); border: 1px solid var(--bd); border-radius: 999px; padding: 0.05rem 0.5rem; }
@@ -127,7 +138,7 @@
     .csc-table tbody tr:hover td { background: var(--s2); }
     .csc-num { text-align: right; font-variant-numeric: tabular-nums; }
     .csc-tag { display: inline-flex; align-items: center; font-size: 0.72rem; font-weight: 600; padding: 0.1rem 0.5rem; border-radius: 999px; }
-    .csc-tag-dispensacion { color: var(--br); background: var(--brt); }
+    .csc-tag-dispensacion { color: var(--brtx); background: var(--brt); }
     .csc-tag-barra { color: var(--okt); background: var(--okbg); }
 
     /* Readouts */
@@ -137,7 +148,7 @@
     .csc-readout dt { font-size: 0.8rem; color: var(--mut); }
     .csc-readout dd { margin: 0; font-size: 0.88rem; font-weight: 700; color: var(--tx); font-variant-numeric: tabular-nums; }
     .csc-readout dd a { color: var(--tx); text-decoration: none; }
-    .csc-readout dd a:hover { color: var(--br); text-decoration: underline; }
+    .csc-readout dd a:hover { color: var(--brtx); text-decoration: underline; }
 
     /* Alerts */
     .csc-alerts { display: flex; flex-direction: column; gap: 0.55rem; }
@@ -145,7 +156,7 @@
     .csc-alert-ico { width: 1.1rem; height: 1.1rem; flex: none; margin-top: 0.05rem; }
     .csc-alert-msg { font-size: 0.82rem; font-weight: 600; line-height: 1.3; }
     .csc-alert-info { background: var(--brt); border-color: color-mix(in srgb, var(--br) 30%, transparent); }
-    .csc-alert-info .csc-alert-ico, .csc-alert-info .csc-alert-msg { color: var(--br); }
+    .csc-alert-info .csc-alert-ico, .csc-alert-info .csc-alert-msg { color: var(--brtx); }
     .csc-alert-warning { background: var(--warnbg); border-color: color-mix(in srgb, var(--warn) 35%, transparent); }
     .csc-alert-warning .csc-alert-ico, .csc-alert-warning .csc-alert-msg { color: var(--warnt); }
     .csc-alert-error { background: var(--errbg); border-color: color-mix(in srgb, var(--err) 35%, transparent); }

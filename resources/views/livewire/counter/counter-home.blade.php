@@ -64,7 +64,7 @@
                             <span class="inline-block h-2.5 w-2.5 rounded-full bg-success" aria-hidden="true"></span>
                             <span class="text-ink-muted dark:text-slate-400">{{ __('Trabajando') }}:</span>
                             <span class="font-semibold">{{ $this->currentOperatorName() }}</span>
-                            <span class="text-xs text-ink-muted dark:text-slate-500">· {{ __('Cambiar') }}</span>
+                            <span class="text-xs text-ink-muted dark:text-slate-400">· {{ __('Cambiar') }}</span>
                         </button>
                     @endif
 

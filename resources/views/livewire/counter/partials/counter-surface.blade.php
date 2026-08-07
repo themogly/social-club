@@ -112,7 +112,7 @@
                 type="button"
                 data-handover-staff
                 @click="staffPad = true; $nextTick(() => $refs.pinPad?.focus())"
-                class="mt-10 min-h-[2.75rem] rounded-lg px-4 text-xs font-medium text-ink-muted underline underline-offset-4 transition hover:text-ink dark:text-slate-500 dark:hover:text-slate-300"
+                class="mt-10 min-h-[2.75rem] rounded-lg px-4 text-xs font-medium text-ink-muted underline underline-offset-4 transition hover:text-ink dark:text-slate-400 dark:hover:text-slate-300"
             >{{ __('Personal del club') }}</button>
         </div>
     </template>
@@ -138,7 +138,7 @@
                 <template x-for="i in pin.length" :key="i">
                     <span class="h-2.5 w-2.5 rounded-full bg-ink dark:bg-slate-200"></span>
                 </template>
-                <span x-show="pin.length === 0" class="text-sm text-ink-muted dark:text-slate-500">••••</span>
+                <span x-show="pin.length === 0" class="text-sm text-ink-muted dark:text-slate-400">••••</span>
             </div>
 
             @if ($operatorFeedback !== null)
@@ -170,7 +170,7 @@
                     type="button"
                     data-handover-staff-cancel
                     @click="staffPad = false; clear()"
-                    class="mt-3 min-h-[2.75rem] w-full rounded-lg px-4 text-xs font-medium text-ink-muted transition hover:text-ink dark:text-slate-500 dark:hover:text-slate-300"
+                    class="mt-3 min-h-[2.75rem] w-full rounded-lg px-4 text-xs font-medium text-ink-muted transition hover:text-ink dark:text-slate-400 dark:hover:text-slate-300"
                 >{{ __('Volver a la pantalla del solicitante') }}</button>
             </template>
         </div>

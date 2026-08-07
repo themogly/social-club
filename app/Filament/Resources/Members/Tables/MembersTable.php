@@ -54,7 +54,11 @@ class MembersTable
                         MemberStatus::SUSPENDED, MemberStatus::EXPELLED => 'danger',
                         default => 'gray',
                     }),
-                TextColumn::make('kind')->label(__('Tipo'))->badge()->color('warning')
+                // ->placeholder: Filament wraps every cell of a clickable row in an <a>, so a cell that
+                // renders NOTHING becomes a link with no accessible text — ten of them per page, which is
+                // what a screen reader hears on this table (a11y audit). A placeholder gives the link
+                // content, and an em dash is the ordinary table convention for "no value" besides.
+                TextColumn::make('kind')->label(__('Tipo'))->badge()->color('warning')->placeholder('—')
                     ->state(fn (Member $record): ?string => $record->isTemporary() ? __('Temporal') : null),
                 IconColumn::make('is_therapeutic')->label(__('Terapéutico'))->boolean()->toggleable(),
                 // Prompt 72: DERIVED — a warning badge (only) when a generated declaration no longer matches
