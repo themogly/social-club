@@ -289,9 +289,15 @@ class BarPosScreenTest extends TestCase
         $order = Order::query()->withoutGlobalScopes()->firstOrFail();
         $component->assertSet('lastOrderId', $order->id); // lastOrderId is retained through the render
 
-        // The success flash appears BOTH at the page top and colocated in the basket column.
-        $this->assertGreaterThanOrEqual(2, substr_count($component->html(), __('Pedido registrado.')),
-            'The success confirmation must render colocated in the basket column, not only page-top.');
+        // Prompt 199 rewrote this assertion, and the rewrite is the point. It used to require the message
+        // to appear at least TWICE — the page-top banner AND prompt 41's colocated copy — which encoded the
+        // duplication as the requirement and is why nobody noticed when 193 added a third position. What it
+        // was really proving is COLOCATION: the outcome renders beside the control, not at the top of the
+        // page. That is now asserted directly, by position, and exactly once.
+        $html = $component->html();
+        $this->assertStringContainsString('data-commit-feedback', $html, 'the outcome renders beside Cobrar');
+        $this->assertSame(1, substr_count((string) preg_replace('/wire:snapshot="[^"]*"/', '', $html), __('Pedido registrado.')),
+            'and exactly once — two live regions announce the same thing twice');
 
         // The receipt link resolves to the correct order via counter.bar.receipt.
         $component->assertSee(route('counter.bar.receipt', $order->id), false);
@@ -310,8 +316,11 @@ class BarPosScreenTest extends TestCase
             ->call('commitOrder')
             ->assertSet('flashType', 'error');
 
-        $this->assertGreaterThanOrEqual(2, substr_count($component->html(), __('El pago con monedero requiere un socio.')),
-            'The error must be equally visible colocated in the basket column.');
+        // Same rewrite as the success case above (prompt 199): position, not repetition.
+        $html = $component->html();
+        $this->assertStringContainsString('data-commit-feedback', $html, 'the refusal renders beside Cobrar');
+        $this->assertSame(1, substr_count((string) preg_replace('/wire:snapshot="[^"]*"/', '', $html), __('El pago con monedero requiere un socio.')),
+            'and exactly once');
         $this->assertSame(0, Order::query()->withoutGlobalScopes()->count());
     }
 
