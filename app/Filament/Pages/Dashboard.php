@@ -2,11 +2,10 @@
 
 namespace App\Filament\Pages;
 
+use App\Enums\DashboardAlert;
 use App\Enums\Role;
 use App\Filament\Pages\Reports\FinancialReportPage;
 use App\Filament\Pages\Reports\StockReportPage;
-use App\Filament\Resources\Batches\BatchResource;
-use App\Filament\Resources\MemberApplications\MemberApplicationResource;
 use App\Filament\Resources\Members\MemberResource;
 use App\Filament\Resources\TillSessions\TillSessionResource;
 use App\Models\Location;
@@ -200,18 +199,25 @@ class Dashboard extends BaseDashboard
     {
         return array_map(function (array $alert): array {
             $count = $alert['count'];
-            [$message, $href, $icon] = match ($alert['key']) {
-                'members_over_limit' => [trans_choice(':count socio ha superado su límite mensual|:count socios han superado su límite mensual', $count, ['count' => $count]), MemberResource::getUrl(), Heroicon::OutlinedExclamationTriangle],
-                'active_member_cap' => [trans_choice(':count socio activo · tope de socios alcanzado|:count socios activos · tope de socios alcanzado', $count, ['count' => $count]), MemberResource::getUrl(), Heroicon::OutlinedUserGroup],
-                'unreconciled_till' => [trans_choice(':count caja abierta sin arquear|:count cajas abiertas sin arquear', $count, ['count' => $count]), TillSessionResource::getUrl(), Heroicon::OutlinedCalculator],
-                'batches_expiring' => [trans_choice(':count lote caduca pronto|:count lotes caducan pronto', $count, ['count' => $count]), BatchResource::getUrl(), Heroicon::OutlinedClock],
-                'stock_ceiling_exceeded' => [trans_choice(':count sede supera el techo de existencias|:count sedes superan el techo de existencias', $count, ['count' => $count]), BatchResource::getUrl(), Heroicon::OutlinedArchiveBox],
-                'memberships_expiring' => [trans_choice(':count membresía por vencer|:count membresías por vencer', $count, ['count' => $count]), MemberResource::getUrl(), Heroicon::OutlinedClock],
-                'pending_applications' => [trans_choice(':count solicitud pendiente de revisión|:count solicitudes pendientes de revisión', $count, ['count' => $count]), MemberApplicationResource::getUrl(), Heroicon::OutlinedInbox],
-                default => [__('Aviso'), '#', Heroicon::OutlinedBell],
+            $case = DashboardAlert::tryFrom($alert['key']);
+
+            // The DESTINATION comes from the enum, which is now the one map both dashboards read (prompt
+            // 207) — this method used to carry a second copy, so an alert could be pointed at one resource
+            // here and another on the counter. The SENTENCE stays here: this is the back office, and it says
+            // "por vencer" to a manager reading a list where the counter says "vence pronto" to somebody
+            // standing at a till. Two audiences, one set of destinations.
+            [$message, $icon] = match ($alert['key']) {
+                'members_over_limit' => [trans_choice(':count socio ha superado su límite mensual|:count socios han superado su límite mensual', $count, ['count' => $count]), Heroicon::OutlinedExclamationTriangle],
+                'active_member_cap' => [trans_choice(':count socio activo · tope de socios alcanzado|:count socios activos · tope de socios alcanzado', $count, ['count' => $count]), Heroicon::OutlinedUserGroup],
+                'unreconciled_till' => [trans_choice(':count caja abierta sin arquear|:count cajas abiertas sin arquear', $count, ['count' => $count]), Heroicon::OutlinedCalculator],
+                'batches_expiring' => [trans_choice(':count lote caduca pronto|:count lotes caducan pronto', $count, ['count' => $count]), Heroicon::OutlinedClock],
+                'stock_ceiling_exceeded' => [trans_choice(':count sede supera el techo de existencias|:count sedes superan el techo de existencias', $count, ['count' => $count]), Heroicon::OutlinedArchiveBox],
+                'memberships_expiring' => [trans_choice(':count membresía por vencer|:count membresías por vencer', $count, ['count' => $count]), Heroicon::OutlinedClock],
+                'pending_applications' => [trans_choice(':count solicitud pendiente de revisión|:count solicitudes pendientes de revisión', $count, ['count' => $count]), Heroicon::OutlinedInbox],
+                default => [$case?->label($count) ?? __('Aviso'), Heroicon::OutlinedBell],
             };
 
-            return ['severity' => $alert['severity'], 'count' => $count, 'message' => $message, 'href' => $href, 'icon' => $icon];
+            return ['severity' => $alert['severity'], 'count' => $count, 'message' => $message, 'href' => $case?->panelUrl() ?? '#', 'icon' => $icon];
         }, $alerts);
     }
 

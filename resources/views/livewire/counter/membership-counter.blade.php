@@ -31,6 +31,59 @@
             </div>
         @endunless
 
+        {{-- ============ Prompt 207 — the alert that sent you here, with its subjects ============
+
+             The hub's *Requiere atención* rail links to this screen, and until 207 that was all it did: an
+             alert saying *"1 membresía vence pronto"* landed the operator on an empty search box with no way
+             to find out WHICH membership without already knowing the answer. It said something was wrong and
+             then handed over a haystack.
+
+             Printing the names in the rail instead was the obvious fix and the wrong one — 177 put the
+             consumption list behind a deliberate tap and bound it to one socio precisely because the hub is a
+             screen in a room with the next socio standing behind the current one. So the count stays there
+             and the names appear HERE, where member data already belongs and where the operator is about to
+             act. Each row is the ordinary `selectMember()` the search box calls: same sede scope, same
+             verdict, same blocking chain. No second search box (194) — this is a list of subjects, not a
+             second way to find one.
+
+             The cap is 177's figure and is stated rather than silent: a truncated list that looks complete is
+             worse than a long one.
+
+             The BLOCK form below, not `@php(...)`: Blade lifts raw PHP out with a non-greedy
+             `/(?<!@)@php(.*?)@endphp/s` BEFORE it compiles directives, so a shorthand `@php(...)` in a file
+             that uses the block form later pairs with THAT file's next `@endphp` and swallows everything
+             between — here it ate this whole panel and left an unbalanced `@if`. --}}
+        @php
+            $worklist = $this->worklist();
+        @endphp
+        @if ($worklist !== null)
+            <div class="mx-auto mb-4 max-w-xl">
+                <section data-alert-worklist="{{ $alert }}" class="rounded-2xl border border-brand/30 bg-brand-tint p-4 dark:border-slate-700 dark:bg-slate-800">
+                    <h2 class="text-base font-semibold">{{ $worklist['title'] }}</h2>
+                    <ul class="mt-3 divide-y divide-line/70 overflow-hidden rounded-xl border border-line bg-surface dark:divide-slate-800 dark:border-slate-700 dark:bg-slate-900">
+                        @foreach ($worklist['rows'] as $row)
+                            <li>
+                                <button
+                                    type="button"
+                                    wire:click="selectMember('{{ $row['member_id'] }}')"
+                                    data-worklist-member="{{ $row['member_id'] }}"
+                                    class="flex min-h-11 w-full items-center justify-between gap-3 px-3 py-2.5 text-left transition hover:bg-brand-tint dark:hover:bg-slate-800"
+                                >
+                                    <span class="min-w-0 truncate text-sm font-semibold">{{ $row['name'] }}</span>
+                                    <span class="shrink-0 text-xs text-ink-muted dark:text-slate-400">{{ $row['detail'] }}</span>
+                                </button>
+                            </li>
+                        @endforeach
+                    </ul>
+                    @if ($worklist['total'] > $worklist['shown'])
+                        <p data-worklist-truncated class="mt-2 text-xs text-ink-muted dark:text-slate-400">
+                            {{ __('Mostrando :shown de :total. Busca por nombre para el resto.', ['shown' => $worklist['shown'], 'total' => $worklist['total']]) }}
+                        </p>
+                    @endif
+                </section>
+            </div>
+        @endif
+
         {{-- ============ Prompt 174 — Alta at the counter ============
 
              Inside the Socios tab, NOT a sixth destination on the counter strip: that strip took prompts

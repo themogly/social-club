@@ -5,6 +5,7 @@ namespace App\Livewire\Counter;
 use App\Actions\Attendance\ResolveMemberEligibility;
 use App\Actions\Dispensing\ResolveMemberLimits;
 use App\Actions\Till\SelectTillSession;
+use App\Enums\DashboardAlert;
 use App\Enums\DispensationStatus;
 use App\Livewire\Counter\Concerns\CollectsMembershipFees;
 use App\Livewire\Counter\Concerns\FindsMembers;
@@ -27,6 +28,7 @@ use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Locked;
+use Livewire\Attributes\Url;
 use Livewire\Component;
 
 /**
@@ -95,10 +97,137 @@ class MembershipCounter extends Component
     /** success | warning | error */
     public string $flashType = 'success';
 
+    /**
+     * Which hub alert sent the operator here, if any (prompt 207).
+     *
+     * The hub's *Requiere atención* rail used to link to this SCREEN, which is an empty search box: *"1
+     * membresía vence pronto"* told the operator something was wrong and then asked them to guess who. It
+     * links here with the alert attached now, and the screen opens on that alert's subjects.
+     *
+     * Not `#[Locked]`, deliberately: it is a read-only filter over rows this screen may already show, and
+     * every row it produces goes through the same sede scope and the same `selectMember()` as a typed search.
+     * There is nothing here a hostile client could reach that a search box would not also reach.
+     */
+    #[Url(as: 'alert', except: null)]
+    public ?string $alert = null;
+
+    /** A counter answers a question; it is not an export (177's rule, same figure). */
+    private const WORKLIST_LIMIT = 10;
+
     public function mount(): void
     {
         abort_unless($this->userCan('membership.fee.collect'), 403);
         $this->resolveCounterLocation();
+
+        // Pending applications already had a home on this screen — the Alta panel and its
+        // `pendingAltaApplications()` list (174). Arriving from that alert opens it rather than building a
+        // second list of the same rows beside it.
+        if ($this->alert === DashboardAlert::PENDING_APPLICATIONS->value && $this->userCan('applications.review')) {
+            $this->altaOpen = true;
+        }
+    }
+
+    /**
+     * The subjects behind the alert that sent the operator here — resolved HERE, on arrival, not carried in
+     * the alert.
+     *
+     * `Dashboard::alerts()` gives a count and nothing else, and that is deliberate: the hub is on display in
+     * a room with the next socio standing behind the current one, so 177's rule is counts and states, never
+     * names. The names belong on this screen, which already shows member data and is where the operator is
+     * about to act.
+     *
+     * @return array{title: string, rows: list<array{member_id: string, name: string, detail: string}>, shown: int, total: int}|null
+     */
+    public function worklist(): ?array
+    {
+        $location = $this->resolveLocation();
+        $alert = DashboardAlert::tryFrom((string) $this->alert);
+
+        if ($location === null || $alert === null) {
+            return null;
+        }
+
+        $rows = match ($alert) {
+            DashboardAlert::MEMBERSHIPS_EXPIRING => $this->expiringMembershipRows($location),
+            DashboardAlert::MEMBERS_OVER_LIMIT => $this->overLimitRows($location),
+            // Everything else either has its own surface on this screen (the Alta panel, opened in mount)
+            // or has no subject on the counter at all — see DashboardAlert::counterRoute().
+            default => collect(),
+        };
+
+        if ($rows->isEmpty()) {
+            return null;
+        }
+
+        return [
+            'title' => $alert->label($rows->count()),
+            'rows' => $rows->take(self::WORKLIST_LIMIT)->values()->all(),
+            'shown' => min($rows->count(), self::WORKLIST_LIMIT),
+            'total' => $rows->count(),
+        ];
+    }
+
+    /**
+     * Memberships in the renewal window at THIS sede, through the one shared scope the dashboard counts with
+     * ({@see Membership::scopeExpiringSoon}) — so the number in the rail and the names here are one set.
+     *
+     * @return Collection<int, array{member_id: string, name: string, detail: string}>
+     */
+    private function expiringMembershipRows(Location $location): Collection
+    {
+        return Membership::query()->withoutGlobalScopes()
+            ->where('location_id', $location->id)
+            ->expiringSoon()
+            ->with('member')
+            ->orderBy('expires_at')
+            ->get()
+            ->filter(fn (Membership $m): bool => $m->member !== null)
+            ->map(fn (Membership $m): array => [
+                'member_id' => (string) $m->member_id,
+                'name' => (string) $m->member?->fullName(),
+                'detail' => (string) __('Vence el :date', ['date' => $m->expires_at?->translatedFormat('j M Y') ?? '—']),
+            ])->values();
+    }
+
+    /**
+     * Members carrying a per-member monthly override who have reached it.
+     *
+     * Resolved through `ResolveMemberLimits` — **the resolver this screen already uses** for the allowance
+     * block (177: if a figure here ever disagrees with the dispensary, this screen is wrong and the resolver
+     * is right). Not a second copy of `Dashboard::membersOverLimit()`'s aggregate, which exists because the
+     * dashboard needs one number over the whole org; here the candidate set is only the members who carry an
+     * override, which is small by definition.
+     *
+     * Org-wide, like the alert itself and like the counter's own member search (194/203): a socio who has run
+     * out is a fact about them, not about the sede they last collected at.
+     *
+     * @return Collection<int, array{member_id: string, name: string, detail: string}>
+     */
+    private function overLimitRows(Location $location): Collection
+    {
+        $resolver = new ResolveMemberLimits;
+
+        return Member::query()
+            ->whereNotNull('monthly_limit_cg')->where('monthly_limit_cg', '>', 0)
+            ->orderBy('last_name')->orderBy('first_name')
+            ->get()
+            ->map(function (Member $member) use ($resolver, $location): ?array {
+                $limits = $resolver->handle($member, $location);
+                $used = $limits->monthlyUsedCg;
+                $cap = $limits->monthlyLimitCg;
+
+                if ($cap <= 0 || $used < $cap) {
+                    return null;
+                }
+
+                return [
+                    'member_id' => (string) $member->id,
+                    'name' => $member->fullName(),
+                    'detail' => (string) __(':used de :limit este mes', ['used' => $this->grams($used), 'limit' => $this->grams($cap)]),
+                ];
+            })
+            ->filter()
+            ->values();
     }
 
     public function collectFee(): void

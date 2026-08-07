@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Counter;
 
+use App\Enums\DashboardAlert;
 use App\Livewire\Counter\Concerns\IdentifiesOperator;
 use App\Livewire\Counter\Concerns\ResolvesCounterLocation;
 use App\Models\Location;
@@ -135,18 +136,10 @@ class CounterHome extends Component
     }
 
     /** A sentence per alert key — never a raw slug on a screen a person reads. */
+    /** The rail's sentence, owned by the enum so the two dashboards cannot drift into different vocabularies. */
     public function alertLabel(string $key, int $count): string
     {
-        return match ($key) {
-            'members_over_limit' => trans_choice(':count socio ha superado su límite|:count socios han superado su límite', $count, ['count' => $count]),
-            'active_member_cap' => __('El club está en su tope de socios activos'),
-            'unreconciled_till' => trans_choice(':count caja sin cerrar|:count cajas sin cerrar', $count, ['count' => $count]),
-            'batches_expiring' => trans_choice(':count lote caduca pronto|:count lotes caducan pronto', $count, ['count' => $count]),
-            'stock_ceiling_exceeded' => __('Stock por encima del techo legal en esta sede'),
-            'memberships_expiring' => trans_choice(':count membresía vence pronto|:count membresías vencen pronto', $count, ['count' => $count]),
-            'pending_applications' => trans_choice(':count solicitud pendiente|:count solicitudes pendientes', $count, ['count' => $count]),
-            default => $key,
-        };
+        return DashboardAlert::tryFrom($key)?->label($count) ?? $key;
     }
 
     /**
@@ -155,20 +148,46 @@ class CounterHome extends Component
      * Counter destinations where the counter can actually do something; the panel for the rest, and only
      * when this operator can reach the panel — otherwise the item still reports, without a dead link.
      */
+    /**
+     * Where an alert leads — the working screen, **with its worklist already open** (prompt 207).
+     *
+     * It led to a *screen* before: *"1 membresía vence pronto"* landed the operator on Socios, which is an
+     * empty search box, and no way to find out WHICH membership without already knowing the answer. The alert
+     * said something was wrong and then handed over a haystack.
+     *
+     * Naming the socio in the rail was the obvious fix and is the wrong one — 177 put the consumption list
+     * behind a deliberate tap and bound it to one member precisely because this screen is on display in a
+     * room with the next socio standing behind the current one. So the count stays here and the **names
+     * appear at the far end**, on the screen where member data already belongs and where the operator is
+     * about to act. The `alert` parameter is the filter; the destination resolves its own rows.
+     *
+     * Three of the seven have no counter destination at all ({@see DashboardAlert::counterRoute()}) — for a
+     * user who can open the panel they go to the matching resource, and for everybody else they return null
+     * and the rail renders them as plainly non-actionable text. An alert that lands a STAFF user on a 403 is
+     * worse than one that does not link.
+     */
     public function alertHref(string $key): ?string
     {
-        $route = match ($key) {
-            'unreconciled_till' => 'counter.till',
-            'memberships_expiring', 'pending_applications' => 'counter.members',
-            'members_over_limit' => 'counter.pos',
-            default => null,
-        };
+        $alert = DashboardAlert::tryFrom($key);
 
-        if ($route === null) {
-            return $this->canReachPanel() ? url('/') : null;
+        if ($alert === null) {
+            return null;
         }
 
-        return collect($this->tiles())->contains('route', $route) ? route($route) : null;
+        $route = $alert->counterRoute();
+
+        // A counter destination only counts if this operator may actually open it — the tile list IS the
+        // permission list, so an alert can never be a way around a gate the hub itself respects.
+        if ($route !== null && collect($this->tiles())->contains('route', $route)) {
+            return route($route, ['alert' => $alert->value]);
+        }
+
+        // Panel access is not the same as access to the TABLE the alert points at — ask the resource's own
+        // policy. Without this a STAFF operator, who holds panel access and no `viewAny` on Batches, was
+        // handed a 403 by an alert.
+        return ($this->canReachPanel() && $alert->panelDestinationIsOpenToActor())
+            ? $alert->panelUrl()
+            : null;
     }
 
     /** Memoised for the request: every panel reads the same instance, so the queries are counted once. */

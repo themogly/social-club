@@ -2,8 +2,8 @@
 
 namespace App\ViewModels;
 
-use App\Enums\ApplicationStatus;
 use App\Enums\BatchStatus;
+use App\Enums\DashboardAlert;
 use App\Enums\DispensationStatus;
 use App\Enums\MemberKind;
 use App\Enums\MembershipStatus;
@@ -248,29 +248,25 @@ class Dashboard
     {
         $alerts = [];
 
-        if (($n = $this->membersOverLimit()) > 0) {
-            $alerts[] = ['severity' => 'warning', 'key' => 'members_over_limit', 'count' => $n];
-        }
-        if (($n = $this->membersOverCap()) > 0) {
-            $alerts[] = ['severity' => 'warning', 'key' => 'active_member_cap', 'count' => $n];
-        }
-        if ($this->hasUnreconciledTill()) {
-            $n = $this->scopeByLocation(TillSession::query()->withoutGlobalScopes())
-                ->where('status', TillSessionStatus::OPEN->value)->count();
-            $alerts[] = ['severity' => 'warning', 'key' => 'unreconciled_till', 'count' => $n];
-        }
-        if (($n = $this->expiringBatches()) > 0) {
-            $alerts[] = ['severity' => 'warning', 'key' => 'batches_expiring', 'count' => $n];
-        }
-        if (($n = count($this->ceilingBreaches())) > 0) {
-            $alerts[] = ['severity' => 'error', 'key' => 'stock_ceiling_exceeded', 'count' => $n];
-        }
-        if (($n = $this->expiringMemberships()) > 0) {
-            $alerts[] = ['severity' => 'info', 'key' => 'memberships_expiring', 'count' => $n];
-        }
-        if (($n = $this->pendingApplications()) > 0) {
-            $alerts[] = ['severity' => 'info', 'key' => 'pending_applications', 'count' => $n];
-        }
+        // Prompt 207: the key and the severity come from DashboardAlert, so an eighth alert cannot be added
+        // here and then arrive at either dashboard as an unhandled `default` — the counter's was a silent
+        // `null` href, which renders as a deliberate-looking dead <p>.
+        $add = function (DashboardAlert $alert, int $count) use (&$alerts): void {
+            if ($count > 0) {
+                $alerts[] = ['severity' => $alert->severity(), 'key' => $alert->value, 'count' => $count];
+            }
+        };
+
+        $add(DashboardAlert::MEMBERS_OVER_LIMIT, $this->membersOverLimit());
+        $add(DashboardAlert::ACTIVE_MEMBER_CAP, $this->membersOverCap());
+        $add(DashboardAlert::UNRECONCILED_TILL, $this->hasUnreconciledTill()
+            ? $this->scopeByLocation(TillSession::query()->withoutGlobalScopes())
+                ->where('status', TillSessionStatus::OPEN->value)->count()
+            : 0);
+        $add(DashboardAlert::BATCHES_EXPIRING, $this->expiringBatches());
+        $add(DashboardAlert::STOCK_CEILING_EXCEEDED, count($this->ceilingBreaches()));
+        $add(DashboardAlert::MEMBERSHIPS_EXPIRING, $this->expiringMemberships());
+        $add(DashboardAlert::PENDING_APPLICATIONS, $this->pendingApplications());
 
         return $alerts;
     }
@@ -375,19 +371,33 @@ class Dashboard
         })->values()->all();
     }
 
+    /**
+     * Memberships in the renewal window at this sede.
+     *
+     * Through `Membership::expiringSoon()` since prompt 207 — the same scope the counter's worklist resolves
+     * its ROWS from, so the count in the rail and the names at the far end can never be different sets. It
+     * also fixes two disagreements this method had with `SweepMembershipExpiry`: a hardcoded 30 days where
+     * the sweep reads `expiring_soon_days`, and `status = ACTIVE` where the sweep flips exactly these rows to
+     * `EXPIRING_SOON` — so the nightly sweep had been emptying this count.
+     */
     public function expiringMemberships(): int
     {
         return $this->scopeByLocation(Membership::query()->withoutGlobalScopes())
-            ->where('status', MembershipStatus::ACTIVE->value)
-            ->whereNotNull('expires_at')
-            ->whereBetween('expires_at', [now(), now()->addDays(30)])
+            ->expiringSoon()
             ->count();
     }
 
+    /**
+     * Applications waiting to be reviewed at this sede.
+     *
+     * Through `MemberApplication::awaitingReview()` since prompt 207 — the same scope the counter's Alta panel
+     * lists from. It counted every PENDING row before, including invitations nobody had filled in yet, so the
+     * hub could report a pending application and land the operator on a panel with nothing in it.
+     */
     public function pendingApplications(): int
     {
         return $this->scopeByLocation(MemberApplication::query()->withoutGlobalScopes())
-            ->where('status', ApplicationStatus::PENDING->value)->count();
+            ->awaitingReview()->count();
     }
 
     // --- Payload for role/location tests --------------------------------------------

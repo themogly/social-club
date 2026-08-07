@@ -6,6 +6,7 @@ use App\Casts\NormalisedEmail;
 use App\Enums\ApplicationStatus;
 use App\Models\Concerns\BelongsToOrganisation;
 use Database\Factories\MemberApplicationFactory;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -95,5 +96,24 @@ class MemberApplication extends Model
     public function member(): BelongsTo
     {
         return $this->belongsTo(Member::class, 'resulting_member_id');
+    }
+
+    /**
+     * Applications a reviewer can actually do something about (prompt 207).
+     *
+     * PENDING covers two different things: an invitation issued and not yet filled in, and a form the
+     * applicant has SUBMITTED and is waiting on. Only the second is work. `Dashboard::pendingApplications()`
+     * counted both while the counter's own list (`SignsUpMembers::pendingAltaApplications`) has always shown
+     * only the submitted ones — so the hub could say *"1 solicitud pendiente"* and land the operator on a
+     * screen with nothing to review. One scope, both callers.
+     *
+     * @param  Builder<static>  $query
+     * @return Builder<static>
+     */
+    public function scopeAwaitingReview(Builder $query): Builder
+    {
+        return $query
+            ->where('status', ApplicationStatus::PENDING->value)
+            ->whereNotNull('submitted_at');
     }
 }
