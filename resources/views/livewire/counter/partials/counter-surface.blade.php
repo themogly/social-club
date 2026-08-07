@@ -34,7 +34,14 @@
     x-cloak
     x-data="{
         pin: '',
-        serverMode: @js($surfaceMode),
+        {{-- Prompt 188: the mode is READ from $wire, never copied into local state. `serverMode:
+             @js($surfaceMode)` snapshotted it at init, and Livewire preserves the DOM across a re-render, so
+             x-data never ran again — after identifying, the server said null while Alpine still held
+             'unidentified' and the surface stayed up until a manual reload. $wire is reactive, so an effect
+             that reads it re-runs when the server changes it. A redirect after identifying was considered and
+             rejected: it would have masked this one transition, left the staleness in place for switching
+             operator, locking, unlocking and handover, and thrown away the basket and form state that 173
+             deliberately preserves across the surface. --}}
         {{-- Prompt 187 defect 2: handed-over mode shipped with NO control of any kind, so aborting a handover
              was impossible — a staff member whose applicant walks away, gives up, or turns out to be underage
              had a terminal they could not recover without clearing the session. 173 required "the PIN is how
@@ -48,9 +55,9 @@
         {{-- Handed over outranks everything: the applicant must not be shown a lock screen mid-form.
              Otherwise a client-side idle lock outranks the server's 'no operator yet'. --}}
         get mode() {
-            if (this.serverMode === 'handover') return 'handover'
+            if ($wire.surfaceModeState === 'handover') return 'handover'
             if ($store.counter.locked) return 'locked'
-            return this.serverMode
+            return $wire.surfaceModeState ?? null
         },
         get open() { return this.mode !== null },
         {{-- The pad is the same pad in all three modes; only what it says differs. --}}
