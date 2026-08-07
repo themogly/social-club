@@ -23,10 +23,13 @@ use Illuminate\Support\Facades\Auth;
  *
  * So: ONE box. The operator types or scans into it and this works out which happened.
  *
- *   1. The raw input goes to {@see ResolveMemberByToken}. If it resolves, the member is identified at once.
- *   2. If it does not, the name / member_no search runs and renders its results in place, beneath the input.
+ *   1. **As the operator types**, the name / member_no search runs and renders its results in place,
+ *      beneath the input (prompt 204). It never resolves tokens, so it never reaches the scan throttle.
+ *   2. **On Enter** — or the scanner's trailing Return — the raw input goes to {@see ResolveMemberByToken}
+ *      first. If it resolves, the member is identified at once; if not, it falls through to the same search.
  *
- * No mode toggle, no radio, no second field. The host decides only what happens AFTER a member is found,
+ * One box, two lookups, and they are separable: that is what lets it be live. No mode toggle, no radio,
+ * no second field. The host decides only what happens AFTER a member is found,
  * through {@see onMemberFound()} — if a host ever needs this to behave differently BEFORE that point, the
  * shape is wrong and the difference belongs after the event, not inside here.
  *
@@ -129,13 +132,34 @@ trait FindsMembers
     /**
      * The name / member_no results to render in place, or null when there is nothing to show yet.
      *
+     * **Live as the operator types (prompt 204).** Prompt 194 gated this on `$lookupSearched` — results
+     * appeared only after Enter — on the reasoning that one box cannot search per keystroke because a token
+     * has to be resolved whole and a half-typed name would reach prompt 58's failed-scan throttle. The first
+     * half of that is true and the second does not follow: **the two lookups are separable**. Only
+     * {@see submitLookup()} resolves tokens, and only it can reach the throttle. Searching by name never
+     * touches {@see ResolveMemberByToken} at all, so it can run on every keystroke for free.
+     *
+     * Three of the five screens this replaced DID search live; asking an operator with a member at the
+     * counter to type, stop, and press a key they cannot see was the regression, and the placeholder that
+     * told them to was the evidence that it needed explaining.
+     *
+     * A scan-shaped term is suppressed WHILE IT IS BEING TYPED: a wedge reader types its 48 characters into
+     * this box before its trailing Return arrives, and *"Sin resultados."* flickering under every scan is
+     * noise about a search nobody asked for. Once Enter HAS been pressed (`$lookupSearched`) the same term
+     * searches normally — that is 194's fall-through for an unrecognised card, and it must still land on
+     * *"Sin resultados."* rather than on nothing at all.
+     *
      * @return Collection<int, Member>|null
      */
     public function lookupResults(): ?Collection
     {
         $term = trim($this->lookup);
 
-        if (! $this->lookupSearched || mb_strlen($term) < 2) {
+        if (mb_strlen($term) < 2) {
+            return null;
+        }
+
+        if (self::looksLikeAScan($term) && ! $this->lookupSearched) {
             return null;
         }
 
@@ -171,22 +195,23 @@ trait FindsMembers
     }
 
     /**
-     * Both placeholders name the Enter key, and that is load-bearing rather than tidy copy.
+     * An example, not an instruction (prompt 204).
      *
-     * One box means the input cannot search on every keystroke — a token has to be resolved as a whole, and
-     * a per-keystroke resolve would hand a half-typed name to the scan throttle. Three of the five screens
-     * this replaces DID search live as you typed, so an operator who types and waits is a real regression
-     * unless the field says what to do.
+     * 194 put *"pulsa Enter"* in both placeholders and argued it was load-bearing: with results gated behind
+     * a submit, an operator who typed and waited saw nothing, so the field had to say what to do. That was
+     * an honest fix for a shape that should not have existed — **a control that has to explain its own
+     * keystroke is the defect**, not a control that is missing a caption. Results are live now, so there is
+     * nothing to explain and the example comes back.
      *
-     * The member-number half of the old example ("Ej. García o M-00042") is dropped rather than the Enter
-     * instruction: measured at 1180x820, the full string truncates inside the bar's narrow socio column and
-     * "pulsa Enter" is exactly the part that falls off. The label above already says "por nombre o nº".
+     * The member-number half returns with it. 194 dropped it because the full string truncated in the bar's
+     * narrow socio column at 1180x820 — but what it measured was the string WITH the Enter instruction on
+     * the end. Re-measured without it on this branch: it fits.
      */
     public function lookupPlaceholder(): string
     {
         return $this->cardReadersEnabled()
-            ? __('Escanea la tarjeta, o escribe y pulsa Enter')
-            : __('Ej. García — pulsa Enter');
+            ? __('Escanea la tarjeta o escribe un nombre')
+            : __('Ej. García o M-00042');
     }
 
     /** What the host does once a socio is identified. The ONLY thing that differs between screens. */
