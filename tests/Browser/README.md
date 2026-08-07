@@ -175,3 +175,20 @@ handed to somebody. Fails on a missing alta panel, a control under 44×44, or ho
 
 The applicant's own half is not captured here: it is the ordinary public application form, already
 photographed by prompt 178's harness. That is the point of the design rather than a gap in the coverage.
+
+## The in-browser MRZ prefill (prompt 179)
+
+```bash
+npm run build                                           # also vendors public/ocr/ — see scripts/vendor-ocr.mjs
+php artisan test tests/Browser/MrzPrefillHarnessTest.php
+node tests/Browser/shoot-mrz-prefill.mjs                # → storage/app/screenshots/179/
+```
+
+Three states × two locales × phone and tablet. The **`plain`** state is deliberately captured with the scan
+trigger still `hidden`, because that is exactly what a browser which cannot run the reader shows — an
+ordinary form. Fails on horizontal scroll, on fields marked with nothing read, on nothing marked after a
+read, or on a confirmation target under 44px.
+
+**Playwright is `--no-save`, so any `npm install` prunes it.** That happened during 179 (installing
+tesseract.js removed it) and every `.mjs` here died with `ERR_MODULE_NOT_FOUND`. Reinstall with
+`npm install --no-save playwright` — it is deliberately not a project dependency.

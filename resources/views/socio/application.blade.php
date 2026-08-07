@@ -48,11 +48,13 @@
                 <div class="grid grid-cols-2 gap-3">
                     <div>
                         <label class="mb-1 block text-sm font-medium" for="first_name">{{ __('Nombre') }} <x-socio.required-mark /></label>
-                        <input id="first_name" name="first_name" type="text" required value="{{ old('first_name', data_get($payload, 'first_name')) }}" class="{{ $input }}">
+                        <input id="first_name" name="first_name" type="text" required value="{{ old('first_name', data_get($payload, 'first_name') ?: ($prefill['first_name'] ?? null)) }}" class="{{ $input }}">
+                        @include('socio.partials.mrz-confirm', ['field' => 'first_name'])
                     </div>
                     <div>
                         <label class="mb-1 block text-sm font-medium" for="last_name">{{ __('Apellidos') }} <x-socio.required-mark /></label>
-                        <input id="last_name" name="last_name" type="text" required value="{{ old('last_name', data_get($payload, 'last_name')) }}" class="{{ $input }}">
+                        <input id="last_name" name="last_name" type="text" required value="{{ old('last_name', data_get($payload, 'last_name') ?: ($prefill['last_name'] ?? null)) }}" class="{{ $input }}">
+                        @include('socio.partials.mrz-confirm', ['field' => 'last_name'])
                     </div>
                 </div>
 
@@ -68,7 +70,8 @@
 
                 <div>
                     <label class="mb-1 block text-sm font-medium" for="date_of_birth">{{ __('Fecha de nacimiento') }} <x-socio.required-mark /></label>
-                    <input id="date_of_birth" name="date_of_birth" type="date" required value="{{ old('date_of_birth', data_get($payload, 'date_of_birth')) }}" class="{{ $input }}">
+                    <input id="date_of_birth" name="date_of_birth" type="date" required value="{{ old('date_of_birth', data_get($payload, 'date_of_birth') ?: ($prefill['date_of_birth'] ?? null)) }}" class="{{ $input }}">
+                        @include('socio.partials.mrz-confirm', ['field' => 'date_of_birth'])
                     {{-- Explicit format hint (prompt 97): the native picker's displayed order follows the
                          document language, but the submitted value is always ISO — the hint removes any doubt
                          about which number is the day, since DOB drives the minimum-age check. --}}
@@ -86,7 +89,8 @@
                     </div>
                     <div>
                         <label class="mb-1 block text-sm font-medium" for="document_number">{{ __('Nº documento') }} <x-socio.required-mark /></label>
-                        <input id="document_number" name="document_number" type="text" required value="{{ old('document_number', data_get($payload, 'document_number')) }}" class="{{ $input }}">
+                        <input id="document_number" name="document_number" type="text" required value="{{ old('document_number', data_get($payload, 'document_number') ?: ($prefill['document_number'] ?? null)) }}" class="{{ $input }}">
+                        @include('socio.partials.mrz-confirm', ['field' => 'document_number'])
                     </div>
                 </div>
 
@@ -113,6 +117,25 @@
                     <input id="document_scan" name="document_scan" type="file" accept="image/*,application/pdf"
                            class="block w-full text-sm text-ink file:mr-3 file:rounded-lg file:border-0 file:bg-brand-tint file:px-3 file:py-2 file:text-sm file:font-medium file:text-brand dark:text-slate-200 dark:file:bg-slate-800 dark:file:text-slate-100">
                     <p class="mt-1 text-xs text-ink-muted dark:text-slate-500">{{ \App\Support\DocumentUpload::helperText(__('Foto o PDF de tu DNI, NIE o pasaporte. Se guarda cifrado, solo se abre con un enlace firmado y cada consulta queda registrada. Si tu solicitud no se aprueba, se borra. Puedes omitirlo y enseñarlo en el mostrador.')) }}</p>
+
+                    {{-- Prompt 179 — read it here, on this device. `hidden` until the script mounts, so a
+                         browser that cannot run the reader never shows a control that would do nothing.
+
+                         Which side to photograph is the part most likely to fail with real people, and it
+                         is a UX problem rather than a parsing one — so it is said once, plainly, next to
+                         the button rather than in a wall of text above it. --}}
+                    <div class="mt-3">
+                        <button
+                            type="button"
+                            data-mrz-scan
+                            hidden
+                            data-reading="{{ __('Leyendo el documento…') }}"
+                            data-needs-file="{{ __('Elige primero una foto de tu documento.') }}"
+                            class="inline-flex min-h-11 items-center rounded-xl border border-brand/40 bg-brand-tint px-4 text-sm font-semibold text-brand transition hover:bg-brand-tint/70 disabled:opacity-60 dark:bg-slate-800 dark:text-slate-100"
+                        >{{ __('Rellenar mis datos desde el documento') }}</button>
+                        <p data-mrz-status role="status" aria-live="polite" class="mt-1 text-xs text-ink-muted dark:text-slate-500"></p>
+                        <p class="mt-1 text-xs text-ink-muted dark:text-slate-500">{{ __('Del DNI o NIE, fotografía el REVERSO (las tres líneas de letras y símbolos). Del pasaporte, la página de la foto.') }}</p>
+                    </div>
                 </div>
 
                 <div>
@@ -189,6 +212,21 @@
 
                 <x-button type="submit" size="md" class="w-full">{{ __('Enviar solicitud') }}</x-button>
             </form>
+
+            {{-- Prompt 179 — the read post. Separate from the application form because HTML forbids nesting,
+                 and it carries the MRZ TEXT only. No image is posted here: that is the whole privacy
+                 argument, and a test pins it. --}}
+            <form method="POST" action="{{ route('socio.application.read', ['token' => $token]) }}" data-mrz-form class="hidden">
+                @csrf
+                <input type="hidden" name="mrz" data-mrz-input value="">
+            </form>
+
+            {{-- Guarded exactly as the layouts guard their own @vite: a full-page GET must never 500 before
+                 `npm run build`. Without the build the reader is simply absent, which is the specified
+                 behaviour for a browser that cannot run it. --}}
+            @if (file_exists(public_path('build/manifest.json')) || file_exists(public_path('hot')))
+                @vite('resources/js/mrz-reader.js')
+            @endif
 
             {{-- On a failed submit, land the applicant ON the first problem field — not at the top of a long form
                  on a phone (prompt 155). The field ids/names match the validation keys. --}}

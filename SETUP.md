@@ -149,3 +149,14 @@ php artisan memberships:sweep    # run the expiry sweep once, right now
 **How you know it actually ran:** `memberships:sweep` stamps its own heartbeat, so **Sistema ▸ Salud
 del sistema** shows the sweep's last-run time and turns **red if it has not run in ~26 h — even when
 the generic scheduler heartbeat is green.** A silently-broken sweep is therefore visible, not silent.
+
+## The in-browser MRZ reader (prompt 179)
+
+`npm run build` copies the reader's runtime out of `node_modules` into `public/ocr/` (see
+`scripts/vendor-ocr.mjs`). It is **not** committed — ~10 MB, and `npm ci && npm run build` is already the
+deploy sequence — and `public/ocr` is gitignored exactly as `public/build` is.
+
+There is **no server-side OCR dependency**: no `tesseract` binary, no cloud API. If `public/ocr` is missing,
+the application form simply offers no scan control and the applicant types their details, which is the same
+path a browser that cannot run WASM takes. So a deploy that skips the build degrades rather than breaks —
+but it does silently turn the feature off, which is worth knowing when someone asks why nobody is scanning.

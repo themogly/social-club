@@ -31,3 +31,6 @@ _ide_helper.php
 Homestead.json
 Homestead.yaml
 Thumbs.db
+
+# Prompt 179 — the in-browser MRZ reader, copied from node_modules by npm run build (see scripts/vendor-ocr.mjs)
+/public/ocr

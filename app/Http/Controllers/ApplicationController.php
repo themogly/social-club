@@ -7,11 +7,15 @@ use App\Enums\MemberStatus;
 use App\Http\Requests\SubmitApplicationRequest;
 use App\Models\Member;
 use App\Models\MemberApplication;
+use App\Models\MrzFieldStat;
 use App\Support\ApplicationSpamGuard;
 use App\Support\DocumentVault;
+use App\Support\Mrz\MrzParser;
+use App\Support\MrzPrefill;
 use App\Support\Settings;
 use App\Support\Weight;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\View\View;
 
@@ -54,6 +58,8 @@ class ApplicationController extends Controller
             'application' => $application,
             'payload' => $application->payload ?? [],
             'formToken' => ApplicationSpamGuard::issueToken(),
+            // Prompt 179 — what the browser read, still awaiting confirmation. Empty is the ordinary case.
+            'prefill' => MrzPrefill::get($token),
         ]);
     }
 
@@ -144,6 +150,11 @@ class ApplicationController extends Controller
             $payload['document_scan_path'] = DocumentVault::storeUpload($request->file('document_scan'), 'member-id-scans');
         }
 
+        // Prompt 179 — the read rate, measured from real use: was each prefilled field corrected? Counts
+        // only, recorded BEFORE the prefill is discarded, and the prefill is discarded here so the next
+        // person handed this tablet cannot inherit it.
+        $this->recordMrzCorrections($application, $payload, $token);
+
         // Still PENDING — it now carries the applicant's details and enters the review queue.
         $application->update(['payload' => $payload, 'submitted_at' => now()]);
 
@@ -151,6 +162,83 @@ class ApplicationController extends Controller
     }
 
     /** The post-submit redirect — byte-identical for a genuine submit and a silently-dropped bot. */
+    /**
+     * Read an MRZ (prompt 179). The BROWSER did the OCR; this receives the resulting TEXT and parses it with
+     * the one parser that already exists.
+     *
+     * The image never arrives here for the purpose of being read — that is the whole privacy argument, and
+     * a test pins that this endpoint accepts a string and nothing else. The raw MRZ lives for the length of
+     * this request: parsed, mapped, discarded. It is never persisted, never logged and never echoed back.
+     *
+     * A failed or invalid read is an ORDINARY outcome, not an error: the parser is correct-or-invalid, so a
+     * garbled scan yields nothing and the applicant fills the form exactly as they do today. No warning, no
+     * red state, no suggestion they did something wrong.
+     */
+    public function read(Request $request, string $token): RedirectResponse
+    {
+        $application = $this->find($token);
+
+        if ($application === null || ! $application->isInviteLive()) {
+            abort(404);
+        }
+
+        // Rate limited like any unauthenticated write, and bounded in size — an MRZ is at most three lines
+        // of 44 characters, so anything larger is not an MRZ.
+        $raw = (string) $request->input('mrz', '');
+
+        if (mb_strlen($raw) > 200 || ! RateLimiter::attempt('application-mrz:'.$request->ip(), 20, fn () => true, 3600)) {
+            return $this->backToForm($token);
+        }
+
+        $parsed = (new MrzParser)->parse($raw);
+
+        // `valid` is the ICAO check-digit verdict. A broken digit means a mis-read, and a mis-read must
+        // never prefill a document number — 128 built the parser correct-or-invalid for exactly this.
+        if ($parsed === null || $parsed['valid'] !== true) {
+            MrzPrefill::forget($token);
+
+            return $this->backToForm($token);
+        }
+
+        MrzPrefill::remember($token, [
+            'first_name' => $parsed['given_names'],
+            'last_name' => $parsed['surname'],
+            'document_number' => $parsed['document_number'],
+            // The only nullable one: a TD1/TD3 date can fail to parse while the rest of the zone reads.
+            'date_of_birth' => (string) ($parsed['birth_date'] ?? ''),
+        ]);
+
+        return $this->backToForm($token);
+    }
+
+    private function backToForm(string $token): RedirectResponse
+    {
+        // withInput() so a value the applicant already typed survives the round trip and the prefill fills
+        // only blanks — prefill fills gaps, it does not correct people.
+        return redirect()->route('socio.application', ['token' => $token])->withInput();
+    }
+
+    /**
+     * Count, per field, how often a prefilled value was kept and how often it was corrected — which IS the
+     * read rate, gathered on real documents with no corpus to assemble, hold or destroy.
+     *
+     * @param  array<string, mixed>  $payload
+     */
+    private function recordMrzCorrections(MemberApplication $application, array $payload, string $token): void
+    {
+        foreach (MrzPrefill::get($token) as $field => $read) {
+            $submitted = $payload[$field] ?? null;
+
+            MrzFieldStat::record(
+                $application->organisation_id,
+                $field,
+                corrected: is_string($submitted) && trim($submitted) !== trim($read),
+            );
+        }
+
+        MrzPrefill::forget($token);
+    }
+
     private function submittedRedirect(string $token): RedirectResponse
     {
         return redirect()
