@@ -76,10 +76,18 @@ class Permissions
         'members.view',
         'expenses.record', 'membership.fee.collect', 'till.open',
         'lockdown.initiate', // the panic button — staff are the ones in a robbery (prompt 121)
-        // members.create is deliberately NOT here (prompt 122): admitting a member is a board/assembly act in a
-        // Spanish asociación, and application review is already manager-gated (applications.review) — so the
-        // direct enrol route should not be more open than the reviewed one. A club that wants on-the-spot staff
-        // enrolment grants members.create back to the STAFF role. See DECISIONS (OVERNIGHT-DEFAULT — CONFIRM).
+        // Prompt 174, on the owner's explicit instruction: STAFF may review an APPLICATION. There is normally
+        // one member of staff in the club, so requiring a manager would mean nobody could be signed up — the
+        // counter-first design fails at its first step. This reverses prompt 122's OVERNIGHT-DEFAULT, whose
+        // reasoning ("application review is already manager-gated, so direct enrol should not be more open
+        // than the reviewed one") is now superseded from the other direction: the REVIEWED route is the open
+        // one, precisely because it is the audited one.
+        'applications.review',
+        // members.create is STILL deliberately NOT here, and that line is the point. Staff can admit somebody
+        // who APPLIED — through the audited path, with the age gate, the duplicate search and the versioned
+        // consent capture all enforced — but cannot conjure a member out of nothing through the panel's
+        // direct-enrol form, which has none of those. A club that wants on-the-spot staff enrolment grants
+        // members.create back to the STAFF role deliberately. See DECISIONS (prompts 122 and 174).
     ];
 
     /**

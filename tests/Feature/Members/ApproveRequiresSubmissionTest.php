@@ -124,17 +124,38 @@ class ApproveRequiresSubmissionTest extends TestCase
         $this->assertSame(0, Member::query()->count(), 'No member may be created with a blank name in the register.');
     }
 
-    public function test_a_user_without_review_permission_cannot_reach_the_review_queue(): void
+    /**
+     * Re-pointed by prompt 174, not weakened.
+     *
+     * The guarantee this defends is that the review queue — and therefore every decision, approve included —
+     * is gated on `applications.review` at the POLICY, server-side, never by hiding a button. That is
+     * unchanged. What changed is which role holds it: 174 grants `applications.review` to STAFF on the
+     * owner's explicit instruction, because there is normally one member of staff in the club and requiring
+     * a manager would mean nobody could be signed up.
+     *
+     * So the denial is asserted against a user with NO role, and the line 174 deliberately did not cross —
+     * `members.create` staying manager-only — is asserted alongside it, which is the more important half now.
+     */
+    public function test_the_review_queue_is_gated_on_the_permission_not_on_a_hidden_button(): void
     {
-        // STAFF lacks applications.review, so the whole review queue — and therefore every decision, approve
-        // included — is denied at the policy (viewAny), server-side, not by hiding a button. A reviewer, by
-        // contrast, can view it (asserted true here so the denial is a real contrast, not a tautology).
+        // No role at all → no applications.review → denied at viewAny.
+        $nobody = User::factory()->create();
+        $nobody->locations()->sync([$this->location->id]);
+
+        $this->actingAs($nobody);
+        $this->assertFalse(MemberApplicationResource::canViewAny());
+
+        // STAFF now CAN review — prompt 174, the counter-first alta.
         $staff = User::factory()->create();
         $staff->assignRole(Role::STAFF->value);
         $staff->locations()->sync([$this->location->id]);
 
         $this->actingAs($staff);
-        $this->assertFalse(MemberApplicationResource::canViewAny());
+        $this->assertTrue(MemberApplicationResource::canViewAny());
+
+        // …but STAFF still cannot conjure a member out of nothing. Staff admit somebody who APPLIED, through
+        // the audited path; the direct-enrol route stays manager-only. This is the line, asserted directly.
+        $this->assertFalse($staff->can('members.create'));
 
         $this->actingAs($this->reviewer());
         $this->assertTrue(MemberApplicationResource::canViewAny());
