@@ -65,6 +65,46 @@ class ApplicationRetentionTest extends TestCase
         $this->assertSame(ApplicationStatus::REJECTED, $fresh->status);  // the row shell (outcome) survives
     }
 
+    public function test_a_handover_invite_never_taken_up_is_swept_too(): void
+    {
+        // Security audit, Phase C carry-forward. A `handover`-mode invite is printed and handed over, so it
+        // has NO applicant_email and — until someone submits — no payload. The sweep's "still holds personal
+        // data" filter tested only those two, so this row never matched and its reference survived forever.
+        // It is a person: the field is "¿Para quién es la invitación?" ("Un nombre o referencia").
+        $application = MemberApplication::factory()->create([
+            'organisation_id' => $this->org->id,
+            'status' => ApplicationStatus::PENDING,
+            'applicant_email' => null,
+            'payload' => null,
+            'applicant_reference' => 'Javier, avalado por Marta',
+        ]);
+        MemberApplication::withoutGlobalScopes()->whereKey($application->id)
+            ->update(['updated_at' => now()->subDays(200)]);
+
+        $this->artisan('applications:prune-retention')->assertSuccessful();
+
+        $this->assertNull($application->fresh()?->applicant_reference,
+            'A handover invite that was never taken up kept the applicant\'s name indefinitely.');
+    }
+
+    public function test_a_handover_invite_within_retention_is_left_alone(): void
+    {
+        $application = MemberApplication::factory()->create([
+            'organisation_id' => $this->org->id,
+            'status' => ApplicationStatus::PENDING,
+            'applicant_email' => null,
+            'payload' => null,
+            'applicant_reference' => 'Javier, avalado por Marta',
+        ]);
+        MemberApplication::withoutGlobalScopes()->whereKey($application->id)
+            ->update(['updated_at' => now()->subDays(10)]);
+
+        $this->artisan('applications:prune-retention')->assertSuccessful();
+
+        // A live invite is not stale data — the retention window has to actually elapse.
+        $this->assertSame('Javier, avalado por Marta', $application->fresh()?->applicant_reference);
+    }
+
     public function test_an_approved_application_is_never_touched_so_the_members_photo_survives(): void
     {
         [$application, $path] = $this->application(ApplicationStatus::APPROVED, 200);

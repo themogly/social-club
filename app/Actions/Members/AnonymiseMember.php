@@ -59,7 +59,7 @@ class AnonymiseMember
         'refunds' => 'reference + amount/reason (no name/DNI).',
         'convocatoria_recipients' => 'HANDLED here: the frozen roll keeps the row + status as assembly evidence; the name/email SNAPSHOT it holds is redacted.',
         'message_threads' => 'HANDLED here: the thread + timestamps stay as evidence of contact; the member-authored subject is redacted and their message bodies scrubbed (messages hang off the thread, no member_id of their own).',
-        'assembly_attendances' => 'HANDLED here: the attendance register keeps the row + mode/proxy as assembly evidence; the name SNAPSHOT it holds is redacted.',
+        'assembly_attendances' => 'HANDLED here: the register keeps the row + mode as assembly evidence; the name SNAPSHOT is redacted, AND proxy_holder is redacted wherever THIS member is the one named there (a column no member_id points at).',
     ];
 
     public function handle(Member $member): Member
@@ -82,6 +82,10 @@ class AnonymiseMember
             Storage::disk('documents')->delete((string) $dispensation->signature_path);
             $dispensation->forceFill(['signature_path' => null])->save();
         }
+
+        // The name is needed AFTER the row is scrubbed, to find where it survives as free text elsewhere
+        // (step 5). Captured here because step 2 is about to destroy it.
+        $originalName = trim($member->first_name.' '.$member->last_name);
 
         // 2. Scrub the member row — including the HEALTH flag and the medical-cert path (Art. 9).
         $clearedFields = ['first_name', 'last_name', 'email', 'phone', 'address', 'date_of_birth', 'document_number', 'document_hash', 'is_therapeutic', 'medical_cert_path'];
@@ -130,6 +134,21 @@ class AnonymiseMember
         // The assembly attendance register snapshots the member's name too. Keep the row (and its present/proxy
         // mode) as evidence they attended a given assembly, but redact the name.
         AssemblyAttendance::query()->withoutGlobalScopes()->where('member_id', $member->id)->update(['name' => '[borrado]']);
+        // …and where THIS member held someone ELSE's proxy, their name survives in `proxy_holder` on a row
+        // matched by the other member's id — so `where('member_id', $member->id)` never reaches it (security
+        // audit, Phase C carry-forward). Erasing A must not touch the name of whoever represented A (that is
+        // a third party's data and the register's evidence); erasing B MUST remove B's name from every row
+        // where B was the representative.
+        //
+        // Best-effort by necessity: `proxy_holder` is free text typed at the Asamblea screen, with no member
+        // reference beside it, so an exact (trimmed, case-insensitive) name match is the only link that
+        // exists. A nickname or a role ("Tesorero") will not match and cannot. The structural fix — making
+        // the proxy holder a member REFERENCE — is recorded in the audit report rather than done here.
+        if ($originalName !== '') {
+            AssemblyAttendance::query()->withoutGlobalScopes()
+                ->whereRaw('LOWER(TRIM(proxy_holder)) = ?', [mb_strtolower($originalName)])
+                ->update(['proxy_holder' => '[borrado]']);
+        }
 
         // 6. Record the erasure itself WITHOUT any of the scrubbed values — the fact, not the data.
         (new RecordAuditLog)->handle('member.anonymised', $member, null, ['fields_cleared' => $clearedFields]);

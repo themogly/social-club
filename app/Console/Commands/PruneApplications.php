@@ -45,7 +45,15 @@ class PruneApplications extends Command
             ->where('status', '!=', ApplicationStatus::APPROVED->value)
             ->where('updated_at', '<', $cutoff)
             ->where(function ($query): void {
-                $query->whereNotNull('applicant_email')->orWhereNotNull('payload');
+                // `applicant_reference` counts as personal data here (security audit, Phase C carry-forward).
+                // A `handover`-mode invite sets NEITHER an email NOR a payload — it is printed and handed
+                // over — so without this clause it never matched, and the reference survived indefinitely.
+                // It is a person: the field is labelled "¿Para quién es la invitación?" with the helper text
+                // "Un nombre o referencia (p. ej. el avalador)". The sweep already nulls it; it simply never
+                // ran for these rows.
+                $query->whereNotNull('applicant_email')
+                    ->orWhereNotNull('payload')
+                    ->orWhereNotNull('applicant_reference');
             });
 
         if ($this->option('dry-run')) {
