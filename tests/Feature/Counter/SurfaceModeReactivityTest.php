@@ -166,4 +166,33 @@ class SurfaceModeReactivityTest extends TestCase
             ->call('beginHandover')->assertSet('basket', $basket)
             ->set('operatorPin', '4321')->call('unlockOperator')->assertSet('basket', $basket);
     }
+
+    // --- the surface must not go on swallowing input once the server has cleared it -------------------
+
+    public function test_the_counter_beneath_is_reachable_immediately_after_identifying(): void
+    {
+        // The surface is `fixed inset-0 z-50` and opaque, so while it is stale and up it covers the whole
+        // viewport and every tap lands on it — the counter beneath looks dead. That makes a stale surface a
+        // plausible-looking cause of "I pressed the button and nothing happened", which is why this assertion
+        // exists: it is the difference between a cosmetic bug and a correctness one.
+        //
+        // (It was in fact suspected of causing exactly that on the bar, and it was NOT the cause — that was
+        // prompt 195's `$wire` alias collision, a different bug in a different file. The two are told apart
+        // by one measurement: a tap swallowed by an overlay produces NO Livewire request at all, whereas the
+        // charge button produced one and got a 200 back. See audits/reports/192-bar-charge-investigation.md.)
+        CounterOperator::set($this->operator);
+
+        $screen = Livewire::actingAs($this->device)->test(BarPos::class)
+            ->call('switchOperator')
+            ->assertSet('surfaceModeState', 'unidentified')     // surface up: input would be swallowed
+            ->set('operatorPin', '4321')
+            ->call('unlockOperator')
+            ->assertSet('surfaceModeState', null);              // …and down again, in the same interaction
+
+        // No reload in between: the very next thing the operator does reaches the counter and is answered.
+        $screen->call('commitOrder');
+
+        $this->assertNotNull($screen->get('flashMessage'),
+            'The counter beneath the surface produced no outcome — a control under a cleared surface must be reachable.');
+    }
 }
