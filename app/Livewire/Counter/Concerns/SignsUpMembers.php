@@ -5,8 +5,12 @@ namespace App\Livewire\Counter\Concerns;
 use App\Actions\Members\ApproveApplication;
 use App\Actions\Members\FindDuplicateMembers;
 use App\Actions\Members\IssueApplicationInvite;
+use App\Actions\Members\SubmitApplication;
 use App\Actions\Memberships\EnrolMembership;
+use App\Actions\RecordAuditLog;
+use App\Enums\ConsentChannel;
 use App\Exceptions\DuplicateMemberException;
+use App\Http\Requests\SubmitApplicationRequest;
 use App\Models\Location;
 use App\Models\Member;
 use App\Models\MemberApplication;
@@ -50,9 +54,50 @@ trait SignsUpMembers
     /** Whether the Alta panel is expanded in the Socios tab. */
     public bool $altaOpen = false;
 
+    /**
+     * The staff-typed form (prompt 210) — open, its fields, and how consent was captured.
+     *
+     * **Why this route did not exist, and why the button read wrong.** The owner: *"I don't think it needs to
+     * say 'hand tablet over' … the staff might do it for them as well."* He was right, and the reason is
+     * sharper than the wording: `handOverForAlta()` and `sendAltaInvitation()` were the only two ways to begin
+     * a sign-up, so **there was no staff-fills-it-in route at all**. A member of staff with the person in
+     * front of them could reach the form only by handing the device over — and then, if they typed it
+     * themselves, they were working on the applicant-facing public page with no counter chrome and a PIN to
+     * get back out. The label was not badly chosen; it was describing the only mechanism there was.
+     *
+     * @var array<string, mixed>
+     */
+    public array $altaForm = self::BLANK_ALTA_FORM;
+
+    /**
+     * The operator's explicit confirmation that the club holds this person's consent — see the consent
+     * decision on {@see self::submitStaffAlta()}. Required, and deliberately not a default.
+     */
+    public bool $altaConsentHeld = false;
+
+    public bool $altaStaffFormOpen = false;
+
+    private const BLANK_ALTA_FORM = [
+        'first_name' => '', 'last_name' => '', 'email' => '', 'phone' => '',
+        'date_of_birth' => '', 'address' => '', 'document_type' => '', 'document_number' => '',
+        'is_therapeutic' => false, 'avalador_ref' => '',
+    ];
+
     public function toggleAlta(): void
     {
         $this->altaOpen = ! $this->altaOpen;
+    }
+
+    /** Open (or close) the staff-typed form — one of three ways to do the one job, not a separate job. */
+    public function toggleStaffAltaForm(): void
+    {
+        $this->altaStaffFormOpen = ! $this->altaStaffFormOpen;
+
+        if (! $this->altaStaffFormOpen) {
+            $this->altaForm = self::BLANK_ALTA_FORM;
+            $this->altaConsentHeld = false;
+            $this->resetValidation();
+        }
     }
 
     /**
@@ -86,6 +131,124 @@ trait SignsUpMembers
         $this->beginHandover($application->inviteUrl());
 
         $this->redirect($application->inviteUrl(), navigate: false);
+    }
+
+    /**
+     * **Staff type the form, here, inside the counter's chrome** — the third way to do the one job (prompt
+     * 210), and the one that was missing.
+     *
+     * ONE WRITER, and that is the whole argument. This does not validate its own way, build its own payload
+     * or capture its own consent: the facts go through `SubmitApplicationRequest::factRules()` — literally
+     * the public form's rules — and the record is written by **`SubmitApplication`**, the same Action the
+     * public POST calls, against an application issued by the same `IssueApplicationInvite`. The age gate,
+     * the duplicate search and the versioned consent capture all still run in `ApproveApplication`
+     * afterwards, unchanged: 174's argument was that the audited route is the open one, and this is that
+     * route with a different keyboard in front of it.
+     *
+     * ---
+     * **THE CONSENT DECISION, which is a compliance judgement and not a wording one.**
+     *
+     * The facts on the form — name, birth date, document, contact — are the same facts whoever types them.
+     * The consent is not. `SubmitApplication` stamps a versioned consent text and locale at submit, and that
+     * record is the club's evidence that the applicant agreed to the processing of their data **including
+     * Article 9 health data** (the medicinal-usage flag). If a member of staff ticks that box on someone's
+     * behalf, the artefact stops being a record of consent GIVEN and becomes the club's assertion that it
+     * WAS — a materially different thing to hold in an inspection, and it is the club that carries it.
+     *
+     * **So this route cannot produce the public form's artefact, and does not pretend to.** Choosing to type
+     * it here IS the choice: the consent row is stamped `PAPER` and **names the operator who recorded it**,
+     * so an inspection can tell the two apart and the club knows which records are which. The two ways that
+     * end in the applicant's own tick are still on the same panel, one tap away — hand the tablet over, or
+     * send a link — and the screen says which artefact each produces.
+     *
+     * There is deliberately no option where a member of staff ticks on the applicant's behalf and the record
+     * reads as an applicant tick. The operator must confirm explicitly that the club holds the consent, and
+     * that confirmation is what the row then attributes to them.
+     *
+     * `OVERNIGHT-DEFAULT — CONFIRM`: whether `PAPER` is acceptable for Article 9 explicit consent **without a
+     * scan of the signed form attached to the record** is the owner's call with their lawyer, not a default
+     * anyone should pick quietly. See `DECISIONS.md`. If the answer is no, the shape is already here — the
+     * channel is a first-class column, so requiring an upload is a rule on this method rather than a redesign.
+     */
+    public function submitStaffAlta(): void
+    {
+        $operator = $this->requireOperatorForAlta();
+
+        if ($operator === null) {
+            return;
+        }
+
+        $data = $this->validate(
+            $this->staffAltaRules(),
+            [],
+            $this->staffAltaAttributes(),
+        )['altaForm'];
+
+        $application = $this->issueApplication($operator, email: $data['email'] ?: null, reference: __('Alta en el mostrador'));
+
+        if ($application === null) {
+            return;
+        }
+
+        (new SubmitApplication)->handle(
+            $application,
+            $data + [
+                'consent_channel' => ConsentChannel::PAPER,
+                'consent_attested_by' => $operator->id,
+            ],
+            files: [],
+            token: (string) $application->invite_token,
+            ip: request()->ip(),
+        );
+
+        (new RecordAuditLog)->handle('counter.alta.staff_entered', $this->resolveLocation(), [
+            'application_id' => $application->id,
+            'consent_channel' => ConsentChannel::PAPER->value,
+        ]);
+
+        $this->altaForm = self::BLANK_ALTA_FORM;
+        $this->altaConsentHeld = false;
+        $this->altaStaffFormOpen = false;
+        $this->flash(__('Solicitud creada. Revísala abajo para dar de alta.'), 'success');
+    }
+
+    /**
+     * The public form's rules, namespaced onto `altaForm`, plus the one rule this route adds.
+     *
+     * File uploads are deliberately absent: they are optional on the public form and a counter form has no
+     * file picker in front of an applicant. The consent confirmation is `accepted` rather than a checkbox
+     * with a default — a default is exactly how a staff assertion would end up wearing an applicant tick's
+     * clothes.
+     *
+     * @return array<string, mixed>
+     */
+    private function staffAltaRules(): array
+    {
+        $rules = ['altaConsentHeld' => ['accepted']];
+
+        foreach (SubmitApplicationRequest::factRules() as $field => $rule) {
+            if (in_array($field, ['photo', 'document_scan'], true)) {
+                continue;
+            }
+
+            $rules['altaForm.'.$field] = $rule;
+        }
+
+        return $rules;
+    }
+
+    /** @return array<string, string> */
+    private function staffAltaAttributes(): array
+    {
+        return [
+            'altaForm.first_name' => __('Nombre'),
+            'altaForm.last_name' => __('Apellidos'),
+            'altaForm.email' => __('Email'),
+            'altaForm.date_of_birth' => __('Fecha de nacimiento'),
+            'altaForm.document_type' => __('Tipo de documento'),
+            'altaForm.document_number' => __('Número de documento'),
+            'altaConsentHeld' => __('Consentimiento'),
+        ];
     }
 
     /** Send an invitation instead — the same record and token shape, picked up on their next visit. */

@@ -4,6 +4,7 @@ namespace App\Actions\Members;
 
 use App\Actions\RecordAuditLog;
 use App\Enums\ApplicationStatus;
+use App\Enums\ConsentChannel;
 use App\Exceptions\DuplicateMemberException;
 use App\Models\Member;
 use App\Models\MemberApplication;
@@ -97,8 +98,21 @@ class ApproveApplication
         // approval can never rewrite what they agreed to or the language they read it in.
         $consentVersion = isset($payload['consent_version']) && is_string($payload['consent_version']) ? $payload['consent_version'] : null;
         $consentLocale = isset($payload['consent_locale']) && is_string($payload['consent_locale']) ? $payload['consent_locale'] : null;
+        // And HOW it was captured (prompt 210): an applicant tick, or a paper consent a member of staff
+        // recorded at the counter and is named on. Carried from the payload for the same reason as the
+        // version and the locale — it is a fact about the moment of consent, and approval must not restate
+        // it from whatever is true now. Absent ⇒ APPLICANT, which is what every consent meant before the
+        // staff-typed route existed.
+        $consentChannel = ConsentChannel::tryFrom((string) ($payload['consent_channel'] ?? '')) ?? ConsentChannel::APPLICANT;
+        $consentAttestedBy = isset($payload['consent_attested_by']) && is_string($payload['consent_attested_by'])
+            ? $payload['consent_attested_by']
+            : null;
+
         foreach (($payload['consents'] ?? ['membership', 'data_processing']) as $purpose) {
-            (new RecordMemberConsent)->handle($member, $purpose, request()->ip(), $consentVersion, locale: $consentLocale);
+            (new RecordMemberConsent)->handle(
+                $member, $purpose, request()->ip(), $consentVersion,
+                locale: $consentLocale, channel: $consentChannel, attestedBy: $consentAttestedBy,
+            );
         }
 
         $application->update([

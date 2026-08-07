@@ -381,13 +381,32 @@ class CounterAltaWizardTest extends TestCase
             $this->assertStringContainsString($writer, $source);
         }
 
+        // Prompt 210 added a third way to START one of these — staff type the form here — and it had to add
+        // it without adding a writer. It writes through `SubmitApplication`, the SAME Action the public POST
+        // calls, so that is now a fourth reused name rather than a fourth writer.
+        $this->assertStringContainsString('SubmitApplication', $source);
+
         // No second consent capture and no second validator anywhere in the counter half. Asserted against
         // INVOCATIONS rather than mere mentions — the docblock names SubmitApplicationRequest to explain why
         // it is not reimplemented here, and a test that failed on that would be testing prose.
         $this->assertStringNotContainsString('new RecordMemberConsent', $source);
         $this->assertStringNotContainsString('new SubmitApplicationRequest', $source);
         $this->assertStringNotContainsString('Member::create', $source);
-        $this->assertStringNotContainsString('->validate(', $source);
+
+        // **`->validate(` used to be banned outright, and prompt 210 had to relax that to the rule it was
+        // standing in for.** The staff-typed form does validate — it has fields — but it must not declare
+        // what an application's facts ARE. It validates against `SubmitApplicationRequest::factRules()`,
+        // literally the public form's rules, so the two cannot diverge; what is banned is this file writing
+        // rules of its own for those fields.
+        $this->assertStringContainsString('SubmitApplicationRequest::factRules()', $source);
+
+        foreach (['first_name', 'last_name', 'date_of_birth', 'document_type', 'document_number'] as $field) {
+            $this->assertDoesNotMatchRegularExpression(
+                "/'{$field}'\s*=>\s*\[/",
+                $source,
+                "the counter declares its own rules for {$field} — that is the second validator this test exists to stop",
+            );
+        }
     }
 
     public function test_approval_still_refuses_an_unsubmitted_invitation(): void
