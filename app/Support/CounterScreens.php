@@ -79,6 +79,34 @@ class CounterScreens
     }
 
     /**
+     * The label of the screen currently being rendered, or null off the counter.
+     *
+     * The counter layout names the page from this, so the browser tab, the top bar heading and the tab strip
+     * can never disagree. Before the accessibility audit all six screens fell through to the same
+     * *"Mostrador"*: six identical `<title>`s and six identical `<h1>`s, which is a WCAG 2.4.2 failure and,
+     * more practically, an operator with three counter tabs open who cannot tell them apart.
+     *
+     * Route name → label rather than a per-component title, because the labels already live here for the tab
+     * strip and a second copy would drift the first time one is renamed.
+     */
+    public static function currentLabel(): ?string
+    {
+        $route = request()->route()?->getName();
+
+        if ($route === null) {
+            return null;
+        }
+
+        foreach (self::forUser(null) as $screen) {
+            if ($screen['route'] === $route) {
+                return $screen['label'];
+            }
+        }
+
+        return null;
+    }
+
+    /**
      * Where one link into the counter should land this user.
      *
      * **Recepción, because that is where a shift starts** — but only if they can actually be there. The

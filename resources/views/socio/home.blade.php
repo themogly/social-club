@@ -7,11 +7,14 @@
     <section class="overflow-hidden rounded-2xl border border-line bg-surface shadow-sm dark:border-slate-800 dark:bg-slate-900"
              data-offline-card>
         <div class="bg-brand px-5 py-4 text-white">
-            {{-- text-white (not /80): on the brand blue an 80% white is 3.89:1, under AA, on the PWA's
-                 most-used screen. The a11y audit's finding. --}}
-            <p class="text-xs font-medium uppercase tracking-wide text-white">{{ __('Carné de socio/a') }}</p>
+            {{-- The card label is the page's <h1>: this screen had NO level-one heading at all, and it is the
+                 PWA's home. Styled exactly as before — a heading level is not a size.
+                 text-white throughout, never /80 or /85: on the brand blue those measure 3.89:1 and 4.16:1,
+                 both under AA, on the most-used screen in the product. Hierarchy is carried by size and
+                 weight instead. Both are the a11y audit's findings. --}}
+            <h1 class="text-xs font-medium uppercase tracking-wide text-white">{{ __('Carné de socio/a') }}</h1>
             <p class="mt-0.5 text-lg font-semibold leading-tight">{{ $member->fullName() }}</p>
-            <p class="text-sm text-white/85">{{ __('Nº :no', ['no' => $member->member_no]) }}</p>
+            <p class="text-sm text-white">{{ __('Nº :no', ['no' => $member->member_no]) }}</p>
         </div>
         <div class="p-6 text-center">
             <img src="data:image/png;base64,{{ base64_encode($qrPng) }}" alt="{{ __('Carné QR') }}"

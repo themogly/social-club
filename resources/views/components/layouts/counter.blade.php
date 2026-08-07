@@ -12,7 +12,11 @@
         {{-- No public/indexable surface anywhere in this app (NOTES §A / §B). --}}
         <meta name="robots" content="noindex, nofollow">
 
-        <title>{{ $title ?? __('Mostrador') }} · {{ config('app.name') }}</title>
+        {{-- The screen's own name, from the ONE list the tab strip uses (App\Support\CounterScreens), so the
+             tab, the heading and the strip can never disagree. All six screens used to fall through to
+             "Mostrador" — six identical titles and six identical h1s (a11y audit, WCAG 2.4.2). --}}
+        @php($screenTitle = $title ?? \App\Support\CounterScreens::currentLabel())
+        <title>{{ $screenTitle ?? __('Mostrador') }} · {{ config('app.name') }}</title>
 
         {{-- Assets only when built (or the Vite dev server is hot); guarded so a
              full-page GET never 500s before `npm run build`, and tests stay quiet. --}}
@@ -117,11 +121,17 @@
                  The tab strip, the overflow menu with its Panel link and Log out, the sede switcher and the
                  panic button are all inside this component — while an applicant holds the tablet there is no
                  element to find, no link to follow and nothing for a keyboard to reach. --}}
+            {{-- Skip link (a11y audit): the top bar is ~7 controls to tab past on EVERY counter screen, and
+                 the panel already has one. Visually hidden until focused, then it is the first thing on the
+                 page. Inside the handover guard's scope but outside it in the DOM, so it is absent while an
+                 applicant holds the tablet — same rule as the rest of the chrome. --}}
             @unless (\App\Support\CounterHandover::active())
-                <x-counter.top-bar :title="$title ?? null" />
+                <a href="#counter-main"
+                   class="sr-only rounded-xl bg-brand px-4 py-2 text-sm font-semibold text-white focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-[60]">{{ __('Saltar al contenido') }}</a>
+                <x-counter.top-bar :title="$screenTitle ?? null" />
             @endunless
 
-            <main @class([
+            <main id="counter-main" @class([
                 'flex-1 px-4 py-5 sm:px-6',
                 'md:min-h-0 md:overflow-hidden' => $fills,
             ])>

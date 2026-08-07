@@ -7,7 +7,7 @@
                 <x-filament::icon :icon="$icon" class="csc-section-ico" />
             @endif
             @if ($title)
-                <h3 class="csc-section-title">{{ $title }}</h3>
+                <h2 class="csc-section-title">{{ $title }}</h2>
             @endif
             @if (! is_null($count))
                 <span class="csc-count">{{ $count }}</span>

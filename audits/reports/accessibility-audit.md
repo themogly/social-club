@@ -173,3 +173,73 @@ photo-capture errors are `role="alert"`; every form control on the counter and i
 the one named in Phase 2; the counter's 44×44 touch floor holds (re-measured under prompt 194); and
 `prefers-reduced-motion` is respected — the browser passes above were all run with `reducedMotion: 'reduce'`
 and nothing depended on motion to become visible.
+
+---
+
+## Outcome (after the fix passes)
+
+`node tests/Browser/axe-sweep.mjs` re-run against the same 28 page states × 2 widths × 2 themes, plus the
+member PWA at 390px:
+
+| | before | after |
+|---|---|---|
+| distinct (rule × page) findings | 30 | **7** |
+| serious / critical occurrences | 80 | **2** |
+| member PWA violations | 2 | **0** |
+
+Both remaining serious occurrences are the single finding this report already dismissed on inspection (axe
+resolves a transitional background on the genetics tile; measured in the browser it is slate-400 on
+slate-950, ~7:1). The other five are Filament's `empty-table-header` on six tables, deferred above.
+
+### Phase 1 — all 7 done
+
+| finding | outcome |
+|---|---|
+| Filament primary ramp fails AA | **fixed** — `Color::hex('#2563eb')` → `Color::Blue`, whose 600 IS #2563eb (5.12:1) |
+| `--color-ink-muted` has no dark value | **fixed** — dark value added in `tokens.css` |
+| `dark:text-slate-500` below AA | **fixed** — → `slate-400`, 30 occurrences in 11 views |
+| `opacity-80` undoes the token pass | **fixed** — removed from all three token-coloured spans |
+| member card sub-label 3.89:1 | **fixed** — `text-white`; `text-white/85` on the line below was measured at 4.16:1 and went with it |
+| dashboard alert strip bypasses the tokens | **fixed** — `--warnt` → amber-800 (6.16:1) |
+| ten unnamed links per table page | **fixed** — `->placeholder('—')` on both columns |
+
+Two further contrast failures surfaced only once the first pass was re-measured, and both are recorded
+because they are the same class of defect: **`--br` was the brand as a fill AND as text**, and on dark those
+want opposite directions. Split into `--br` / `--brtx` / `--brfill`, which fixed the active period toggle
+(3.67:1) and the info alert (3.24:1). The first attempt at the scroll-region fix also gave four regions one
+shared label, which axe correctly reported as four indistinguishable landmarks; each is now named.
+
+### Phase 2 — all 6 done
+
+| finding | outcome |
+|---|---|
+| six counter screens share one `<title>` | **fixed** — `CounterScreens::currentLabel()` names the page from the same list the tab strip uses. The top-bar `<h1>` was generic too, and is now the screen's own name |
+| dashboard renders every chart heading twice | **fixed** — widget headings suppressed on the shared base, `csc-section-title` promoted to `<h2>`; order is now `h1 → h2` |
+| `/counter/members` has three `<h1>`s | **fixed** — the two panel headings are `<h2>` |
+| `/socio` has no `<h1>` | **fixed** — the card label is the heading, styled identically |
+| bar POS cash field has no label | **fixed** — real `<label for="bar-cash-tendered">` |
+| form errors not associated | **fixed** — `<x-socio.field-error>` + `aria-invalid`/`aria-describedby` on all 12 application fields and on the socio login; the summary is now `role="alert"` with a heading |
+
+### Phase 3 — 1 of 2 done, 1 deliberately deferred
+
+- **Skip-to-content link on the counter layout — done.** Hidden until focused, inside the handover guard so
+  it is absent while an applicant holds the tablet.
+- **Focus trap on the counter's full-screen overlays — DEFERRED, and this is a judgement call worth stating.**
+  The correct fix marks everything behind the surface `inert` while it is open, driven by the same reactive
+  `open` getter that drives `x-show`. The failure mode if that effect ever misfires is `inert` left ON — a
+  counter that looks fine and responds to nothing, which is a far worse defect than the one being fixed. This
+  exact component has already produced two such bugs (prompt 188's stale surface, prompt 196's missing Alpine
+  scope). It is Phase 3 by this report's own ranking, every write behind the surface is refused server-side by
+  `requireOperator()` regardless, and it deserves its own branch with a browser test rather than the tail end
+  of an audit pass. Not done, not hidden.
+
+### Contrast changes that touched brand colours — for the owner
+
+Two, both worth a look before they are taken as settled:
+
+1. **The admin panel's primary ramp moved.** Filament was generating its own shades around `#2563eb` and the
+   600 step came out lighter than the brand blue; it is now Tailwind's blue, whose 600 IS `#2563eb`. Primary
+   buttons are therefore very slightly darker than they were. This is the brand colour rather than an
+   approximation of it, so the change is toward the palette, not away from it.
+2. **On the dashboard in dark mode**, the active period pill is now blue-700 rather than blue-500, and
+   brand-coloured text is blue-400 rather than blue-500. Light mode is unchanged.

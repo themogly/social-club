@@ -15,8 +15,12 @@
                 <p class="mt-2 text-sm text-ink-muted dark:text-slate-300">{{ session('status') }}</p>
             </div>
         @else
+            {{-- The summary stays (it is the fastest way to see everything at once) but it is now announced:
+                 role="alert" fires it on return from a failed submit, and each message is ALSO on its own
+                 field via <x-socio.field-error> (a11y audit). --}}
             @if ($errors->any())
-                <div class="mb-4 rounded-lg bg-error/10 p-3 text-sm text-error">
+                <div role="alert" class="mb-4 rounded-lg bg-error/10 p-3 text-sm text-error">
+                    <p class="mb-1 font-semibold">{{ __('Revisa estos campos:') }}</p>
                     <ul class="list-inside list-disc space-y-0.5">
                         @foreach ($errors->all() as $error)
                             <li>{{ $error }}</li>
@@ -48,29 +52,34 @@
                 <div class="grid grid-cols-2 gap-3">
                     <div>
                         <label class="mb-1 block text-sm font-medium" for="first_name">{{ __('Nombre') }} <x-socio.required-mark /></label>
-                        <input id="first_name" name="first_name" type="text" required value="{{ old('first_name', data_get($payload, 'first_name') ?: ($prefill['first_name'] ?? null)) }}" class="{{ $input }}">
+                        <input id="first_name" name="first_name" @error('first_name') aria-invalid="true" aria-describedby="first_name-error" @enderror type="text" required value="{{ old('first_name', data_get($payload, 'first_name') ?: ($prefill['first_name'] ?? null)) }}" class="{{ $input }}">
+                    <x-socio.field-error name="first_name" />
                         @include('socio.partials.mrz-confirm', ['field' => 'first_name'])
                     </div>
                     <div>
                         <label class="mb-1 block text-sm font-medium" for="last_name">{{ __('Apellidos') }} <x-socio.required-mark /></label>
-                        <input id="last_name" name="last_name" type="text" required value="{{ old('last_name', data_get($payload, 'last_name') ?: ($prefill['last_name'] ?? null)) }}" class="{{ $input }}">
+                        <input id="last_name" name="last_name" @error('last_name') aria-invalid="true" aria-describedby="last_name-error" @enderror type="text" required value="{{ old('last_name', data_get($payload, 'last_name') ?: ($prefill['last_name'] ?? null)) }}" class="{{ $input }}">
+                    <x-socio.field-error name="last_name" />
                         @include('socio.partials.mrz-confirm', ['field' => 'last_name'])
                     </div>
                 </div>
 
                 <div>
                     <label class="mb-1 block text-sm font-medium" for="email">{{ __('Correo electrónico') }} <x-socio.required-mark /></label>
-                    <input id="email" name="email" type="email" required inputmode="email" value="{{ old('email', data_get($payload, 'email')) }}" class="{{ $input }}">
+                    <input id="email" name="email" @error('email') aria-invalid="true" aria-describedby="email-error" @enderror type="email" required inputmode="email" value="{{ old('email', data_get($payload, 'email')) }}" class="{{ $input }}">
+                    <x-socio.field-error name="email" />
                 </div>
 
                 <div>
                     <label class="mb-1 block text-sm font-medium" for="phone">{{ __('Teléfono') }}</label>
-                    <input id="phone" name="phone" type="tel" inputmode="tel" value="{{ old('phone', data_get($payload, 'phone')) }}" class="{{ $input }}">
+                    <input id="phone" name="phone" @error('phone') aria-invalid="true" aria-describedby="phone-error" @enderror type="tel" inputmode="tel" value="{{ old('phone', data_get($payload, 'phone')) }}" class="{{ $input }}">
+                    <x-socio.field-error name="phone" />
                 </div>
 
                 <div>
                     <label class="mb-1 block text-sm font-medium" for="date_of_birth">{{ __('Fecha de nacimiento') }} <x-socio.required-mark /></label>
-                    <input id="date_of_birth" name="date_of_birth" type="date" required value="{{ old('date_of_birth', data_get($payload, 'date_of_birth') ?: ($prefill['date_of_birth'] ?? null)) }}" class="{{ $input }}">
+                    <input id="date_of_birth" name="date_of_birth" @error('date_of_birth') aria-invalid="true" aria-describedby="date_of_birth-error" @enderror type="date" required value="{{ old('date_of_birth', data_get($payload, 'date_of_birth') ?: ($prefill['date_of_birth'] ?? null)) }}" class="{{ $input }}">
+                    <x-socio.field-error name="date_of_birth" />
                         @include('socio.partials.mrz-confirm', ['field' => 'date_of_birth'])
                     {{-- Explicit format hint (prompt 97): the native picker's displayed order follows the
                          document language, but the submitted value is always ISO — the hint removes any doubt
@@ -81,15 +90,17 @@
                 <div class="grid grid-cols-2 gap-3">
                     <div>
                         <label class="mb-1 block text-sm font-medium" for="document_type">{{ __('Tipo de documento') }} <x-socio.required-mark /></label>
-                        <select id="document_type" name="document_type" required class="{{ $input }}">
+                        <select id="document_type" name="document_type" @error('document_type') aria-invalid="true" aria-describedby="document_type-error" @enderror required class="{{ $input }}">
                             @foreach (\App\Enums\IdDocumentType::cases() as $type)
                                 <option value="{{ $type->value }}" @selected(old('document_type', data_get($payload, 'document_type')) === $type->value)>{{ $type->label() }}</option>
                             @endforeach
                         </select>
+                    <x-socio.field-error name="document_type" />
                     </div>
                     <div>
                         <label class="mb-1 block text-sm font-medium" for="document_number">{{ __('Nº documento') }} <x-socio.required-mark /></label>
-                        <input id="document_number" name="document_number" type="text" required value="{{ old('document_number', data_get($payload, 'document_number') ?: ($prefill['document_number'] ?? null)) }}" class="{{ $input }}">
+                        <input id="document_number" name="document_number" @error('document_number') aria-invalid="true" aria-describedby="document_number-error" @enderror type="text" required value="{{ old('document_number', data_get($payload, 'document_number') ?: ($prefill['document_number'] ?? null)) }}" class="{{ $input }}">
+                    <x-socio.field-error name="document_number" />
                         @include('socio.partials.mrz-confirm', ['field' => 'document_number'])
                     </div>
                 </div>
@@ -98,8 +109,9 @@
                      on arrival and shortens the first visit. The copy is honest about what it is for. --}}
                 <div>
                     <label class="mb-1 block text-sm font-medium" for="photo">{{ __('Foto (opcional)') }}</label>
-                    <input id="photo" name="photo" type="file" accept="image/*" capture="user"
+                    <input id="photo" name="photo" @error('photo') aria-invalid="true" aria-describedby="photo-error" @enderror type="file" accept="image/*" capture="user"
                            class="block w-full text-sm text-ink file:mr-3 file:rounded-lg file:border-0 file:bg-brand-tint file:px-3 file:py-2 file:text-sm file:font-medium file:text-brand dark:text-slate-200 dark:file:bg-slate-800 dark:file:text-slate-100">
+                    <x-socio.field-error name="photo" />
                     <p class="mt-1 text-xs text-ink-muted dark:text-slate-400">{{ \App\Support\DocumentUpload::helperText(__('Ayuda a que te reconozcan al llegar. Se comparará contigo en el mostrador. Puedes omitirla y hacerla en la sede.')) }}</p>
                 </div>
 
@@ -114,8 +126,9 @@
                      obligation, not a courtesy. --}}
                 <div>
                     <label class="mb-1 block text-sm font-medium" for="document_scan">{{ __('Documento de identidad (opcional)') }}</label>
-                    <input id="document_scan" name="document_scan" type="file" accept="image/*,application/pdf"
+                    <input id="document_scan" name="document_scan" @error('document_scan') aria-invalid="true" aria-describedby="document_scan-error" @enderror type="file" accept="image/*,application/pdf"
                            class="block w-full text-sm text-ink file:mr-3 file:rounded-lg file:border-0 file:bg-brand-tint file:px-3 file:py-2 file:text-sm file:font-medium file:text-brand dark:text-slate-200 dark:file:bg-slate-800 dark:file:text-slate-100">
+                    <x-socio.field-error name="document_scan" />
                     <p class="mt-1 text-xs text-ink-muted dark:text-slate-400">{{ \App\Support\DocumentUpload::helperText(__('Foto o PDF de tu DNI, NIE o pasaporte. Se guarda cifrado, solo se abre con un enlace firmado y cada consulta queda registrada. Si tu solicitud no se aprueba, se borra. Puedes omitirlo y enseñarlo en el mostrador.')) }}</p>
 
                     {{-- Prompt 179 — read it here, on this device. `hidden` until the script mounts, so a
@@ -140,7 +153,8 @@
 
                 <div>
                     <label class="mb-1 block text-sm font-medium" for="address">{{ __('Dirección') }}</label>
-                    <input id="address" name="address" type="text" value="{{ old('address', data_get($payload, 'address')) }}" class="{{ $input }}">
+                    <input id="address" name="address" @error('address') aria-invalid="true" aria-describedby="address-error" @enderror type="text" value="{{ old('address', data_get($payload, 'address')) }}" class="{{ $input }}">
+                    <x-socio.field-error name="address" />
                 </div>
 
                 {{-- Consumo: a GUIDED choice from the club's forecast presets (prompt 97), not a free number
@@ -148,12 +162,13 @@
                 @php($forecastOptions = array_values(array_filter((array) \App\Support\Settings::get('forecast_options_g', [30, 50, 60, 90]), 'is_numeric')))
                 <div>
                     <label class="mb-1 block text-sm font-medium" for="declared_monthly_g">{{ __('Consumo mensual estimado') }}</label>
-                    <select id="declared_monthly_g" name="declared_monthly_g" class="{{ $input }}">
+                    <select id="declared_monthly_g" name="declared_monthly_g" @error('declared_monthly_g') aria-invalid="true" aria-describedby="declared_monthly_g-error" @enderror class="{{ $input }}">
                         <option value="">{{ __('Prefiero no indicarlo ahora') }}</option>
                         @foreach ($forecastOptions as $opt)
                             <option value="{{ $opt }}" @selected((string) old('declared_monthly_g', $declaredG !== null ? (int) $declaredG : '') === (string) $opt)>{{ __(':n g al mes', ['n' => $opt]) }}</option>
                         @endforeach
                     </select>
+                    <x-socio.field-error name="declared_monthly_g" />
                     <p class="mt-1 text-xs text-ink-muted dark:text-slate-400">{{ __('Una estimación orientativa. Podrás ajustarla con la asociación.') }}</p>
                 </div>
 
@@ -161,7 +176,8 @@
                      and this is never a hard block; the association confirms the aval at review. --}}
                 <div>
                     <label class="mb-1 block text-sm font-medium" for="avalador_ref">{{ __('Tu avalador/a (nombre o nº de socio/a)') }}</label>
-                    <input id="avalador_ref" name="avalador_ref" type="text" value="{{ old('avalador_ref', data_get($payload, 'avalador_ref')) }}" class="{{ $input }}">
+                    <input id="avalador_ref" name="avalador_ref" @error('avalador_ref') aria-invalid="true" aria-describedby="avalador_ref-error" @enderror type="text" value="{{ old('avalador_ref', data_get($payload, 'avalador_ref')) }}" class="{{ $input }}">
+                    <x-socio.field-error name="avalador_ref" />
                     <p class="mt-1 text-xs text-ink-muted dark:text-slate-400">{{ __('El socio/a que te presenta. Si no lo sabes, déjalo en blanco y la asociación te orientará.') }}</p>
                 </div>
 

@@ -4,7 +4,7 @@
     <div class="csc-section-head">
         <div class="csc-section-heading">
             <x-filament::icon :icon="\Filament\Support\Icons\Heroicon::OutlinedBell" class="csc-section-ico" />
-            <h3 class="csc-section-title">{{ __('Alertas') }}</h3>
+            <h2 class="csc-section-title">{{ __('Alertas') }}</h2>
             @if (count($alerts))
                 <span class="csc-count">{{ count($alerts) }}</span>
             @endif

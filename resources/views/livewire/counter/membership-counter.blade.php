@@ -52,7 +52,7 @@
             <div class="mx-auto mb-4 max-w-xl">
                 <section data-alta-panel class="rounded-2xl border border-line bg-surface p-4 dark:border-slate-800 dark:bg-slate-900">
                     <div class="flex items-center justify-between gap-3">
-                        <h1 class="text-base font-semibold">{{ __('Alta de socio/a') }}</h1>
+                        <h2 class="text-base font-semibold">{{ __('Alta de socio/a') }}</h2>
                         <button
                             type="button"
                             wire:click="toggleAlta"
@@ -151,7 +151,7 @@
 
         <div class="mx-auto max-w-xl">
             <section class="rounded-2xl border border-line bg-surface p-4 dark:border-slate-800 dark:bg-slate-900">
-                <h1 class="text-base font-semibold">{{ __('Cobro de cuota') }}</h1>
+                <h2 class="text-base font-semibold">{{ __('Cobro de cuota') }}</h2>
 
                 @if ($feeMember)
                     <div class="mt-3 flex items-start justify-between gap-3 rounded-xl bg-surface-alt p-3 dark:bg-slate-800">

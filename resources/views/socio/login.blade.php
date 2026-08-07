@@ -11,14 +11,17 @@
             @if (session('status'))
                 <p class="mb-4 rounded-lg bg-brand-tint p-3 text-sm text-brand dark:bg-slate-800 dark:text-slate-200">{{ session('status') }}</p>
             @endif
+            {{-- The error is ASSOCIATED with the field (aria-describedby + aria-invalid), not just printed
+                 near it: a screen-reader user tabbing to the input was told nothing was wrong with it. --}}
             @error('email')
-                <p class="mb-4 rounded-lg bg-error/10 p-3 text-sm text-error">{{ $message }}</p>
+                <p id="email-error" role="alert" class="mb-4 rounded-lg bg-error/10 p-3 text-sm text-error">{{ $message }}</p>
             @enderror
 
             <form method="POST" action="{{ route('socio.login.send') }}" class="space-y-3">
                 @csrf
                 <label class="block text-sm font-medium" for="email">{{ __('Correo electrónico') }}</label>
                 <input type="email" id="email" name="email" required autocomplete="email" inputmode="email"
+                       @error('email') aria-invalid="true" aria-describedby="email-error" @enderror
                        placeholder="{{ __('tu@correo.es') }}"
                        class="{{ \App\Support\SocioForm::FIELD }}">
                 <x-button type="submit" size="md" class="w-full">{{ __('Enviar enlace') }}</x-button>

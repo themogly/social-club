@@ -8,11 +8,6 @@ namespace App\Filament\Widgets;
  */
 class DispensedByGeneticChart extends DashboardChart
 {
-    public function getHeading(): string
-    {
-        return __('Dispensado por genética');
-    }
-
     protected function getType(): string
     {
         return 'bar';

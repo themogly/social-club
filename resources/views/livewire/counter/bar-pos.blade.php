@@ -423,7 +423,9 @@
 
                         {{-- Quick cash --}}
                         <div>
-                            <p class="text-xs font-medium text-ink-muted dark:text-slate-400">{{ __('Efectivo entregado') }}</p>
+                            {{-- A real <label for>, not a loose <p> plus a placeholder: a placeholder disappears on focus and is
+                                 not a label (a11y audit), and this is the field that decides what goes in the drawer. --}}
+                            <label for="bar-cash-tendered" class="block text-xs font-medium text-ink-muted dark:text-slate-400">{{ __('Efectivo entregado') }}</label>
                             <div class="mt-1 grid grid-cols-4 gap-2">
                                 <button type="button" wire:click="quickCash" class="h-11 rounded-xl border border-line bg-surface text-sm font-semibold text-ink transition hover:bg-surface-alt dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:hover:bg-slate-800">{{ __('Justo') }}</button>
                                 <button type="button" wire:click="quickCash(500)" class="h-11 rounded-xl border border-line bg-surface text-sm font-semibold text-ink transition hover:bg-surface-alt dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:hover:bg-slate-800">€5</button>
@@ -431,6 +433,7 @@
                                 <button type="button" wire:click="quickCash(2000)" class="h-11 rounded-xl border border-line bg-surface text-sm font-semibold text-ink transition hover:bg-surface-alt dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:hover:bg-slate-800">€20</button>
                             </div>
                             <input
+                                id="bar-cash-tendered"
                                 type="text"
                                 inputmode="decimal"
                                 wire:model.live.debounce.400ms="cashTendered"
