@@ -7,6 +7,7 @@ use App\Actions\Bar\VoidOrder;
 use App\Actions\Pricing\ResolveArticleDiscount;
 use App\Enums\TillSessionStatus;
 use App\Exceptions\TillClosedException;
+use App\Livewire\Counter\Concerns\FindsMembers;
 use App\Livewire\Counter\Concerns\HandlesTender;
 use App\Livewire\Counter\Concerns\IdentifiesOperator;
 use App\Livewire\Counter\Concerns\ResolvesCounterLocation;
@@ -23,7 +24,6 @@ use App\Support\TerminalName;
 use App\Support\Wallet;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Contracts\View\View;
-use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Storage;
@@ -62,12 +62,12 @@ use Throwable;
 #[Layout('components.layouts.counter', ['fullHeight' => true])] // prompt 176: the page must not scroll; the selection pane does
 class BarPos extends Component
 {
-    use HandlesTender, IdentifiesOperator, ResolvesCounterLocation;
+    use FindsMembers, HandlesTender, IdentifiesOperator, ResolvesCounterLocation;
 
     // --- Identity / scope -------------------------------------------------------
-
-    /** Live org-wide search to OPTIONALLY attach a socio (name or member number). */
-    public string $search = '';
+    // The ONE lookup field ($lookup) lives in FindsMembers (prompt 194). The bar used to offer a name box with
+    // no scan affordance at all, so a socio's card scanned here — a wedge reader types into whatever has focus
+    // — landed in a name search and found nothing.
 
     /** The attached socio (id only — the model is resolved live). Optional: cash guests are fine. */
     public ?string $memberId = null;
@@ -169,26 +169,18 @@ class BarPos extends Component
 
     // --- Attach / detach a socio (optional) -------------------------------------
 
-    public function selectMember(string $memberId): void
+    /** Prompt 194 — the shared lookup found somebody; the bar's job is to attach them to the open ticket. */
+    protected function onMemberFound(Member $member, bool $scanned): void
     {
-        $member = Member::query()->find($memberId);
-
-        if ($member === null) {
-            $this->flash(__('Socio no encontrado.'), 'error');
-
-            return;
-        }
-
         // The basket is kept — a socio can be attached at any point to enable wallet payment.
         $this->memberId = $member->id;
-        $this->search = '';
     }
 
     public function clearMember(): void
     {
         $this->memberId = null;
-        $this->search = '';
         $this->walletInput = '';
+        $this->clearLookup();
     }
 
     // --- Article grid → basket --------------------------------------------------
@@ -535,7 +527,6 @@ class BarPos extends Component
             'member' => $member,
             'walletCents' => $walletCents,
             'projectedWalletCents' => $walletCents - $walletApplied,
-            'searchResults' => $this->searchResults(),
             'articles' => $this->filterArticles($allArticles),
             'categories' => $this->deriveCategories($allArticles),
             'basketLines' => $basketLines,
@@ -748,30 +739,6 @@ class BarPos extends Component
         }
     }
 
-    /**
-     * Org-wide socio search (crosses locations by design — Member is org-scoped). Null
-     * until at least two characters are typed.
-     *
-     * @return Collection<int, Member>|null
-     */
-    private function searchResults(): ?Collection
-    {
-        $term = trim($this->search);
-
-        if (mb_strlen($term) < 2) {
-            return null;
-        }
-
-        return Member::query()
-            ->where(fn ($q) => $q
-                ->where('first_name', 'like', '%'.$term.'%')
-                ->orWhere('last_name', 'like', '%'.$term.'%')
-                ->orWhere('member_no', 'like', '%'.$term.'%'))
-            ->orderBy('last_name')
-            ->limit(8)
-            ->get();
-    }
-
     // --- Resolvers (live queries; nothing cached) -------------------------------
 
     private function resolveLocation(): ?Location
@@ -853,7 +820,7 @@ class BarPos extends Component
     {
         $this->reset([
             'basket', 'walletInput', 'cashTendered', 'reference',
-            'miscDescription', 'miscAmount', 'miscReference', 'memberId', 'search',
+            'miscDescription', 'miscAmount', 'miscReference', 'memberId', 'lookup', 'lookupSearched',
         ]);
 
         $this->idempotencyKey = (string) Str::ulid();

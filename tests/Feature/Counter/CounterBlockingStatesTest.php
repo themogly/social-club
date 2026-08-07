@@ -389,11 +389,15 @@ class CounterBlockingStatesTest extends TestCase
 
         $this->assertSame('member', $this->blockerKind($html));
         $this->assertSame(1, substr_count($html, 'data-blocker-action'));
-        $this->assertStringContainsString('id="scan"', $html);          // the scan field
-        $this->assertStringContainsString('id="member-search"', $html); // and the name / nº lookup
+
+        // Prompt 194 — ONE field, not the stacked scan-box-above-name-box this state used to carry.
+        $this->assertSame(1, substr_count($html, 'id="member-lookup"'));
+        $this->assertStringNotContainsString('id="scan"', $html);
+        $this->assertStringNotContainsString('id="member-search"', $html);
 
         // And it actually resolves: searching from the blocking state surfaces the socio and clears it.
-        $component->set('search', $member->last_name)->assertSee($member->member_no)
+        $component->set('lookup', $member->last_name)->call('submitLookup')
+            ->assertSee($member->member_no)
             ->call('selectMember', $member->id);
 
         $this->assertSame(0, $this->blockerCount($component->html()));

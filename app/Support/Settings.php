@@ -157,6 +157,11 @@ class Settings
         // cart column then opens on the basket, where the operator's attention belongs. The flag governs
         // INPUT only: a socio or a ticket reference recorded earlier still renders on receipts, in the ledger
         // export and in reports.
+        // Prompt 194 — does this sede have card readers? CONFIGURATION, not feature detection: a USB QR or
+        // RFID reader is a keyboard and has no presence any browser API can detect, so there is nothing to
+        // test for. It changes the lookup field's WORDS only; token resolution runs either way, so a scan
+        // that happens anyway still works. Default off — a club with no readers must never be told to scan.
+        'card_readers_enabled' => false,
         'bar_attach_socio_enabled' => false,
         'bar_ticket_reference_enabled' => false,
         // Panic lockdown (prompt 121), all per-org. The safety-net auto-reactivation runs after this many

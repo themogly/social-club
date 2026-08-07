@@ -42,59 +42,10 @@
 
             {{-- Scan + search --}}
             <section class="rounded-2xl border border-line bg-surface p-4 dark:border-slate-800 dark:bg-slate-900 sm:p-5">
-                <form wire:submit="submitScan">
-                    <label for="scan" class="block text-sm font-medium text-ink-muted dark:text-slate-400">{{ __('Escanear tarjeta de socio') }}</label>
-                    <div class="mt-2 flex gap-2">
-                        <input
-                            id="scan"
-                            type="text"
-                            wire:model="scan"
-                            autofocus
-                            autocomplete="off"
-                            spellcheck="false"
-                            placeholder="{{ __('Escanea la tarjeta o escribe el código y pulsa Enter') }}"
-                            class="h-14 min-w-0 flex-1 rounded-xl border border-line bg-surface px-4 text-lg text-ink placeholder:text-ink-muted focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/40 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
-                        >
-                        <button type="submit" class="h-14 shrink-0 rounded-xl bg-brand px-6 text-base font-semibold text-white transition hover:bg-brand-dark focus:outline-none focus:ring-2 focus:ring-brand/40">
-                            {{ __('Buscar') }}
-                        </button>
-                    </div>
-                </form>
+                {{-- Prompt 194 — ONE field. This screen used to stack a scan box above a name box, each of
+                     which already accepted what the other asked for. --}}
+                @include('livewire.counter.partials.member-lookup', ['autofocus' => true])
 
-                @if ($cameraScanEnabled)
-                    <x-counter.camera-scan />
-                @endif
-
-                <div class="mt-4">
-                    <label for="search" class="block text-sm font-medium text-ink-muted dark:text-slate-400">{{ __('o busca por nombre / nº de socio') }}</label>
-                    <input
-                        id="search"
-                        type="text"
-                        wire:model.live.debounce.300ms="search"
-                        autocomplete="off"
-                        placeholder="{{ __('Ej. García o M-00042') }}"
-                        class="mt-2 h-12 w-full rounded-xl border border-line bg-surface px-4 text-base text-ink placeholder:text-ink-muted focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/40 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
-                    >
-
-                    @if ($searchResults !== null)
-                        <ul class="mt-2 divide-y divide-line overflow-hidden rounded-xl border border-line dark:divide-slate-800 dark:border-slate-800">
-                            @forelse ($searchResults as $result)
-                                <li>
-                                    <button
-                                        type="button"
-                                        wire:click="selectMember('{{ $result->id }}')"
-                                        class="flex w-full items-center justify-between gap-3 bg-surface px-4 py-3 text-left transition hover:bg-surface-alt dark:bg-slate-900 dark:hover:bg-slate-800"
-                                    >
-                                        <span class="font-medium">{{ $result->fullName() }}</span>
-                                        <span class="text-sm text-ink-muted dark:text-slate-400">{{ $result->member_no }}</span>
-                                    </button>
-                                </li>
-                            @empty
-                                <li class="bg-surface px-4 py-3 text-sm text-ink-muted dark:bg-slate-900 dark:text-slate-400">{{ __('Sin resultados.') }}</li>
-                            @endforelse
-                        </ul>
-                    @endif
-                </div>
             </section>
 
             {{-- Member card OR prompt --}}

@@ -8,6 +8,7 @@ use App\Enums\DispensationStatus;
 use App\Enums\MembershipStatus;
 use App\Enums\TillSessionStatus;
 use App\Livewire\Counter\Concerns\CollectsMembershipFees;
+use App\Livewire\Counter\Concerns\FindsMembers;
 use App\Livewire\Counter\Concerns\IdentifiesOperator;
 use App\Livewire\Counter\Concerns\ResolvesCounterLocation;
 use App\Livewire\Counter\Concerns\SignsUpMembers;
@@ -43,10 +44,22 @@ use Livewire\Component;
 #[Layout('components.layouts.counter')]
 class MembershipCounter extends Component
 {
-    use CollectsMembershipFees, IdentifiesOperator, ResolvesCounterLocation, SignsUpMembers;
+    use CollectsMembershipFees, FindsMembers, IdentifiesOperator, ResolvesCounterLocation, SignsUpMembers;
 
     /** How many past collections the counter will show. A counter answers a question; it is not an export. */
     private const HISTORY_LIMIT = 5;
+
+    /**
+     * Prompt 194 — the shared lookup found somebody; Socios' job is to put them on screen.
+     *
+     * This tab used to offer a name box with no scan affordance at all, which is worse than it sounds: a USB
+     * wedge reader types into whatever has focus and presses Enter, so a card scanned here ran a name search
+     * for a 48-character token and found nothing. It now resolves the token first, exactly like the door.
+     */
+    protected function onMemberFound(Member $member, bool $scanned): void
+    {
+        $this->selectFeeMember($member->id);
+    }
 
     /** The active location id, resolved in mount(). #[Locked] (prompt 75): the client can never retarget the sede. */
     #[Locked]
@@ -129,7 +142,6 @@ class MembershipCounter extends Component
         return view('livewire.counter.membership-counter', [
             'location' => $location,
             'openTill' => $location !== null ? $this->openTill($location) : null,
-            'feeResults' => $this->feeSearchResults(),
             'feeMember' => $feeMember,
             'membership' => $membership,
             'owedCents' => $membership !== null ? $this->owedCents($membership) : null,

@@ -319,22 +319,12 @@
                         </form>
                     @endif
                 @else
-                    <label for="fee-search" class="mt-3 block text-xs font-medium text-ink-muted dark:text-slate-400">{{ __('Buscar socio (nombre o nº)') }}</label>
-                    <input id="fee-search" type="text" autofocus wire:model.live.debounce.300ms="feeSearch" autocomplete="off" placeholder="{{ __('Buscar socio (nombre o nº)') }}" class="mt-1 h-12 w-full rounded-xl border border-line bg-surface px-4 text-base text-ink placeholder:text-ink-muted focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/40 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100">
-
-                    @if ($feeResults !== null)
-                        <ul class="mt-2 divide-y divide-line overflow-hidden rounded-xl border border-line dark:divide-slate-800 dark:border-slate-800">
-                            @forelse ($feeResults as $result)
-                                <li>
-                                    <button type="button" wire:click="selectFeeMember('{{ $result->id }}')" class="flex w-full items-center justify-between gap-3 bg-surface px-4 py-3 text-left transition hover:bg-surface-alt dark:bg-slate-900 dark:hover:bg-slate-800">
-                                        <span class="min-w-0"><span class="block truncate font-medium">{{ $result->fullName() }}</span><span class="block text-sm text-ink-muted dark:text-slate-400">{{ $result->member_no }}</span></span>
-                                    </button>
-                                </li>
-                            @empty
-                                <li class="px-4 py-3 text-sm text-ink-muted dark:text-slate-400">{{ __('Sin resultados.') }}</li>
-                            @endforelse
-                        </ul>
-                    @endif
+                    {{-- Prompt 194 — the SAME lookup as the door, the dispensary, the till and the bar. This
+                         tab's own name box could not resolve a scanned card at all. Identifying somebody is
+                         the whole purpose of this screen's empty state, so it takes the cursor. --}}
+                    <div class="mt-3">
+                        @include('livewire.counter.partials.member-lookup', ['autofocus' => true])
+                    </div>
                 @endif
             </section>
         </div>

@@ -201,8 +201,8 @@ class CounterStaffDayTest extends TestCase
         $this->assertStringContainsString('x-bind:disabled="! online"', $html);
     }
 
-    // 6) A name typed into the scan field routes to the SAME member search.
-    public function test_a_name_typed_into_the_scan_field_routes_to_the_member_search(): void
+    // 6) A name typed into the ONE lookup field falls through to the member search, in the same box.
+    public function test_a_name_typed_into_the_lookup_falls_through_to_the_member_search(): void
     {
         $this->actingAs($this->operator());
         // Prompt 175: the member step's blocking state carries the lookup itself, so the search is reachable
@@ -212,11 +212,15 @@ class CounterStaffDayTest extends TestCase
             'organisation_id' => $this->org->id, 'first_name' => 'Lucía', 'last_name' => 'García', 'member_no' => 'M-00099',
         ]);
 
+        // Prompt 194 — there is no second box to route to any more. The typed term fails to resolve as a
+        // token and the name results render beneath the SAME field, with the term still in it.
         Livewire::test(DispensaryPos::class)
-            ->set('scan', 'García')
-            ->call('submitScan')
-            ->assertSet('search', 'García') // routed to the search
-            ->assertSee('García');          // and the member surfaces
+            ->set('lookup', 'García')
+            ->call('submitLookup')
+            ->assertSet('lookupSearched', true)
+            ->assertSet('lookup', 'García')
+            ->assertSee('García')
+            ->assertSee('M-00099');
     }
 
     // 7) The reweigh copy matches the filter, and the progress reflects the count.

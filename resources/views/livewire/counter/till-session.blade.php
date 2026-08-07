@@ -523,26 +523,11 @@
                     <fieldset @disabled(! $this->hasOperator()) class="contents">
 
                     @if ($feeMember === null)
+                        {{-- Prompt 194 — the SAME lookup as the door and the dispensary. The caja's own name
+                             box could not resolve a scanned card. No autofocus: this panel is one of several
+                             on a screen whose main job is the drawer, not identifying anybody. --}}
                         <div class="mt-4">
-                            <label for="feeSearch" class="block text-sm font-medium text-ink-muted dark:text-slate-400">{{ __('Buscar socio (nombre o nº)') }}</label>
-                            <input id="feeSearch" type="text" wire:model.live.debounce.300ms="feeSearch" autocomplete="off"
-                                   placeholder="{{ __('Ej. García o M-00042') }}"
-                                   class="mt-2 h-12 w-full rounded-xl border border-line bg-surface px-4 text-base text-ink placeholder:text-ink-muted focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/40 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100">
-                            @if ($feeResults !== null)
-                                <ul class="mt-2 divide-y divide-line rounded-xl border border-line dark:divide-slate-800 dark:border-slate-800">
-                                    @forelse ($feeResults as $result)
-                                        <li>
-                                            <button type="button" wire:click="selectFeeMember('{{ $result->id }}')"
-                                                    class="flex w-full items-center justify-between px-4 py-3 text-left text-sm hover:bg-surface-alt dark:hover:bg-slate-800">
-                                                <span class="font-medium">{{ $result->fullName() }}</span>
-                                                <span class="text-ink-muted dark:text-slate-400">{{ $result->member_no }}</span>
-                                            </button>
-                                        </li>
-                                    @empty
-                                        <li class="px-4 py-3 text-sm text-ink-muted dark:text-slate-400">{{ __('Sin resultados.') }}</li>
-                                    @endforelse
-                                </ul>
-                            @endif
+                            @include('livewire.counter.partials.member-lookup', ['autofocus' => false])
                         </div>
                     @else
                         <div class="mt-4 flex items-center justify-between rounded-xl bg-surface-alt px-4 py-3 dark:bg-slate-800">

@@ -17,6 +17,7 @@ use App\Enums\UnitType;
 use App\Exceptions\TillAlreadyOpenException;
 use App\Exceptions\TillClosedException;
 use App\Livewire\Counter\Concerns\CollectsMembershipFees;
+use App\Livewire\Counter\Concerns\FindsMembers;
 use App\Livewire\Counter\Concerns\IdentifiesOperator;
 use App\Livewire\Counter\Concerns\ResolvesCounterLocation;
 use App\Models\Batch;
@@ -57,7 +58,18 @@ use RuntimeException;
 #[Layout('components.layouts.counter')]
 class TillSession extends Component
 {
-    use CollectsMembershipFees, IdentifiesOperator, ResolvesCounterLocation;
+    use CollectsMembershipFees, FindsMembers, IdentifiesOperator, ResolvesCounterLocation;
+
+    /**
+     * Prompt 194 — the shared lookup found somebody; the till's job is to point `Cobrar cuota` at them.
+     *
+     * Like Socios, this screen used to offer a name box with no scan affordance, so a card scanned at the
+     * caja searched for a 48-character name and found nothing.
+     */
+    protected function onMemberFound(Member $member, bool $scanned): void
+    {
+        $this->selectFeeMember($member->id);
+    }
 
     /** The active location id, resolved in mount(). #[Locked] (prompt 75): the client can never retarget the counter's sede. */
     #[Locked]
@@ -861,7 +873,6 @@ class TillSession extends Component
             'session' => $session,
             'breakdown' => $breakdown,
             'expenseCategories' => $expenseCategories,
-            'feeResults' => $this->feeSearchResults(),
             'feeMember' => $feeMember,
             'feeOwedCents' => $feeMembership !== null ? $this->owedCents($feeMembership) : null,
             // EOD flower reweigh (prompt 47) — the in-scope batches, only while in that step.
