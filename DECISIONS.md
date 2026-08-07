@@ -9088,3 +9088,66 @@ The outcome is gone after the next article tap.
 
 **MySQL left to CI**, per the running order: `composer check` green on SQLite — 1537 tests, Larastan 0, Pint
 clean.
+
+## Prompt 204 — the member lookup searches as you type
+
+**194 was right to make it one box and wrong to make it a form you submit.** Its reasoning was that one box
+cannot search per keystroke, because a token has to be resolved whole and a half-typed name would reach
+prompt 58's failed-scan throttle. The first half is true; the second does not follow. **The two lookups are
+separable.** Only `submitLookup()` resolves tokens, and only it can reach the throttle — the name/nº search
+never calls `ResolveMemberByToken` at all, so it runs on every keystroke for nothing.
+
+The evidence that it needed fixing was in 194's own copy: it had to put *"pulsa Enter"* in the placeholder and
+argued the instruction was load-bearing. **A control that has to teach its own keystroke is the defect.**
+Three of the five screens it replaced already searched live; an operator with a socio in front of them typed,
+and waited.
+
+So `wire:model.live.debounce.250ms`, results from two characters up, and Enter still doing exactly what it
+did — token first, then fall through.
+
+### It is now actually a combobox
+
+Before this the results were an unowned `<ul>` that appeared in the DOM beside an input claiming to be a
+plain textbox: no `role`, no `aria-expanded`, no `aria-activedescendant`, no keyboard route to a row at all.
+A screen-reader user got **no announcement that anything had happened**. Now: `role="combobox"` +
+`aria-autocomplete="list"` + `aria-controls` onto a `listbox` that is always in the DOM (so `aria-controls`
+never dangles) and `hidden` when empty; rows are `role="option"` with ids; ↑/↓ move an active option, Enter
+takes it, Escape closes. The Alpine island reads its options **from the DOM at keypress time** rather than
+snapshotting a count into `x-data` — prompt 188's lesson in miniature, since Livewire re-renders this list
+under a persistent island.
+
+Enter with **no** option active still submits, and that is what keeps a scanner working: a wedge reader types
+its token and presses Return, no arrow key is ever involved.
+
+### Two things that could only be settled in a browser
+
+`tests/Browser/prove-live-lookup.mjs` (running server, like 195's and 202's):
+
+- **The debounce does not eat a scan.** This is the risk the branch introduces: a wedge reader types 48
+  characters and presses Return before a 250ms debounce has flushed. If the submit request carried a
+  truncated `lookup`, **every card scan would silently become a name search** — a failure mode no PHP test
+  can see, because `Livewire::test()->set()` has no debounce. Asserted on the raw POST body: the
+  `submitLookup` request **carried all 48 characters**.
+- **The placeholder fits.** 194 dropped the member-number example after measuring truncation in the bar's
+  narrow socio column — but what it measured was the string **with "pulsa Enter" on the end**. Re-measured
+  without it: **178px needed of 268px available** in the bar column (656px on Recepción). The example comes
+  back.
+
+Also proved live: typing "ell" alone → 5 rows and `aria-expanded="true"` with no Enter; ArrowDown → option 0
+with exactly one `aria-selected`, then option 1; Escape closes; Enter on the active option calls
+`selectMember` and **does not** also submit.
+
+### The suppression that keeps it quiet
+
+A scan-shaped term (≥32 chars, alphanumeric — `looksLikeAScan()`, already load-bearing for the throttle)
+returns no results **while it is being typed**, so "Sin resultados." does not flicker under every scan. Once
+Enter has been pressed it searches normally, because 194's fall-through for an unrecognised card must still
+land on "Sin resultados." rather than on nothing.
+
+**Guards.** `LiveMemberLookupTest` (12 tests): results from typing with `lookupSearched` still false; the
+2-character floor; thirty live misses leaving `RateLimiter::attempts('qr-scan:…')` at **0**; the full combobox
+ARIA asserted on **all four** screens that host the field — with the till opened and the bar's socio flag on
+first, because otherwise two of them render a blocker and the sweep would certify screens it never audited;
+and a grep that **no screen instructs the operator to press a key**.
+
+**MySQL left to CI**: `composer check` green on SQLite — 1549 tests, Larastan 0, Pint clean.

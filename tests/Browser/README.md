@@ -316,3 +316,31 @@ block or live region is on screen, if no change is stated, or if the outcome sur
 Last run (branch `feat/confirmation-carries-the-outcome`) at 1180×820: Charge y **736 · 736 · 736**, spread
 **0.0px**; 1 outcome block and 1 live region per round; change **€48.80** each time with the tender field
 already empty; 0 outcome blocks after the next article tap. **PASS**.
+
+## The member lookup is live, and is a real combobox (prompt 204)
+
+The **third** script needing a running server. Two of its four claims cannot be made anywhere else: that a
+wedge scanner's 48 characters survive `wire:model.live.debounce` (a truncated `lookup` on the submit request
+would turn every card scan into a name search, invisibly), and that the placeholder fits the narrowest field
+it appears in.
+
+```bash
+npm run build
+php artisan serve --port=8123
+node tests/Browser/prove-live-lookup.mjs        # MEMBER_QUERY=… to match your demo data
+```
+
+The bar's lookup sits behind a per-sede flag, so enable it first or the bar measurement is skipped (the script
+says so rather than passing silently):
+
+```bash
+php artisan tinker --execute="\$l = App\Models\Location::query()->withoutGlobalScopes()->first();
+app(App\Support\ActiveScope::class)->setOrganisation(\$l->organisation_id);
+App\Support\Settings::set('bar_attach_socio_enabled', true, App\Enums\SettingType::BOOL, \$l->id);"
+```
+
+Last run (branch `feat/live-member-lookup`) at 1180×820: typing `ell` → **5 rows**, `aria-expanded="true"`,
+no Enter; ArrowDown → `member-lookup-option-0` with exactly **1** `aria-selected`, then `option-1`; Escape
+closes; Enter on the active option → `selectMember` **without** `submitLookup`; the wedge scan's submit
+request **carried all 48 characters**; placeholder needs **178px of 268px** in the bar socio column and 178
+of 656 on Recepción. **PASS**.
