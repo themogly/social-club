@@ -37,6 +37,51 @@ class TillSession extends Model
         ];
     }
 
+    /**
+     * The shift currently holding this drawer, if any (prompt 186).
+     *
+     * A session that is OPEN with no OPEN shift is Toast's middle state: the drawer is between people, so
+     * nothing may be charged to it. In practice a handover is atomic — the incoming operator identifies
+     * before the outgoing one is released — so the window does not arise in the ordinary flow. This exists
+     * because the gate must be a real gate rather than a picture of one: any path that leaves a drawer
+     * unheld refuses money, whether or not the UI can produce it.
+     */
+    public function currentShift(): ?TillShift
+    {
+        return TillShift::query()->withoutGlobalScopes()
+            ->where('till_session_id', $this->id)->open()->latest('opened_at')->first();
+    }
+
+    public function hasOpenShift(): bool
+    {
+        return $this->currentShift() !== null;
+    }
+
+    /**
+     * Is this drawer BETWEEN people — Toast's middle state?
+     *
+     * Deliberately narrower than "has no open shift". A session that never had a shift at all is not
+     * between people: it is a session from before shifts existed, and the migration backfills every one
+     * that was open at deploy time. Refusing money on those would break a live drawer for no safety gain,
+     * because nobody handed anything over. What must be refused is a drawer that HAD a holder and does not
+     * now — that is the state where a charge would belong to nobody.
+     */
+    public function isBetweenShifts(): bool
+    {
+        return ! $this->hasOpenShift()
+            && TillShift::query()->withoutGlobalScopes()->where('till_session_id', $this->id)->exists();
+    }
+
+    /**
+     * Every shift this drawer passed through, oldest first — the day's attribution trail.
+     *
+     * @return HasMany<TillShift, $this>
+     */
+    public function shifts(): HasMany
+    {
+        return $this->hasMany(TillShift::class)->orderBy('opened_at');
+    }
+
     /** @return BelongsTo<User, $this> */
     public function openedBy(): BelongsTo
     {

@@ -5,8 +5,10 @@ namespace App\Livewire\Counter;
 use App\Actions\Expenses\RecordTillExpense;
 use App\Actions\Stock\CommitStockTake;
 use App\Actions\Till\CloseTill;
+use App\Actions\Till\HandOverTill;
 use App\Actions\Till\OpenTill;
 use App\Actions\Till\RecordCashMovement;
+use App\Actions\UnlockOperator;
 use App\Enums\BatchStatus;
 use App\Enums\CashMovementType;
 use App\Enums\StockTakeStatus;
@@ -25,6 +27,7 @@ use App\Models\StockTake;
 use App\Models\StockTakeLine;
 use App\Models\TillSession as TillSessionModel;
 use App\Models\User;
+use App\Support\CounterOperator;
 use App\Support\Money;
 use App\Support\Settings;
 use App\Support\TerminalName;
@@ -220,6 +223,101 @@ class TillSession extends Component
     }
 
     // --- Open ------------------------------------------------------------------
+
+    // --- Prompt 186: handing the drawer to the next person -------------------------------------------
+
+    /** The handover panel is open. */
+    public bool $handoverOpen = false;
+
+    /** Counted cash at the handover, euros at the edge — parsed to integer cents before it leaves. */
+    public string $handoverCounted = '';
+
+    /** The INCOMING operator's PIN. Never kept in component state beyond the call. */
+    public string $handoverPin = '';
+
+    public string $handoverNote = '';
+
+    public function toggleHandover(): void
+    {
+        $this->handoverOpen = ! $this->handoverOpen;
+        $this->reset(['handoverCounted', 'handoverPin', 'handoverNote']);
+    }
+
+    /**
+     * Hand the drawer over: the outgoing operator counts it, the incoming one identifies, and the session
+     * continues as one arqueo.
+     *
+     * The count is BLIND — nothing on this screen shows the expected figure, and the variance is never
+     * echoed back here. Consistent with the close-out and with prompt 47's flower reweigh, and it is the
+     * whole reason the count is worth taking.
+     *
+     * The INCOMING operator identifies BEFORE the outgoing one is released, which is why the drawer is
+     * never unheld in the ordinary flow — Toast's middle state exists in the model but the UI does not
+     * produce it. `CommitDispensation` and `CommitOrder` refuse it anyway, because a gate has to be a gate.
+     */
+    public function handOver(): void
+    {
+        if (! $this->requireOperator()) {
+            return;
+        }
+
+        $location = $this->resolveLocation();
+        $session = $this->resolveOpenSession();
+        $outgoing = CounterOperator::current();
+
+        if ($location === null || $session === null || $outgoing === null) {
+            $this->flash(__('No hay ninguna caja abierta que entregar.'), 'error');
+
+            return;
+        }
+
+        $counted = $this->toCents($this->handoverCounted);
+
+        if ($counted === null || $counted < 0) {
+            $this->flash(__('El recuento no es válido.'), 'error');
+
+            return;
+        }
+
+        $pin = trim($this->handoverPin);
+        $this->handoverPin = '';
+
+        if ($pin === '') {
+            $this->flash(__('La persona que entra debe introducir su PIN.'), 'error');
+
+            return;
+        }
+
+        $incoming = (new UnlockOperator)->handle($location, $pin, $this->operatorThrottleKey());
+
+        if ($incoming === null) {
+            $this->flash(__('PIN no reconocido.'), 'error');
+
+            return;
+        }
+
+        if ($incoming->is($outgoing)) {
+            $this->flash(__('La caja se entrega a otra persona, no a ti mismo.'), 'error');
+
+            return;
+        }
+
+        try {
+            (new HandOverTill)->handle($session, $counted, $outgoing, $incoming, filled($this->handoverNote) ? $this->handoverNote : null);
+        } catch (AuthorizationException|RuntimeException|TillClosedException $e) {
+            $this->flash($e->getMessage(), 'error');
+
+            return;
+        }
+
+        // The drawer now belongs to the person who took it, so the counter works as them from here.
+        CounterOperator::set($incoming);
+        $this->reset(['handoverOpen', 'handoverCounted', 'handoverPin', 'handoverNote']);
+
+        // Deliberately says nothing about the variance: the count was blind and stays blind until the
+        // arqueo. Telling the outgoing operator now would let the next handover be counted to fit.
+        $this->flash(__('Caja entregada a :name.', ['name' => $incoming->name]), 'success');
+    }
 
     public function open(): void
     {
@@ -722,6 +820,8 @@ class TillSession extends Component
         // session is now CLOSED so there is no open session to resolve.
         if ($this->countSubmitted) {
             return view('livewire.counter.till-session', [
+                // The session is CLOSED here, so there is no live drawer and no trail to attribute.
+                'shifts' => collect(),
                 'location' => $location,
                 'session' => null,
                 'breakdown' => null,
@@ -731,10 +831,14 @@ class TillSession extends Component
 
         $session = $this->noLocation ? null : $this->resolveOpenSession();
 
-        // While counting the drawer (closing, not yet submitted) NOTHING about the
-        // expected figure is computed and NO breakdown reaches the view — a true blind
-        // count. The breakdown (incl. expected) is only assembled for normal operation.
-        $breakdown = ($session !== null && ! $this->closing)
+        // While counting the drawer NOTHING about the expected figure is computed and NO breakdown reaches
+        // the view — a true blind count. That now covers the HANDOVER as well as the close (prompt 186):
+        // the handover panel sits on the ordinary till screen, which renders "efectivo esperado en el
+        // cajón" a few centimetres above it, so an operator could simply read the answer before counting.
+        // The close-out withholds the breakdown by going through `closing`; the handover has to withhold it
+        // the same way or its count is blind in name only. Found by LOOKING at the screenshot, not by a
+        // test — which is exactly the accident the prompt predicted from reusing the close-out's parts.
+        $breakdown = ($session !== null && ! $this->closing && ! $this->handoverOpen)
             ? TillSummary::breakdown($session)
             : null;
 
@@ -750,6 +854,9 @@ class TillSession extends Component
             : null;
 
         return view('livewire.counter.till-session', [
+            // Prompt 186 — the day's attribution trail. ONE row on a single-operator day, which is why such
+            // a club notices nothing: the list only renders when the drawer actually changed hands.
+            'shifts' => $session?->shifts()->with('openedBy')->get() ?? collect(),
             'location' => $location,
             'session' => $session,
             'breakdown' => $breakdown,

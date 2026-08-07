@@ -6,6 +6,7 @@ use App\Enums\TillSessionStatus;
 use App\Exceptions\TillAlreadyOpenException;
 use App\Models\Location;
 use App\Models\TillSession;
+use App\Models\User;
 use App\Support\CounterOperator;
 use App\Support\TerminalName;
 use Illuminate\Support\Facades\Auth;
@@ -38,7 +39,7 @@ class OpenTill
             $located = Location::withoutGlobalScopes()->lockForUpdate()->findOrFail($location->id);
             $located->update(['terminals' => TerminalName::register($located->terminalNames(), $terminal)]);
 
-            return TillSession::create([
+            $session = TillSession::create([
                 'organisation_id' => $location->organisation_id,
                 'location_id' => $location->id,
                 'terminal' => $terminal,
@@ -48,6 +49,18 @@ class OpenTill
                 'status' => TillSessionStatus::OPEN,
                 'notes' => $options['notes'] ?? null,
             ]);
+
+            // Prompt 186 — the first shift, opened with the session. A single-operator day is then ONE shift
+            // and behaves exactly as it did: the shift is the attributable unit, and a day with one operator
+            // has one of them. Nothing about the session, the arqueo or any report that reconciles against
+            // it changes.
+            $operator = User::query()->find($session->opened_by);
+
+            if ($operator !== null) {
+                (new StartTillShift)->handle($session, $operator);
+            }
+
+            return $session;
         });
     }
 }

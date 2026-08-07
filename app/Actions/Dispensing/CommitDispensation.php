@@ -78,6 +78,15 @@ class CommitDispensation
                 $tillSessionId = $options['till_session_id'] ?? null;
                 if ($tillSessionId !== null) {
                     $till = TillSession::withoutGlobalScopes()->find($tillSessionId);
+                    // Prompt 186 — a drawer nobody holds takes no money. A session can be OPEN with no OPEN
+                    // shift (Toast's middle state), and that is refused SERVER-SIDE rather than by hiding a
+                    // button: a cash variance is attributable to whoever held the drawer, so a charge landing
+                    // while nobody does would belong to nobody, which is the defect this whole branch exists
+                    // to remove.
+                    if ($till !== null && $till->status === TillSessionStatus::OPEN && $till->isBetweenShifts()) {
+                        throw new TillClosedException('The till is between shifts — take it over before charging to it.');
+                    }
+
                     if ($till === null || $till->status !== TillSessionStatus::OPEN) {
                         throw new TillClosedException('The dispensation must attach to an open till session.');
                     }

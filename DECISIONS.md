@@ -7705,3 +7705,74 @@ An applicant who does not upload sees no difference at all.
 **MySQL was left to CI**, per the running order: `composer check` green on SQLite (1382 tests). This branch
 does add a migration (`mrz_field_stats`) — plain integer columns and a unique index, no JSON and no raw
 expression — so there is no driver-difference surface a local MySQL run would find that CI will not.
+
+## Prompt 186 — two people cannot share a day at the till
+
+**The drawer belongs to the till, and a handover is counted — the owner's decision, not reopened.** So a
+shift change is a count and a signature, and the session, the trading day and the arqueo continue as one.
+The alternative (the drawer follows the person) is more honest about accountability and much more work: it
+redefines a trading day and every report that reconciles against a session.
+
+**A shift is a RECORD INSIDE a session, not a third `TillSessionStatus`.** That follows from the fork rather
+than being a separate choice: the session is never "between people" — it is continuously open, and the
+*shift* is what begins and ends. Modelling it this way is why every existing report is untouched and why a
+single-operator club notices nothing. Toast's middle state still exists — a session OPEN with no OPEN shift
+— but as a condition rather than a status.
+
+**Attribution is the point, and the arithmetic is where it is won or lost.** A shift's expected figure is
+**what it was handed plus what the ledger moved during it**, never the session float:
+
+```
+shift.expected = opening_counted + (TillSummary::expectedCents(session) now − opening_expected at handover)
+```
+
+Both sides come from `TillSummary`, the one existing source — nothing here recomputes a drawer figure. The
+consequence is the assertion the whole branch exists for: if Ana hands over €5 short and Bea is exact, Ana's
+shift carries −500 and **Bea's carries 0**. She does not inherit it. Had the shift been measured against the
+session float, every subsequent operator would have worn the first one's shortfall, which would have been
+worse than the problem being solved. Tested with three shifts, and the shifts' variances **sum to the
+session's**.
+
+**The count is mandatory, and there is therefore no "uncounted" state to mark.** An uncounted handover
+leaves the outgoing person's variance unknowable, which is exactly the problem. `countedCents` is a required
+argument with no optional path, asserted by reflection so a later default cannot quietly appear.
+
+**The handover count is BLIND — and getting that right needed a fix that the tests did not catch.** The
+source-level assertions passed: the handover block references no `breakdown`, no `expected_cents`, no
+`variance_cents`, and the success flash names only the incoming operator. Then the **screenshot** showed
+*"Cash expected in the drawer €100.00"* sitting a few centimetres above the count box, because the handover
+panel lives on the ordinary till screen while the close-out reaches its blindness by routing through
+`closing`. The count was blind in name only. Opening the handover now withholds the breakdown and the whole
+summary section exactly as the close does. **This is precisely the accident the prompt predicted from
+reusing the close-out's components**, it survived four targeted assertions, and it was found by looking.
+
+**Permission: `till.open`, not `till.close`.** Closing ends the trading day, produces the arqueo and is
+manager-gated for that reason; a handover does neither. Requiring a manager for every shift change would
+reintroduce the defect — clubs run shift changes without one, so they would leave the session open and share
+it, which is the behaviour this exists to remove. **The incoming operator identifies by PIN before the
+outgoing one is released**, which is why the drawer is never unheld in the ordinary flow: the UI cannot
+produce the middle state. `CommitDispensation` and `CommitOrder` refuse it anyway, server-side, because a
+gate has to be a gate rather than a picture of one.
+
+**`isBetweenShifts()` is deliberately narrower than "has no open shift".** A session that never had a shift
+is not between people — it is pre-186 data, and the migration backfills every session that was OPEN at
+deploy time. Refusing money on those would break a live drawer for no safety gain.
+
+**Reports: per session AND per shift, with the session unchanged.** Every existing report reconciles against
+a session and none of them changed. The shift breakdown is additive — the till screen shows the day's
+attribution trail, and it only renders when the drawer actually changed hands, so a single-operator day
+looks exactly as it did.
+
+**`TillSessionFactory` now creates the opening shift, because `OpenTill` does.** Sixteen tests failed when
+the commit gate landed, all of them building a session by factory and therefore producing a shape the real
+writer never produces — a drawer nobody holds. Fixing the factory rather than loosening the gate is
+CLAUDE.md's own rule: a fixture that drifts from its writer certifies a state production cannot reach.
+
+**Untouched:** `RecordFeePayment`, `CommitDispensation`, `CommitOrder` and everything that writes money;
+the close-out's count, expected figure, variance, tolerance and note requirement; prompt 26's PIN as the
+only way to say who is working; and prompt 175's blocking pattern as the only way a closed till is
+presented. Cash stays integer cents through `MoneyCast`, and a closed shift is immutable like the session.
+
+**MySQL was left to CI**, per the running order: `composer check` green on SQLite (1399 tests). The
+migration is plain integer columns, an index and a backfill of open sessions — no JSON, no raw expression.
+The backfill is the one part worth re-checking on the production runtime, and CI runs it.
