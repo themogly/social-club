@@ -320,6 +320,12 @@
         @else
             {{-- ============ Open session: the LIVE summary + movements + close ============ --}}
             @php $b = $breakdown; @endphp
+
+            {{-- Prompt 186: while a handover count is being taken the breakdown is withheld, exactly as the
+                 close-out withholds it. The whole summary section goes with it — leaving the drawer's
+                 expected figure on screen a few centimetres above the count box would make the "blind"
+                 count blind in name only. --}}
+            @if ($b !== null)
             <section class="rounded-2xl border border-line bg-surface p-5 dark:border-slate-800 dark:bg-slate-900 sm:p-6">
                 <div class="flex items-start justify-between gap-3">
                     <div class="min-w-0">
@@ -576,6 +582,101 @@
                     @endif
                     </fieldset>
                 </section>
+            @endcan
+
+            @endif
+
+            {{-- ============ Prompt 186 — hand the drawer to the next person ============
+
+                 Not a close. The session, the trading day and the arqueo all continue; what changes is who
+                 is accountable for the cash. A shift change used to leave two bad options — two arqueos for
+                 one day, or two people inside one session and a shortfall belonging to nobody.
+
+                 The count is MANDATORY and BLIND. Nothing here shows the expected figure and the flash that
+                 follows says nothing about the variance: telling the outgoing operator would let the next
+                 handover be counted to fit. `till.open`, not `till.close` — closing ends the day and is
+                 manager-gated for that reason; a handover does neither, and requiring a manager for every
+                 shift change would push clubs straight back to sharing a session. --}}
+            @can('till.open')
+                <div data-handover class="mt-4 rounded-2xl border border-line bg-surface p-4 dark:border-slate-800 dark:bg-slate-900">
+                    <div class="flex items-center justify-between gap-3">
+                        <h3 class="text-base font-semibold">{{ __('Cambio de turno') }}</h3>
+                        <button
+                            type="button"
+                            wire:click="toggleHandover"
+                            data-handover-toggle
+                            aria-expanded="{{ $handoverOpen ? 'true' : 'false' }}"
+                            class="inline-flex h-11 items-center rounded-xl border border-line px-4 text-sm font-medium text-ink-muted transition hover:bg-surface-alt dark:border-slate-700 dark:text-slate-400 dark:hover:bg-slate-800"
+                        >{{ $handoverOpen ? __('Cancelar') : __('Entregar la caja') }}</button>
+                    </div>
+
+                    @if ($handoverOpen)
+                        <p class="mt-2 text-sm text-ink-muted dark:text-slate-400">{{ __('Cuenta el efectivo del cajón y que entre la siguiente persona con su PIN. La caja no se cierra: el día sigue siendo uno.') }}</p>
+
+                        <div class="mt-4 space-y-4">
+                            <div>
+                                <label for="handover-counted" class="block text-sm font-medium text-ink-muted dark:text-slate-400">{{ __('Efectivo contado (€)') }}</label>
+                                <input
+                                    id="handover-counted"
+                                    data-handover-counted
+                                    type="text"
+                                    inputmode="decimal"
+                                    wire:model="handoverCounted"
+                                    autocomplete="off"
+                                    placeholder="0,00"
+                                    class="mt-2 h-12 w-full rounded-xl border border-line bg-surface px-4 text-base text-ink placeholder:text-ink-muted focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/40 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
+                                >
+                                {{-- Blind, exactly like the arqueo: the expected figure is not on this screen. --}}
+                                <p class="mt-1 text-xs text-ink-muted dark:text-slate-500">{{ __('Cuenta primero. La diferencia se calcula después y queda en el arqueo del día.') }}</p>
+                            </div>
+
+                            <div>
+                                <label for="handover-pin" class="block text-sm font-medium text-ink-muted dark:text-slate-400">{{ __('PIN de quien entra') }}</label>
+                                <input
+                                    id="handover-pin"
+                                    data-handover-pin
+                                    type="password"
+                                    inputmode="numeric"
+                                    autocomplete="off"
+                                    wire:model="handoverPin"
+                                    class="mt-2 h-12 w-full rounded-xl border border-line bg-surface px-4 text-base tracking-widest text-ink focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/40 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
+                                >
+                                <p class="mt-1 text-xs text-ink-muted dark:text-slate-500">{{ __('Quien entra se identifica antes de que salgas: así el cajón nunca queda sin responsable.') }}</p>
+                            </div>
+
+                            <div>
+                                <label for="handover-note" class="block text-sm font-medium text-ink-muted dark:text-slate-400">{{ __('Nota (opcional)') }}</label>
+                                <input id="handover-note" type="text" wire:model="handoverNote" autocomplete="off" class="mt-2 h-12 w-full rounded-xl border border-line bg-surface px-4 text-base text-ink focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/40 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100">
+                            </div>
+
+                            <button
+                                type="button"
+                                wire:click="handOver"
+                                data-handover-confirm
+                                wire:loading.attr="disabled"
+                                class="h-14 w-full rounded-xl bg-brand text-base font-semibold text-white transition hover:bg-brand-dark focus:outline-none focus:ring-2 focus:ring-brand/40 disabled:opacity-60"
+                            >{{ __('Entregar la caja') }}</button>
+                        </div>
+                    @endif
+
+                    {{-- The day's attribution trail. A single-operator day shows one row and reads exactly as
+                         it always did. --}}
+                    @if ($shifts->count() > 1)
+                        <ul data-shift-trail class="mt-4 divide-y divide-line overflow-hidden rounded-xl border border-line text-sm dark:divide-slate-800 dark:border-slate-800">
+                            @foreach ($shifts as $shift)
+                                <li class="flex items-center justify-between gap-3 px-3 py-2">
+                                    <span class="min-w-0">
+                                        <span class="block truncate font-medium">{{ $shift->openedBy?->name ?? '—' }}</span>
+                                        <span class="block text-xs text-ink-muted dark:text-slate-400">
+                                            {{ $shift->opened_at?->format('H:i') }}–{{ $shift->closed_at?->format('H:i') ?? __('ahora') }}
+                                        </span>
+                                    </span>
+                                    <span class="shrink-0 text-xs font-medium">{{ $shift->status->label() }}</span>
+                                </li>
+                            @endforeach
+                        </ul>
+                    @endif
+                </div>
             @endcan
 
             {{-- Close (arqueo) — DEMOTED (prompt 91): a once-a-day, irreversible action must not be the

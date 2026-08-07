@@ -4,8 +4,10 @@ namespace App\Actions\Till;
 
 use App\Actions\RecordAuditLog;
 use App\Enums\TillSessionStatus;
+use App\Enums\TillShiftStatus;
 use App\Exceptions\TillClosedException;
 use App\Models\TillSession;
+use App\Models\TillShift;
 use App\Models\User;
 use App\Support\Settings;
 use App\Support\TillSummary;
@@ -55,6 +57,29 @@ class CloseTill
                 'status' => TillSessionStatus::CLOSED,
                 'notes' => $note ?? $locked->notes,
             ]);
+
+            // Prompt 186 — the final shift closes WITH the session, against the same count. The day's figures
+            // then reconcile whether it held one shift or three: each shift's expected is what it was handed
+            // plus what moved during it, so the shifts' variances sum to the session's. Nothing about the
+            // arqueo itself changed — the count, the expected figure, the variance and the note are all
+            // exactly as they were, which is why a single-operator club sees no difference.
+            $shift = TillShift::query()->withoutGlobalScopes()
+                ->where('till_session_id', $locked->id)->open()->latest('opened_at')->first();
+
+            if ($shift !== null) {
+                $shiftExpected = (int) $shift->getRawOriginal('opening_counted_cents')
+                    + ($expected - (int) $shift->getRawOriginal('opening_expected_cents'));
+
+                $shift->forceFill([
+                    'closed_by' => $closedBy->id,
+                    'closed_at' => now(),
+                    'counted_cents' => $countedCents,
+                    'expected_cents' => $shiftExpected,
+                    'variance_cents' => $countedCents - $shiftExpected,
+                    'notes' => $note,
+                    'status' => TillShiftStatus::CLOSED,
+                ])->save();
+            }
 
             (new RecordAuditLog)->handle('till.closed', $locked, null, [
                 'expected_cents' => $expected,
