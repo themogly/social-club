@@ -5,7 +5,6 @@ namespace App\Filament\Resources\MemberApplications;
 use App\Actions\Members\ApproveApplication;
 use App\Actions\ResolveLocale;
 use App\Enums\ApplicationStatus;
-use App\Filament\Resources\MemberApplications\Pages\CreateMemberApplication;
 use App\Filament\Resources\MemberApplications\Pages\EditMemberApplication;
 use App\Filament\Resources\MemberApplications\Pages\ListMemberApplications;
 use App\Filament\Resources\MemberApplications\Pages\ViewMemberApplication;
@@ -307,7 +306,9 @@ class MemberApplicationResource extends Resource
     {
         return [
             'index' => ListMemberApplications::route('/'),
-            'create' => CreateMemberApplication::route('/create'),
+            // No `create` page (admin audit, Phase C). An application hand-made in the panel has no invite
+            // token, so nobody can ever fill it in — and that page was the way to the free `status` Select.
+            // Invitations are issued by the `Invitar` action on the list page, through IssueApplicationInvite.
             'view' => ViewMemberApplication::route('/{record}'),
             'edit' => EditMemberApplication::route('/{record}/edit'),
         ];
