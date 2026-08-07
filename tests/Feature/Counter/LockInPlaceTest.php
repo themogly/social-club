@@ -112,13 +112,20 @@ class LockInPlaceTest extends TestCase
         $this->assertStringNotContainsString('confirm(', $control);
     }
 
-    /** The guard is still on the controls that DO leave the counter — 196's behaviour, unchanged. */
+    /**
+     * The guard is still on the controls that DO leave the counter — 196's behaviour, unchanged.
+     *
+     * **Home dropped off this list in prompt 206**, and that is the point rather than an omission: the basket
+     * is session-backed, so a trip to the hub cannot lose it, and this test asserting `dirty` on the Home link
+     * is what the previous behaviour looked like from the inside. Home's own guard is `volatile`, asserted in
+     * `TopBarNamesItsDestinationsTest`.
+     */
     public function test_the_unsaved_work_guard_still_fires_on_the_routes_that_leave_the_counter(): void
     {
         $this->operator();
         $html = (string) $this->get(route('counter.bar'))->assertOk()->getContent();
 
-        foreach (['data-counter-dashboard', 'data-counter-logout', 'data-counter-home-link'] as $marker) {
+        foreach (['data-counter-admin-link', 'data-counter-logout'] as $marker) {
             $at = strpos($html, $marker);
             $this->assertNotFalse($at, $marker.' must be present');
 

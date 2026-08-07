@@ -131,7 +131,10 @@ class CounterScreenSwitcherTest extends TestCase
      *
      * 130's scrollable-strip rule retired with the strip — there is nothing left in the middle of the row to
      * overlap its neighbours, which is a stronger guarantee than the one it replaced. What survives is the
-     * floor itself, and the uniform `lg`-gated labelling (116's `md:inline` must not come back).
+     * floor itself, and the uniform breakpoint-gated labelling (116's `md:inline` must not come back).
+     * **The threshold moved `lg` → `xl` in prompt 206**, measured: that branch widened the row and at 1024
+     * the labelled version overlapped the sede badge by 68px. All-or-nothing is the rule; where it flips is
+     * whatever the measurement says.
      */
     public function test_the_tiles_clear_the_touch_floor_and_the_bar_labels_uniformly(): void
     {
@@ -143,9 +146,10 @@ class CounterScreenSwitcherTest extends TestCase
         $this->assertMatchesRegularExpression('/data-counter-home-tile="counter\.\w+"[^>]*\n?[^>]*min-h-\[8rem\]/s', $html);
         $this->assertStringContainsString('min-h-[11rem]', $html);
 
-        // The bar's controls: uniform labelling gated at lg, 116's md:inline still gone.
-        $this->assertStringContainsString('hidden lg:inline', $html);
+        // The bar's controls: uniform labelling gated at xl, 116's md:inline still gone.
+        $this->assertStringContainsString('hidden xl:inline', $html);
         $this->assertStringNotContainsString('hidden md:inline', $html);
+        $this->assertStringNotContainsString('hidden lg:inline', $html);
         $this->assertStringContainsString('min-h-11', $html);
     }
 

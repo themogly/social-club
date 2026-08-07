@@ -2,6 +2,10 @@
 // intersect, and none is under 44×44, at 768 / 800 / 1024 / 1280 (1024 landscape is the one that matters and is
 // NOT the narrowest — a fixed-width check catches what the extremes miss). This is what prompt 130 lacked.
 //
+// **Prompt 206 added the two TABLET orientations** — 1180×820 and 820×1180 — because that branch changed what
+// the row CONTAINS (the club's name went back into the home link, the admin control gained a longer word and a
+// divider), and a widened row is exactly the change a width-only sweep at a fixed 900px height under-measures.
+//
 // **Updated by prompt 205, not deleted.** The five-destination row it was written for is gone — the hub is the
 // menu — but "no two controls overlap, none under 44px, at four widths" is as valuable on a short row, and a
 // short row is exactly where somebody would stop checking. The selector list had to move with it: left
@@ -21,7 +25,13 @@ import { pathToFileURL } from 'node:url';
 import { resolve } from 'node:path';
 
 const harness = pathToFileURL(resolve('storage/app/topbar-harness.html')).href;
-const WIDTHS = [768, 800, 1024, 1280];
+// width × height, because 206's two required checks are ORIENTATIONS, not widths.
+const VIEWPORTS = [
+  { width: 768, height: 900 }, { width: 800, height: 900 },
+  { width: 1024, height: 900 }, { width: 1280, height: 900 },
+  { width: 1180, height: 820 },   // tablet landscape (prompt 206)
+  { width: 820, height: 1180 },   // tablet portrait  (prompt 206)
+];
 // Every interactive control the bar carries after prompt 205. Keyed by attribute so a renamed hook fails
 // loudly (the count check below) rather than quietly shrinking what is measured.
 const CONTROLS = [
@@ -30,19 +40,22 @@ const CONTROLS = [
   ['data-counter-sede-state', 'sede'],
   ['data-operator-name-chip', 'operator'],
   ['data-counter-lock', 'lock'],
-  ['data-counter-dashboard', 'panel'],
+  ['data-counter-admin-link', 'admin'],
   ['data-counter-logout', 'logout'],
   ['data-counter-panic', 'panic'],
 ];
 const SELECTOR = CONTROLS.map(([attr]) => `[data-counter-topbar] [${attr}]`).join(', ');
-const MIN_CONTROLS = 6;   // home, sede, operator, lock, panel, logout — panic depends on the fixture's role
+// All 7 the harness's OWNER fixture renders. Was 6 ("panic depends on the role") — but the fixture is always
+// an owner, and the loose floor let a stale measurement through again during prompt 206: a renamed hook
+// dropped a control and 6 still read as PASS. A floor that cannot catch the thing it exists for is decoration.
+const MIN_CONTROLS = 7;
 
 const browser = await chromium.launch();
 let failed = false;
 
-for (const width of WIDTHS) {
+for (const { width, height } of VIEWPORTS) {
   const page = await browser.newPage();
-  await page.setViewportSize({ width, height: 900 });
+  await page.setViewportSize({ width, height });
   await page.goto(harness);
 
   const els = await page.$$eval(SELECTOR, (nodes) =>
@@ -52,7 +65,7 @@ for (const width of WIDTHS) {
         const hooks = [
           ['data-counter-home-link', 'home'], ['data-counter-sede-current', 'sede'],
           ['data-counter-sede-state', 'sede'], ['data-operator-name-chip', 'operator'],
-          ['data-counter-lock', 'lock'], ['data-counter-dashboard', 'panel'],
+          ['data-counter-lock', 'lock'], ['data-counter-admin-link', 'admin'],
           ['data-counter-logout', 'logout'], ['data-counter-panic', 'panic'],
         ];
         const label = (hooks.find(([attr]) => n.hasAttribute(attr)) ?? [null, '?'])[1];
@@ -85,7 +98,7 @@ for (const width of WIDTHS) {
   }
 
   if (!ok) failed = true;
-  console.log(`=== ${width}px === ${ok ? 'PASS' : 'FAIL'} (${els.length} controls) hScroll=${pageScroll}`);
+  console.log(`=== ${width}×${height} === ${ok ? 'PASS' : 'FAIL'} (${els.length} controls) hScroll=${pageScroll}`);
   if (overlaps.length) console.log('  overlaps:', overlaps.join(', '));
   if (under44.length) console.log('  under44:', under44.join(', '));
   await page.close();

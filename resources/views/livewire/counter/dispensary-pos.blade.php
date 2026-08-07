@@ -787,7 +787,9 @@
 @endif
 </div>
 
-{{-- Prompt 23: flag unsaved counter work so the header's Panel/Log out confirm before leaving. --}}
+{{-- Prompt 23: flag unsaved counter work so the header's Administración / Log out controls confirm before
+     leaving. `dirty` only — NOT `volatile` (prompt 206): this basket is session-backed (PersistsBasket), so
+     it survives the trip to the hub and back, and Home must not warn about a loss that cannot happen. --}}
 @script
 <script>
     const sync = () => { if (window.Alpine?.store('counter')) window.Alpine.store('counter').dirty = (($wire.basket?.length ?? 0) > 0); };

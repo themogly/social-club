@@ -161,7 +161,7 @@ class CounterHubTest extends TestCase
             'data-counter-sede-region' => 'the sede',
             'data-operator-name-chip' => 'the operator chip',
             'data-counter-lock' => 'Lock',
-            'data-counter-dashboard' => 'Panel',
+            'data-counter-admin-link' => 'Panel',
             'data-counter-logout' => 'Log out',
             'data-counter-home-link' => 'the Home link',
         ] as $hook => $what) {

@@ -4,7 +4,20 @@
     // with no panel access sees no way into admin — that lockdown is intentional.
     $user = auth()->user();
     $canPanel = $user !== null && $user->canAccessPanel(\Filament\Facades\Filament::getPanel('admin'));
+
+    // TWO confirms, because there are two different losses (prompt 206).
+    //   · leaving the counter  — the basket goes with the session; `counter.dirty` is the right question.
+    //   · going home           — the basket SURVIVES (App\Support\CounterBasket), so the only thing a
+    //                            navigation inside the counter can lose is typed-but-unsubmitted input,
+    //                            which is `counter.volatile` and today means the till's count/movement
+    //                            fields only.
     $confirmLeave = __('Tienes trabajo sin guardar en el mostrador. ¿Seguro que quieres salir?');
+    $confirmDiscard = __('Hay datos sin guardar en esta pantalla. Se perderán. ¿Continuar?');
+
+    // Whose terminal this is (prompt 206). 205 left only the PRODUCT name's first letter in an aria-hidden
+    // tile, so nothing on any counter screen said which club the staff were working at — and the product
+    // name is the wrong name anyway (prompt 150 records the same mistake on club email). One indexed lookup.
+    $clubName = \App\Support\OrganisationIdentity::tradingName();
 
     // Which sede this terminal is working at (prompt 89). Resolved HERE, in the one shared header, so all
     // four counter screens show it identically. Read from the counter's OWN state (session
@@ -40,46 +53,68 @@
     operations belong on the home screen; they were added there and never removed from here.
 
     So the split is now clean, and it is the model the owner chose:
-      · this bar   — Home, the sede, who is working (and Switch), Lock screen, Panel, Log out, panic
+      · this bar   — Home, the sede, who is working (and Switch), Lock screen, Administración, Log out, panic
       · the hub    — the destinations, and the live panels
     The tab strip is gone. The overflow is gone. Nothing renders in both.
 
-    Leaving the counter entirely still confirms unsaved work (Alpine store `counter.dirty`); moving BETWEEN
-    counter screens no longer needs to, because prompt 205 made the basket survive navigation.
+    **Prompt 206 — the bar now says what it does.** It carried two controls that both read "go to the main
+    screen": *Inicio* (the counter hub) and *Panel*, which `lang/en.json` renders as **Dashboard** — so an
+    English operator read *Home* and *Dashboard* side by side, two synonyms, neither naming the application it
+    opens. **And the house icon was on the wrong one**: the admin link wore the home glyph while the control
+    that actually goes home wore a letter. Each is now named by its DESTINATION — the club's own counter, and
+    *Administración* — the house sits on the link that goes home, and the two controls that LEAVE the counter
+    are grouped behind a divider away from the ones that stay inside it.
+
+    Leaving the counter entirely still confirms unsaved work (`counter.dirty`); going home confirms only
+    `counter.volatile` — typed input that no navigation preserves — because prompt 205 made the BASKET survive
+    the trip, so a Home confirm about a lost basket was warning about a loss that cannot happen.
 --}}
 <header
     data-counter-topbar
     class="flex items-center justify-between border-b border-line px-4 py-3 dark:border-slate-800 sm:px-6"
 >
     <div class="flex min-w-0 items-center gap-3">
-        {{-- HOME — a labelled link, not a logo (prompt 205).
+        {{-- HOME — a labelled link, not a logo (205), and now named by where it goes (206).
 
-             The reported bug in one line: this was a 44×44 brand-blue square with one letter in it and an
-             `aria-label`, and the words beside it were a separate, unclickable `div`. Nobody could see the
-             route home because there was nothing that looked like one. It is now one control, carrying the
-             brand mark AND the word, and it is the only route between screens — the most-used control in
-             the product.
+             205's fix was that the route home must not BE a logo: it was a 44×44 brand square with one letter
+             and an `aria-label`, and the words beside it were a separate, unclickable `div`. That still holds —
+             this is one control, and it is the only route between screens.
 
-             It keeps 196's unsaved-work confirm, but the confirm now almost never fires: prompt 205 made the
-             basket survive navigation, so `counter.dirty` is set only when work would GENUINELY be lost. --}}
+             What 206 changes is what it SAYS. "Inicio" and "Panel" (English: *Home* and *Dashboard*) were
+             synonyms sitting a few pixels apart, and the **house glyph was on the admin link** — the visual
+             language was inverted, which is most of why the owner read this row as confusing rather than
+             merely ambiguous. So the house is here, on the control that goes home; the club's name is back,
+             because it is the identity of the screen staff work at all day and 205 had reduced it to one
+             aria-hidden letter of the PRODUCT name; and the destination is spelled out for assistive tech
+             (visible text stays part of the accessible name, so WCAG 2.5.3 holds).
+
+             The confirm: `volatile`, not `dirty` — see the top of this file. Going home cannot lose a basket. --}}
         <a href="{{ route('counter.home') }}"
            data-counter-home-link
            wire:navigate.ignore
-           @click.prevent="(! ($store.counter?.dirty) || window.confirm(@js($confirmLeave))) && window.location.assign('{{ route('counter.home') }}')"
+           @click.prevent="(! ($store.counter?.volatile) || window.confirm(@js($confirmDiscard))) && window.location.assign('{{ route('counter.home') }}')"
            @class([
-               'flex min-h-11 shrink-0 items-center gap-2 rounded-xl px-2 text-left transition sm:px-3',
+               'flex min-w-0 min-h-11 items-center gap-2 rounded-xl px-2 text-left transition sm:px-3',
                'bg-brand-tint text-brand dark:bg-slate-800 dark:text-white' => request()->routeIs('counter.home'),
                'text-ink hover:bg-brand-tint hover:text-brand dark:text-slate-100 dark:hover:bg-slate-800' => ! request()->routeIs('counter.home'),
            ])
            @if (request()->routeIs('counter.home')) aria-current="page" @endif>
-            <span class="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-brand text-sm font-bold text-white" aria-hidden="true">{{ mb_substr(config('app.name', 'C'), 0, 1) }}</span>
+            {{-- The house, taken back off the admin link where 205 left it. --}}
+            <span class="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-brand text-white" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" class="h-5 w-5">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M2.25 12 12 2.25 21.75 12M4.5 9.75v9.75a.75.75 0 0 0 .75.75H9.75V15.75a1.5 1.5 0 0 1 1.5-1.5h1.5a1.5 1.5 0 0 1 1.5 1.5v4.5h4.5a.75.75 0 0 0 .75-.75V9.75"/>
+                </svg>
+            </span>
             <span class="min-w-0 leading-tight">
-                {{-- The accessible name is a WORD, which is the whole fix. --}}
-                <span class="block truncate text-sm font-semibold">{{ __('Inicio') }}</span>
+                {{-- Whose terminal this is. Visible, so it is part of the link's accessible name. --}}
+                <span class="block truncate text-sm font-semibold">{{ $clubName }}</span>
                 {{-- The counter screen's one <h1> (a11y): the shared header renders it for every terminal,
                      so headings below can start at h2 without skipping a level. --}}
                 <h1 class="truncate text-xs font-normal text-ink-muted dark:text-slate-400">{{ $title ?? __('Mostrador') }}</h1>
             </span>
+            {{-- …and where the link GOES, which the club's name alone does not say. Same idiom as the
+                 operator chip's "· Cambiar" below. --}}
+            <span class="sr-only">· {{ __('Inicio del mostrador') }}</span>
         </a>
 
         {{-- Which sede this terminal is working at (prompt 89) — shown on EVERY counter screen, from the
@@ -161,8 +196,15 @@
     {{-- ============ THE TERMINAL CONTROLS ============
          Every one of these was in TWO places after 189 — here and on the hub's "Terminal" panel. They live
          here now and only here (prompt 205), because they are facts about this terminal rather than about
-         whichever screen happens to be open. Labels collapse below `lg`, where a labelled row does not fit a
-         portrait tablet; every target stays at the 44px floor either way. --}}
+         whichever screen happens to be open.
+
+         **Labels collapse below `xl`, raised from `lg` by prompt 206**, and 130's rule that labelling is
+         all-or-nothing is why it had to move rather than half-collapse: this row grew — the club's name went
+         back into the home link and *Panel* became the longer, correct *Administración* — and a labelled row
+         no longer fits the 1024px landscape tablet. Measured, not guessed: at 1024 the labelled row overlapped
+         the sede badge by 68px. Every target stays at the 44px floor either way, and every control carries an
+         `aria-label`, because `hidden` takes a label out of the accessibility tree as well as off the screen —
+         the Lock button was relying on a span that vanished from both below `lg`. --}}
     <div class="flex shrink-0 items-center gap-1">
         {{-- WHO IS WORKING, and Switch — one control (prompt 173's rule: exactly ONE route to the pad, which
              is 173's own full-screen surface; this dispatches to it and does not draw a second one). --}}
@@ -190,49 +232,64 @@
             type="button"
             data-counter-lock
             @click="$store.counter.lockNow()"
+            aria-label="{{ __('Bloquear pantalla') }}"
             class="inline-flex min-h-11 items-center gap-2 rounded-lg px-3 text-sm font-medium text-ink-muted transition hover:bg-brand-tint hover:text-brand dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-white"
         >
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" class="h-5 w-5 shrink-0" aria-hidden="true">
                 <path stroke-linecap="round" stroke-linejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 1 0-9 0v3.75m-.75 0h10.5a2.25 2.25 0 0 1 2.25 2.25v6.75a2.25 2.25 0 0 1-2.25 2.25H6.75a2.25 2.25 0 0 1-2.25-2.25v-6.75a2.25 2.25 0 0 1 2.25-2.25Z"/>
             </svg>
-            <span class="hidden lg:inline">{{ __('Bloquear pantalla') }}</span>
+            <span class="hidden xl:inline" aria-hidden="true">{{ __('Bloquear pantalla') }}</span>
         </button>
 
-        {{-- PANEL + LOG OUT — both LEAVE the counter, so both keep 196's confirm. --}}
-        @if ($canPanel)
-            <a
-                href="{{ url('/') }}"
-                data-counter-dashboard
-                wire:navigate.ignore
-                @click.prevent="(! ($store.counter?.dirty) || window.confirm(@js($confirmLeave))) && window.location.assign('{{ url('/') }}')"
-                aria-label="{{ __('Panel') }}"
-                class="inline-flex min-h-11 items-center gap-2 rounded-lg px-3 text-sm font-medium text-ink-muted transition hover:bg-brand-tint hover:text-brand dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-white"
-            >
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" class="h-5 w-5 shrink-0" aria-hidden="true">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M2.25 12 12 2.25 21.75 12M4.5 9.75v9.75a.75.75 0 0 0 .75.75H9.75V15.75a1.5 1.5 0 0 1 1.5-1.5h1.5a1.5 1.5 0 0 1 1.5 1.5v4.5h4.5a.75.75 0 0 0 .75-.75V9.75"/>
-                </svg>
-                <span class="hidden lg:inline" aria-hidden="true">{{ __('Panel') }}</span>
-            </a>
-        @endif
+        {{-- ======== THE CONTROLS THAT LEAVE THE COUNTER (prompt 206) ========
+             Everything above stays INSIDE the counter — Home and Lock change nothing about the session.
+             These two end it: Administración opens a different application, Log out takes the session with
+             it. Both already confirmed unsaved work, and that shared behaviour is exactly the tell that they
+             are one group — so they are one group, behind a divider. Nothing moved and nothing was renamed to
+             achieve it; grouping by SCOPE is what makes the row legible.
 
-        <form
-            method="POST"
-            action="{{ route('filament.admin.auth.logout') }}"
-            @submit="($store.counter?.dirty && ! window.confirm(@js($confirmLeave))) && $event.preventDefault()"
-        >
-            @csrf
-            <button
-                type="submit"
-                data-counter-logout
-                aria-label="{{ __('Cerrar sesión') }}"
-                class="inline-flex min-h-11 items-center gap-2 rounded-lg px-3 text-sm font-medium text-ink-muted transition hover:bg-black/5 dark:text-slate-400 dark:hover:bg-white/5"
+             The divider is decorative and the group is not a landmark: the separation is visual, and the
+             accessible names below carry the meaning on their own. --}}
+        <div data-counter-leave-group class="ml-1 flex items-center gap-1 border-l border-line pl-2 dark:border-slate-800">
+            @if ($canPanel)
+                {{-- ADMINISTRACIÓN — was "Panel", which `lang/en.json` rendered as **Dashboard**, making it a
+                     synonym of the Home link a few pixels away (and the hub is a dashboard too, so the word
+                     could not stay). It is named for its destination now: this is the way OUT of the counter
+                     and into the back office, and the briefcase says office where the house says home. --}}
+                <a
+                    href="{{ url('/') }}"
+                    data-counter-admin-link
+                    wire:navigate.ignore
+                    @click.prevent="(! ($store.counter?.dirty) || window.confirm(@js($confirmLeave))) && window.location.assign('{{ url('/') }}')"
+                    aria-label="{{ __('Administración') }}"
+                    class="inline-flex min-h-11 items-center gap-2 rounded-lg px-3 text-sm font-medium text-ink-muted transition hover:bg-brand-tint hover:text-brand dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-white"
+                >
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" class="h-5 w-5 shrink-0" aria-hidden="true">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M20.25 14.15v4.25c0 1.094-.787 2.036-1.872 2.18-2.087.277-4.216.42-6.378.42s-4.291-.143-6.378-.42c-1.085-.144-1.872-1.086-1.872-2.18v-4.25m16.5 0a2.18 2.18 0 0 0 .75-1.661V8.706c0-1.081-.768-2.015-1.837-2.175a48.114 48.114 0 0 0-3.413-.387m4.5 8.006c-.194.165-.42.295-.673.38A23.978 23.978 0 0 1 12 15.75c-2.648 0-5.195-.429-7.577-1.22a2.016 2.016 0 0 1-.673-.38m0 0A2.18 2.18 0 0 1 3 12.489V8.706c0-1.081.768-2.015 1.837-2.175a48.111 48.111 0 0 1 3.413-.387m7.5 0V5.25A2.25 2.25 0 0 0 13.5 3h-3a2.25 2.25 0 0 0-2.25 2.25v.894m7.5 0a48.667 48.667 0 0 0-7.5 0"/>
+                    </svg>
+                    <span class="hidden xl:inline" aria-hidden="true">{{ __('Administración') }}</span>
+                </a>
+            @endif
+
+            <form
+                method="POST"
+                action="{{ route('filament.admin.auth.logout') }}"
+                @submit="($store.counter?.dirty && ! window.confirm(@js($confirmLeave))) && $event.preventDefault()"
             >
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" class="h-5 w-5 shrink-0" aria-hidden="true">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0 0 13.5 3h-6a2.25 2.25 0 0 0-2.25 2.25v13.5A2.25 2.25 0 0 0 7.5 21h6a2.25 2.25 0 0 0 2.25-2.25V15M12 9l-3 3m0 0 3 3m-3-3h12.75"/>
-                </svg>
-                <span class="hidden lg:inline" aria-hidden="true">{{ __('Cerrar sesión') }}</span>
-            </button>
-        </form>
+                @csrf
+                <button
+                    type="submit"
+                    data-counter-logout
+                    aria-label="{{ __('Cerrar sesión') }}"
+                    class="inline-flex min-h-11 items-center gap-2 rounded-lg px-3 text-sm font-medium text-ink-muted transition hover:bg-black/5 dark:text-slate-400 dark:hover:bg-white/5"
+                >
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" class="h-5 w-5 shrink-0" aria-hidden="true">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0 0 13.5 3h-6a2.25 2.25 0 0 0-2.25 2.25v13.5A2.25 2.25 0 0 0 7.5 21h6a2.25 2.25 0 0 0 2.25-2.25V15M12 9l-3 3m0 0 3 3m-3-3h12.75"/>
+                    </svg>
+                    <span class="hidden xl:inline" aria-hidden="true">{{ __('Cerrar sesión') }}</span>
+                </button>
+            </form>
+        </div>
 
         {{-- PANIC (prompt 121). The hardest thing 205 had to rehome: the overflow it lived in is gone, and
              121 requires it to stay DISCREET and FAST — a labelled button on a hub is neither.
