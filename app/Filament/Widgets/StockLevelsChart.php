@@ -9,11 +9,6 @@ namespace App\Filament\Widgets;
  */
 class StockLevelsChart extends DashboardChart
 {
-    public function getHeading(): string
-    {
-        return __('Niveles de stock');
-    }
-
     protected function getType(): string
     {
         return 'bar';

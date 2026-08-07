@@ -291,7 +291,7 @@
                                     @endforeach
                                 </div>
                                 <input id="misc-ref" type="text" wire:model="miscReference" autocomplete="off" placeholder="{{ __('… o escribe un motivo') }}" class="mt-2 h-11 w-full rounded-xl border border-line bg-surface px-3 text-base text-ink placeholder:text-ink-muted focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/40 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100">
-                                <p class="mt-1 text-[11px] text-ink-muted dark:text-slate-500">{{ __('Justifica por qué es una línea sin catálogo — se revisa al cerrar la caja.') }}</p>
+                                <p class="mt-1 text-[11px] text-ink-muted dark:text-slate-400">{{ __('Justifica por qué es una línea sin catálogo — se revisa al cerrar la caja.') }}</p>
                             </div>
                             <button type="button" wire:click="addMiscLine" class="h-11 w-full rounded-xl bg-brand text-sm font-semibold text-white transition hover:bg-brand-dark focus:outline-none focus:ring-2 focus:ring-brand/40">{{ __('Añadir importe manual') }}</button>
                         </div>
@@ -416,14 +416,16 @@
                                 class="mt-1 h-11 w-full rounded-xl border border-line bg-surface px-3 text-base text-ink placeholder:text-ink-muted focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/40 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
                             >
                             @if ($member === null)
-                                <p class="mt-1 text-xs text-ink-muted dark:text-slate-500">{{ __('Atribuye un socio para pagar con monedero.') }}</p>
+                                <p class="mt-1 text-xs text-ink-muted dark:text-slate-400">{{ __('Atribuye un socio para pagar con monedero.') }}</p>
                             @endif
                         </div>
                         @endif
 
                         {{-- Quick cash --}}
                         <div>
-                            <p class="text-xs font-medium text-ink-muted dark:text-slate-400">{{ __('Efectivo entregado') }}</p>
+                            {{-- A real <label for>, not a loose <p> plus a placeholder: a placeholder disappears on focus and is
+                                 not a label (a11y audit), and this is the field that decides what goes in the drawer. --}}
+                            <label for="bar-cash-tendered" class="block text-xs font-medium text-ink-muted dark:text-slate-400">{{ __('Efectivo entregado') }}</label>
                             <div class="mt-1 grid grid-cols-4 gap-2">
                                 <button type="button" wire:click="quickCash" class="h-11 rounded-xl border border-line bg-surface text-sm font-semibold text-ink transition hover:bg-surface-alt dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:hover:bg-slate-800">{{ __('Justo') }}</button>
                                 <button type="button" wire:click="quickCash(500)" class="h-11 rounded-xl border border-line bg-surface text-sm font-semibold text-ink transition hover:bg-surface-alt dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:hover:bg-slate-800">€5</button>
@@ -431,6 +433,7 @@
                                 <button type="button" wire:click="quickCash(2000)" class="h-11 rounded-xl border border-line bg-surface text-sm font-semibold text-ink transition hover:bg-surface-alt dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:hover:bg-slate-800">€20</button>
                             </div>
                             <input
+                                id="bar-cash-tendered"
                                 type="text"
                                 inputmode="decimal"
                                 wire:model.live.debounce.400ms="cashTendered"

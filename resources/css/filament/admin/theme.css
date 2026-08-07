@@ -80,3 +80,17 @@
         min-height: 44px;
     }
 }
+
+/* 4. Filament's empty-cell placeholder ships at gray-400 (#9f9fa9), which is 2.62:1 on white — well under
+      the 4.5:1 floor, and it is not decorative: it is the dash that says a member has no membership type
+      or an audit entry has no actor, on the tables staff read most. gray-500 clears AA on both surfaces.
+      Found by the accessibility audit; vendor default, so it is corrected here rather than per-column. */
+.fi-ta-placeholder,
+.fi-in-placeholder {
+    color: var(--fi-color-gray-500, #62748e);
+}
+
+.dark .fi-ta-placeholder,
+.dark .fi-in-placeholder {
+    color: var(--fi-color-gray-400, #90a1b9);
+}

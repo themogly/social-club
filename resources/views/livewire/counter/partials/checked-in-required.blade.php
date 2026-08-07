@@ -6,5 +6,5 @@
     stays that way; anything true of one screen only is the host's chrome, added after it.
 --}}
 @if ($requireCheckedIn)
-    <p class="mt-2 text-xs text-ink-muted dark:text-slate-500">{{ __('Esta sede solo permite dispensar a socios que han registrado su entrada.') }}</p>
+    <p class="mt-2 text-xs text-ink-muted dark:text-slate-400">{{ __('Esta sede solo permite dispensar a socios que han registrado su entrada.') }}</p>
 @endif

@@ -57,8 +57,16 @@ class AdminPanelProvider extends PanelProvider
                 AppAuthentication::make()->recoverable(),
             ])
             ->colors([
-                // Brand blue #2563eb — set deliberately (never Filament's default amber).
-                'primary' => Color::hex('#2563eb'),
+                // Brand blue — set deliberately (never Filament's default amber).
+                //
+                // NOT `Color::hex('#2563eb')`, which is what this was and which quietly failed AA. That
+                // helper GENERATES a ramp around the hex it is given, and the generated 600 is not the
+                // colour asked for: it came out at oklch(0.5978 …) ≈ #477ae3, and white on that is
+                // 4.06:1 — under the 4.5:1 floor, on every primary button in the panel and on the login
+                // button. `Color::Blue` is Tailwind's blue, whose 600 IS #2563eb (white on it 5.12:1) and
+                // whose 50/700 are exactly this product's --brand-tint / --brand-dark. So the ramp now
+                // agrees with resources/css/tokens.css step for step instead of approximating it.
+                'primary' => Color::Blue,
             ])
             // Local initials avatar (prompt 61) — replaces Filament's default UiAvatarsProvider, which
             // sent every staff name to https://ui-avatars.com on each page load (undeclared outbound

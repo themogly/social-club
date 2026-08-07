@@ -429,7 +429,7 @@
                                     @elseif ($g['has_batch'])
                                         <span class="inline-flex items-center gap-1 text-success"><span class="h-2 w-2 rounded-full bg-success"></span>{{ __('Con lote') }}</span>
                                     @else
-                                        <span class="inline-flex items-center gap-1 text-ink-muted dark:text-slate-500"><span class="h-2 w-2 rounded-full bg-slate-400"></span>{{ __('Sin lote') }}</span>
+                                        <span class="inline-flex items-center gap-1 text-ink-muted dark:text-slate-400"><span class="h-2 w-2 rounded-full bg-slate-400"></span>{{ __('Sin lote') }}</span>
                                     @endif
                                 </div>
                                 @if ($g['price_label'])
@@ -515,7 +515,7 @@
                                                 <span class="min-w-0">
                                                     {{ $remedy['detail'] }}
                                                     @if ($remedy['remedy'])
-                                                        <span class="mt-0.5 block text-[11px] opacity-80">{{ $remedy['remedy'] }}</span>
+                                                        <span class="mt-0.5 block text-[11px]">{{ $remedy['remedy'] }}</span>
                                                     @endif
                                                 </span>
                                                 <span class="shrink-0 rounded-full border border-current px-2 py-0.5 text-[10px] font-semibold uppercase">{{ $isBlock ? __('Bloquea') : __('Aviso') }}</span>
@@ -628,7 +628,7 @@
                                 <input type="text" inputmode="decimal" wire:model.blur="priceOverrideEuros" autocomplete="off" placeholder="{{ __('Nuevo total (€)') }}" class="h-11 w-full rounded-xl border border-line bg-surface px-3 text-base text-ink placeholder:text-ink-muted focus:border-warning focus:outline-none focus:ring-2 focus:ring-warning/40 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100">
                                 <input type="text" wire:model.blur="priceOverrideReason" autocomplete="off" placeholder="{{ __('Motivo (p. ej. producto defectuoso)') }}" class="h-11 w-full rounded-xl border border-line bg-surface px-3 text-base text-ink placeholder:text-ink-muted focus:border-warning focus:outline-none focus:ring-2 focus:ring-warning/40 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100">
                             </div>
-                            <p class="mt-1 text-[11px] text-ink-muted dark:text-slate-500">{{ __('Deja el importe vacío para cobrar el precio normal. 0 € = gratis.') }}</p>
+                            <p class="mt-1 text-[11px] text-ink-muted dark:text-slate-400">{{ __('Deja el importe vacío para cobrar el precio normal. 0 € = gratis.') }}</p>
                         </div>
                     @endcan
 
@@ -639,7 +639,7 @@
                             <label for="wallet" class="block text-xs font-medium text-ink-muted dark:text-slate-400">{{ __('Monedero (€)') }}</label>
                             <input id="wallet" type="text" inputmode="decimal" wire:model.live.debounce.400ms="walletInput" @disabled($member === null) autocomplete="off" placeholder="0,00" class="mt-1 h-11 w-full rounded-xl border border-line bg-surface px-3 text-base text-ink placeholder:text-ink-muted focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/40 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100">
                             @if ($member === null)
-                                <p class="mt-1 text-[11px] text-ink-muted dark:text-slate-500">{{ __('Atribuye un socio para pagar con monedero.') }}</p>
+                                <p class="mt-1 text-[11px] text-ink-muted dark:text-slate-400">{{ __('Atribuye un socio para pagar con monedero.') }}</p>
                             @endif
                         </div>
 

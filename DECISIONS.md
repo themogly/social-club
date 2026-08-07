@@ -8377,3 +8377,65 @@ after grepping each to confirm no remaining reference.
 
 **MySQL was left to CI**, per the running order: `composer check` green on SQLite — 1482 tests, Larastan 0,
 Pint clean.
+
+---
+
+## Accessibility audit — the pass, and what the sweep taught before it found anything
+
+Full findings and outcomes: `audits/reports/accessibility-audit.md`. Result: axe went from **30 distinct
+(rule × page) findings to 7**, serious/critical occurrences from **80 to 2**, and the member PWA from 2 to
+**0**. Both survivors are the one finding the report dismisses on inspection (axe resolves a transitional
+background on a genetics tile; measured in the browser it is slate-400 on slate-950, ~7:1) and Filament's
+`empty-table-header` best-practice rule on six tables, where the cell is correctly `aria-label`ed already.
+
+**The sweep was wrong twice before it was right, and that is the part worth keeping.** First run: `/login`
+was audited while signed in, so it redirected and the dashboard was audited twice while the login screen was
+never audited once. Second: all six counter screens reported 18 controls and zero violations — which was
+prompt 175's chain, an owner with two sedes landing on the **sede chooser**, photographed six times. The
+sweep now clears the chain (choose a sede, enter a PIN, drive the member lookup) and the POS goes from 18
+controls to 51. Every render records what it landed on — URL, title, h1, control count, blocker state — and
+that table prints with the results, so **"no violations" can no longer mean "nothing was audited"**. This is
+the same defect class as the fixture and unreachable-Action lessons already in CLAUDE.md, arriving through a
+third door.
+
+**The largest finding was a rule this repo had already written down.** `AdminPanelProvider` set
+`'primary' => Color::hex('#2563eb')` — deliberate, commented, exactly as CLAUDE.md's design rules require.
+But `Color::hex()` GENERATES a ramp around the hex it is handed, and the generated 600 was not the colour
+given: `oklch(0.5978 …)` ≈ `#477ae3`, white on it **4.06:1**. So every primary button in the panel, and the
+login button, failed the very line that says *"button-text contrast passes AA"*. Now `Color::Blue`, whose
+600 **is** `#2563eb` (5.12:1) and whose 50/700 are this product's `--brand-tint` / `--brand-dark` — the panel
+ramp agrees with `tokens.css` step for step instead of approximating it. **A colour helper that interpolates
+is not the same as setting a colour**, and nothing in a test suite says so.
+
+**Three contrast defects shared one root cause: a token that had to mean two things.** `--color-ink-muted`
+had no dark value, so it stayed `#475569` at 2.35:1 wherever a usage forgot its own `dark:` utility (two real
+controls did). `--br` on the dashboard was the brand as a FILL *and* as TEXT, and on a dark surface those
+want opposite directions — text lighter, fill-under-white darker — which is why the active period toggle sat
+at 3.67:1 and the info alert at 3.24:1. It is now three variables (`--br` / `--brtx` / `--brfill`). And
+`opacity-80` on token-coloured text silently undid prompt 98's per-scheme pass (error 5.24:1 → 4.07:1): **an
+opacity modifier on a contrast-tuned token re-breaks the fix, and no test would notice.**
+
+**Six screens, one page title.** Every counter screen fell through to *"Mostrador"* — six identical `<title>`s
+and six identical top-bar `<h1>`s, so an operator with three counter tabs open could not tell them apart. The
+name now comes from `CounterScreens::currentLabel()`, the same list the tab strip renders from, so the tab,
+the heading and the strip cannot disagree. Route → label rather than a per-component title, because a second
+copy would drift the first time a screen is renamed.
+
+**Ten unnamed links per table page.** Filament wraps every cell of a clickable row in an `<a>`, so an EMPTY
+cell becomes a link with no accessible text — ten per page on Socios (`kind`) and Lotes (`expires_on`).
+`->placeholder('—')` gives the link content and is the ordinary table convention for "no value" besides.
+
+**One finding is deliberately NOT fixed, and it is Phase 3.** The counter's full-screen overlays are
+`role="dialog" aria-modal="true"` but do not trap focus, so Tab walks behind them. The correct fix marks the
+content behind `inert` while the surface is open; the failure mode if that effect ever misfires is `inert`
+left ON — a counter that looks fine and responds to nothing, which is far worse than the defect. This exact
+component has already produced two such bugs (prompt 188's stale surface, prompt 196's missing Alpine scope),
+every write behind the surface is refused server-side by `requireOperator()` regardless, and it deserves its
+own branch with a browser test rather than the tail of an audit. Recorded, not hidden.
+
+**Two brand-colour changes are flagged for the owner** in the report: panel primary buttons are marginally
+darker (they are now the brand blue rather than an interpolation of it), and in dark mode the dashboard's
+active period pill is blue-700 and brand text is blue-400. Light mode is unchanged.
+
+**MySQL was left to CI**, per the running order: `composer check` green on SQLite — 1482 tests, Larastan 0,
+Pint clean. Verified by looking, in both themes.

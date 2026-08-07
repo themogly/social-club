@@ -146,7 +146,7 @@
                                 <p class="mt-0.5">{{ $sanction->reason }}</p>
                             @endif
                             @if ($sanction->until_date)
-                                <p class="mt-0.5 opacity-80">{{ __('Hasta') }} {{ $sanction->until_date->format('d/m/Y') }}</p>
+                                <p class="mt-0.5">{{ __('Hasta') }} {{ $sanction->until_date->format('d/m/Y') }}</p>
                             @endif
                         </div>
                     @endif
@@ -176,7 +176,7 @@
                                             <span class="min-w-0">
                                                 {{ $remedy['detail'] }}
                                                 @if ($remedy['remedy'])
-                                                    <span class="mt-0.5 block text-xs opacity-80">{{ $remedy['remedy'] }}</span>
+                                                    <span class="mt-0.5 block text-xs">{{ $remedy['remedy'] }}</span>
                                                 @endif
                                             </span>
                                             <span class="shrink-0 rounded-full border border-current px-2 py-0.5 text-xs font-semibold uppercase">{{ $isBlock ? __('Bloquea') : __('Aviso') }}</span>

@@ -17,11 +17,6 @@ class IncomeByPeriodChart extends DashboardChart
         return Auth::user()?->canAny(['reports.view', 'reports.view.all']) ?? false;
     }
 
-    public function getHeading(): string
-    {
-        return __('Ingresos por período');
-    }
-
     protected function getType(): string
     {
         return 'bar';
