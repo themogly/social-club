@@ -1,6 +1,29 @@
 {{-- Reusable counter shell (check-in / dispensary / bar POS). Tablet-first, dark-mode
      aware, large touch targets — legible one-handed at 390px, comfortable at 1024px+.
-     Pure presentation: no queries live here. Uses the app's own Tailwind via @vite. --}}
+     Pure presentation: no queries live here. Uses the app's own Tailwind via @vite.
+
+     ============================================================================================
+     THE RULE THIS FILE OBEYS (prompt 209)
+
+     **Nothing this layout branches on may be changeable by a Livewire component within the same
+     page life.** A Livewire response replaces the component's markup and nothing else — this file
+     is rendered once, on the full page load, and never again. So a branch here is a SNAPSHOT: it
+     freezes whatever the server said at page load, and no later action can correct it.
+
+     Concretely, the line that must never come back is `@unless (CounterHandover::active())` around
+     the top bar. Ending a handover restored the counter and left it with no chrome, no sede, no
+     lock and no way to another screen — a stranded terminal, because 205 made the bar the only
+     navigation. This is prompt 188's failure one level out: 188 was Alpine snapshotting server
+     state into `x-data`, this was the layout snapshotting it into the DOM.
+
+     The line is drawn at SESSION-BACKED state, because that is exactly what a counter component
+     can write mid-page-life. Route-derived facts (the screen title), deploy-time facts (whether
+     the build manifest exists) and per-sede config (the idle-lock window, changed in the admin
+     panel, i.e. a different page life) are fixed for the life of the page and are fine here.
+
+     `tests/Feature/Counter/LayoutBranchesOnFixedFactsTest` derives that rule rather than listing
+     offenders: it fails on any `App\Support` class this layout reads whose own source writes to
+     the session. --}}
 <!DOCTYPE html>
 <html
     lang="{{ str_replace('_', '-', app()->getLocale()) }}"
@@ -132,22 +155,19 @@
             'mx-auto flex min-h-screen w-full max-w-6xl flex-col',
             'md:h-screen md:min-h-0' => $fills,
         ])>
-            {{-- One shared header for every counter terminal (the club + this screen's title, the sede, who
-                 is working, Lock, and — behind a divider, because they LEAVE the counter — a
-                 permission-filtered Administración link + Log out). See x-counter.top-bar. --}}
-            {{-- Handed over (prompt 173): the counter's chrome is ABSENT from the DOM, not hidden by CSS.
-                 The tab strip, the Administración link and Log out, the sede switcher and the
-                 panic button are all inside this component — while an applicant holds the tablet there is no
-                 element to find, no link to follow and nothing for a keyboard to reach. --}}
-            {{-- Skip link (a11y audit): the top bar is ~7 controls to tab past on EVERY counter screen, and
-                 the panel already has one. Visually hidden until focused, then it is the first thing on the
-                 page. Inside the handover guard's scope but outside it in the DOM, so it is absent while an
-                 applicant holds the tablet — same rule as the rest of the chrome. --}}
-            @unless (\App\Support\CounterHandover::active())
-                <a href="#counter-main"
-                   class="sr-only rounded-xl bg-brand text-sm font-semibold text-white focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-[60] focus:px-4 focus:py-2">{{ __('Saltar al contenido') }}</a>
-                <x-counter.top-bar :title="$screenTitle ?? null" />
-            @endunless
+            {{-- THE CHROME — the skip link and the shared top bar, and it is a COMPONENT (prompt 209).
+
+                 It used to be `@unless (CounterHandover::active())` right here, wrapping the bar directly.
+                 The rule was right — 173 requires the chrome absent from the DOM while an applicant holds the
+                 tablet, not merely hidden — and the place was wrong. `unlockOperator()` ends a handover inside
+                 a Livewire action, and a Livewire response replaces the COMPONENT's markup and nothing else:
+                 this file is never re-rendered. So recovering from a handover restored the counter and not its
+                 chrome, and since 205 made the bar the only navigation, that stranded the terminal on whatever
+                 screen it was on until somebody reloaded.
+
+                 Deciding it inside a component puts the branch somewhere a Livewire response can reach. See
+                 the rule this layout now obeys — and the test that enforces it — at the top of the file. --}}
+            <livewire:counter.counter-chrome :title="$screenTitle ?? null" />
 
             <main id="counter-main" @class([
                 'flex-1 px-4 py-5 sm:px-6',
