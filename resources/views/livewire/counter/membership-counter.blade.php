@@ -160,6 +160,28 @@
                                 {{ $feeMember->member_no }}
                                 <span class="rounded-full border px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide">{{ $feeMember->status->label() }}</span>
                             </p>
+
+                            {{-- Prompt 203 — who this is, which the record did not say.
+
+                                 AGE, not date of birth, and the distinction is the decision: age answers the
+                                 question a person at a counter actually has — does this match the card, are
+                                 they plainly of age — while `12/04/1992` is an identifier used for identity
+                                 verification everywhere else, printed on a tablet with the next socio behind
+                                 them. Same reasoning 177 applied to consumption history: the summary that
+                                 answers the question is on screen; the identifying detail is not here at all.
+
+                                 Joined is an ordinary register fact and answers the seniority/carencia
+                                 question the counter is asked next. --}}
+                            <p data-member-identity class="mt-1 text-sm text-ink-muted dark:text-slate-400">
+                                @if ($feeMember->date_of_birth)
+                                    <span data-member-age>{{ __(':years años', ['years' => $feeMember->date_of_birth->age]) }}</span>
+                                @else
+                                    <span data-member-age>{{ __('Edad sin registrar') }}</span>
+                                @endif
+                                @if ($feeMember->joined_at)
+                                    · {{ __('Socio desde') }} {{ $feeMember->joined_at->format('m/Y') }}
+                                @endif
+                            </p>
                             @if ($membership)
                                 <p class="mt-1 text-sm">
                                     {{-- Prompt 177: the TIER is named, not just its price — "what tier am I on"
@@ -176,6 +198,15 @@
                                 </p>
                             @else
                                 <p class="mt-1 text-sm text-ink-muted dark:text-slate-400">{{ __('Sin membresía activa en esta sede.') }}</p>
+                                {{-- The register fact that tells the three cases apart. Without it an operator
+                                     sees "no membership here" on somebody plainly active and cannot tell
+                                     which situation they are looking at (prompt 203). --}}
+                                @if ($elsewhere->isNotEmpty())
+                                    <p data-membership-elsewhere class="mt-0.5 text-sm">
+                                        {{ __('Activo en') }}:
+                                        <span class="font-medium">{{ $elsewhere->map(fn ($m) => $m->location?->name)->filter()->join(' · ') }}</span>
+                                    </p>
+                                @endif
                             @endif
                         </div>
                         <button type="button" wire:click="clearFeeMember" class="flex h-11 shrink-0 items-center rounded-lg px-3 text-sm text-ink-muted transition hover:bg-black/5 dark:text-slate-400 dark:hover:bg-white/5">{{ __('Cambiar') }}</button>
@@ -193,6 +224,77 @@
                          Every figure below comes from the resolver that already owns it
                          (ResolveMemberLimits, ResolveMemberEligibility, Wallet). If one ever disagrees with
                          the dispensary, this screen is wrong and the resolver is right. --}}
+                    {{-- ============ Prompt 203 — the way out of the dead end ============
+
+                         An ACTIVE member could stand here with the screen reading "Sin membresía activa en
+                         esta sede" and the verdict below saying "renueva su cuota desde su ficha" — and
+                         nothing on the screen did that. The three Actions that would were surfaced only in
+                         the admin panel, which STAFF cannot act in, so the remedy text pointed a staff user
+                         at a door they cannot open.
+
+                         One control per case, and the wording says what will actually happen:
+                           · lapsed here  → RenewMembership on the SAME row (its fee history survives)
+                           · none here    → EnrolMembership on the chosen tier, at that tier's DEFAULT fee
+                           · active elsewhere → the same enrolment, worded so it is clear the other sede is
+                             untouched. Moving a membership changes another sede's register and stock ceiling
+                             and stays in the panel behind `members.transfer`.
+
+                         No fee box anywhere: `membership.fee.override` has not moved. --}}
+                    @if ($membershipCase !== 'active')
+                        <div data-membership-fix class="mt-3 rounded-xl border border-brand/30 bg-brand-tint p-3 dark:border-slate-700 dark:bg-slate-800">
+                            @if (! $this->canOpenMembership())
+                                {{-- A clear refusal, never a dead panel: the operator is told who CAN do it
+                                     rather than being shown a button that will not work. --}}
+                                <p data-membership-fix-denied class="text-sm text-ink-muted dark:text-slate-400">
+                                    {{ __('Este socio necesita una membresía en esta sede. Pídeselo a un responsable: no tienes permiso para darla de alta.') }}
+                                </p>
+                            @elseif ($membershipCase === 'lapsed_here')
+                                <p class="text-sm font-medium">{{ __('Su membresía en esta sede ha vencido.') }}</p>
+                                <p class="mt-0.5 text-xs text-ink-muted dark:text-slate-400">
+                                    {{ __('Cuota') }}: {{ $lapsedHere?->tier?->name ?? '—' }}
+                                    @if ($lapsedHere?->expires_at)
+                                        · {{ __('Venció') }} {{ $lapsedHere->expires_at->format('d/m/Y') }}
+                                    @endif
+                                </p>
+                                <button
+                                    type="button"
+                                    wire:click="renewMembership"
+                                    data-membership-renew
+                                    class="mt-3 inline-flex h-11 w-full items-center justify-center rounded-xl bg-brand px-4 text-sm font-semibold text-white transition hover:bg-brand-dark focus:outline-none focus:ring-2 focus:ring-brand/40"
+                                >{{ __('Renovar membresía') }}</button>
+                            @else
+                                <p class="text-sm font-medium">
+                                    {{ $elsewhere->isNotEmpty() ? __('Es socio del club, pero no de esta sede.') : __('Todavía no es socio de ninguna sede.') }}
+                                </p>
+                                @if ($elsewhere->isNotEmpty())
+                                    <p class="mt-0.5 text-xs text-ink-muted dark:text-slate-400">
+                                        {{ __('Su membresía en la otra sede no cambia: aquí se añade una nueva.') }}
+                                    </p>
+                                @endif
+
+                                <label for="open-tier" class="mt-3 block text-xs font-medium text-ink-muted dark:text-slate-400">{{ __('Cuota') }}</label>
+                                <select
+                                    id="open-tier"
+                                    wire:model="openTierId"
+                                    data-membership-tier
+                                    class="mt-1 h-11 w-full rounded-xl border border-line bg-surface px-3 text-sm text-ink focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/40 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
+                                >
+                                    <option value="">{{ __('Elige una cuota') }}</option>
+                                    @foreach ($openTiers as $tier)
+                                        <option value="{{ $tier->id }}">{{ $tier->name }} · {{ $this->money($tier->default_fee_cents->cents) }}</option>
+                                    @endforeach
+                                </select>
+
+                                <button
+                                    type="button"
+                                    wire:click="enrolAtThisSede"
+                                    data-membership-enrol
+                                    class="mt-3 inline-flex h-11 w-full items-center justify-center rounded-xl bg-brand px-4 text-sm font-semibold text-white transition hover:bg-brand-dark focus:outline-none focus:ring-2 focus:ring-brand/40"
+                                >{{ $elsewhere->isNotEmpty() ? __('Dar de alta también en esta sede') : __('Dar de alta en esta sede') }}</button>
+                            @endif
+                        </div>
+                    @endif
+
                     <div data-member-record class="mt-3 space-y-3">
                         {{-- What they may still have — the same figures the POS puts on its cart. --}}
                         @if ($limits)

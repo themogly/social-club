@@ -9,6 +9,7 @@ use App\Enums\DispensationStatus;
 use App\Livewire\Counter\Concerns\CollectsMembershipFees;
 use App\Livewire\Counter\Concerns\FindsMembers;
 use App\Livewire\Counter\Concerns\IdentifiesOperator;
+use App\Livewire\Counter\Concerns\OpensMemberships;
 use App\Livewire\Counter\Concerns\ResolvesCounterLocation;
 use App\Livewire\Counter\Concerns\SignsUpMembers;
 use App\Models\Dispensation;
@@ -33,9 +34,16 @@ use Livewire\Component;
  * membership state (tier, expiry, what is owed) and collect a fee. It is a THIN shell over the SAME shared
  * fee-collection concern the till screen uses ({@see CollectsMembershipFees} → RecordFeePayment, the single
  * writer) — no second path — so a fee taken here produces byte-identical records and clears `unpaid_fee` just
- * the same. A CASH fee still lands in the open drawer; a wallet fee does not need one. Owner deliberately kept
- * SMALL: collect a fee and see what's owed. Renewals, tier changes, suspensions and limits stay in the admin
- * panel where they carry real authorisation weight and do not belong on a counter tablet.
+ * the same. A CASH fee still lands in the open drawer; a wallet fee does not need one.
+ *
+ * **Prompt 203 moved one line, deliberately, and left the rest.** 127 kept this screen to "collect a fee and
+ * see what's owed", with renewals in the admin panel "where they carry real authorisation weight". That held
+ * until the screen started telling operators to do something they could not do: an ACTIVE member with no
+ * membership at this sede read *"renew their fee from their record"*, and the record is in a panel STAFF hold
+ * no permission to act in. So opening a membership AT THE SEDE YOU ARE WORKING AT, on the tier's default fee,
+ * is now here ({@see OpensMemberships}, gated on `membership.enrol`) — the same shape prompt 174 used for the
+ * alta: the audited, single-writer, locally-scoped route is the open one. Fee overrides, tier changes,
+ * suspensions, limits and transfers between sedes have NOT moved.
  *
  * Gated on `membership.fee.collect` (the same permission, unchanged). Layout + operator identification are the
  * shared counter chrome.
@@ -43,7 +51,7 @@ use Livewire\Component;
 #[Layout('components.layouts.counter')]
 class MembershipCounter extends Component
 {
-    use CollectsMembershipFees, FindsMembers, IdentifiesOperator, ResolvesCounterLocation, SignsUpMembers;
+    use CollectsMembershipFees, FindsMembers, IdentifiesOperator, OpensMemberships, ResolvesCounterLocation, SignsUpMembers;
 
     /** How many past collections the counter will show. A counter answers a question; it is not an export. */
     private const HISTORY_LIMIT = 5;
@@ -151,6 +159,18 @@ class MembershipCounter extends Component
             'recent' => ($feeMember !== null && $location !== null && $this->historyIsForCurrentMember())
                 ? $this->recentDispensations($feeMember, $location)
                 : null,
+            // Prompt 203 — which of the three dead-end situations this member is in, and the register facts
+            // the operator needs to tell them apart. Resolved here so the blade branches on a word.
+            'membershipCase' => ($feeMember !== null && $location !== null)
+                ? $this->membershipCase($feeMember, $location)
+                : null,
+            'lapsedHere' => ($feeMember !== null && $location !== null)
+                ? $this->lapsedMembershipHere($feeMember, $location)
+                : null,
+            'elsewhere' => ($feeMember !== null && $location !== null)
+                ? $this->membershipsElsewhere($feeMember, $location)
+                : collect(),
+            'openTiers' => $location !== null ? $this->openTiers($location) : collect(),
         ]);
     }
 

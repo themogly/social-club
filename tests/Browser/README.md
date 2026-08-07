@@ -344,3 +344,29 @@ no Enter; ArrowDown → `member-lookup-option-0` with exactly **1** `aria-select
 closes; Enter on the active option → `selectMember` **without** `submitLookup`; the wedge scan's submit
 request **carried all 48 characters**; placeholder needs **178px of 268px** in the bar socio column and 178
 of 656 on Recepción. **PASS**.
+
+## The membership dead end, before and after (prompt 203)
+
+```bash
+npm run build
+php artisan test tests/Browser/MembershipDeadEndHarnessTest.php   # → storage/app/deadend-{lapsed,none,elsewhere}.html
+node tests/Browser/shoot-membership-deadend.mjs                   # → storage/app/screenshots/203/
+```
+
+Regenerate the **before** (the owner's screenshot: an ACTIVE member with nothing to press) from `main`'s
+blade, using the same recipe as the 175 shooter — the artifacts are written before the assertions run, so a
+failing harness still produces them:
+
+```bash
+git show main:resources/views/livewire/counter/membership-counter.blade.php \
+  > resources/views/livewire/counter/membership-counter.blade.php
+php artisan test tests/Browser/MembershipDeadEndHarnessTest.php   # fails; writes the artifacts anyway
+cp storage/app/deadend-lapsed.html storage/app/deadend-before.html
+git checkout -- resources/views/livewire/counter/membership-counter.blade.php
+```
+
+The script asserts what a picture cannot: **before has 0 controls** and every after has at least one, none
+under 44×44, no horizontal page scroll.
+
+Last run (branch `feat/membership-at-the-counter`): before **0** controls at both orientations; lapsed **1**;
+none **2**; elsewhere **2**; no horizontal scroll anywhere. **PASS**.

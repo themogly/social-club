@@ -5,6 +5,7 @@ namespace App\Actions\Memberships;
 use App\Actions\RecordAuditLog;
 use App\Enums\MembershipPeriod;
 use App\Enums\MembershipStatus;
+use App\Exceptions\DuplicateMembershipException;
 use App\Models\Location;
 use App\Models\Member;
 use App\Models\Membership;
@@ -28,6 +29,19 @@ class EnrolMembership
      */
     public function handle(Member $member, Location $location, MembershipTier $tier, array $options = []): Membership
     {
+        // ONE active membership per member per location (prompt 203). There is no schema constraint and
+        // there was no check here, which was survivable while the callers were a wizard, the panel and an
+        // import — a counter button on a tablet is none of those, and a double-tap would have inflated the
+        // sede's stock ceiling (StockCeiling counts members holding an ACTIVE membership here).
+        //
+        // Deliberately scoped to ACTIVE: the paper-register import (prompt 131) brings across LAPSED and
+        // CANCELLED rows, and a member may legitimately have a string of expired ones behind them.
+        if ($member->activeMembershipAt($location) !== null) {
+            throw new DuplicateMembershipException(
+                __('Este socio ya tiene una membresía activa en esta sede.')
+            );
+        }
+
         $startsAt = $options['starts_at'] ?? now();
         $defaultFee = $tier->default_fee_cents->cents;
         $feeCents = $options['fee_cents'] ?? $defaultFee;
