@@ -344,7 +344,12 @@ class BarPos extends Component
 
     // --- Commit -----------------------------------------------------------------
 
-    public function commit(): void
+    /**
+     * NOT `commit()` — Livewire v4's `$wire` alias table maps `commit` → `$commit` and is consulted before
+     * component methods, so `wire:click="commit"` ran a built-in no-op and this was never reached from a
+     * browser (prompt 195). Named for the Action it calls, as the dispensary's is.
+     */
+    public function commitOrder(): void
     {
         $location = $this->resolveLocation();
 

@@ -8123,3 +8123,67 @@ Three consequences, handled:
 
 **MySQL was left to CI**, per the running order: `composer check` green on SQLite. Two Setting keys and Blade
 — no migration.
+
+---
+
+## Prompt 195 — `commit` is a reserved Livewire name, so neither POS could take money from a browser
+
+**The most serious defect found in this programme.** Livewire v4's `$wire` proxy resolves an ALIAS TABLE
+before it looks for a component method. Verified in this tree, `vendor/livewire/livewire/dist/livewire.esm.js`
+line 11657:
+
+```js
+var aliases = { …, "commit": "$commit", … };
+…
+get(target, property) {
+  if (property === "__instance") return component;
+  if (property in aliases)      return getProperty(component, aliases[property]);   // ← taken
+  else if (property in properties) …
+  else return getFallback(component)(property);                                     // ← never reached
+}
+```
+
+So `wire:click="commit"` resolved to Livewire's built-in `$commit` — a state flush returning null — and
+`DispensaryPos::commit()` and `BarPos::commit()` were **never invoked from a browser**. The buttons were
+enabled, hit-testable and returned 200. Exactly two collisions exist app-wide; a scan of every public method
+on every `App\Livewire` class and its traits found no others.
+
+**Reproduced in a real browser, on the same build, same click:**
+
+| | `commit` | renamed |
+|---|---|---|
+| Livewire call over the wire | `["$commit"]` | `["commitOrder"]` |
+| flash | `null` | *Order recorded.* |
+| `orders` | 57 → **57** | 56 → **57** |
+
+Names chosen: **`commitDispensation()`** and **`commitOrder()`**, after the Actions they call
+(`CommitDispensation`, `CommitOrder`). No behaviour changed — `attemptCommit()`, every guard, the signature
+requirement, the till check and the override path are untouched. `commitWithOverride()` was already safe.
+
+**Why 42 green tests proved nothing.** They all call the method from PHP:
+
+```php
+Livewire::test(DispensaryPos::class)->…->call('commit')
+```
+
+`Testable::call()` invokes the PHP method directly and never goes near the JS proxy, so it never meets the
+alias table. **The tests proved the method works; they could not prove the button reaches it.** This is the
+third instance of the same shape in this session — the handover test that enumerated only counter routes,
+and prompt 60's `assertSee()` that is true wherever the markup renders — and it is the most expensive one.
+
+**Two guards now, and the alias list is PARSED FROM THE VENDOR DIST rather than copied.** One writer per
+fact: a Livewire upgrade that adds an alias colliding with an existing action fails loudly instead of
+silently killing another button. `LivewireReservedNameTest` asserts (a) no method this project *declares* on
+an `App\Livewire` class or its traits is named after an alias — filtered to declared methods, because
+Livewire's own base class legitimately provides `id()`, `dispatch()` and `js()` — and (b) no
+`wire:click|submit|change|blur|target|keydown` in any Blade names one. Both fail against the old names.
+
+**`tests/Browser/prove-commit-click.mjs` is the coverage that was missing**, and unlike the other `.mjs` it
+needs a running server: it logs in, chooses a sede, identifies with a PIN, adds a line, presses the REAL
+button, and asserts the request names the action and an order row appears. Two things worth knowing for the
+next person: Livewire v4 serves its update endpoint from an **obfuscated path** (`/livewire-<hash>/update`),
+so a filter on `/livewire/update` captures nothing; and matching the raw body for the method name is more
+durable than parsing a payload shape Livewire is free to change.
+
+**MySQL was left to CI**, per the running order: `composer check` green on SQLite. Two method names and their
+call sites — no migration, no query.

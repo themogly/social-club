@@ -118,7 +118,7 @@ class DispensaryTenderTest extends TestCase
         $this->withOneGramBasket()
             ->set('cashTendered', '10')                 // hands a €10 note for an €8.37 contribution
             ->assertViewHas('changeDueCents', 163)      // change €1.63 shown BEFORE commit
-            ->call('commit')
+            ->call('commitDispensation')
             ->assertSet('flashType', 'success');
 
         $d = Dispensation::query()->withoutGlobalScopes()->firstOrFail();
@@ -131,7 +131,7 @@ class DispensaryTenderTest extends TestCase
     {
         $this->withOneGramBasket()
             ->set('cashTendered', '5')                  // €5 for an €8.37 contribution
-            ->call('commit')
+            ->call('commitDispensation')
             ->assertSet('flashType', 'error')
             ->assertSee(__('El efectivo entregado no cubre el total.'));
 
@@ -142,7 +142,7 @@ class DispensaryTenderTest extends TestCase
     {
         // Regression guard: the pre-fix behaviour (blank cash = exact) must still work.
         $this->withOneGramBasket()
-            ->call('commit')
+            ->call('commitDispensation')
             ->assertSet('flashType', 'success');
 
         $d = Dispensation::query()->withoutGlobalScopes()->firstOrFail();
@@ -165,7 +165,7 @@ class DispensaryTenderTest extends TestCase
             ->call('addLine')
             ->set('walletInput', '3')                   // €3 from the wallet
             ->set('cashTendered', '6')                  // €6 handed for the €5.37 cash owed
-            ->call('commit')
+            ->call('commitDispensation')
             ->assertSet('flashType', 'success');
 
         $d = Dispensation::query()->withoutGlobalScopes()->firstOrFail();
@@ -178,7 +178,7 @@ class DispensaryTenderTest extends TestCase
     {
         $this->withOneGramBasket()
             ->set('cashTendered', '10') // €1.63 change
-            ->call('commit')
+            ->call('commitDispensation')
             ->assertSet('flashType', 'success');
 
         $session = TillSession::query()->withoutGlobalScopes()->where('terminal', 'POS-1')->firstOrFail();
@@ -193,7 +193,7 @@ class DispensaryTenderTest extends TestCase
             ->set('priceOverrideEuros', '5')
             ->set('priceOverrideReason', 'Producto mohoso')
             ->set('cashTendered', '10')
-            ->call('commit')
+            ->call('commitDispensation')
             ->assertSet('flashType', 'success');
 
         $d = Dispensation::query()->withoutGlobalScopes()->firstOrFail();
@@ -209,7 +209,7 @@ class DispensaryTenderTest extends TestCase
             ->set('flashMessage', 'Firma capturada')
             ->set('flashType', 'success')
             ->set('cashTendered', '5') // under-tender → a new error flash
-            ->call('commit')
+            ->call('commitDispensation')
             ->assertSet('flashType', 'error')
             ->assertSet('flashMessage', __('El efectivo entregado no cubre el total.'));
     }

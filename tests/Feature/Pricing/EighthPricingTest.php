@@ -168,7 +168,7 @@ class EighthPricingTest extends TestCase
             ->call('chooseGenetic', $a->id)->set('weightInput', '1.75')->call('addLine')
             ->call('chooseGenetic', $b->id)->set('weightInput', '1.75')->call('addLine')
             ->assertViewHas('basketTotalCents', 3000) // shown as one eighth
-            ->call('commit')
+            ->call('commitDispensation')
             ->assertSet('flashType', 'success');
 
         $this->assertSame(3000, Dispensation::query()->withoutGlobalScopes()->firstOrFail()->total_cents->cents);

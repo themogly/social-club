@@ -117,7 +117,7 @@ class BarPosScreenTest extends TestCase
             ->call('addArticle', $b->id)
             ->call('addArticle', $c->id)
             ->assertCount('basket', 3)
-            ->call('commit')
+            ->call('commitOrder')
             ->assertSet('flashType', 'success');
 
         $this->assertSame(1, Order::query()->withoutGlobalScopes()->count());
@@ -167,7 +167,7 @@ class BarPosScreenTest extends TestCase
             ->assertSet('memberId', null)
             ->call('addArticle', $a->id)
             ->set('reference', 'Invitado')
-            ->call('commit')
+            ->call('commitOrder')
             ->assertSet('flashType', 'success');
 
         $order = Order::query()->withoutGlobalScopes()->firstOrFail();
@@ -189,7 +189,7 @@ class BarPosScreenTest extends TestCase
             ->call('addArticle', $a->id)
             ->assertSet('memberId', null)
             ->set('walletInput', '5,00')
-            ->call('commit')
+            ->call('commitOrder')
             ->assertSet('flashType', 'error');
 
         $this->assertSame(0, Order::query()->withoutGlobalScopes()->count());
@@ -207,7 +207,7 @@ class BarPosScreenTest extends TestCase
             ->call('selectMember', $member->id)
             ->assertSet('memberId', $member->id)
             ->set('walletInput', '2,00') // €2 wallet, €3 cash
-            ->call('commit')
+            ->call('commitOrder')
             ->assertSet('flashType', 'success');
 
         $order = Order::query()->withoutGlobalScopes()->firstOrFail();
@@ -282,7 +282,7 @@ class BarPosScreenTest extends TestCase
 
         $component = Livewire::test(BarPos::class)
             ->call('addArticle', $a->id)
-            ->call('commit')
+            ->call('commitOrder')
             ->assertSet('flashType', 'success')
             ->assertSee(__('Última venta registrada')); // colocated "last sale" block under Cobrar
 
@@ -307,7 +307,7 @@ class BarPosScreenTest extends TestCase
         $component = Livewire::test(BarPos::class)
             ->call('addArticle', $a->id)
             ->set('walletInput', '5,00') // wallet with no socio → refused
-            ->call('commit')
+            ->call('commitOrder')
             ->assertSet('flashType', 'error');
 
         $this->assertGreaterThanOrEqual(2, substr_count($component->html(), __('El pago con monedero requiere un socio.')),
