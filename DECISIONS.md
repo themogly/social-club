@@ -8439,3 +8439,60 @@ active period pill is blue-700 and brand text is blue-400. Light mode is unchang
 
 **MySQL was left to CI**, per the running order: `composer check` green on SQLite — 1482 tests, Larastan 0,
 Pint clean. Verified by looking, in both themes.
+
+---
+
+## Admin audit (Phase C) — one writer, one signpost, and 26 empty screens
+
+Full findings and outcomes: `audits/reports/admin-audit-phase-c.md`. Two Phase 1 findings, one Phase 2, one
+Phase 3, all closed — and **one half of one finding withdrawn as wrong**, which is the part worth keeping.
+
+**An ungated second writer to a state one Action owns.** `MemberApplicationForm` offered `status` as a free
+Select over every case — including APPROVED — plus `reject_reason`, on an Edit page whose policy requires
+`applications.review`, which **STAFF holds** (prompt 174). Measured, not argued: a STAFF user opened a
+submitted application whose applicant was **14 years old**, set APPROVED and saved. The register then said
+the application was approved while **no member existed**, `resulting_member_id` was null, no versioned
+consent had been recorded, and neither the age gate nor the duplicate search had run. It walked straight
+through 174's own reasoning — `members.create` is withheld from STAFF *precisely* so they cannot produce a
+member without those gates, and this let them record the outcome anyway. The fields are gone (removed, not
+disabled: a disabled field is still a field and Livewire data is addressable), and the `create` page with
+them — an application hand-made in the panel has no invite token, so nobody could ever fill it in.
+`FormCompletenessTest` failed the moment the create page went, unprompted, and the resource is now
+documented in `FORMLESS`. That test earning its keep without being asked is the good kind of surprise.
+
+**"Eliminar" is not erasure, and the fix is a signpost rather than a second writer.** `Member` soft-deletes,
+so Delete hides the record and keeps the name, DNI, email, phone, photo and ID scan. Real erasure is
+`AnonymiseMember`, and it was reachable only by creating a Data Request from another screen — nothing on the
+member pointed at it. An owner told *"erase this person"* presses the button labelled Delete and reasonably
+believes they have complied; that is an Article 17 misreading with legal consequences. The member record now
+offers **Solicitar supresión (RGPD)**, which registers the ERASE request and hands off to the screen that
+fulfils it. It deliberately does not anonymise on the spot: the DataRequest row is itself the evidence the
+club received a request and answered in time, and fulfilment stays behind `data.erase`.
+
+**The withdrawn half, on the record.** The same finding also claimed *"MembersTable has no TrashedFilter and
+EditMember no RestoreAction"*. Checked against the report's own starting commit: **both were already there**,
+along with `RestoreBulkAction`. A deleted member was always recoverable from the panel. Nothing was changed
+for it, and the bulk delete is **kept** — with restore present and confirmed, a mis-click is recoverable, and
+removing a working affordance on a false premise would be the worse error. The report opens by correcting two
+inherited stale claims; it does not get to exempt its own. **An audit finding is a claim, and claims get
+checked** — including against the commit the auditor themselves named.
+
+**26 of 26 resource tables now have a designed empty state** (25 added). This is not a cosmetic complaint
+about a mature install: **on day one of a real club every one of these tables is empty**, so a new owner
+meets Filament's "No records found" twenty-six times before they meet the product. Each now says what the
+screen is for and what to do first, in the club's own vocabulary — *"A batch is real stock of a strain at one
+location. Record a purchase or a harvest so there is something to dispense."* 33 new strings, both locales,
+verified in the browser.
+
+**One stale docblock, and why it got a commit.** `SystemHealth` still described "backup/restore
+placeholders" long after prompt 180 replaced that section with a statement of fact. Trivial as a defect —
+except that this exact sentence is how the claim propagated into the Phase C work order and the security
+report, twice repeated as a known gap on the strength of a comment nobody re-read. **A comment nobody
+re-reads is load-bearing.**
+
+**Deviation from the audit brief, on the owner's instruction:** the brief says *push the branch, do not
+merge*. The owner instructed that Phase C branches merge to main and the round continues in one session.
+Recorded rather than silently followed.
+
+**MySQL was left to CI**, per the running order: `composer check` green on SQLite — 1490 tests, Larastan 0,
+Pint clean.

@@ -39,6 +39,11 @@ class EventsTable
                     DeleteBulkAction::make(),
                     RestoreBulkAction::make(),
                 ]),
-            ]);
+            ])
+            // Day one of a real club, EVERY one of these tables is empty; a framework shrug is the
+            // first thing a new owner sees (admin audit, Phase C). Say what the screen is for and
+            // what to do first.
+            ->emptyStateHeading(__('Sin eventos'))
+            ->emptyStateDescription(__('Publica un evento para que los socios lo vean en su app y confirmen asistencia.'));
     }
 }

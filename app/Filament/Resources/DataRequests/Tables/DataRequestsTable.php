@@ -51,6 +51,11 @@ class DataRequestsTable
                 DataRequestResource::fulfilExportAction(),
                 DataRequestResource::fulfilErasureAction(),
                 DataRequestResource::markResolvedAction(),
-            ]);
+            ])
+            // Day one of a real club, EVERY one of these tables is empty; a framework shrug is the
+            // first thing a new owner sees (admin audit, Phase C). Say what the screen is for and
+            // what to do first.
+            ->emptyStateHeading(__('Sin solicitudes RGPD'))
+            ->emptyStateDescription(__('Cuando un socio ejerza sus derechos —acceso, rectificación, supresión, portabilidad— regístralo aquí. La ficha es la prueba de que respondiste en plazo.'));
     }
 }

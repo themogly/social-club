@@ -48,6 +48,11 @@ class ConvocatoriasTable
                 EditAction::make(),
                 ConvocatoriaResource::pdfAction(),
                 DeleteAction::make(),
-            ]);
+            ])
+            // Day one of a real club, EVERY one of these tables is empty; a framework shrug is the
+            // first thing a new owner sees (admin audit, Phase C). Say what the screen is for and
+            // what to do first.
+            ->emptyStateHeading(__('Sin convocatorias'))
+            ->emptyStateDescription(__('Una convocatoria cita a los socios a una asamblea y congela la lista con derecho a voto. Crea una para empezar.'));
     }
 }

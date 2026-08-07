@@ -62,6 +62,11 @@ class MinutesTable
                 EditAction::make(),
                 MinuteResource::correctAction(),
                 MinuteResource::pdfAction(),
-            ]);
+            ])
+            // Day one of a real club, EVERY one of these tables is empty; a framework shrug is the
+            // first thing a new owner sees (admin audit, Phase C). Say what the screen is for and
+            // what to do first.
+            ->emptyStateHeading(__('Sin actas'))
+            ->emptyStateDescription(__('Un acta se redacta a partir de lo registrado en la asamblea, no a mano. Celebra una asamblea desde una convocatoria emitida.'));
     }
 }

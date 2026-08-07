@@ -32,6 +32,11 @@ class DocumentTemplatesTable
             ])
             ->recordActions([
                 EditAction::make()->label(__('Nueva versión')),
-            ]);
+            ])
+            // Day one of a real club, EVERY one of these tables is empty; a framework shrug is the
+            // first thing a new owner sees (admin audit, Phase C). Say what the screen is for and
+            // what to do first.
+            ->emptyStateHeading(__('Sin plantillas'))
+            ->emptyStateDescription(__('Las plantillas definen el texto de los documentos que firma un socio: solicitud de alta, previsión de consumo, acta de sanción.'));
     }
 }

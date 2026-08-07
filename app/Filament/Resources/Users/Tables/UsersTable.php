@@ -44,7 +44,12 @@ class UsersTable
                     DeleteBulkAction::make(),
                     RestoreBulkAction::make(),
                 ]),
-            ]);
+            ])
+            // Day one of a real club, EVERY one of these tables is empty; a framework shrug is the
+            // first thing a new owner sees (admin audit, Phase C). Say what the screen is for and
+            // what to do first.
+            ->emptyStateHeading(__('Sin usuarios'))
+            ->emptyStateDescription(__('Los usuarios son el personal del club, no los socios. Cada uno necesita una sede asignada y un PIN para trabajar en el mostrador.'));
     }
 
     /** Name each setup gap so the badge tells the truth (prompt 93). */

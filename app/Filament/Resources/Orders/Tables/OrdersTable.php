@@ -70,6 +70,11 @@ class OrdersTable
             ])
             ->recordActions([
                 ViewAction::make(),
-            ]);
+            ])
+            // Day one of a real club, EVERY one of these tables is empty; a framework shrug is the
+            // first thing a new owner sees (admin audit, Phase C). Say what the screen is for and
+            // what to do first.
+            ->emptyStateHeading(__('Sin ventas de barra'))
+            ->emptyStateDescription(__('Las ventas de barra y tienda se registran en el TPV de barra. Esta pantalla es solo de consulta.'));
     }
 }

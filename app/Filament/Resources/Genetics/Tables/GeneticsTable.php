@@ -97,6 +97,11 @@ class GeneticsTable
                     DeleteBulkAction::make(),
                     RestoreBulkAction::make(),
                 ]),
-            ]);
+            ])
+            // Day one of a real club, EVERY one of these tables is empty; a framework shrug is the
+            // first thing a new owner sees (admin audit, Phase C). Say what the screen is for and
+            // what to do first.
+            ->emptyStateHeading(__('Sin genéticas'))
+            ->emptyStateDescription(__('Una genética es una variedad con su precio por gramo en cada sede. Crea la primera y después registra un lote con su stock.'));
     }
 }

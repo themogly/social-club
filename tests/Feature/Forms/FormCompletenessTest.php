@@ -59,6 +59,7 @@ class FormCompletenessTest extends TestCase
         OrderResource::class => 'Read-only bar-sales oversight — orders are committed/voided at the bar POS, never a form (prompt 43).',
         DispensationResource::class => 'Read-only dispensation oversight — withdrawals happen at the dispensary POS; the only action is the refund modal (prompt 71).',
         MessageThreadResource::class => 'Read-only messaging oversight — threads are started by members from the PWA; staff only reply/close/convert via actions, never a form (prompt 136).',
+        MemberApplicationResource::class => 'Applications ARRIVE from the invited applicant on /socio/solicitud/{token} — one hand-made in the panel has no invite token, so nobody could ever fill it in. Its transitions belong to approve/reject/waitingList (admin audit, Phase C).',
     ];
 
     /**

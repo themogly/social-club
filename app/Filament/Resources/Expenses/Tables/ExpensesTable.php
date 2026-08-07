@@ -105,7 +105,12 @@ class ExpensesTable
                 // Editing is overheads-only — petty-cash rows belong to a till reconciliation.
                 EditAction::make()
                     ->visible(fn (Expense $record): bool => $record->kind === ExpenseKind::OVERHEAD),
-            ]);
+            ])
+            // Day one of a real club, EVERY one of these tables is empty; a framework shrug is the
+            // first thing a new owner sees (admin audit, Phase C). Say what the screen is for and
+            // what to do first.
+            ->emptyStateHeading(__('Sin gastos'))
+            ->emptyStateDescription(__('Registra aquí los gastos de la asociación. Los de caja chica se anotan en el mostrador y aparecen en el arqueo; los generales se registran desde esta pantalla.'));
     }
 
     /**

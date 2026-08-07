@@ -85,6 +85,11 @@ class TillSessionsTable
             ])
             ->recordActions([
                 ViewAction::make(),
-            ]);
+            ])
+            // Day one of a real club, EVERY one of these tables is empty; a framework shrug is the
+            // first thing a new owner sees (admin audit, Phase C). Say what the screen is for and
+            // what to do first.
+            ->emptyStateHeading(__('Sin cajas'))
+            ->emptyStateDescription(__('Las cajas se abren y se cierran en el terminal del mostrador. Aquí se consultan las sesiones y sus descuadres.'));
     }
 }

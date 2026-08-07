@@ -40,6 +40,11 @@ class MembershipTiersTable
                     DeleteBulkAction::make(),
                     RestoreBulkAction::make(),
                 ]),
-            ]);
+            ])
+            // Day one of a real club, EVERY one of these tables is empty; a framework shrug is the
+            // first thing a new owner sees (admin audit, Phase C). Say what the screen is for and
+            // what to do first.
+            ->emptyStateHeading(__('Sin tarifas'))
+            ->emptyStateDescription(__('Una tarifa define la cuota y, si lo usas, el precio por gramo de ese grupo de socios. Crea al menos una antes de dar de alta a nadie.'));
     }
 }

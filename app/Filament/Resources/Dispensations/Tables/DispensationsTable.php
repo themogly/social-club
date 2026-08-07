@@ -67,6 +67,11 @@ class DispensationsTable
             ->recordActions([
                 ViewAction::make(),
                 DispensationResource::refundAction(),
-            ]);
+            ])
+            // Day one of a real club, EVERY one of these tables is empty; a framework shrug is the
+            // first thing a new owner sees (admin audit, Phase C). Say what the screen is for and
+            // what to do first.
+            ->emptyStateHeading(__('Sin dispensaciones'))
+            ->emptyStateDescription(__('Las dispensaciones se registran en el TPV del dispensario, no aquí. Esta pantalla es solo de consulta.'));
     }
 }
