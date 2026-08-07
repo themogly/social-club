@@ -4901,13 +4901,11 @@ drills and the runbook. A REAL lockdown has **no in-app reactivation permission 
 **Runbook** lives in the Manual (`Help::GUIDES['lockdown-runbook']`, gated on `lockdown.manage`) and a `Seguridad`
 page topic — what to do, and the three ways back, in the club's own words.
 
-**Verification gap (owed — no browser here):** the counter panic button, the Filament Seguridad page and the
-ordinary 503 screen are unverified visually; the *mechanism* is fully tested server-side (`PanicLockdownTest`,
-11: audit-before-lock + idempotent; gate blocks counter/PWA with an ordinary screen; owner-link single-use;
-auto-delay after the window and not before; break-glass; drill blocks staff but passes an owner; doc URL refused
-while locked; staff can trip, a no-role user is 403'd). Owed browser assertions: (a) the counter overflow shows
-"Bloqueo de seguridad" only for `lockdown.initiate` holders and confirms before posting; (b) the Seguridad page
-renders the panic/drill actions and history; (c) the 503 page reads as a mundane outage in light and dark.
+**Verification gap — CLOSED by prompt 200.** All three were verified in a real browser: the counter trigger
+is present at 302×44 for a holder and **absent from the DOM** for a non-holder; the Seguridad page renders
+its panic, drill and history; and the 503 reads as an ordinary maintenance notice in both themes. See
+*"Prompt 200"* below for what each actually looked like. The *mechanism* was already fully tested
+server-side (`PanicLockdownTest`, 11 cases) and none of that was what was owed.
 
 `composer check` green (940 tests, 937 passed, 3 pre-existing skips, PHPStan 0). EN/ES parity gated (50 keys).
 Pushed; **do not merge**.
@@ -8858,3 +8856,92 @@ before counting, so the number is what a person would see.
 
 **MySQL was left to CI**, per the running order: `composer check` green on SQLite — 1510 tests, Larastan 0,
 Pint clean.
+
+---
+
+## Prompt 200 — the three lockdown surfaces, finally seen
+
+Prompt 121 shipped with a stated gap: *"no browser here."* Its mechanism was tested thoroughly server-side —
+audit-before-lock, idempotency, three ways back, the drill, signed document URLs dying — and **none of that
+was what was owed.** What was owed is what a person sees, once, under stress, having never used it before.
+
+**This is a verification branch and it changed no product code.** That was the intended outcome and it is
+what happened: eight structural tests, one harness, one shooter, and nothing in `app/` or `resources/`
+touched. Everything the measurements flagged turned out to be the measurement.
+
+### What each surface actually looks like
+
+**The counter trigger.** *"Bloqueo de seguridad"*, in red, the last item in the overflow menu, below Lock
+screen / Panel / Log out and separated by a rule. It measures **302×44**. For a user without
+`lockdown.initiate` it is **not in the DOM at all** — not hidden, absent, along with the route it posts to.
+It confirms before firing: *"¿Activar el bloqueo de seguridad? Cerrará el club entero."*
+
+The trade reads correctly: **discreet in the room** (invisible until the menu is opened) but **findable by
+the operator** (clearly labelled and colour-coded once it is). Those pull in opposite directions and this is
+the right side of both.
+
+**The Seguridad page.** A red *"Activate security lockdown"*, an amber *"Drill"*, a status banner — *"The
+club is operational. Use «Activate security lockdown» only for a real threat; «Drill» to rehearse it. See the
+runbook in the Manual → «Security lockdown»."* — and a History table reading *"No lockdowns on record."*
+Prominent rather than discreet, which is right: this is a manager's page behind a login on a desktop, not a
+screen with members standing at it. End-drill appears only while a drill is running, and `drill` disappears
+inside one.
+
+**The 503, which is the one with a consequence.** In the words I would use to the club: *it looks like the
+wifi is down.* Centred, unbranded, two sentences — *"Servicio no disponible temporalmente / Estamos
+realizando tareas de mantenimiento. Vuelve a intentarlo en unos minutos."* — on a plain background, in both
+themes. **No wordmark, no club name, no sede, no member, no operator, no status, and nothing that hints
+anything was triggered.** A stranger reads a routine outage, which is exactly the design intent.
+
+It is asserted as **text**, not eyeballed, in both the PHPUnit test and the shooter: eight forbidden words
+(`lockdown`, `bloqueo`, `locked`, `cerrado`, `pánico`, `panic`, `simulacro`, `emergencia`, case-insensitive)
+plus the org name, the sede name, a member surname and the operator's name. `Retry-After: 600` is present.
+
+**The drill, end to end.** An owner passes and reaches the Seguridad page to observe it; a staff user gets
+the ordinary 503; an unauthenticated visitor gets the ordinary 503. And during a REAL lockdown every route
+503s **except the reactivation path**, which answers 200 with its own *"this link is no longer valid"* page —
+deliberately not a 404, since a 404 would tell whoever holds a stolen link whether the token was ever real.
+
+### Four measurement defects, and none of them was the product
+
+Worth recording because each is a trap the next browser pass will meet:
+
+1. **The skip link measured 1×1** and my touch-target check called it a failure. `sr-only` collapsing until
+   focused is what the accessibility audit deliberately built. Excluded.
+2. **The 44px floor was applied to a Filament panel page.** 44×44 is the *counter's* touch floor; the panel
+   is desktop-first by CLAUDE.md and prompt 98 set 24×24 there. The floor is now per-surface.
+3. **The panic trigger measured 0×0.** Alpine does not run on a static capture, so the overflow panel was
+   closed by both `x-show` and `x-cloak`; the measurement was of a hidden element. Both are stripped now.
+4. **The Seguridad page photographed blank** — twice, for two different reasons, and this is the useful one.
+   First: the harness inlined `app-*.css`, but a panel page is styled by `theme-*.css`. Prompt 176's
+   fidelity lesson **bites in both directions**, and every existing harness here is a counter page, which is
+   why it had no precedent. Then, with the right stylesheet: still blank, because the counter's
+   hide-every-`[x-show]` convention blanks a page whose layout Filament drives with `x-show`.
+
+   The conclusion is the finding: **a Filament panel page cannot be photographed as a static artifact.** It
+   is shot from the live server instead, the way `prove-commit-click.mjs` already does for anything needing
+   the runtime.
+
+And two script defects on top: logging in per context tripped Filament's login throttle on the fifth attempt
+(*"Demasiados intentos"*) so every capture landed back on `/login`; and the sign-in check ran before
+Livewire's **client-side** redirect, so a perfectly good login read as a failure. Both would have been
+reported as broken pages by anyone reading only the exit code.
+
+### One thing the prompt asked for that does not exist
+
+`go-live-runbook.md` is not in this repository, and no file contains a section called *"What I could not
+verify, and you should"*. The claim it describes is real but lives in **`DECISIONS.md`, prompt 121's own
+entry**, as *"Verification gap (owed — no browser here)"* — with exactly the three items (a), (b), (c) the
+prompt names. That paragraph is what has been updated to record the verification, since that is where the
+claim actually was.
+
+### Left alone deliberately
+
+Whether STAFF should hold `lockdown.initiate` at all remains an **OVERNIGHT-DEFAULT — CONFIRM** for the
+owner (prompt 121's reasoning: they are the ones in the room during a robbery). Not resolved here. The
+`/horizon` verified-email gate was not touched. The Seguridad page's amber Drill button is Filament's
+`warning` colour rather than the product's `--color-warning` token — noted, not changed, since no
+measurement flagged it and this branch does not redesign.
+
+**MySQL was left to CI**, per the running order: `composer check` green on SQLite — 1519 tests, Larastan 0,
+Pint clean. `shoot-lockdown.mjs`: **ALL PASS**, 16 captures at 1180×820 and 820×1180, light and dark.
