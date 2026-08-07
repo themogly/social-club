@@ -12,7 +12,7 @@ use App\Enums\MembershipStatus;
 use App\Enums\MemberStatus;
 use App\Enums\Role;
 use App\Enums\WalletTransactionType;
-use App\Livewire\Counter\TillSession;
+use App\Livewire\Counter\MembershipCounter;
 use App\Models\Location;
 use App\Models\Member;
 use App\Models\Membership;
@@ -115,7 +115,14 @@ class FeeCollectionTest extends TestCase
         $this->assertGreaterThan($paid, $membership->fee_cents->cents); // still owed €8.00
     }
 
-    public function test_collecting_the_fee_at_the_till_unblocks_dispensing_end_to_end(): void
+    /**
+     * Prompt 201 — the same end-to-end proof, taken where fees now live.
+     *
+     * This was `…_at_the_till_…`. Fee collection left the caja because it was the one panel that made the
+     * operator go and find a person on a screen about the drawer; what it proves — collecting the fee
+     * clears the block that stops a dispensation — is unchanged and is now proved through Socios.
+     */
+    public function test_collecting_the_fee_in_socios_unblocks_dispensing_end_to_end(): void
     {
         $membership = $this->memberWithFee(2000);
         $member = $membership->member;
@@ -126,9 +133,9 @@ class FeeCollectionTest extends TestCase
         $before = (new ResolveMemberEligibility)->handle($member, $this->location, 'counter');
         $this->assertContains(__('Cuota de socio pendiente.'), $before->blockingMessages());
 
-        // Collect the full fee at the till.
-        Livewire::test(TillSession::class)
-            ->set('feeMemberId', $member->id)
+        // Collect the full fee in Socios — a CASH fee still needs the open drawer above.
+        Livewire::test(MembershipCounter::class)
+            ->call('selectFeeMember', $member->id)
             ->set('feeAmount', '20,00')
             ->set('feeMethod', 'CASH')
             ->call('collectFee')
@@ -149,25 +156,25 @@ class FeeCollectionTest extends TestCase
         $this->assertSame(2000, TillSummary::breakdown($session->fresh())['fees_cash']);
     }
 
-    public function test_the_till_action_is_denied_without_the_permission(): void
+    /** Prompt 201 — the same denial, on the screen that now owns the action. */
+    public function test_the_fee_action_is_denied_without_the_permission(): void
     {
         $membership = $this->memberWithFee();
         (new OpenTill)->handle($this->location, 'POS-1', 10000);
 
-        // A user with till.open (to reach the screen) but WITHOUT membership.fee.collect.
+        // A user who can reach the Socios screen but does NOT hold membership.fee.collect.
         $user = User::factory()->create();
+        $user->givePermissionTo(['membership.fee.collect']);
+        $user->revokePermissionTo('membership.fee.collect');
         $user->givePermissionTo(['till.open']);
         $user->locations()->sync([$this->location->id]);
         $this->actingAs($user);
         app(ActiveScope::class)->setLocation($this->location->id);
         CounterOperator::set($user);
 
-        Livewire::test(TillSession::class)
-            ->set('feeMemberId', $membership->member_id)
-            ->set('feeAmount', '20,00')
-            ->call('collectFee')
-            ->assertSet('flashType', 'error');
-
+        // The screen itself is gated on the permission, so the refusal is a 403 rather than a flash —
+        // which is the stronger denial, and the one the policy actually makes.
+        $this->get(route('counter.members'))->assertForbidden();
         $this->assertSame(0, MembershipFeePayment::query()->count());
     }
 
@@ -186,14 +193,16 @@ class FeeCollectionTest extends TestCase
         $this->assertSame(0, MembershipFeePayment::query()->count()); // no payment created by enrolment
     }
 
-    public function test_the_till_action_is_denied_with_no_open_till(): void
+    /** Prompt 201 — the drawer invariant, on the screen that now owns the action. A CASH fee needs a till. */
+    public function test_a_cash_fee_is_denied_with_no_open_till(): void
     {
         $membership = $this->memberWithFee();
         $this->operator(); // no till opened
 
-        Livewire::test(TillSession::class)
-            ->set('feeMemberId', $membership->member_id)
+        Livewire::test(MembershipCounter::class)
+            ->call('selectFeeMember', $membership->member_id)
             ->set('feeAmount', '20,00')
+            ->set('feeMethod', 'CASH')
             ->call('collectFee')
             ->assertSet('flashType', 'error');
 

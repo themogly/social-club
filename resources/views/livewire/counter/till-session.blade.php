@@ -397,14 +397,16 @@
             </section>
 
             {{-- Cash movement --}}
-            {{-- The three "record something" panels sit SIDE BY SIDE from lg (design audit).
-                 Measured before: the Caja was the only counter screen not using its width — a 672px column
-                 in a 1440px viewport, so the page ran to 1811px (3.2 screens at a short laptop height) and
-                 `Cobrar cuota`, the fourth stacked section, opened at y=1413. Half the screen was empty
-                 while the operator scrolled past the arqueo to reach it.
-                 Deliberately only these three: they are independent, equal-weight forms. The summary above
-                 and the close-out below stay full width, because each is the whole job when it is on screen
-                 — and the blind count in particular must not share a viewport with anything. --}}
+            {{-- The "record something" panels sit SIDE BY SIDE from lg (design audit). There were three;
+                 fee collection left for Socios in prompt 201, so there are two — and two is what this grid
+                 was always shaped for. A 2-column row of three panels left one alone on the second line
+                 with the other half empty; two fills the row exactly, which is why the layout reads as a
+                 decision rather than as something with a hole in it.
+
+                 Measured before the audit: the Caja was the only counter screen not using its width — a
+                 672px column in a 1440px viewport, so the page ran to 1811px. The summary above and the
+                 close-out below stay full width, because each is the whole job when it is on screen — and
+                 the blind count in particular must not share a viewport with anything. --}}
             <div class="grid gap-5 lg:grid-cols-2 lg:items-start">
             <section class="rounded-2xl border border-line bg-surface p-5 dark:border-slate-800 dark:bg-slate-900 sm:p-6">
                 <h3 class="text-base font-semibold">{{ __('Registrar movimiento de efectivo') }}</h3>
@@ -521,61 +523,23 @@
                     </form>
                 </section>
             @endcan
+            {{-- Fee collection LEFT this screen (prompt 201). It was the only panel on the caja that began
+                 by asking you to find a person — its own member lookup, on a screen otherwise about the
+                 drawer — and Socios does that job better, showing the socio's record, what they owe and
+                 their tier before any money is taken.
 
-            {{-- Cobrar cuota — record a membership fee against the open drawer. The ONLY path that
-                 clears unpaid_fee at the counter (prompt 46). Gated on membership.fee.collect. --}}
+                 The line below is deliberately not a link. The tab strip is already on screen and Socios is
+                 one tap away from it; a second route to the same place is the duplication the counter has
+                 twice been cleaned of (189, 194). What an operator who used to do this here needs is to be
+                 told WHERE it went, once, not given another button.
+
+                 The drawer invariant is unchanged: a CASH fee still needs an open till, and Socios resolves
+                 the same one through SelectTillSession, so it still lands in this drawer and still shows in
+                 the arqueo as «Cuotas en efectivo». That is asserted, not assumed. --}}
             @can('membership.fee.collect')
-                <section class="rounded-2xl border border-line bg-surface p-5 dark:border-slate-800 dark:bg-slate-900 sm:p-6">
-                    <h3 class="text-base font-semibold">{{ __('Cobrar cuota') }}</h3>
-                    <p class="mt-0.5 text-sm text-ink-muted dark:text-slate-400">{{ __('Registra el pago de la cuota de socio.') }}</p>
-                    @unless ($this->hasOperator()) @include('livewire.counter.partials.needs-operator') @endunless
-                    <fieldset @disabled(! $this->hasOperator()) class="contents">
-
-                    @if ($feeMember === null)
-                        {{-- Prompt 194 — the SAME lookup as the door and the dispensary. The caja's own name
-                             box could not resolve a scanned card. No autofocus: this panel is one of several
-                             on a screen whose main job is the drawer, not identifying anybody. --}}
-                        <div class="mt-4">
-                            @include('livewire.counter.partials.member-lookup', ['autofocus' => false])
-                        </div>
-                    @else
-                        <div class="mt-4 flex items-center justify-between rounded-xl bg-surface-alt px-4 py-3 dark:bg-slate-800">
-                            <div>
-                                <p class="font-semibold">{{ $feeMember->fullName() }}</p>
-                                <p class="text-sm text-ink-muted dark:text-slate-400">{{ $feeMember->member_no }}</p>
-                            </div>
-                            <button type="button" wire:click="clearFeeMember" class="rounded-lg px-3 py-1.5 text-sm font-medium text-ink-muted hover:bg-black/5 dark:text-slate-400 dark:hover:bg-white/5">{{ __('Cambiar') }}</button>
-                        </div>
-
-                        @if ($feeOwedCents === null)
-                            <p class="mt-3 rounded-xl border border-warning/30 bg-warning/10 px-4 py-3 text-sm font-medium text-warning">{{ __('Este socio no tiene cuota pendiente en esta sede.') }}</p>
-                        @else
-                            <p class="mt-3 text-sm">{{ __('Cuota pendiente:') }} <span class="font-bold tabular-nums">{{ $this->money($feeOwedCents) }}</span></p>
-                            <form wire:submit="collectFee" class="mt-3 grid gap-3 sm:grid-cols-2">
-                                <div>
-                                    <label for="feeAmount" class="block text-sm font-medium text-ink-muted dark:text-slate-400">{{ __('Importe a cobrar (€)') }}</label>
-                                    <input id="feeAmount" type="text" inputmode="decimal" wire:model="feeAmount" autocomplete="off" placeholder="0,00"
-                                           class="mt-2 h-12 w-full rounded-xl border border-line bg-surface px-4 text-base text-ink placeholder:text-ink-muted focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/40 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100">
-                                </div>
-                                <div>
-                                    <label for="feeMethod" class="block text-sm font-medium text-ink-muted dark:text-slate-400">{{ __('Método') }}</label>
-                                    <select id="feeMethod" wire:model="feeMethod"
-                                            class="mt-2 h-12 w-full rounded-xl border border-line bg-surface px-3 text-base text-ink focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/40 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100">
-                                        <option value="CASH">{{ __('Efectivo') }}</option>
-                                        <option value="WALLET">{{ __('Monedero') }}</option>
-                                    </select>
-                                </div>
-                                <div class="sm:col-span-2">
-                                    <button type="submit" wire:loading.attr="disabled"
-                                            class="h-12 w-full rounded-xl bg-brand px-6 text-base font-semibold text-white transition hover:bg-brand-dark focus:outline-none focus:ring-2 focus:ring-brand/40 disabled:opacity-60">
-                                        {{ __('Cobrar cuota') }}
-                                    </button>
-                                </div>
-                            </form>
-                        @endif
-                    @endif
-                    </fieldset>
-                </section>
+                <p data-fee-moved class="rounded-2xl border border-dashed border-line px-4 py-3 text-sm text-ink-muted dark:border-slate-700 dark:text-slate-400">
+                    {{ __('Las cuotas se cobran en Socios, donde ves la ficha del socio y lo que debe. El efectivo sigue entrando en esta caja.') }}
+                </p>
             @endcan
             </div>
 

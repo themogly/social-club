@@ -16,14 +16,11 @@ use App\Enums\TillSessionStatus;
 use App\Enums\UnitType;
 use App\Exceptions\TillAlreadyOpenException;
 use App\Exceptions\TillClosedException;
-use App\Livewire\Counter\Concerns\CollectsMembershipFees;
-use App\Livewire\Counter\Concerns\FindsMembers;
 use App\Livewire\Counter\Concerns\IdentifiesOperator;
 use App\Livewire\Counter\Concerns\ResolvesCounterLocation;
 use App\Models\Batch;
 use App\Models\ExpenseCategory;
 use App\Models\Location;
-use App\Models\Member;
 use App\Models\StockTake;
 use App\Models\StockTakeLine;
 use App\Models\TillSession as TillSessionModel;
@@ -36,7 +33,7 @@ use App\Support\TillSummary;
 use App\Support\Weight;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Contracts\View\View;
-use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
 use InvalidArgumentException;
 use Livewire\Attributes\Layout;
@@ -58,18 +55,7 @@ use RuntimeException;
 #[Layout('components.layouts.counter')]
 class TillSession extends Component
 {
-    use CollectsMembershipFees, FindsMembers, IdentifiesOperator, ResolvesCounterLocation;
-
-    /**
-     * Prompt 194 — the shared lookup found somebody; the till's job is to point `Cobrar cuota` at them.
-     *
-     * Like Socios, this screen used to offer a name box with no scan affordance, so a card scanned at the
-     * caja searched for a 48-character name and found nothing.
-     */
-    protected function onMemberFound(Member $member, bool $scanned): void
-    {
-        $this->selectFeeMember($member->id);
-    }
+    use IdentifiesOperator, ResolvesCounterLocation;
 
     /** The active location id, resolved in mount(). #[Locked] (prompt 75): the client can never retarget the counter's sede. */
     #[Locked]
@@ -148,8 +134,6 @@ class TillSession extends Component
 
     /** success | warning | error */
     public string $flashType = 'success';
-
-    // --- Fee collection (Cobrar cuota) — state + logic live in CollectsMembershipFees (prompt 127) ------
 
     public function mount(): void
     {
@@ -498,39 +482,6 @@ class TillSession extends Component
         $this->flash(__('Gasto de caja registrado.'), 'success');
     }
 
-    // --- Fee collection (Cobrar cuota) — the only path that clears unpaid_fee ----
-
-    public function collectFee(): void
-    {
-        // The till screen keeps its "open drawer required" gate for BOTH methods (it IS the till). The shared
-        // collectFeeThrough enforces the CASH-needs-a-till rule for callers that allow a wallet fee without one
-        // (the Socios tab); here we pass the resolved open session so behaviour is unchanged (prompt 127).
-        $session = $this->resolveOpenSession();
-        if ($session === null) {
-            $this->flash(__('No hay caja abierta en este terminal.'), 'error');
-
-            return;
-        }
-        if (! $this->requireOperator()) {
-            return;
-        }
-        $user = $this->currentUser();
-        if ($user === null || ! $user->can('membership.fee.collect')) {
-            $this->flash(__('No tienes permiso para cobrar cuotas.'), 'error');
-
-            return;
-        }
-        $location = $this->resolveLocation();
-        if ($location === null) {
-            $this->flash(__('Selecciona un socio.'), 'error');
-
-            return;
-        }
-
-        $result = $this->collectFeeThrough($session, $location, $user);
-        $this->flash($result['message'], $result['type']);
-    }
-
     // --- Blind close (arqueo) --------------------------------------------------
 
     /** Enter the blind count: hide the live summary and clear any prior reveal. */
@@ -556,9 +507,9 @@ class TillSession extends Component
      * (remaining_cg <> initial_cg). A never-dispensed batch (remaining === initial) is simply excluded —
      * nothing for staff to do. UNIT genetics (prerolls/edibles) and CLOSED/QUARANTINED batches never appear.
      *
-     * @return \Illuminate\Support\Collection<int, Batch>
+     * @return Collection<int, Batch>
      */
-    public function reweighBatches(): \Illuminate\Support\Collection
+    public function reweighBatches(): Collection
     {
         if ($this->locationId === null) {
             return collect();
@@ -859,12 +810,6 @@ class TillSession extends Component
             ? ExpenseCategory::query()->where('active', true)->orderBy('name')->get()
             : collect();
 
-        // Fee collection view data — live, never stored on the component.
-        $feeMember = $this->feeMemberId !== null ? Member::query()->find($this->feeMemberId) : null;
-        $feeMembership = ($feeMember !== null && $location !== null)
-            ? $this->outstandingMembership($feeMember, $location)
-            : null;
-
         return view('livewire.counter.till-session', [
             // Prompt 186 — the day's attribution trail. ONE row on a single-operator day, which is why such
             // a club notices nothing: the list only renders when the drawer actually changed hands.
@@ -873,8 +818,6 @@ class TillSession extends Component
             'session' => $session,
             'breakdown' => $breakdown,
             'expenseCategories' => $expenseCategories,
-            'feeMember' => $feeMember,
-            'feeOwedCents' => $feeMembership !== null ? $this->owedCents($feeMembership) : null,
             // EOD flower reweigh (prompt 47) — the in-scope batches, only while in that step.
             'reweighBatches' => $this->reweighing ? $this->reweighBatches() : collect(),
             // Configured terminals for the open-form picker (prompt 84).

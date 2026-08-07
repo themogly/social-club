@@ -157,18 +157,31 @@ class OneMemberLookupTest extends TestCase
         $this->assertFileDoesNotExist(resource_path('views/livewire/counter/partials/member-identify.blade.php'));
     }
 
-    /** Every counter screen that identifies a socio composes the ONE behaviour rather than its own. */
+    /**
+     * Every counter screen that identifies a socio composes the ONE behaviour rather than its own — and the
+     * caja, which no longer identifies anybody, composes NONE of it.
+     *
+     * The till is kept in this list deliberately (prompt 201). Dropping it would have been the easy move and
+     * the wrong one: "the till has no lookup" is a STRONGER position than "the till has exactly one", and a
+     * guard that silently stops covering a screen is how the thing it guards comes back.
+     */
     public function test_every_counter_screen_that_identifies_a_socio_uses_the_shared_lookup(): void
     {
-        $screens = [CheckInScreen::class, DispensaryPos::class, MembershipCounter::class, TillSession::class, BarPos::class];
-
-        foreach ($screens as $screen) {
+        foreach ([CheckInScreen::class, DispensaryPos::class, MembershipCounter::class, BarPos::class] as $screen) {
             $this->assertContains(
                 FindsMembers::class,
                 class_uses_recursive($screen),
                 $screen.' identifies socios and must do it through the shared lookup.',
             );
         }
+
+        // The caja is about the drawer. Fee collection moved to Socios in prompt 201 because it was the one
+        // panel that made the operator go and find a person on a screen that is not about people.
+        $this->assertNotContains(
+            FindsMembers::class,
+            class_uses_recursive(TillSession::class),
+            'the caja identifies nobody — it must not carry the lookup at all',
+        );
     }
 
     // --- The throttle only counts what could have been a scan --------------------
@@ -294,18 +307,23 @@ class OneMemberLookupTest extends TestCase
             ->assertSee($member->member_no);
     }
 
-    /** The till points `Cobrar cuota` at whoever the shared field resolved. */
-    public function test_a_scanned_token_selects_the_fee_member_at_the_till(): void
+    /**
+     * The till used to point `Cobrar cuota` at whoever the shared field resolved. It has no field now.
+     *
+     * This test is re-expressed rather than deleted (prompt 201): the caja renders ZERO member lookups, at
+     * every permission level. The screen it was written about still has an assertion about it, and that
+     * assertion is stricter than the one it replaces.
+     */
+    public function test_the_till_renders_no_member_lookup_at_all(): void
     {
-        $this->operator();
-        (new OpenTill)->handle($this->location, 'POS-1', 10000);
+        foreach ([Role::OWNER, Role::MANAGER, Role::STAFF] as $role) {
+            $this->operator($role);
+            (new OpenTill)->handle($this->location, 'TILL-'.$role->value, 10000);
 
-        $member = $this->eligibleMember();
+            $html = (string) $this->get(route('counter.till'))->assertOk()->getContent();
 
-        Livewire::test(TillSession::class)
-            ->set('lookup', (new IssueMemberToken)->handle($member))
-            ->call('submitLookup')
-            ->assertSet('feeMemberId', $member->id);
+            $this->assertSame(0, substr_count($html, 'id="member-lookup"'), 'the caja asks nobody to find a socio ('.$role->value.')');
+        }
     }
 
     // --- The results are touch targets -------------------------------------------

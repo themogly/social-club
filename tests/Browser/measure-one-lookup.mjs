@@ -24,18 +24,14 @@ import { mkdirSync } from 'node:fs';
 //   FOLD     — the input and the first result row are inside the viewport at scroll 0. This is the bar for a
 //              screen whose reason to exist is identifying somebody: the door, the dispensary (blocked and
 //              resolved), Socios, and the bar's socio panel.
-//   TOGETHER — the input and the first row fit within ONE viewport height of each other. The caja is a long
-//              stacked page and `Cobrar cuota` is its FOURTH section (measured: the section opens at y=1413
-//              of a 2016px page, and the input 115px into it — exactly where the old feeSearch box sat, so
-//              194 did not move it). Demanding scroll-0 visibility there would mean re-laying-out the whole
-//              till screen, which is not this branch. What 194 IS responsible for is that the results it now
-//              renders below the field do not fall out of view once the operator is at the panel.
+//   TOGETHER — kept for any future long stacked page. It existed for the caja, whose `Cobrar cuota` panel
+//              opened at y=1413 of a 2016px page; fee collection left that screen in prompt 201, so the caja
+//              has no lookup to measure and no longer appears here.
 const SCREENS = [
   { name: 'checkin', rule: 'FOLD' },
   { name: 'dispensary-blocker', rule: 'FOLD' },
   { name: 'dispensary-pane', rule: 'FOLD' },
   { name: 'socios', rule: 'FOLD' },
-  { name: 'till', rule: 'TOGETHER' },
   { name: 'bar', rule: 'FOLD' },
 ];
 const VIEWPORTS = [
