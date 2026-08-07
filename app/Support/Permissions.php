@@ -26,7 +26,10 @@ class Permissions
         'member.limits.set', 'member.discount.assign', 'member.documents.view', 'member.sanction',
         'applications.review',
         // Membership
-        'membership.fee.override', 'membership.fee.collect', 'carencia.waive',
+        // 'membership.enrol' (prompt 203) = open a membership at the sede you are working at, on the tier's
+        // DEFAULT fee — a new one or a lapsed one restored. Moving a membership between sedes is a different
+        // act with another sede's register in it and stays at 'members.transfer'.
+        'membership.enrol', 'membership.fee.override', 'membership.fee.collect', 'carencia.waive',
         // Attendance
         'checkin.manage', 'checkin.override',
         // Counter
@@ -57,7 +60,7 @@ class Permissions
         'reports.view', 'reports.export',
         'members.view', 'members.create', 'members.edit', 'members.transfer', 'members.import',
         'member.sanction', 'applications.review',
-        'membership.fee.override', 'membership.fee.collect', 'carencia.waive',
+        'membership.enrol', 'membership.fee.override', 'membership.fee.collect', 'carencia.waive',
         'checkin.manage', 'checkin.override',
         'pos.use', 'pos.bar', 'dispensation.void', 'order.void', 'limits.override', 'dispensation.price.override',
         'genetics.manage', 'prices.manage', 'stock.manage', 'stock.merma', 'stock.transfer',
@@ -75,6 +78,12 @@ class Permissions
         'pos.use', 'pos.bar', 'checkin.manage',
         'members.view',
         'expenses.record', 'membership.fee.collect', 'till.open',
+        // Prompt 203, the same reasoning as 174 one step further along: a member whose membership lapsed —
+        // or who has never been enrolled HERE — was a dead end whose own remedy text sent the operator to a
+        // panel STAFF cannot act in. On a Friday evening with one person working, that means turning the
+        // member away. What is opened is the LOCAL, audited, single-writer route on the tier's default fee;
+        // fee overrides, tier changes, suspensions, limits and TRANSFERS all stay where they were.
+        'membership.enrol',
         'lockdown.initiate', // the panic button — staff are the ones in a robbery (prompt 121)
         // Prompt 174, on the owner's explicit instruction: STAFF may review an APPLICATION. There is normally
         // one member of staff in the club, so requiring a manager would mean nobody could be signed up — the

@@ -255,20 +255,57 @@ class CounterMemberRecordTest extends TestCase
 
     // --- read-only: no write path but the fee ----------------------------------------------------------
 
-    public function test_nothing_on_this_screen_can_change_a_member_except_the_fee(): void
+    /**
+     * **Amended by prompt 203, deliberately, and made harder to evade.**
+     *
+     * 177 wrote this as an exact-name deny-list containing `renew`. That entry is now out of date: the
+     * counter legitimately renews a lapsed membership at the sede it is working at, because the screen was
+     * telling operators to do exactly that in a panel STAFF cannot act in. Removing the entry is the honest
+     * move — but an exact-name deny-list was always weak, since `renewMembership` would never have matched
+     * `renew` anyway. **Renaming around the guard is precisely what the amendment must not enable.**
+     *
+     * So the list keeps everything it kept, gains the transfer names it never had, and is joined by a
+     * SUBSTRING sweep over every public method: no capability word may appear in any name, whatever it is
+     * called. What is now allowed is named explicitly, so the next capability still cannot arrive silently.
+     */
+    public function test_nothing_on_this_screen_can_change_a_member_beyond_what_203_allowed(): void
     {
         $methods = collect((new \ReflectionClass(MembershipCounter::class))->getMethods(\ReflectionMethod::IS_PUBLIC))
             ->map(fn (\ReflectionMethod $m): string => $m->getName())
             ->reject(fn (string $n): bool => str_starts_with($n, '__'))
             ->values();
 
-        // Prompt 127's boundary, asserted: no renewals, no tier changes, no suspensions, no limit overrides.
-        foreach (['renew', 'suspend', 'setTier', 'changeTier', 'expel', 'setLimit', 'overrideLimit', 'updateMember', 'saveMember'] as $forbidden) {
+        // Prompt 127's boundary, minus only what 203 opened: no tier changes, no suspensions, no limit
+        // overrides, no member edits — and no TRANSFER, which 203 considered and deliberately left in the
+        // panel because it changes ANOTHER sede's register and stock ceiling.
+        foreach ([
+            'suspend', 'setTier', 'changeTier', 'expel', 'setLimit', 'overrideLimit', 'updateMember',
+            'saveMember', 'transfer', 'transferMembership', 'moveMembership', 'setFee', 'overrideFee',
+        ] as $forbidden) {
             $this->assertNotContains($forbidden, $methods->all(), "a write path appeared: $forbidden");
         }
 
-        // The one write is the shared fee concern, unchanged.
-        $this->assertContains('collectFee', $methods->all());
+        // …and the same capabilities under any other name. Two sweeps, because the nouns differ from the
+        // verbs: some words are a capability wherever they appear (`suspend`, `transfer`), while `tier` and
+        // `limit` are perfectly ordinary in a READ helper — `openTiers()` lists the tiers to choose from and
+        // changes nothing. So the second sweep is a governed verb applied to a governed noun.
+        foreach ($methods as $name) {
+            $this->assertDoesNotMatchRegularExpression(
+                '/suspend|expel|transfer|override|anonymise|erase/i',
+                $name,
+                "a public method named `{$name}` reaches a capability this screen must not have",
+            );
+            $this->assertDoesNotMatchRegularExpression(
+                '/(set|change|assign|update|edit|apply)(tier|limit|fee|status|carencia|discount)/i',
+                $name,
+                "a public method named `{$name}` writes something this screen may only read",
+            );
+        }
+
+        // The writes this screen is allowed, named — so a third one cannot appear without editing this line.
+        foreach (['collectFee', 'renewMembership', 'enrolAtThisSede'] as $allowed) {
+            $this->assertContains($allowed, $methods->all(), "the allowed write `{$allowed}` is missing");
+        }
     }
 
     public function test_a_fee_collected_here_is_still_identical_to_one_collected_at_the_till(): void

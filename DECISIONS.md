@@ -9151,3 +9151,122 @@ first, because otherwise two of them render a blocker and the sweep would certif
 and a grep that **no screen instructs the operator to press a key**.
 
 **MySQL left to CI**: `composer check` green on SQLite — 1549 tests, Larastan 0, Pint clean.
+
+## Prompt 203 — a member with no membership at this sede was a dead end
+
+**The screen's own remedy pointed at a door the reader cannot open.** An ACTIVE member — the owner's
+screenshot is Caitlin Allen, M-00012 — stood at Socios reading *"Sin membresía activa en esta sede"*, with
+the verdict panel beneath it saying *"renueva su cuota desde su ficha para poder dispensarle"*. **There was
+no control on the screen that did that.** `EnrolMembership`, `RenewMembership` and `TransferMembership` were
+surfaced in exactly one place, `MembershipsRelationManager`, and the STAFF role holds **no
+membership-management permission of any kind**. With one person working on a Friday evening — the staffing
+assumption this repo already records — the member goes home.
+
+### Which case, which Action
+
+Three situations arrived at that one dead end and they are not the same problem:
+
+| case | Action | why |
+|---|---|---|
+| **Lapsed here** | `RenewMembership` on the **same row** | the fee payments, the history and the id all survive; the audit reads `membership.renewed`, not a second alta |
+| **Never enrolled here** | `EnrolMembership` on the chosen tier | at that tier's **default fee** — the counter has no fee box |
+| **Active at another sede** | `EnrolMembership` — a **second** membership | see below |
+
+**Case 3 enrols; it never transfers.** `TransferMembership` moves the row: the other sede loses a member
+from its register and from `StockCeiling::forLocation()` — decided from a tablet at this sede, by somebody
+who may not work at that one and does not hold `members.transfer`. Enrolling here is **additive and local**:
+it changes this sede's register and touches nothing at the other, which the test asserts by comparing
+`StockCeiling::forLocation($otherSede)['active_members']` before and after. This is one asociación with
+several premises, not several clubs, so holding a membership at two of them raises no `sole_association`
+question; it is an internal register fact, and the screen states it (*"Activo en: Sede Norte"*, and
+*"Su membresía en la otra sede no cambia: aquí se añade una nueva."*). Moving a membership stays in the panel
+behind `members.transfer`, where two sedes' interests are both represented.
+
+### How this sits with 177's boundary and 174's precedent
+
+177 recorded, and guarded, the opposite: *"renewals, tier changes, suspensions and limits stay in the admin
+panel where they carry real authorisation weight."* That was right when it was written and is **not** what
+was overturned. What changed is that the same screen began telling operators to do one of those things —
+so the boundary was no longer a boundary, it was a dead end with instructions.
+
+**174 is the precedent and its shape is copied exactly.** 174 did not conclude "let staff do anything"; it
+concluded that **the audited route is the open one** — staff may admit somebody who applied, through the path
+that runs the age gate, the duplicate search and the versioned consent capture, and still may not use the
+panel's unguarded direct-enrol form. The same distinction here: what opened is the **local, audited,
+single-writer, default-fee** route, at the sede the operator is standing in, with the member in front of
+them. What did not move: fee overrides, tier changes, suspensions, limits, and transfers between sedes.
+
+**And the line had already moved once, unremarked**: `SignsUpMembers` (174) has called `EnrolMembership` from
+this very screen since it shipped — as the tail of an approved alta. A staff user could already create a
+membership at the counter, provided the member had never existed before. The state that was unreachable was
+the *easier* one.
+
+**New permission: `membership.enrol`**, granted to STAFF and MANAGER. No existing permission meant this:
+`members.create` is deliberately manager-only (122, reaffirmed by 174), `members.transfer` is the act being
+declined, and `membership.fee.collect` is about money. Without it the panel renders a **named refusal** —
+*"Pídeselo a un responsable"* — not a hidden button and not a dead control, and the server refuses the call
+as well, which the test asserts by checking the row is untouched.
+
+**A non-default fee is refused rather than renewed.** `RenewMembership` recomputes `$overridden` against the
+tier default, so a counter renewal of a membership whose fee was set by somebody holding
+`membership.fee.override` would either throw for a staff actor or silently reset a negotiated figure.
+Neither is acceptable, so the counter declines that one case and says where the renewal lives. Asserted: the
+membership stays LAPSED **and** the €0 fee stays €0.
+
+### `EnrolMembership` had no uniqueness guard, and now does
+
+It created a row unconditionally — no schema constraint, no check — which was survivable while the callers
+were a wizard, the panel and an import. **A button on a tablet is none of those.** A double-tap would have
+produced a second ACTIVE membership at the same sede, and `StockCeiling` counts members holding an ACTIVE
+membership *here* — so a UI slip would have inflated the sede's legal stock ceiling. The guard is in the
+Action (`DuplicateMembershipException`), scoped to **ACTIVE** so the paper-register import (131) can still
+bring across strings of LAPSED and CANCELLED rows. Asserted against the Action, not the screen.
+
+**Enrolment and the fee are deliberately NOT one transaction** — 174's recorded decision, for the same
+reason. If the fee cannot be taken (no cash, no open drawer) the membership exists and is owed, which is an
+ordinary state this product represents and this screen surfaces. Tested: with no till open, the cash fee is
+refused with its usual sentence, the alta stands, and nothing is collected.
+
+### Part two — the record says who this is
+
+**Age, not date of birth.** *"34 años"* answers the question a person at a counter actually has — does this
+match the card, are they plainly of age — while `12/04/1992` is an identifier used for identity verification
+everywhere else, printed on a tablet with the next socio behind them. This is 177's own reasoning about
+consumption history applied one field over: the summary that answers the question is on screen, the
+identifying detail is not here at all. Also added: **joined** (`Socio desde 08/2024`), an ordinary register
+fact that answers the seniority question the counter is asked next, and **the sedes where they are active**,
+which is what makes the three dead-end cases tellable apart.
+
+**177's document denial test passes untouched**, for OWNER, MANAGER and STAFF, and a new test asserts the
+date of birth itself is never rendered in any format for any of the three.
+
+**The alta panel's `Nacimiento`/`Documento` is consistent with that line, not an inconsistency to fix.** It
+shows an *applicant's* DOB at the moment the operator is running the **age gate** — `ApproveApplication`
+refuses an underage applicant, and the person approving must be able to see what they are approving. There,
+the date of birth is the datum being decided on; here it would be decoration. (It also prints the document
+*type*, not the number, which is not an identifier.) Left alone deliberately.
+
+### 177's reflection guard, amended and made harder to evade
+
+The exact-name deny-list contained `renew`, which is now out of date. Removing that entry is the honest
+move — but the list was always weak, because `renewMembership` would never have matched `renew` anyway, and
+**renaming around the guard is exactly what the amendment must not enable**. So it keeps everything it kept,
+gains the transfer names it never had, and is joined by two substring sweeps over every public method: one
+for words that are a capability wherever they appear (`suspend`, `transfer`, `override`, `erase`), one for a
+governed verb on a governed noun (`setTier`, `changeLimit`, `applyDiscount`…) so that `openTiers()` — a read
+helper — is still allowed. The three permitted writes are then named, so a fourth cannot arrive silently.
+
+### Verification
+
+`composer check` green — **1562 tests**, Larastan 0, Pint clean. **MySQL left to CI**, per the running order.
+
+Screenshots at 1180×820 and 820×1180, light and dark, motion reduced and allowed (32 captures,
+`storage/app/screenshots/203/`). The **before** artifact is `main`'s blade rendered through the same harness
+and reproduces the owner's screenshot exactly: ACTIVE member, *"No active membership at this location"*,
+*"Renew their fee from their record"*, and **0 controls**. After: 1 control on the lapsed case, 2 on each
+enrolment case, none under 44px, no horizontal scroll at either orientation.
+
+**One thing left alone on purpose.** `VerdictRemedy::describe()` still says *"renueva su cuota desde su
+ficha"*. The rules forbid touching `ResolveMemberEligibility`, and the sentence is shared with the door and
+the dispensary where no such control exists — but it is now *true* on this screen for the first time, rather
+than an instruction nobody could follow.
