@@ -9719,3 +9719,108 @@ destination renders exactly once; the hero stays substantially larger; `CounterS
 **Retargeted, not deleted:** `CounterHubTest::test_recepcion_is_the_hero_tile_for_an_operator_who_can_open_it`
 asserted `counter.checkin` because the hero *was* `tiles()[0]`. What 205 was actually protecting — exactly one
 tile promoted, and one the operator may open — is what it asserts now; which route wins moved to the new file.
+
+---
+
+## Prompt 209 — the top bar never came back after a handover, because the layout is outside Livewire
+
+Reported: *"managed to lose the top bar when I went to sign up a new member, clicked hand tablet over and
+clicked back."* Reproduced on `988a845` exactly as described — hand over → Back → *Personal del club* → PIN:
+the counter is back, the operator is restored, the green *"Trabajando: Club Owner"* confirmation is on screen,
+**and there is no top bar.** No sede, no lock, no way to any other screen. A full page reload brings it back.
+
+Since 205 the bar is the only navigation, so this is not a cosmetic loss: **the terminal is stranded** on
+whatever screen it happens to be on until somebody reloads.
+
+### The server logic was right; the rendering boundary was wrong
+
+`components/layouts/counter.blade.php` asked `CounterHandover::active()` whether the chrome should exist. That
+is the correct **rule** — 173 requires the chrome absent from the DOM while an applicant holds the tablet, not
+merely hidden — evaluated in the wrong **place**. `unlockOperator()` ends the handover inside a **Livewire
+action**, and a Livewire response replaces the component's markup and nothing else: the Blade layout is never
+re-rendered. So the branch was resolved on the previous full page load, while the handover was still active,
+and no amount of correct server state could bring the bar back.
+
+**The component recovers. The chrome could not.**
+
+**This is prompt 188's failure one level out.** 188 was Alpine snapshotting server state into `x-data`; this
+was the *layout* snapshotting server state into the DOM. Same shape: a fact a component can change
+mid-session, read somewhere a component's response can never reach.
+
+### Which option, and what it costs
+
+The prompt offered three. Two were rejected for stated reasons:
+
+- **Force a full page load on recovery.** It would work, and at that exact moment it would cost nothing —
+  the handover has already disposed of everything the applicant touched, and the basket is session-backed. But
+  `unlockOperator()` is the *same method* for all three modes, so the reload would also land on the **lock**
+  path, where 198 and 205 deliberately preserve in-progress work; narrowing it to "only when a handover was
+  ended" is possible but leaves the real problem untouched. Decisively: the layout would still be branching on
+  session state a component can change, so the **class** of bug would survive the fix of the instance — and
+  the guard below could not then be written without whitelisting the very line that caused this.
+- **Render the bar always and remove it another way.** 173 is explicit that the chrome must be *absent from
+  the DOM*, not hidden, so "remove it with CSS/Alpine" is not available.
+
+**Chosen: the chrome is a Livewire component.** `App\Livewire\Counter\CounterChrome` renders the skip link and
+`<x-counter.top-bar>`, decides `CounterHandover::active()` for itself, and the layout renders it
+unconditionally. It listens on the two events that change the answer:
+
+- `counter-unlocked`, which `unlockOperator()` already dispatched — **after** ending the handover and writing
+  the session, so by the time the chrome answers it the session is correct. The ordering is guaranteed rather
+  than lucky: the event fires in the browser after the response returns, and the chrome's re-render is a
+  separate request.
+- `counter-lock`, which is what makes `lockCounter()` end a timed-out handover in the first place.
+
+**What it costs.** One nested Livewire component per counter screen: one extra snapshot in the page, no extra
+queries on a full load (the bar's lookups ran once before and run once now), and one extra round trip on the
+PIN — which previously produced a broken screen. Livewire does not re-render children when the parent updates,
+so ordinary counter interactions are unaffected. `CounterHandover`, `unlockOperator()`, the throttle and the
+audit entries are untouched, as required: the server logic never had the bug.
+
+### The rule, stated and guarded
+
+> **Nothing the counter layout branches on may be changeable by a Livewire component within the same page
+> life.**
+
+`tests/Feature/Counter/LayoutBranchesOnFixedFactsTest` **derives** that rather than listing offenders: it
+collects every `App\Support` class the layout references (comments stripped — the file now documents the rule
+at length) and fails if any of their own sources write to the session, which is exactly how a counter
+component changes state. Route-derived facts (the screen title), deploy-time facts (whether a build manifest
+exists) and per-sede config (the idle-lock window, changed in the admin panel — a different page life) are
+fixed for the life of the page and pass.
+
+The failure message **names the mechanism**, not the symptom: that a Livewire response replaces the
+component's markup and nothing else, that the layout renders once, that this shipped as a stranded terminal,
+and where the decision lives now. **Verified to bite**: reinstating `@unless (CounterHandover::active())`
+fails two of its three tests.
+
+### Two things verified correct and deliberately left alone
+
+- **The applicant page has no counter chrome and no PIN pad**, and should not — its only controls are the
+  language toggle, the MRZ prefill and Submit. 173's guarantee, re-asserted here hook by hook against the raw
+  body on all five counter screens, because "hidden" and "absent" are indistinguishable in a rendered-text
+  assertion and only one of them is the guarantee.
+- **The two-step way back works and is not made louder.** After Back, the surface renders with *"Continuar con
+  mi solicitud"* and *"Personal del club"*; the second reveals the pad and a valid PIN restores the counter.
+  187 asked for reachable-but-not-prominent; asserted, including that the working screen never renders behind
+  it.
+
+### Verification
+
+`composer check` green — **1625 tests**, 1622 passed, 3 pre-existing skips, Larastan 0, Pint clean. **MySQL was
+left to CI**, per the running order; the suite ran on SQLite. No new copy: the strings moved with the markup.
+
+Screenshots at 1180×820 and 820×1180, light and dark (`storage/app/screenshots/209/`) — step 4 with and
+without its bar, both showing the recovered counter and *"Trabajando: Lucía Márquez"*. The frames are
+**spliced**, deliberately and recorded as such: the page as the browser is holding it, with the chrome region
+replaced by what a Livewire response would have put there. A plain `GET` after recovery shows the fixed state
+on `main` too — the reload is what always hid this bug, so photographing a GET would have photographed
+nothing. The shoot script asserts the difference rather than trusting the pictures: `before` has 0 of 7 chrome
+controls, `after` has 7 of 7, and both show the recovery.
+
+**Tests** (`ChromeReturnsWithTheCounterTest`, 7): the bar comes back after a handover with **no page reload**,
+modelled as the real sequence (a Livewire action on the page component, then the chrome answering the event it
+dispatched, with no `get()` in between); every control it carries comes back, not just the element holding
+them; the same for the idle-timeout path; the chrome absent from the DOM on every screen while handed over;
+Back showing the surface with 187's way back and never the working screen; and a basket and form state both
+surviving the recovery — the guarantee that made the redirect option unattractive.
