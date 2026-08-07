@@ -3,13 +3,17 @@
 namespace Tests\Browser;
 
 use App\Enums\Role;
+use App\Livewire\Counter\TillSession;
 use App\Models\Location;
 use App\Models\Organisation;
 use App\Models\User;
 use App\Support\ActiveScope;
+use App\Support\CounterHandover;
+use App\Support\CounterOperator;
 use Database\Seeders\RolePermissionSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
+use Livewire\Livewire;
 use Tests\TestCase;
 
 /**
@@ -76,6 +80,18 @@ class SurfaceChainHarnessTest extends TestCase
             ->get(route('counter.checkin'))->getContent();
         $this->write('with-sede', $withSede);
 
+        // 3) HANDED OVER — prompt 187 defect 2. The applicant left their form and landed back here; this is
+        // the resting state and the way back, which together used to be a box promising a form.
+        app(ActiveScope::class)->setLocation($centro->id);
+        CounterOperator::set($user);
+        Livewire::actingAs($user)->test(TillSession::class)->call('beginHandover');
+        // session(), not withSession(): the handover lives in the session too, and withSession() would
+        // reset it out from under the very state being captured.
+        session(['counter.location_id' => $centro->id]);
+        $handover = $this->actingAs($user)->get(route('counter.checkin'))->getContent();
+        $this->write('handover', $handover);
+        CounterHandover::end();
+
         // --- now the assertions ---
 
         // The bug: the surface raised here, covering the sede blocker AND the top bar that carries the only
@@ -89,5 +105,11 @@ class SurfaceChainHarnessTest extends TestCase
         $this->assertStringContainsString('data-surface-mode="unidentified"', $withSede);
         $this->assertStringNotContainsString('data-blocker="sede"', $withSede);
         $this->assertStringContainsString('data-counter-surface-unlock', $withSede);
+
+        // Handed-over mode offers a real way back, and still names nobody and nothing.
+        $this->assertStringContainsString('data-surface-mode="handover"', $handover);
+        $this->assertStringContainsString('data-handover-staff', $handover);
+        $this->assertStringNotContainsString('data-counter-topbar', $handover);
+        $this->assertStringNotContainsString('Sede Centro', $handover);
     }
 }

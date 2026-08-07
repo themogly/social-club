@@ -20,6 +20,7 @@ import { mkdirSync } from 'node:fs';
 const STATES = [
   { name: 'no-sede', surfaceUp: false },   // fresh terminal: sede blocker + reachable switcher
   { name: 'with-sede', surfaceUp: true },  // sede chosen: the operator surface owns its own step
+  { name: 'handover', surfaceUp: true },   // 187 defect 2: the resting state and the way back
 ];
 const VIEWPORTS = [
   { name: '1180x820', width: 1180, height: 820 }, // iPad landscape — the counter's working orientation
@@ -69,7 +70,20 @@ for (const state of STATES) {
           failed = true;
         }
 
-        if (state.surfaceUp) {
+        if (state.name === 'handover') {
+          // The reported bug was a surface with no control of any kind. Assert the way back is really on
+          // screen — not merely in the markup — and that the applicant is not being shown a PIN pad.
+          const staff = await page.$('[data-handover-staff]');
+          const box = staff === null ? null : await staff.boundingBox();
+          if (box === null || box.width === 0) {
+            console.error(`FAIL ${state.name} @ ${vp.name}/${theme}: no visible way out of handed-over mode`);
+            failed = true;
+          }
+          if (await page.$('[data-counter-surface-unlock]') !== null) {
+            console.error(`FAIL ${state.name} @ ${vp.name}/${theme}: the PIN pad is shown to the applicant`);
+            failed = true;
+          }
+        } else if (state.surfaceUp) {
           // The PIN pad is the surface's whole purpose; it lives in an x-if template, so its presence also
           // proves Alpine really ran rather than the capture being a styled shell.
           const pad = await page.$('[data-counter-surface-unlock]');
