@@ -17,11 +17,15 @@ use Tests\TestCase;
 
 /**
  * Every counter screen (check-in / till / dispensary POS / bar POS) shares ONE header
- * component. It offers a back-to-dashboard link ONLY to a user who can access the panel
+ * component. It offers a way into the admin panel ONLY to a user who can access it
  * (the same gate the sidebar uses) — a locked-down counter-only login sees no path into
  * admin — and confirms before leaving with unsaved work.
+ *
+ * Renamed by prompt 206 with the control it tests: the link was labelled *Panel*, which `lang/en.json`
+ * rendered as **Dashboard**, making it a synonym of the Home link beside it. It is *Administración* now,
+ * named for where it goes.
  */
-class BackToDashboardTest extends TestCase
+class BackToAdminPanelTest extends TestCase
 {
     use RefreshDatabase;
 
@@ -51,7 +55,7 @@ class BackToDashboardTest extends TestCase
         return $user;
     }
 
-    public function test_a_panel_user_sees_the_shared_back_to_dashboard_link_on_every_counter_screen(): void
+    public function test_a_panel_user_sees_the_shared_administration_link_on_every_counter_screen(): void
     {
         $owner = $this->user(Role::OWNER);
 
@@ -59,16 +63,16 @@ class BackToDashboardTest extends TestCase
             $response = $this->actingAs($owner)->get(route($route));
             $response->assertOk();
             $response->assertSee('data-counter-topbar', false);   // the ONE shared header
-            $response->assertSee('data-counter-dashboard', false); // the back-to-dashboard link
+            $response->assertSee('data-counter-admin-link', false); // the way into the admin panel
             $response->assertSee(url('/'), false);
         }
     }
 
-    public function test_a_counter_only_user_without_panel_access_sees_no_dashboard_link(): void
+    public function test_a_counter_only_user_without_panel_access_sees_no_administration_link(): void
     {
         // Has the counter permission (via STAFF) but canAccessPanel() is false (inactive) —
         // the deliberate lockdown for a fixed till tablet. The shared header still renders;
-        // the dashboard link does not.
+        // the Administración link does not.
         $counterOnly = $this->user(Role::STAFF, active: false);
         $this->assertFalse($counterOnly->canAccessPanel(Filament::getPanel('admin')));
 
@@ -76,7 +80,7 @@ class BackToDashboardTest extends TestCase
             $response = $this->actingAs($counterOnly)->get(route($route));
             $response->assertOk();
             $response->assertSee('data-counter-topbar', false); // shared header present
-            $response->assertDontSee('data-counter-dashboard', false); // but NO way into the panel
+            $response->assertDontSee('data-counter-admin-link', false); // but NO way into the panel
         }
     }
 

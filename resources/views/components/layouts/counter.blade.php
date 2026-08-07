@@ -24,8 +24,24 @@
             @vite(['resources/css/app.css', 'resources/js/app.js'])
         @endif
 
-        {{-- Shared counter store. `dirty` = unsaved work (POS/till screens set it; the header's Panel/Log out
-             controls confirm before leaving). `locked` = the idle-lock overlay (prompt 120): after
+        {{-- Shared counter store.
+
+             TWO unsaved-work flags, because there are two different losses (prompt 206):
+
+             · `dirty`    = there is work in progress at this terminal. Guards the controls that LEAVE the
+                            counter — Administración, Log out, and switching sede — because all three take
+                            the basket with them (log out ends the session; a sede switch re-keys it).
+             · `volatile` = work that no navigation preserves. Guards HOME, which is now every trip between
+                            screens. The POS baskets are session-backed (App\Support\CounterBasket), so going
+                            home cannot lose one — only typed-but-unsubmitted input dies, which today is the
+                            till's count/movement/expense fields and nothing else. Guarding Home on `dirty`
+                            meant the operator met a warning about a loss that could not happen, on the most
+                            common action in the product, and learned to dismiss it — which then costs them
+                            the one on Administración and Log out, where it is still true.
+
+             Volatile work is also dirty (the till sets both); the reverse is not so.
+
+             `locked` = the idle-lock overlay (prompt 120): after
              `idleMinutes` of NO real operator input the screen locks, obscuring member data and signing the
              operator out server-side (a commit then fails requireOperator, not just the overlay). Only genuine
              input (pointer/key/touch) resets the timer — Livewire polling and re-renders never do. The window is
@@ -38,6 +54,7 @@
 
                 window.Alpine.store('counter', {
                     dirty: false,
+                    volatile: false,
                     locked: false,
                     idleMinutes: {{ (int) \App\Support\Settings::get('counter_idle_lock_minutes', 5) }},
                     _timer: null,
@@ -115,10 +132,11 @@
             'mx-auto flex min-h-screen w-full max-w-6xl flex-col',
             'md:h-screen md:min-h-0' => $fills,
         ])>
-            {{-- One shared header for every counter terminal (brand + title + a
-                 permission-filtered Panel link + Log out). See x-counter.top-bar. --}}
+            {{-- One shared header for every counter terminal (the club + this screen's title, the sede, who
+                 is working, Lock, and — behind a divider, because they LEAVE the counter — a
+                 permission-filtered Administración link + Log out). See x-counter.top-bar. --}}
             {{-- Handed over (prompt 173): the counter's chrome is ABSENT from the DOM, not hidden by CSS.
-                 The tab strip, the overflow menu with its Panel link and Log out, the sede switcher and the
+                 The tab strip, the Administración link and Log out, the sede switcher and the
                  panic button are all inside this component — while an applicant holds the tablet there is no
                  element to find, no link to follow and nothing for a keyboard to reach. --}}
             {{-- Skip link (a11y audit): the top bar is ~7 controls to tab past on EVERY counter screen, and

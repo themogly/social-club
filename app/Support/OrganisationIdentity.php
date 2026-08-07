@@ -55,6 +55,26 @@ class OrganisationIdentity
     }
 
     /**
+     * The club's TRADING name, for UI chrome — one indexed lookup, no logo read and no legal name.
+     *
+     * Separate from {@see self::current()} deliberately: that assembles a document identity block and reads
+     * the logo off disk to build a data URI, which is far too much for a header that renders on every counter
+     * screen, all shift. And separate from `config('app.name')`, which is the PRODUCT name — the same mistake
+     * {@see self::mailLogo()} records for email: a bar reading "CSC platform" re-brands the club's own
+     * terminal as ours. Falls back to the product name only when there is no organisation to ask.
+     */
+    public static function tradingName(): string
+    {
+        $id = app(ActiveScope::class)->organisationId();
+
+        $name = $id !== null
+            ? Organisation::query()->whereKey($id)->value('name')
+            : null;
+
+        return filled($name) ? (string) $name : (string) config('app.name');
+    }
+
+    /**
      * True when the active org (or the given one) carries a legal name. A statutory document must refuse to
      * generate without it — the whole point of the document is to name the responsible association.
      */

@@ -645,10 +645,20 @@
 @endif
 </div>
 
-{{-- Prompt 23: flag an in-progress blind count / cash entry as unsaved work. --}}
+{{-- Prompt 23: flag an in-progress blind count / cash entry as unsaved work.
+
+     **Both flags, and this is the ONLY screen that sets `volatile`** (prompt 206). These three are plain
+     Livewire properties on a screen with no `PersistsBasket`: a half-typed arqueo does not survive a trip to
+     the hub, so Home must ask here even though it must not ask on a POS basket. --}}
 @script
 <script>
-    const sync = () => { if (window.Alpine?.store('counter')) window.Alpine.store('counter').dirty = ((($wire.countInput ?? '') !== '') || (($wire.movementAmount ?? '') !== '') || (($wire.expenseAmount ?? '') !== '')); };
+    const sync = () => {
+        const s = window.Alpine?.store('counter');
+        if (! s) return;
+        const typed = ((($wire.countInput ?? '') !== '') || (($wire.movementAmount ?? '') !== '') || (($wire.expenseAmount ?? '') !== ''));
+        s.dirty = typed;
+        s.volatile = typed;
+    };
     ['countInput', 'movementAmount', 'expenseAmount'].forEach((p) => $wire.$watch(p, sync));
     sync();
 </script>

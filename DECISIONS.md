@@ -9392,3 +9392,134 @@ filtering, the current screen marked, the touch floor), `LockInPlaceTest` (198's
 it not at all), `HelpTest` (92's content, now on the hub) and `AlpineScopeTest` (196's confirm, now on the links
 that leave). The one rule that genuinely retired is the per-tab-link confirm, because the work it protected no
 longer dies.
+
+---
+
+## Prompt 206 — two controls called "Home" and "Dashboard", and the house icon was on the wrong one
+
+The owner, on the counter hub: *"Dashboard button and Home / Counter is confusing. Come up with a way to solve
+it."* Both halves of that checked out, and the second half is the one that made it *confusing* rather than
+merely ambiguous.
+
+### They were synonyms, and only in English
+
+| control | ES | EN (`lang/en.json:1593`) | goes to | icon |
+|---|---|---|---|---|
+| `data-counter-home-link` | Inicio | **Home** | `counter.home` — the hub | the PRODUCT name's first letter |
+| `data-counter-dashboard` | Panel | **Dashboard** | `url('/')` — the admin panel | **a house** |
+
+*Home* and *Dashboard* are two ways of saying *the main screen*. Neither names the application it opens, and
+**the house glyph was on the admin link** while the control that actually goes home wore a letter — the visual
+language was inverted. A Spanish operator read *Inicio* / *Panel*, which is merely vague; the English pair is
+the bug, which is why the English screenshot is the bug report.
+
+**Named by destination, not by kind of thing.** *Dashboard* could not stay under any spelling, because the hub
+is a dashboard too:
+
+- **The home control is the club's own counter.** It carries the **house**, taken back off the admin link, and
+  the **club's name** — visible, so it is part of the accessible name (WCAG 2.5.3), with `· Inicio del
+  mostrador` appended `sr-only` to say where it goes, the same idiom the operator chip already uses for
+  `· Cambiar`. The `<h1>` is untouched below it: still exactly one per screen, still the screen's own name.
+- **The other one is *Administración* / *Administration*** with a **briefcase**. House and office is a pair a
+  room can read across a counter; *Panel* and *Dashboard* were a kind of thing.
+- **Grouped by scope.** Home and Lock stay *inside* the counter; Administración and Log out **leave** it, and
+  both already confirmed unsaved work — that shared behaviour is the tell that they are one group, so they sit
+  behind a divider (`data-counter-leave-group`). Nothing moved and nothing else was renamed. 121's panic
+  control is untouched, still last, still icon-only.
+
+**The identity is the CLUB's, not `config('app.name')`.** 205's aria-hidden tile held the first letter of the
+*product* name; pre-205 the bar printed the product name outright. `App\Support\OrganisationIdentity` already
+records why that is wrong on club-facing surfaces (prompt 150: the product logo on club email "re-brands the
+club's email as ours"). New `OrganisationIdentity::tradingName()` — **one indexed lookup, no logo read**,
+deliberately not `current()`, which assembles a document identity block and base64s a logo off disk. The hub's
+query budget goes 32 → 33 against a documented ceiling of 40.
+
+**The hook was renamed too** (`data-counter-dashboard` → `data-counter-admin-link`, and
+`BackToDashboardTest` → `BackToAdminPanelTest`). A hook named *dashboard* pointing at a control labelled
+*Administración* is the same small lie as the stale comment below, and the next person pays for it.
+
+### The confirm fired when nothing would be lost, and the file said the opposite
+
+`top-bar.blade.php` guarded Home on `$store.counter?.dirty` under a comment claiming *"the confirm now almost
+never fires: prompt 205 made the basket survive navigation, so `counter.dirty` is set only when work would
+GENUINELY be lost."* **Not true of this codebase** — `dirty` was still basket length, unchanged:
+
+```
+bar-pos.blade.php:532        …counter').dirty = (($wire.basket?.length ?? 0) > 0)
+dispensary-pos.blade.php:793 …counter').dirty = (($wire.basket?.length ?? 0) > 0)
+```
+
+So: one article in the basket, tap Home, get *"Tienes trabajo sin guardar…"*, accept — and the basket is still
+there. Home is now **every** navigation, so the operator met that dialog constantly and learned to dismiss it,
+which then costs them the identical dialog on Administración and Log out, where it is still true. **Teaching
+people to dismiss a warning is worse than not having one.**
+
+**`dirty` was conflating two different losses, so it is now two flags:**
+
+| flag | means | guards | set by |
+|---|---|---|---|
+| `dirty` | work in progress at this terminal | Administración, Log out, sede switch | both POS baskets, the till |
+| `volatile` | work no navigation preserves | **Home** | the till only |
+
+The till is the one screen where going home really does lose something: `countInput` / `movementAmount` /
+`expenseAmount` are plain Livewire properties on a screen with no `PersistsBasket`, so a half-typed arqueo dies
+on any full page load. Blanket-removing Home's confirm would have dropped a warning that is *still true there* —
+the same defect in the opposite direction. Volatile work is also dirty; the reverse is not so.
+
+### Three instruments were wrong, and the third one found a real defect
+
+**The screenshot/measurement harness had been inlining the wrong CSS.** Both counter harnesses did
+`glob(public_path('build/assets/*.css'))` — every stylesheet in the build. That drags in Filament's
+`theme-*.css`, which **a counter screen never loads**, and which ends with its own copy of the Tailwind utility
+layer: its `.hidden{display:none}` landed after app.css's `@media (width>=64rem){.lg\:inline{display:inline}}`,
+equal specificity, later wins. **Every `hidden lg:inline` label in the bar was forced off at every width.** So
+`measure-topbar.mjs` has been measuring an icon-only row and reporting PASS — when the row a 1180px tablet
+really renders is the labelled one, the wider of the two and the only one that can overlap. Same class as the
+two instrument failures 205 recorded about this exact script. New `Tests\Browser\Concerns\InlinesBuiltCss`
+inlines exactly the `<link>`s the page emitted, which is faithful by construction.
+
+**With a faithful instrument it found a real overlap in this branch's own row.** At 1024 the labelled row
+overlapped the sede badge by **68px**, and at 1280 by 24px — this branch widened the row twice over (the club's
+name in the home link, and *Administración* at 151px against *Dashboard*'s 88px). Two fixes, both structural:
+
+- **The home link can shrink** (`shrink-0` → `min-w-0`). A club's name is arbitrary text; a `shrink-0` block
+  carrying it is an overflow waiting for a long name, which is 130's original rule about this same block.
+- **Labelling moved `lg` → `xl`.** 130's rule is that labelling is all-or-nothing and only where it fits; where
+  it flips is whatever the measurement says, and a labelled row no longer fits a 1024px landscape tablet.
+
+**And that exposed an a11y defect the CSS bug had been hiding.** `hidden` is `display:none`, which removes a
+label from the accessibility tree as well as the screen — so the Lock button, whose only name was a
+`hidden lg:inline` span, was **anonymous to a screen reader on the tablet it was designed for**. It has an
+`aria-label` now, and a test asserts no bar control's only name is a breakpoint-hidden label.
+
+**`MIN_CONTROLS` raised 6 → 7** in `measure-topbar.mjs`. The loose floor let a stale measurement through again
+on this branch: a renamed hook dropped a control and 6 still read PASS. A floor that cannot catch the thing it
+exists for is decoration.
+
+**A Blade gotcha worth recording**, because it cost a debugging round and fails silently: `@php` written inside
+a `{{-- --}}` comment is still compiled. Blade runs `compileStatements` **before** `compileComments`, so a
+prose mention of a directive opens a real PHP block — the home link and the whole sede region silently vanished
+from the rendered header, with no error.
+
+### Verification
+
+`composer check` green — **1593 tests**, 1590 passed, 3 pre-existing skips, Larastan 0, Pint clean. **MySQL was
+left to CI**, per the running order; the suite ran on SQLite.
+
+`measure-topbar.mjs` re-run with the corrected harness: **7 controls, no overlaps, none under 44×44, no
+horizontal page scroll at 768 / 800 / 1024 / 1280 / 1180×820 / 820×1180** (the last two added by this branch —
+206's required checks are orientations, not widths).
+
+Screenshots before and after, **English and Spanish**, light and dark, at 1180×820, 820×1180 and 1440×900 (the
+last above the label threshold, so the wording is legible): `storage/app/screenshots/206/`.
+
+**Tests.** `TopBarNamesItsDestinationsTest` — accessible names unique across the whole rendered bar as a SET in
+both locales (a guard for the next collision, not a repro: *Home* and *Dashboard* were synonyms, not identical
+strings); each control named for its destination and nothing named *Dashboard*; the home glyph on the link that
+goes home and the two icons distinct; the leave-group membership; Home raising no confirm with a basket **and
+the basket intact afterwards**; typed till input still stopping the trip home; Administración and Log out still
+confirming with declining structurally staying put; one `<h1>` per screen; the club's name on every screen; no
+control naming itself only through a CSS-hidden label. Seven of the eleven fail against `main`.
+
+**Retargeted, not deleted:** `LockInPlaceTest` (Home dropped off its leaves-the-counter list, which is the
+point), `CounterScreenSwitcherTest` and `TopbarHarnessTest` (the `lg` → `xl` threshold).
