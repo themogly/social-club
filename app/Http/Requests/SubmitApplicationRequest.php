@@ -5,6 +5,7 @@ namespace App\Http\Requests;
 use App\Enums\IdDocumentType;
 use App\Support\DocumentUpload;
 use App\Support\MemberEligibility;
+use App\Support\MrzPrefill;
 use Illuminate\Contracts\Validation\Validator;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
@@ -64,6 +65,20 @@ class SubmitApplicationRequest extends FormRequest
 
     public function withValidator(Validator $validator): void
     {
+        $validator->after(function (Validator $validator): void {
+            // Prompt 179 — the form cannot be submitted while a prefilled field is UNCONFIRMED, and this is
+            // the server-side half of that. The browser marks each field it filled; the applicant confirms
+            // or corrects each one. Enforcing it only in the page would make the confirmation decorative,
+            // and the confirmation is the entire reason an imperfect reader is safe to ship.
+            $confirmed = (array) $this->input('mrz_confirmed', []);
+
+            foreach (MrzPrefill::fields((string) $this->route('token')) as $field) {
+                if (! filled($confirmed[$field] ?? null)) {
+                    $validator->errors()->add($field, __('Comprueba este dato leído del documento y confírmalo.'));
+                }
+            }
+        });
+
         $validator->after(function (Validator $validator): void {
             $dob = $this->input('date_of_birth');
             if (is_string($dob) && $dob !== '' && ! MemberEligibility::isOldEnough($dob)) {

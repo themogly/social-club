@@ -7615,3 +7615,93 @@ a panel-made one in the invitations list — same record, same token shape, same
 
 **MySQL was left to CI**, per the running order: `composer check` green on SQLite (1363 tests). No migration
 and no column — a permission list entry, a gate change, a trait and a blade.
+
+## Prompt 179 (rewritten) — read the ID in the browser, parse it on the server
+
+**The earlier 179's premise was false, and this records exactly how — because the correction is the useful
+part.** It asserted that `MrzParser` and `id:mrz-read-rate` gave the form a reusable OCR path. Verified on
+`e934fc9`: `MrzParser::parse(string $raw)` takes **already-OCR'd text** — it is a parser, not a reader; the
+only OCR anywhere was a `tesseract` shell-out inside `MeasureMrzReadRate`, a CLI command that aborts if the
+binary is absent; and `tesseract` was declared in composer.json, package.json, SETUP.md and CI in **none of
+them**. So the read rate was not low, it was **zero**, and the confirmation UI would have been a complete,
+tested feature that nothing could reach. The session that refused to build it was right.
+
+**The owner chose the browser, and it is the stronger answer.** 128 had already ruled out cloud OCR in its
+own error message (*"do NOT reach for a cloud OCR API — no processor / transfer / RAT for Article-9 data"*),
+which left a server binary or the client. The client wins on the ground 128 cared about: **the ID image
+never leaves the applicant's device in order to be read.** It is still uploaded, because 178 needs it as the
+compliance artefact — but the *reading* is local, on their own phone or the club's tablet, on their own
+document. No processor, no transfer, no RAT entry beyond what 178 already records, and no server dependency
+that can vanish on a rebuild.
+
+**OCR in the browser, parsing on the server, one parser.** The browser turns the image into raw MRZ **text**
+and posts that; `MrzParser` — unchanged — turns text into fields. A JavaScript reimplementation of the ICAO
+check-digit logic would drift from the PHP one, and the half that drifted would be the half validating an
+identity document. What crosses the wire is a ≤200-character string rather than a photograph, it is parsed
+and discarded inside that one request, and it is never persisted, logged or echoed back — asserted against
+the log file, the response body and the session.
+
+**The privacy claim is pinned by a test, not by prose.** `test_the_read_endpoint_takes_text_and_never_an_image`
+asserts the client module contains no `FormData` and no `.append(`, and that the read method contains no
+`hasFile` and no `storeUpload`. If someone later "simplifies" this by posting the image for reading, that
+test fails.
+
+**The prefill is provisional, always — which is what answers 128's gate.** 128's reasoning rested on an
+assumption: that a prefilled value is TRUSTED. Remove it and the read rate stops being load-bearing. Every
+field the reader fills is visibly marked as read from the document, and the form **cannot be submitted until
+each is confirmed or corrected** — enforced server-side in `SubmitApplicationRequest`, not only in the page,
+because a confirmation enforced only in the browser is decorative. A wrong read then costs a correction, not
+a wrong row in the libro de socios. A 60% read rate is annoying and a 95% one delightful; neither is
+dangerous. That matters MORE for a client-side read: it cannot be trusted for correctness and does not need
+to be, because the applicant is the check. A broken ICAO check digit prefills **nothing** — the parser is
+correct-or-invalid and the caller honours it.
+
+**Prefill fills blanks; it does not correct people.** The read redirects back `withInput()`, and the field
+value is `old() ?: payload ?: prefill`, so a value typed before scanning survives.
+
+**The read rate, measured from real use.** How often a prefilled field is **corrected** is the read rate —
+on real documents, in real conditions, judged by the only people who can tell whether it was right, with no
+corpus to assemble, hold or destroy. `mrz_field_stats` holds `organisation_id`, `field`, `prefills`,
+`corrections` and nothing else; a test asserts the exact column list and that no name, document number, date
+of birth or email can be found anywhere in the table.
+
+**The number at which to reconsider the feature: a correction rate above ~40% on `document_number`,
+sustained over 100+ prefills.** Reasoning: names and dates are cheap to fix and applicants read them
+carefully anyway, but a wrong document number is the one that matters for the register, and correcting more
+than two in five means the reader is costing more attention than it saves. Below ~20% it is clearly earning
+its place. Between the two, leave it and keep measuring. Note this is **not** 128's ≥90% read-rate gate
+restated — that gate was for a prefill that would be trusted; this is a usefulness threshold for one that
+never is.
+
+**The engine is vendored, same-origin, and loaded on demand.** `tesseract.js` + `tesseract.js-core` +
+`@tesseract.js-data/eng` (the 3 MB `best_int` model, against 10.9 MB for the full one) are npm dependencies;
+`scripts/vendor-ocr.mjs` copies four files into `public/ocr/` as part of `npm run build`, and `public/ocr` is
+gitignored exactly as `public/build` is. **Why not a CDN:** fetching from unpkg would not send the image
+anywhere, but it would put a third party on the critical path of an identity-document flow, and it is
+avoidable. **Why not commit the binaries:** ~10 MB, already an npm dependency, and `npm ci && npm run build`
+is already the deploy sequence. **Why not a server binary:** that is the failure the first 179 died of.
+
+The engine is a **dynamic `await import()` inside the click handler**, and `mrz-reader.js` is its own Vite
+entry loaded only by the application form — a WASM bundle is megabytes and an applicant who never scans must
+not pay for it. Asserted: the page references neither `tesseract` nor `/ocr/`, the module uses
+`await import(…)` and not a static import, and the module contains no `https://`, `unpkg`, `jsdelivr` or
+`cdn.`.
+
+**Unsupported is a normal outcome, and will be the common case for a while.** If the engine cannot be
+fetched, cannot run, or reads nothing, there is no prefill, no warning and no suggestion the applicant did
+something wrong — they fill the form exactly as they do today. The `@vite` call is guarded the way the
+layouts guard theirs, so a tree without `npm run build` degrades rather than 500s, and the trigger is
+`hidden` until the script mounts so a browser that cannot run the reader never shows a control that would do
+nothing.
+
+**Which side to photograph is said once, plainly, next to the button.** A Spanish DNI's MRZ is on the
+**back** (TD1, three lines); a passport's is on the photo page (TD3, two lines). Both parse — asserted with
+prompt 128's own canonical ICAO fixtures, so there is one parser and one set of examples.
+
+**Untouched:** `DocumentVault`, the disks, 178's upload/retention/rate-limiting, what
+`SubmitApplicationRequest` validates, prompt 155's required-field marking, and the upload staying optional.
+An applicant who does not upload sees no difference at all.
+
+**MySQL was left to CI**, per the running order: `composer check` green on SQLite (1382 tests). This branch
+does add a migration (`mrz_field_stats`) — plain integer columns and a unique index, no JSON and no raw
+expression — so there is no driver-difference surface a local MySQL run would find that CI will not.

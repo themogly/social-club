@@ -161,6 +161,11 @@ Route::middleware('web')->prefix('socio')->name('socio.')->group(function () {
     Route::post('solicitud/{token}', [ApplicationController::class, 'store'])
         ->middleware('throttle:10,1')->name('application.store');
 
+    // Prompt 179 — the browser posts the MRZ TEXT it read; the server parses it with the one parser that
+    // already exists. No image is posted here, which is the whole privacy argument.
+    Route::post('solicitud/{token}/leer', [ApplicationController::class, 'read'])
+        ->middleware('throttle:20,1')->name('application.read');
+
     Route::middleware('auth:member')->group(function () {
         Route::get('avisos', [AnnouncementController::class, 'index'])->name('announcements');
 
