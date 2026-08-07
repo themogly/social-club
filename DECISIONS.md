@@ -8187,3 +8187,50 @@ durable than parsing a payload shape Livewire is free to change.
 
 **MySQL was left to CI**, per the running order: `composer check` green on SQLite. Two method names and their
 call sites — no migration, no query.
+
+---
+
+## Prompt 196 — the counter chrome's Alpine handlers were never bound
+
+**Alpine 3 does not walk the document on start.** It queries its root selectors and calls `initTree` only on
+those subtrees, so an element carrying `@click` with no `x-data` ancestor is never initialised — with **no
+console warning, no exception, nothing**. That silence is why this survived: every other failure mode in this
+programme left a symptom.
+
+The shared counter header opened `<header data-counter-topbar …>` with no `x-data`, and nothing between it
+and `<body>` had one. Measured live (`_x_attributeCleanups` present = Alpine bound it):
+
+| control | before | after |
+|---|---|---|
+| `data-counter-home-link` (the unsaved-work guard on the way home) | **false** | **true** |
+| `data-counter-screen` ×N (the tab strip's unsaved-work guards) | **false** | **true** |
+| `data-counter-overflow-trigger` (inside its own `x-data` island) | true | true |
+
+**What it cost.** Prompt 120's **manual** lock did nothing — and note which half of that pair broke: the idle
+timer registers on `alpine:init` and never depended on a DOM binding, so the **automatic** control worked all
+along and the **deliberate** one did not, which is exactly the wrong way round. Prompt 23's unsaved-work
+guard never fired on the tab strip, and that is worse than absent: the nav items are real `<a href>`s, so
+`@click.prevent` not running means the browser simply follows the link — the guard was *bypassed silently*
+with a basket open. The overflow menu's copy of the same guard worked, because that menu has its own island.
+
+**Scoped on the counter SHELL, not the header.** The prompt offered the header as the minimal fix; the shell
+`<div>` wraps the header **and** `<main>`, so one attribute covers every screen's content as well. That
+mattered immediately: the same bug had already reached prompt 189's home screen, whose lock button and
+back-to-home guard were dead for the same reason and which a header-only fix would have left broken. Nested
+islands (the sede switcher, the overflow menu, the 173 surface) are unaffected — Alpine nests scopes.
+
+**Geometry proved untouched, not assumed**, since 132's overflow layout and 130's scrollable strip depend on
+that flex row: `measure-topbar.mjs` still passes at 768/800/1024/1280 with no overlap and no page scroll, and
+189's density figures are byte-identical (furniture 331px; portrait strip headroom 221px). An attribute was
+added, not a wrapper element.
+
+**The guard is structural, because the instance is not the point.** `AlpineScopeTest` renders all six counter
+screens' real authed HTML, normalises Alpine's `@` shorthand to `x-on:` (DOMDocument discards `@click` as an
+invalid attribute name — the shorthand is otherwise invisible to any DOM parser), and asserts every element
+carrying an `x-…` or `:…` directive sits inside an `x-data` scope. `wire:` is excluded: Livewire binds its own
+directives and does not care about Alpine scope. It fails against the previous code naming
+`data-counter-home-link`, `data-counter-screen` and `data-counter-home-lock`, and it is the only thing that
+will catch the next one — which will otherwise arrive, again, with no error to notice.
+
+**MySQL was left to CI**, per the running order: `composer check` green on SQLite. One attribute in one Blade
+layout — no migration, no query.

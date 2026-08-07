@@ -88,7 +88,26 @@
         'min-h-full bg-surface-alt text-ink antialiased dark:bg-slate-950 dark:text-slate-100',
         'md:overflow-hidden' => $fills,
     ])>
-        <div @class([
+        {{-- Prompt 196 — THE COUNTER SHELL IS AN ALPINE SCOPE, and that is the whole fix.
+
+             Alpine 3 does not walk the document on start: it queries its root selectors and calls initTree
+             only on those subtrees. An element carrying `@click` with no `x-data` ancestor is never
+             initialised — with no console warning, no exception, nothing. The shared header had no scope, so
+             five handlers on every counter screen were dead: prompt 120's MANUAL lock (the idle timer was
+             fine — it registers on `alpine:init` and never needed a DOM binding, so the automatic control
+             worked and the deliberate one did not) and prompt 23's unsaved-work guard on the tab strip. The
+             nav items are real <a href>s, so `@click.prevent` not running meant the browser simply followed
+             the link: the guard was not absent, it was bypassed silently with a basket open. The overflow
+             menu's copy of the same guard worked, because that menu has its own x-data island.
+
+             Scoped HERE rather than on the header, deliberately: this div wraps the header AND <main>, so
+             every counter screen's content is covered too — the same bug had already reached prompt 189's
+             home screen, whose lock button and back-to-home guard were dead for exactly this reason. One
+             attribute, and the class cannot recur inside the counter. Nested x-data islands (the sede
+             switcher, the overflow menu, the 173 surface) are unaffected; Alpine nests scopes. --}}
+        <div
+            x-data="{}"
+            @class([
             'mx-auto flex min-h-screen w-full max-w-6xl flex-col',
             'md:h-screen md:min-h-0' => $fills,
         ])>
