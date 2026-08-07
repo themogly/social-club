@@ -8742,3 +8742,67 @@ an entire investigation, and it sent the follow-up prompt after the wrong three 
 `assertTrue` in a test with more than one of them is a defect in the test, not a style preference.**
 
 **MySQL was left to CI**, per the running order: `composer check` green on SQLite.
+
+---
+
+## Prompt 198 — locking the counter cost you the sale
+
+Measured on `main` at `a2a0a36`: one article in the bar basket, then lock. To reach the only lock control the
+operator had to tap the brand block, accept *"Tienes trabajo sin guardar en el mostrador. ¿Seguro que quieres
+salir?"*, and tap **Bloquear** on the home screen. Unlock, return to the bar: **"Cesta vacía."** The idle
+timer, firing in place with the same basket, kept the line.
+
+**The mechanism was never wrong; the route to it was.** Prompt 120's design — restated in the shared store's
+own comment — is that locking preserves state: it signs the operator out server-side and leaves the basket
+alone, so unlocking resumes exactly where it left off.
+`SurfaceModeReactivityTest::test_a_basket_in_progress_survives_every_transition` has proved that since 188.
+What 189 changed was where the control lived, and reaching it destroyed the thing the mechanism promised to
+keep.
+
+**189's reasoning was sound and its premise was not.** Moving the non-transaction operations to the home
+screen was right for the top bar — the lock was a 44px control on a row the owner had called cramped — but it
+travelled with the sentence *"locking is not something you do mid-basket"*, and that is exactly backwards.
+Locking is what you do **while standing at the counter with a member in front of you**: it is the one of
+those operations that is mid-transaction by definition. Switching sede, opening the panel and logging out all
+genuinely leave the counter; locking is the opposite of leaving.
+
+And the trip to the home screen crosses prompt 196's unsaved-work guard — which is **correct, newly working,
+and precisely what made this expensive.** So the operator's real choice mid-order was: leave the terminal
+unlocked, or abandon the sale in front of the member. **The deliberate control had lost the property the
+automatic one kept** — the same inversion 196 fixed for a different reason, arriving again through a
+different door.
+
+**Where it now lives, and why not a revert.** A **menu item, first, in the existing overflow** — not the 44px
+row button 189 removed. One tap more than before, no new furniture on the row, no navigation, and the
+overflow is already an `x-data` island so the handler binds (196). The home tile stays as the discoverable
+route; this is the fast one. `measure-topbar.mjs` re-run at 768 / 800 / 1024 / 1280: **7 controls, no overlap,
+none under 44px, no horizontal scroll** — byte-identical to 196's recorded run, because the row did not
+change.
+
+It is deliberately **not** behind the unsaved-work confirm, and that is asserted: a control whose entire
+purpose is to preserve work must never ask whether work would be lost. Panel, Log out and the Home link keep
+theirs, because those do leave.
+
+**Evidence, in a real browser** (`tests/Browser/prove-lock-in-place.mjs`, both orientations): basket HAS
+LINES → lock from the overflow → **no navigation, no confirm dialog**, surface up → unlock with a PIN →
+basket **HAS LINES**. The lock item measures over 44×44 at both sizes.
+
+### Switching operator has the identical defect, and is NOT fixed here
+
+`switchOperator()` also preserves the basket (`SurfaceModeReactivityTest` asserts it) and its **only** control
+is `data-counter-home-switch-operator` on the home screen — so reaching it mid-basket crosses the same confirm
+and loses the same sale. Same shape, same cost.
+
+It is **not** the same one-line answer, which is why it is recorded rather than done. The lock needed only a
+menu item calling `$store.counter.lockNow()`, which already existed and already dispatched `counter-lock`.
+Switching operator has no such plumbing: the top bar renders **outside** the Livewire component's DOM, so
+`$wire.switchOperator()` is not reachable from it, and an in-place control would need a new global event and
+a new `#[On]` listener on `IdentifiesOperator` — which touches 173's surface modes and 188's reactivity. That
+is a branch, not a line.
+
+**Switching sede is fine** and needed nothing: it is already in the bar on every screen, in place, and it
+*does* carry the confirm — correctly, because a different sede means different stock, a different till and
+different prices, so the basket genuinely cannot survive it.
+
+**MySQL was left to CI**, per the running order: `composer check` green on SQLite — 1504 tests, Larastan 0,
+Pint clean.
