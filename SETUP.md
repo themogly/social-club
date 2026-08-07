@@ -101,7 +101,13 @@ Everything used in code/config appears in `.env.example`. Highlights:
 - **Storage:** `FILESYSTEM_DISK` for general uploads. **ID documents & member photos use the separate
   private `documents` disk** — `DOCUMENTS_DRIVER=local` in dev; production sets `s3` with a dedicated
   private `AWS_DOCUMENTS_BUCKET`. Encrypted at rest, signed-URL access only, access-logged (prompt 04).
-- **Sentry:** `SENTRY_LARAVEL_DSN` (inert when empty), `SENTRY_TRACES_SAMPLE_RATE`.
+- **Sentry:** `SENTRY_LARAVEL_DSN` (inert when empty), `SENTRY_TRACES_SAMPLE_RATE`. `config/sentry.php`
+  sets the privacy options **deliberately** — `max_request_body_size => 'none'`, `send_default_pii => false`,
+  no SQL bindings in breadcrumbs, and a `before_send` scrubber. Do not remove that file: the library
+  defaults capture the whole POST body (the raw MRZ, the member application payload, the counter PIN, the
+  staff password), and body capture is **not** gated on `send_default_pii`. The scrubber is registered as a
+  callable array rather than a closure so `config:cache` still works — a closure there makes step 6 of the
+  deploy fail, or silently drops the protection.
 - **Security:** `APP_DEBUG=false` by default (flip on for local dev), `SESSION_SECURE_COOKIE=true` in prod.
 
 ## Deploy sequence (order matters — wrong order causes silent bugs)

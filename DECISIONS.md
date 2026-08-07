@@ -7776,3 +7776,58 @@ presented. Cash stays integer cents through `MoneyCast`, and a closed shift is i
 **MySQL was left to CI**, per the running order: `composer check` green on SQLite (1399 tests). The
 migration is plain integer columns, an index and a backfill of open sessions — no JSON, no raw expression.
 The backfill is the one part worth re-checking on the production runtime, and CI runs it.
+
+---
+
+## Security audit — Phase C carry-forward pass
+
+The Phase C security pass reported one real finding (a dependency CVE) and listed **seven items it had not
+verified**. This pass closed that list, and **the carried-forward items were where the defects actually
+were** — four real findings, three of them Phase 1. Two of them only surface if you attack the thing rather
+than read it, which is the lesson worth keeping.
+
+**Handover mode was a picture of a gate.** Prompt 173 blanked the five counter screens while an applicant
+holds the tablet, but never closed the session behind them: the device user stays authenticated with panel
+access. Measured, not argued — with a handover active, `GET /` returned **200 with the Filament dashboard**
+and the member list returned **200 with a member's surname in the HTML**. The existing test
+(`test_every_counter_route_refuses_to_show_its_screen_during_handover`) enumerated counter routes only, so
+it passed throughout. `EnforceCounterHandover` is now a global allowlist. It matches on **paths, not route
+names**, because global middleware runs before the router matches and `$request->route()` is null there —
+the first attempt used route names, matched nothing, and put every counter screen in a redirect loop. The
+denial tests caught that, which is the argument for writing them.
+
+**"Every view of an Article 9 file is access-logged" was false in production.** Filament's
+`BaseFileUpload::getUploadedFile()` calls `temporaryUrl()` for ANY `visibility('private')` field, and
+`previewable(false)` does not prevent it — that only sets a flag the FilePond JS reads. On
+`DOCUMENTS_DRIVER=s3` the member edit form therefore emitted a live presigned, bucket-direct URL to the ID
+scan, bypassing `VaultStream` entirely: no policy, no `u` binding, no `DocumentAccessLog` row. The three
+member fields are vault-encrypted so a leaked URL yields ciphertext — that is the saving grace — but
+`invoice_path`, `receipt_path` and `lab_report_path` sit on the same disk unencrypted. On the local driver
+the same path throws and falls through to `/storage/<path>`, a dead link into the public symlink, which is
+why nobody had noticed. `DocumentUpload::withoutDirectUrl()` now covers all six fields, enumerated by the
+existing chain walker so a seventh cannot be added without it.
+
+**The erasure guard was table-level, not column-level.** `test_every_member_linked_table_is_covered_by_erasure`
+enumerates tables holding a `member_id` COLUMN and asserts the table name is documented. It cannot see
+`assembly_attendances.proxy_holder` — a person's name with no `member_id` beside it — so erasing the member
+who HELD someone else's proxy left their name in plain text on the Asamblea screen and in the acta, with the
+guard green. Fixed one-directionally on purpose: erasing A must not touch the name of whoever represented A.
+The match is best-effort because the column is free text; **the structural fix is to make the proxy holder a
+member reference**, which is product work and is recorded in the report rather than done here.
+
+**Sentry would have shipped raw request bodies.** There was no `config/sentry.php` at all, so every option
+was a library default — and `max_request_body_size` defaults to `'medium'` while
+`RequestIntegration::captureRequestBody()` gates on that size **alone, not on `send_default_pii`**. The DSN
+goes in as part of going to production, which is the same deploy that brings real members' Article 9 data.
+The config now sets `'none'`, and the `before_send` scrubber is a **callable array, never a Closure** —
+a closure in config makes `config:cache` fail, which on deploy means the protection is silently absent
+exactly when it matters.
+
+**Two carried items were checked and already held**, and are recorded as such rather than padded into
+findings: email normalisation (146) is lowercase+trim only, so it cannot collapse two addresses into one
+account, and its backfill migration refuses to run on a collision; and 174's invite→approve trail is
+attributable end to end, by a column on one side and an audit row on the other.
+
+**Known residual, stated rather than buried:** the handover fix closes the server side and cannot close the
+browser's back/forward cache, which repaints bytes no middleware sees. The tablet's kiosk configuration is
+an OWNER/OPS task and the code cannot substitute for it.

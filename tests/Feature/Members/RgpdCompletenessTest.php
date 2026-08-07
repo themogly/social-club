@@ -5,6 +5,7 @@ namespace Tests\Feature\Members;
 use App\Actions\Members\AnonymiseMember;
 use App\Actions\RecordAuditLog;
 use App\Enums\MemberDocumentType;
+use App\Models\AssemblyAttendance;
 use App\Models\AuditLog;
 use App\Models\Member;
 use App\Models\MemberDocument;
@@ -115,6 +116,43 @@ class RgpdCompletenessTest extends TestCase
                 "Table [{$table}] holds a member_id but is not documented in AnonymiseMember::COVERED_MEMBER_TABLES."
             );
         }
+    }
+
+    public function test_erasure_removes_the_members_name_where_they_hel_d_someone_elses_proxy(): void
+    {
+        // Security audit, Phase C carry-forward. `assembly_attendances.proxy_holder` is a person's name typed
+        // at the Asamblea screen, and no member_id points at it — so `where('member_id', $member->id)` never
+        // reached it and the name survived erasure, on screen and in the acta.
+        $member = $this->member();                                   // Ana Real
+        $other = Member::factory()->create(['organisation_id' => $this->org->id]);
+
+        // Ana represented someone else at an assembly: her name is on THEIR row, not hers.
+        $row = AssemblyAttendance::factory()->proxy('Ana Real')->create([
+            'organisation_id' => $this->org->id,
+            'member_id' => $other->id,
+        ]);
+
+        (new AnonymiseMember)->handle($member);
+
+        $this->assertSame('[borrado]', $row->fresh()?->proxy_holder,
+            "The erased member's name survived in the assembly register as a proxy holder.");
+    }
+
+    public function test_erasure_does_no_t_redact_the_name_of_whoever_represented_the_erased_member(): void
+    {
+        // The other direction is deliberately untouched: that name is a THIRD PARTY's personal data and the
+        // register's evidence of who acted for whom. Erasing Ana must not erase Beatriz.
+        $member = $this->member();
+        $row = AssemblyAttendance::factory()->proxy('Beatriz Gestora')->create([
+            'organisation_id' => $this->org->id,
+            'member_id' => $member->id,
+        ]);
+
+        (new AnonymiseMember)->handle($member);
+
+        $row->refresh();
+        $this->assertSame('[borrado]', $row->name);                   // the erased member's own snapshot goes
+        $this->assertSame('Beatriz Gestora', $row->proxy_holder);     // the third party's does not
     }
 
     public function test_erasure_redacts_the_dni_index_and_health_flag_from_audit_rows(): void

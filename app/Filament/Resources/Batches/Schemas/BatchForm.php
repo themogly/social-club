@@ -64,6 +64,7 @@ class BatchForm
                         FileUpload::make('lab_report_path')
                             ->label(__('Informe de laboratorio'))
                             ->disk('documents')
+                            ->getUploadedFileUsing(DocumentUpload::withoutDirectUrl())
                             ->visibility('private')
                             ->maxSize(DocumentUpload::maxKilobytes())
                             ->helperText(DocumentUpload::helperText()),

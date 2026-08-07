@@ -2,6 +2,10 @@
 
 namespace App\Support;
 
+use Closure;
+use Filament\Forms\Components\BaseFileUpload;
+use Throwable;
+
 /**
  * The ONE definition of how large a document upload may be (prompt 164).
  *
@@ -58,5 +62,43 @@ class DocumentUpload
         $limit = __('Tamaño máximo :size.', ['size' => self::limitLabel()]);
 
         return filled($context) ? $context.' '.$limit : $limit;
+    }
+
+    /**
+     * Stop a `documents`-disk FileUpload from ever addressing the disk for a URL (security audit, Phase C
+     * carry-forward).
+     *
+     * Filament's `BaseFileUpload::getUploadedFile()` calls `$storage->temporaryUrl()` for ANY field with
+     * `visibility('private')`. `previewable(false)` does not prevent it — that only sets a flag the FilePond
+     * JS reads. With `DOCUMENTS_DRIVER=s3` this returned a live presigned, bucket-direct URL to the object:
+     * `https://<bucket>.s3.<region>.amazonaws.com/member-id-scans/<key>?X-Amz-Algorithm=...`, valid for 30
+     * minutes rounded up to the hour, which bypasses MemberDocumentController and VaultStream entirely — so
+     * no policy check, no `u` user-binding, and NO `DocumentAccessLog` row. "Every view of an Article 9 file
+     * is access-logged" was false in production for the panel's own form fields.
+     *
+     * (On the local driver the same path throws, is caught, and falls through to `url()` → `/storage/<path>`,
+     * a dead link into the public symlink where the file is not. Harmless, and the reason nobody noticed.)
+     *
+     * So: the field keeps its name and size, and hands out no URL at all. The Article-9 member fields already
+     * offer the correct viewer through their `hintAction`, which goes via the signed, authorised, logged
+     * endpoint. `DocumentsDiskUrlTest` enumerates every field on the disk, so one added later without this
+     * fails the suite.
+     */
+    public static function withoutDirectUrl(): Closure
+    {
+        return static function (BaseFileUpload $component, string $file, string|array|null $storedFileNames): ?array {
+            try {
+                $size = $component->getDisk()->size($file);
+            } catch (Throwable) {
+                return null;   // the file is gone — same outcome as Filament's own metadata failure
+            }
+
+            return [
+                'name' => (is_array($storedFileNames) ? ($storedFileNames[$file] ?? null) : $storedFileNames) ?? basename($file),
+                'size' => $size,
+                'type' => null,   // the bytes on disk are ciphertext; a sniffed type would be a lie
+                'url' => null,    // never a direct disk URL — see the note above
+            ];
+        };
     }
 }
