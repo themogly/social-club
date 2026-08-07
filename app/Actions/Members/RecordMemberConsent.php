@@ -2,6 +2,7 @@
 
 namespace App\Actions\Members;
 
+use App\Enums\ConsentChannel;
 use App\Models\ConsentRecord;
 use App\Models\Member;
 use App\Support\Settings;
@@ -23,11 +24,24 @@ use Carbon\CarbonInterface;
  */
 class RecordMemberConsent
 {
-    public function handle(Member $member, string $purpose = 'membership', ?string $ip = null, ?string $version = null, ?CarbonInterface $grantedAt = null, ?string $locale = null): ConsentRecord
-    {
+    public function handle(
+        Member $member,
+        string $purpose = 'membership',
+        ?string $ip = null,
+        ?string $version = null,
+        ?CarbonInterface $grantedAt = null,
+        ?string $locale = null,
+        ConsentChannel $channel = ConsentChannel::APPLICANT,
+        ?string $attestedBy = null,
+    ): ConsentRecord {
         return $member->consents()->create([
             'purpose' => $purpose,
             'consent_text_version' => $version ?? (string) Settings::get('consent_text_version', '1.0'),
+            // HOW it was captured, and who at the club recorded it if the club did (prompt 210). The default
+            // is the applicant's own tick, which is what every consent meant before the staff-typed route
+            // existed — so no existing caller changes meaning by not passing these.
+            'channel' => $channel,
+            'attested_by' => $channel->isApplicantsOwnAct() ? null : $attestedBy,
             // The locale the person actually READ the declaration in (prompt 153). Like the version, it is
             // whatever the caller captured at submit — NOT the current app locale. Left null when unknown (a
             // paper-register import, or a caller that did not observe one): absent means absent, never guessed.

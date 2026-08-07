@@ -9824,3 +9824,126 @@ dispatched, with no `get()` in between); every control it carries comes back, no
 them; the same for the idle-timeout path; the chrome absent from the DOM on every screen while handed over;
 Back showing the surface with 187's way back and never the working screen; and a basket and form state both
 surviving the recovery — the guarantee that made the redirect option unattractive.
+
+---
+
+## Prompt 210 — there was no way for staff to fill the form in, which is why the button read wrong
+
+The owner: *"I don't think it needs to say 'hand tablet over', just something like 'fill form out', as the
+staff might do it for them as well. It was more just a suggestion they could hand it over, but more than
+likely the staff will do it for them."*
+
+**He is right, and the reason is sharper than the wording.** `SignsUpMembers` had exactly two ways to begin a
+sign-up — `handOverForAlta()` (navigate to the applicant's public form) and `sendAltaInvitation()` (email a
+link). **There was no staff-fills-it-in route at all.** A member of staff with the person standing in front of
+them could reach the form only by handing the device over, and then, if they typed it themselves, they were
+working on the applicant-facing public page with no counter chrome and a PIN to get back out. So the button
+did not read wrong because somebody chose bad words: it was describing **the only mechanism there was**, and
+that mechanism is not the common case.
+
+### One job, three ways
+
+The job is named — *Alta de socio/a* — and how it gets typed is a choice underneath it:
+
+| | what it produces |
+|---|---|
+| **Rellenar sus datos aquí** (new) | staff type it, inside the counter's chrome; consent recorded as **PAPER**, naming the operator |
+| **Entregar la tablet** | the applicant fills it in and ticks; consent is **their own act** |
+| **Enviar una invitación** | same, on their own device later |
+
+Each option states the consent artefact it produces, because that is the one part of this that is not
+interchangeable — see below. The old headline *"Entregar la tablet para que rellene sus datos"* described a
+mechanism; these name outcomes.
+
+**One writer, and that is the whole argument.** The staff form validates against
+`SubmitApplicationRequest::factRules()` — literally the public form's rules, extracted to a static so there
+cannot be two — and writes through **`SubmitApplication`**, the same Action the public POST calls, against an
+application issued by the same `IssueApplicationInvite`. The age gate, the duplicate search and the versioned
+consent capture all still run in `ApproveApplication` afterwards. 174's argument was that the audited route is
+the open one; this is that route with a different keyboard in front of it. Asserted against the **row**: the
+two payloads are compared key-for-key and must have the same shape.
+
+### `OVERNIGHT-DEFAULT — CONFIRM` — the consent decision
+
+**This is a compliance judgement, not a wording one, and it is the reason this branch is not just a label
+change.** The facts on the form — name, birth date, document, contact — are the same facts whoever types them.
+The consent is not. `SubmitApplication` stamps a versioned consent text and locale at submit, and that record
+is the club's evidence that the applicant consented to the processing of their data **including Article 9
+health data** (the medicinal-usage flag). If a member of staff ticks that box on someone's behalf, the
+artefact stops being a record of consent **given** and becomes the club's assertion that it **was**. Under
+Article 7(1) the controller must be able to demonstrate consent; for Article 9 the standard is *explicit*
+consent. An assertion and a tick are materially different things to hold in an inspection, and it is the club
+that carries the difference.
+
+**Decided, rather than settled by convenience:** the staff route **does not produce the public form's artefact
+and does not pretend to**.
+
+- `App\Enums\ConsentChannel` is a first-class fact on the consent row: `APPLICANT` (their own tick) or `PAPER`
+  (the club holds a signed consent and a named member of staff recorded it).
+- Choosing to type it at the counter **is** that choice — there is deliberately no third option where staff
+  tick on the applicant's behalf and the record reads as an applicant tick.
+- The operator must confirm explicitly that the club holds the signed consent. The rule is `accepted`, not a
+  checkbox with a default, because a default is exactly how a staff assertion ends up wearing an applicant
+  tick's clothes. Without it nothing is written at all — asserted.
+- `consent_records.channel` + `consent_records.attested_by` carry it onto the member, so an inspection can
+  tell the two apart and **the club knows which of its records are which**.
+- Existing rows default to `APPLICANT` and do not change meaning: every consent recorded before this branch
+  WAS the applicant's own act. Asserted against a row inserted without the column, which is what an upgraded
+  database holds. Historical paper-register imports (131) are deliberately **not** retro-labelled — guessing
+  at old rows is the mistake 153's migration avoided.
+
+**What needs the owner's call:** whether `PAPER` is acceptable for Article 9 explicit consent **without a scan
+of the signed form attached to the record**, and whether the club wants staff attestation available at all.
+Shipped as available, recorded and attributed, because the alternative is a route the owner asked for that
+cannot complete. If the answer is that a scan must be attached, the shape is already here — the channel is a
+column, so requiring an upload is one rule on `submitStaffAlta()` rather than a redesign.
+
+### The layout, and the space it was not using
+
+The screen carries three jobs now — sign-up, fee collection and the member's record — and all three were
+stacked in one `mx-auto max-w-xl` column. **Measured** at 1180×820 with a socio held: sign-up at 89px, fee
+collection at **200px**, the record at **296px**, with ~300px of unused width on each side. Same finding the
+design audit made about the Caja.
+
+Two columns from `lg` — sign-up left, because it is a task you finish and leave; the member's record right,
+because it is the thing you read while you work. After: sign-up 89, fee **106**, record **202** at 1180×820,
+so the record starts ~94px higher and the width is used. Below `lg` they stack in exactly the previous order,
+so the portrait tablet — how the device is held when it *is* handed over — is unchanged (89 / 200 / 296, the
+same figures as before).
+
+### Boundaries that did not move
+
+**173's handover guarantees** — chrome absent from the DOM, nothing of the club's on screen, the PIN as the
+way back — re-asserted on the new panel, including that the three new controls are absent while an applicant
+holds the tablet. **177's boundary**: no document scan, no medical certificate and no vault artefact rendered
+on this screen, asserted for STAFF, MANAGER and OWNER. **194's one-lookup rule**: the staff form adds no
+second search box, asserted by counting. **203/174's gating**: `applications.review` still decides whether the
+panel renders at all, and a staff form does not change who may approve.
+
+**One existing guard was retargeted rather than deleted.** 174's `test_the_flow_adds_no_fourth_writer` banned
+`->validate(` outright in the counter half. The staff form does validate — it has fields — so the ban was
+relaxed to the rule it was standing in for: this file must not **declare what an application's facts are**. It
+now asserts `SubmitApplicationRequest::factRules()` is what is validated against, and fails if the file ever
+writes its own rules for `first_name`, `last_name`, `date_of_birth`, `document_type` or `document_number`.
+
+### Verification
+
+`composer check` green — **1640 tests**, 1637 passed, 3 pre-existing skips, Larastan 0, Pint clean. **MySQL was
+left to CI**, per the running order; the suite ran on SQLite. One migration, tested against a row inserted the
+way an upgraded database holds it rather than only against a fresh schema.
+
+Screenshots before and after at 1180×820 and 820×1180, light and dark (`storage/app/screenshots/210/`),
+including the staff form open — the before is the single narrow column. The shoot script records the **fold
+position of each of the three jobs** (the figures above), and asserts no control under 44px, nothing clipped
+and no horizontal page scroll; `sr-only` elements are excluded from the touch-target measure, because the skip
+link collapsing to 1×1 until focused is the a11y pattern working rather than a failure.
+
+**Tests** (`SigningSomeoneUpTest`, 14): staff sign somebody up **without handing the tablet over**, asserted
+against the row (fails against `main` — the route does not exist there); the staff payload has the same shape
+as the public form's, key for key; the age gate still refuses an under-age applicant on the staff route; the
+duplicate search still fires and the override is still a reasoned, audited decision; the consent row is
+`PAPER` and names the operator; the public form still records the applicant's own act with no attester; the
+staff route cannot produce a weaker artefact and cannot run at all without the explicit confirmation; the
+staff form refuses what the public form refuses; an existing consent row still reads as an applicant tick;
+handing over still leaks nothing; the emailed invitation still works; no document artefact renders for any
+role; no second lookup; and a user without `applications.review` sees no panel.

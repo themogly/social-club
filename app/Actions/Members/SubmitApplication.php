@@ -2,6 +2,7 @@
 
 namespace App\Actions\Members;
 
+use App\Enums\ConsentChannel;
 use App\Enums\MemberStatus;
 use App\Models\Member;
 use App\Models\MemberApplication;
@@ -65,6 +66,11 @@ class SubmitApplication
             'consents' => ['membership', 'data_processing'],
             'consent_version' => (string) Settings::get('consent_text_version', '1.0'),
             'consent_locale' => app()->getLocale(),
+            // HOW the consent was captured, and who at the club recorded it if the club did (prompt 210).
+            // The public form never passes these, so it keeps the only meaning a consent had before the
+            // staff-typed route existed: the applicant ticked it themselves, in a session they controlled.
+            'consent_channel' => $this->consentChannel($data['consent_channel'] ?? null)->value,
+            'consent_attested_by' => $data['consent_attested_by'] ?? null,
         ];
 
         $photo = $files['photo'] ?? null;
@@ -97,6 +103,24 @@ class SubmitApplication
         $application->update(['payload' => $payload, 'submitted_at' => now()]);
 
         return $application;
+    }
+
+    /**
+     * The channel a caller asked for, or the applicant's own tick.
+     *
+     * The public form never passes one, so it keeps the only meaning a consent had before prompt 210's
+     * staff-typed route existed. An unrecognised value degrades the same way rather than throwing on an
+     * unauthenticated route.
+     */
+    private function consentChannel(mixed $value): ConsentChannel
+    {
+        if ($value instanceof ConsentChannel) {
+            return $value;
+        }
+
+        return is_string($value)
+            ? (ConsentChannel::tryFrom($value) ?? ConsentChannel::APPLICANT)
+            : ConsentChannel::APPLICANT;
     }
 
     /**

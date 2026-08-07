@@ -56,8 +56,23 @@
         @php
             $worklist = $this->worklist();
         @endphp
+
+        {{-- ============ THE SCREEN'S THREE JOBS, IN THE SPACE IT HAS (prompt 210) ============
+
+             This screen carries three: signing somebody up, collecting a fee, and reading a member's record.
+             All three were stacked in one `max-w-xl` column, so at 1180×820 the record — the job an operator
+             spends the most time reading — began below the fold with the width unused on both sides. That is
+             the same finding the design audit made about the Caja.
+
+             Two columns from `lg`, which is where a labelled counter row fits at all (206 measured that same
+             threshold on the top bar): sign-up on the left, because it is a task you finish and leave; the
+             member's record on the right, because it is the thing you read while you work. Below `lg` they
+             stack in exactly the previous order, so the portrait tablet — how the device is held when it IS
+             handed over — is unchanged. --}}
+        <div class="lg:grid lg:grid-cols-[minmax(0,26rem)_minmax(0,1fr)] lg:items-start lg:gap-6">
+        <div data-alta-column class="min-w-0">
         @if ($worklist !== null)
-            <div class="mx-auto mb-4 max-w-xl">
+            <div class="mb-4">
                 <section data-alert-worklist="{{ $alert }}" class="rounded-2xl border border-brand/30 bg-brand-tint p-4 dark:border-slate-700 dark:bg-slate-800">
                     <h2 class="text-base font-semibold">{{ $worklist['title'] }}</h2>
                     <ul class="mt-3 divide-y divide-line/70 overflow-hidden rounded-xl border border-line bg-surface dark:divide-slate-800 dark:border-slate-700 dark:bg-slate-900">
@@ -91,7 +106,7 @@
              already does. It creates an APPLICATION, never a member — the age gate, the duplicate search
              and the versioned consent capture all live in ApproveApplication and stay there. --}}
         @if ($this->userCan('applications.review'))
-            <div class="mx-auto mb-4 max-w-xl">
+            <div class="mb-4">
                 <section data-alta-panel class="rounded-2xl border border-line bg-surface p-4 dark:border-slate-800 dark:bg-slate-900">
                     <div class="flex items-center justify-between gap-3">
                         <h2 class="text-base font-semibold">{{ __('Alta de socio/a') }}</h2>
@@ -156,9 +171,43 @@
                                 </div>
                             </div>
                         @else
-                            {{-- Two ways to start the SAME record: hand the tablet over, or send a link. --}}
+                            {{-- ONE JOB, THREE WAYS (prompt 210).
+
+                                 The headline used to be *"Entregar la tablet para que rellene sus datos"* —
+                                 which read wrong not because the words were badly chosen but because it was
+                                 **describing the only mechanism there was**. `handOverForAlta()` and
+                                 `sendAltaInvitation()` were the two ways to begin a sign-up, so a member of
+                                 staff with the person in front of them could reach the form only by handing
+                                 the device over. The owner: *"more than likely the staff will do it for
+                                 them."*
+
+                                 So the job is named — dar de alta — and how it gets typed is a choice
+                                 underneath it. Each option says what CONSENT ARTEFACT it produces, because
+                                 that is the one part that is not interchangeable: two of these end with the
+                                 applicant's own tick and one ends with the club's record of a paper consent,
+                                 and an operator choosing between them is choosing between those. --}}
                             <div class="mt-4 space-y-4">
-                                <button type="button" wire:click="handOverForAlta" data-alta-handover class="h-14 w-full rounded-xl bg-brand text-base font-semibold text-white transition hover:bg-brand-dark">{{ __('Entregar la tablet para que rellene sus datos') }}</button>
+                                <button type="button" wire:click="toggleStaffAltaForm" data-alta-staff-form
+                                        aria-expanded="{{ $altaStaffFormOpen ? 'true' : 'false' }}"
+                                        class="flex min-h-[3.5rem] w-full items-center justify-between gap-3 rounded-xl bg-brand px-4 text-left text-white transition hover:bg-brand-dark">
+                                    <span>
+                                        <span class="block text-base font-semibold">{{ __('Rellenar sus datos aquí') }}</span>
+                                        <span class="block text-xs text-white">{{ __('Con el consentimiento firmado en papel') }}</span>
+                                    </span>
+                                    <span aria-hidden="true" class="shrink-0 text-lg">{{ $altaStaffFormOpen ? '×' : '+' }}</span>
+                                </button>
+
+                                @if ($altaStaffFormOpen)
+                                    @include('livewire.counter.partials.alta-staff-form')
+                                @endif
+
+                                <button type="button" wire:click="handOverForAlta" data-alta-handover
+                                        class="flex min-h-[3.5rem] w-full items-center justify-between gap-3 rounded-xl border border-line px-4 text-left transition hover:bg-surface-alt dark:border-slate-700 dark:hover:bg-slate-800">
+                                    <span>
+                                        <span class="block text-base font-semibold">{{ __('Entregar la tablet') }}</span>
+                                        <span class="block text-xs text-ink-muted dark:text-slate-400">{{ __('Rellena y acepta el consentimiento en persona') }}</span>
+                                    </span>
+                                </button>
 
                                 <div>
                                     <label for="alta-email" class="block text-xs font-medium text-ink-muted dark:text-slate-400">{{ __('…o enviar una invitación por email') }}</label>
@@ -191,7 +240,9 @@
             </div>
         @endif
 
-        <div class="mx-auto max-w-xl">
+        </div>{{-- /alta column --}}
+
+        <div data-member-column class="min-w-0">
             <section class="rounded-2xl border border-line bg-surface p-4 dark:border-slate-800 dark:bg-slate-900">
                 <h2 class="text-base font-semibold">{{ __('Cobro de cuota') }}</h2>
 
@@ -483,7 +534,8 @@
                     <p class="mt-1 text-sm text-ink-muted dark:text-slate-400">{{ __('Su cuota, su tarifa y lo que lleva este mes aparecerán aquí.') }}</p>
                 </div>
             @endunless
-        </div>
+        </div>{{-- /member column --}}
+        </div>{{-- /the two columns --}}
     @endif
 @endif
 </div>

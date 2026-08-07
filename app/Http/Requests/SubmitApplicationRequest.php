@@ -27,7 +27,17 @@ class SubmitApplicationRequest extends FormRequest
     /**
      * @return array<string, mixed>
      */
-    public function rules(): array
+    /**
+     * The rules for an application's FACTS, shared with the counter's staff-typed route (prompt 210).
+     *
+     * Static and separate so there is genuinely ONE validator: 174's argument was that the audited route is
+     * the open one, and a staff form with its own copy of these rules would be a second route wearing the
+     * first one's name. The counter's form calls this and adds only the consent-channel rules it needs; the
+     * two consent ticks below stay HERE because they are the public form's own artefact.
+     *
+     * @return array<string, mixed>
+     */
+    public static function factRules(): array
     {
         return [
             'first_name' => ['required', 'string', 'max:255'],
@@ -56,11 +66,20 @@ class SubmitApplicationRequest extends FormRequest
             // Never required at the form — the avalador_policy is enforced (and waived) at approval, so an
             // applicant who cannot supply one is not silently blocked here.
             'avalador_ref' => ['nullable', 'string', 'max:255'],
+        ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function rules(): array
+    {
+        return array_merge(self::factRules(), [
             // Two SEPARATE consents (prompt 97): data processing and the statutes are different agreements,
             // and two ticks are stronger evidence than one bundled box. Both are required.
             'consent_data' => ['accepted'],
             'consent_statutes' => ['accepted'],
-        ];
+        ]);
     }
 
     public function withValidator(Validator $validator): void
