@@ -7875,3 +7875,56 @@ screens are covered, not just check-in, because all five include the surface.
 
 **MySQL was left to CI**, per the running order: `composer check` green on SQLite. This branch changes a
 rendering condition and one translated string — no migration, no query, nothing driver-sensitive.
+
+---
+
+## Prompt 187, defect 2 — handed-over mode shipped with no way out
+
+**The bug.** On any counter screen during a handover the surface showed a heading, a sentence, and a box
+reading *"El formulario se abrirá aquí."* — no button, no pad, no control of any kind. Reported as *"if I
+close the form I get stuck on this page."*
+
+**Why the box was empty, and always would have been.** That placeholder was written expecting prompt 174 to
+fill it. 174 chose differently and better: `handOverForAlta` **redirects** to the real tokenised route, so
+the applicant fills in the actual form with prompt 167's language switcher on it. Which means this surface
+is not where the form appears — it is what shows when the applicant *leaves* that form, by the back button
+or by closing it. The promise was therefore permanent and false.
+
+**Handed-over mode stays TERMINAL-WIDE.** The prompt asked whether it should carry its own surface
+everywhere or stop persisting outside the flow that owns it. It must persist: the mode describes *who is
+holding the device*, not which screen is open — which is why 173 made it session-backed, and why the Phase C
+security fix (`EnforceCounterHandover`) can allowlist all five counter screens at all. Each of them renders
+only this surface; if the mode stopped applying outside the Socios tab, navigating to `/counter/pos` during
+a handover would render the POS to a stranger, which is the exact leak the mode exists to prevent. So the
+fix is that the surface is *complete* everywhere, not that it stops persisting.
+
+**How the way back is surfaced: a small, muted, always-present button.** Not a long-press. A hidden gesture
+is undiscoverable for the staff member who needs it, unreachable by keyboard or assistive technology, and
+impossible to assert as "present" in any honest sense — and the prompt ruled an invisible one out. So
+`data-handover-staff` is a real `<button>`, labelled *"Personal del club"*, muted and set well apart from
+the applicant's own content so it reads as *not for you*. Pressing it only opens the PIN pad, which an
+applicant cannot pass. A second control returns from the pad to the applicant's screen, so a mis-tap does
+not strand them in front of a keypad.
+
+**The PIN pad is the same pad.** It is one `<template>` for all three modes, selected by `padVisible`, so
+handed-over mode goes through the identical `unlockOperator()` call and therefore the identical
+`UnlockOperator` throttle — asserted, because a third mode with its own pad would be exactly the drift 173
+deleted two partials to stop.
+
+**The resting state.** Heading, the true instruction (*fill in your details, hand the tablet back*), and —
+when a return URL was recorded with the handover — *"Continuar con mi solicitud"*, back to their own form by
+the token they already hold. Nothing of the club's is in that link. Where no form exists the button is
+simply absent rather than dead.
+
+**Untouched:** `CounterBlocker`, `UnlockOperator` and its throttle, when the surface raises, the opacity,
+the precedence (handover outranks locked outranks unidentified), and every 173 leak guarantee — the operator
+is not named, the sede is not named, the chrome is absent from the DOM, the back button does not return the
+counter, and the idle timer still lands on locked. All re-asserted alongside the new control rather than
+assumed.
+
+**Verified by picture:** the harness now writes a third artifact and the Playwright pass captures 24 images
+across both orientations, both themes, motion both ways — asserting the way back is genuinely *on screen*
+(a non-zero bounding box, not merely present in the markup) and that the applicant is never shown the pad.
+
+**MySQL was left to CI**, per the running order: `composer check` green on SQLite. This branch changes one
+Blade partial and five translated strings — no migration, no query.
