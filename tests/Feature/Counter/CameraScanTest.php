@@ -130,6 +130,8 @@ class CameraScanTest extends TestCase
         Livewire::test(CheckInScreen::class)
             ->call('submitCameraScan', 'not-a-real-token')
             ->assertSet('memberId', null)
-            ->assertSee(__('Tarjeta no reconocida. Inténtalo de nuevo o busca por nombre.'));
+            // Prompt 194 — an unresolved token is no longer an error: it falls through to the name search in
+            // the same field, so an unknown card shows an empty result rather than a flash.
+            ->assertSee(__('Sin resultados.'));
     }
 }

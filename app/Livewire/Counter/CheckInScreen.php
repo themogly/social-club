@@ -6,13 +6,12 @@ use App\Actions\Attendance\CheckInMember;
 use App\Actions\Attendance\CheckOutMember;
 use App\Actions\Attendance\ResolveMemberEligibility;
 use App\Actions\Dispensing\ResolveMemberLimits;
-use App\Actions\Members\ResolveMemberByToken;
 use App\Enums\CheckInMethod;
 use App\Enums\MembershipStatus;
 use App\Enums\TillSessionStatus;
 use App\Exceptions\CheckInBlockedException;
-use App\Exceptions\ScanRateLimitedException;
 use App\Livewire\Counter\Concerns\CollectsMembershipFees;
+use App\Livewire\Counter\Concerns\FindsMembers;
 use App\Livewire\Counter\Concerns\IdentifiesOperator;
 use App\Livewire\Counter\Concerns\ResolvesCounterLocation;
 use App\Models\CheckIn;
@@ -29,7 +28,6 @@ use App\Support\Wallet;
 use App\Support\Weight;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Contracts\View\View;
-use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Storage;
 use Livewire\Attributes\Layout;
@@ -51,7 +49,7 @@ use Livewire\Component;
 #[Layout('components.layouts.counter')]
 class CheckInScreen extends Component
 {
-    use CollectsMembershipFees, IdentifiesOperator, ResolvesCounterLocation;
+    use CollectsMembershipFees, FindsMembers, IdentifiesOperator, ResolvesCounterLocation;
 
     /** Bound to the scan input — a keyboard-wedge scanner types the token then hits Enter. */
     public string $scan = '';
@@ -100,49 +98,23 @@ class CheckInScreen extends Component
 
     // --- Scan & search ---------------------------------------------------------
 
-    public function submitScan(): void
+    /** Prompt 194 — the shared lookup found somebody; the door's job is to hold them for a verdict. */
+    protected function onMemberFound(Member $member, bool $scanned): void
     {
-        $token = trim($this->scan);
-        $this->scan = '';
-
-        if ($token === '') {
-            return;
-        }
-
-        try {
-            $member = (new ResolveMemberByToken)->handle($token, (string) (Auth::id() ?? request()->ip()));
-        } catch (ScanRateLimitedException) {
-            $this->flash(__('Demasiados intentos de escaneo. Espera unos segundos.'), 'error');
-
-            return;
-        }
-
-        if ($member === null) {
-            $this->flash(__('Tarjeta no reconocida. Inténtalo de nuevo o busca por nombre.'), 'error');
-
-            return;
-        }
-
-        $this->holdMember($member->id, scanned: true);
+        $this->holdMember($member->id, $scanned);
     }
 
-    /** A camera-decoded QR token routes through the SAME lookup as the wedge scanner (prompt 35). */
     public function submitCameraScan(string $token): void
     {
-        $this->scan = $token;
-        $this->submitScan();
-    }
-
-    public function selectMember(string $memberId): void
-    {
-        $this->holdMember($memberId, scanned: false);
+        $this->lookup = $token;
+        $this->submitLookup();
     }
 
     public function clearMember(): void
     {
         $this->reset([
             'memberId', 'scanned', 'blocked', 'blockedReasons',
-            'overrideReason', 'search', 'flashMessage',
+            'overrideReason', 'lookup', 'lookupSearched', 'flashMessage',
         ]);
     }
 
@@ -290,7 +262,6 @@ class CheckInScreen extends Component
             'sanction' => $member !== null ? $this->activeSanction($member) : null,
             'walletCents' => $walletCents,
             'photoUrl' => $member !== null ? $this->photoUrl($member) : null,
-            'searchResults' => $this->searchResults(),
             'canOverride' => $this->userCan('checkin.override'),
             'cameraScanEnabled' => (bool) Settings::get('camera_scan_enabled', false),
             // Inline fee (prompt 127): the action follows the unpaid-fee verdict. Owed>0 iff the door flags it.
@@ -373,31 +344,6 @@ class CheckInScreen extends Component
         $actor = Auth::user();
 
         return $actor instanceof User ? VaultUrl::photo($member, $actor) : null;
-    }
-
-    /**
-     * Org-wide socio search — deliberately crosses locations so the door can find a
-     * member registered at another sede (Member is org-scoped, never location-scoped).
-     * Null until at least two characters are typed (nothing to look up yet).
-     *
-     * @return Collection<int, Member>|null
-     */
-    private function searchResults(): ?Collection
-    {
-        $term = trim($this->search);
-
-        if (mb_strlen($term) < 2) {
-            return null;
-        }
-
-        return Member::query()
-            ->where(fn ($q) => $q
-                ->where('first_name', 'like', '%'.$term.'%')
-                ->orWhere('last_name', 'like', '%'.$term.'%')
-                ->orWhere('member_no', 'like', '%'.$term.'%'))
-            ->orderBy('last_name')
-            ->limit(8)
-            ->get();
     }
 
     private function userCan(string $permission): bool

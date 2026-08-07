@@ -145,7 +145,8 @@ class CheckInScreenTest extends TestCase
         Livewire::test(CheckInScreen::class)
             ->assertOk()
             ->assertSet('noLocation', false)
-            ->assertSee(__('Escanear tarjeta de socio'));
+            // Prompt 194 — ONE field, and its label is the sede's `card_readers_enabled` wording (off here).
+            ->assertSee(__('Buscar socio por nombre o nº'));
     }
 
     public function test_an_operator_with_no_location_gets_a_friendly_state_still_200(): void
@@ -170,8 +171,8 @@ class CheckInScreenTest extends TestCase
         app(ActiveScope::class)->setLocation($this->location->id);
 
         Livewire::test(CheckInScreen::class)
-            ->set('scan', $token)
-            ->call('submitScan')
+            ->set('lookup', $token)
+            ->call('submitLookup')
             ->assertSet('memberId', $member->id)
             ->assertSee($member->fullName())
             ->assertSee($member->member_no)
@@ -191,10 +192,13 @@ class CheckInScreenTest extends TestCase
         app(ActiveScope::class)->setLocation($this->location->id);
 
         Livewire::test(CheckInScreen::class)
-            ->set('scan', 'not-a-real-token')
-            ->call('submitScan')
+            ->set('lookup', 'not-a-real-token')
+            ->call('submitLookup')
             ->assertSet('memberId', null)
-            ->assertSee(__('Tarjeta no reconocida. Inténtalo de nuevo o busca por nombre.'));
+            // Prompt 194 — an input that does not resolve as a token is no longer an ERROR: it falls
+            // through to the name search in the same box, which is the whole point of one field. An
+            // unknown card therefore shows an empty result rather than a card-not-recognised flash.
+            ->assertSee(__('Sin resultados.'));
     }
 
     public function test_the_fallback_search_finds_a_member_and_selecting_holds_them(): void
@@ -205,7 +209,7 @@ class CheckInScreenTest extends TestCase
         app(ActiveScope::class)->setLocation($this->location->id);
 
         Livewire::test(CheckInScreen::class)
-            ->set('search', $member->last_name)
+            ->set('lookup', $member->last_name)->call('submitLookup')
             ->assertSee($member->fullName())
             ->call('selectMember', $member->id)
             ->assertSet('memberId', $member->id);

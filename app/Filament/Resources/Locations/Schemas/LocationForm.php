@@ -26,6 +26,7 @@ class LocationForm
         'camera_scan_enabled',
         'ring_fenced',
         'multiple_tills_enabled',
+        'card_readers_enabled',
         'bar_attach_socio_enabled',
         'bar_ticket_reference_enabled',
     ];
@@ -149,6 +150,13 @@ class LocationForm
                 // a coffee for cash; when off the panel is not rendered at all, so the cart opens on the
                 // basket. Turning either off governs INPUT only — anything already recorded still shows on
                 // receipts, in the ledger export and in reports.
+                // Prompt 194 — the words on the member lookup, nothing else. A reader is a keyboard, so
+                // this cannot be feature-detected; the club tells us. Off by default.
+                Toggle::make('card_readers_enabled')
+                    ->label(__('Lectores de tarjeta en esta sede'))
+                    ->helperText(__('Cambia solo el texto del buscador de socios. Escanear funciona igualmente si está apagado.'))
+                    ->default(false),
+
                 Toggle::make('bar_attach_socio_enabled')
                     ->label(__('Barra: permitir atribuir un socio'))
                     ->helperText(__('Necesario para cobrar con monedero en la barra. Si está apagado, la barra cobra solo en efectivo.'))
