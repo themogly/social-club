@@ -7971,3 +7971,74 @@ transport is stood in for.
 
 **MySQL was left to CI**, per the running order: `composer check` green on SQLite. One property, one trait
 hook and one Blade getter — no migration, no query.
+
+---
+
+## Prompt 189 — the counter gets a front door, and the top bar gives some back
+
+**Two reports, one cause.** The owner asked twice for "a page with big grid icons for all the sections", and
+separately that "the menu at the top is too cramped". They are the same problem: the bar was doing a home
+screen's job.
+
+**It filled up honestly.** Prompt 132 folded the secondary actions into one overflow so five destinations
+would fit; prompt 173 then retired the operator strip and moved *"Trabajando: …"* into the same row. Each
+step was right on its own. The row was full before the last one arrived.
+
+**The earlier recommendation against a hub was too narrow, and this branch says so.** The evidence for
+landing on a queue rather than a menu still stands — the unit of work at a counter is a member, not a
+basket. But a hub and a queue-first landing were never in conflict. Dynamics' own split is the useful rule:
+operations that are not specific to the current transaction belong on the welcome screen; selling belongs on
+the transaction screen. So: build the hub, and make **which one you land on a decision rather than an
+accident**.
+
+**The landing screen is now a Setting, defaulting to the hub.** `counter_landing` = `'home'` (default) or
+`'screen'`. Default `home` because the owner asked for it twice and because a chooser cannot strand anybody,
+whereas landing straight on a working screen assumes we know which work they came to do. `'screen'` restores
+prompt 172's behaviour exactly, and **172's guarantee is preserved either way**: resolution stays per user,
+so a till-only operator still lands somewhere they are allowed to be — the home screen is reachable by
+anyone who can reach any counter screen, which makes it a legal landing rather than an exception.
+
+**ONE source for the destinations.** The tiles come from `CounterScreens::reachableFor()` — the same list,
+with the same gates, the tab strip reads. 172 extracted it precisely so there would not be two, and the test
+asserts against that list rather than a hard-coded one: a tile to a screen the operator cannot open is the
+same defect as a link to a 403.
+
+**It is not a way around a precondition.** The home screen sits behind prompt 175's chain like every other
+counter screen: no sede blocks it, in the same order, and 173's surface still owns identifying.
+
+### What actually left the bar, measured
+
+`measure-topbar.mjs` (prompt 132) asks whether anything OVERLAPS or falls under 44px. It passed before this
+branch and passes after — which is exactly why it could not see what the owner was describing. Overlap is
+the failure state; cramped is the state just before it. `measure-topbar-density.mjs` measures the split
+instead: how much of the row the fixed furniture claims, and how much is left for the destinations.
+
+| | before | after |
+|---|---|---|
+| furniture, 1180×820 landscape | 371px (33% of 1120) | **331px (30%)** |
+| furniture, 820×1180 portrait | 371px (47% of 788) | **331px (42%)** |
+| strip headroom, portrait | 181px | **221px (+22%)** |
+
+**Gone from the bar:** the dedicated *"lock now"* button, to the home screen. It was a 44px control on a row
+reported as cramped, and locking is not something you do mid-basket — the idle timer (prompt 120) is
+unchanged and still locks on its own, and home is one tap away because the brand block is now the way there.
+**The operator pill** now appears from `xl` rather than `sm`, so it is absent from the portrait row where
+space is tightest; the home screen carries the name as a real control (it doubles as *switch operator*).
+
+**What deliberately STAYED, against the prompt's suggestion, and why:**
+
+- **The Panel link.** `BackToDashboardTest` pins it to *every* counter screen as an invariant in both
+  directions: a panel user must always have a way in, and a counter-only tablet must have none. Removing it
+  from the bar would have meant rewriting a test the prompt said must pass untouched, to weaken a security
+  assertion. It is on the home screen too — a duplicated *link* to one route, not duplicated logic.
+- **The sede switcher.** Prompt 187 had just established that when the sede is unset the switcher must be
+  reachable, because the blocking state points at it. Home's own sede buttons sit *past* that blocker by
+  design, so they cannot be the answer to it. Moving the switcher would have recreated 187's deadlock in a
+  new place. The home screen's copy of it is for switching sede when you are already working.
+
+The honest summary: the hub is the substantial half of this branch; the bar reclaimed 40px and a percentage
+point or two of density. That is a real improvement and a modest one, and it is reported as measured rather
+than as the win the framing invites.
+
+**MySQL was left to CI**, per the running order: `composer check` green on SQLite. One new Livewire
+component, one route, one Setting key and a Blade edit — no migration.

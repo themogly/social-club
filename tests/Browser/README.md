@@ -215,3 +215,28 @@ node tests/Browser/shoot-surface-chain.mjs                 # non-zero if the sur
 
 Last run (branch `fix/surface-respects-blocker-chain`): **ALL PASS** — 16 captures, surface down with the
 top bar reachable on the sede step, surface up with its PIN pad once the sede is chosen.
+
+## Counter home + top-bar density (prompt 189)
+
+Screenshots the counter home at 1180×820 and 820×1180, light and dark, and asserts what a picture cannot:
+every tile is a real finger target (≥96px tall — far above the 44px floor, which is the whole reason a hub
+beats a menu bar on a tablet), nothing is under 44×44, and the page never scrolls sideways.
+
+`measure-topbar-density.mjs` is the other half. `measure-topbar.mjs` (prompt 132) asks whether anything
+OVERLAPS; it passed before this branch and after, which is why it could not see what the owner reported.
+Overlap is the failure state, cramped is the state just before it — so this measures the split between the
+row's fixed furniture and the space left for the destinations. Run it, stash the top-bar change, run it
+again: the comparison is the argument.
+
+```bash
+npm install --no-save playwright && node_modules/.bin/playwright install chromium-headless-shell
+npm run build                                              # the arbitrary grid class must be compiled
+php artisan test tests/Browser/CounterHomeHarnessTest.php  # writes storage/app/counter-home.html
+node tests/Browser/shoot-counter-home.mjs
+php artisan test tests/Browser/TopbarHarnessTest.php       # writes storage/app/topbar-harness.html
+node tests/Browser/measure-topbar-density.mjs
+```
+
+Last run (branch `feat/counter-home`): **ALL PASS** — 4 captures, 5 tiles at 128px tall in both
+orientations. Density: furniture 371px → **331px**; portrait strip headroom 181px → **221px (+22%)**.
+

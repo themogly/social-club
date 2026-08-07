@@ -67,6 +67,7 @@ class ManageSettings extends Page
         'application_retention_days' => SettingType::INT,
         'signed_url_ttl_seconds' => SettingType::INT,
         'qr_scan_max_failures_per_minute' => SettingType::INT,
+        'counter_landing' => SettingType::STRING,
         // Locale (prompt 44) — actively read by ResolveLocale / LocaleSwitcher / SetLocale, but had
         // no admin UI until now. enabled_locales is an array (JSON); default_locale a plain string.
         'default_locale' => SettingType::STRING,
@@ -240,6 +241,12 @@ class ManageSettings extends Page
                         TextInput::make('signed_url_ttl_seconds')->label(__('Caducidad de URLs firmadas (seg.)'))->numeric()->required(),
                         TextInput::make('qr_scan_max_failures_per_minute')->label(__('Máx. escaneos fallidos por minuto'))->numeric()->minValue(1)->required()
                             ->helperText(__('Tras tantos escaneos de tarjeta fallidos por operador en un minuto, se bloquea temporalmente (anti fuerza bruta).')),
+                        Select::make('counter_landing')->label(__('Pantalla de inicio del mostrador'))
+                            ->options([
+                                'home' => __('Inicio del mostrador (iconos)'),
+                                'screen' => __('Directo a la pantalla de trabajo'),
+                            ])->required()
+                            ->helperText(__('Dónde entra un operador al abrir el mostrador. Si eliges la pantalla de trabajo, cada persona entra en la primera que tiene permiso para abrir.')),
                     ])->columns(3),
             ]);
     }

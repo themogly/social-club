@@ -17,6 +17,7 @@ use App\Http\Controllers\Socio\AuthController as SocioAuthController;
 use App\Http\Controllers\Socio\PwaController;
 use App\Livewire\Counter\BarPos;
 use App\Livewire\Counter\CheckInScreen;
+use App\Livewire\Counter\CounterHome;
 use App\Livewire\Counter\DispensaryPos;
 use App\Livewire\Counter\MembershipCounter;
 use App\Livewire\Counter\TillSession;
@@ -46,6 +47,14 @@ Route::middleware(['web', 'auth', 'signed'])
 //
 // Local-only developer routes (e.g. /dev/mail) live in routes/dev.php, loaded only
 // in the local environment from bootstrap/app.php.
+
+// The counter's front door (prompt 189) — big tiles, one per destination the operator may open, plus the
+// terminal operations that are not specific to any transaction (switch operator, switch sede, lock, panel,
+// log out). Gated on being able to reach ANY counter screen; the destinations and their gates come from the
+// one shared list in App\Support\CounterScreens, never a second copy.
+Route::middleware(['web', 'auth'])
+    ->get('/counter', CounterHome::class)
+    ->name('counter.home');
 
 // Counter apps run OUTSIDE the Filament panel on their own tablet-first authenticated
 // routes (full-page Livewire components with the shared `counter` layout). The
