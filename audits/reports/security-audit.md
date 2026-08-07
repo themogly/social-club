@@ -35,7 +35,10 @@ branches. The four remaining Phase C audits (admin, accessibility, design, code-
 
   `npm audit --omit=dev`: **0 vulnerabilities.**
 
-**Review:** applied — see the commit following this report.
+**Review:** ✅ **FIXED.** `composer update league/commonmark` → **2.9.0**. `composer audit` now reports
+*"No security vulnerability advisories found."* `composer check` green afterwards — 1399 tests, Larastan 0,
+Pint clean — so the update changed no behaviour. `composer.lock` is committed; the server picks it up on the
+next `composer install`.
 
 ### Verified and already correct (no action)
 
