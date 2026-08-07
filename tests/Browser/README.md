@@ -280,3 +280,19 @@ Last run (branch `fix/commit-action-name-collision`): bar `["commitOrder"]` + *O
 56 → 57; dispensary `["commitDispensation"]`. Against the old names on the same build: `["$commit"]`, flash
 `null`, orders 57 → 57.
 
+## Top-bar geometry after the Alpine scope (prompt 196)
+
+196 added one attribute (`x-data="{}"`) to the counter shell. 132's overflow layout and 130's scrollable
+strip both depend on that flex row, so the geometry is **proved** unchanged rather than assumed — re-run both
+top-bar scripts after any change to the shell:
+
+```bash
+npm run build
+php artisan test tests/Browser/TopbarHarnessTest.php
+node tests/Browser/measure-topbar.mjs           # overlap / 44px / page scroll
+node tests/Browser/measure-topbar-density.mjs   # the furniture-vs-strip split
+```
+
+Last run (branch `fix/topbar-alpine-scope`): **ALL PASS** at 768/800/1024/1280, 7 controls, no overlap, no
+horizontal scroll; density byte-identical to 189 (furniture 331px, portrait strip headroom 221px).
+
