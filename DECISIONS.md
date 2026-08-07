@@ -7776,3 +7776,50 @@ presented. Cash stays integer cents through `MoneyCast`, and a closed shift is i
 **MySQL was left to CI**, per the running order: `composer check` green on SQLite (1399 tests). The
 migration is plain integer columns, an index and a backfill of open sessions — no JSON, no raw expression.
 The backfill is the one part worth re-checking on the production runtime, and CI runs it.
+
+---
+
+## Prompt 187 — the operator surface asks the chain whether it is its turn
+
+**The bug, reported from a live local install.** A fresh terminal showed the full-screen *"¿Quién está
+trabajando?"* surface; the operator entered their PIN and it was refused with *"Sin sede activa."* There
+was no way out: the sede switcher lives in the top bar and the surface was covering it at `z-50`. No route
+out of the surface without an operator, and no route to an operator without a sede. **A deadlock, not an
+inconvenience** — and it is every first run of a terminal for anyone who works in more than one sede.
+
+**`CounterBlocker` was already right; the surface was not asking it.** The chain
+(`sede → operator → till → member`) and `rendersInPage()` returning false for `OPERATOR` were both correct
+and are unchanged by this branch. The defect was that `IdentifiesOperator::surfaceMode()` raised on
+`! hasOperator()` **alone**, consulting nothing. With neither sede nor operator set, the chain correctly
+said SEDE, the screen rendered the in-page sede blocker — and the surface then painted over it, taking the
+top bar with it.
+
+**The fix is one condition.** `surfaceMode()` now asks `CounterBlocker::first()` and raises `unidentified`
+only when the answer is actually `OPERATOR`. SEDE is the only link ahead of OPERATOR in the chain, so a
+two-entry map answers the question completely; TILL and MEMBER come after and cannot preempt it. Nothing
+else moved: not `CounterBlocker`, not `UnlockOperator`, not 173's three modes, opacity, PIN path, throttle
+or handover guarantees. Only *when it raises*.
+
+**The locked mode is deliberately NOT chain-aware.** The idle lock is client state (prompt 120) and Alpine
+puts it ahead of the server mode, so a locked terminal still shows the lock even with no sede. That is
+correct and is asserted: the operator there has already identified once, and must always be able to get
+back in. This is the one route by which *"Sin sede activa."* is still reachable, which is why the copy
+changed rather than being deleted — it now names the fix and where to find it
+(*"Elige tu sede en la barra superior antes de identificarte."*), in both locales. The two other uses of
+the old string (`MembershipCounter`, `BarPos`) are different contexts and were left alone.
+
+**Verified by picture, with real Alpine.** `SurfaceChainHarnessTest` writes the authed check-in screen
+either side of the sede step; `shoot-surface-chain.mjs` captures 16 images at 1180×820 and 820×1180, light
+and dark, motion reduced and allowed. Prompt 175's script hid every `x-show` element with CSS because its
+captures had no Alpine; that would not do here — this branch is *about* what the surface decides, and its
+content sits inside `<template x-if>`, which no CSS can materialise. So the real Alpine (the standalone
+build, injected — Livewire's bundle will not boot without an endpoint) makes the real call from the
+server-rendered `data-surface-mode`. One infidelity worth naming: the sede switcher's dropdown panel renders
+open in the static captures where the real app would keep it closed until tapped. It does not affect the
+thing under test and it happens to show the escape route.
+
+**Tests written to fail against main first** — four of the six did, which is the reported bug. All five
+screens are covered, not just check-in, because all five include the surface.
+
+**MySQL was left to CI**, per the running order: `composer check` green on SQLite. This branch changes a
+rendering condition and one translated string — no migration, no query, nothing driver-sensitive.

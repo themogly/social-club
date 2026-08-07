@@ -192,3 +192,26 @@ read, or on a confirmation target under 44px.
 **Playwright is `--no-save`, so any `npm install` prunes it.** That happened during 179 (installing
 tesseract.js removed it) and every `.mjs` here died with `ERR_MODULE_NOT_FOUND`. Reinstall with
 `npm install --no-save playwright` — it is deliberately not a project dependency.
+
+## Counter surface vs the blocker chain (prompt 187)
+
+Screenshots the counter terminal **either side of the sede step** at 1180×820 and 820×1180, light and dark,
+motion reduced and allowed (16 captures), and asserts what a picture cannot: the operator surface is **down**
+while the chain is on the sede step — with the top bar, and therefore the sede switcher, reachable — and
+**up**, with its PIN pad, once a sede is chosen.
+
+Unlike the prompt-175 script this one runs **real Alpine**: the surface's content lives in `<template x-if>`,
+which no CSS can materialise, and approximating the decision under test would only photograph our own
+assumption. Livewire's bundle carries Alpine but will not boot without a Livewire endpoint, so the
+standalone build is injected.
+
+```bash
+npm install --no-save playwright alpinejs
+node_modules/.bin/playwright install chromium-headless-shell
+npm run build                                              # compile the CSS the harness inlines
+php artisan test tests/Browser/SurfaceChainHarnessTest.php # writes storage/app/surface-chain-*.html
+node tests/Browser/shoot-surface-chain.mjs                 # non-zero if the surface is up on the sede step
+```
+
+Last run (branch `fix/surface-respects-blocker-chain`): **ALL PASS** — 16 captures, surface down with the
+top bar reachable on the sede step, surface up with its PIN pad once the sede is chosen.

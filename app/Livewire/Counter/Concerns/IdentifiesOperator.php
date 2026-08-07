@@ -5,6 +5,7 @@ namespace App\Livewire\Counter\Concerns;
 use App\Actions\RecordAuditLog;
 use App\Actions\UnlockOperator;
 use App\Support\ActiveScope;
+use App\Support\CounterBlocker;
 use App\Support\CounterHandover;
 use App\Support\CounterOperator;
 use Livewire\Attributes\On;
@@ -17,8 +18,9 @@ use Livewire\Attributes\On;
  * {@see CounterOperator} session store) already existed and is reused verbatim — this
  * trait is the missing wiring + UI surface.
  *
- * The composing component must expose `resolveLocation(): ?\App\Models\Location` and
- * `flash(string, string): void` — every counter component already does.
+ * The composing component must expose `resolveLocation(): ?\App\Models\Location`,
+ * `flash(string, string): void`, and the `$noLocation` state from {@see ResolvesCounterLocation}
+ * — every counter component already does all three.
  */
 trait IdentifiesOperator
 {
@@ -35,8 +37,19 @@ trait IdentifiesOperator
      * `locked` is client-state (the idle timer) and is layered on top of this in the surface itself.
      *
      *   handover      an applicant is holding the tablet — outranks everything
-     *   unidentified  no operator yet: start of a shift, or after a switch
-     *   null          an operator is working; the counter is usable
+     *   unidentified  the chain has REACHED the operator step and no operator is identified
+     *   null          an operator is working, or an earlier precondition is still unmet
+     *
+     * Prompt 187 — it asks the chain whether it is its turn. It used to raise on "no operator" ALONE, which
+     * deadlocked a fresh terminal: with neither sede nor operator set, {@see CounterBlocker} correctly says
+     * SEDE and the screen renders the in-page sede blocker — and then this surface painted over it at z-50,
+     * taking the top bar, and with it the only control that can choose a sede. The operator was asked for a
+     * PIN that {@see UnlockOperator} must then refuse for want of a location, with no way back.
+     * No route out of the surface without an operator, no route to an operator without a sede.
+     *
+     * SEDE is the only link ahead of OPERATOR in the chain, so those two answer the question completely —
+     * TILL and MEMBER come after and cannot preempt it. `$noLocation` is set by {@see ResolvesCounterLocation},
+     * which every counter screen composes alongside this trait.
      */
     public function surfaceMode(): ?string
     {
@@ -44,7 +57,12 @@ trait IdentifiesOperator
             return 'handover';
         }
 
-        return $this->hasOperator() ? null : 'unidentified';
+        $blocker = CounterBlocker::first([
+            CounterBlocker::SEDE => ! $this->noLocation,
+            CounterBlocker::OPERATOR => $this->hasOperator(),
+        ]);
+
+        return $blocker === CounterBlocker::OPERATOR ? 'unidentified' : null;
     }
 
     /** Is the tablet currently in an applicant's hands? Drives DOM-absence of the counter's chrome. */
@@ -141,7 +159,11 @@ trait IdentifiesOperator
         $location = $this->resolveLocation();
 
         if ($location === null) {
-            $this->operatorFeedback = __('Sin sede activa.');
+            // Prompt 187: once the surface asks the chain, an unidentified operator should never see this —
+            // the sede step blocks first. It IS still reachable from the LOCKED mode, which raises on client
+            // state regardless of the chain, so it names the fix and where to find it rather than only the
+            // precondition. "Sin sede activa." was accurate and useless.
+            $this->operatorFeedback = __('Sin sede activa. Elige tu sede en la barra superior antes de identificarte.');
 
             return;
         }
