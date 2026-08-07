@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Middleware\EnforceCounterHandover;
 use App\Http\Middleware\EnforceOrgLockdown;
 use App\Http\Middleware\SecurityHeaders;
 use App\Http\Middleware\SetLocale;
@@ -37,6 +38,12 @@ return Application::configure(basePath: dirname(__DIR__))
         // Org-wide panic lockdown (prompt 121): appended globally so it gates the panel, the counter and the
         // member PWA at once. When the org is locked it returns an ordinary "temporarily unavailable" page.
         $middleware->append(EnforceOrgLockdown::class);
+
+        // Prompt 173's handover mode as a real boundary (security audit, Phase C carry-forward). Appended
+        // globally for the same reason as the lockdown: the tablet in an applicant's hands is still logged
+        // in as staff, so the gate has to sit in front of EVERY surface, not only the five counter screens
+        // that know the mode exists. Before this, `GET /` served them the admin panel.
+        $middleware->append(EnforceCounterHandover::class);
 
         // Apply the session locale on web routes (after StartSession). The panel
         // adds it to its own stack in AdminPanelProvider.

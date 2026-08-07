@@ -82,7 +82,9 @@ trait SignsUpMembers
         // 173's OWN entry point, not a second way in: it records the audit entry and signs the operator out
         // (which is what makes requireOperator() refuse every write while an applicant holds the device).
         // Last thing before the redirect, so the review steps below can only run after a fresh PIN.
-        $this->beginHandover();
+        // The invite URL is recorded with the handover so EnforceCounterHandover can put the applicant back
+        // on their form if they leave it, rather than bouncing them to a PIN pad they cannot use.
+        $this->beginHandover($application->inviteUrl());
 
         $this->redirect($application->inviteUrl(), navigate: false);
     }

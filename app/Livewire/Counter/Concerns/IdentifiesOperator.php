@@ -59,7 +59,7 @@ trait IdentifiesOperator
      * lockCounter(): while an applicant holds the device, requireOperator() refuses every write
      * server-side, so the surface is not the only thing standing between a tap and a commit.
      */
-    public function beginHandover(): void
+    public function beginHandover(?string $returnUrl = null): void
     {
         if (! $this->requireOperator()) {
             return;
@@ -68,7 +68,7 @@ trait IdentifiesOperator
         $operator = CounterOperator::current();
         $location = $this->resolveLocation();
 
-        CounterHandover::begin((string) $operator?->id, $location?->id);
+        CounterHandover::begin((string) $operator?->id, $location?->id, $returnUrl);
         (new RecordAuditLog)->handle('counter.handover.started', $location);
 
         CounterOperator::clear();

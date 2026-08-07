@@ -21,10 +21,10 @@ class CounterHandover
 {
     private const KEY = 'counter.handover';
 
-    /** @return array{operator_id: string, location_id: ?string, started_at: string}|null */
+    /** @return array{operator_id: string, location_id: ?string, started_at: string, return_url: ?string}|null */
     public static function current(): ?array
     {
-        /** @var array{operator_id: string, location_id: ?string, started_at: string}|null $state */
+        /** @var array{operator_id: string, location_id: ?string, started_at: string, return_url: ?string}|null $state */
         $state = session(self::KEY);
 
         return is_array($state) ? $state : null;
@@ -35,14 +35,27 @@ class CounterHandover
         return self::current() !== null;
     }
 
-    /** Hand the tablet over. The operator is recorded so the audit entry names who did it. */
-    public static function begin(string $operatorId, ?string $locationId): void
+    /**
+     * Hand the tablet over. The operator is recorded so the audit entry names who did it, and the URL the
+     * applicant was sent to is recorded so {@see \App\Http\Middleware\EnforceCounterHandover} can put them
+     * back there when they wander off it.
+     */
+    public static function begin(string $operatorId, ?string $locationId, ?string $returnUrl = null): void
     {
         session([self::KEY => [
             'operator_id' => $operatorId,
             'location_id' => $locationId,
             'started_at' => now()->toIso8601String(),
+            'return_url' => $returnUrl,
         ]]);
+    }
+
+    /** Where the applicant belongs — the tokenised form they were handed. Null when none was recorded. */
+    public static function returnUrl(): ?string
+    {
+        $url = self::current()['return_url'] ?? null;
+
+        return is_string($url) && $url !== '' ? $url : null;
     }
 
     /**
