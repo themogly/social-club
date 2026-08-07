@@ -25,6 +25,7 @@ use App\Support\ActiveScope;
 use App\Support\CounterOperator;
 use App\Support\Money;
 use App\Support\Period;
+use App\Support\Settings;
 use App\ViewModels\Dashboard;
 use Database\Seeders\RolePermissionSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -208,15 +209,28 @@ class CounterHubTest extends TestCase
         $this->get(route('counter.till'))->assertOk();
     }
 
-    /** Recepción earns the hero for anyone who can open it: it is the screen a shift starts at. */
-    public function test_recepcion_is_the_hero_tile_for_an_operator_who_can_open_it(): void
+    /**
+     * ONE tile is the hero, and it is whichever destination the club configured.
+     *
+     * **205 asserted `counter.checkin` here**, because the hero was `tiles()[0]` and Recepción is first in
+     * `CounterScreens`. Prompt 208 separated those: the hero is the `counter_hero` Setting (the owner's call
+     * is the dispensary), and this order means only the grid's reading order and `landingRouteFor()`'s
+     * fallback again. What 205 was actually protecting — that exactly one tile is promoted and it is one the
+     * operator may open — is what is asserted now; which route wins lives in `CounterHeroTileTest`.
+     */
+    public function test_exactly_one_tile_is_the_hero_and_it_is_the_configured_one(): void
     {
         $this->operator();
 
         $html = Livewire::test(CounterHome::class)->html();
 
         preg_match('/data-counter-home-tile="([^"]+)"[^>]*data-counter-home-hero/s', $html, $hero);
-        $this->assertSame('counter.checkin', $hero[1] ?? null, 'the hero is not Recepción');
+        $this->assertSame(
+            Settings::get('counter_hero', 'counter.pos'),
+            $hero[1] ?? null,
+            'the hero is not the configured destination',
+        );
+        $this->assertSame(1, substr_count($html, 'data-counter-home-hero'));
     }
 
     // --- Every figure comes from Dashboard --------------------------------------------

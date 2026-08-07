@@ -53,7 +53,8 @@ class CounterHomeHarnessTest extends TestCase
         }
         file_put_contents(storage_path('app/counter-home.html'), $html);
 
-        // A tile per destination an OWNER may open — all five — with Recepción as the hero (prompt 205).
+        // A tile per destination an OWNER may open — all five — with the CONFIGURED hero (prompt 208; 205
+        // had it as Recepción only because the hero was `tiles()[0]`).
         foreach (['counter.checkin', 'counter.members', 'counter.pos', 'counter.bar', 'counter.till'] as $route) {
             $this->assertStringContainsString('data-counter-home-tile="'.$route.'"', $html);
         }

@@ -70,6 +70,14 @@ class Settings
         'temporary_reminder_lead_days' => 3,
         'temporary_count_toward_cap' => true,   // temporary members count toward the active-member soft cap
 
+        // The counter hub's hero tile (prompt 208) — which destination gets the big button. A SETTING and not
+        // the first entry of CounterScreens, which is what it used to be: that array is ordered for the tile
+        // grid's reading order and for landingRouteFor()'s fallback, and 205 had quietly made it carry a
+        // design decision as well. The owner's call is the dispensary: with 205's two-tap navigation the hero
+        // saves a tap on whatever it names, every time, and dispensing is what a shift actually spends its
+        // time on. Resolved per user — an operator who cannot open it falls back to one they can.
+        'counter_hero' => 'counter.pos',
+
         // Stock
         'low_stock_threshold_cg' => 5000,
         'batch_expiry_window_days' => 30,
