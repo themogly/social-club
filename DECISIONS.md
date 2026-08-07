@@ -9005,3 +9005,86 @@ wrong one:
 
 **MySQL was left to CI**, per the running order: `composer check` green on SQLite — 1525 tests, Larastan 0,
 Pint clean. Screenshots before and after at 1180×820 and 820×1180, light and dark.
+
+## Prompt 202 — one confirmation after a charge, and it carries the outcome
+
+**Half the prompt's premise was wrong, and that half is recorded rather than quietly built.** 202 described
+"two mechanisms" producing two confirmations after a bar charge, and asked for one to be removed. There was
+only ever **one** — a single `$flashMessage` that prompt 193 rendered from two places in the view — and
+**prompt 199 had already removed the second render**, on the branch immediately before this one. The prompt
+invited exactly this reply ("if the double render turns out to be one mechanism firing twice, most of this
+prompt is wrong… say so"), so: it was one mechanism, and it was already fixed.
+
+What was left is the other half of 202, and it is a real defect on a cash counter.
+
+### The message outlived the only number that mattered
+
+The surviving confirmation said **"Pedido registrado."** and stopped. That tells the operator nothing the
+emptied basket had not already told them — while the one figure a cash bar is actually waiting on, **the
+change due**, had been destroyed a millisecond earlier: `resetBasketState()` clears `cashTendered`, and the
+change is derived from `cashTendered`. €50 handed over for a €1,20 coffee, and the screen could no longer say
+€48,80.
+
+So the outcome is now captured from the **settled row** — the `Order`/`Dispensation` that now exists — rather
+than re-read from live cart fields the reset has already emptied. `App\Support\SettledOutcome` builds it;
+the change is the one figure passed IN, because neither row stores what the member *handed over* (prompt 74:
+cash entered is the amount handed, never the amount charged), so it is computed **before** the reset.
+
+`partials/settled-outcome.blade.php` renders it **inside the flash's own live region**, so a commit is
+announced once, as one message, with its figures — 199's one-region rule kept, not worked around. Change
+first and largest; the charge and the split below it; the split only when it *is* a split, because repeating
+the total as "efectivo" tells nobody anything.
+
+### Its lifetime is the point, not a detail
+
+A stale *"Cambio €5,40"* is worse than no confirmation at all, because the next operator will act on it. So:
+
+- **`flashSettled()` is the only way an outcome is ever set**, and **every other `flash()` clears it**. A
+  figure can therefore never end up sitting under *"La cesta está vacía."* This is structural — not a rule to
+  remember at each of a dozen call sites, which is how the near-copies below happened.
+- It clears on the **next basket action** (`addArticle`/`addMiscLine` on the bar; `chooseGenetic`,
+  `addBarItem` and identifying a socio on the dispensary — that screen is member-first, so a new socio *is*
+  the next transaction).
+- It does **not** survive a lock, an operator switch or a handover. Prompt 198 deliberately made the lock keep
+  the **basket**; a confirmation is not work, it is a receipt for a transaction that is over, and whoever
+  unlocks may not be who it belongs to. A sede switch is a full page load and clears it by construction.
+
+### The near-copies that the prompt was half-right about
+
+There were no two mechanisms — but there **were five copies of the flash markup**, and they had drifted:
+Recepción, Caja and Socios each hand-rolled their own, and **Socios had lost `aria-live` altogether**, so a
+fee confirmation was announced to nobody. All five now include `partials/counter-flash.blade.php` (an optional
+`$spacing`, because some hosts stack with `gap-*` where a bottom margin doubles the gap).
+
+And there genuinely **was** a second green "it worked" on both POS screens, which the screenshot found and the
+measurement did not: the **"Última venta registrada"** panel, success-tinted, directly above the confirmation.
+It is now a neutral **"Última venta"** label over the two affordances only it offers — the ticket and the void.
+
+Three vague confirmations were made to **name what they did**, all of them cases of the same defect one screen
+over — the field is cleared before the message renders: *"Movimiento registrado: €50,00."*, *"Gasto de caja
+registrado: €X."*, *"Cuota cobrada: €5,00. Pendiente: €15,00."*
+
+### Verified in a browser, because two of the claims are invisible to PHP
+
+`tests/Browser/prove-confirmation-holds-still.mjs` (needs a running server, like 195's prover and for the same
+reason — real Livewire round trips). Three consecutive charges at 1180×820:
+
+| round | Charge y before | after | outcome blocks | live regions | change stated | tender field |
+|---|---|---|---|---|---|---|
+| 1 | 736 | 736 | 1 | 1 | €48.80 | *(empty)* |
+| 2 | 736 | 736 | 1 | 1 | €48.80 | *(empty)* |
+| 3 | 736 | 736 | 1 | 1 | €48.80 | *(empty)* |
+
+**Spread 0.0px** — the confirmation renders above Charge inside the column's pinned bottom block, so the block
+grows upward and the thumb target does not move on the second sale of a busy evening. The tender field is
+empty in every row and the change is on screen anyway, which is the whole point: the figure outlived the reset.
+The outcome is gone after the next article tap.
+
+**Guards.** `ConfirmationCarriesTheOutcomeTest` (12 tests) asserts the real cents (500 handed − 120 charged →
+`change_cents` 380), each lifetime rule, and — in the style of 194's view-tree grep —
+**that no counter screen prints `$flashMessage` itself**, which is how the five near-copies happened. Not
+"a flash appears": `assertSee` is true however many copies exist, and that is exactly the weakness that let
+193's duplicate through in the first place.
+
+**MySQL left to CI**, per the running order: `composer check` green on SQLite — 1537 tests, Larastan 0, Pint
+clean.

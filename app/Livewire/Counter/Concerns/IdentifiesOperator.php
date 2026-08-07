@@ -115,6 +115,7 @@ trait IdentifiesOperator
         (new RecordAuditLog)->handle('counter.handover.started', $location);
 
         CounterOperator::clear();
+        $this->forgetLastOutcome();
     }
 
     public function currentOperatorName(): ?string
@@ -156,6 +157,11 @@ trait IdentifiesOperator
         }
 
         CounterOperator::clear();
+
+        // Prompt 198 keeps the BASKET across a lock, deliberately — work survives a step away from the screen.
+        // A confirmation is not work; it is a receipt for a transaction that is over, and whoever unlocks may
+        // not be who it belongs to (prompt 202).
+        $this->forgetLastOutcome();
     }
 
     public function openOperatorPanel(): void
@@ -175,7 +181,28 @@ trait IdentifiesOperator
     public function switchOperator(): void
     {
         CounterOperator::clear();
+        $this->forgetLastOutcome();
         $this->openOperatorPanel();
+    }
+
+    /**
+     * Drop the last commit's figures, if this screen shows any (prompt 202).
+     *
+     * Locking and switching operator both mean the person in front of the screen may have changed, and a
+     * stale *"Cambio €5,40"* is worse than no confirmation at all — the next operator will act on it. The
+     * BASKET is deliberately untouched: prompt 120's guarantee is that work survives a lock. What does not
+     * survive is a receipt for somebody else's transaction.
+     *
+     * Guarded rather than declared on this trait because only the two POS screens settle money.
+     */
+    private function forgetLastOutcome(): void
+    {
+        if (method_exists($this, 'clearSettledOutcome')) {
+            $this->clearSettledOutcome();
+        }
+
+        // Every counter screen declares `$flashMessage`; the confirmation IS that flash, so it goes too.
+        $this->flashMessage = null;
     }
 
     /** Verify the entered PIN against the location's active staff and, on success, set the operator. */

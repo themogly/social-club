@@ -22,23 +22,7 @@
                 :body="$mustChooseLocation ? __('Trabajas en varias sedes. Selecciona en la barra superior en cuál estás.') : __('No tienes ninguna sede activa. Pide a un responsable que te asigne una para usar la recepción.')"
             />
         @else
-            {{-- Flash --}}
-            @if ($flashMessage)
-                <div
-                    wire:key="flash"
-                    role="{{ $flashType === 'error' ? 'alert' : 'status' }}"
-                    aria-live="{{ $flashType === 'error' ? 'assertive' : 'polite' }}"
-                    @class([
-                        'flex items-center justify-between gap-3 rounded-xl border px-4 py-3 text-sm font-medium',
-                        'border-success/30 bg-success/10 text-success' => $flashType === 'success',
-                        'border-warning/30 bg-warning/10 text-warning' => $flashType === 'warning',
-                        'border-error/30 bg-error/10 text-error' => $flashType === 'error',
-                    ])
-                >
-                    <span>{{ $flashMessage }}</span>
-                    <button type="button" wire:click="$set('flashMessage', null)" aria-label="{{ __('Descartar aviso') }}" class="shrink-0 rounded-md px-2 py-1 opacity-70 hover:opacity-100">✕</button>
-                </div>
-            @endif
+            @include('livewire.counter.partials.counter-flash', ['anchor' => 'data-commit-feedback', 'spacing' => ''])
 
             {{-- Scan + search --}}
             <section class="rounded-2xl border border-line bg-surface p-4 dark:border-slate-800 dark:bg-slate-900 sm:p-5">

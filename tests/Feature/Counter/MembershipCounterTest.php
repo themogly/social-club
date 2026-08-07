@@ -147,7 +147,12 @@ class MembershipCounterTest extends TestCase
             ->set('feeAmount', '5,00')->set('feeMethod', 'CASH')
             ->call('collectFee')
             ->assertSet('flashType', 'success')
-            ->assertSee(__('Cuota parcial cobrada. Pendiente: :remaining', ['remaining' => Money::fromCents(1500)->formatted()]));
+            // Prompt 202 — the confirmation names the amount TAKEN as well as what is left, because
+            // `feeAmount` has just been reset and the operator can no longer read it off the form.
+            ->assertSee(__('Cuota cobrada: :amount. Pendiente: :remaining', [
+                'amount' => Money::fromCents(500)->formatted(),
+                'remaining' => Money::fromCents(1500)->formatted(),
+            ]));
     }
 
     public function test_collecting_the_fee_clears_the_doors_unpaid_fee_verdict(): void

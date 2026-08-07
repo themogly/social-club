@@ -415,7 +415,9 @@ class TillSession extends Component
 
         $this->movementAmount = '';
         $this->movementReason = '';
-        $this->flash(__('Movimiento registrado.'), 'success');
+        // Named, not just acknowledged: the amount field is now blank, so "Movimiento registrado." left the
+        // operator with no way to check what they had posted (prompt 202).
+        $this->flash(__('Movimiento registrado: :amount.', ['amount' => Money::fromCents($cents)->formatted()]), 'success');
     }
 
     // --- Petty cash (gasto de caja) --------------------------------------------
@@ -479,7 +481,7 @@ class TillSession extends Component
         $this->expenseAmount = '';
         $this->expenseNote = '';
         $this->expenseCategoryId = null;
-        $this->flash(__('Gasto de caja registrado.'), 'success');
+        $this->flash(__('Gasto de caja registrado: :amount.', ['amount' => Money::fromCents($cents)->formatted()]), 'success');
     }
 
     // --- Blind close (arqueo) --------------------------------------------------

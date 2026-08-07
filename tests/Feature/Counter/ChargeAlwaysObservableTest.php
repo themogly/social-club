@@ -146,7 +146,11 @@ class ChargeAlwaysObservableTest extends TestCase
             ->call('addArticle', $this->article()->id)
             ->call('commitOrder')
             ->assertSet('flashType', 'success')
-            ->assertSee(__('Última venta registrada'));
+            // Prompt 202 — assert the CONFIRMATION, not the last-sale panel's heading. That heading used to
+            // read "Última venta registrada" and stood in for the confirmation here; it is now a neutral
+            // label over the ticket and the void, because two green "it worked" blocks is one too many.
+            ->assertSee(__('Pedido registrado.'))
+            ->assertSee(__('Última venta'));
     }
 
     public function test_the_bar_charge_button_is_disabled_only_when_offline(): void

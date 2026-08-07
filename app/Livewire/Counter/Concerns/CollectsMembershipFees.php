@@ -99,11 +99,13 @@ trait CollectsMembershipFees
         $this->reset(['feeMemberId', 'feeAmount']);
         $this->feeMethod = 'CASH';
 
+        // The amount is named because the field it was typed into has just been reset — a confirmation that
+        // survives the figure it confirms is no confirmation at all (prompt 202).
         return [
             'type' => 'success',
             'message' => $remaining > 0
-                ? __('Cuota parcial cobrada. Pendiente: :remaining', ['remaining' => Money::fromCents($remaining)->formatted()])
-                : __('Cuota cobrada por completo.'),
+                ? __('Cuota cobrada: :amount. Pendiente: :remaining', ['amount' => Money::fromCents($cents)->formatted(), 'remaining' => Money::fromCents($remaining)->formatted()])
+                : __('Cuota cobrada por completo: :amount.', ['amount' => Money::fromCents($cents)->formatted()]),
         ];
     }
 

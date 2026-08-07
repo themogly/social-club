@@ -737,8 +737,10 @@
 
                 {{-- Just committed → receipt + void affordance. --}}
                 @if ($lastDispensationId)
-                    <section class="rounded-2xl border border-success/30 bg-success/5 p-4">
-                        <p class="text-sm font-semibold text-success">{{ __('Última dispensación registrada') }}</p>
+                    <section class="rounded-2xl border border-line bg-surface-alt p-4 dark:border-slate-700 dark:bg-slate-800/50">
+                        {{-- A label over the receipt and the void, not a second confirmation — see BarPos and
+                             prompt 202. The one that announces the commit is beside the commit. --}}
+                        <p class="text-sm font-semibold text-ink-muted dark:text-slate-400">{{ __('Última dispensación') }}</p>
                         <div class="mt-3 flex flex-col gap-2">
                             <a href="{{ route('counter.pos.receipt', $lastDispensationId) }}" target="_blank" rel="noopener" class="inline-flex h-11 items-center justify-center rounded-xl border border-line bg-surface px-4 text-sm font-semibold text-ink transition hover:bg-surface-alt dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100">{{ __('Ver / imprimir recibo') }}</a>
 
