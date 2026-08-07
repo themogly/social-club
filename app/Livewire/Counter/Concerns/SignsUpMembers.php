@@ -6,7 +6,6 @@ use App\Actions\Members\ApproveApplication;
 use App\Actions\Members\FindDuplicateMembers;
 use App\Actions\Members\IssueApplicationInvite;
 use App\Actions\Memberships\EnrolMembership;
-use App\Enums\ApplicationStatus;
 use App\Exceptions\DuplicateMemberException;
 use App\Models\Location;
 use App\Models\Member;
@@ -127,8 +126,7 @@ trait SignsUpMembers
 
         return MemberApplication::query()->withoutGlobalScopes()
             ->where('location_id', $this->locationId)
-            ->where('status', ApplicationStatus::PENDING->value)
-            ->whereNotNull('submitted_at')
+            ->awaitingReview()   // the same scope the hub's alert counts (prompt 207)
             ->latest('submitted_at')
             ->limit(10)
             ->get();

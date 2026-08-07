@@ -9523,3 +9523,127 @@ control naming itself only through a CSS-hidden label. Seven of the eleven fail 
 
 **Retargeted, not deleted:** `LockInPlaceTest` (Home dropped off its leaves-the-counter list, which is the
 point), `CounterScreenSwitcherTest` and `TopbarHarnessTest` (the `lg` → `xl` threshold).
+
+---
+
+## Prompt 207 — an alert that names a count and lands on a search box has not told you anything
+
+The owner, on the hub's *Requiere atención* rail: *"the 2 alerts on the side don't actually tell you who they
+are when you click on it. Need to make that function work."*
+
+The panel was right as far as it went — it renders exactly what `Dashboard::alerts()` returns, and each item
+is a real link. But `alerts()` returns `['severity', 'key', 'count']` and nothing else, so the label was a
+count and the destination was a **screen**: *"1 membresía vence pronto"* landed the operator on Socios, which
+is an empty search box, with no way to find out **which** membership without already knowing the answer. 205's
+own comment above the panel says *"each item leads somewhere. An alert you cannot act on is decoration."* It
+led somewhere. It did not lead to **the thing**.
+
+### Naming people in the rail was considered and rejected
+
+The obvious fix — printing *"María López's membership expires Friday"* in the rail — is the wrong one, and 177
+already recorded why. The hub is a screen in a room with the next socio standing behind the current one; 177
+put the consumption list behind a deliberate tap, capped it at five and bound it to one member precisely
+because a counter answers a question rather than publishing a list. Since 205 the hub is also the **landing
+page and the only route between screens**, so it is on display all shift — a permanent named list there is the
+opposite of that decision.
+
+**So the count stays on the hub and the names appear at the far end.** The alert links to the working screen
+with its worklist already open; that screen resolves the rows through its own resolvers. Asserted in both
+directions: the arrival names the member, and the hub is searched for the name, the member number and the id
+in every alert state, for OWNER, MANAGER and STAFF alike.
+
+### What each key now does
+
+| key | counter destination | for a user who cannot open it |
+|---|---|---|
+| `memberships_expiring` | **Socios**, worklist of the sede's expiring memberships, each row selecting that member | non-actionable |
+| `pending_applications` | **Socios**, the Alta panel **opened** on `pendingAltaApplications()` — 174's existing list, not a second one | non-actionable |
+| `members_over_limit` | **Socios**, worklist of members who have reached a per-member monthly override | non-actionable |
+| `unreconciled_till` | **Caja** — already resumed the sede's open session, and already made the operator pick when several are open. **This one was right.** | non-actionable |
+| `batches_expiring` | **none** — stock is something the counter reads (185) and never adjusts | Batches resource |
+| `stock_ceiling_exceeded` | **none** — a state of the sede, not a set of rows; the remedy is a purchasing decision over days | Batches resource |
+| `active_member_cap` | **none** — a club-wide governance figure | Members resource |
+
+The three nulls are a decision rather than an omission, and it is the same decision each time: **the counter
+has no subject to land on.** They are non-actionable *at the counter* for everybody, and the rail renders them
+as a `<p>` rather than a dead link.
+
+**And a panel destination is now permission-checked, which it was not.** `alertHref()` fell back to `url('/')`
+whenever `canReachPanel()` — but panel access is not access to a *table* in it. A STAFF operator holds panel
+access and no `viewAny` on Batches, so *"2 lotes caducan pronto"* handed them a **403**. It asks the resource's
+own policy now (`DashboardAlert::panelDestinationIsOpenToActor()`), and where the answer is no the alert is
+plainly non-actionable instead. An alert that lands somebody on a 403 is worse than one that does not link.
+
+### How a key with no destination is prevented from arriving silently
+
+The alert vocabulary was declared in **three** places — `Dashboard::alerts()` produced the keys,
+`Filament\Pages\Dashboard::decorateAlerts()` gave each a sentence, an icon and a panel URL, and `CounterHome`
+gave each a sentence and a counter route — each a `match` with its own `default`. An eighth alert could be
+added in one and reach the other two as `default`: *"Aviso"* linking to `#` in the panel, and a **silent
+`null`** on the hub, which renders as a `<p>` that looks deliberate and is not.
+
+**`App\Enums\DashboardAlert`** now owns the key set, the severity, the sentence and both destinations. Every
+method is a `match ($this)` with **no default**, so Larastan fails the build on a case that has not declared
+what it means, and `Dashboard::alerts()` builds its rows from the enum so a new alert must add a case first.
+The admin dashboard keeps its own *wording* — it says *"por vencer"* to a manager reading a list where the
+counter says *"vence pronto"* to somebody standing at a till — but reads the same destination map.
+
+### Two counts had drifted from their own subjects, which is why "land on the thing" was not just a link change
+
+- **The nightly sweep was emptying the expiring-memberships alert.** `SweepMembershipExpiry` reads the
+  `expiring_soon_days` Setting and flips memberships inside the window to `EXPIRING_SOON`;
+  `Dashboard::expiringMemberships()` counted `status = ACTIVE` inside a **hardcoded 30 days**. So the morning
+  after the sweep ran, the alert reported nothing — and a club that had widened the window disagreed twice
+  over. One scope now, `Membership::expiringSoon()`, read by the dashboard's count and the counter's rows, so
+  the number in the rail and the names at the far end cannot be different sets.
+- **An invitation nobody had filled in counted as a pending application.** `PENDING` covers two different
+  things: an invite issued, and a form the applicant has SUBMITTED. The counter's Alta panel has always listed
+  only the submitted ones, so the hub could say *"1 solicitud pendiente"* and land the operator on an empty
+  panel. One scope now, `MemberApplication::awaitingReview()`, read by both.
+
+Neither is a widening of `alerts()`: both are the count and the rows agreeing about what they are counting.
+
+### Where the rows come from
+
+Nothing was added to `alerts()`. The Socios screen resolves its own worklist on arrival:
+
+- **expiring memberships** through the shared `Membership::expiringSoon()` scope, at this sede;
+- **pending applications** through the Alta panel's existing `pendingAltaApplications()` — the arrival opens
+  the panel rather than building a second list of the same rows beside it;
+- **over-limit members** through **`ResolveMemberLimits`**, the resolver this screen already uses for the
+  allowance block (177: if a figure here ever disagrees with the dispensary, the screen is wrong and the
+  resolver is right). Not a second copy of `Dashboard::membersOverLimit()`'s aggregate — that exists because
+  the dashboard needs one number over the whole org; here the candidate set is only the members carrying an
+  override, which is small by definition. Org-wide, like the alert and like the counter's own member search
+  (194/203).
+
+Each row is the ordinary `selectMember()` the search box calls — same sede scope, same verdict, same blocking
+chain, and **no second search box** (194, asserted on the filtered arrival as well as the plain one). The list
+is capped at 10 and says so when it truncates: a shortened list that looks complete is worse than a long one.
+
+### A Blade trap that cost a debugging round
+
+`@php($x = …)` **cannot be mixed into a file that also uses `@php … @endphp` blocks.** Blade lifts raw PHP out
+with a non-greedy `/(?<!@)@php(.*?)@endphp/s` **before** it compiles directives, so a shorthand `@php(` pairs
+with that file's *next* `@endphp` and swallows everything between — here it ate the whole worklist panel and
+left an unbalanced `@if`, and the only symptom was a 500 with a parse error 400 lines into the compiled view.
+The block form is used instead. (Prompt 206 hit the sibling of this: `@php` written inside a `{{-- --}}`
+comment is still compiled, because statements are compiled before comments.)
+
+### Verification
+
+`composer check` green — **1604 tests**, 1601 passed, 3 pre-existing skips, Larastan 0, Pint clean. **MySQL was
+left to CI**, per the running order; the suite ran on SQLite.
+
+Screenshots at 1180×820 and 820×1180, light and dark (`storage/app/screenshots/207/`): the rail with two
+alerts on it, and the screen each one lands on with its subjects visible. The shoot script also asserts what a
+picture cannot — every rail item is a real `<a href>` rather than a click handler on a `<p>`, no worklist row
+is under 44×44, and no page scrolls horizontally.
+
+**Tests** (`AlertsLandOnTheSubjectTest`, 11): following each alert arrives with the subject **on the screen**,
+not merely with the screen rendered; two expiring memberships both reachable from the one alert (a count of 1
+passing by luck is the failure mode); a worklist row really selecting that member; every enum case declaring
+either a filtered counter destination or a deliberate non-actionable one, iterated over `cases()`; no alert
+landing STAFF on anything but a 200, and a counter-only login offered nothing that leaves the counter; the hub
+leaking no name, member number or id in any alert state for three roles; the designed empty state; the swept
+membership still counting and still landing; and an unsubmitted invitation no longer counted as pending.

@@ -6,6 +6,7 @@ use App\Casts\MoneyCast;
 use App\Enums\MembershipStatus;
 use App\Models\Concerns\BelongsToOrganisation;
 use App\Models\Concerns\ScopedToLocation;
+use App\Support\Settings;
 use Database\Factories\MembershipFactory;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
@@ -75,5 +76,28 @@ class Membership extends Model
     public function scopeLapsed(Builder $query): Builder
     {
         return $query->where('status', MembershipStatus::LAPSED);
+    }
+
+    /**
+     * Memberships inside the renewal window — the ONE definition of "vence pronto" (prompt 207).
+     *
+     * There were two, and they disagreed in a way that emptied the alert. `Dashboard::expiringMemberships()`
+     * counted `status = ACTIVE` inside a **hardcoded 30 days**, while `SweepMembershipExpiry` reads the
+     * `expiring_soon_days` Setting and, on the way past, **flips exactly those rows to `EXPIRING_SOON`** — so
+     * the nightly sweep took every membership the dashboard was counting out of the count. A club that had
+     * widened the window disagreed twice over. Both statuses are in scope here, and the window is the Setting
+     * the sweep already uses.
+     *
+     * @param  Builder<static>  $query
+     * @return Builder<static>
+     */
+    public function scopeExpiringSoon(Builder $query): Builder
+    {
+        $days = (int) Settings::get('expiring_soon_days', 30);
+
+        return $query
+            ->whereIn('status', [MembershipStatus::ACTIVE->value, MembershipStatus::EXPIRING_SOON->value])
+            ->whereNotNull('expires_at')
+            ->whereBetween('expires_at', [now(), now()->addDays($days)]);
     }
 }
