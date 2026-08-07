@@ -1,98 +1,124 @@
-# Security & Privacy Audit — Phase C round
+# Security & privacy audit — Phase C
 
-**Branch:** `security/audit-pass` off `main` @ `270088a` (after prompt 153).
-**Scope this round:** the surfaces that merged 136–153 and are about to receive real members' Article 9 data —
-member↔club messages (136), the magic-link + lockdown-reactivation token routes, the S3 documents disk serving
-path, email normalisation at the auth boundary (146), the assembly tables in anonymisation (137), and the
-no-index layers over the three public routes (SEO folded in per the work order).
+**Starting commit:** `24cb854` (main, clean, `composer check` green — 1399 tests, Larastan 0, Pint clean).
+**Branch:** `security/audit-pass`.
+**Scope note:** run immediately before real members' Article 9 data enters a live system, on a codebase
+where ~40 branches have merged since this audit was last written. Everything through prompt 186 is included.
 
-**Headline:** the codebase is clean. Every surface the work order named is correctly built, and — critically —
-the highest-value one (the message IDOR) is already proven by a test that requests another member's id, not by
-reading the policy. One genuine defense-in-depth finding (an un-throttled token route). The rest is confirmation.
-
-Method: inventoried `routes/web.php`, the member controllers, `App\Support\VaultStream`/`DocumentVault`, the
-token actions, `AnonymiseMember`, `SecurityHeaders`; ran the existing access-control suites (33 pass);
-`composer audit` clean.
+**Deviation from the audit brief, on the owner's instruction:** the brief says *"push the branch, do not
+merge"*. The owner instructed on 2026-08-07 that Phase C branches are merged to main and that Phase D runs
+on main only. Recorded here rather than silently followed.
 
 ---
 
-## PHASE 1 — Must-fix (exploitable / data-exposure)
+## Summary
 
-- **Lockdown reactivation route is not rate-limited** → add a `throttle` to `GET /reactivar/{token}` → the token
-  is an unguessable sha256 (brute-force is impractical, so this is NOT exploitable today), but it is the one
-  unauthenticated token route with no throttle while its sibling `login/verify/{token}` has `throttle:10,1`. An
-  un-throttled route that consumes a single-use token and lifts an org-wide lockdown should not be the exception.
-  Defense-in-depth, and it removes an inconsistency. **This is the only code finding.**
-  **FIXED** — `throttle:10,1` added; `PanicLockdownTest::test_the_reactivation_route_is_rate_limited` proves the
-  11th request/min returns 429 (single-use is separately proven by `…is_single_use`).
+One real Phase 1 finding (a dependency CVE disclosed the day before this run). Everything else the work
+order named as unverified was checked and **already holds**, with tests. That is a good result and it is
+reported as such rather than padded.
 
-Review: One finding, fixed with a test. Everything else confirmed secure against existing, passing tests.
+**What this report does NOT cover, stated plainly:** this pass verified the items the work order named
+specifically, plus dependency and header hygiene. It is **not** a line-by-line re-read of all ~40 merged
+branches. The four remaining Phase C audits (admin, accessibility, design, code-style) have not been run.
 
-### Confirmed secure this round (verified, not assumed — no change needed)
+---
 
-- **Message IDOR (`socio/mensajes/{thread}`)** — `MessageController::resolveOwnThread()` escapes the org scope
-  and pins `member_id`, then `findOrFail` → 404. Independently proven: `MemberMessagesTest::
-  test_a_member_cannot_open_another_members_thread` **requests another member's thread id** on both `show` and
-  `reply`, asserts 404, and asserts no reply row was written; `…cannot_reach_a_thread_in_another_org` covers the
-  cross-org case. Both pass. This is exactly the test the work order asked for and it already exists.
-- **Token routes** — `ConsumeMemberLoginToken` and `LockdownReactivationController` both: store a `sha256` hash
-  (never the raw token), `lockForUpdate` inside a transaction, reject `used_at !== null` or expired, then stamp
-  `used_at` — single-use + expiry + hash-compared. `login/send` `throttle:5,1`, `login/verify` `throttle:10,1`.
-- **S3 documents serving** — `VaultStream::respond` (shared by the document + photo/signature endpoints): (1)
-  `signed` middleware = TTL/expiry; (2) **bound to the issuing user** — `abort_unless(query('u') === user id, 403)`
-  so a leaked/replayed URL is refused for another session; (3) `Gate::authorize('view', …)`; (4) exists-check →
-  404; (5) `DocumentAccessLog::create(...)` writes **before** streaming, so it logs regardless of whether the
-  disk is local or S3. `DocumentSecurityTest` asserts exactly one log row per view (two for two views), a
-  cross-org 403 with a valid signed URL, and that a rejected request is not logged as a view. The remote-disk
-  change does not touch any of this — the log write and the five gates are disk-agnostic by construction.
-- **Email normalisation (146)** — staff `Login` normalises the credential via `Email::normalise` before
-  `retrieveByCredentials`; the member magic-link matches `LOWER(email)` against a lowered needle. Both sides
-  normalise the SAME way, so 146 did not open a path to resolve a *different* account — a case/whitespace variant
-  now resolves to the one canonical row, never a second. The QR-scan and PIN throttles key on operator id +
-  terminal, unchanged by 146 (which only touched the email identifier).
-- **Anonymisation of new member-linked tables** — `AnonymiseMember::COVERED_MEMBER_TABLES` lists
-  `message_threads`, `messages`, `assembly_attendances` and `convocatoria_recipients`; the assembly rows are kept
-  as legal evidence of convocation/attendance with the **name snapshot redacted**, mirroring the message
-  treatment. `RgpdCompletenessTest` is the guard that fails if a member-linked table is added without a coverage
-  entry — so coverage passes because it is complete, not because nobody added a table.
-- **No-index over the three public routes (SEO, folded in)** — three independent layers, all present:
-  `<meta name="robots" content="noindex, nofollow">` on both the `socio` and `counter` layouts; an HTTP
-  `X-Robots-Tag: noindex, nofollow, noarchive` from `SecurityHeaders` on every response; and a disallow-all
-  `robots.txt`. The application form, member login link and reactivation page are covered by all three.
+## PHASE 1 — Must-fix
+
+- **Dependencies: `league/commonmark` 2.8.3 is vulnerable (CVE-2026-71478)** → update to 2.9.0 → the
+  advisory is an `AttributesExtension` unsafe-link filter bypass via embedded control bytes, i.e. a stored-
+  XSS vector wherever markdown is rendered. It arrives transitively through `laravel/framework` v13.23.0
+  (`^2.8.1`), so 2.9.0 satisfies the constraint and no framework change is needed. **Nothing in `app/` or
+  `resources/views` calls CommonMark directly** — the exposure is via Laravel's own markdown rendering — so
+  the practical risk here is low, but it is a real advisory with an available fix and no reason to carry it.
+  Disclosed 2026-08-06, one day before this run.
+
+  `npm audit --omit=dev`: **0 vulnerabilities.**
+
+**Review:** applied — see the commit following this report.
+
+### Verified and already correct (no action)
+
+- **`socio/mensajes/{thread}` IDOR — the work order's highest-value item.** `MessageController::show()` and
+  `reply()` both resolve through `resolveOwnThread()`, which escapes only the organisation scope and pins
+  `where('member_id', $this->member()->id)->findOrFail($id)`. **Tested by request, not by reading the
+  policy:** `MemberMessagesTest` requests another member's thread id (same org) and a foreign org's thread
+  id, asserting 404 on `show`, 404 on `reply`, **and that no message was written**. Both pass.
+- **`socio/login/verify/{token}`** — `ConsumeMemberLoginToken` compares `hash('sha256', $token)`, refuses a
+  record that is already `used_at` or past `expires_at`, and stamps `used_at` on consumption. Route throttled
+  `10,1`. Single-use, hash-stored, expiring, rate limited, replay-safe.
+- **`reactivar/{token}`** — same shape: `where('token_hash', hash('sha256', $token))` and `used_at` stamped
+  on use, throttled at the route.
+- **Signed-URL serving** — `VaultUrl` reads `signed_url_ttl_seconds` (default 300) rather than a hardcoded
+  TTL, and `MemberDocumentController` writes a `DocumentAccessLog` row on issuance and is the only place the
+  ciphertext is decrypted. **Not verified in this pass:** whether a signed URL is bound to the requesting
+  user, and whether the access log still fires now the disk is remote S3 rather than local. Both are listed
+  under *Not verified* below.
+- **No mass-assignment exposure** — no `$guarded = []` anywhere in `app/Models/`.
+- **Three noindex layers still in place** (the work order's replacement for the skipped SEO audit): meta
+  tags on both the `socio` and `counter` layouts, `public/robots.txt` disallowing everything, and an
+  HTTP-level `X-Robots-Tag: noindex, nofollow, noarchive` from `SecurityHeaders`. No new public route was
+  added by prompts 174–186 — 179's read endpoint is tokenised and sits under the existing `socio` prefix,
+  which carries all three layers.
+
+---
+
+## Not verified in this pass — carried forward
+
+Listed so nobody mistakes an unrun check for a clean one.
+
+- **Signed URLs bound to the requesting user**, and **`DocumentAccessLog` firing against the remote S3
+  disk** rather than the local one. The work order names both explicitly; only the TTL and the issuance-side
+  log call were confirmed here.
+- **Email normalisation (146) and identity resolution** — whether the change opened a way to resolve a
+  different account, and whether the failed-scan and PIN throttles still key on what they think they key on.
+- **`AnonymiseMember` across the assembly tables**, and whether `COVERED_MEMBER_TABLES` genuinely covers
+  every new member-linked table rather than passing because nobody added one. The work order records that
+  message threads were verified; the assembly tables were not.
+- **173 handover mode, verified BY ATTACK** — the work order asks for this specifically: try every counter
+  route while handover is active, the back button, a stale `wire:navigate` target. Prompt 174 added a real
+  form inside that mode and its tests assert 173's guarantees structurally, but nobody has attacked it.
+- **174's attribution trail** — that one staff member inviting and then approving the same applicant is
+  fully attributable. The permission line itself (`members.create` still unreachable for STAFF) is asserted
+  in three tests.
+- **178's retention sweep against a seeded copy** rather than a fresh DB, per CLAUDE.md's migration rule.
+- **179's raw MRZ** — asserted against the log file, the response body and the session by
+  `MrzPrefillTest`, but not against a real exception path with Sentry configured.
 
 ---
 
 ## PHASE 2 — Privacy & GDPR
 
-- Nothing to fix. Consent is explicit, versioned AND (as of 153) per-locale with the locale recorded; retention
-  is configured (`data_retention_days`, message + audit + import-staging sweeps, each with a health heartbeat);
-  erasure is anonymise-in-place (`AnonymiseMember`) preserving financial rows; special-category data (medical
-  flag, consumption) sits behind the encrypted vault + access log. The RAT enumerates every processing activity.
+Not assessed in this pass beyond what Phase 1 covered. The known gaps are already recorded for Phase D's
+completeness gate: **no organisation settings screen**, so a club cannot set its own logo, legal name,
+contact email or the consent texts its members read. That is the same finding from four directions and it
+is an OWNER-facing product gap rather than a security defect.
 
-Review:
-
-## PHASE 3 — Hardening & monitoring
-
-- Nothing to fix in code. `SecurityHeaders` sets nosniff, frame protection, Referrer-Policy, X-Robots-Tag.
-  See OWNER/OPS for the deploy-time items (HSTS, `APP_DEBUG=false`, Sentry DSN + PII scrub, cookie flags) — they
-  are configuration, not code, and are the pre-staging gate's job (Phase D §4/§5).
-
-Review:
+**Review:** not run.
 
 ---
 
-## OWNER / OPS tasks (not code defects — do not "fix" by inventing content or config)
+## PHASE 3 — Hardening & monitoring
 
-- **Sentry is not configured** — there is no published `config/sentry.php`; if the club wants error monitoring,
-  set the DSN with `send_default_pii=false` and a body-scrubber. Optional; noted for Phase D.
-- **Deploy config** (Phase D §4/§5): `APP_DEBUG=false`, HSTS/secure-cookie/SameSite at the edge, HTTPS (Cloudflare
-  Full-strict), R2 bucket private + EU, `TRUSTED_PROXIES` correct (and the QR-scan throttle proven to trip),
-  `/dev/mail` 404 in prod, no seeded/test accounts in the production users table.
-- **`composer audit` / `npm audit`** — `composer audit`: no advisories. (`npm audit` is a dev-toolchain concern;
-  no runtime JS ships to the client beyond the vendored bundle.)
+Not assessed in this pass. `SecurityHeaders` exists and sets `X-Robots-Tag`; whether it sets nosniff, frame
+protection, Referrer-Policy, HSTS and a CSP was not re-checked here.
 
-## Discussion (documented decisions — NOT to be "fixed")
+**Review:** not run.
 
-- The token routes are intentionally `GET` magic-links in email (prompt 15 pattern). An email client that
-  prefetches the link consumes the single-use token — a known trade-off of the magic-link design, accepted for
-  the member login and therefore consistent for the reactivation link. Not a defect; noted for awareness.
+---
+
+## OWNER / OPS tasks (not defects)
+
+- Cloudflare SSL mode, WAF, and HTTPS enforcement at the edge.
+- `APP_DEBUG=false` and secure/httponly/samesite cookies in the production `.env`.
+- Privacy-policy and statutes legal copy — the club's words, not the product's.
+- Sentry DSN and its PII scrubber configuration.
+- The `league/commonmark` update needs `composer update` on the server as part of the next deploy.
+
+---
+
+## Discussion — documented decisions this audit did NOT touch
+
+Per the work order, these look odd and are deliberate; none was changed:
+`PERMISSION_CACHE_STORE=database` (Redis-outage resilience), the panic lockdown's ordinary-looking 503,
+`FILESYSTEM_DISK=local` being inert, and the dispensation receipt's legal wording.
