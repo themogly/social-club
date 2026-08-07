@@ -80,7 +80,15 @@ class SurfaceChainHarnessTest extends TestCase
             ->get(route('counter.checkin'))->getContent();
         $this->write('with-sede', $withSede);
 
-        // 3) HANDED OVER — prompt 187 defect 2. The applicant left their form and landed back here; this is
+        // 3) IDENTIFIED — prompt 188's "after". Same sede, now with an operator: the surface is DOWN and the
+        // counter is on screen. Paired with with-sede.html this is the before/after of identifying.
+        session(['counter.location_id' => $centro->id]);
+        CounterOperator::set($user);
+        $identified = $this->actingAs($user)->get(route('counter.checkin'))->getContent();
+        $this->write('identified', $identified);
+        CounterOperator::clear();
+
+        // 4) HANDED OVER — prompt 187 defect 2. The applicant left their form and landed back here; this is
         // the resting state and the way back, which together used to be a box promising a form.
         app(ActiveScope::class)->setLocation($centro->id);
         CounterOperator::set($user);
@@ -105,6 +113,10 @@ class SurfaceChainHarnessTest extends TestCase
         $this->assertStringContainsString('data-surface-mode="unidentified"', $withSede);
         $this->assertStringNotContainsString('data-blocker="sede"', $withSede);
         $this->assertStringContainsString('data-counter-surface-unlock', $withSede);
+
+        // Identified: no surface, and the counter's own chrome is back.
+        $this->assertStringContainsString('data-surface-mode="none"', $identified);
+        $this->assertStringContainsString('data-counter-topbar', $identified);
 
         // Handed-over mode offers a real way back, and still names nobody and nothing.
         $this->assertStringContainsString('data-surface-mode="handover"', $handover);

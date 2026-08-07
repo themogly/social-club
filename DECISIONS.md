@@ -7928,3 +7928,46 @@ across both orientations, both themes, motion both ways — asserting the way ba
 
 **MySQL was left to CI**, per the running order: `composer check` green on SQLite. This branch changes one
 Blade partial and five translated strings — no migration, no query.
+
+---
+
+## Prompt 188 — the surface mode was snapshotted into Alpine and never updated
+
+**The bug.** Enter your PIN, press Identificarse, and nothing happens. The PIN was accepted — a manual
+reload revealed the counter with *"Trabajando: …"* in the bar — but the surface stayed up until you
+refreshed.
+
+**Cause.** `serverMode: @js($surfaceMode)` copied the mode into Alpine's `x-data` **once**, at init. Livewire
+preserves the DOM across a re-render, so `x-data` is never re-evaluated: after `unlockOperator()` the
+server's mode was null while the client still held `'unidentified'`. The server state was right the whole
+time; only the client's copy was stale. A reload re-initialised `x-data` and the surface vanished.
+
+**What it is bound to now.** `IdentifiesOperator::$surfaceModeState` — a public property mirroring
+`surfaceMode()`, refreshed by a `renderingIdentifiesOperator()` trait hook on **every** render, before the
+view and before the snapshot is built. The Blade getter reads `$wire.surfaceModeState`. `$wire` is a
+reactive proxy, so an Alpine effect that reads it re-runs when the server changes it.
+
+**A hook, not a line in each transition.** The defect was one path forgetting to tell the client; a rule
+that must be remembered in six places will be forgotten in a seventh. Refreshing on render fixes
+identifying, switching operator, locking, unlocking, and entering and leaving handed-over mode in one
+stroke — and the tests assert all five, not just the one that was reported.
+
+**A redirect after identifying was considered and REJECTED.** It would have masked this single instance and
+left the staleness in place for every other transition — and it would have thrown away the basket and form
+state that prompt 173 deliberately preserves across the surface. There is a test that a basket in progress
+survives lock → unlock → switch operator → handover → back.
+
+**Precedence is unchanged and asserted:** handed-over outranks the client-side idle lock, which outranks the
+server's "no operator yet". An applicant must not be shown a lock mid-form, and an operator already
+identified once must see the lock rather than a fresh identify prompt.
+
+**Untouched:** `UnlockOperator`, its throttle, and when the surface raises. The server logic was correct.
+
+**One consequence for the browser harness, recorded because it looks like a regression and is not.** The
+surface now depends on `$wire`, which does not exist in a static capture. `shoot-surface-chain.mjs`
+therefore stubs that ONE property from the same server-rendered value it mirrors — the `data-surface-mode`
+attribute on the surface itself. What the surface does with the value is still the real code; only the
+transport is stood in for.
+
+**MySQL was left to CI**, per the running order: `composer check` green on SQLite. One property, one trait
+hook and one Blade getter — no migration, no query.
