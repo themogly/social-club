@@ -23,6 +23,7 @@ use App\Livewire\Counter\Concerns\FindsMembers;
 use App\Livewire\Counter\Concerns\HandlesTender;
 use App\Livewire\Counter\Concerns\IdentifiesOperator;
 use App\Livewire\Counter\Concerns\ResolvesCounterLocation;
+use App\Livewire\Counter\Concerns\ShowsSettledOutcome;
 use App\Mail\DispensationReceiptMail;
 use App\Models\Article;
 use App\Models\Batch;
@@ -43,6 +44,7 @@ use App\Support\LimitSnapshot;
 use App\Support\Money;
 use App\Support\PriceResult;
 use App\Support\Settings;
+use App\Support\SettledOutcome;
 use App\Support\VaultUrl;
 use App\Support\Wallet;
 use App\Support\Weight;
@@ -79,7 +81,7 @@ use RuntimeException;
 #[Layout('components.layouts.counter', ['fullHeight' => true])] // prompt 176: the page must not scroll; the selection pane does
 class DispensaryPos extends Component
 {
-    use CollectsMembershipFees, FindsMembers, HandlesTender, IdentifiesOperator, ResolvesCounterLocation;
+    use CollectsMembershipFees, FindsMembers, HandlesTender, IdentifiesOperator, ResolvesCounterLocation, ShowsSettledOutcome;
 
     // --- Identity ---------------------------------------------------------------
     // The ONE lookup field ($lookup) and everything behind it live in FindsMembers (prompt 194). This screen
@@ -251,6 +253,11 @@ class DispensaryPos extends Component
      */
     protected function onMemberFound(Member $member, bool $scanned): void
     {
+        // This screen is member-FIRST: identifying a socio is the start of the next dispensación, so the
+        // previous one's confirmation goes now. (The bar is basket-first — a socio can be attached mid-basket
+        // to pay by wallet — so there the article add is what clears it.)
+        $this->dismissOutcome();
+
         $this->holdMember($member->id, $scanned);
     }
 
@@ -305,6 +312,9 @@ class DispensaryPos extends Component
 
             return;
         }
+
+        // The operator is on to the next socio's product — the previous confirmation goes (prompt 202).
+        $this->dismissOutcome();
 
         $this->activeGeneticId = $geneticId;
         $this->weightInput = '';
@@ -720,9 +730,12 @@ class DispensaryPos extends Component
             return;
         }
 
+        // Before the reset — see BarPos: the change comes from cashTendered, which the reset clears.
+        $change = $this->changeDueCents($dispensation->cash_cents->cents);
+
         $this->lastDispensationId = $dispensation->id;
         $this->resetBasketState();
-        $this->flash(__('Dispensación registrada.'), 'success');
+        $this->flashSettled(SettledOutcome::forDispensation($dispensation, $change), __('Dispensación registrada.'));
     }
 
     // --- Combined settle: same visit, cannabis + bar, two records (prompt 118) --------
@@ -748,6 +761,7 @@ class DispensaryPos extends Component
             }
         }
         $this->barBasket[] = ['article_id' => $articleId, 'qty' => 1];
+        $this->dismissOutcome();
     }
 
     public function removeBarItem(int $index): void
@@ -1782,6 +1796,10 @@ class DispensaryPos extends Component
 
     private function flash(string $message, string $type): void
     {
+        // Any message other than a settled one means the previous outcome is no longer what is on screen
+        // (prompt 202). `flashSettled()` re-sets it immediately after; nothing else may.
+        $this->settled = [];
+
         $this->flashMessage = $message;
         $this->flashType = $type;
     }

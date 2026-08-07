@@ -296,3 +296,23 @@ node tests/Browser/measure-topbar-density.mjs   # the furniture-vs-strip split
 Last run (branch `fix/topbar-alpine-scope`): **ALL PASS** at 768/800/1024/1280, 7 controls, no overlap, no
 horizontal scroll; density byte-identical to 189 (furniture 331px, portrait strip headroom 221px).
 
+
+## The confirmation carries the outcome and holds still (prompt 202)
+
+The **second** script needing a running server, for two claims a PHP test cannot make: that the Charge button
+does not MOVE when the confirmation renders above it, and that the change due is still on screen after
+Livewire has re-rendered the column that produced it.
+
+```bash
+npm run build
+php artisan serve --port=8123
+node tests/Browser/prove-confirmation-holds-still.mjs   # → storage/app/screenshots/202/
+```
+
+Logs in, reaches a working bar counter, and charges three times in a row — tendering €50,00 each time so there
+is always change to state. Exits non-zero if the Charge button moves more than 1px, if more than one outcome
+block or live region is on screen, if no change is stated, or if the outcome survives the next basket action.
+
+Last run (branch `feat/confirmation-carries-the-outcome`) at 1180×820: Charge y **736 · 736 · 736**, spread
+**0.0px**; 1 outcome block and 1 live region per round; change **€48.80** each time with the tender field
+already empty; 0 outcome blocks after the next article tap. **PASS**.

@@ -284,7 +284,10 @@ class BarPosScreenTest extends TestCase
             ->call('addArticle', $a->id)
             ->call('commitOrder')
             ->assertSet('flashType', 'success')
-            ->assertSee(__('Última venta registrada')); // colocated "last sale" block under Cobrar
+            // Prompt 202 — the confirmation itself, beside Cobrar. The last-sale block is still there and is
+            // still asserted below, but it is an AFFORDANCE (ticket + void) now, not a second confirmation.
+            ->assertSee(__('Pedido registrado.'))
+            ->assertSee(__('Última venta'));
 
         $order = Order::query()->withoutGlobalScopes()->firstOrFail();
         $component->assertSet('lastOrderId', $order->id); // lastOrderId is retained through the render

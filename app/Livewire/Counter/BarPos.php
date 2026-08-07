@@ -12,6 +12,7 @@ use App\Livewire\Counter\Concerns\FindsMembers;
 use App\Livewire\Counter\Concerns\HandlesTender;
 use App\Livewire\Counter\Concerns\IdentifiesOperator;
 use App\Livewire\Counter\Concerns\ResolvesCounterLocation;
+use App\Livewire\Counter\Concerns\ShowsSettledOutcome;
 use App\Models\Article;
 use App\Models\Location;
 use App\Models\Member;
@@ -21,6 +22,7 @@ use App\Models\User;
 use App\Support\CounterOperator;
 use App\Support\Money;
 use App\Support\Settings;
+use App\Support\SettledOutcome;
 use App\Support\Wallet;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Contracts\View\View;
@@ -62,7 +64,7 @@ use Throwable;
 #[Layout('components.layouts.counter', ['fullHeight' => true])] // prompt 176: the page must not scroll; the selection pane does
 class BarPos extends Component
 {
-    use FindsMembers, HandlesTender, IdentifiesOperator, ResolvesCounterLocation;
+    use FindsMembers, HandlesTender, IdentifiesOperator, ResolvesCounterLocation, ShowsSettledOutcome;
 
     // --- Identity / scope -------------------------------------------------------
     // The ONE lookup field ($lookup) lives in FindsMembers (prompt 194). The bar used to offer a name box with
@@ -232,7 +234,7 @@ class BarPos extends Component
         }
 
         $this->ensureIdempotencyKey();
-        $this->flashMessage = null;
+        $this->dismissOutcome();
     }
 
     public function addMiscLine(): void
@@ -271,7 +273,7 @@ class BarPos extends Component
 
         $this->reset(['miscDescription', 'miscAmount', 'miscReference']);
         $this->ensureIdempotencyKey();
-        $this->flashMessage = null;
+        $this->dismissOutcome();
         // Tell the blade's modal to close — but only now, on SUCCESS, so a validation refusal keeps it open with
         // the operator's input intact.
         $this->dispatch('misc-added');
@@ -446,9 +448,13 @@ class BarPos extends Component
             return;
         }
 
+        // Capture the outcome BEFORE the reset: the change is derived from `cashTendered`, which
+        // resetBasketState() clears, so reading it afterwards would always be zero (prompt 202).
+        $change = $this->changeDueCents($order->cash_cents->cents);
+
         $this->lastOrderId = $order->id;
         $this->resetBasketState();
-        $this->flash(__('Pedido registrado.'), 'success');
+        $this->flashSettled(SettledOutcome::forOrder($order, $change), __('Pedido registrado.'));
     }
 
     // --- Void -------------------------------------------------------------------
@@ -829,6 +835,10 @@ class BarPos extends Component
 
     private function flash(string $message, string $type): void
     {
+        // Any message other than a settled one means the previous outcome is no longer what is on screen
+        // (prompt 202). `flashSettled()` re-sets it immediately after; nothing else may.
+        $this->settled = [];
+
         $this->flashMessage = $message;
         $this->flashType = $type;
     }
