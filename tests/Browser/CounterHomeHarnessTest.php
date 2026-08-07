@@ -60,7 +60,11 @@ class CounterHomeHarnessTest extends TestCase
         $this->assertStringContainsString('data-counter-home-switch-operator', $html);
         $this->assertStringContainsString('data-counter-home-lock', $html);
         $this->assertStringContainsString('data-counter-home-sedes', $html);
-        // And the lock button is gone from the bar it used to crowd.
+        // And the lock BUTTON is still gone from the row it used to crowd (prompt 189). Prompt 198 put an
+        // in-place lock back in the bar's overflow MENU — a menu item, not a control on the row — because
+        // reaching the home tile mid-basket crossed 196's unsaved-work confirm and destroyed the basket the
+        // lock exists to preserve. The row's geometry is unchanged; measure-topbar.mjs still reads 7 controls.
         $this->assertStringNotContainsString('data-counter-lock-now', $html);
+        $this->assertStringContainsString('data-counter-overflow-lock', $html);
     }
 }

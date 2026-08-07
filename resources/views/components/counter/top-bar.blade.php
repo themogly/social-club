@@ -184,11 +184,20 @@
          the non-destination actions (Help, Panel, Log out). Both are 44px; the overflow is what lets the widened
          five-destination nav be one flow that cannot overlap a wide fixed group — there isn't one any more. --}}
     <div class="flex shrink-0 items-center gap-1">
-        {{-- Prompt 189: the dedicated "lock now" button has moved to the counter HOME screen, with the other
-             operations that are not specific to the current transaction (switch operator, switch sede, panel,
-             log out). It was a 44px control on a row that the owner reported as cramped, and locking is not
-             something you do mid-basket. The idle timer (prompt 120) is unchanged and still locks on its own;
-             the home screen is one tap away via the brand block. --}}
+        {{-- Prompt 189 moved the dedicated "lock now" BUTTON off this row to the counter home, with the other
+             operations that are not specific to the current transaction. That was right for the row — it was a
+             44px control the owner had called cramped — but the premise that came with it, "locking is not
+             something you do mid-basket", was wrong, and prompt 198 measured the cost.
+
+             Locking is precisely what you do mid-basket: it is what happens when you step away from a counter
+             with a member in front of you. With the only control on `/counter`, reaching it crossed prompt
+             196's unsaved-work confirm — correct, newly working, and exactly what made it expensive — so the
+             operator's real choice mid-order was to leave the terminal unlocked or abandon the sale. The idle
+             timer, firing in place, always kept the basket; the DELIBERATE control was the one that lost it.
+
+             So the lock comes back to the bar as a MENU ITEM rather than a button: one tap more than before,
+             no new furniture in the row, no navigation, and the overflow is already an x-data island so the
+             handler binds (prompt 196). The home tile stays as the discoverable route. --}}
 
         {{-- Secondary actions, collapsed behind ONE 44px overflow control (prompt 132). Help, Panel and Log out
              — the three items that are NOT a counter destination — folded into a single dropdown so the widened
@@ -221,7 +230,24 @@
             @keydown.escape.window="open = false"
             class="absolute right-0 z-40 mt-1 w-80 max-w-[90vw] rounded-xl border border-line bg-surface p-2 text-left shadow-lg dark:border-slate-700 dark:bg-slate-900"
         >
-            {{-- Panel + Log out (44px rows). --}}
+            {{-- Lock, first (prompt 198): the only item here that does NOT leave the counter, and the one
+                 with a person waiting. Deliberately NOT behind the unsaved-work confirm the two below carry
+                 — locking preserves the basket by design, so asking whether work would be lost is both
+                 wrong and the whole bug. `lockNow()` is the store's own method, unchanged: it flips the
+                 overlay AND dispatches `counter-lock`, which signs the operator out server-side. --}}
+            <button
+                type="button"
+                data-counter-overflow-lock
+                @click="open = false; $store.counter.lockNow()"
+                class="flex min-h-11 w-full items-center gap-2 rounded-lg px-3 text-sm font-medium text-ink-muted transition hover:bg-brand-tint hover:text-brand dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-white"
+            >
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" class="h-5 w-5 shrink-0" aria-hidden="true">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 1 0-9 0v3.75m-.75 0h10.5a2.25 2.25 0 0 1 2.25 2.25v6.75a2.25 2.25 0 0 1-2.25 2.25H6.75a2.25 2.25 0 0 1-2.25-2.25v-6.75a2.25 2.25 0 0 1 2.25-2.25Z"/>
+                </svg>
+                {{ __('Bloquear pantalla') }}
+            </button>
+
+            {{-- Panel + Log out (44px rows) — both LEAVE the counter, so both keep 196's confirm. --}}
             @if ($canPanel)
                 <a
                     href="{{ url('/') }}"
