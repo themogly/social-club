@@ -72,7 +72,27 @@ verified by code path but not against live S3, and says so.
   `url()`, which returns `/storage/<path>` — a dead link into the public symlink, where the file is not.
   Harmless, but it means the field has never worked in dev, which is likely why nobody noticed the S3 case.
 
-**Review:** _pending — fixes follow this commit._
+**Review:** ✅ **BOTH FIXED.**
+
+*Handover* — `App\Http\Middleware\EnforceCounterHandover`, appended globally like the lockdown gate. While a
+handover is active only the tokenised application form, the language switcher on it, the five counter
+SCREENS and Livewire's endpoint answer; everything else redirects to the form the applicant was handed (now
+recorded with the handover). Deliberately excluded: the counter receipts, the photo-capture POST, the sede
+switcher and the panic POST — all live in the top bar, which is absent from the DOM during a handover.
+
+It matches on PATHS, not route names, and that is load-bearing: global middleware runs BEFORE the router has
+matched, so `$request->route()` is null there. The first attempt used route names, matched nothing, and sent
+every counter screen into a redirect loop — the denial tests caught it, which is the argument for writing
+them. `HandoverBoundaryTest` asserts both halves: the panel, the member register and a contribution receipt
+are refused; the form, the five screens and Livewire still answer; and ending the handover restores ordinary
+reach, so the tablet is never bricked.
+
+*Documents on S3* — `DocumentUpload::withoutDirectUrl()`, applied to all six fields on the disk. The field
+keeps its name and size and hands out no URL at all; the Article-9 fields already offer the correct viewer
+through their `hintAction`, via the signed, authorised, logged endpoint. `UploadLimitsTest` reuses its
+existing chain walker to enumerate every field on the disk, so one added later without this fails the suite.
+`DocumentsDiskUrlTest` proves the override suppresses a URL Filament would otherwise emit, and anchors the
+finding by asserting an s3-configured disk really does presign a bucket-direct URL.
 
 ---
 
@@ -102,7 +122,19 @@ verified by code path but not against live S3, and says so.
   data" condition. → **Why it matters:** small, but it is personal data with no retention bound, and the fix
   is one clause.
 
-**Review:** _pending._
+**Review:** ✅ **BOTH FIXED.**
+
+*`proxy_holder`* — `AnonymiseMember` now also redacts `proxy_holder` wherever the erased member is the one
+named there. Deliberately one-directional, and both directions are asserted: erasing A must NOT touch the
+name of whoever represented A, because that is a third party's personal data and the register's evidence of
+who acted for whom. Best-effort by necessity — the column is free text with no member reference beside it,
+so a trimmed, case-insensitive full-name match is the only link that exists, and a nickname or a role
+("Tesorero", which is what the existing test uses) cannot match. **The structural fix is to make the proxy
+holder a member REFERENCE rather than free text**; that is a schema and UI change, it is product work rather
+than an audit fix, and it is recorded here rather than done.
+
+*`applicant_reference`* — added to the sweep's "still holds personal data" condition. Two tests: a
+handover invite past retention is now swept, and one within retention is still left alone.
 
 ---
 
@@ -155,7 +187,23 @@ verified by code path but not against live S3, and says so.
   part of going to production, which is the same deploy that brings real members' Article 9 data. The audit
   brief asks for this explicitly and it had never been run.
 
-**Review:** _pending._
+**Review:** ✅ **FIXED.** `config/sentry.php` now exists, holding only the options this project sets
+deliberately (sentry-laravel calls `mergeConfigFrom`, so omitted keys stay the vendor's rather than
+becoming null): `max_request_body_size => 'none'` — the actual fix — plus `send_default_pii => false`,
+`breadcrumbs.sql_bindings => false` (bindings carry the literal values being written), and a `before_send`
+scrubber for what arrives by another door.
+
+The scrubber is registered as a **callable array, never a Closure**: a closure in a config file makes
+`php artisan config:cache` fail outright, which on deploy means the protection is silently absent at exactly
+the moment it matters. `App\Support\SentryScrubber` redacts by KEY, recursively, and never inspects values
+— a rule that read values would have to decide what a document number looks like, and would be wrong about
+somebody's.
+
+`SentryScrubbingTest` does what the brief asks and verifies a captured event **is actually scrubbed**: it
+builds an event shaped as Sentry's own `RequestIntegration` populates it, carrying a real MRZ string, a
+counter PIN, a document number, a session cookie and a bearer token, runs it through the **configured**
+callback (so the wiring is under test, not just the class), and asserts against the serialised event that
+none of them survives — while the non-identifying context that makes the report useful does.
 
 ---
 
@@ -165,6 +213,13 @@ verified by code path but not against live S3, and says so.
   s3-configured disk, but not against a live bucket.** The URL was produced with dummy credentials; nobody
   fetched an object with it. The generation is the security-relevant half and it is proven; the fetch is not
   in doubt but is not demonstrated.
+- **The handover fix closes the SERVER side; it cannot close the browser.** A page the staff member had
+  already loaded before handing the tablet over can still be reached from the back/forward cache, because
+  that is a repaint of bytes the browser already holds and no middleware sees the request. Livewire's
+  endpoint is necessarily allowed (it is how the PIN returns), so a *valid snapshot already in the page*
+  remains interactive; a forged one is rejected by Livewire's own checksum, and a fresh panel page cannot be
+  obtained while the gate is up. Closing that last gap is the tablet's kiosk/guided-access configuration,
+  which is listed under OWNER/OPS and is not a substitute the code can provide.
 - **178's retention sweep against a seeded copy** rather than a fresh DB (CLAUDE.md's migration rule). The
   `applicant_reference` gap above was found by reading the query, not by running the sweep over seeded data.
   Running it that way may find more.
