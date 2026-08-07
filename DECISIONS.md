@@ -9647,3 +9647,75 @@ either a filtered counter destination or a deliberate non-actionable one, iterat
 landing STAFF on anything but a 200, and a counter-only login offered nothing that leaves the counter; the hub
 leaking no name, member number or id in any alert state for three roles; the designed empty state; the swept
 membership still counting and still landing; and an unsubmitted invitation no longer counted as pending.
+
+---
+
+## Prompt 208 — the hero tile should be the dispensary, and it should not be an accident of list order
+
+The owner, on the hub: *"I think dispensary should be the main button."*
+
+**He is right, and the reason is sharper than the preference.** `CounterHome::heroTile()` returned
+`$this->tiles()[0]`, and `CounterScreens::forUser()` said so in its own comment: *"**Recepción is first, and
+that is now load-bearing** (prompt 205): the hub's hero tile is the first screen…"* So **the hero and the list
+order were the same fact.** Nobody chose Recepción as the most important thing on the counter — it is first in
+an array ordered for two other reasons, and 205 quietly made that ordering carry a design decision it was
+never written to hold.
+
+**That coupling is what this branch fixes, not the route.** Reordering the array to promote the dispensary
+would have moved the tile grid's reading order *and* touched `landingRouteFor()`, which still looks for
+`counter.checkin` by name — three things changed to change one.
+
+### The hero is its own decision now
+
+A `counter_hero` Setting, defaulting to `counter.pos`, in the shape prompt 189 already used for
+`counter_landing`: read through the `Settings::get()` accessor with a code default, so a stale or missing
+value degrades rather than throws (asserted — a nonsense value falls back to today's behaviour, it does not
+blank the hub).
+
+**`CounterScreens` order is untouched**, and now means only the two things it was written for. Its comment
+says so, so the next person reordering it for layout reasons does not move a design decision with it.
+
+**The per-user property that made deriving it attractive is kept, not lost.** A configured hero the operator
+cannot open would be a tile to a 403; `heroTile()` falls back to the first destination they *can* open — which
+is exactly what it did before — so a till-only operator's hero is still Caja and nobody gets a hole where
+their hero should be. Asserted directly, because this branch is where it would break.
+
+**And `secondaryTiles()` had to change with it**, which is the part a naive implementation gets wrong. It was
+`array_slice($tiles, 1)` — position-based, correct only while the hero *was* the first entry. Promoting the
+dispensary without touching it would have rendered Dispensario twice and dropped **Recepción out of the grid
+entirely**. It filters by route now, and a test asserts every reachable destination renders exactly once —
+the hero is one of them promoted, never a sixth tile and never one lost.
+
+### What "main" is for, which is the part worth arguing with
+
+With 205's two-tap navigation (hub → tile) the hero is the only destination that stays **one tap**. So the
+hero is not decoration or emphasis: it is a standing tap saved on whichever screen it names, on every trip,
+all shift.
+
+That reframes the choice as *what does a shift actually spend its time on*, and the owner's answer is
+dispensing. 205 recorded the opposite reasoning — Recepción "earns the hero tile, on frequency rather than
+revenue", because every visit starts at the door — and that argument is not wrong, it is answered: check-in is
+one tap per **visit**, dispensing is the loop the counter runs for as long as somebody is standing at it, and
+a member who came to collect passes the door once and the scales repeatedly. It is now a Setting precisely
+because this is a judgement about one club's shift and not a law: a club whose door is the bottleneck sets it
+back to Recepción in the panel, and gets 205's behaviour with no code change.
+
+### Verification
+
+`composer check` green — **1614 tests**, 1611 passed, 3 pre-existing skips, Larastan 0, Pint clean. **MySQL was
+left to CI**, per the running order; the suite ran on SQLite.
+
+Screenshots before and after at 1180×820 and 820×1180, light and dark (`storage/app/screenshots/208/`). The
+shoot script asserts what the pictures cannot: exactly one hero, no destination rendered twice, the hero
+**5.7× the area** of the largest other tile, nothing clipped, nothing under 44×44, no horizontal page scroll —
+before and after alike, so the layout is proved unchanged apart from which tile is big.
+
+**Tests** (`CounterHeroTileTest`, 9): the dispensary is the hero by default (fails against `main`); the setting
+is honoured, asserted against `Settings::get()` rather than a literal; a till-only operator still gets a hero
+they can open; one reachable destination is its own hero with an empty-but-not-broken grid; every reachable
+destination renders exactly once; the hero stays substantially larger; `CounterScreens` order is unchanged;
+`landingRouteFor()` is unaffected by the hero setting; and an unknown setting degrades rather than throwing.
+
+**Retargeted, not deleted:** `CounterHubTest::test_recepcion_is_the_hero_tile_for_an_operator_who_can_open_it`
+asserted `counter.checkin` because the hero *was* `tiles()[0]`. What 205 was actually protecting — exactly one
+tile promoted, and one the operator may open — is what it asserts now; which route wins moved to the new file.

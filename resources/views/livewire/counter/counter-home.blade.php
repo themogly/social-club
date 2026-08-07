@@ -45,10 +45,16 @@
         <div class="mx-auto grid w-full max-w-6xl gap-6 lg:grid-cols-[minmax(0,1fr)_20rem] lg:items-start">
             {{-- ============ THE TILES ============
                  Asymmetric: one hero, the rest secondary. The hero is the FIRST destination this operator may
-                 open, which is Recepción in CounterScreens order — and Recepción earns it on FREQUENCY, not
-                 on revenue. Every visit starts at the door; DESIGN-counter-first.md's research is that these
-                 products land on a queue of people rather than a menu. Deriving it from the list also makes
-                 it degrade by role for free: a till-only operator's hero is Caja, and nobody gets a hole. --}}
+                 open, which was Recepción only because Recepción is first in `CounterScreens` — an array
+                 ordered for THIS grid's reading order and for `landingRouteFor()`'s fallback, which 205 then
+                 quietly made carry a third job it was never written for.
+
+                 **Prompt 208 made the hero its own decision**: the `counter_hero` Setting, defaulting to the
+                 dispensary, which is the owner's call — with 205's two-tap navigation the hero saves a tap on
+                 whatever it names, every time, and dispensing is what a shift spends its time on. The
+                 per-role property that made deriving it attractive is kept rather than lost: an operator who
+                 cannot open the configured hero falls back to the first destination they can, so a till-only
+                 operator's hero is still Caja and nobody ever gets a hole where their hero should be. --}}
             <div data-counter-home-tiles class="flex flex-col gap-4">
                 @if ($hero)
                     <a

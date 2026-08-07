@@ -46,9 +46,12 @@ class CounterScreens
     /**
      * Every counter screen, in hub order, with its gate resolved for this user.
      *
-     * **Recepción is first, and that is now load-bearing** (prompt 205): the hub's hero tile is the first
-     * destination the operator may open, so this order decides which screen gets the big one. Recepción
-     * earns it on frequency — every visit starts at the door.
+     * **This order is the tile grid's reading order and `landingRouteFor()`'s fallback — and nothing else.**
+     * 205 made it a third thing: the hub's hero tile was `tiles()[0]`, so an array ordered for those two
+     * reasons was silently deciding which screen got the big button. Prompt 208 took that job away and gave
+     * it the `counter_hero` Setting, so this order can change for layout reasons without moving a design
+     * decision with it. Recepción stays first on its own merits: every visit starts at the door, and
+     * `landingRouteFor()` still looks for `counter.checkin` by name.
      *
      * @return list<array{route: string, label: string, granted: bool, icon: string}>
      */

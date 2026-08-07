@@ -4,6 +4,7 @@ namespace App\Filament\Pages;
 
 use App\Actions\RecordAuditLog;
 use App\Enums\SettingType;
+use App\Support\CounterScreens;
 use App\Support\Settings;
 use BackedEnum;
 use Filament\Forms\Components\CheckboxList;
@@ -67,6 +68,7 @@ class ManageSettings extends Page
         'application_retention_days' => SettingType::INT,
         'signed_url_ttl_seconds' => SettingType::INT,
         'qr_scan_max_failures_per_minute' => SettingType::INT,
+        'counter_hero' => SettingType::STRING,
         'counter_landing' => SettingType::STRING,
         // Locale (prompt 44) — actively read by ResolveLocale / LocaleSwitcher / SetLocale, but had
         // no admin UI until now. enabled_locales is an array (JSON); default_locale a plain string.
@@ -247,6 +249,11 @@ class ManageSettings extends Page
                                 'screen' => __('Directo a la pantalla de trabajo'),
                             ])->required()
                             ->helperText(__('Dónde entra un operador al abrir el mostrador. Si eliges la pantalla de trabajo, cada persona entra en la primera que tiene permiso para abrir.')),
+                        Select::make('counter_hero')->label(__('Botón principal del mostrador'))
+                            ->options(fn (): array => collect(CounterScreens::forUser(null))
+                                ->mapWithKeys(fn (array $s): array => [$s['route'] => $s['label']])->all())
+                            ->required()
+                            ->helperText(__('Qué destino ocupa el botón grande del inicio del mostrador. Quien no tenga permiso para abrirlo verá como principal el primero que sí pueda abrir.')),
                     ])->columns(3),
             ]);
     }

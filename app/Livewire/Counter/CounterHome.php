@@ -11,6 +11,7 @@ use App\Support\CounterScreens;
 use App\Support\LocationSwitcher;
 use App\Support\Money;
 use App\Support\Period;
+use App\Support\Settings;
 use App\ViewModels\Dashboard;
 use Filament\Facades\Filament;
 use Illuminate\Contracts\View\View;
@@ -86,17 +87,61 @@ class CounterHome extends Component
      *
      * @return array{route: string, label: string, granted: bool, icon: string}|null
      */
+    /**
+     * The one big tile — **its own decision since prompt 208**, not an accident of list order.
+     *
+     * It used to be `tiles()[0]`, and `CounterScreens::forUser()` said so in its own comment: *"Recepción is
+     * first, and that is now load-bearing."* Nobody had chosen Recepción as the most important thing on the
+     * counter — it is first in an array ordered for the tile grid's reading order and for
+     * `landingRouteFor()`'s fallback, and 205 quietly made that ordering carry a design decision it was never
+     * written to hold. The owner: *"I think dispensary should be the main button."*
+     *
+     * So it is a Setting, `counter_hero`, defaulting to the dispensary — the same shape 189 used for
+     * `counter_landing`, and read through the accessor with a code default so a stale or missing value
+     * degrades rather than throws.
+     *
+     * **Resolved per user, and that property is the reason this is not a one-liner.** A configured hero the
+     * operator cannot open would be a tile to a 403; a till-only operator falls back to the first destination
+     * they CAN open, which is exactly what this method did before, so nobody ever gets a hole where their
+     * hero should be.
+     *
+     * @return array{route: string, label: string, granted: bool, icon: string}|null
+     */
     public function heroTile(): ?array
     {
-        return $this->tiles()[0] ?? null;
+        $tiles = $this->tiles();
+        $configured = (string) Settings::get('counter_hero', 'counter.pos');
+
+        foreach ($tiles as $tile) {
+            if ($tile['route'] === $configured) {
+                return $tile;
+            }
+        }
+
+        return $tiles[0] ?? null;
     }
 
     /**
      * @return list<array{route: string, label: string, granted: bool, icon: string}>
      */
+    /**
+     * Every other reachable destination, in `CounterScreens` order.
+     *
+     * Filtered by ROUTE rather than by position since prompt 208: the hero is no longer necessarily the first
+     * entry, so slicing the head off would have promoted the dispensary and then left Recepción out of the
+     * grid entirely. Every reachable destination still renders exactly once — the hero is one of them
+     * promoted, never a sixth tile.
+     *
+     * @return list<array{route: string, label: string, granted: bool, icon: string}>
+     */
     public function secondaryTiles(): array
     {
-        return array_slice($this->tiles(), 1);
+        $hero = $this->heroTile();
+
+        return array_values(array_filter(
+            $this->tiles(),
+            fn (array $tile): bool => $tile['route'] !== ($hero['route'] ?? null),
+        ));
     }
 
     /**
