@@ -1,4 +1,4 @@
-<div class="mx-auto flex w-full max-w-2xl flex-col gap-5">
+<div class="mx-auto flex w-full max-w-2xl flex-col gap-5 lg:max-w-5xl">
     @include('livewire.counter.partials.counter-surface')
 
     @if (! $this->handoverActive())
@@ -397,6 +397,15 @@
             </section>
 
             {{-- Cash movement --}}
+            {{-- The three "record something" panels sit SIDE BY SIDE from lg (design audit).
+                 Measured before: the Caja was the only counter screen not using its width — a 672px column
+                 in a 1440px viewport, so the page ran to 1811px (3.2 screens at a short laptop height) and
+                 `Cobrar cuota`, the fourth stacked section, opened at y=1413. Half the screen was empty
+                 while the operator scrolled past the arqueo to reach it.
+                 Deliberately only these three: they are independent, equal-weight forms. The summary above
+                 and the close-out below stay full width, because each is the whole job when it is on screen
+                 — and the blind count in particular must not share a viewport with anything. --}}
+            <div class="grid gap-5 lg:grid-cols-2 lg:items-start">
             <section class="rounded-2xl border border-line bg-surface p-5 dark:border-slate-800 dark:bg-slate-900 sm:p-6">
                 <h3 class="text-base font-semibold">{{ __('Registrar movimiento de efectivo') }}</h3>
                 @unless ($this->hasOperator()) @include('livewire.counter.partials.needs-operator') @endunless
@@ -568,6 +577,7 @@
                     </fieldset>
                 </section>
             @endcan
+            </div>
 
             @endif
 

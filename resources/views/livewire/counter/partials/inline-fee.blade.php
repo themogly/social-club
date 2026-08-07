@@ -19,7 +19,7 @@
                 <button type="button" wire:click="$set('feeMethod', 'CASH')" @class(['h-11 rounded-lg border text-sm font-semibold', 'border-brand bg-brand text-white' => $feeMethod === 'CASH', 'border-line text-ink dark:border-slate-700 dark:text-slate-100' => $feeMethod !== 'CASH'])>{{ __('Efectivo') }}</button>
                 <button type="button" wire:click="$set('feeMethod', 'WALLET')" @class(['h-11 rounded-lg border text-sm font-semibold', 'border-brand bg-brand text-white' => $feeMethod === 'WALLET', 'border-line text-ink dark:border-slate-700 dark:text-slate-100' => $feeMethod !== 'WALLET'])>{{ __('Monedero') }}</button>
             </div>
-            <button type="submit" wire:loading.attr="disabled" wire:target="collectMemberFee" class="h-11 w-full rounded-lg bg-brand text-sm font-semibold text-white transition hover:bg-brand-dark focus:outline-none focus:ring-2 focus:ring-brand/40 disabled:opacity-60">{{ __('Cobrar cuota') }}</button>
+            <x-button type="submit" size="md" class="w-full" wire:loading.attr="disabled" wire:target="collectMemberFee">{{ __('Cobrar cuota') }}</x-button>
         </form>
         @unless ($openTillPresent)
             <p class="mt-1.5 text-[11px] text-warning">{{ __('Sin caja abierta solo se admite el cobro con monedero.') }}</p>

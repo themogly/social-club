@@ -8496,3 +8496,64 @@ Recorded rather than silently followed.
 
 **MySQL was left to CI**, per the running order: `composer check` green on SQLite — 1490 tests, Larastan 0,
 Pint clean.
+
+---
+
+## Design audit — drift from the primitives this codebase already built
+
+Full findings and outcomes: `audits/reports/design-audit.md`. 170 viewport-sized captures — 17 page states ×
+five viewports (1440, 1280, 1024, **1440×560 short laptop**, 390) × light and dark, with the counter chain
+cleared so the working screens were captured rather than six blocking states. All seven findings closed.
+
+**The good result first, because it is the honest headline: nothing is broken.** No page scrolls
+horizontally at any width in either theme, no layout fails at the in-between sizes, and the dispensary POS
+still holds identity, the allowance gauge and `Registrar aportación` above the fold at 1440×560 — prompt
+176's rebuild surviving two prompts of subsequent change. What the audit found is **drift from primitives
+this repo already wrote down**, which is a different and more interesting failure than bad design.
+
+**Colour: four usages of raw `red-*` / `amber-*` where `--color-error` and `--color-warning` exist.** Not
+Filament's neutral grey ramp (which the panel legitimately uses) — *new hues*, standing in for states the
+palette already names. That matters beyond the rule: prompt 98 tuned those tokens **per scheme** to clear AA
+on both surfaces, and the accessibility audit had just extended the same treatment. **A raw Tailwind hue is
+the one place a contrast fix cannot reach.** A repo-wide grep for a non-neutral hue in `resources/views` now
+returns 0.
+
+**Buttons: fourteen hand-rolled primaries against fifteen uses of the component extracted to prevent exactly
+that.** `x-button` exists since prompt 36, its docblock says *"to end the hand-rolled per-screen drift"*, and
+about half the brand-coloured buttons never adopted it. Six were plain primaries the component covers
+verbatim and are converted (uses 15 → 21, hand-rolled 14 → 8). The remaining eight are left alone and named
+in the report: the PIN pad's twelve keys are a keypad, and the product tiles are cards that happen to be
+buttons. **An extraction is not finished when the component exists; it is finished when the call sites use
+it** — and nothing in the test suite can tell you the difference.
+
+Two of the six moved up a size step: `inline-fee` and the bar's manual-amount button were `h-11` — 44px, the
+touch floor *exactly* — and are now `h-12`. Clearing the floor beats sitting on it.
+
+**The Caja was the only counter screen not using its width, and it cost 334px of scroll.** A 672px column in
+a 1440px viewport, seven stacked sections, page 1811px — 3.2 screens at a short laptop — with `Cobrar cuota`
+as the FOURTH section opening at y=1413. The three independent "record something" panels now sit side by
+side from `lg`: page **1477px**, `Cobrar cuota` at **y=1104**, its lookup at **y=1194** (was 1528). This also
+closes the caveat carried over from prompt 194's fold measurement.
+
+Deliberately only those three panels. The summary above and the close-out below stay full width, because
+each is the whole job while it is on screen — and **the blind count must never share a viewport with the
+expected-cash figure**, which is the entire point of a blind arqueo (prompt 186). At 390 the grid collapses
+to one column and the page is unchanged.
+
+**Socios had ~700px of blank background and no designed empty state**, on a product whose CLAUDE.md requires
+empty states to be *"INTENTIONAL (designed), never a broken/blank box"* — a rule the admin audit had just
+applied to 26 admin tables. The counter does not get to be the exception. It now uses the same panel the door
+already had, and hides it the moment a socio is on screen.
+
+**One observation recorded rather than "fixed".** While verifying the skip link by pressing Tab in a real
+browser: on the screens whose lookup carries `autofocus` (the door, Socios, the dispensary blocker) a forward
+Tab never reaches it, because focus already starts inside `<main>`. That is not a defect — it is the skip
+link's job already being done — and it remains reachable with Shift+Tab. Worth writing down so the next audit
+does not report it as a broken skip link.
+
+**No OWNER CONTENT tasks exist for this product, and that is a legal fact rather than a gap.** There is no
+marketing surface, no hero imagery, no stock photography and no placeholder media anywhere: a Spanish CSC may
+not advertise (NOTES §A). The only images are the club's own logo, member photos and generated QR codes.
+
+**MySQL was left to CI**, per the running order: `composer check` green on SQLite — 1490 tests, Larastan 0,
+Pint clean. Every fix re-measured and re-screenshotted at all five viewports in both themes.

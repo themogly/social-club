@@ -84,12 +84,14 @@
                                 @foreach ($ceilingHeadroom as $h)
                                     <div @class([
                                         'rounded-xl border p-4',
-                                        'border-red-300 bg-red-50 dark:border-red-500/40 dark:bg-red-500/10' => $h['exceeded'],
+                                        // Semantic token, not raw red-* — see the design audit; prompt 98's
+                                        // per-scheme AA work only reaches --color-error.
+                                        'border-error/40 bg-error/10' => $h['exceeded'],
                                         'border-gray-200 bg-white dark:border-white/10 dark:bg-gray-900' => ! $h['exceeded'],
                                     ])>
                                         <p class="text-sm font-semibold text-gray-950 dark:text-white">{{ $h['location'] }}</p>
                                         @if ($h['exceeded'])
-                                            <p class="mt-1 text-sm font-semibold text-red-600 dark:text-red-400" data-headroom-over>
+                                            <p class="mt-1 text-sm font-semibold text-error" data-headroom-over>
                                                 {{ __('Supera el techo en :g.', ['g' => $gr($h['over_cg'])]) }}
                                             </p>
                                         @else
