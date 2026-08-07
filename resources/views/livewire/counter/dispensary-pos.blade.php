@@ -85,16 +85,20 @@
                 :action-href="route('counter.till')"
             />
         @else
-            {{-- The member step carries its own fix — see the partial. Replaced BOTH the grey empty state in
-                 the left column and the grey helper text under the commit button, which said the same thing
-                 twice in two styles. --}}
+            {{-- The member step carries its own fix — the lookup itself, not a link elsewhere. Replaced BOTH
+                 the grey empty state in the left column and the grey helper text under the commit button,
+                 which said the same thing twice in two styles.
+
+                 Prompt 194 — ONE field, the shared one. This blocking state used to stack a scan box above a
+                 name box (partials/member-identify), each already accepting what the other asked for. --}}
             <x-counter.blocking-state
                 data-blocker="member"
                 icon="🪪"
                 :heading="__('Identifica a un socio')"
                 :body="__('Sin socio no se puede registrar ninguna dispensación.')"
             >
-                @include('livewire.counter.partials.member-identify')
+                @include('livewire.counter.partials.member-lookup', ['autofocus' => true])
+                @include('livewire.counter.partials.checked-in-required')
             </x-counter.blocking-state>
         @endif
     @else
@@ -140,11 +144,13 @@
                 data-selection-pane
                 class="flex min-h-0 flex-1 flex-col gap-4 md:overflow-y-auto md:pr-1"
             >
-                {{-- Identify — the same partial the member blocking state uses, wrapped in this column's card
-                     chrome. Kept here so an operator can scan the next socio without clearing the current one
-                     first; the audit's finding 3 (this column eating the top of the screen) is prompt 176. --}}
+                {{-- Identify — the same shared lookup the member blocking state uses, wrapped in this column's
+                     card chrome. Kept here so an operator can scan the next socio without clearing the current
+                     one first; the audit's finding 3 (this column eating the top of the screen) is prompt 176.
+                     No autofocus: a basket is already in progress and the cursor belongs to it. --}}
                 <section class="rounded-2xl border border-line bg-surface p-4 dark:border-slate-800 dark:bg-slate-900">
-                    @include('livewire.counter.partials.member-identify')
+                    @include('livewire.counter.partials.member-lookup', ['autofocus' => false])
+                    @include('livewire.counter.partials.checked-in-required')
                 </section>
                 {{-- Weight entry panel (opens when a genetic is chosen). --}}
                 @if ($activeGenetic)

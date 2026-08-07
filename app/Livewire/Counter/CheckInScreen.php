@@ -51,11 +51,8 @@ class CheckInScreen extends Component
 {
     use CollectsMembershipFees, FindsMembers, IdentifiesOperator, ResolvesCounterLocation;
 
-    /** Bound to the scan input — a keyboard-wedge scanner types the token then hits Enter. */
-    public string $scan = '';
-
-    /** Live org-wide fallback search (name or member number). */
-    public string $search = '';
+    // The ONE lookup field ($lookup) and everything behind it live in FindsMembers (prompt 194) — this screen
+    // used to stack a scan box above a name box, each already accepting what the other asked for.
 
     /** The held socio (id only — the model is resolved live, never stored on the component). */
     public ?string $memberId = null;
@@ -102,12 +99,6 @@ class CheckInScreen extends Component
     protected function onMemberFound(Member $member, bool $scanned): void
     {
         $this->holdMember($member->id, $scanned);
-    }
-
-    public function submitCameraScan(string $token): void
-    {
-        $this->lookup = $token;
-        $this->submitLookup();
     }
 
     public function clearMember(): void
@@ -362,7 +353,6 @@ class CheckInScreen extends Component
     {
         $this->memberId = $memberId;
         $this->scanned = $scanned;
-        $this->search = '';
         $this->blocked = false;
         $this->blockedReasons = [];
         $this->overrideReason = '';

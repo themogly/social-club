@@ -97,14 +97,18 @@ await page.screenshot({ path: 'storage/app/screenshots/195-bar-commit.png' });
 await page.goto(`${BASE}/counter/pos`);
 await page.waitForLoadState('networkidle');
 
-// The dispensary blocks on a member (prompt 175's chain), so the commit button does not exist until one
-// is identified. Search by name and take the first result.
-const memberSearch = await page.$('#member-search');
-if (memberSearch) {
-  await memberSearch.fill(process.env.MEMBER_QUERY ?? 'M-');
-  await page.waitForTimeout(900);
-  const first = await page.$('#member-search ~ ul button, ul button');
+// The dispensary blocks on a member (prompt 175's chain), so the commit button does not exist until one is
+// identified. Since prompt 194 that is ONE field which resolves a token first and falls through to the name
+// search, so this types and presses Enter rather than waiting on a live-search debounce — and in doing so it
+// proves the real Enter path in a real browser, which is the half PHP cannot see (the 195 lesson).
+const memberLookup = await page.$('#member-lookup');
+if (memberLookup) {
+  await memberLookup.fill(process.env.MEMBER_QUERY ?? 'M-');
+  await memberLookup.press('Enter');
+  await page.waitForTimeout(1200);
+  const first = await page.$('[data-member-lookup-result]');
   if (first) { await first.click(); await page.waitForTimeout(1200); }
+  else { console.error('FAIL: the lookup returned no result rows after Enter.'); failed = true; }
 }
 
 const posCommit = await page.$('[data-commit-action]');

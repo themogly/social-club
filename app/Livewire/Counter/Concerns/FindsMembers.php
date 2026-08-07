@@ -92,6 +92,20 @@ trait FindsMembers
         $this->lookupSearched = true;
     }
 
+    /**
+     * A camera-decoded QR token routes through the SAME lookup as the wedge scanner (prompt 35).
+     *
+     * It lives here rather than on each host because `x-counter.camera-scan` calls `$wire.submitCameraScan`
+     * by name: identical two-line copies on the door and the dispensary were the same near-duplicate this
+     * prompt exists to remove. A host renders the camera by passing `cameraScanEnabled` to the partial; the
+     * three screens that do not are unchanged, and turning it on for one of them is now that one variable.
+     */
+    public function submitCameraScan(string $token): void
+    {
+        $this->lookup = $token;
+        $this->submitLookup();
+    }
+
     /** A result row was tapped. */
     public function selectMember(string $memberId): void
     {
@@ -156,11 +170,23 @@ trait FindsMembers
             : __('Buscar socio por nombre o nº');
     }
 
+    /**
+     * Both placeholders name the Enter key, and that is load-bearing rather than tidy copy.
+     *
+     * One box means the input cannot search on every keystroke — a token has to be resolved as a whole, and
+     * a per-keystroke resolve would hand a half-typed name to the scan throttle. Three of the five screens
+     * this replaces DID search live as you typed, so an operator who types and waits is a real regression
+     * unless the field says what to do.
+     *
+     * The member-number half of the old example ("Ej. García o M-00042") is dropped rather than the Enter
+     * instruction: measured at 1180x820, the full string truncates inside the bar's narrow socio column and
+     * "pulsa Enter" is exactly the part that falls off. The label above already says "por nombre o nº".
+     */
     public function lookupPlaceholder(): string
     {
         return $this->cardReadersEnabled()
             ? __('Escanea la tarjeta, o escribe y pulsa Enter')
-            : __('Ej. García o M-00042');
+            : __('Ej. García — pulsa Enter');
     }
 
     /** What the host does once a socio is identified. The ONLY thing that differs between screens. */

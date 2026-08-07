@@ -14,7 +14,6 @@ use App\Models\TillSession;
 use App\Models\User;
 use App\Support\CounterOperator;
 use App\Support\Money;
-use Illuminate\Database\Eloquent\Collection;
 
 /**
  * The ONE membership-fee collection model shared by the till screen and the Socios counter tab (prompt 127) —
@@ -26,8 +25,10 @@ use Illuminate\Database\Eloquent\Collection;
  */
 trait CollectsMembershipFees
 {
-    /** Org-wide member search to pick who's paying a membership fee. */
-    public string $feeSearch = '';
+    // Who is paying is now decided by the ONE shared lookup (prompt 194) — {@see FindsMembers}, whose
+    // onMemberFound() calls selectFeeMember(). This concern used to carry a second member search of its own
+    // ($feeSearch + feeSearchResults()), which is how the till and Socios each ended up with a name box that
+    // could not resolve a scanned card.
 
     /** The held member id — their outstanding fee is resolved live, never stored. */
     public ?string $feeMemberId = null;
@@ -41,12 +42,11 @@ trait CollectsMembershipFees
     public function selectFeeMember(string $memberId): void
     {
         $this->feeMemberId = $memberId;
-        $this->feeSearch = '';
     }
 
     public function clearFeeMember(): void
     {
-        $this->reset(['feeMemberId', 'feeSearch', 'feeAmount']);
+        $this->reset(['feeMemberId', 'feeAmount']);
         $this->feeMethod = 'CASH';
     }
 
@@ -97,7 +97,7 @@ trait CollectsMembershipFees
         }
 
         $remaining = $owed - $cents;
-        $this->reset(['feeMemberId', 'feeSearch', 'feeAmount']);
+        $this->reset(['feeMemberId', 'feeAmount']);
         $this->feeMethod = 'CASH';
 
         return [
@@ -146,29 +146,6 @@ trait CollectsMembershipFees
         $paid = (int) MembershipFeePayment::query()->where('membership_id', $membership->id)->sum('amount_cents');
 
         return max(0, $membership->fee_cents->cents - $paid);
-    }
-
-    /**
-     * Org-wide socio search — the SAME by-name/member_no query the dispensary POS uses.
-     *
-     * @return Collection<int, Member>|null
-     */
-    protected function feeSearchResults(): ?Collection
-    {
-        $term = trim($this->feeSearch);
-
-        if (mb_strlen($term) < 2) {
-            return null;
-        }
-
-        return Member::query()
-            ->where(fn ($q) => $q
-                ->where('first_name', 'like', '%'.$term.'%')
-                ->orWhere('last_name', 'like', '%'.$term.'%')
-                ->orWhere('member_no', 'like', '%'.$term.'%'))
-            ->orderBy('last_name')
-            ->limit(8)
-            ->get();
     }
 
     /** Parse the euro amount field to integer cents (edge conversion), or null when blank/invalid. */

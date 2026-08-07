@@ -331,32 +331,11 @@
                             <button type="button" wire:click="clearMember" class="shrink-0 rounded-lg px-2 py-1.5 text-sm text-ink-muted transition hover:bg-black/5 dark:text-slate-400 dark:hover:bg-white/5">{{ __('Quitar') }}</button>
                         </div>
                     @else
+                        {{-- Prompt 194 — the SAME lookup as the door and the dispensary. The bar's own name box
+                             had no scan affordance, so a card scanned at this counter found nothing; attaching
+                             a socio here is optional, so this must not steal the cursor from the basket. --}}
                         <div class="mt-3">
-                            <label for="member-search" class="sr-only">{{ __('Buscar socio por nombre / nº de socio') }}</label>
-                            <input
-                                id="member-search"
-                                type="text"
-                                autofocus
-                                wire:model.live.debounce.300ms="search"
-                                autocomplete="off"
-                                placeholder="{{ __('Buscar socio (nombre o nº)') }}"
-                                class="h-11 w-full rounded-xl border border-line bg-surface px-4 text-base text-ink placeholder:text-ink-muted focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/40 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
-                            >
-
-                            @if ($searchResults !== null)
-                                <ul class="mt-2 divide-y divide-line overflow-hidden rounded-xl border border-line dark:divide-slate-800 dark:border-slate-800">
-                                    @forelse ($searchResults as $result)
-                                        <li>
-                                            <button type="button" wire:click="selectMember('{{ $result->id }}')" class="flex w-full items-center justify-between gap-3 bg-surface px-4 py-3 text-left transition hover:bg-surface-alt dark:bg-slate-900 dark:hover:bg-slate-800">
-                                                <span class="font-medium">{{ $result->fullName() }}</span>
-                                                <span class="text-sm text-ink-muted dark:text-slate-400">{{ $result->member_no }}</span>
-                                            </button>
-                                        </li>
-                                    @empty
-                                        <li class="bg-surface px-4 py-3 text-sm text-ink-muted dark:bg-slate-900 dark:text-slate-400">{{ __('Sin resultados.') }}</li>
-                                    @endforelse
-                                </ul>
-                            @endif
+                            @include('livewire.counter.partials.member-lookup', ['autofocus' => false])
                         </div>
                     @endif
                 </section>

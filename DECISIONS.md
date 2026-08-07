@@ -8269,3 +8269,111 @@ always reactive — the idle lock and the manual lock worked throughout. Only `s
 entering and leaving handover) and precisely the client-decided ones were fine.
 
 **MySQL was left to CI**, per the running order: `composer check` green on SQLite.
+
+---
+
+## Prompt 194 — one member lookup, everywhere
+
+**What was wrong.** SEVEN member-search inputs across five counter screens, in two incompatible shapes. The
+door and the dispensary each stacked *"Escanear tarjeta o buscar socio"* — which already accepted a typed
+name — directly above *"o busca por nombre / nº de socio"*, which did the same job again; an operator reading
+top to bottom had to decide which box a typed name belonged in, and the answer was *either*, the worst
+possible answer. Socios, the caja and the barra offered a name box with **no scan affordance at all**, and
+since a USB wedge reader just types into whatever has focus and presses Enter, a card scanned there ran a
+name search for a 48-character token and found nothing. Between them the two shapes taught staff that
+scanning *"works on Dispensario but not on Socios"*, which is not a rule anybody designed.
+
+**The shape.** One trait, `App\Livewire\Counter\Concerns\FindsMembers`, and one surface,
+`partials/member-lookup.blade.php`. ONE field: the input goes to `ResolveMemberByToken` first and, if it does
+not resolve, the name / nº search renders its results **in place** beneath the same box. No mode toggle, no
+second field. A host implements exactly one method — `onMemberFound(Member $member, bool $scanned)` — and if a
+host ever needs different behaviour BEFORE that point, the shape is wrong and the difference belongs after it.
+That rule was tested immediately by the dispensary (below).
+
+**Scope was bigger than the prompt assumed, and three of its premises were wrong.** Verified before building,
+because each would have changed the work: `ResolveMemberByToken::handle()` takes an optional `$throttleKey`;
+Socios, the till and the bar do **not** attempt token resolution at all, so the inconsistency is behavioural
+rather than cosmetic; prompt 58's throttle does **not** already distinguish a scan from a typed name; and
+check-in carried the same stacked pair the prompt attributed only to Dispensario.
+
+**The throttle now counts scans, not searching.** This was the live risk in routing every input through the
+token resolver: prompt 58's limiter distinguishes a scan HIT from a scan MISS, so every typed name that is
+not a token would have looked like a failed scan, and an operator searching thirty socios across a shift
+would have tripped a limiter built for someone brute-forcing QR codes — locking the door mid-service. The
+throttle key is now passed **only when the input plausibly was a scan**: `FindsMembers::looksLikeAScan()` —
+at least 32 characters and strictly alphanumeric, which is what `Str::random(48)` produces. *"García"* and
+*"M-00042"* match neither the length nor the charset, so a search miss is never counted and a malformed token
+still is. Deliberately not widened: the whole value is that it cannot be tripped by typing.
+
+**A deliberate behaviour change.** An input that does not resolve as a token is no longer an error. It falls
+through to the name search in the same field, which is the entire point of one box — so an unknown card now
+shows an empty result rather than *"Tarjeta no reconocida"*. Two existing tests were updated to match.
+
+**The dispensary's check-in rule moved AFTER `onMemberFound()`, not into the lookup.** Where the sede sets
+`restrict_pos_to_checked_in`, the POS used to filter its search results down to socios currently inside. That
+is exactly the "different behaviour before the member is found" the shared shape forbids, so it now runs where
+it always also ran — inside `holdMember()` — and a socio who has not checked in is **refused with a message
+that says so** instead of being silently absent from the results. For a member standing at the counter, *"no
+results"* is the least useful thing the screen can say. The sede's note (*"Esta sede solo permite dispensar a
+socios que han registrado su entrada"*) is host chrome in `partials/checked-in-required.blade.php`, beside the
+shared field rather than inside it.
+
+**`submitCameraScan()` moved into the trait.** `x-counter.camera-scan` calls `$wire.submitCameraScan` by name,
+and the door and the dispensary carried identical two-line copies — the near-duplicate this prompt exists to
+remove. The camera stays exactly where it is today (those two screens, per-sede, off by default); turning it
+on for one of the other three is now one view variable rather than a new method.
+
+**Both placeholders name the Enter key, and that is load-bearing.** One box means the field cannot search on
+every keystroke — a token has to be resolved whole, and a per-keystroke resolve would hand half-typed names to
+the scan throttle. Three of the five screens searched live as you typed before this, so an operator who types
+and waits is a real regression unless the field says what to do. The old *"Ej. García o M-00042"* lost its
+member-number half rather than the instruction: measured at 1180×820, the full string truncates inside the
+bar's narrow socio column and *"pulsa Enter"* is exactly the part that falls off. The label above still says
+*por nombre o nº*.
+
+**`card_readers_enabled`** (per-sede, default off) changes the WORDS only. Token resolution runs either way,
+so a club that has not told the software it owns a reader can still scan a card and have it work. It is
+configuration, not feature detection: a USB reader **is** a keyboard and has no presence any browser API can
+detect. Asserted both ways on two screens.
+
+**Measured, at both tablet orientations.** `tests/Browser/OneLookupHarnessTest` writes all six lookup surfaces
+with their results on screen (they only exist after an interaction, so a plain GET cannot reach the state) and
+`measure-one-lookup.mjs` measures them. Two criteria, because these are two kinds of page and one rule would
+be dishonest on both:
+
+| screen | 1180×820 | 820×1180 | rule |
+|---|---|---|---|
+| Recepción | input 138–186, row 195–243 | same | above the fold |
+| Dispensario, blocked | input 305–353, row 362–410 | input 413–461, row 470–518 | above the fold |
+| Dispensario, resolved (selection pane) | input 134–182, row 191–239 | same | above the fold |
+| Socios | input 264–312, row 321–369 | same | above the fold |
+| Barra | input 206–254, row 263–311 | same | above the fold |
+| Caja | input 1528–1576, row 1585–1633 | same | field+row together |
+
+The caja is the one exception and it is **pre-existing, not introduced here**: `Cobrar cuota` is the FOURTH
+stacked section of a 2016px page — measured, the section opens at y=1413 and the input sits 115px into it,
+which is precisely where the old `feeSearch` box sat. Demanding scroll-0 visibility there would mean
+re-laying-out the whole till screen, which is a different prompt. What 194 IS answerable for is that the
+results it now renders below the field do not fall out of view once the operator is at the panel: field and
+first row span **105px** on every screen, so they always fit together. Recorded here rather than waved
+through, and worth carrying into the design audit.
+
+Every result row is ≥44×44 (asserted in PHP and re-measured in the browser), 24 captures light and dark,
+motion reduced, `[x-show]` hidden so the offline banner does not shift the page into a layout no operator sees.
+
+**The acceptance criterion is now a permanent guard, not a one-off grep.**
+`OneMemberLookupTest::test_the_product_contains_exactly_one_member_search_input` walks every blade, asserts
+exactly one file renders `id="member-lookup"`, and re-greps every `<input>` in the view tree for a
+member-search binding — with `geneticSearch` / `articleSearch` named explicitly as catalogue filters, so a
+future product filter trips it once and is added deliberately rather than a sixth member search being waved
+through as "probably another filter". Proved to fail: a stray `wire:model="memberSearch"` added to bar-pos
+reports the file and the binding.
+
+**Dead code went with it**: `partials/member-identify.blade.php` deleted, `CollectsMembershipFees` lost its
+second member search (`$feeSearch` + `feeSearchResults()` — the reason the till and Socios each had a name box
+that could not resolve a card), `DispensaryPos` lost `submitScan()` / `searchResults()` / `checkedInMemberIds()`,
+`BarPos` lost its third copy of the same query, and the eight orphaned locale keys were pruned from both files
+after grepping each to confirm no remaining reference.
+
+**MySQL was left to CI**, per the running order: `composer check` green on SQLite — 1482 tests, Larastan 0,
+Pint clean.
