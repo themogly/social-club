@@ -8945,3 +8945,63 @@ measurement flagged it and this branch does not redesign.
 
 **MySQL was left to CI**, per the running order: `composer check` green on SQLite — 1519 tests, Larastan 0,
 Pint clean. `shoot-lockdown.mjs`: **ALL PASS**, 16 captures at 1180×820 and 820×1180, light and dark.
+
+---
+
+## Prompt 201 — fee collection lives with the member, not with the drawer
+
+The owner, looking at `/counter/till`: *"remove collect fees as that's in the members section."* He is right,
+and the screen made the argument by itself.
+
+**Why this one of four, and not the other three.** `CollectsMembershipFees` (prompt 127) served four screens.
+Three of them are **contextual** — the door, the dispensary and Socios all offer the fee on a member who is
+*already in front of the operator*. The caja was the only one that began by asking you to **go and find a
+person**, with its own *"Buscar socio"* box, on a screen otherwise about cash in, cash out, petty cash, hand
+over and close. That distinction — not the count — is the reason one was removed and three were left.
+
+Socios also does the job better: it shows the socio's record, what they owe and their tier *before* any money
+is taken.
+
+**The stale comment did not talk me out of it.** The section introduced itself as *"The ONLY path that clears
+unpaid_fee at the counter (prompt 46)"*. That has been untrue since prompt 127 extracted the shared trait
+precisely so Socios could do the same thing. It went with the section. This is the second stale comment this
+round — the admin audit's `SystemHealth` docblock was the first — and both propagated a false claim to the
+next reader.
+
+**The drawer invariant is unchanged, and is now asserted rather than assumed.** A CASH fee still needs an open
+till; a WALLET fee still does not. Socios resolves the till through prompt 194's single resolver
+(`SelectTillSession`), so a cash fee taken there **already** posted to the open drawer at that sede — verified
+before cutting anything. It is now pinned end to end: the payment carries the open session's id, the arqueo's
+`fees_cash` line counts it, and `expected` rises by the amount. That is the one thing that would have broken
+the day's reconciliation silently.
+
+**What the operator gets instead.** One line of copy, and deliberately **not a link**: *"Las cuotas se cobran
+en Socios, donde ves la ficha del socio y lo que debe. El efectivo sigue entrando en esta caja."* The tab strip
+is already on screen and Socios is one tap from it; a second route to the same place is exactly the
+duplication this counter has now been cleaned of twice (189, 194). Someone who used to do this here needs to be
+told **where it went**, once — not handed another button.
+
+**The layout got better, not emptier.** The design audit had put three "record something" panels in a
+2-column grid, which left one alone on a second row with the other half blank. Two fills the row exactly.
+Measured at 1180×820: page **1477px → 1355px**, the close-out moved from y=1330 to **y=1208**, member lookups
+on the caja **1 → 0**, no horizontal scroll at either orientation.
+
+### The guards were re-expressed, not dropped
+
+Three test files asserted the till's fee path. Deleting their cases would have been the easy move and the
+wrong one:
+
+- **`OneMemberLookupTest` keeps the caja in its screen list** and now asserts **zero** lookups on it, at every
+  permission level — *"the till has no lookup"* is a stronger position than *"the till has exactly one"*. Its
+  view-tree re-grep still fails on a planted stray `wire:model="memberSearch"`, re-proved on this branch.
+- **`FeeCollectionTest`'s three till cases are re-pointed at Socios**, keeping what each proved: collecting
+  the fee clears the block that stops a dispensation; the action is denied without `membership.fee.collect`
+  (now a 403 on the screen itself, which is the stronger denial the policy actually makes); and a cash fee is
+  refused with no open till.
+- **`OneLookupHarnessTest`** no longer photographs a caja lookup that does not exist, and
+  `measure-one-lookup.mjs`'s TOGETHER rule — which existed for that panel — says so where it is defined.
+
+**A guard that silently stops covering a screen is how the thing it guards comes back.**
+
+**MySQL was left to CI**, per the running order: `composer check` green on SQLite — 1525 tests, Larastan 0,
+Pint clean. Screenshots before and after at 1180×820 and 820×1180, light and dark.

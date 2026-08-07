@@ -12,7 +12,6 @@ use App\Livewire\Counter\BarPos;
 use App\Livewire\Counter\CheckInScreen;
 use App\Livewire\Counter\DispensaryPos;
 use App\Livewire\Counter\MembershipCounter;
-use App\Livewire\Counter\TillSession;
 use App\Models\Batch;
 use App\Models\Genetic;
 use App\Models\GeneticPrice;
@@ -165,12 +164,11 @@ class OneLookupHarnessTest extends TestCase
             ->html();
         $this->write('dispensary-pane', $pane, 'Dispensario', fullHeight: true);
 
-        // 4) Socios, 5) the caja, 6) the bar — the three that had no scan affordance at all before 194.
+        // 4) Socios and 5) the bar — two of the three that had no scan affordance at all before 194.
+        // The caja was the third; fee collection left it for Socios in prompt 201, so it now has no member
+        // lookup to photograph. `OneMemberLookupTest` asserts that ABSENCE, which is the stronger claim.
         $socios = $search(MembershipCounter::class)->html();
         $this->write('socios', $socios, 'Socios', fullHeight: false);
-
-        $till = $search(TillSession::class)->html();
-        $this->write('till', $till, 'Caja', fullHeight: false);
 
         $bar = $search(BarPos::class)->html();
         $this->write('bar', $bar, 'Barra', fullHeight: true);
@@ -178,7 +176,7 @@ class OneLookupHarnessTest extends TestCase
         // --- now the assertions ---
 
         foreach (['checkin' => $checkin, 'dispensary-blocker' => $blocker, 'dispensary-pane' => $pane,
-            'socios' => $socios, 'till' => $till, 'bar' => $bar] as $name => $html) {
+            'socios' => $socios, 'bar' => $bar] as $name => $html) {
             $this->assertSame(1, substr_count($html, 'id="member-lookup"'), $name.' renders ONE lookup field');
             $this->assertStringContainsString('data-member-lookup-results', $html, $name.' renders its results in place');
 
