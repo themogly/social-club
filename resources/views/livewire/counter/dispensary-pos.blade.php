@@ -270,7 +270,7 @@
                             @endif
                         </div>
 
-                        <button type="button" wire:click="addLine" wire:loading.attr="disabled" wire:target="addLine" class="mt-4 h-14 w-full rounded-xl bg-brand text-base font-semibold text-white transition hover:bg-brand-dark focus:outline-none focus:ring-2 focus:ring-brand/40 disabled:opacity-60">{{ __('Añadir a la cesta') }}</button>
+                        <x-button size="lg" class="mt-4 w-full" wire:click="addLine" wire:loading.attr="disabled" wire:target="addLine">{{ __('Añadir a la cesta') }}</x-button>
                     </section>
                 @endif
 

@@ -1,7 +1,7 @@
 <x-filament-panels::page>
     {{-- The club manual (prompt 99). Content only, static — no queries, nothing lazy. Everything here is
          already filtered by the page to what the reader's role can do, so there is no gating in the view. --}}
-    <div class="mx-auto w-full max-w-3xl space-y-10">
+    <div class="w-full max-w-3xl space-y-10">
 
         {{-- Task guides — the jobs people actually do. A short contents list, then each guide in full so the
              page prints and any step is reachable by anchor from the screen where the task starts. --}}

@@ -15,9 +15,7 @@
         <x-socio.textarea id="body" name="body" rows="3" maxlength="4000" required class="mt-1">{{ old('body') }}</x-socio.textarea>
         @error('body')<p class="mt-1 text-xs text-error">{{ $message }}</p>@enderror
 
-        <button type="submit" class="mt-3 w-full rounded-lg bg-brand px-4 py-2.5 text-sm font-semibold text-white hover:bg-brand-dark">
-            {{ __('Enviar mensaje') }}
-        </button>
+        <x-button type="submit" size="sm" class="mt-3 w-full">{{ __('Enviar mensaje') }}</x-button>
     </form>
 
     {{-- Existing threads --}}

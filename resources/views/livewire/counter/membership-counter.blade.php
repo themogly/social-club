@@ -315,7 +315,7 @@
                                     <button type="button" wire:click="$set('feeMethod', 'WALLET')" @class(['h-11 rounded-xl border text-sm font-semibold', 'border-brand bg-brand text-white' => $feeMethod === 'WALLET', 'border-line text-ink dark:border-slate-700 dark:text-slate-100' => $feeMethod !== 'WALLET'])>{{ __('Monedero') }}</button>
                                 </div>
                             </div>
-                            <button type="submit" wire:loading.attr="disabled" wire:target="collectFee" class="h-12 w-full rounded-xl bg-brand text-base font-semibold text-white transition hover:bg-brand-dark focus:outline-none focus:ring-2 focus:ring-brand/40 disabled:opacity-60">{{ __('Cobrar cuota') }}</button>
+                            <x-button type="submit" size="md" class="w-full" wire:loading.attr="disabled" wire:target="collectFee">{{ __('Cobrar cuota') }}</x-button>
                         </form>
                     @endif
                 @else
@@ -327,6 +327,18 @@
                     </div>
                 @endif
             </section>
+
+            {{-- Intentional empty state (design audit): with nobody on screen this page was two small cards
+                 and ~700px of blank background at 1440x900, while the door already answers the same question
+                 with the same panel. An operator who has never opened this tab now knows what is about to
+                 appear in the space. Hidden the moment a socio is held — the space is theirs then. --}}
+            @unless ($feeMember)
+                <div class="mt-4 rounded-2xl border border-dashed border-line bg-surface p-10 text-center dark:border-slate-700 dark:bg-slate-900">
+                    <div class="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-surface-alt text-2xl dark:bg-slate-800">🪪</div>
+                    <p class="mt-4 font-medium">{{ __('Escanea una tarjeta o busca un socio') }}</p>
+                    <p class="mt-1 text-sm text-ink-muted dark:text-slate-400">{{ __('Su cuota, su tarifa y lo que lleva este mes aparecerán aquí.') }}</p>
+                </div>
+            @endunless
         </div>
     @endif
 @endif

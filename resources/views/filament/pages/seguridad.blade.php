@@ -3,8 +3,11 @@
         @if ($active)
             <div @class([
                 'rounded-xl border p-4',
-                'border-amber-300 bg-amber-50 dark:border-amber-500/40 dark:bg-amber-500/10' => $active->is_drill,
-                'border-red-300 bg-red-50 dark:border-red-500/40 dark:bg-red-500/10' => ! $active->is_drill,
+                // The semantic tokens, not raw red-*/amber-*: prompt 98 tuned --color-warning and
+                // --color-error PER SCHEME to clear AA on both surfaces, and a raw Tailwind hue is the one
+                // place that work cannot reach (design audit).
+                'border-warning/40 bg-warning/10' => $active->is_drill,
+                'border-error/40 bg-error/10' => ! $active->is_drill,
             ])>
                 <p class="text-sm font-semibold">
                     {{ $active->is_drill ? __('Simulacro en curso') : __('Bloqueo de seguridad ACTIVO') }}

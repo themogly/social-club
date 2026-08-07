@@ -127,7 +127,7 @@
                  applicant holds the tablet — same rule as the rest of the chrome. --}}
             @unless (\App\Support\CounterHandover::active())
                 <a href="#counter-main"
-                   class="sr-only rounded-xl bg-brand px-4 py-2 text-sm font-semibold text-white focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-[60]">{{ __('Saltar al contenido') }}</a>
+                   class="sr-only rounded-xl bg-brand text-sm font-semibold text-white focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-[60] focus:px-4 focus:py-2">{{ __('Saltar al contenido') }}</a>
                 <x-counter.top-bar :title="$screenTitle ?? null" />
             @endunless
 

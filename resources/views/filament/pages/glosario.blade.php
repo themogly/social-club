@@ -1,6 +1,6 @@
 <x-filament-panels::page>
     {{-- Static + searchable (Alpine). No queries, nothing lazy to load — help never slows anything. --}}
-    <div x-data="{ q: '' }" class="mx-auto w-full max-w-3xl">
+    <div x-data="{ q: '' }" class="w-full max-w-3xl">
         <input
             type="search"
             x-model="q"

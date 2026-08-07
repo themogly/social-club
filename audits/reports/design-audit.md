@@ -143,3 +143,67 @@ Reported so a later pass does not re-derive them.
 None. There is no marketing surface (a Spanish CSC may not advertise), no hero imagery, no stock photography
 and no placeholder media anywhere in the product — the only images are the club's own logo, member photos and
 generated QR codes. Nothing here needs real copy or real photos to be judged.
+
+---
+
+## Outcome
+
+All seven findings closed; nothing deferred. `composer check` green throughout: **1490 tests**, Larastan 0,
+Pint clean. Every fix re-measured and re-screenshotted across the same five viewports in both themes.
+
+### PHASE 1
+
+| finding | outcome |
+|---|---|
+| Off-palette `red-*` / `amber-*` | **fixed** — the four usages now use `--color-error` / `--color-warning`. A repo-wide grep for a non-neutral Tailwind hue in `resources/views` returns **0**. |
+| Fourteen hand-rolled primaries | **six converted** to `<x-button>` — `x-button` uses 15 → 21, hand-rolled `bg-brand` buttons 14 → 8, and the eight that remain are the PIN pad's keypad and product tiles, named in the report as deliberate. |
+
+The six conversions took two size steps with them, both upward: `inline-fee` and the bar's manual-amount
+button were `h-11` (44px, the touch floor exactly) and are now the component's `md` at `h-12`. That clears
+the floor rather than sitting on it, and it is why they were converted to `md` rather than `sm`.
+
+### PHASE 2
+
+**The Caja now uses its width, and the numbers say so.** The three independent "record something" panels —
+cash movement, till expense, fee collection — sit side by side from `lg`, and the container widens to
+`max-w-5xl` there. Measured at 1440:
+
+| | before | after |
+|---|---|---|
+| page height | 1811px | **1477px** |
+| screens at 1440×560 | 3.2× | **2.6×** |
+| `Cobrar cuota` heading | y=1413 | **y=1104** |
+| its lookup field | y=1528 | **y=1194** |
+
+Deliberately only those three. The summary above and the close-out below stay full width, because each is
+the whole job while it is on screen — and the blind count in particular must never share a viewport with the
+expected-cash figure, which is the entire point of a blind arqueo (prompt 186). At 390 the grid collapses to
+one column and the page is unchanged at 2015px.
+
+**Socios has a designed empty state**, the same panel the door already uses, reading *"Scan a card or search
+for a member — their fee, their tier and what they have taken this month will appear here."* It disappears
+the moment a socio is held; the space is theirs then.
+
+**The Manual and the Glossary now share a left edge with their own headings** — `mx-auto` dropped,
+`max-w-3xl` kept.
+
+### PHASE 3
+
+**The skip link collapses to 1×1 while hidden** (padding moved to `focus:`), and was verified by pressing
+Tab in a real browser: on the counter home it is the first stop, renders as a brand pill at top-left, and
+takes focus to `<main>`.
+
+One thing that surfaced while checking it, worth recording rather than "fixing": on the screens whose lookup
+carries `autofocus` — the door, Socios, the dispensary blocking state — a forward Tab never reaches the skip
+link, because focus already starts inside the main content. That is not a defect of the link; it is the skip
+link's job already being done by the autofocus, and on those screens it remains reachable with Shift+Tab.
+
+**The PDF greys are unchanged**, per the report: dompdf gets its own inline stylesheet, cannot read the
+Tailwind tokens, and print hairlines are a different medium.
+
+### Nothing regressed
+
+The full sweep was re-run after every phase. No page scrolls horizontally at any of the five widths in
+either theme; the five "overflowing" rows remain the same tables inside their own scroll containers; and the
+dispensary POS still holds identity, the allowance gauge and `Registrar aportación` above the fold at
+1440×560.
