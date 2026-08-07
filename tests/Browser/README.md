@@ -161,3 +161,17 @@ reproduce what the user actually sees:**
   them on boot. A Filament page is the other way round: its shell stays cloaked until Alpine runs, so a raw
   capture photographs an empty topbar — which looks like a broken page rather than a missing script. The
   script reveals the main region and suppresses the dropdown panels Alpine would have kept closed.
+
+## The counter's alta wizard (prompt 174)
+
+```bash
+npm run build
+php artisan test tests/Browser/AltaWizardHarnessTest.php   # writes storage/app/alta-{entry,review,duplicate}.html
+node tests/Browser/shoot-alta-wizard.mjs                   # → storage/app/screenshots/174/
+```
+
+Three counter-side states at both orientations and both themes, portrait first — that is how a tablet gets
+handed to somebody. Fails on a missing alta panel, a control under 44×44, or horizontal page scroll.
+
+The applicant's own half is not captured here: it is the ordinary public application form, already
+photographed by prompt 178's harness. That is the point of the design rather than a gap in the coverage.

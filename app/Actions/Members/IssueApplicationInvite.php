@@ -24,8 +24,21 @@ class IssueApplicationInvite
 {
     public function handle(User $actor, ?string $locationId, ?string $email, ?string $reference): MemberApplication
     {
-        if (! $actor->can('members.create')) {
-            throw new AuthorizationException('Generating an invitation requires the members.create permission.');
+        // Prompt 174 — gated on `applications.review`, not `members.create`.
+        //
+        // 174's rules collide here: STAFF must be able to start an alta at the counter, `members.create`
+        // must stay manager-only, and no fourth writer may appear. Something had to give, and the honest
+        // resolution is that this gate was always the wrong one. An invitation creates a PENDING
+        // `MemberApplication` carrying no personal data and no membership — it is not creating a member, it
+        // is opening the AUDITED path (apply → age gate → duplicate search → versioned consent → approve).
+        // 174's whole argument is that those are different acts, and that the reviewed route is the open one
+        // precisely because it is the audited one. Gating the start of that route on the permission for
+        // conjuring a member out of nothing conflated the two.
+        //
+        // Consequence, stated rather than smuggled: STAFF can now issue invitations from the panel as well
+        // as the counter. That is the same act through a different door, and it is deliberate.
+        if (! $actor->can('applications.review')) {
+            throw new AuthorizationException('Generating an invitation requires the applications.review permission.');
         }
 
         $email = filled($email) ? $email : null;

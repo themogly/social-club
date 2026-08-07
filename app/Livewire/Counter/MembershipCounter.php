@@ -10,6 +10,7 @@ use App\Enums\TillSessionStatus;
 use App\Livewire\Counter\Concerns\CollectsMembershipFees;
 use App\Livewire\Counter\Concerns\IdentifiesOperator;
 use App\Livewire\Counter\Concerns\ResolvesCounterLocation;
+use App\Livewire\Counter\Concerns\SignsUpMembers;
 use App\Models\Dispensation;
 use App\Models\Location;
 use App\Models\Member;
@@ -42,7 +43,7 @@ use Livewire\Component;
 #[Layout('components.layouts.counter')]
 class MembershipCounter extends Component
 {
-    use CollectsMembershipFees, IdentifiesOperator, ResolvesCounterLocation;
+    use CollectsMembershipFees, IdentifiesOperator, ResolvesCounterLocation, SignsUpMembers;
 
     /** How many past collections the counter will show. A counter answers a question; it is not an export. */
     private const HISTORY_LIMIT = 5;

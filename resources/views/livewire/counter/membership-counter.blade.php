@@ -42,6 +42,113 @@
             </div>
         @endunless
 
+        {{-- ============ Prompt 174 — Alta at the counter ============
+
+             Inside the Socios tab, NOT a sixth destination on the counter strip: that strip took prompts
+             116, 130 and 132 to fit five on a portrait tablet, and "add a new one" is the same job Socios
+             already does. It creates an APPLICATION, never a member — the age gate, the duplicate search
+             and the versioned consent capture all live in ApproveApplication and stay there. --}}
+        @if ($this->userCan('applications.review'))
+            <div class="mx-auto mb-4 max-w-xl">
+                <section data-alta-panel class="rounded-2xl border border-line bg-surface p-4 dark:border-slate-800 dark:bg-slate-900">
+                    <div class="flex items-center justify-between gap-3">
+                        <h1 class="text-base font-semibold">{{ __('Alta de socio/a') }}</h1>
+                        <button
+                            type="button"
+                            wire:click="toggleAlta"
+                            data-alta-toggle
+                            aria-expanded="{{ $altaOpen ? 'true' : 'false' }}"
+                            class="inline-flex h-11 items-center rounded-xl border border-line px-4 text-sm font-medium text-ink-muted transition hover:bg-surface-alt dark:border-slate-700 dark:text-slate-400 dark:hover:bg-slate-800"
+                        >{{ $altaOpen ? __('Cerrar') : __('Dar de alta') }}</button>
+                    </div>
+
+                    @if ($altaOpen)
+                        @php $pending = $this->pendingAltaApplications(); @endphp
+
+                        {{-- Reviewing one that has come back --}}
+                        @if ($this->altaApplication())
+                            @php $application = $this->altaApplication(); $payload = $application->payload ?? []; @endphp
+                            <div data-alta-review class="mt-4 space-y-3">
+                                <div class="rounded-xl bg-surface-alt p-3 text-sm dark:bg-slate-800">
+                                    <p class="font-semibold">{{ trim(($payload['first_name'] ?? '').' '.($payload['last_name'] ?? '')) ?: __('Solicitud sin nombre') }}</p>
+                                    <p class="text-ink-muted dark:text-slate-400">{{ $payload['email'] ?? '—' }}</p>
+                                    <p class="mt-1 text-xs text-ink-muted dark:text-slate-400">
+                                        {{ __('Documento') }}: {{ $payload['document_type'] ?? '—' }} ·
+                                        {{ __('Nacimiento') }}: {{ $payload['date_of_birth'] ?? '—' }}
+                                    </p>
+                                </div>
+
+                                <div>
+                                    <label for="alta-tier" class="block text-xs font-medium text-ink-muted dark:text-slate-400">{{ __('Cuota / tier') }}</label>
+                                    <select id="alta-tier" wire:model="altaTierId" class="mt-1 h-12 w-full rounded-xl border border-line bg-surface px-4 text-base dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100">
+                                        <option value="">{{ __('Elige una cuota…') }}</option>
+                                        @foreach ($this->altaTiers() as $tier)
+                                            <option value="{{ $tier->id }}">{{ $tier->name }}</option>
+                                        @endforeach
+                                    </select>
+                                </div>
+
+                                {{-- A duplicate is a DECISION, never a default. The matches are named so the
+                                     staff member can tell "this is the same person" from "same surname". --}}
+                                @if ($altaDuplicateBlocked)
+                                    <div data-alta-duplicates class="rounded-xl border border-warning/40 bg-warning/10 p-3 text-sm">
+                                        <p class="font-semibold text-warning">{{ __('Ya existe un socio que coincide') }}</p>
+                                        <ul class="mt-1 space-y-0.5">
+                                            @foreach ($this->altaDuplicateMatches() as $match)
+                                                <li class="text-ink dark:text-slate-200">· {{ $match->fullName() }} ({{ $match->member_no }})</li>
+                                            @endforeach
+                                        </ul>
+                                        <button
+                                            type="button"
+                                            wire:click="approveAlta(true)"
+                                            data-alta-override
+                                            wire:confirm="{{ __('¿Aprobar de todas formas? Quedará registrado que se creó pese a la coincidencia.') }}"
+                                            class="mt-3 inline-flex h-11 items-center rounded-xl border border-warning/50 px-4 text-sm font-semibold text-warning transition hover:bg-warning/10"
+                                        >{{ __('Es otra persona: dar de alta igualmente') }}</button>
+                                    </div>
+                                @endif
+
+                                <div class="flex gap-2">
+                                    <button type="button" wire:click="approveAlta" data-alta-approve class="h-12 flex-1 rounded-xl bg-brand text-base font-semibold text-white transition hover:bg-brand-dark">{{ __('Aprobar y dar de alta') }}</button>
+                                    <button type="button" wire:click="cancelAltaReview" class="inline-flex h-12 items-center rounded-xl border border-line px-4 text-sm text-ink-muted dark:border-slate-700 dark:text-slate-400">{{ __('Cancelar') }}</button>
+                                </div>
+                            </div>
+                        @else
+                            {{-- Two ways to start the SAME record: hand the tablet over, or send a link. --}}
+                            <div class="mt-4 space-y-4">
+                                <button type="button" wire:click="handOverForAlta" data-alta-handover class="h-14 w-full rounded-xl bg-brand text-base font-semibold text-white transition hover:bg-brand-dark">{{ __('Entregar la tablet para que rellene sus datos') }}</button>
+
+                                <div>
+                                    <label for="alta-email" class="block text-xs font-medium text-ink-muted dark:text-slate-400">{{ __('…o enviar una invitación por email') }}</label>
+                                    <div class="mt-1 flex gap-2">
+                                        <input id="alta-email" type="email" inputmode="email" wire:model="altaInviteEmail" autocomplete="off" placeholder="socio@example.es" class="h-12 min-w-0 flex-1 rounded-xl border border-line bg-surface px-4 text-base dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100">
+                                        <button type="button" wire:click="sendAltaInvitation" data-alta-invite class="inline-flex h-12 shrink-0 items-center rounded-xl border border-line px-4 text-sm font-semibold transition hover:bg-surface-alt dark:border-slate-700 dark:hover:bg-slate-800">{{ __('Enviar') }}</button>
+                                    </div>
+                                </div>
+
+                                @if ($pending->isNotEmpty())
+                                    <div>
+                                        <p class="text-xs font-medium text-ink-muted dark:text-slate-400">{{ __('Solicitudes pendientes de revisar') }}</p>
+                                        <ul data-alta-pending class="mt-1 divide-y divide-line overflow-hidden rounded-xl border border-line dark:divide-slate-800 dark:border-slate-800">
+                                            @foreach ($pending as $application)
+                                                @php $p = $application->payload ?? []; @endphp
+                                                <li>
+                                                    <button type="button" wire:click="reviewAltaApplication('{{ $application->id }}')" class="flex min-h-11 w-full items-center justify-between gap-3 bg-surface px-4 py-3 text-left text-sm transition hover:bg-surface-alt dark:bg-slate-900 dark:hover:bg-slate-800">
+                                                        <span class="min-w-0 truncate">{{ trim(($p['first_name'] ?? '').' '.($p['last_name'] ?? '')) ?: ($application->applicant_email ?? __('Solicitud')) }}</span>
+                                                        <span class="shrink-0 text-xs text-ink-muted dark:text-slate-400">{{ $application->submitted_at?->format('d/m/Y') }}</span>
+                                                    </button>
+                                                </li>
+                                            @endforeach
+                                        </ul>
+                                    </div>
+                                @endif
+                            </div>
+                        @endif
+                    @endif
+                </section>
+            </div>
+        @endif
+
         <div class="mx-auto max-w-xl">
             <section class="rounded-2xl border border-line bg-surface p-4 dark:border-slate-800 dark:bg-slate-900">
                 <h1 class="text-base font-semibold">{{ __('Cobro de cuota') }}</h1>

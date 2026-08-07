@@ -7537,3 +7537,81 @@ drift CLAUDE.md records: a fixture that does not say what it means produces a gr
 
 **MySQL was left to CI**, per the running order: `composer check` green on SQLite (1350 tests). No migration,
 no column, no query change — two model methods and a chip.
+
+## Prompt 174 — Alta at the counter: sign a member up without opening the panel
+
+**It creates an APPLICATION, not a member, and that framing is what preserved everything else.** The join
+form already existed end to end — a tokenised route, `SubmitApplicationRequest`, two separate Article 9
+consent ticks, the encrypted ID upload (178), a spam guard — and `ApproveApplication` already did the age
+gate, the duplicate search, the versioned consent capture naming the locale the applicant actually read, and
+the member creation. Had the counter written a member directly it would have had to reimplement all of that,
+and the half that drifted would have been the half holding consent. What changes is **which device the form
+is filled in on**. Nothing else.
+
+**So the applicant is sent to the real public form at the real token.** `handOverForAlta()` issues the
+application, enters 173's handover mode through 173's *own* `beginHandover()` (which records the audit entry
+and signs the operator out, so `requireOperator()` refuses every write while an applicant holds the device),
+and redirects to `inviteUrl()`. There is no second form, no second validator and no second consent capture
+anywhere in the counter half — asserted by reading the source for `new RecordMemberConsent`, `new
+SubmitApplicationRequest`, `Member::create` and `->validate(`. The byte-comparability test passes because it
+is not a parallel path: **it is the same path on a different screen.** The applicant also gets prompt 167's
+language switcher for free, which is the same audience for the same reason.
+
+**A conflict in the prompt's own rules, named and resolved.** 174 requires that STAFF can start an alta at
+the counter, that `members.create` stays manager-only, and that no fourth writer appears. But
+`IssueApplicationInvite` — the existing writer — gated on `members.create`. All three could not hold.
+
+Resolved by moving that gate to **`applications.review`**, on the reasoning that it was always the wrong one:
+an invitation creates a PENDING `MemberApplication` carrying no personal data and no membership. It is not
+creating a member; it is opening the audited path. 174's whole argument is that those are different acts,
+and that the reviewed route is the open one *precisely because* it is the audited one. Gating the start of
+that route on the permission for conjuring a member out of nothing conflated them. **Consequence, stated
+rather than smuggled: STAFF can now issue invitations from the panel as well as the counter** — the same act
+through a different door, and deliberate.
+
+**The permission change, and the line that did not move.** `applications.review` is granted to STAFF on the
+owner's explicit instruction: there is normally one member of staff in the club, so requiring a manager would
+mean nobody could be signed up and the counter-first design fails at its first step. This reverses prompt
+122's `OVERNIGHT-DEFAULT — CONFIRM`, whose reasoning is superseded from the other direction. **`members.create`
+stays manager-only**, and that is the point: staff admit somebody who *applied*, through the path with the
+age gate, the duplicate search and the consent capture — they cannot conjure a member out of nothing through
+the panel's direct-enrol form, which has none of those. Asserted directly, in three separate tests. Two
+existing tests that encoded the old policy (`ApproveRequiresSubmissionTest`, `ViewAnyScopeTest`) were
+**re-pointed, not weakened** — each still asserts the gate is a server-side policy check rather than a hidden
+button, and each now asserts the `members.create` denial alongside, which is the more important half.
+
+**The three approval failures, each with a person standing at the counter.**
+
+| Failure | What the screen does | What happens to the record |
+|---|---|---|
+| **Underage** | the action's own sentence, flashed as an error — never a stack trace | stays **PENDING** so a responsable decides; it neither vanishes nor silently ages out |
+| **Duplicate** | the matches are **named** (`Lucía García (M-30255)`), approval stops | stays PENDING; an explicit second act is required |
+| **Missing name** | the action's own sentence naming the missing fields | stays PENDING |
+
+The duplicate override is surfaced as a **decision, never a default**: a separate secondary control, worded
+*"Es otra persona: dar de alta igualmente"*, behind a confirm, calling `approveAlta(true)` — which is
+`ApproveApplication`'s existing `$allowDuplicate`, audited where it always was. The matches are re-resolved
+read-only for display because `DuplicateMemberException` carries them only inside its message.
+
+**Approval and payment are deliberately NOT one transaction.** If the fee cannot be taken — no cash, a card
+machine that will not talk — the member exists and owes it, which is an ordinary state this product already
+represents and the counter already surfaces (`unpaid_fee`). Wrapping them together would roll back an
+admission over a payment failure, which is worse. After approval the flow simply hands the new member to the
+fee-collection panel that was already on the screen (177), and a test asserts a real member with an
+outstanding fee rather than a rollback.
+
+**No new writer.** `IssueApplicationInvite` → `ApproveApplication` → `EnrolMembership` → `RecordFeePayment`
+(the last via the existing `CollectsMembershipFees`), in that order, each already audited. The counter half
+is a `SignsUpMembers` concern beside `CollectsMembershipFees` — the established pattern — so
+`MembershipCounter` stays the thin shell prompts 127 and 177 both preserved.
+
+**Entry is inside the Socios tab, not a sixth counter destination.** That strip took prompts 116, 130 and 132
+to fit five on a portrait tablet, and "add a new one" is the same job Socios already does. The panel is
+hidden entirely from anyone without `applications.review` — asserted.
+
+**The sede comes from the counter's resolved location**, never the client, and the operator is the
+PIN-identified one rather than the device session user. A counter-made invitation is indistinguishable from
+a panel-made one in the invitations list — same record, same token shape, same `inviteUrl()`.
+
+**MySQL was left to CI**, per the running order: `composer check` green on SQLite (1363 tests). No migration
+and no column — a permission list entry, a gate change, a trait and a blade.

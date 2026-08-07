@@ -82,15 +82,24 @@ class ViewAnyScopeTest extends TestCase
         $this->assertFalse($staff->can('viewAny', Dispensation::class));
     }
 
-    public function test_staff_can_no_longer_enrol_a_member_and_a_manager_still_can(): void
+    /**
+     * Re-pointed by prompt 174, and the half that matters is unchanged.
+     *
+     * Prompt 122 closed BOTH admission routes to staff. Prompt 174 reopens exactly one, on the owner's
+     * instruction: there is normally one member of staff in the club, so requiring a manager to review an
+     * application would mean nobody could be signed up. The two routes are not equivalent — the reviewed
+     * one runs the age gate, the duplicate search and the versioned consent capture, and the direct-enrol
+     * one runs none of them. So the AUDITED route is the open one, and `members.create` stays shut.
+     */
+    public function test_staff_may_review_an_application_but_still_cannot_enrol_a_member_directly(): void
     {
         $staff = $this->user(Role::STAFF);
-        $this->assertFalse($staff->can('create', Member::class));
-        $this->assertFalse($staff->can('applications.review'));   // the reviewed route was already manager-gated
+        $this->assertFalse($staff->can('create', Member::class));  // the line 174 deliberately did not cross
+        $this->assertTrue($staff->can('applications.review'));     // …and the one it did (prompt 174)
 
         $manager = $this->user(Role::MANAGER);
-        $this->assertTrue($manager->can('create', Member::class)); // enrolment stays possible — at manager level
-        $this->assertTrue($manager->can('applications.review'));   // both admission routes now sit together
+        $this->assertTrue($manager->can('create', Member::class)); // direct enrolment stays at manager level
+        $this->assertTrue($manager->can('applications.review'));
     }
 
     public function test_staff_keep_every_permission_the_counter_shift_needs(): void
