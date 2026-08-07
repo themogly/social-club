@@ -539,6 +539,11 @@ class BarPos extends Component
             'walletAppliedCents' => $walletApplied,
             'changeDueCents' => $this->changeDueCents($cashPosted),
             'openTill' => $location !== null ? $this->openTillSession($location) : null,
+            // Prompt 193 — per-sede: whether the cart offers a socio and a ticket reference at all. Wallet
+            // payment REQUIRES a socio, so when attaching one is off the wallet field goes with it rather
+            // than offering a tender that cannot complete.
+            'attachSocioEnabled' => (bool) Settings::get('bar_attach_socio_enabled', false),
+            'ticketReferenceEnabled' => (bool) Settings::get('bar_ticket_reference_enabled', false),
             'canVoid' => $this->userCan('order.void'),
         ]);
     }

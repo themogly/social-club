@@ -240,3 +240,23 @@ node tests/Browser/measure-topbar-density.mjs
 Last run (branch `feat/counter-home`): **ALL PASS** — 4 captures, 5 tiles at 128px tall in both
 orientations. Density: furniture 371px → **331px**; portrait strip headroom 181px → **221px (+22%)**.
 
+## Bar screen: list rows + cart column (prompt 193)
+
+Counts article rows per viewport, measures the first row, checks no name wraps, and measures how much of the
+cart column sits below its own fold — at 1180×820, 820×1180, 1440×900 and a short 1280×720 laptop, because
+two-width checking is how the old row layout survived. Screenshots land in `storage/app/screenshots/193/`.
+
+Takes the layout as an argument; `articleLayout` is `#[Session]`-backed so the harness writes both.
+
+```bash
+npm install --no-save playwright && node_modules/.bin/playwright install chromium-headless-shell
+npm run build
+php artisan test tests/Browser/BarScreenHarnessTest.php   # writes storage/app/bar-screen-{list,grid}.html
+node tests/Browser/measure-bar-screen.mjs list
+node tests/Browser/measure-bar-screen.mjs grid
+```
+
+Last run (branch `feat/bar-rows-and-cart`), list layout: rows on screen **6 → 9** at 1180×820 and **6 → 12**
+in portrait; first row **714×106 → 714×68** (portrait 166 → 68); names wrapped **0**; cart hidden below its
+fold **212px → 0px** at every viewport.
+

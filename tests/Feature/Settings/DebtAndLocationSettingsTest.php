@@ -177,6 +177,9 @@ class DebtAndLocationSettingsTest extends TestCase
             'restrict_pos_to_checked_in', 'signature_on_dispensation', 'camera_scan_enabled',
             // Per-location toggles reconciled to Setting rows (prompt 59/102), edited on LocationForm.
             'bar_enabled', 'ring_fenced', 'multiple_tills_enabled',
+            // Per-location bar cart panels (prompt 193): attaching a socio and the ticket reference are
+            // per-sede input toggles on LocationForm, not org thresholds.
+            'bar_attach_socio_enabled', 'bar_ticket_reference_enabled',
             // Per-location INTEGER setting, edited on LocationForm (prompt 120): idle-lock minutes.
             'counter_idle_lock_minutes',
             // Panic-lockdown system settings (prompt 121): the auto-reactivation delay and the owner link TTL are

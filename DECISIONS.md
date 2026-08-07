@@ -8042,3 +8042,84 @@ than as the win the framing invites.
 
 **MySQL was left to CI**, per the running order: `composer check` green on SQLite. One new Livewire
 component, one route, one Setting key and a Blade edit — no migration.
+
+---
+
+## Prompt 193 — the bar screen: a real list row, and two panels most sales do not need
+
+### The list view was the grid tile rotated
+
+`list` and `grid` shared one markup with `flex-col lg:flex-row`, and the tile's image block is `h-24 w-full`
+— so in a row it claimed the entire width and the name, price and stock were squeezed into what was left.
+
+**Measured, before → after** (12 articles, built CSS, `[x-show]` hidden as prompt 175's script does):
+
+| viewport | rows on screen before | after | first row before → after |
+|---|---|---|---|
+| 1180×820 landscape | 6 / 12 | **9 / 12** | 714×106 → **714×68** |
+| 820×1180 portrait | 6 / 12 | **12 / 12** | 414×**166** → **414×68** |
+| 1440×900 | 7 / 12 | **10 / 12** | 714×106 → 714×68 |
+| 1280×720 short laptop | 5 / 12 | **8 / 12** | 714×106 → 714×68 |
+
+The reported "~165px tall" was the **portrait** case: below `lg` the tile did not rotate at all, so list mode
+was literally the grid tile stacked. Six rows filled the viewport — worse density than the grid it is an
+alternative to, which left list mode with no reason to exist.
+
+A row is now its own component: 68px tall (the prompt's 64–72 band), name on ONE line with `truncate`, price
+and stock right-aligned in their own columns with `tabular-nums` so the numbers scan straight down. **No name
+wraps at any tested width in list mode.** (Three wrap in GRID at 820 portrait — that is the tile's deliberate
+`line-clamp-2`, which is correct for a tile and is left alone.)
+
+**The thumbnail column is omitted entirely when no article at the sede has an image**, which is every article
+today. A large empty glyph filling most of a row is a broken-looking gap, not a design. When some article
+does have one, the column appears and articles without a photo get an initial at thumbnail size. Nothing
+fabricates an image; the photos are the club's to supply and are flagged as a content gap, not a defect.
+
+**The default was already grid, not list.** The prompt believed the bar defaults to list; it does not —
+`BarPos::$articleLayout = 'grid'`, which already matches the audit's conclusion (list for genetics, grid for
+bar articles). Nothing to revisit. The reporter had toggled to list, which is how the row was found.
+
+### Socio and ticket reference are now per-sede settings, default OFF
+
+`bar_attach_socio_enabled` and `bar_ticket_reference_enabled`, on `LocationForm` beside `bar_enabled` and
+`counter_idle_lock_minutes` — per-sede, because that is where the other counter toggles live. When off the
+panel is **not rendered at all**, so the cart column opens on the Basket.
+
+Three consequences, handled:
+
+- **Wallet goes with the socio.** Wallet payment requires one, so when attaching a socio is off the wallet
+  field is removed rather than left permanently disabled — offering a tender that can never complete is
+  worse than not offering it.
+- **A combined settle is unaffected**, by construction rather than by a special case: it runs on the
+  DISPENSARY screen through `CommitCombinedSettle`, where the member is already identified, and never goes
+  through the bar's socio panel.
+- **The flag governs INPUT, never DISPLAY.** A socio or reference recorded before the flag was turned off
+  still renders on its receipt, in the ledger and in reports — asserted directly against a rendered receipt
+  with both flags off.
+
+### The cart column, and prompt 192's finding
+
+192 measured the outcome of pressing Charge rendering **~650px from the button** in an 820px viewport, and
+**212px of the cart hidden below a silent fold**. Both are fixed here:
+
+- **The flash is one partial rendered in one of two positions, never both.** Beside Charge when there is a
+  Charge to stand beside; at the top of the page when a blocking state has replaced the cart column
+  entirely. Moving it unconditionally broke `test_bar_no_open_till_states_a_reason` immediately — the
+  original comment ("a blocking state replaces the work, not the warnings") was right, and the test caught
+  the regression the same minute it was introduced.
+- **The cart now hides 0px at every tested viewport** (was 212 / 0 / 132 / 312), and the commit button is
+  fully on screen at all four — mostly because the two panels that used to sit above the basket are gone by
+  default.
+
+### Two harness bugs found while doing this, both worth keeping
+
+- `@php($x = collect(...)->contains(fn () => ...))` is a **Blade parse error** — an arrow function's `=>`
+  inside the parenthesised form. The 500 page renders the template SOURCE, so
+  `assertStringContainsString('data-product')` passed against the exception page. The harness now calls
+  `assertOk()` first.
+- The measurement script did not hide `[x-show]` elements, so the offline banner (54px, hidden by Alpine in
+  the real app) rendered in the static capture and reported the commit button below the fold when it is not.
+  Prompt 175's script hides them for exactly this reason.
+
+**MySQL was left to CI**, per the running order: `composer check` green on SQLite. Two Setting keys and Blade
+— no migration.
