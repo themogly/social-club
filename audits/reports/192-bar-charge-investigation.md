@@ -51,19 +51,36 @@ The operator reported the basket still showing the line after pressing Charge. O
 `resetBasketState()`, so a basket that survives is proof the method never ran. Combined with §1 — the same
 call succeeding in a test — the click did not reach Livewire.
 
-**What I can prove from here ends there, and I am not going to guess past it.** I do not have the browser
-session, and the two candidates are distinguishable only in it:
+**What I could prove from here ended there, and I did not guess past it. Good, because my ranking of the
+candidates was wrong.**
 
-- **Prompt 188's stale surface.** Until it was fixed earlier today, `serverMode` was snapshotted into Alpine
-  at init and never updated, so after identifying, the full-screen surface — `fixed inset-0 z-50` — stayed
-  up over a counter the server considered ready. Any tap then lands on the overlay. The same reporter's own
-  188 report ("a manual page refresh reveals the counter") places that overlay in this session. This is the
-  most likely cause, and **it is already fixed on main**.
-- **`x-bind:disabled="! online"`.** The button's only disabling condition. A false `navigator.onLine` — or a
-  stale `offline` event the browser never paired with an `online` one — leaves it inert at 50% opacity.
+> ### CORRECTED — the cause is now known, and it was not the one I thought most likely
+>
+> Prompt **195** found it: Livewire v4's `$wire` proxy resolves an ALIAS TABLE before it looks for a
+> component method, and that table maps `commit` → `$commit`. So `wire:click="commit"` called Livewire's
+> built-in no-op and `BarPos::commit()` was never invoked from a browser. Measured on the same build, same
+> click: `["$commit"]` and no row; after renaming to `commitOrder`, `["commitOrder"]` and an order.
+>
+> **I named prompt 188's stale surface as "the most likely cause". That was wrong**, and it is worth saying
+> why rather than quietly editing it out. The two are distinguishable by one measurement I did not take: an
+> overlay swallowing a tap produces **no Livewire request at all**, whereas this produced a request that
+> returned 200. I had the right instinct — that the click never reached the server — and reached for the
+> nearest recently-found bug instead of measuring which of the two shapes it was. A stale `fixed inset-0
+> z-50` surface is a *plausible-looking* cause of a dead button, which is exactly why it needs ruling out by
+> evidence rather than by plausibility.
+>
+> Both bugs were real; only one was this one. 188 is a separate defect in a separate file and its fix is not
+> credited to this, nor this to it.
 
-**Re-test the reproduction on current main before anything else.** If 188 was the cause it is already gone,
-and 193 should not go hunting for a bug that no longer exists.
+The candidates I ranked at the time, both since ruled out:
+
+- ~~**Prompt 188's stale surface.**~~ **RULED OUT.** A tap swallowed by an overlay sends no request at all;
+  this one sent a request that returned 200. A real defect, fixed separately, but not this one.
+- ~~**`x-bind:disabled="! online"`.**~~ **RULED OUT.** A disabled button sends no request either.
+
+**Neither survived the one measurement that mattered.** The lesson for the next investigation: when the
+question is "did the click reach the server", *read the wire* before ranking suspects — the request body was
+sitting there the whole time saying `$commit`.
 
 ## 4. The second bug — and it is the one worth the branch
 

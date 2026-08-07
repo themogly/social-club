@@ -8234,3 +8234,38 @@ will catch the next one — which will otherwise arrive, again, with no error to
 
 **MySQL was left to CI**, per the running order: `composer check` green on SQLite. One attribute in one Blade
 layout — no migration, no query.
+
+---
+
+## Prompt 188 — follow-ups, and a correction
+
+Two things prompt 188 asked for that its first pass did not deliver, plus a wrong call of mine that is worth
+recording rather than quietly editing away.
+
+**1. The missing assertion: a cleared surface must not go on swallowing input.** The surface is
+`fixed inset-0 z-50` and opaque, so while it is stale and up it covers the whole viewport and the counter
+beneath *looks* dead. That is what makes this a correctness bug rather than a cosmetic one, and it is now
+asserted: after switching operator and identifying again — no reload in between — the very next action on
+the counter beneath reaches the server and is answered.
+
+**2. The correction.** In the prompt-192 investigation I named 188's stale surface as *"the most likely
+cause"* of the bar's dead Charge button. **That was wrong.** The cause was prompt 195: Livewire v4's `$wire`
+alias table shadows a component method named `commit`, so the request went out addressed to `$commit` and the
+PHP was never reached.
+
+The two are distinguishable by one measurement I did not take at the time: **a tap swallowed by an overlay
+produces no Livewire request at all**, whereas the charge button produced one and got a 200 back. I had the
+right instinct — that the click never reached the server — and then reached for the nearest recently-found
+bug instead of measuring which of the two shapes it was. A stale full-screen overlay is a *plausible-looking*
+cause of a dead button, which is exactly why it has to be ruled out by evidence and not by plausibility.
+
+Both defects were real and both are fixed; neither fix is credited to the other. The 192 report has been
+corrected in place rather than rewritten, so the wrong call and its correction both stay on the record.
+
+**3. Which half of the getter was ever broken.** Worth writing down because it explains the symptom exactly:
+`$store.counter.locked` is read live from the shared store on every evaluation, so the *locked* branch was
+always reactive — the idle lock and the manual lock worked throughout. Only `serverMode` was frozen at
+`x-data` init. So precisely the server-decided transitions were stale (identifying, switching operator,
+entering and leaving handover) and precisely the client-decided ones were fine.
+
+**MySQL was left to CI**, per the running order: `composer check` green on SQLite.
