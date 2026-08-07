@@ -138,3 +138,45 @@ None. No idiom-vs-decision conflict surfaced: every documented decision this aud
 (`withoutGlobalScopes()` on counter queries, `Genetic::grams_per_unit_cg` staying a plain integer, no
 repository pattern, no `declare(strict_types=1)`) is deliberate, recorded in CLAUDE.md or DECISIONS.md, and
 was enforced rather than relitigated.
+
+---
+
+## Outcome
+
+Three of four findings fixed on this branch; one is reported for its own branch, with the reason. `composer
+check` green at every commit: **1497 tests** (up from 1490 — seven new, all on the till resolver), Larastan
+0, Pint clean.
+
+| finding | outcome |
+|---|---|
+| Four "which open till?" resolvers, two versions | **fixed** — `App\Actions\Till\SelectTillSession` |
+| A cash fee at the door/Socios posts to a silently-chosen drawer | **reported, not fixed** — a product change, not a refactor |
+| `ApplicationController::store()` carries domain logic | **fixed** — `App\Actions\Members\SubmitApplication`; the controller drops 288 → 161 lines |
+| Four copies of "active membership at this sede" | **fixed** — `Member::activeMembershipAt()` |
+| Orphaned docblock | **fixed** — moved to the method it describes |
+
+### The till resolver changed behaviour, deliberately
+
+The other two fixes are pure refactors proven by the existing suite. This one is not, and saying so is the
+point: the door and Socios had no terminal and took the NEWEST open session; they now take the same
+oldest-open fallback the POS screens fall back to. **On a multi-till sede that is a different drawer.** That
+is the fix rather than a side effect — four screens performing one operation now agree — and the tie-break is
+stated once, in one place, instead of being implied twice.
+
+`OneTillResolverTest` pins it at the resolver (terminal preference, the normalised-key match from prompt 84,
+the oldest-open fallback, an unknown terminal resolving to nothing rather than guessing, and scope to open
+sessions at this sede only) and through both screens that changed. **Its two screen-level tests were
+confirmed failing against the old code first** — the Socios one by resolving a different till id — so the
+divergence is measured rather than asserted. The one-till case, which is every case in the seed and in every
+other test, is pinned as unchanged.
+
+### What was NOT done, and why
+
+`ApplicationController` still resolves the invite with its own `find()` and its own `isInviteLive()` guard,
+which is correct: that is HTTP-layer authorisation of a tokenised route, not domain logic.
+`SubmitApplication` takes plain arrays and an optional IP rather than a `Request`, so it is callable from a
+test, a command or a future API without a fake request — the same shape as every other Action here.
+
+The drawer-naming defect is left for its own branch. A code-style audit whose brief says *"don't change
+behaviour … except as internal refactors proven by tests"* does not get to redesign where money goes; the
+till resolver above is already at the edge of that licence and is documented as such.
