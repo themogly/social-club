@@ -2,18 +2,14 @@
 
 namespace App\Http\Controllers;
 
+use App\Actions\Members\SubmitApplication;
 use App\Enums\ApplicationStatus;
-use App\Enums\MemberStatus;
 use App\Http\Requests\SubmitApplicationRequest;
 use App\Models\Member;
 use App\Models\MemberApplication;
-use App\Models\MrzFieldStat;
 use App\Support\ApplicationSpamGuard;
-use App\Support\DocumentVault;
 use App\Support\Mrz\MrzParser;
 use App\Support\MrzPrefill;
-use App\Support\Settings;
-use App\Support\Weight;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\RateLimiter;
@@ -29,9 +25,6 @@ use Illuminate\View\View;
  */
 class ApplicationController extends Controller
 {
-    /** File-bearing submissions per IP per hour — bounds vault writes, not bandwidth (see store()). */
-    private const UPLOADS_PER_HOUR = 5;
-
     public function show(string $token): View
     {
         $application = $this->find($token);
@@ -79,89 +72,20 @@ class ApplicationController extends Controller
             return $this->submittedRedirect($token);
         }
 
-        $data = $request->validated();
-
-        $payload = [
-            'first_name' => $data['first_name'],
-            'last_name' => $data['last_name'],
-            'email' => $data['email'],
-            'phone' => $data['phone'] ?? null,
-            'date_of_birth' => $data['date_of_birth'],
-            'address' => $data['address'] ?? null,
-            'document_type' => $data['document_type'],
-            'document_number' => $data['document_number'],
-            'is_therapeutic' => (bool) ($data['is_therapeutic'] ?? false),
-            // Sponsor by name OR number (prompt 97): resolve best-effort, and KEEP the raw text the applicant
-            // typed so the reviewer can find them even when it doesn't match a record exactly.
-            'avalador_ref' => $data['avalador_ref'] ?? null,
-            'avalador_member_id' => $this->resolveAvalador($application, $data['avalador_ref'] ?? null),
-            // Empty ("Prefiero no indicarlo") arrives as null (ConvertEmptyStringsToNull) ⇒ no declaration.
-            'declared_monthly_cg' => isset($data['declared_monthly_g'])
-                ? Weight::fromGrams($data['declared_monthly_g'])->centigrams
-                : null,
-            'consents' => ['membership', 'data_processing'],
-            // The consent-text version AND the locale the applicant ACTUALLY saw, captured now — RecordMemberConsent
-            // stamps THESE at approval, so neither the recorded version nor the language can become a later revision
-            // they never read (prompts 97 + 153). The locale is the resolved request locale (SetLocale → ResolveLocale),
-            // i.e. the one the form's consent block was rendered in.
-            'consent_version' => (string) Settings::get('consent_text_version', '1.0'),
-            'consent_locale' => app()->getLocale(),
-        ];
-
-        // Optional identity photo (prompt 157): encrypt it onto the private disk NOW (never the public disk,
-        // never an unsigned path), and carry only the path on the payload — ApproveApplication points the new
-        // member at it. Skipped is fine; the form never requires it. A rejected/abandoned application (one never
-        // approved) is anonymised and this photo deleted by `applications:prune-retention` past
-        // application_retention_days — the retention the ID scan raised, now actually enforced (not prompt 142's
-        // sweep, which only prunes member-import CSVs — that claim was wrong; a security audit caught it).
-        // Rate limiting, and what it does and does not defend (prompt 178).
-        //
-        // The uploads are NOT a separate endpoint — they ride the same POST, so the route's `throttle:10,1`
-        // and ApplicationSpamGuard already apply to them unchanged. What that does not bound is STORAGE: ten
-        // submissions a minute, each up to the shared 12 MB ceiling, is ~120 MB/min of encrypted vault writes
-        // per IP, sustained, on an unauthenticated route. So file-bearing submissions get their own, tighter
-        // limit on top. It is honest about its scope — the bytes have already crossed the wire and been parsed
-        // by PHP before this runs, so this bounds what reaches the DISK, not bandwidth; bandwidth is nginx's
-        // `client_max_body_size` and PHP's `upload_max_filesize` (prompt 164 reconciled those three numbers).
-        //
-        // Five an hour is far above a genuine applicant (who uploads once, twice if they mis-picked a file)
-        // and far below anything worth doing to a disk. Over the limit the application still SUBMITS — the
-        // files are simply not stored, because an upload is optional and losing it must never cost someone
-        // their application.
-        $filesPresent = $request->hasFile('photo') || $request->hasFile('document_scan');
-        $storageAllowed = ! $filesPresent || RateLimiter::attempt(
-            'application-upload:'.$request->ip(),
-            self::UPLOADS_PER_HOUR,
-            fn () => true,
-            3600,
+        // Everything the submission MEANS — payload assembly, the avalador match, grams to centigrams, the
+        // consent version and locale, the rate-limited vault uploads, the MRZ read rate — belongs to the
+        // Action (code-style audit). The controller resolves, guards and redirects.
+        (new SubmitApplication)->handle(
+            $application,
+            $request->validated(),
+            ['photo' => $request->file('photo'), 'document_scan' => $request->file('document_scan')],
+            $token,
+            $request->ip(),
         );
-
-        if ($storageAllowed && $request->hasFile('photo')) {
-            $payload['photo_path'] = DocumentVault::storeUpload($request->file('photo'), 'member-photos');
-        }
-
-        // Optional identity DOCUMENT (prompt 178 — 155's part B). Same vault, same private encrypted disk, same
-        // `member-id-scans` directory the staff MemberForm already writes to, so an application's scan and a
-        // member's scan are one kind of object with one serving path (signed, access-logged). A DIFFERENT
-        // artefact from the photo above — a face is not a document — so it gets its own payload key and its own
-        // member column, and the two are never merged. On approval the member points at THIS SAME FILE rather
-        // than a copy; until then `applications:prune-retention` deletes it with the rest of the payload.
-        if ($storageAllowed && $request->hasFile('document_scan')) {
-            $payload['document_scan_path'] = DocumentVault::storeUpload($request->file('document_scan'), 'member-id-scans');
-        }
-
-        // Prompt 179 — the read rate, measured from real use: was each prefilled field corrected? Counts
-        // only, recorded BEFORE the prefill is discarded, and the prefill is discarded here so the next
-        // person handed this tablet cannot inherit it.
-        $this->recordMrzCorrections($application, $payload, $token);
-
-        // Still PENDING — it now carries the applicant's details and enters the review queue.
-        $application->update(['payload' => $payload, 'submitted_at' => now()]);
 
         return $this->submittedRedirect($token);
     }
 
-    /** The post-submit redirect — byte-identical for a genuine submit and a silently-dropped bot. */
     /**
      * Read an MRZ (prompt 179). The BROWSER did the OCR; this receives the resulting TEXT and parses it with
      * the one parser that already exists.
@@ -218,27 +142,7 @@ class ApplicationController extends Controller
         return redirect()->route('socio.application', ['token' => $token])->withInput();
     }
 
-    /**
-     * Count, per field, how often a prefilled value was kept and how often it was corrected — which IS the
-     * read rate, gathered on real documents with no corpus to assemble, hold or destroy.
-     *
-     * @param  array<string, mixed>  $payload
-     */
-    private function recordMrzCorrections(MemberApplication $application, array $payload, string $token): void
-    {
-        foreach (MrzPrefill::get($token) as $field => $read) {
-            $submitted = $payload[$field] ?? null;
-
-            MrzFieldStat::record(
-                $application->organisation_id,
-                $field,
-                corrected: is_string($submitted) && trim($submitted) !== trim($read),
-            );
-        }
-
-        MrzPrefill::forget($token);
-    }
-
+    /** The post-submit redirect — byte-identical for a genuine submit and a silently-dropped bot. */
     private function submittedRedirect(string $token): RedirectResponse
     {
         return redirect()
@@ -253,36 +157,5 @@ class ApplicationController extends Controller
             ->where('invite_token_hash', hash('sha256', $token))
             ->where('status', ApplicationStatus::PENDING)
             ->first();
-    }
-
-    /**
-     * Best-effort: match a sponsor by member NUMBER or by NAME within the invite's organisation (prompt 97 —
-     * a prospect usually knows the name, not the number). An ambiguous name match is left unresolved for the
-     * reviewer (the raw text is kept on the payload) rather than guessing the wrong socio.
-     */
-    private function resolveAvalador(MemberApplication $application, ?string $ref): ?string
-    {
-        $ref = trim((string) $ref);
-        if ($ref === '') {
-            return null;
-        }
-
-        $base = fn () => Member::query()->withoutGlobalScopes()
-            ->where('organisation_id', $application->organisation_id)
-            ->where('status', MemberStatus::ACTIVE->value);
-
-        $byNumber = $base()->where('member_no', $ref)->value('id');
-        if ($byNumber !== null) {
-            return $byNumber;
-        }
-
-        // A NAME match, only when it is unambiguous (exactly one active socio). Matched in PHP so the
-        // full-name comparison is portable across SQLite (dev) and MySQL (prod).
-        $needle = mb_strtolower($ref);
-        $byName = $base()->get(['id', 'first_name', 'last_name'])
-            ->filter(fn (Member $m): bool => mb_strtolower(trim($m->first_name.' '.$m->last_name)) === $needle)
-            ->pluck('id');
-
-        return $byName->count() === 1 ? (string) $byName->first() : null;
     }
 }

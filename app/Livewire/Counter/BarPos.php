@@ -5,6 +5,7 @@ namespace App\Livewire\Counter;
 use App\Actions\Bar\CommitOrder;
 use App\Actions\Bar\VoidOrder;
 use App\Actions\Pricing\ResolveArticleDiscount;
+use App\Actions\Till\SelectTillSession;
 use App\Enums\TillSessionStatus;
 use App\Exceptions\TillClosedException;
 use App\Livewire\Counter\Concerns\FindsMembers;
@@ -20,7 +21,6 @@ use App\Models\User;
 use App\Support\CounterOperator;
 use App\Support\Money;
 use App\Support\Settings;
-use App\Support\TerminalName;
 use App\Support\Wallet;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Contracts\View\View;
@@ -751,21 +751,10 @@ class BarPos extends Component
         return $this->memberId !== null ? Member::query()->find($this->memberId) : null;
     }
 
+    /** Through the ONE resolver (code-style audit) — this was a byte-identical copy of the dispensary's. */
     private function openTillSession(Location $location): ?TillSession
     {
-        $sessions = TillSession::query()->withoutGlobalScopes()
-            ->where('location_id', $location->id)
-            ->where('status', TillSessionStatus::OPEN->value)
-            ->orderBy('opened_at')->get();
-
-        if ($this->terminal === '') {
-            return $sessions->first();
-        }
-
-        // Match by normalised KEY, not the raw string, so a spelling variant still resolves (prompt 84).
-        $key = TerminalName::key($this->terminal);
-
-        return $sessions->first(fn (TillSession $s): bool => TerminalName::key((string) $s->terminal) === $key);
+        return (new SelectTillSession)->handle($location, $this->terminal);
     }
 
     // --- Small helpers ----------------------------------------------------------

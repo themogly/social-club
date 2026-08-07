@@ -11,8 +11,8 @@ use App\Actions\Pricing\ResolveArticleDiscount;
 use App\Actions\Pricing\ResolvePrice;
 use App\Actions\ResolveLocale;
 use App\Actions\Stock\SelectBatch;
+use App\Actions\Till\SelectTillSession;
 use App\Enums\DispensationStatus;
-use App\Enums\MembershipStatus;
 use App\Enums\TillSessionStatus;
 use App\Exceptions\DebtLimitExceededException;
 use App\Exceptions\DispensationBlockedException;
@@ -43,7 +43,6 @@ use App\Support\LimitSnapshot;
 use App\Support\Money;
 use App\Support\PriceResult;
 use App\Support\Settings;
-use App\Support\TerminalName;
 use App\Support\VaultUrl;
 use App\Support\Wallet;
 use App\Support\Weight;
@@ -1667,42 +1666,21 @@ class DispensaryPos extends Component
         return $this->memberId !== null ? Member::query()->find($this->memberId) : null;
     }
 
+    /** Through the ONE resolver (code-style audit) — this screen and BarPos carried byte-identical copies. */
     private function openTillSession(Location $location): ?TillSession
     {
-        $sessions = $this->openSessionsAt($location);
-
-        if ($this->terminal === '') {
-            return $sessions->first();
-        }
-
-        // Match by normalised KEY, not the raw string, so a spelling variant still resolves (prompt 84).
-        $key = TerminalName::key($this->terminal);
-
-        return $sessions->first(fn (TillSession $s): bool => TerminalName::key((string) $s->terminal) === $key);
-    }
-
-    /** @return \Illuminate\Support\Collection<int, TillSession> */
-    private function openSessionsAt(Location $location): \Illuminate\Support\Collection
-    {
-        return TillSession::query()->withoutGlobalScopes()
-            ->where('location_id', $location->id)
-            ->where('status', TillSessionStatus::OPEN->value)
-            ->orderBy('opened_at')->get();
+        return (new SelectTillSession)->handle($location, $this->terminal);
     }
 
     /** The names of terminals with an OPEN till here — turns a "no till" dead end into a one-click fix. */
     private function openTerminalNames(Location $location): string
     {
-        return $this->openSessionsAt($location)->pluck('terminal')->filter()->unique()->implode(', ');
+        return (new SelectTillSession)->openAt($location)->pluck('terminal')->filter()->unique()->implode(', ');
     }
 
     private function activeMembership(Member $member, Location $location): ?Membership
     {
-        return $member->memberships()->withoutGlobalScopes()
-            ->where('location_id', $location->id)
-            ->where('status', MembershipStatus::ACTIVE->value)
-            ->latest('id')
-            ->first();
+        return $member->activeMembershipAt($location);
     }
 
     private function activeSanction(Member $member): ?MemberSanction

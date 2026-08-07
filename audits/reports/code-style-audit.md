@@ -1,92 +1,182 @@
-# Code-Style / Craft Audit — Phase C round (audit #5)
+# Code-style audit (Laravel idiom & consistency)
 
-**Branch:** `code-style/audit-pass` off `main` @ `a98480e` (after 156/157/159 merged).
-**Scope:** craft the linters CANNOT see — house-rule adherence (CLAUDE.md architecture rules + named reference
-implementations), logic-in-the-wrong-layer, dead code / YAGNI / over-abstraction, DRY, hardcoded thresholds,
-transactional-data caching, vocabulary, swallowed exceptions, stubs. **Pint (formatting) and Larastan L6 (types)
-already pass and are NOT re-litigated here** — nothing a linter catches is reported. Method: read the full domain
-core (every named reference Action, the `DispensaryPos` counter stack + `HandlesTender`/`CollectsMembershipFees`
-concerns, `Money`/`Weight`/`Settings`/`Wallet`, all model casts/enums) + swept `app/` (561 files) for the specific
-smells. Every finding was re-verified against the code before landing here; one candidate was dismissed on
-verification (below).
+**Branch** `chore/code-style-audit` · **from** `6a7759f` (main, after the accessibility, admin and design
+audits) · **date** 2026-08-07
 
-**Headline:** the codebase is exceptionally disciplined — single-writers, the compliance boundary, money=cents /
-weight=cg, live-query-never-cache, Settings-with-defaults, translated enum `label()`s and the vocabulary rule all
-hold with unusual consistency. Five candidates surfaced; **four are real and fixed here, one was a false positive**.
-Nothing undoes a `DECISIONS.md` choice.
+Scope: `app/` (475 PHP files), `routes/`, `database/`, `config/`, `tests/`. Behaviour identical before and
+after — this is not a redesign.
 
----
+## Summary
 
-## PHASE 1 — Correctness (fixed)
+| | count |
+|---|---|
+| PHASE 1 — correctness & convention | 3 |
+| PHASE 2 — simplification | 1 |
+| PHASE 3 — polish | 1 |
+| Checked and found correct | 6 |
 
-- **`app/Actions/Wallet/RecordWalletTransaction.php:50,55,56` — debt/low-balance settings read AMBIENT, not for
-  the movement's `$location`.** The balance is computed per-location (`Wallet::balance($member->id, $location->id)`,
-  `:44`) but `low_balance_threshold_cents` / `wallet_debt_allowed` / `wallet_debt_limit_cents` were read with no
-  location arg, so once any of these is set per-location they resolve against whatever sede is ambient — and this
-  writer is reachable cross-location (the wallet relation-manager's adjust/refund offers an all-sedes picker; an
-  org-wide owner sits on the org default). The canonical sibling `RefundDispensation.php:90` reads
-  `Settings::get('refund_window_days', 30, $locked->location_id)`. Latent today (these keys are written org-level),
-  but a genuine correctness hazard and a clear inconsistency. → **Fixed:** pass `$location->id` as the 3rd arg to
-  all three reads. *(Contrast: `ResolveMemberEligibility::debtWithinThreshold` reads the SAME key ambient and is
-  CORRECT, because its whole body runs inside `ActiveScope::forLocation($location->id, …)` — see Investigated.)*
+**This is a short report because the codebase is in good shape, and that is the honest result.** The
+framework idioms are current (no `Http/Kernel.php`, no `$casts` property, config in `bootstrap/app.php`),
+Larastan runs at level 6 with generics on every relation and scope, there is **no query building in any
+Blade view** (0 occurrences of `::query()` or `::where(` under `resources/views`), money and weight never
+leave their casts, and every one of the 15 `catch` sites that returns a default has a documented reason —
+`Settings` degrading rather than throwing is a written CLAUDE.md requirement, and the rest are parse helpers
+where invalid input is an ordinary outcome. None is error-swallowing.
 
-- **`app/Livewire/Counter/DispensaryPos.php:618` — a non-numeric price override becomes a €0 (free) dispensation.**
-  The euros were hand-parsed `(int) round_half_up((float) str_replace(',', '.', …) * 100)`; a non-numeric entry
-  casts to `0.0` → `0` cents → `max(0, min(0, …))` → total 0 → a FREE contribution, behind only the
-  `dispensation.price.override` permission + a reason. The component already carries a validating
-  `HandlesTender::parseCents()` that returns `null` on garbage. → **Fixed:** parse via `parseCents()`; a non-empty
-  field that does not parse is rejected with an error instead of silently pricing at zero.
-
-## PHASE 2 — House rules (fixed)
-
-- **`app/Filament/Resources/DocumentTemplates/DocumentTemplateResource.php:73` — domain orchestration on a Filament
-  Resource instead of an Action.** `persistVersion()` runs a multi-step domain write (next version incl. trashed →
-  deactivate the prior active → create, in a `DB::transaction`) as a static method on the Resource, called from the
-  Create/Edit pages. It is the one domain write that breaks the otherwise-universal "every domain write is an
-  `App\Actions` class; controllers/resources are thin" rule. → **Fixed:** extracted to
-  `App\Actions\Documents\SaveDocumentTemplateVersion` (the `App\Actions\Documents` namespace already existed); the
-  two pages call the Action, and `DocumentTemplateResource::persistVersion` now delegates to it (one line) so no
-  call site broke.
-
-- **`app/Models/Organisation.php:23,29,47` — a `'settings' => 'array'` cast SHADOWS the `settings(): HasMany<Setting>`
-  relation; both are dead.** Accessing `$org->settings` returns the (unused) JSON-column blob, never the Setting
-  rows — a silent naming trap — and neither the `organisations.settings` column nor the relation is read anywhere
-  (real config lives in the `Setting` table via `Support\Settings`, which queries it directly). The parallel
-  `locations.settings` column was already retired (`2026_08_01_000000_retire_location_settings_json_column`,
-  prompt 59); the org side was simply missed. → **Fixed:** removed the dead cast, fillable entry and relation from
-  the model, plus the `OrganisationFactory`'s vestigial `'settings' => []` write (its only writer; the column is
-  `nullable` and read by nothing, so this de-shadows + deletes dead code with zero schema risk). **Recommended follow-up (owner):** drop the empty
-  `organisations.settings` column with a migration copied from the locations precedent — deferred out of the audit
-  branch only because it is a schema/data migration that wants its own seeded-copy test, not because it is optional.
+The Phase 1 findings are the same shape as everything else this round has surfaced: **one operation with more
+than one implementation of the rule**, where the rule decides something that matters.
 
 ---
 
-## Investigated and DISMISSED (not a defect)
+### PHASE 1 — Correctness & convention
 
-- **`app/Actions/Attendance/ResolveMemberEligibility.php:83` reading `wallet_debt_limit_cents` without a location
-  arg is CORRECT, not a bug.** It looks identical to the RecordWalletTransaction defect, but the entire rule-building
-  body runs inside `app(ActiveScope::class)->forLocation($location->id, function () { … })` (`:27`), so the ambient
-  Settings location IS `$location`. Left unchanged.
+- **Four resolvers answer "which open till is this?", in two different versions.**
 
-## OWNER / JUDGMENT (reported, not changed)
+  | caller | rule |
+  |---|---|
+  | `DispensaryPos::openTillSession()` | terminal-matched (normalised key, prompt 84), else **oldest** open |
+  | `BarPos::openTillSession()` | byte-identical copy of the above |
+  | `CheckInScreen::openTill()` | **newest** open (`latest('opened_at')`), terminal-blind |
+  | `MembershipCounter::openTill()` | **newest** open, terminal-blind |
 
-- **`app/Filament/Pages/RegistroDispensacion.php:146` — `controlRows()` builds a raw multi-join `DB::table(...)`
-  inline in a Filament page** rather than a `ViewModel`. It is correct, live and location-scoped (COMPLETED-only,
-  snapshot columns), so this is placement taste against the "page data assembly → `ViewModels`" rule, not a bug.
-- **Edge €→cents conversion style is split** — ~17 files hand-roll `round_half_up((float)$eur * 100)` vs `Money::fromEuros()`.
-  `DECISIONS.md` explicitly BLESSES the raw edge form, so this is **not a defect** — an optional one-style tidy-up only.
-  (Same family, already recorded in DECISIONS as intended consolidation: `CollectsMembershipFees::parseFeeCents`
-  duplicates `HandlesTender::parseCents`.)
+  All four feed the SAME operation: `CollectsMembershipFees::collectFeeThrough()` → `RecordFeePayment`,
+  which posts a CASH fee into `$session`. → One resolver, using the scope that already exists. → **Why it
+  matters:** `Membership`, `Order` and stock all funnel through one writer precisely so a rule cannot be
+  written twice and drift; the *selection* of the till never got the same treatment, and it is written four
+  times in two versions.
 
-## CONFIRMATION (verified solid)
+  **Scoped honestly, because the first draft of this finding overstated it.** With ONE open till — the
+  common case, and every case in the seed and the tests — all four agree and nothing is wrong. The
+  divergence only appears on a sede running two or more tills at once, and even then neither rule is
+  *wrong*: the POS legitimately knows its own terminal and the door legitimately does not have one. What is
+  genuinely wrong is narrower and is recorded as its own defect below: **the door and Socios pick a drawer
+  arbitrarily and never say which.**
 
-- **Transactional data is never cached.** Balances, stock, limits, takings, occupancy, till/arqueo are all
-  live-queried; the only `Cache::` uses are a health probe + integer PIN-throttle counters. No Eloquent object cached.
-- **Single-writers + compliance boundary are exemplary.** Each locks the row, runs one transaction, is idempotent
-  under retry, audits inside the txn; void/refund authorise through the location-bound policy, not a bare permission.
-- **Money = integer cents, weight = integer centigrams, end-to-end.** Every amount `*_cents` / weight-of-goods `*_cg`
-  column uses the casts; rate/limit/definitional columns are plain-int per the documented carve-outs. No float feeds
-  a stored or compared money/weight value.
-- **The rest of the rulebook holds.** Domain thresholds are `Settings::get(key, default)`; every backed enum has a
-  translated `label()`; vocabulary is clean (no *cliente/venta/precio de venta/beneficio* in the cannabis domain);
-  no `$guarded = []` (`User` is `totallyGuarded`); no TODO/FIXME/stub features.
+- **A cash fee taken at the door or on Socios posts to a silently-chosen drawer.** Neither screen has a
+  terminal, and neither surfaces which till it used — `inline-fee.blade.php` and the Socios panel take only
+  a boolean (*is a till open*). On a two-till sede the money lands in whichever session was opened last,
+  with nothing on screen naming it. → Name the drawer where the fee is about to be posted. → **Why it
+  matters:** `TillSummary` derives expected cash from the ledger, so at the blind close the drawer that took
+  the money is over and the other is short, and the operator has no way to reconstruct why. This is a
+  product change rather than a refactor, so it is reported for its own branch and NOT made here — a
+  code-style audit does not get to redesign a money flow.
+
+  Worse in the small: **`TillSession::scopeOpen()` already exists** (`app/Models/TillSession.php:119`) and
+  none of the four uses it — six callers in the codebase do, all of them elsewhere.
+
+- **`ApplicationController::store()` carries the domain logic of submitting an application** — ~110 lines
+  assembling the payload, resolving the avalador, converting declared grams to centigrams, capturing the
+  consent version AND the locale the applicant actually read, rate-limiting and vaulting two encrypted
+  uploads, recording MRZ corrections, then updating the record. → Extract to
+  `App\Actions\Members\SubmitApplication`; the controller resolves the invite, guards it, and returns. →
+  **Why it matters:** `CLAUDE.md` is explicit — *"Controllers/Livewire components are thin: resolve + return
+  only"*, *"Business logic lives in fat models … or single-purpose Action classes"* — and this is the one
+  place in the codebase that breaks it. It is also the worst place to break it: an **unauthenticated** route
+  that writes Article 9 material to the encrypted vault and stamps the consent record the club later relies
+  on. Every comparable write in this product (`CommitDispensation`, `CommitOrder`, `ApproveApplication`,
+  `RecordFeePayment`) is an Action with its own tests; this one is reachable only through HTTP.
+
+**Review:** the second is a genuine defect with a money consequence and ranks first, as the brief asks — but
+it is a product change, so it is reported rather than made here. The first and third are fixed on this
+branch. The third is the single largest deviation from a rule this project states in writing.
+
+---
+
+### PHASE 2 — Simplification & de-abstraction
+
+- **Four copies of "the member's active membership at this sede"**, in `CheckInScreen::activeMembership()`,
+  `DispensaryPos::activeMembership()`, `MembershipCounter::latestMembership()` and
+  `CollectsMembershipFees::outstandingMembership()` — all four `->memberships()->withoutGlobalScopes()
+  ->where('location_id', …)->where('status', ACTIVE)->latest('id')->first()`, and `Membership::scopeActive()`
+  already exists. → One method on the fat model: `Member::activeMembershipAt(Location $location)`. → **Why it
+  matters:** unlike the till above these four agree today, which is exactly why it is Phase 2 and not Phase
+  1 — but they are the same query written four times, and the till finding is what happens when four copies
+  of a rule stop agreeing.
+
+**Review:** one item, and it is the *cause* of the Phase 1 defect rather than an aesthetic complaint.
+
+---
+
+### PHASE 3 — Polish
+
+- **An orphaned docblock in `ApplicationController`** (line 163): `/** The post-submit redirect —
+  byte-identical for a genuine submit and a silently-dropped bot. */` sits directly above `read()`'s own
+  docblock and describes `submittedRedirect()`, which is defined 80 lines further down. → Move it to the
+  method it documents. → It is small, but a comment attached to the wrong method is worse than no comment,
+  and this codebase has already had a stale docblock propagate a false claim into two other documents (the
+  admin audit's Phase 3).
+
+**Review:** one item; there is no general comment rot to clean up.
+
+---
+
+## Checked and found correct — no action
+
+Reported so a later pass does not re-derive them.
+
+- **Framework idioms are current.** No `app/Http/Kernel.php`; middleware and config live in
+  `bootstrap/app.php`; no model uses the superseded `protected $casts` property (all use the `casts()`
+  method); enums are backed with `label()`; relations and scopes carry Larastan L6 generics throughout.
+- **No logic in views.** Zero `::query()`, `::where(` or `::all()` anywhere under `resources/views`. Page
+  data assembly is in `App\ViewModels` (17 classes) exactly as CLAUDE.md prescribes.
+- **No error-swallowing.** All 15 `catch`-and-return-a-default sites are deliberate: `Settings` degrading
+  instead of throwing is a written requirement (a stale cache must not break a queued job); the parse
+  helpers (`Weight::fromGrams`, `Carbon::parse`, `parseCents`) treat invalid input as an ordinary outcome
+  and return null to a caller that checks; the logo/image readers degrade to "no image" so a PDF or mailable
+  still renders; and `MaterialiseRecurringExpenses` catches a `QueryException` on its unique marker, which
+  IS the idempotency mechanism.
+- **The Action layer is the norm, not the exception** — 78 single-purpose classes in `App\Actions`, and
+  `tests/Feature/Cleanup/UnreachableCodeGuardTest` already enforces that each has a non-test caller.
+- **No God controllers besides the one above.** The other 16 controllers total 1,461 lines; the largest,
+  `Socio\PwaController`, is 179 lines across six thin read actions.
+- **`App\Support` and `App\ViewModels` are not mixed.** Support holds genuine helpers (`Money`, `Weight`,
+  `BusinessDay`, `TillSummary`, `ActiveScope`); ViewModels hold page assembly. Spot-checked both directions.
+
+## Discussion (needs owner decision)
+
+None. No idiom-vs-decision conflict surfaced: every documented decision this audit touched
+(`withoutGlobalScopes()` on counter queries, `Genetic::grams_per_unit_cg` staying a plain integer, no
+repository pattern, no `declare(strict_types=1)`) is deliberate, recorded in CLAUDE.md or DECISIONS.md, and
+was enforced rather than relitigated.
+
+---
+
+## Outcome
+
+Three of four findings fixed on this branch; one is reported for its own branch, with the reason. `composer
+check` green at every commit: **1497 tests** (up from 1490 — seven new, all on the till resolver), Larastan
+0, Pint clean.
+
+| finding | outcome |
+|---|---|
+| Four "which open till?" resolvers, two versions | **fixed** — `App\Actions\Till\SelectTillSession` |
+| A cash fee at the door/Socios posts to a silently-chosen drawer | **reported, not fixed** — a product change, not a refactor |
+| `ApplicationController::store()` carries domain logic | **fixed** — `App\Actions\Members\SubmitApplication`; the controller drops 288 → 161 lines |
+| Four copies of "active membership at this sede" | **fixed** — `Member::activeMembershipAt()` |
+| Orphaned docblock | **fixed** — moved to the method it describes |
+
+### The till resolver changed behaviour, deliberately
+
+The other two fixes are pure refactors proven by the existing suite. This one is not, and saying so is the
+point: the door and Socios had no terminal and took the NEWEST open session; they now take the same
+oldest-open fallback the POS screens fall back to. **On a multi-till sede that is a different drawer.** That
+is the fix rather than a side effect — four screens performing one operation now agree — and the tie-break is
+stated once, in one place, instead of being implied twice.
+
+`OneTillResolverTest` pins it at the resolver (terminal preference, the normalised-key match from prompt 84,
+the oldest-open fallback, an unknown terminal resolving to nothing rather than guessing, and scope to open
+sessions at this sede only) and through both screens that changed. **Its two screen-level tests were
+confirmed failing against the old code first** — the Socios one by resolving a different till id — so the
+divergence is measured rather than asserted. The one-till case, which is every case in the seed and in every
+other test, is pinned as unchanged.
+
+### What was NOT done, and why
+
+`ApplicationController` still resolves the invite with its own `find()` and its own `isInviteLive()` guard,
+which is correct: that is HTTP-layer authorisation of a tokenised route, not domain logic.
+`SubmitApplication` takes plain arrays and an optional IP rather than a `Request`, so it is callable from a
+test, a command or a future API without a fake request — the same shape as every other Action here.
+
+The drawer-naming defect is left for its own branch. A code-style audit whose brief says *"don't change
+behaviour … except as internal refactors proven by tests"* does not get to redesign where money goes; the
+till resolver above is already at the edge of that licence and is documented as such.

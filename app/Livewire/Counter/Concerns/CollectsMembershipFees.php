@@ -4,7 +4,6 @@ namespace App\Livewire\Counter\Concerns;
 
 use App\Actions\Memberships\RecordFeePayment;
 use App\Enums\FeePaymentMethod;
-use App\Enums\MembershipStatus;
 use App\Exceptions\DebtLimitExceededException;
 use App\Models\Location;
 use App\Models\Member;
@@ -133,10 +132,7 @@ trait CollectsMembershipFees
     /** The member's outstanding membership at this sede (latest active with a balance), or null. */
     protected function outstandingMembership(Member $member, Location $location): ?Membership
     {
-        $membership = $member->memberships()->withoutGlobalScopes()
-            ->where('location_id', $location->id)
-            ->where('status', MembershipStatus::ACTIVE->value)
-            ->latest('id')->first();
+        $membership = $member->activeMembershipAt($location);
 
         return ($membership !== null && $this->owedCents($membership) > 0) ? $membership : null;
     }

@@ -8557,3 +8557,61 @@ not advertise (NOTES §A). The only images are the club's own logo, member photo
 
 **MySQL was left to CI**, per the running order: `composer check` green on SQLite — 1490 tests, Larastan 0,
 Pint clean. Every fix re-measured and re-screenshotted at all five viewports in both themes.
+
+---
+
+## Code-style audit — one rule, written four times, in two versions
+
+Full findings and outcomes: `audits/reports/code-style-audit.md`. A short report, because the codebase is in
+good shape and that is the honest result: framework idioms are current (no `Http/Kernel.php`, no `$casts`
+property, config in `bootstrap/app.php`), Larastan runs at level 6 with generics throughout, there is **zero
+query building in any Blade view**, and all 15 `catch`-and-return-a-default sites are deliberate with a
+documented reason. None is error-swallowing.
+
+**The finding that matters: four resolvers answered "which open caja is this counter posting to?", in two
+different versions.** `DispensaryPos` and `BarPos` carried byte-identical copies matching the operator's own
+terminal and falling back to the OLDEST open session; `CheckInScreen` and `MembershipCounter` took
+`latest('opened_at')` — the NEWEST — with no terminal at all. All four bypassed `TillSession::scopeOpen()`,
+which already existed and has six callers elsewhere.
+
+**With one open till they agreed, which is exactly why nothing caught it.** With two, the same cash
+membership fee posted to a different drawer depending on which screen took it — and because `TillSummary`
+derives expected cash from the ledger, both drawers then show a real variance at the blind close. Every
+domain write in this product funnels through one writer precisely so a rule cannot be written twice and
+drift; the *selection* of the till never got that treatment.
+
+`App\Actions\Till\SelectTillSession` is modelled on `SelectBatch`, down to being an Action rather than a
+helper: **choosing WHICH row the counter acts on is a domain decision, not framework plumbing.** The
+tie-break is stated once — oldest open first, terminal preferred when the caller has one. Oldest rather than
+newest because the till that has been running the shift holds the float the money is counted against.
+
+**This changed behaviour, deliberately, and the branch says so.** The door and Socios now resolve a different
+drawer on a multi-till sede. That IS the fix. `OneTillResolverTest`'s two screen-level tests were **confirmed
+failing against the old code first** — the Socios one by resolving a different till id — so the divergence is
+measured rather than argued, and the one-till case is pinned as unchanged.
+
+**I overstated this finding in the first draft and corrected it in place.** The report initially said the fee
+"lands in the wrong drawer". Neither rule is *wrong*: the POS legitimately knows its terminal and the door
+legitimately does not have one. What is genuinely wrong is narrower — **the door and Socios pick a drawer
+arbitrarily and never say which**; both surface only a boolean (*is a till open*). That is recorded as its
+own defect and **deliberately not fixed here**: naming the drawer is a product change, and a code-style
+audit whose brief says *"don't change behaviour except as internal refactors proven by tests"* does not get
+to redesign where money goes. Same discipline as the admin audit's withdrawn half — **an audit finding is a
+claim, and claims get checked, including your own.**
+
+**The one place domain logic lived in a controller.** `ApplicationController::store()` was ~110 lines
+assembling the application payload, matching the avalador, converting grams to centigrams, capturing the
+consent VERSION and the LOCALE the applicant actually read, rate-limiting and vaulting two encrypted uploads,
+and recording the MRZ read rate. The worst possible place for it: the only **unauthenticated** route in the
+product, writing Article 9 material and stamping a consent record. Now
+`App\Actions\Members\SubmitApplication`; the controller drops 288 → 161 lines and keeps only what is HTTP.
+It takes plain arrays and an optional IP rather than a `Request`, so it is callable from a test, a command or
+a future API without faking one.
+
+**And the same shape at Phase 2:** four hand-written copies of "the member's ACTIVE membership at this sede"
+while `Membership::scopeActive()` sat unused → `Member::activeMembershipAt()`. Those four *agreed*, which is
+the only reason it ranked below the till — and the till is what that pattern looks like once the copies stop
+agreeing.
+
+**MySQL was left to CI**, per the running order: `composer check` green on SQLite at every commit — 1497
+tests, Larastan 0, Pint clean.
