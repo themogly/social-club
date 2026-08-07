@@ -44,23 +44,18 @@
             <span>{{ __('Sin conexión. No se puede registrar ninguna venta; la cesta se conserva y se reactivará al reconectar.') }}</span>
         </div>
 
-        {{-- Flash --}}
-        @if ($flashMessage)
-            <div
-                wire:key="flash"
-                role="{{ $flashType === 'error' ? 'alert' : 'status' }}"
-                aria-live="{{ $flashType === 'error' ? 'assertive' : 'polite' }}"
-                @class([
-                    'mb-4 flex items-center justify-between gap-3 rounded-xl border px-4 py-3 text-sm font-medium',
-                    'border-success/30 bg-success/10 text-success' => $flashType === 'success',
-                    'border-warning/30 bg-warning/10 text-warning' => $flashType === 'warning',
-                    'border-error/30 bg-error/10 text-error' => $flashType === 'error',
-                ])
-            >
-                <span>{{ $flashMessage }}</span>
-                <button type="button" wire:click="$set('flashMessage', null)" aria-label="{{ __('Descartar aviso') }}" class="shrink-0 rounded-md px-2 py-1 opacity-70 hover:opacity-100">✕</button>
-            </div>
+        {{-- Prompts 192/193 — the flash used to live here unconditionally, ~650px from the Charge button
+             that produces it in an 820px viewport. Prompt 60 guaranteed that pressing Charge always produces
+             an observable outcome and proved it with assertSee(), which is true of the markup wherever it
+             renders — to a parser, not to a person. It now renders beside Charge instead.
+
+             But only when there IS a Charge to stand beside: a blocking state replaces the work AND the cart
+             column, so in that case the reason has nowhere else to go and belongs here, exactly as the
+             original comment argued. Two positions, one partial, never both at once. --}}
+        @if (\App\Support\CounterBlocker::rendersInPage($blocker))
+            @include('livewire.counter.partials.counter-flash', ['anchor' => 'data-blocked-feedback'])
         @endif
+
     @endif
 
     @if ($blocker === \App\Support\CounterBlocker::SEDE)
@@ -159,50 +154,108 @@
                         </div>
                     @endif
 
+                    @php
+                        // A full @php block, not @php(...): an arrow function's `=>` inside the parenthesised
+                        // form is a Blade parse error, and the harness happily asserted against the 500 page.
+                        $showThumbs = collect($articles)->contains(fn (array $a): bool => filled($a['image_url']));
+                    @endphp
+
                     <div @class([
                         'mt-4',
-                        'flex flex-col gap-2' => $articleLayout === 'list',
+                        'flex flex-col gap-1.5' => $articleLayout === 'list',
                         'grid gap-3 sm:grid-cols-2 lg:grid-cols-3' => $articleLayout === 'grid',
                     ])>
                         @forelse ($articles as $a)
                             @php $soldOut = $a['stock'] <= 0; @endphp
-                            <button
-                                type="button"
-                                @if (! $soldOut) wire:click="addArticle('{{ $a['id'] }}')" @endif
-                                @disabled($soldOut)
-                                data-product
-                                @class([
-                                    'flex overflow-hidden rounded-xl border text-left transition',
-                                    'flex-col' => $articleLayout === 'grid',
-                                    'flex-col lg:flex-row lg:items-center lg:justify-between' => $articleLayout === 'list',
-                                    'border-line bg-surface hover:border-brand hover:bg-brand-tint/40 dark:border-slate-700 dark:bg-slate-950 dark:hover:border-brand' => ! $soldOut,
-                                    'cursor-not-allowed border-dashed border-line bg-surface-alt opacity-60 dark:border-slate-800 dark:bg-slate-900' => $soldOut,
-                                ])
-                            >
-                                <div class="flex h-24 w-full items-center justify-center bg-surface-alt dark:bg-slate-800">
-                                    @if ($a['image_url'])
-                                        <img src="{{ $a['image_url'] }}" alt="" class="h-full w-full object-cover">
-                                    @else
-                                        <span class="text-3xl opacity-70">🛒</span>
+
+                            @if ($articleLayout === 'list')
+                                {{-- Prompt 193 — a ROW, not the grid tile turned sideways. The old list mode reused
+                                     the tile markup with `lg:flex-row`, and the tile's image block is `h-24 w-full`,
+                                     so in a row it claimed the whole width: measured 714x106 at 1180x820 with the
+                                     name and price crammed into the remainder, and 166px tall below `lg` where the
+                                     tile did not rotate at all. Six rows filled the viewport — worse density than
+                                     the grid it is an alternative to, which left list mode with no reason to exist.
+
+                                     A row is its own component: fixed small thumbnail, name on ONE line, and the
+                                     numbers right-aligned in their own columns so the price and stock scan straight
+                                     down the list. `tabular-nums` is what makes that column actually align. --}}
+                                <button
+                                    type="button"
+                                    @if (! $soldOut) wire:click="addArticle('{{ $a['id'] }}')" @endif
+                                    @disabled($soldOut)
+                                    data-product
+                                    data-product-row
+                                    @class([
+                                        'flex h-[4.25rem] w-full items-center gap-3 rounded-xl border px-3 text-left transition',
+                                        'border-line bg-surface hover:border-brand hover:bg-brand-tint/40 dark:border-slate-700 dark:bg-slate-950 dark:hover:border-brand' => ! $soldOut,
+                                        'cursor-not-allowed border-dashed border-line bg-surface-alt opacity-60 dark:border-slate-800 dark:bg-slate-900' => $soldOut,
+                                    ])
+                                >
+                                    {{-- The thumbnail column exists only if some article at this sede HAS an image.
+                                         None of them does today, and a large empty glyph is a broken-looking gap
+                                         rather than a design (prompt 193). Missing photos are the club's to supply;
+                                         nothing here fabricates one. --}}
+                                    @if ($showThumbs)
+                                        <span class="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-surface-alt dark:bg-slate-800">
+                                            @if ($a['image_url'])
+                                                <img src="{{ $a['image_url'] }}" alt="" class="h-full w-full object-cover">
+                                            @else
+                                                <span class="text-sm font-semibold text-ink-muted dark:text-slate-400">{{ mb_strtoupper(mb_substr($a['name'], 0, 1)) }}</span>
+                                            @endif
+                                        </span>
                                     @endif
-                                </div>
-                                <div class="flex flex-1 flex-col p-3">
-                                    <div class="flex items-start justify-between gap-2">
-                                        {{-- min-w-0 lets a long name wrap/clamp instead of forcing the row past the
-                                             card's overflow-hidden edge and clipping the shrink-0 price (e.g. "Mechero €1,00"). --}}
-                                        <span class="min-w-0 font-semibold leading-tight line-clamp-2">{{ $a['name'] }}</span>
-                                        <span class="shrink-0 text-sm font-semibold text-brand dark:text-slate-100">{{ $this->money($a['price_cents']) }}</span>
-                                    </div>
-                                    <div class="mt-2 flex items-center justify-between text-xs">
-                                        <span class="text-ink-muted dark:text-slate-400">{{ __('Stock') }}: {{ $a['stock'] }}</span>
+
+                                    <span data-product-name class="min-w-0 flex-1 truncate font-semibold leading-tight">{{ $a['name'] }}</span>
+
+                                    <span class="shrink-0 text-xs text-ink-muted tabular-nums dark:text-slate-400">
                                         @if ($soldOut)
                                             <span class="inline-flex items-center gap-1 text-error"><span class="h-2 w-2 rounded-full bg-error"></span>{{ __('Agotado') }}</span>
                                         @elseif ($a['low_stock'])
-                                            <span class="inline-flex items-center gap-1 text-warning"><span class="h-2 w-2 rounded-full bg-warning"></span>{{ __('Stock bajo') }}</span>
+                                            <span class="inline-flex items-center gap-1 text-warning"><span class="h-2 w-2 rounded-full bg-warning"></span>{{ $a['stock'] }}</span>
+                                        @else
+                                            {{ __('Stock') }}: {{ $a['stock'] }}
+                                        @endif
+                                    </span>
+
+                                    <span class="w-20 shrink-0 text-right text-sm font-semibold tabular-nums text-brand dark:text-slate-100">{{ $this->money($a['price_cents']) }}</span>
+                                </button>
+                            @else
+                                <button
+                                    type="button"
+                                    @if (! $soldOut) wire:click="addArticle('{{ $a['id'] }}')" @endif
+                                    @disabled($soldOut)
+                                    data-product
+                                    @class([
+                                        'flex flex-col overflow-hidden rounded-xl border text-left transition',
+                                        'border-line bg-surface hover:border-brand hover:bg-brand-tint/40 dark:border-slate-700 dark:bg-slate-950 dark:hover:border-brand' => ! $soldOut,
+                                        'cursor-not-allowed border-dashed border-line bg-surface-alt opacity-60 dark:border-slate-800 dark:bg-slate-900' => $soldOut,
+                                    ])
+                                >
+                                    <div class="flex h-24 w-full items-center justify-center bg-surface-alt dark:bg-slate-800">
+                                        @if ($a['image_url'])
+                                            <img src="{{ $a['image_url'] }}" alt="" class="h-full w-full object-cover">
+                                        @else
+                                            <span class="text-3xl opacity-70">🛒</span>
                                         @endif
                                     </div>
-                                </div>
-                            </button>
+                                    <div class="flex flex-1 flex-col p-3">
+                                        <div class="flex items-start justify-between gap-2">
+                                            {{-- min-w-0 lets a long name wrap/clamp instead of forcing the row past the
+                                                 card's overflow-hidden edge and clipping the shrink-0 price. --}}
+                                            <span data-product-name class="min-w-0 font-semibold leading-tight line-clamp-2">{{ $a['name'] }}</span>
+                                            <span class="shrink-0 text-sm font-semibold text-brand dark:text-slate-100">{{ $this->money($a['price_cents']) }}</span>
+                                        </div>
+                                        <div class="mt-2 flex items-center justify-between text-xs">
+                                            <span class="text-ink-muted dark:text-slate-400">{{ __('Stock') }}: {{ $a['stock'] }}</span>
+                                            @if ($soldOut)
+                                                <span class="inline-flex items-center gap-1 text-error"><span class="h-2 w-2 rounded-full bg-error"></span>{{ __('Agotado') }}</span>
+                                            @elseif ($a['low_stock'])
+                                                <span class="inline-flex items-center gap-1 text-warning"><span class="h-2 w-2 rounded-full bg-warning"></span>{{ __('Stock bajo') }}</span>
+                                            @endif
+                                        </div>
+                                    </div>
+                                </button>
+                            @endif
                         @empty
                             <p class="col-span-full rounded-xl border border-dashed border-line px-4 py-8 text-center text-sm text-ink-muted dark:border-slate-700 dark:text-slate-400">{{ __('No hay artículos activos en esta sede.') }}</p>
                         @endforelse
@@ -253,6 +306,11 @@
                 class="flex min-h-0 shrink-0 flex-col gap-3 md:w-[19rem] lg:w-[21rem]"
             >
                 <div class="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto">
+                {{-- Prompt 193 — per-sede, and NOT rendered when off (not collapsed, not disabled): most bar
+                     sales are a coffee for cash, and with this off the cart column opens on the Basket, which
+                     is where the operator's attention belongs. The flag governs INPUT only — a socio recorded
+                     on an earlier order still shows on its receipt, in the ledger export and in reports. --}}
+                @if ($attachSocioEnabled)
                 <section class="rounded-2xl border border-line bg-surface p-4 dark:border-slate-800 dark:bg-slate-900">
                     <h2 class="text-base font-semibold">{{ __('Socio (opcional)') }}</h2>
                     <p class="mt-1 text-xs text-ink-muted dark:text-slate-400">{{ __('Atribuye un socio para pagar con monedero. Cobrar en efectivo a un invitado también es válido.') }}</p>
@@ -302,8 +360,11 @@
                         </div>
                     @endif
                 </section>
+                @endif
 
-                {{-- Order-level reference (guests / rollout / event). --}}
+                {{-- Order-level reference (guests / rollout / event) — per-sede, off by default (prompt 193).
+                     Same rule as the socio panel: the flag governs input, never display. --}}
+                @if ($ticketReferenceEnabled)
                 <section class="rounded-2xl border border-line bg-surface p-4 dark:border-slate-800 dark:bg-slate-900">
                     <label for="reference" class="block text-sm font-medium text-ink-muted dark:text-slate-400">{{ __('Referencia del ticket (opcional)') }}</label>
                     <input
@@ -315,6 +376,7 @@
                         class="mt-2 h-11 w-full rounded-xl border border-line bg-surface px-4 text-base text-ink placeholder:text-ink-muted focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/40 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
                     >
                 </section>
+                @endif
 
                 <section class="rounded-2xl border border-line bg-surface p-4 dark:border-slate-800 dark:bg-slate-900">
                     <div class="flex items-center justify-between">
@@ -357,7 +419,11 @@
 
                     {{-- Payment --}}
                     <div class="mt-4 space-y-3">
-                        {{-- Wallet (only with a socio attached). --}}
+                        {{-- Wallet (only with a socio attached) — and therefore only when this sede allows one
+                             to be attached at all (prompt 193). Offering a tender that can never complete is
+                             worse than not offering it, so the field goes rather than sitting permanently
+                             disabled. --}}
+                        @if ($attachSocioEnabled)
                         <div>
                             <label for="wallet" class="block text-xs font-medium text-ink-muted dark:text-slate-400">{{ __('Monedero (€)') }}</label>
                             <input
@@ -374,6 +440,7 @@
                                 <p class="mt-1 text-xs text-ink-muted dark:text-slate-500">{{ __('Atribuye un socio para pagar con monedero.') }}</p>
                             @endif
                         </div>
+                        @endif
 
                         {{-- Quick cash --}}
                         <div>
@@ -456,8 +523,11 @@
                 @endif
                 </div>
 
-                {{-- BOTTOM — the commit, at the foot of the column. --}}
+                {{-- BOTTOM — the commit, at the foot of the column, with its OUTCOME beside it. --}}
                 <div class="shrink-0">
+                    {{-- The answer to "I pressed Charge", beside Charge (prompts 192/193). --}}
+                    @include('livewire.counter.partials.counter-flash', ['anchor' => 'data-commit-feedback'])
+
                     {{-- Commit — disabled ONLY when offline (prompt 60). The offline banner above is driven
                          by the SAME `online`, so a disabled button always shows its reason. Every other
                          blocked state (no till, empty basket, wallet-without-socio…) stays CLICKABLE and

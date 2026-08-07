@@ -152,6 +152,13 @@ class Settings
         // the first screen the operator may open (prompt 172's per-user resolution, which is the fallback
         // either way — a till-only operator must always land somewhere they are allowed to be).
         'counter_landing' => 'home',
+        // Prompt 193 — the bar's two optional cart panels, per SEDE. Most bar sales are a coffee for cash, so
+        // both default OFF and the panel is not rendered at all when off (not collapsed, not disabled) — the
+        // cart column then opens on the basket, where the operator's attention belongs. The flag governs
+        // INPUT only: a socio or a ticket reference recorded earlier still renders on receipts, in the ledger
+        // export and in reports.
+        'bar_attach_socio_enabled' => false,
+        'bar_ticket_reference_enabled' => false,
         // Panic lockdown (prompt 121), all per-org. The safety-net auto-reactivation runs after this many
         // minutes so a locked-out club — who are the data controller — always regains access to their own
         // statutory register (default 24h). The owner email "way back" link is valid for this many hours.
