@@ -75,7 +75,7 @@
             </div>
         @else
             <x-dashboard.section :title="__('Registro de dispensación')" :count="$count">
-                <div class="csc-table-wrap">
+                <div class="csc-table-wrap" tabindex="0" role="region" aria-label="{{ __('Registro de dispensación') }}">
                     <table class="csc-table csc-rep-table">
                         <thead>
                             <tr>

@@ -215,3 +215,84 @@ node tests/Browser/shoot-surface-chain.mjs                 # non-zero if the sur
 
 Last run (branch `fix/surface-respects-blocker-chain`): **ALL PASS** — 16 captures, surface down with the
 top bar reachable on the sede step, surface up with its PIN pad once the sede is chosen.
+
+## Counter home + top-bar density (prompt 189)
+
+Screenshots the counter home at 1180×820 and 820×1180, light and dark, and asserts what a picture cannot:
+every tile is a real finger target (≥96px tall — far above the 44px floor, which is the whole reason a hub
+beats a menu bar on a tablet), nothing is under 44×44, and the page never scrolls sideways.
+
+`measure-topbar-density.mjs` is the other half. `measure-topbar.mjs` (prompt 132) asks whether anything
+OVERLAPS; it passed before this branch and after, which is why it could not see what the owner reported.
+Overlap is the failure state, cramped is the state just before it — so this measures the split between the
+row's fixed furniture and the space left for the destinations. Run it, stash the top-bar change, run it
+again: the comparison is the argument.
+
+```bash
+npm install --no-save playwright && node_modules/.bin/playwright install chromium-headless-shell
+npm run build                                              # the arbitrary grid class must be compiled
+php artisan test tests/Browser/CounterHomeHarnessTest.php  # writes storage/app/counter-home.html
+node tests/Browser/shoot-counter-home.mjs
+php artisan test tests/Browser/TopbarHarnessTest.php       # writes storage/app/topbar-harness.html
+node tests/Browser/measure-topbar-density.mjs
+```
+
+Last run (branch `feat/counter-home`): **ALL PASS** — 4 captures, 5 tiles at 128px tall in both
+orientations. Density: furniture 371px → **331px**; portrait strip headroom 181px → **221px (+22%)**.
+
+## Bar screen: list rows + cart column (prompt 193)
+
+Counts article rows per viewport, measures the first row, checks no name wraps, and measures how much of the
+cart column sits below its own fold — at 1180×820, 820×1180, 1440×900 and a short 1280×720 laptop, because
+two-width checking is how the old row layout survived. Screenshots land in `storage/app/screenshots/193/`.
+
+Takes the layout as an argument; `articleLayout` is `#[Session]`-backed so the harness writes both.
+
+```bash
+npm install --no-save playwright && node_modules/.bin/playwright install chromium-headless-shell
+npm run build
+php artisan test tests/Browser/BarScreenHarnessTest.php   # writes storage/app/bar-screen-{list,grid}.html
+node tests/Browser/measure-bar-screen.mjs list
+node tests/Browser/measure-bar-screen.mjs grid
+```
+
+Last run (branch `feat/bar-rows-and-cart`), list layout: rows on screen **6 → 9** at 1180×820 and **6 → 12**
+in portrait; first row **714×106 → 714×68** (portrait 166 → 68); names wrapped **0**; cart hidden below its
+fold **212px → 0px** at every viewport.
+
+## The commit buttons actually reach their actions (prompt 195)
+
+The only script here that needs a **running server**, because it is the one thing a PHP test cannot see: a
+Livewire action named after one of `$wire`'s aliases is unreachable from a browser, and
+`Livewire::test(...)->call('commit')` invokes the PHP method directly so it never meets the alias table.
+Forty-two green tests exercised a path no operator could reach.
+
+```bash
+npm run build
+php artisan serve --port=8123
+node tests/Browser/prove-commit-click.mjs          # MEMBER_QUERY=… to override the member lookup
+```
+
+Logs in as the dev owner, chooses a sede, identifies with a PIN, adds a line, presses the real button, and
+asserts the request names the action (not `$commit`) and an order is recorded.
+
+Last run (branch `fix/commit-action-name-collision`): bar `["commitOrder"]` + *Order recorded.*, orders
+56 → 57; dispensary `["commitDispensation"]`. Against the old names on the same build: `["$commit"]`, flash
+`null`, orders 57 → 57.
+
+## Top-bar geometry after the Alpine scope (prompt 196)
+
+196 added one attribute (`x-data="{}"`) to the counter shell. 132's overflow layout and 130's scrollable
+strip both depend on that flex row, so the geometry is **proved** unchanged rather than assumed — re-run both
+top-bar scripts after any change to the shell:
+
+```bash
+npm run build
+php artisan test tests/Browser/TopbarHarnessTest.php
+node tests/Browser/measure-topbar.mjs           # overlap / 44px / page scroll
+node tests/Browser/measure-topbar-density.mjs   # the furniture-vs-strip split
+```
+
+Last run (branch `fix/topbar-alpine-scope`): **ALL PASS** at 768/800/1024/1280, 7 controls, no overlap, no
+horizontal scroll; density byte-identical to 189 (furniture 331px, portrait strip headroom 221px).
+

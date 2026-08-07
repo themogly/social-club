@@ -9,11 +9,6 @@ namespace App\Filament\Widgets;
  */
 class ConsumptionDistributionChart extends DashboardChart
 {
-    public function getHeading(): string
-    {
-        return __('Distribución de consumo');
-    }
-
     protected function getType(): string
     {
         return 'bar';

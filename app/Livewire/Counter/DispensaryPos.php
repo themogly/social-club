@@ -7,7 +7,6 @@ use App\Actions\Counter\CommitCombinedSettle;
 use App\Actions\Dispensing\CommitDispensation;
 use App\Actions\Dispensing\ResolveMemberLimits;
 use App\Actions\Dispensing\VoidDispensation;
-use App\Actions\Members\ResolveMemberByToken;
 use App\Actions\Pricing\ResolveArticleDiscount;
 use App\Actions\Pricing\ResolvePrice;
 use App\Actions\ResolveLocale;
@@ -18,9 +17,9 @@ use App\Enums\TillSessionStatus;
 use App\Exceptions\DebtLimitExceededException;
 use App\Exceptions\DispensationBlockedException;
 use App\Exceptions\LimitExceededException;
-use App\Exceptions\ScanRateLimitedException;
 use App\Exceptions\TillClosedException;
 use App\Livewire\Counter\Concerns\CollectsMembershipFees;
+use App\Livewire\Counter\Concerns\FindsMembers;
 use App\Livewire\Counter\Concerns\HandlesTender;
 use App\Livewire\Counter\Concerns\IdentifiesOperator;
 use App\Livewire\Counter\Concerns\ResolvesCounterLocation;
@@ -81,15 +80,12 @@ use RuntimeException;
 #[Layout('components.layouts.counter', ['fullHeight' => true])] // prompt 176: the page must not scroll; the selection pane does
 class DispensaryPos extends Component
 {
-    use CollectsMembershipFees, HandlesTender, IdentifiesOperator, ResolvesCounterLocation;
+    use CollectsMembershipFees, FindsMembers, HandlesTender, IdentifiesOperator, ResolvesCounterLocation;
 
     // --- Identity ---------------------------------------------------------------
-
-    /** Bound to the scan input — a keyboard-wedge scanner types the token then hits Enter. */
-    public string $scan = '';
-
-    /** Live org-wide fallback search to identify a socio (name or member number). */
-    public string $search = '';
+    // The ONE lookup field ($lookup) and everything behind it live in FindsMembers (prompt 194). This screen
+    // used to carry two stacked inputs of its own — a scan box above a name box, each already doing the
+    // other's job — plus its own copy of the org-wide search query.
 
     /** Live filter over the genetics grid (name). */
     public string $geneticSearch = '';
@@ -245,46 +241,18 @@ class DispensaryPos extends Component
 
     // --- Identify ---------------------------------------------------------------
 
-    public function submitScan(): void
+    /**
+     * Prompt 194 — the shared lookup identified somebody; the POS holds them for a basket.
+     *
+     * The sede's check-in requirement is enforced inside holdMember(), which is AFTER this point on purpose:
+     * the difference between this screen and the door belongs after the member is found, never inside the
+     * shared lookup. A socio who has not checked in is REFUSED with a message that says so, rather than
+     * being quietly filtered out of the results — "no results" for a member standing at the counter is the
+     * least useful thing the screen could say.
+     */
+    protected function onMemberFound(Member $member, bool $scanned): void
     {
-        $token = trim($this->scan);
-        $this->scan = '';
-
-        if ($token === '') {
-            return;
-        }
-
-        try {
-            $member = (new ResolveMemberByToken)->handle($token, (string) (Auth::id() ?? request()->ip()));
-        } catch (ScanRateLimitedException) {
-            $this->flash(__('Demasiados intentos de escaneo. Espera unos segundos.'), 'error');
-
-            return;
-        }
-
-        if ($member === null) {
-            // A name (or member number) typed into the scan field falls through to the SAME search
-            // (prompt 91), so the lookup never depends on the operator noticing which of two adjacent boxes
-            // has the cursor. If it really was a card, the search simply returns nothing and they retype.
-            $this->search = $token;
-            $this->flash(__('Tarjeta no reconocida. Buscando por nombre o nº de socio…'), 'warning');
-
-            return;
-        }
-
-        $this->holdMember($member->id, scanned: true);
-    }
-
-    /** A camera-decoded QR token routes through the SAME lookup as the wedge scanner (prompt 35). */
-    public function submitCameraScan(string $token): void
-    {
-        $this->scan = $token;
-        $this->submitScan();
-    }
-
-    public function selectMember(string $memberId): void
-    {
-        $this->holdMember($memberId, scanned: false);
+        $this->holdMember($member->id, $scanned);
     }
 
     /**
@@ -319,7 +287,7 @@ class DispensaryPos extends Component
     public function clearMember(): void
     {
         $this->reset([
-            'memberId', 'scanned', 'search', 'basket', 'activeGeneticId', 'activeBatchId',
+            'memberId', 'scanned', 'lookup', 'lookupSearched', 'basket', 'activeGeneticId', 'activeBatchId',
             'weightInput', 'calculatorMode', 'unitQty', 'cashTendered', 'walletInput', 'requireOverride',
             'limitBreach', 'overrideReason', 'priceOverrideEuros', 'priceOverrideReason', 'signaturePath',
             'lastDispensationId', 'lastOrderId', 'barBasket', 'voidReason', 'flashMessage',
@@ -536,7 +504,19 @@ class DispensaryPos extends Component
 
     // --- Commit -----------------------------------------------------------------
 
-    public function commit(): void
+    /**
+     * NOT `commit()` — that name is unreachable from a browser (prompt 195).
+     *
+     * Livewire v4's `$wire` proxy resolves an ALIAS TABLE before it looks for a component method, and that
+     * table maps `commit` → `$commit`, a built-in state flush that returns null. So `wire:click="commit"`
+     * called Livewire's own no-op and this method was never invoked from the counter. Ever. The button was
+     * hit-testable, enabled and produced a 200 — it just ran the wrong thing.
+     *
+     * The 42 tests over this path all call it from PHP (`Livewire::test(...)->call('commit')`), which
+     * invokes the method directly and never meets the proxy. They proved the method works, not that the
+     * button reaches it.
+     */
+    public function commitDispensation(): void
     {
         $this->attemptCommit(override: false);
     }
@@ -1046,7 +1026,6 @@ class DispensaryPos extends Component
             'walletCents' => $walletCents,
             'projectedWalletCents' => $walletCents - $walletPreview,
             'photoUrl' => $member !== null ? $this->photoUrl($member) : null,
-            'searchResults' => $this->searchResults($location),
             'genetics' => $this->filterGenetics($allGenetics),
             'categories' => $this->deriveCategories($allGenetics),
             'productTypes' => $this->deriveProductTypes($allGenetics),
@@ -1745,46 +1724,6 @@ class DispensaryPos extends Component
         return $actor instanceof User ? VaultUrl::photo($member, $actor) : null;
     }
 
-    /**
-     * Org-wide socio search (crosses locations by design — Member is org-scoped). When
-     * the sede requires check-in first, results are restricted to socios inside now.
-     *
-     * @return Collection<int, Member>|null
-     */
-    private function searchResults(?Location $location): ?Collection
-    {
-        $term = trim($this->search);
-
-        if (mb_strlen($term) < 2) {
-            return null;
-        }
-
-        $query = Member::query()
-            ->where(fn ($q) => $q
-                ->where('first_name', 'like', '%'.$term.'%')
-                ->orWhere('last_name', 'like', '%'.$term.'%')
-                ->orWhere('member_no', 'like', '%'.$term.'%'))
-            ->orderBy('last_name')
-            ->limit(8);
-
-        if ($this->checkedInRequired() && $location !== null) {
-            $query->whereIn('id', $this->checkedInMemberIds($location));
-        }
-
-        return $query->get();
-    }
-
-    /** @return list<string> */
-    private function checkedInMemberIds(Location $location): array
-    {
-        return CheckIn::query()->withoutGlobalScopes()
-            ->where('location_id', $location->id)
-            ->whereNull('checked_out_at')
-            ->pluck('member_id')
-            ->map(fn ($id): string => (string) $id)
-            ->all();
-    }
-
     private function isCheckedIn(Member $member, Location $location): bool
     {
         return CheckIn::query()->withoutGlobalScopes()
@@ -1829,7 +1768,7 @@ class DispensaryPos extends Component
 
         $this->memberId = $member->id;
         $this->scanned = $scanned;
-        $this->search = '';
+        $this->clearLookup();
 
         // A new socio always starts a fresh basket → a fresh idempotency key.
         $this->reset([

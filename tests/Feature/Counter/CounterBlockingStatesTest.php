@@ -389,11 +389,15 @@ class CounterBlockingStatesTest extends TestCase
 
         $this->assertSame('member', $this->blockerKind($html));
         $this->assertSame(1, substr_count($html, 'data-blocker-action'));
-        $this->assertStringContainsString('id="scan"', $html);          // the scan field
-        $this->assertStringContainsString('id="member-search"', $html); // and the name / nº lookup
+
+        // Prompt 194 — ONE field, not the stacked scan-box-above-name-box this state used to carry.
+        $this->assertSame(1, substr_count($html, 'id="member-lookup"'));
+        $this->assertStringNotContainsString('id="scan"', $html);
+        $this->assertStringNotContainsString('id="member-search"', $html);
 
         // And it actually resolves: searching from the blocking state surfaces the socio and clears it.
-        $component->set('search', $member->last_name)->assertSee($member->member_no)
+        $component->set('lookup', $member->last_name)->call('submitLookup')
+            ->assertSee($member->member_no)
             ->call('selectMember', $member->id);
 
         $this->assertSame(0, $this->blockerCount($component->html()));
@@ -439,7 +443,7 @@ class CounterBlockingStatesTest extends TestCase
         $user->assignRole(Role::MANAGER->value);
         $this->actingAs($user); // no sede
 
-        Livewire::test(DispensaryPos::class)->call('commit')->assertSet('flashType', 'error');
+        Livewire::test(DispensaryPos::class)->call('commitDispensation')->assertSet('flashType', 'error');
 
         $this->assertSame(0, Dispensation::query()->count());
     }
@@ -452,7 +456,7 @@ class CounterBlockingStatesTest extends TestCase
 
         Livewire::test(DispensaryPos::class)
             ->call('selectMember', $member->id)
-            ->call('commit')
+            ->call('commitDispensation')
             ->assertSet('flashType', 'error');
 
         $this->assertSame(0, Dispensation::query()->count());
@@ -465,7 +469,7 @@ class CounterBlockingStatesTest extends TestCase
 
         Livewire::test(DispensaryPos::class)
             ->call('selectMember', $member->id)
-            ->call('commit')
+            ->call('commitDispensation')
             ->assertSet('flashType', 'error');
 
         $this->assertSame(0, Dispensation::query()->count());
@@ -477,7 +481,7 @@ class CounterBlockingStatesTest extends TestCase
         $this->openTill();
 
         Livewire::test(DispensaryPos::class)
-            ->call('commit')
+            ->call('commitDispensation')
             ->assertSet('flashType', 'error')
             ->assertSee(__('Identifica a un socio antes de registrar una dispensación.'));
 
@@ -490,7 +494,7 @@ class CounterBlockingStatesTest extends TestCase
     {
         $this->operatorWithoutSede();
 
-        Livewire::test(BarPos::class)->call('commit')->assertSet('flashType', 'error');
+        Livewire::test(BarPos::class)->call('commitOrder')->assertSet('flashType', 'error');
 
         $this->assertSame(0, Order::query()->count());
     }
@@ -502,7 +506,7 @@ class CounterBlockingStatesTest extends TestCase
 
         Livewire::test(BarPos::class)
             ->call('addArticle', $this->article()->id)
-            ->call('commit')
+            ->call('commitOrder')
             ->assertSet('flashType', 'error');
 
         $this->assertSame(0, Order::query()->count());
@@ -514,7 +518,7 @@ class CounterBlockingStatesTest extends TestCase
 
         Livewire::test(BarPos::class)
             ->call('addArticle', $this->article()->id)
-            ->call('commit')
+            ->call('commitOrder')
             ->assertSet('flashType', 'error');
 
         $this->assertSame(0, Order::query()->count());
@@ -527,7 +531,7 @@ class CounterBlockingStatesTest extends TestCase
         $this->openTill(); // → the member blocking state is what renders
 
         Livewire::test(DispensaryPos::class)
-            ->call('commit')
+            ->call('commitDispensation')
             ->assertSee(__('Identifica a un socio antes de registrar una dispensación.'));
     }
 }

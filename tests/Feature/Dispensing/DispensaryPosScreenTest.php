@@ -132,7 +132,8 @@ class DispensaryPosScreenTest extends TestCase
             ->call('selectMember', $this->eligibleMember()->id)
             ->assertOk()
             ->assertSet('noLocation', false)
-            ->assertSee(__('Escanear tarjeta o buscar socio'))
+            // Prompt 194 — ONE field, labelled by the sede's card_readers_enabled wording (off here).
+            ->assertSee(__('Buscar socio por nombre o nº'))
             ->assertSee($this->genetic->name); // the genetics grid lists the priced sede genetic
     }
 
@@ -156,7 +157,7 @@ class DispensaryPosScreenTest extends TestCase
         // without a member" rule, enforced in the component guard.
         Livewire::test(DispensaryPos::class)
             ->assertSet('memberId', null)
-            ->call('commit')
+            ->call('commitDispensation')
             ->assertSet('flashType', 'error');
 
         $this->assertSame(0, Dispensation::query()->withoutGlobalScopes()->count());
@@ -178,7 +179,7 @@ class DispensaryPosScreenTest extends TestCase
             ->set('weightInput', '3.5')
             ->call('addLine')
             ->assertCount('basket', 1)
-            ->call('commit')
+            ->call('commitDispensation')
             ->assertSet('flashType', 'success');
 
         $this->assertSame(1, Dispensation::query()->withoutGlobalScopes()->count());
@@ -210,7 +211,7 @@ class DispensaryPosScreenTest extends TestCase
             ->assertCount('basket', 1)
             ->set('priceOverrideEuros', 'abc')            // not a number
             ->set('priceOverrideReason', 'Producto defectuoso')
-            ->call('commit')
+            ->call('commitDispensation')
             ->assertSet('flashType', 'error');            // rejected, never priced at zero
 
         $this->assertSame(0, Dispensation::query()->withoutGlobalScopes()->count());
@@ -231,7 +232,7 @@ class DispensaryPosScreenTest extends TestCase
             ->set('weightInput', '2')
             ->call('addLine')
             ->assertCount('basket', 1)
-            ->call('commit')
+            ->call('commitDispensation')
             ->assertSet('flashType', 'error');
 
         $this->assertSame(0, Dispensation::query()->withoutGlobalScopes()->count());
@@ -252,7 +253,7 @@ class DispensaryPosScreenTest extends TestCase
             ->set('weightInput', '3.5')
             ->call('addLine')
             ->set('offline', true) // the Alpine listener would set this when the connection drops
-            ->call('commit')
+            ->call('commitDispensation')
             ->assertSet('flashType', 'error')
             ->assertCount('basket', 1); // the basket survives — fail closed, not lost
 

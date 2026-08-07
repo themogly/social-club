@@ -157,7 +157,8 @@ class BlockingStatesHarnessTest extends TestCase
 
         $this->assertSame(1, substr_count($member, 'data-counter-blocker'));
         $this->assertStringContainsString('data-blocker="member"', $member);
-        $this->assertStringContainsString('id="member-search"', $member); // the fix is inside the blocker
+        // The fix is inside the blocker, and since prompt 194 it is ONE field rather than a stacked pair.
+        $this->assertSame(1, substr_count($member, 'id="member-lookup"'));
 
         // The resolved screen is deliberately NOT written here: DispensaryPos::mount() takes no parameters
         // and reads no member from the request, so a plain GET cannot reach it — only a Livewire interaction

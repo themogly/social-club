@@ -79,6 +79,34 @@ class CounterScreens
     }
 
     /**
+     * The label of the screen currently being rendered, or null off the counter.
+     *
+     * The counter layout names the page from this, so the browser tab, the top bar heading and the tab strip
+     * can never disagree. Before the accessibility audit all six screens fell through to the same
+     * *"Mostrador"*: six identical `<title>`s and six identical `<h1>`s, which is a WCAG 2.4.2 failure and,
+     * more practically, an operator with three counter tabs open who cannot tell them apart.
+     *
+     * Route name → label rather than a per-component title, because the labels already live here for the tab
+     * strip and a second copy would drift the first time one is renamed.
+     */
+    public static function currentLabel(): ?string
+    {
+        $route = request()->route()?->getName();
+
+        if ($route === null) {
+            return null;
+        }
+
+        foreach (self::forUser(null) as $screen) {
+            if ($screen['route'] === $route) {
+                return $screen['label'];
+            }
+        }
+
+        return null;
+    }
+
+    /**
      * Where one link into the counter should land this user.
      *
      * **Recepción, because that is where a shift starts** — but only if they can actually be there. The
@@ -93,6 +121,15 @@ class CounterScreens
 
         if ($reachable === []) {
             return null;
+        }
+
+        // Prompt 189 — the landing screen is a SETTING, not a law. The counter home is the default because
+        // the owner asked for it twice and it is the safer front door: a chooser cannot strand anybody,
+        // whereas landing straight on a working screen assumes we know which work they came to do. A club
+        // that would rather open on Recepción sets `counter_landing` to 'screen' and gets prompt 172's
+        // behaviour back unchanged. Either way the resolution below stays PER USER.
+        if (Settings::get('counter_landing', 'home') === 'home') {
+            return 'counter.home';
         }
 
         foreach ($reachable as $screen) {

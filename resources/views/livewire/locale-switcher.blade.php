@@ -20,7 +20,8 @@
                 // utility in this build, and the var honours a per-location accent override — prompt 03).
                 'inline-flex min-h-[1.5rem] min-w-[1.75rem] items-center justify-center rounded-md px-2 py-1 text-xs font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary-600)]',
                 'bg-[var(--primary-600)] text-white shadow-sm' => $current === $locale,
-                'text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white' => $current !== $locale,
+                // gray-600, not gray-500: on the gray-100 track the lighter step measures 4.39:1 (a11y audit).
+                'text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white' => $current !== $locale,
             ])
         >
             {{ strtoupper($locale) }}

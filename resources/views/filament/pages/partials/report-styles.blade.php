@@ -27,7 +27,7 @@
     .csc-sort:hover { color: var(--tx); }
     .csc-sort:focus-visible { outline: 2px solid var(--br); outline-offset: 2px; border-radius: 3px; }
     .csc-sort-caret { font-size: 0.6rem; opacity: .5; }
-    .csc-sort-on { color: var(--br); }
+    .csc-sort-on { color: var(--brtx); }
     .csc-sort-on .csc-sort-caret { opacity: 1; }
 
     /* Totals row */

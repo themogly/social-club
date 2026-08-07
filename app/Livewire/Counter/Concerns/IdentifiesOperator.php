@@ -33,6 +33,31 @@ trait IdentifiesOperator
     public ?string $operatorFeedback = null;
 
     /**
+     * {@see surfaceMode()} as a PROPERTY, so the client can read it LIVE (prompt 188).
+     *
+     * The surface used to snapshot the mode into Alpine's `x-data` at init. Livewire preserves the DOM
+     * across a re-render, so `x-data` is never re-evaluated and the component kept whatever value it
+     * started with. After a successful `unlockOperator()` the server's mode was null while Alpine still
+     * held 'unidentified', so the surface stayed up over a counter that was, server-side, perfectly ready
+     * — and only a manual reload cleared it. The state was right; only the client's copy was stale.
+     *
+     * A property is in the Livewire snapshot, and `$wire` is reactive, so an Alpine effect reading it
+     * re-runs when the server changes it. That fixes every transition at once — identify, switch operator,
+     * lock, unlock, enter and leave handover — rather than the one that happened to be reported.
+     */
+    public ?string $surfaceModeState = null;
+
+    /**
+     * Refresh the mirror on EVERY render, before the view and before the snapshot is built. A hook, not a
+     * line in each transition: the whole defect was one path forgetting to tell the client, and a rule
+     * that has to be remembered in six places will be forgotten in a seventh.
+     */
+    public function renderingIdentifiesOperator(mixed $view, mixed $data): void
+    {
+        $this->surfaceModeState = $this->surfaceMode();
+    }
+
+    /**
      * Which mode the counter's one full-screen surface is in, resolved SERVER-side (prompt 173).
      * `locked` is client-state (the idle timer) and is layered on top of this in the surface itself.
      *

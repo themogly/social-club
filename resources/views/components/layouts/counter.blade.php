@@ -12,7 +12,11 @@
         {{-- No public/indexable surface anywhere in this app (NOTES §A / §B). --}}
         <meta name="robots" content="noindex, nofollow">
 
-        <title>{{ $title ?? __('Mostrador') }} · {{ config('app.name') }}</title>
+        {{-- The screen's own name, from the ONE list the tab strip uses (App\Support\CounterScreens), so the
+             tab, the heading and the strip can never disagree. All six screens used to fall through to
+             "Mostrador" — six identical titles and six identical h1s (a11y audit, WCAG 2.4.2). --}}
+        @php($screenTitle = $title ?? \App\Support\CounterScreens::currentLabel())
+        <title>{{ $screenTitle ?? __('Mostrador') }} · {{ config('app.name') }}</title>
 
         {{-- Assets only when built (or the Vite dev server is hot); guarded so a
              full-page GET never 500s before `npm run build`, and tests stay quiet. --}}
@@ -88,7 +92,26 @@
         'min-h-full bg-surface-alt text-ink antialiased dark:bg-slate-950 dark:text-slate-100',
         'md:overflow-hidden' => $fills,
     ])>
-        <div @class([
+        {{-- Prompt 196 — THE COUNTER SHELL IS AN ALPINE SCOPE, and that is the whole fix.
+
+             Alpine 3 does not walk the document on start: it queries its root selectors and calls initTree
+             only on those subtrees. An element carrying `@click` with no `x-data` ancestor is never
+             initialised — with no console warning, no exception, nothing. The shared header had no scope, so
+             five handlers on every counter screen were dead: prompt 120's MANUAL lock (the idle timer was
+             fine — it registers on `alpine:init` and never needed a DOM binding, so the automatic control
+             worked and the deliberate one did not) and prompt 23's unsaved-work guard on the tab strip. The
+             nav items are real <a href>s, so `@click.prevent` not running meant the browser simply followed
+             the link: the guard was not absent, it was bypassed silently with a basket open. The overflow
+             menu's copy of the same guard worked, because that menu has its own x-data island.
+
+             Scoped HERE rather than on the header, deliberately: this div wraps the header AND <main>, so
+             every counter screen's content is covered too — the same bug had already reached prompt 189's
+             home screen, whose lock button and back-to-home guard were dead for exactly this reason. One
+             attribute, and the class cannot recur inside the counter. Nested x-data islands (the sede
+             switcher, the overflow menu, the 173 surface) are unaffected; Alpine nests scopes. --}}
+        <div
+            x-data="{}"
+            @class([
             'mx-auto flex min-h-screen w-full max-w-6xl flex-col',
             'md:h-screen md:min-h-0' => $fills,
         ])>
@@ -98,11 +121,17 @@
                  The tab strip, the overflow menu with its Panel link and Log out, the sede switcher and the
                  panic button are all inside this component — while an applicant holds the tablet there is no
                  element to find, no link to follow and nothing for a keyboard to reach. --}}
+            {{-- Skip link (a11y audit): the top bar is ~7 controls to tab past on EVERY counter screen, and
+                 the panel already has one. Visually hidden until focused, then it is the first thing on the
+                 page. Inside the handover guard's scope but outside it in the DOM, so it is absent while an
+                 applicant holds the tablet — same rule as the rest of the chrome. --}}
             @unless (\App\Support\CounterHandover::active())
-                <x-counter.top-bar :title="$title ?? null" />
+                <a href="#counter-main"
+                   class="sr-only rounded-xl bg-brand px-4 py-2 text-sm font-semibold text-white focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-[60]">{{ __('Saltar al contenido') }}</a>
+                <x-counter.top-bar :title="$screenTitle ?? null" />
             @endunless
 
-            <main @class([
+            <main id="counter-main" @class([
                 'flex-1 px-4 py-5 sm:px-6',
                 'md:min-h-0 md:overflow-hidden' => $fills,
             ])>

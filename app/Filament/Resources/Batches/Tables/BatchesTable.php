@@ -63,7 +63,9 @@ class BatchesTable
                         BatchStatus::QUARANTINED => 'warning',
                         BatchStatus::CLOSED => 'gray',
                     }),
-                TextColumn::make('expires_on')->label(__('Caduca'))->date()->sortable(),
+                // ->placeholder: an empty cell in a clickable Filament row is still an <a>, and one with no
+                // text is a link a screen reader cannot name (a11y audit). A batch with no expiry is common.
+                TextColumn::make('expires_on')->label(__('Caduca'))->date()->sortable()->placeholder('—'),
             ])
             ->filters([
                 TrashedFilter::make(),

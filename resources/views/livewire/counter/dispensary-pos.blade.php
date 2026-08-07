@@ -85,16 +85,20 @@
                 :action-href="route('counter.till')"
             />
         @else
-            {{-- The member step carries its own fix — see the partial. Replaced BOTH the grey empty state in
-                 the left column and the grey helper text under the commit button, which said the same thing
-                 twice in two styles. --}}
+            {{-- The member step carries its own fix — the lookup itself, not a link elsewhere. Replaced BOTH
+                 the grey empty state in the left column and the grey helper text under the commit button,
+                 which said the same thing twice in two styles.
+
+                 Prompt 194 — ONE field, the shared one. This blocking state used to stack a scan box above a
+                 name box (partials/member-identify), each already accepting what the other asked for. --}}
             <x-counter.blocking-state
                 data-blocker="member"
                 icon="🪪"
                 :heading="__('Identifica a un socio')"
                 :body="__('Sin socio no se puede registrar ninguna dispensación.')"
             >
-                @include('livewire.counter.partials.member-identify')
+                @include('livewire.counter.partials.member-lookup', ['autofocus' => true])
+                @include('livewire.counter.partials.checked-in-required')
             </x-counter.blocking-state>
         @endif
     @else
@@ -140,11 +144,13 @@
                 data-selection-pane
                 class="flex min-h-0 flex-1 flex-col gap-4 md:overflow-y-auto md:pr-1"
             >
-                {{-- Identify — the same partial the member blocking state uses, wrapped in this column's card
-                     chrome. Kept here so an operator can scan the next socio without clearing the current one
-                     first; the audit's finding 3 (this column eating the top of the screen) is prompt 176. --}}
+                {{-- Identify — the same shared lookup the member blocking state uses, wrapped in this column's
+                     card chrome. Kept here so an operator can scan the next socio without clearing the current
+                     one first; the audit's finding 3 (this column eating the top of the screen) is prompt 176.
+                     No autofocus: a basket is already in progress and the cursor belongs to it. --}}
                 <section class="rounded-2xl border border-line bg-surface p-4 dark:border-slate-800 dark:bg-slate-900">
-                    @include('livewire.counter.partials.member-identify')
+                    @include('livewire.counter.partials.member-lookup', ['autofocus' => false])
+                    @include('livewire.counter.partials.checked-in-required')
                 </section>
                 {{-- Weight entry panel (opens when a genetic is chosen). --}}
                 @if ($activeGenetic)
@@ -423,7 +429,7 @@
                                     @elseif ($g['has_batch'])
                                         <span class="inline-flex items-center gap-1 text-success"><span class="h-2 w-2 rounded-full bg-success"></span>{{ __('Con lote') }}</span>
                                     @else
-                                        <span class="inline-flex items-center gap-1 text-ink-muted dark:text-slate-500"><span class="h-2 w-2 rounded-full bg-slate-400"></span>{{ __('Sin lote') }}</span>
+                                        <span class="inline-flex items-center gap-1 text-ink-muted dark:text-slate-400"><span class="h-2 w-2 rounded-full bg-slate-400"></span>{{ __('Sin lote') }}</span>
                                     @endif
                                 </div>
                                 @if ($g['price_label'])
@@ -509,7 +515,7 @@
                                                 <span class="min-w-0">
                                                     {{ $remedy['detail'] }}
                                                     @if ($remedy['remedy'])
-                                                        <span class="mt-0.5 block text-[11px] opacity-80">{{ $remedy['remedy'] }}</span>
+                                                        <span class="mt-0.5 block text-[11px]">{{ $remedy['remedy'] }}</span>
                                                     @endif
                                                 </span>
                                                 <span class="shrink-0 rounded-full border border-current px-2 py-0.5 text-[10px] font-semibold uppercase">{{ $isBlock ? __('Bloquea') : __('Aviso') }}</span>
@@ -622,7 +628,7 @@
                                 <input type="text" inputmode="decimal" wire:model.blur="priceOverrideEuros" autocomplete="off" placeholder="{{ __('Nuevo total (€)') }}" class="h-11 w-full rounded-xl border border-line bg-surface px-3 text-base text-ink placeholder:text-ink-muted focus:border-warning focus:outline-none focus:ring-2 focus:ring-warning/40 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100">
                                 <input type="text" wire:model.blur="priceOverrideReason" autocomplete="off" placeholder="{{ __('Motivo (p. ej. producto defectuoso)') }}" class="h-11 w-full rounded-xl border border-line bg-surface px-3 text-base text-ink placeholder:text-ink-muted focus:border-warning focus:outline-none focus:ring-2 focus:ring-warning/40 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100">
                             </div>
-                            <p class="mt-1 text-[11px] text-ink-muted dark:text-slate-500">{{ __('Deja el importe vacío para cobrar el precio normal. 0 € = gratis.') }}</p>
+                            <p class="mt-1 text-[11px] text-ink-muted dark:text-slate-400">{{ __('Deja el importe vacío para cobrar el precio normal. 0 € = gratis.') }}</p>
                         </div>
                     @endcan
 
@@ -633,7 +639,7 @@
                             <label for="wallet" class="block text-xs font-medium text-ink-muted dark:text-slate-400">{{ __('Monedero (€)') }}</label>
                             <input id="wallet" type="text" inputmode="decimal" wire:model.live.debounce.400ms="walletInput" @disabled($member === null) autocomplete="off" placeholder="0,00" class="mt-1 h-11 w-full rounded-xl border border-line bg-surface px-3 text-base text-ink placeholder:text-ink-muted focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/40 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100">
                             @if ($member === null)
-                                <p class="mt-1 text-[11px] text-ink-muted dark:text-slate-500">{{ __('Atribuye un socio para pagar con monedero.') }}</p>
+                                <p class="mt-1 text-[11px] text-ink-muted dark:text-slate-400">{{ __('Atribuye un socio para pagar con monedero.') }}</p>
                             @endif
                         </div>
 
@@ -780,15 +786,15 @@
                          commit() flashes its reason into the colocated block above — never a silent dead control. --}}
                     <button
                         type="button"
-                        wire:click="commit"
+                        wire:click="commitDispensation"
                         data-commit-action
                         wire:loading.attr="disabled"
-                        wire:target="commit"
+                        wire:target="commitDispensation"
                         x-bind:disabled="! online"
                         class="mt-4 h-16 w-full rounded-xl bg-brand text-lg font-bold text-white transition hover:bg-brand-dark focus:outline-none focus:ring-2 focus:ring-brand/40 disabled:cursor-not-allowed disabled:opacity-50"
                     >
-                        <span wire:loading.remove wire:target="commit">{{ __('Registrar aportación') }}</span>
-                        <span wire:loading wire:target="commit">{{ __('Registrando…') }}</span>
+                        <span wire:loading.remove wire:target="commitDispensation">{{ __('Registrar aportación') }}</span>
+                        <span wire:loading wire:target="commitDispensation">{{ __('Registrando…') }}</span>
                     </button>
                 </div>
             </aside>

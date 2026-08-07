@@ -148,6 +148,22 @@ class Settings
         // operator out, so commits are refused server-side and an unattended tablet stops showing member data
         // until someone re-enters a PIN. Per-location (a quiet sede may want longer). 0 disables the idle lock.
         'counter_idle_lock_minutes' => 5,
+        // Where one link into the counter lands (prompt 189). 'home' = the tile hub, 'screen' = straight to
+        // the first screen the operator may open (prompt 172's per-user resolution, which is the fallback
+        // either way — a till-only operator must always land somewhere they are allowed to be).
+        'counter_landing' => 'home',
+        // Prompt 193 — the bar's two optional cart panels, per SEDE. Most bar sales are a coffee for cash, so
+        // both default OFF and the panel is not rendered at all when off (not collapsed, not disabled) — the
+        // cart column then opens on the basket, where the operator's attention belongs. The flag governs
+        // INPUT only: a socio or a ticket reference recorded earlier still renders on receipts, in the ledger
+        // export and in reports.
+        // Prompt 194 — does this sede have card readers? CONFIGURATION, not feature detection: a USB QR or
+        // RFID reader is a keyboard and has no presence any browser API can detect, so there is nothing to
+        // test for. It changes the lookup field's WORDS only; token resolution runs either way, so a scan
+        // that happens anyway still works. Default off — a club with no readers must never be told to scan.
+        'card_readers_enabled' => false,
+        'bar_attach_socio_enabled' => false,
+        'bar_ticket_reference_enabled' => false,
         // Panic lockdown (prompt 121), all per-org. The safety-net auto-reactivation runs after this many
         // minutes so a locked-out club — who are the data controller — always regains access to their own
         // statutory register (default 24h). The owner email "way back" link is valid for this many hours.

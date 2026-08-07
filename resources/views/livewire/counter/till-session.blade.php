@@ -143,9 +143,9 @@
                              empty required field with no explanation — so it says why it is empty and where
                              the figure comes from once someone sets one. --}}
                         @if ($this->defaultFloatCents() !== null)
-                            <p data-float-default class="mt-1.5 text-xs text-ink-muted dark:text-slate-500">{{ __('Fondo habitual de la sede. Puedes cambiarlo.') }}</p>
+                            <p data-float-default class="mt-1.5 text-xs text-ink-muted dark:text-slate-400">{{ __('Fondo habitual de la sede. Puedes cambiarlo.') }}</p>
                         @else
-                            <p data-float-no-default class="mt-1.5 text-xs text-ink-muted dark:text-slate-500">{{ __('Esta sede no tiene fondo por defecto. Escribe el importe con el que abres; un responsable puede fijarlo en Ajustes.') }}</p>
+                            <p data-float-no-default class="mt-1.5 text-xs text-ink-muted dark:text-slate-400">{{ __('Esta sede no tiene fondo por defecto. Escribe el importe con el que abres; un responsable puede fijarlo en Ajustes.') }}</p>
                         @endif
                     </div>
                     <button
@@ -352,9 +352,9 @@
                     <div class="flex items-center justify-between gap-3 py-2">
                         <dt class="text-ink-muted dark:text-slate-400">
                             {{ __('Contribuciones con monedero') }}
-                            <span class="ml-1 whitespace-nowrap rounded-full border border-line px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-ink-muted dark:border-slate-700 dark:text-slate-500">{{ __('Excluido del cajón') }}</span>
+                            <span class="ml-1 whitespace-nowrap rounded-full border border-line px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-ink-muted dark:border-slate-700 dark:text-slate-400">{{ __('Excluido del cajón') }}</span>
                         </dt>
-                        <dd class="tabular-nums text-ink-muted dark:text-slate-500">{{ $this->money($b['wallet_contributions']) }}</dd>
+                        <dd class="tabular-nums text-ink-muted dark:text-slate-400">{{ $this->money($b['wallet_contributions']) }}</dd>
                     </div>
                     <div class="flex items-center justify-between py-2">
                         <dt class="text-ink-muted dark:text-slate-400">{{ __('Barra y tienda en efectivo') }}</dt>
@@ -523,26 +523,11 @@
                     <fieldset @disabled(! $this->hasOperator()) class="contents">
 
                     @if ($feeMember === null)
+                        {{-- Prompt 194 — the SAME lookup as the door and the dispensary. The caja's own name
+                             box could not resolve a scanned card. No autofocus: this panel is one of several
+                             on a screen whose main job is the drawer, not identifying anybody. --}}
                         <div class="mt-4">
-                            <label for="feeSearch" class="block text-sm font-medium text-ink-muted dark:text-slate-400">{{ __('Buscar socio (nombre o nº)') }}</label>
-                            <input id="feeSearch" type="text" wire:model.live.debounce.300ms="feeSearch" autocomplete="off"
-                                   placeholder="{{ __('Ej. García o M-00042') }}"
-                                   class="mt-2 h-12 w-full rounded-xl border border-line bg-surface px-4 text-base text-ink placeholder:text-ink-muted focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/40 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100">
-                            @if ($feeResults !== null)
-                                <ul class="mt-2 divide-y divide-line rounded-xl border border-line dark:divide-slate-800 dark:border-slate-800">
-                                    @forelse ($feeResults as $result)
-                                        <li>
-                                            <button type="button" wire:click="selectFeeMember('{{ $result->id }}')"
-                                                    class="flex w-full items-center justify-between px-4 py-3 text-left text-sm hover:bg-surface-alt dark:hover:bg-slate-800">
-                                                <span class="font-medium">{{ $result->fullName() }}</span>
-                                                <span class="text-ink-muted dark:text-slate-400">{{ $result->member_no }}</span>
-                                            </button>
-                                        </li>
-                                    @empty
-                                        <li class="px-4 py-3 text-sm text-ink-muted dark:text-slate-400">{{ __('Sin resultados.') }}</li>
-                                    @endforelse
-                                </ul>
-                            @endif
+                            @include('livewire.counter.partials.member-lookup', ['autofocus' => false])
                         </div>
                     @else
                         <div class="mt-4 flex items-center justify-between rounded-xl bg-surface-alt px-4 py-3 dark:bg-slate-800">
@@ -627,7 +612,7 @@
                                     class="mt-2 h-12 w-full rounded-xl border border-line bg-surface px-4 text-base text-ink placeholder:text-ink-muted focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/40 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
                                 >
                                 {{-- Blind, exactly like the arqueo: the expected figure is not on this screen. --}}
-                                <p class="mt-1 text-xs text-ink-muted dark:text-slate-500">{{ __('Cuenta primero. La diferencia se calcula después y queda en el arqueo del día.') }}</p>
+                                <p class="mt-1 text-xs text-ink-muted dark:text-slate-400">{{ __('Cuenta primero. La diferencia se calcula después y queda en el arqueo del día.') }}</p>
                             </div>
 
                             <div>
@@ -641,7 +626,7 @@
                                     wire:model="handoverPin"
                                     class="mt-2 h-12 w-full rounded-xl border border-line bg-surface px-4 text-base tracking-widest text-ink focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/40 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
                                 >
-                                <p class="mt-1 text-xs text-ink-muted dark:text-slate-500">{{ __('Quien entra se identifica antes de que salgas: así el cajón nunca queda sin responsable.') }}</p>
+                                <p class="mt-1 text-xs text-ink-muted dark:text-slate-400">{{ __('Quien entra se identifica antes de que salgas: así el cajón nunca queda sin responsable.') }}</p>
                             </div>
 
                             <div>

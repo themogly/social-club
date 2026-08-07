@@ -20,6 +20,8 @@ import { mkdirSync } from 'node:fs';
 const STATES = [
   { name: 'no-sede', surfaceUp: false },   // fresh terminal: sede blocker + reachable switcher
   { name: 'with-sede', surfaceUp: true },  // sede chosen: the operator surface owns its own step
+  { name: 'identified', surfaceUp: false },// 188's "after": identified, surface down, no reload
+  { name: 'handover', surfaceUp: true },   // 187 defect 2: the resting state and the way back
 ];
 const VIEWPORTS = [
   { name: '1180x820', width: 1180, height: 820 }, // iPad landscape — the counter's working orientation
@@ -35,6 +37,19 @@ const MOTION = ['reduce', 'no-preference'];
 // makes the real call from the server-rendered `data-surface-mode`. Alpine ships inside Livewire's bundle,
 // which will not boot without a Livewire endpoint, so the standalone build is injected instead.
 const ALPINE = 'node_modules/alpinejs/dist/cdn.min.js';
+
+// Prompt 188 bound the surface's mode to `$wire.surfaceModeState` so a server-side change reaches the client
+// without a reload. `$wire` is Livewire's magic and does not exist in a static capture, so it is stubbed here
+// from the SAME server-rendered value the property holds — the `data-surface-mode` attribute on the surface
+// itself. That is a stand-in for one property, taken from the server's own output, not a mocked decision:
+// what the surface then does with it is the real code. Registered before Alpine so `alpine:init` catches it.
+const WIRE_STUB = `
+  document.addEventListener('alpine:init', () => {
+    const el = document.querySelector('[data-counter-surface]');
+    const mode = el?.getAttribute('data-surface-mode');
+    window.Alpine.magic('wire', () => ({ surfaceModeState: (!mode || mode === 'none') ? null : mode }));
+  });
+`;
 
 const OUT = 'storage/app/screenshots/187';
 mkdirSync(OUT, { recursive: true });
@@ -54,6 +69,7 @@ for (const state of STATES) {
           viewport: { width: vp.width, height: vp.height },
         });
         await page.goto(url);
+        await page.addScriptTag({ content: WIRE_STUB });
         await page.addScriptTag({ path: resolve(ALPINE) });
         await page.waitForTimeout(400);   // alpine:init registers the counter store, then x-if renders
 
@@ -69,7 +85,20 @@ for (const state of STATES) {
           failed = true;
         }
 
-        if (state.surfaceUp) {
+        if (state.name === 'handover') {
+          // The reported bug was a surface with no control of any kind. Assert the way back is really on
+          // screen — not merely in the markup — and that the applicant is not being shown a PIN pad.
+          const staff = await page.$('[data-handover-staff]');
+          const box = staff === null ? null : await staff.boundingBox();
+          if (box === null || box.width === 0) {
+            console.error(`FAIL ${state.name} @ ${vp.name}/${theme}: no visible way out of handed-over mode`);
+            failed = true;
+          }
+          if (await page.$('[data-counter-surface-unlock]') !== null) {
+            console.error(`FAIL ${state.name} @ ${vp.name}/${theme}: the PIN pad is shown to the applicant`);
+            failed = true;
+          }
+        } else if (state.surfaceUp) {
           // The PIN pad is the surface's whole purpose; it lives in an x-if template, so its presence also
           // proves Alpine really ran rather than the capture being a styled shell.
           const pad = await page.$('[data-counter-surface-unlock]');
@@ -91,9 +120,12 @@ for (const state of STATES) {
             }
           }
 
+          // Exactly one blocking state belongs to the sede step. `identified` is the counter working
+          // normally — it should have NONE, which is prompt 188's whole point.
           const blockers = await page.$$eval('[data-counter-blocker]', (n) => n.length);
-          if (blockers !== 1) {
-            console.error(`FAIL ${state.name} @ ${vp.name}/${theme}: ${blockers} blocking states, expected exactly 1`);
+          const expected = state.name === 'no-sede' ? 1 : 0;
+          if (blockers !== expected) {
+            console.error(`FAIL ${state.name} @ ${vp.name}/${theme}: ${blockers} blocking states, expected ${expected}`);
             failed = true;
           }
         }

@@ -7875,3 +7875,567 @@ screens are covered, not just check-in, because all five include the surface.
 
 **MySQL was left to CI**, per the running order: `composer check` green on SQLite. This branch changes a
 rendering condition and one translated string — no migration, no query, nothing driver-sensitive.
+
+---
+
+## Prompt 187, defect 2 — handed-over mode shipped with no way out
+
+**The bug.** On any counter screen during a handover the surface showed a heading, a sentence, and a box
+reading *"El formulario se abrirá aquí."* — no button, no pad, no control of any kind. Reported as *"if I
+close the form I get stuck on this page."*
+
+**Why the box was empty, and always would have been.** That placeholder was written expecting prompt 174 to
+fill it. 174 chose differently and better: `handOverForAlta` **redirects** to the real tokenised route, so
+the applicant fills in the actual form with prompt 167's language switcher on it. Which means this surface
+is not where the form appears — it is what shows when the applicant *leaves* that form, by the back button
+or by closing it. The promise was therefore permanent and false.
+
+**Handed-over mode stays TERMINAL-WIDE.** The prompt asked whether it should carry its own surface
+everywhere or stop persisting outside the flow that owns it. It must persist: the mode describes *who is
+holding the device*, not which screen is open — which is why 173 made it session-backed, and why the Phase C
+security fix (`EnforceCounterHandover`) can allowlist all five counter screens at all. Each of them renders
+only this surface; if the mode stopped applying outside the Socios tab, navigating to `/counter/pos` during
+a handover would render the POS to a stranger, which is the exact leak the mode exists to prevent. So the
+fix is that the surface is *complete* everywhere, not that it stops persisting.
+
+**How the way back is surfaced: a small, muted, always-present button.** Not a long-press. A hidden gesture
+is undiscoverable for the staff member who needs it, unreachable by keyboard or assistive technology, and
+impossible to assert as "present" in any honest sense — and the prompt ruled an invisible one out. So
+`data-handover-staff` is a real `<button>`, labelled *"Personal del club"*, muted and set well apart from
+the applicant's own content so it reads as *not for you*. Pressing it only opens the PIN pad, which an
+applicant cannot pass. A second control returns from the pad to the applicant's screen, so a mis-tap does
+not strand them in front of a keypad.
+
+**The PIN pad is the same pad.** It is one `<template>` for all three modes, selected by `padVisible`, so
+handed-over mode goes through the identical `unlockOperator()` call and therefore the identical
+`UnlockOperator` throttle — asserted, because a third mode with its own pad would be exactly the drift 173
+deleted two partials to stop.
+
+**The resting state.** Heading, the true instruction (*fill in your details, hand the tablet back*), and —
+when a return URL was recorded with the handover — *"Continuar con mi solicitud"*, back to their own form by
+the token they already hold. Nothing of the club's is in that link. Where no form exists the button is
+simply absent rather than dead.
+
+**Untouched:** `CounterBlocker`, `UnlockOperator` and its throttle, when the surface raises, the opacity,
+the precedence (handover outranks locked outranks unidentified), and every 173 leak guarantee — the operator
+is not named, the sede is not named, the chrome is absent from the DOM, the back button does not return the
+counter, and the idle timer still lands on locked. All re-asserted alongside the new control rather than
+assumed.
+
+**Verified by picture:** the harness now writes a third artifact and the Playwright pass captures 24 images
+across both orientations, both themes, motion both ways — asserting the way back is genuinely *on screen*
+(a non-zero bounding box, not merely present in the markup) and that the applicant is never shown the pad.
+
+**MySQL was left to CI**, per the running order: `composer check` green on SQLite. This branch changes one
+Blade partial and five translated strings — no migration, no query.
+
+---
+
+## Prompt 188 — the surface mode was snapshotted into Alpine and never updated
+
+**The bug.** Enter your PIN, press Identificarse, and nothing happens. The PIN was accepted — a manual
+reload revealed the counter with *"Trabajando: …"* in the bar — but the surface stayed up until you
+refreshed.
+
+**Cause.** `serverMode: @js($surfaceMode)` copied the mode into Alpine's `x-data` **once**, at init. Livewire
+preserves the DOM across a re-render, so `x-data` is never re-evaluated: after `unlockOperator()` the
+server's mode was null while the client still held `'unidentified'`. The server state was right the whole
+time; only the client's copy was stale. A reload re-initialised `x-data` and the surface vanished.
+
+**What it is bound to now.** `IdentifiesOperator::$surfaceModeState` — a public property mirroring
+`surfaceMode()`, refreshed by a `renderingIdentifiesOperator()` trait hook on **every** render, before the
+view and before the snapshot is built. The Blade getter reads `$wire.surfaceModeState`. `$wire` is a
+reactive proxy, so an Alpine effect that reads it re-runs when the server changes it.
+
+**A hook, not a line in each transition.** The defect was one path forgetting to tell the client; a rule
+that must be remembered in six places will be forgotten in a seventh. Refreshing on render fixes
+identifying, switching operator, locking, unlocking, and entering and leaving handed-over mode in one
+stroke — and the tests assert all five, not just the one that was reported.
+
+**A redirect after identifying was considered and REJECTED.** It would have masked this single instance and
+left the staleness in place for every other transition — and it would have thrown away the basket and form
+state that prompt 173 deliberately preserves across the surface. There is a test that a basket in progress
+survives lock → unlock → switch operator → handover → back.
+
+**Precedence is unchanged and asserted:** handed-over outranks the client-side idle lock, which outranks the
+server's "no operator yet". An applicant must not be shown a lock mid-form, and an operator already
+identified once must see the lock rather than a fresh identify prompt.
+
+**Untouched:** `UnlockOperator`, its throttle, and when the surface raises. The server logic was correct.
+
+**One consequence for the browser harness, recorded because it looks like a regression and is not.** The
+surface now depends on `$wire`, which does not exist in a static capture. `shoot-surface-chain.mjs`
+therefore stubs that ONE property from the same server-rendered value it mirrors — the `data-surface-mode`
+attribute on the surface itself. What the surface does with the value is still the real code; only the
+transport is stood in for.
+
+**MySQL was left to CI**, per the running order: `composer check` green on SQLite. One property, one trait
+hook and one Blade getter — no migration, no query.
+
+---
+
+## Prompt 189 — the counter gets a front door, and the top bar gives some back
+
+**Two reports, one cause.** The owner asked twice for "a page with big grid icons for all the sections", and
+separately that "the menu at the top is too cramped". They are the same problem: the bar was doing a home
+screen's job.
+
+**It filled up honestly.** Prompt 132 folded the secondary actions into one overflow so five destinations
+would fit; prompt 173 then retired the operator strip and moved *"Trabajando: …"* into the same row. Each
+step was right on its own. The row was full before the last one arrived.
+
+**The earlier recommendation against a hub was too narrow, and this branch says so.** The evidence for
+landing on a queue rather than a menu still stands — the unit of work at a counter is a member, not a
+basket. But a hub and a queue-first landing were never in conflict. Dynamics' own split is the useful rule:
+operations that are not specific to the current transaction belong on the welcome screen; selling belongs on
+the transaction screen. So: build the hub, and make **which one you land on a decision rather than an
+accident**.
+
+**The landing screen is now a Setting, defaulting to the hub.** `counter_landing` = `'home'` (default) or
+`'screen'`. Default `home` because the owner asked for it twice and because a chooser cannot strand anybody,
+whereas landing straight on a working screen assumes we know which work they came to do. `'screen'` restores
+prompt 172's behaviour exactly, and **172's guarantee is preserved either way**: resolution stays per user,
+so a till-only operator still lands somewhere they are allowed to be — the home screen is reachable by
+anyone who can reach any counter screen, which makes it a legal landing rather than an exception.
+
+**ONE source for the destinations.** The tiles come from `CounterScreens::reachableFor()` — the same list,
+with the same gates, the tab strip reads. 172 extracted it precisely so there would not be two, and the test
+asserts against that list rather than a hard-coded one: a tile to a screen the operator cannot open is the
+same defect as a link to a 403.
+
+**It is not a way around a precondition.** The home screen sits behind prompt 175's chain like every other
+counter screen: no sede blocks it, in the same order, and 173's surface still owns identifying.
+
+### What actually left the bar, measured
+
+`measure-topbar.mjs` (prompt 132) asks whether anything OVERLAPS or falls under 44px. It passed before this
+branch and passes after — which is exactly why it could not see what the owner was describing. Overlap is
+the failure state; cramped is the state just before it. `measure-topbar-density.mjs` measures the split
+instead: how much of the row the fixed furniture claims, and how much is left for the destinations.
+
+| | before | after |
+|---|---|---|
+| furniture, 1180×820 landscape | 371px (33% of 1120) | **331px (30%)** |
+| furniture, 820×1180 portrait | 371px (47% of 788) | **331px (42%)** |
+| strip headroom, portrait | 181px | **221px (+22%)** |
+
+**Gone from the bar:** the dedicated *"lock now"* button, to the home screen. It was a 44px control on a row
+reported as cramped, and locking is not something you do mid-basket — the idle timer (prompt 120) is
+unchanged and still locks on its own, and home is one tap away because the brand block is now the way there.
+**The operator pill** now appears from `xl` rather than `sm`, so it is absent from the portrait row where
+space is tightest; the home screen carries the name as a real control (it doubles as *switch operator*).
+
+**What deliberately STAYED, against the prompt's suggestion, and why:**
+
+- **The Panel link.** `BackToDashboardTest` pins it to *every* counter screen as an invariant in both
+  directions: a panel user must always have a way in, and a counter-only tablet must have none. Removing it
+  from the bar would have meant rewriting a test the prompt said must pass untouched, to weaken a security
+  assertion. It is on the home screen too — a duplicated *link* to one route, not duplicated logic.
+- **The sede switcher.** Prompt 187 had just established that when the sede is unset the switcher must be
+  reachable, because the blocking state points at it. Home's own sede buttons sit *past* that blocker by
+  design, so they cannot be the answer to it. Moving the switcher would have recreated 187's deadlock in a
+  new place. The home screen's copy of it is for switching sede when you are already working.
+
+The honest summary: the hub is the substantial half of this branch; the bar reclaimed 40px and a percentage
+point or two of density. That is a real improvement and a modest one, and it is reported as measured rather
+than as the win the framing invites.
+
+**MySQL was left to CI**, per the running order: `composer check` green on SQLite. One new Livewire
+component, one route, one Setting key and a Blade edit — no migration.
+
+---
+
+## Prompt 193 — the bar screen: a real list row, and two panels most sales do not need
+
+### The list view was the grid tile rotated
+
+`list` and `grid` shared one markup with `flex-col lg:flex-row`, and the tile's image block is `h-24 w-full`
+— so in a row it claimed the entire width and the name, price and stock were squeezed into what was left.
+
+**Measured, before → after** (12 articles, built CSS, `[x-show]` hidden as prompt 175's script does):
+
+| viewport | rows on screen before | after | first row before → after |
+|---|---|---|---|
+| 1180×820 landscape | 6 / 12 | **9 / 12** | 714×106 → **714×68** |
+| 820×1180 portrait | 6 / 12 | **12 / 12** | 414×**166** → **414×68** |
+| 1440×900 | 7 / 12 | **10 / 12** | 714×106 → 714×68 |
+| 1280×720 short laptop | 5 / 12 | **8 / 12** | 714×106 → 714×68 |
+
+The reported "~165px tall" was the **portrait** case: below `lg` the tile did not rotate at all, so list mode
+was literally the grid tile stacked. Six rows filled the viewport — worse density than the grid it is an
+alternative to, which left list mode with no reason to exist.
+
+A row is now its own component: 68px tall (the prompt's 64–72 band), name on ONE line with `truncate`, price
+and stock right-aligned in their own columns with `tabular-nums` so the numbers scan straight down. **No name
+wraps at any tested width in list mode.** (Three wrap in GRID at 820 portrait — that is the tile's deliberate
+`line-clamp-2`, which is correct for a tile and is left alone.)
+
+**The thumbnail column is omitted entirely when no article at the sede has an image**, which is every article
+today. A large empty glyph filling most of a row is a broken-looking gap, not a design. When some article
+does have one, the column appears and articles without a photo get an initial at thumbnail size. Nothing
+fabricates an image; the photos are the club's to supply and are flagged as a content gap, not a defect.
+
+**The default was already grid, not list.** The prompt believed the bar defaults to list; it does not —
+`BarPos::$articleLayout = 'grid'`, which already matches the audit's conclusion (list for genetics, grid for
+bar articles). Nothing to revisit. The reporter had toggled to list, which is how the row was found.
+
+### Socio and ticket reference are now per-sede settings, default OFF
+
+`bar_attach_socio_enabled` and `bar_ticket_reference_enabled`, on `LocationForm` beside `bar_enabled` and
+`counter_idle_lock_minutes` — per-sede, because that is where the other counter toggles live. When off the
+panel is **not rendered at all**, so the cart column opens on the Basket.
+
+Three consequences, handled:
+
+- **Wallet goes with the socio.** Wallet payment requires one, so when attaching a socio is off the wallet
+  field is removed rather than left permanently disabled — offering a tender that can never complete is
+  worse than not offering it.
+- **A combined settle is unaffected**, by construction rather than by a special case: it runs on the
+  DISPENSARY screen through `CommitCombinedSettle`, where the member is already identified, and never goes
+  through the bar's socio panel.
+- **The flag governs INPUT, never DISPLAY.** A socio or reference recorded before the flag was turned off
+  still renders on its receipt, in the ledger and in reports — asserted directly against a rendered receipt
+  with both flags off.
+
+### The cart column, and prompt 192's finding
+
+192 measured the outcome of pressing Charge rendering **~650px from the button** in an 820px viewport, and
+**212px of the cart hidden below a silent fold**. Both are fixed here:
+
+- **The flash is one partial rendered in one of two positions, never both.** Beside Charge when there is a
+  Charge to stand beside; at the top of the page when a blocking state has replaced the cart column
+  entirely. Moving it unconditionally broke `test_bar_no_open_till_states_a_reason` immediately — the
+  original comment ("a blocking state replaces the work, not the warnings") was right, and the test caught
+  the regression the same minute it was introduced.
+- **The cart now hides 0px at every tested viewport** (was 212 / 0 / 132 / 312), and the commit button is
+  fully on screen at all four — mostly because the two panels that used to sit above the basket are gone by
+  default.
+
+### Two harness bugs found while doing this, both worth keeping
+
+- `@php($x = collect(...)->contains(fn () => ...))` is a **Blade parse error** — an arrow function's `=>`
+  inside the parenthesised form. The 500 page renders the template SOURCE, so
+  `assertStringContainsString('data-product')` passed against the exception page. The harness now calls
+  `assertOk()` first.
+- The measurement script did not hide `[x-show]` elements, so the offline banner (54px, hidden by Alpine in
+  the real app) rendered in the static capture and reported the commit button below the fold when it is not.
+  Prompt 175's script hides them for exactly this reason.
+
+**MySQL was left to CI**, per the running order: `composer check` green on SQLite. Two Setting keys and Blade
+— no migration.
+
+---
+
+## Prompt 195 — `commit` is a reserved Livewire name, so neither POS could take money from a browser
+
+**The most serious defect found in this programme.** Livewire v4's `$wire` proxy resolves an ALIAS TABLE
+before it looks for a component method. Verified in this tree, `vendor/livewire/livewire/dist/livewire.esm.js`
+line 11657:
+
+```js
+var aliases = { …, "commit": "$commit", … };
+…
+get(target, property) {
+  if (property === "__instance") return component;
+  if (property in aliases)      return getProperty(component, aliases[property]);   // ← taken
+  else if (property in properties) …
+  else return getFallback(component)(property);                                     // ← never reached
+}
+```
+
+So `wire:click="commit"` resolved to Livewire's built-in `$commit` — a state flush returning null — and
+`DispensaryPos::commit()` and `BarPos::commit()` were **never invoked from a browser**. The buttons were
+enabled, hit-testable and returned 200. Exactly two collisions exist app-wide; a scan of every public method
+on every `App\Livewire` class and its traits found no others.
+
+**Reproduced in a real browser, on the same build, same click:**
+
+| | `commit` | renamed |
+|---|---|---|
+| Livewire call over the wire | `["$commit"]` | `["commitOrder"]` |
+| flash | `null` | *Order recorded.* |
+| `orders` | 57 → **57** | 56 → **57** |
+
+Names chosen: **`commitDispensation()`** and **`commitOrder()`**, after the Actions they call
+(`CommitDispensation`, `CommitOrder`). No behaviour changed — `attemptCommit()`, every guard, the signature
+requirement, the till check and the override path are untouched. `commitWithOverride()` was already safe.
+
+**Why 42 green tests proved nothing.** They all call the method from PHP:
+
+```php
+Livewire::test(DispensaryPos::class)->…->call('commit')
+```
+
+`Testable::call()` invokes the PHP method directly and never goes near the JS proxy, so it never meets the
+alias table. **The tests proved the method works; they could not prove the button reaches it.** This is the
+third instance of the same shape in this session — the handover test that enumerated only counter routes,
+and prompt 60's `assertSee()` that is true wherever the markup renders — and it is the most expensive one.
+
+**Two guards now, and the alias list is PARSED FROM THE VENDOR DIST rather than copied.** One writer per
+fact: a Livewire upgrade that adds an alias colliding with an existing action fails loudly instead of
+silently killing another button. `LivewireReservedNameTest` asserts (a) no method this project *declares* on
+an `App\Livewire` class or its traits is named after an alias — filtered to declared methods, because
+Livewire's own base class legitimately provides `id()`, `dispatch()` and `js()` — and (b) no
+`wire:click|submit|change|blur|target|keydown` in any Blade names one. Both fail against the old names.
+
+**`tests/Browser/prove-commit-click.mjs` is the coverage that was missing**, and unlike the other `.mjs` it
+needs a running server: it logs in, chooses a sede, identifies with a PIN, adds a line, presses the REAL
+button, and asserts the request names the action and an order row appears. Two things worth knowing for the
+next person: Livewire v4 serves its update endpoint from an **obfuscated path** (`/livewire-<hash>/update`),
+so a filter on `/livewire/update` captures nothing; and matching the raw body for the method name is more
+durable than parsing a payload shape Livewire is free to change.
+
+**MySQL was left to CI**, per the running order: `composer check` green on SQLite. Two method names and their
+call sites — no migration, no query.
+
+---
+
+## Prompt 196 — the counter chrome's Alpine handlers were never bound
+
+**Alpine 3 does not walk the document on start.** It queries its root selectors and calls `initTree` only on
+those subtrees, so an element carrying `@click` with no `x-data` ancestor is never initialised — with **no
+console warning, no exception, nothing**. That silence is why this survived: every other failure mode in this
+programme left a symptom.
+
+The shared counter header opened `<header data-counter-topbar …>` with no `x-data`, and nothing between it
+and `<body>` had one. Measured live (`_x_attributeCleanups` present = Alpine bound it):
+
+| control | before | after |
+|---|---|---|
+| `data-counter-home-link` (the unsaved-work guard on the way home) | **false** | **true** |
+| `data-counter-screen` ×N (the tab strip's unsaved-work guards) | **false** | **true** |
+| `data-counter-overflow-trigger` (inside its own `x-data` island) | true | true |
+
+**What it cost.** Prompt 120's **manual** lock did nothing — and note which half of that pair broke: the idle
+timer registers on `alpine:init` and never depended on a DOM binding, so the **automatic** control worked all
+along and the **deliberate** one did not, which is exactly the wrong way round. Prompt 23's unsaved-work
+guard never fired on the tab strip, and that is worse than absent: the nav items are real `<a href>`s, so
+`@click.prevent` not running means the browser simply follows the link — the guard was *bypassed silently*
+with a basket open. The overflow menu's copy of the same guard worked, because that menu has its own island.
+
+**Scoped on the counter SHELL, not the header.** The prompt offered the header as the minimal fix; the shell
+`<div>` wraps the header **and** `<main>`, so one attribute covers every screen's content as well. That
+mattered immediately: the same bug had already reached prompt 189's home screen, whose lock button and
+back-to-home guard were dead for the same reason and which a header-only fix would have left broken. Nested
+islands (the sede switcher, the overflow menu, the 173 surface) are unaffected — Alpine nests scopes.
+
+**Geometry proved untouched, not assumed**, since 132's overflow layout and 130's scrollable strip depend on
+that flex row: `measure-topbar.mjs` still passes at 768/800/1024/1280 with no overlap and no page scroll, and
+189's density figures are byte-identical (furniture 331px; portrait strip headroom 221px). An attribute was
+added, not a wrapper element.
+
+**The guard is structural, because the instance is not the point.** `AlpineScopeTest` renders all six counter
+screens' real authed HTML, normalises Alpine's `@` shorthand to `x-on:` (DOMDocument discards `@click` as an
+invalid attribute name — the shorthand is otherwise invisible to any DOM parser), and asserts every element
+carrying an `x-…` or `:…` directive sits inside an `x-data` scope. `wire:` is excluded: Livewire binds its own
+directives and does not care about Alpine scope. It fails against the previous code naming
+`data-counter-home-link`, `data-counter-screen` and `data-counter-home-lock`, and it is the only thing that
+will catch the next one — which will otherwise arrive, again, with no error to notice.
+
+**MySQL was left to CI**, per the running order: `composer check` green on SQLite. One attribute in one Blade
+layout — no migration, no query.
+
+---
+
+## Prompt 188 — follow-ups, and a correction
+
+Two things prompt 188 asked for that its first pass did not deliver, plus a wrong call of mine that is worth
+recording rather than quietly editing away.
+
+**1. The missing assertion: a cleared surface must not go on swallowing input.** The surface is
+`fixed inset-0 z-50` and opaque, so while it is stale and up it covers the whole viewport and the counter
+beneath *looks* dead. That is what makes this a correctness bug rather than a cosmetic one, and it is now
+asserted: after switching operator and identifying again — no reload in between — the very next action on
+the counter beneath reaches the server and is answered.
+
+**2. The correction.** In the prompt-192 investigation I named 188's stale surface as *"the most likely
+cause"* of the bar's dead Charge button. **That was wrong.** The cause was prompt 195: Livewire v4's `$wire`
+alias table shadows a component method named `commit`, so the request went out addressed to `$commit` and the
+PHP was never reached.
+
+The two are distinguishable by one measurement I did not take at the time: **a tap swallowed by an overlay
+produces no Livewire request at all**, whereas the charge button produced one and got a 200 back. I had the
+right instinct — that the click never reached the server — and then reached for the nearest recently-found
+bug instead of measuring which of the two shapes it was. A stale full-screen overlay is a *plausible-looking*
+cause of a dead button, which is exactly why it has to be ruled out by evidence and not by plausibility.
+
+Both defects were real and both are fixed; neither fix is credited to the other. The 192 report has been
+corrected in place rather than rewritten, so the wrong call and its correction both stay on the record.
+
+**3. Which half of the getter was ever broken.** Worth writing down because it explains the symptom exactly:
+`$store.counter.locked` is read live from the shared store on every evaluation, so the *locked* branch was
+always reactive — the idle lock and the manual lock worked throughout. Only `serverMode` was frozen at
+`x-data` init. So precisely the server-decided transitions were stale (identifying, switching operator,
+entering and leaving handover) and precisely the client-decided ones were fine.
+
+**MySQL was left to CI**, per the running order: `composer check` green on SQLite.
+
+---
+
+## Prompt 194 — one member lookup, everywhere
+
+**What was wrong.** SEVEN member-search inputs across five counter screens, in two incompatible shapes. The
+door and the dispensary each stacked *"Escanear tarjeta o buscar socio"* — which already accepted a typed
+name — directly above *"o busca por nombre / nº de socio"*, which did the same job again; an operator reading
+top to bottom had to decide which box a typed name belonged in, and the answer was *either*, the worst
+possible answer. Socios, the caja and the barra offered a name box with **no scan affordance at all**, and
+since a USB wedge reader just types into whatever has focus and presses Enter, a card scanned there ran a
+name search for a 48-character token and found nothing. Between them the two shapes taught staff that
+scanning *"works on Dispensario but not on Socios"*, which is not a rule anybody designed.
+
+**The shape.** One trait, `App\Livewire\Counter\Concerns\FindsMembers`, and one surface,
+`partials/member-lookup.blade.php`. ONE field: the input goes to `ResolveMemberByToken` first and, if it does
+not resolve, the name / nº search renders its results **in place** beneath the same box. No mode toggle, no
+second field. A host implements exactly one method — `onMemberFound(Member $member, bool $scanned)` — and if a
+host ever needs different behaviour BEFORE that point, the shape is wrong and the difference belongs after it.
+That rule was tested immediately by the dispensary (below).
+
+**Scope was bigger than the prompt assumed, and three of its premises were wrong.** Verified before building,
+because each would have changed the work: `ResolveMemberByToken::handle()` takes an optional `$throttleKey`;
+Socios, the till and the bar do **not** attempt token resolution at all, so the inconsistency is behavioural
+rather than cosmetic; prompt 58's throttle does **not** already distinguish a scan from a typed name; and
+check-in carried the same stacked pair the prompt attributed only to Dispensario.
+
+**The throttle now counts scans, not searching.** This was the live risk in routing every input through the
+token resolver: prompt 58's limiter distinguishes a scan HIT from a scan MISS, so every typed name that is
+not a token would have looked like a failed scan, and an operator searching thirty socios across a shift
+would have tripped a limiter built for someone brute-forcing QR codes — locking the door mid-service. The
+throttle key is now passed **only when the input plausibly was a scan**: `FindsMembers::looksLikeAScan()` —
+at least 32 characters and strictly alphanumeric, which is what `Str::random(48)` produces. *"García"* and
+*"M-00042"* match neither the length nor the charset, so a search miss is never counted and a malformed token
+still is. Deliberately not widened: the whole value is that it cannot be tripped by typing.
+
+**A deliberate behaviour change.** An input that does not resolve as a token is no longer an error. It falls
+through to the name search in the same field, which is the entire point of one box — so an unknown card now
+shows an empty result rather than *"Tarjeta no reconocida"*. Two existing tests were updated to match.
+
+**The dispensary's check-in rule moved AFTER `onMemberFound()`, not into the lookup.** Where the sede sets
+`restrict_pos_to_checked_in`, the POS used to filter its search results down to socios currently inside. That
+is exactly the "different behaviour before the member is found" the shared shape forbids, so it now runs where
+it always also ran — inside `holdMember()` — and a socio who has not checked in is **refused with a message
+that says so** instead of being silently absent from the results. For a member standing at the counter, *"no
+results"* is the least useful thing the screen can say. The sede's note (*"Esta sede solo permite dispensar a
+socios que han registrado su entrada"*) is host chrome in `partials/checked-in-required.blade.php`, beside the
+shared field rather than inside it.
+
+**`submitCameraScan()` moved into the trait.** `x-counter.camera-scan` calls `$wire.submitCameraScan` by name,
+and the door and the dispensary carried identical two-line copies — the near-duplicate this prompt exists to
+remove. The camera stays exactly where it is today (those two screens, per-sede, off by default); turning it
+on for one of the other three is now one view variable rather than a new method.
+
+**Both placeholders name the Enter key, and that is load-bearing.** One box means the field cannot search on
+every keystroke — a token has to be resolved whole, and a per-keystroke resolve would hand half-typed names to
+the scan throttle. Three of the five screens searched live as you typed before this, so an operator who types
+and waits is a real regression unless the field says what to do. The old *"Ej. García o M-00042"* lost its
+member-number half rather than the instruction: measured at 1180×820, the full string truncates inside the
+bar's narrow socio column and *"pulsa Enter"* is exactly the part that falls off. The label above still says
+*por nombre o nº*.
+
+**`card_readers_enabled`** (per-sede, default off) changes the WORDS only. Token resolution runs either way,
+so a club that has not told the software it owns a reader can still scan a card and have it work. It is
+configuration, not feature detection: a USB reader **is** a keyboard and has no presence any browser API can
+detect. Asserted both ways on two screens.
+
+**Measured, at both tablet orientations.** `tests/Browser/OneLookupHarnessTest` writes all six lookup surfaces
+with their results on screen (they only exist after an interaction, so a plain GET cannot reach the state) and
+`measure-one-lookup.mjs` measures them. Two criteria, because these are two kinds of page and one rule would
+be dishonest on both:
+
+| screen | 1180×820 | 820×1180 | rule |
+|---|---|---|---|
+| Recepción | input 138–186, row 195–243 | same | above the fold |
+| Dispensario, blocked | input 305–353, row 362–410 | input 413–461, row 470–518 | above the fold |
+| Dispensario, resolved (selection pane) | input 134–182, row 191–239 | same | above the fold |
+| Socios | input 264–312, row 321–369 | same | above the fold |
+| Barra | input 206–254, row 263–311 | same | above the fold |
+| Caja | input 1528–1576, row 1585–1633 | same | field+row together |
+
+The caja is the one exception and it is **pre-existing, not introduced here**: `Cobrar cuota` is the FOURTH
+stacked section of a 2016px page — measured, the section opens at y=1413 and the input sits 115px into it,
+which is precisely where the old `feeSearch` box sat. Demanding scroll-0 visibility there would mean
+re-laying-out the whole till screen, which is a different prompt. What 194 IS answerable for is that the
+results it now renders below the field do not fall out of view once the operator is at the panel: field and
+first row span **105px** on every screen, so they always fit together. Recorded here rather than waved
+through, and worth carrying into the design audit.
+
+Every result row is ≥44×44 (asserted in PHP and re-measured in the browser), 24 captures light and dark,
+motion reduced, `[x-show]` hidden so the offline banner does not shift the page into a layout no operator sees.
+
+**The acceptance criterion is now a permanent guard, not a one-off grep.**
+`OneMemberLookupTest::test_the_product_contains_exactly_one_member_search_input` walks every blade, asserts
+exactly one file renders `id="member-lookup"`, and re-greps every `<input>` in the view tree for a
+member-search binding — with `geneticSearch` / `articleSearch` named explicitly as catalogue filters, so a
+future product filter trips it once and is added deliberately rather than a sixth member search being waved
+through as "probably another filter". Proved to fail: a stray `wire:model="memberSearch"` added to bar-pos
+reports the file and the binding.
+
+**Dead code went with it**: `partials/member-identify.blade.php` deleted, `CollectsMembershipFees` lost its
+second member search (`$feeSearch` + `feeSearchResults()` — the reason the till and Socios each had a name box
+that could not resolve a card), `DispensaryPos` lost `submitScan()` / `searchResults()` / `checkedInMemberIds()`,
+`BarPos` lost its third copy of the same query, and the eight orphaned locale keys were pruned from both files
+after grepping each to confirm no remaining reference.
+
+**MySQL was left to CI**, per the running order: `composer check` green on SQLite — 1482 tests, Larastan 0,
+Pint clean.
+
+---
+
+## Accessibility audit — the pass, and what the sweep taught before it found anything
+
+Full findings and outcomes: `audits/reports/accessibility-audit.md`. Result: axe went from **30 distinct
+(rule × page) findings to 7**, serious/critical occurrences from **80 to 2**, and the member PWA from 2 to
+**0**. Both survivors are the one finding the report dismisses on inspection (axe resolves a transitional
+background on a genetics tile; measured in the browser it is slate-400 on slate-950, ~7:1) and Filament's
+`empty-table-header` best-practice rule on six tables, where the cell is correctly `aria-label`ed already.
+
+**The sweep was wrong twice before it was right, and that is the part worth keeping.** First run: `/login`
+was audited while signed in, so it redirected and the dashboard was audited twice while the login screen was
+never audited once. Second: all six counter screens reported 18 controls and zero violations — which was
+prompt 175's chain, an owner with two sedes landing on the **sede chooser**, photographed six times. The
+sweep now clears the chain (choose a sede, enter a PIN, drive the member lookup) and the POS goes from 18
+controls to 51. Every render records what it landed on — URL, title, h1, control count, blocker state — and
+that table prints with the results, so **"no violations" can no longer mean "nothing was audited"**. This is
+the same defect class as the fixture and unreachable-Action lessons already in CLAUDE.md, arriving through a
+third door.
+
+**The largest finding was a rule this repo had already written down.** `AdminPanelProvider` set
+`'primary' => Color::hex('#2563eb')` — deliberate, commented, exactly as CLAUDE.md's design rules require.
+But `Color::hex()` GENERATES a ramp around the hex it is handed, and the generated 600 was not the colour
+given: `oklch(0.5978 …)` ≈ `#477ae3`, white on it **4.06:1**. So every primary button in the panel, and the
+login button, failed the very line that says *"button-text contrast passes AA"*. Now `Color::Blue`, whose
+600 **is** `#2563eb` (5.12:1) and whose 50/700 are this product's `--brand-tint` / `--brand-dark` — the panel
+ramp agrees with `tokens.css` step for step instead of approximating it. **A colour helper that interpolates
+is not the same as setting a colour**, and nothing in a test suite says so.
+
+**Three contrast defects shared one root cause: a token that had to mean two things.** `--color-ink-muted`
+had no dark value, so it stayed `#475569` at 2.35:1 wherever a usage forgot its own `dark:` utility (two real
+controls did). `--br` on the dashboard was the brand as a FILL *and* as TEXT, and on a dark surface those
+want opposite directions — text lighter, fill-under-white darker — which is why the active period toggle sat
+at 3.67:1 and the info alert at 3.24:1. It is now three variables (`--br` / `--brtx` / `--brfill`). And
+`opacity-80` on token-coloured text silently undid prompt 98's per-scheme pass (error 5.24:1 → 4.07:1): **an
+opacity modifier on a contrast-tuned token re-breaks the fix, and no test would notice.**
+
+**Six screens, one page title.** Every counter screen fell through to *"Mostrador"* — six identical `<title>`s
+and six identical top-bar `<h1>`s, so an operator with three counter tabs open could not tell them apart. The
+name now comes from `CounterScreens::currentLabel()`, the same list the tab strip renders from, so the tab,
+the heading and the strip cannot disagree. Route → label rather than a per-component title, because a second
+copy would drift the first time a screen is renamed.
+
+**Ten unnamed links per table page.** Filament wraps every cell of a clickable row in an `<a>`, so an EMPTY
+cell becomes a link with no accessible text — ten per page on Socios (`kind`) and Lotes (`expires_on`).
+`->placeholder('—')` gives the link content and is the ordinary table convention for "no value" besides.
+
+**One finding is deliberately NOT fixed, and it is Phase 3.** The counter's full-screen overlays are
+`role="dialog" aria-modal="true"` but do not trap focus, so Tab walks behind them. The correct fix marks the
+content behind `inert` while the surface is open; the failure mode if that effect ever misfires is `inert`
+left ON — a counter that looks fine and responds to nothing, which is far worse than the defect. This exact
+component has already produced two such bugs (prompt 188's stale surface, prompt 196's missing Alpine scope),
+every write behind the surface is refused server-side by `requireOperator()` regardless, and it deserves its
+own branch with a browser test rather than the tail of an audit. Recorded, not hidden.
+
+**Two brand-colour changes are flagged for the owner** in the report: panel primary buttons are marginally
+darker (they are now the brand blue rather than an interpolation of it), and in dark mode the dashboard's
+active period pill is blue-700 and brand text is blue-400. Light mode is unchanged.
+
+**MySQL was left to CI**, per the running order: `composer check` green on SQLite — 1482 tests, Larastan 0,
+Pint clean. Verified by looking, in both themes.

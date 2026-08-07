@@ -37,6 +37,19 @@ abstract class DashboardChart extends ChartWidget
         parent::mount();
     }
 
+    /**
+     * No heading from the widget itself (a11y audit).
+     *
+     * Every one of these renders inside `<x-dashboard.section :title="…">`, which already draws the title in
+     * the page's own section chrome. Filament ALSO drew it, as an `<h2>` after our `<h3>`, so each chart
+     * announced its name twice and the page's heading order read h1 → h3 → h2 → h3 → h2. The section head is
+     * the design, so the title lives there and only there; the section title is now the `<h2>`.
+     */
+    public function getHeading(): string|Htmlable|null
+    {
+        return null;
+    }
+
     public function getEmptyStateHeading(): string|Htmlable
     {
         return __('Sin datos en este período');
