@@ -22,6 +22,7 @@ use App\Support\Settings;
 use App\ViewModels\SystemHealth;
 use Database\Seeders\RolePermissionSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Storage;
 use Livewire\Livewire;
@@ -80,6 +81,12 @@ class TemporaryMemberTest extends TestCase
 
         $this->actingAs($this->owner());
 
+        // The precondition, asserted where it is depended on: `is_temporary` is a conditionally-visible
+        // toggle, and fillForm() on a field that is not in the schema fills NOTHING and says nothing. Without
+        // this the test still fails — but 25 lines later, as "the member is not temporary", which is a
+        // symptom three steps from the cause (prompt 197).
+        Livewire::test(CreateMember::class)->assertFormFieldExists('is_temporary');
+
         Livewire::test(CreateMember::class)
             ->fillForm([
                 'first_name' => 'Vera', 'last_name' => 'Viajera', 'email' => 'vera@example.test',
@@ -93,13 +100,65 @@ class TemporaryMemberTest extends TestCase
             ->assertHasNoFormErrors();
 
         $member = Member::query()->withoutGlobalScopes()->where('first_name', 'Vera')->firstOrFail();
+
+        // The assertion that actually failed during the pre-staging gate, now self-describing (prompt 197).
+        // `is_temporary` is a CONDITIONALLY VISIBLE toggle — MemberForm hides it unless
+        // Settings::get('temporary_members_enabled') resolves true — so if that read ever degrades to its
+        // `false` default, fillForm() has no field to fill, `kind` silently stays STANDARD, and the only
+        // thing the old bare assertTrue() could say was "Failed asserting that false is true".
+        $this->assertSame(
+            MemberKind::TEMPORARY,
+            $member->kind,
+            sprintf(
+                'The member was created as %s, not TEMPORARY — which means the is_temporary toggle was not '
+                .'filled. temporary_members_enabled at assert time=%s (this toggle is hidden when it is false, '
+                .'and fillForm() silently fills nothing).',
+                $member->kind->value,
+                var_export(Settings::get('temporary_members_enabled'), true),
+            ),
+        );
         $this->assertTrue($member->isTemporary());
         $this->assertNotNull($member->temporary_expires_at);
-        // Assert the RULE as timestamps, not a truncated diff: expiry is EXACTLY joined_at + the window. This
-        // still fails if the code computes from the wrong base or the wrong window.
-        $this->assertTrue(
-            $member->temporary_expires_at->equalTo($member->joined_at->copy()->addDays($window)),
-            "temporary_expires_at must equal joined_at + {$window} days (temporary_window_days).",
+
+        $this->assertExpiryIsJoinedPlusWindow($member, $window);
+    }
+
+    /**
+     * The RULE, asserted so a failure SAYS WHAT HAPPENED (prompt 197).
+     *
+     * This assertion caught a real intermittent failure during the pre-staging gate and could only report
+     * *"Failed asserting that false is true"* — because `assertTrue($a->equalTo($b))` throws both timestamps
+     * away. A gate that catches a bug red-handed and cannot describe it costs a whole investigation, which
+     * is exactly what happened.
+     *
+     * Still EXACT, deliberately: comparing formatted strings down to microseconds is the same comparison
+     * `equalTo()` made, so a per-second tolerance is NOT introduced here — that would hide a real base
+     * mismatch, which is the thing most worth catching. What changes is that PHPUnit now prints the two
+     * values as a diff, and the message carries both window reads: the one the TEST used (no `$default`
+     * argument) and the one `CreateMember` uses (`, 30`). If those ever disagree, the message says so
+     * instead of leaving it to be deduced.
+     */
+    private function assertExpiryIsJoinedPlusWindow(Member $member, int $window): void
+    {
+        $stamp = fn (?Carbon $c): string => $c?->format('Y-m-d H:i:s.u') ?? '(null)';
+
+        $windowAsTestReadIt = Settings::get('temporary_window_days');
+        $windowAsCreateMemberReadsIt = Settings::get('temporary_window_days', 30);
+
+        $this->assertSame(
+            $stamp($member->joined_at->copy()->addDays($window)),
+            $stamp($member->temporary_expires_at),
+            sprintf(
+                'temporary_expires_at must equal joined_at + the window. '
+                .'joined_at=%s · temporary_expires_at=%s · window used by this test=%d · '
+                .'Settings::get(key)=%s · Settings::get(key, 30)=%s · frozen now()=%s',
+                $stamp($member->joined_at),
+                $stamp($member->temporary_expires_at),
+                $window,
+                var_export($windowAsTestReadIt, true),
+                var_export($windowAsCreateMemberReadsIt, true),
+                $stamp(now()),
+            ),
         );
     }
 
@@ -110,6 +169,7 @@ class TemporaryMemberTest extends TestCase
         Settings::set('temporary_window_days', 45, SettingType::INT);
 
         $this->actingAs($this->owner());
+        Livewire::test(CreateMember::class)->assertFormFieldExists('is_temporary'); // see the sibling test
         Livewire::test(CreateMember::class)
             ->fillForm([
                 'first_name' => 'Nadia', 'last_name' => 'Nómada', 'email' => 'nadia@example.test',
@@ -124,6 +184,29 @@ class TemporaryMemberTest extends TestCase
 
         $member = Member::query()->withoutGlobalScopes()->where('first_name', 'Nadia')->firstOrFail();
         $this->assertTrue($member->temporary_expires_at->equalTo($member->joined_at->copy()->addDays(45)));
+    }
+
+    /**
+     * The gate whose silent failure caused the flake this test now diagnoses (prompt 197).
+     *
+     * `is_temporary` is visible only on create AND only while `temporary_members_enabled` resolves true.
+     * That is correct behaviour — a club with the feature off should not see the toggle — but it makes the
+     * enrolment tests depend on a Settings read succeeding, and `Settings::get()` degrades to its DEFAULTS
+     * value rather than throwing (a written CLAUDE.md requirement, so it cannot change). When that degrade
+     * happens the toggle vanishes, `fillForm(['is_temporary' => true])` fills nothing, and the member is
+     * created STANDARD with no error anywhere.
+     *
+     * So the gate itself is asserted in both directions, where a failure is unambiguous.
+     */
+    public function test_the_temporary_toggle_is_visible_only_while_the_feature_is_enabled(): void
+    {
+        $this->actingAs($this->owner());
+
+        // Enabled in setUp.
+        Livewire::test(CreateMember::class)->assertFormFieldExists('is_temporary');
+
+        Settings::set('temporary_members_enabled', false, SettingType::BOOL);
+        Livewire::test(CreateMember::class)->assertFormFieldDoesNotExist('is_temporary');
     }
 
     // --- The load-bearing rule: identical compliance -------------------------------

@@ -17,6 +17,7 @@ use Filament\Notifications\Notification;
 use Filament\Resources\Pages\CreateRecord;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Auth;
+use RuntimeException;
 
 class CreateMember extends CreateRecord
 {
@@ -84,7 +85,22 @@ class CreateMember extends CreateRecord
         // and retention timing (prompt 31). The toggle is a virtual field, mapped then dropped.
         if (! empty($data['is_temporary'])) {
             $data['kind'] = MemberKind::TEMPORARY->value;
-            $data['temporary_expires_at'] = Carbon::parse($data['joined_at'])
+
+            // The expiry base is the enrolment's OWN joined_at, and it is required rather than parsed
+            // (prompt 197). `Carbon::parse(null)` — and `parse('')` — silently return a FRESH now(), so a
+            // missing base would not raise anything: it would put the expiry on a different instant from
+            // the joined_at it is supposed to measure from, and only visibly wrong when the two straddle a
+            // second. That is a trapdoor, not a fallback. It cannot be reached today (joined_at is filled
+            // by MemberEnrolment::defaults whenever an organisation is in scope, and without one the row
+            // cannot persist at all — organisation_id is NOT NULL), which is exactly why it would sit here
+            // unnoticed. ->copy()->addDays() rather than a re-parse: same result, nothing to misread.
+            $joinedAt = $data['joined_at'] ?? null;
+
+            if (! $joinedAt instanceof Carbon) {
+                throw new RuntimeException('Cannot compute a temporary expiry: the enrolment has no joined_at to measure from.');
+            }
+
+            $data['temporary_expires_at'] = $joinedAt->copy()
                 ->addDays((int) Settings::get('temporary_window_days', 30));
         }
         unset($data['is_temporary']);

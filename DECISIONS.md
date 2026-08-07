@@ -8615,3 +8615,130 @@ agreeing.
 
 **MySQL was left to CI**, per the running order: `composer check` green on SQLite at every commit — 1497
 tests, Larastan 0, Pint clean.
+
+---
+
+## Prompt 197 — the intermittent temporary-expiry failure: it was never the expiry
+
+The pre-staging gate recorded `TemporaryMemberTest::test_enrolling_a_temporary_member_computes_the_expiry_from_the_window`
+failing once in four full-suite runs, and the prompt that followed built three candidate mechanisms on top
+of it — a clock that was not frozen, `Carbon::parse(null)` returning a fresh `now()`, or the window
+resolving differently between the test's read and the code's. **All three were aimed at the wrong
+assertion**, and so was the report that started it.
+
+### The record was misread, by me, and that is the finding worth keeping
+
+The gate captured exactly this:
+
+```
+line: 73 · "Failed asserting that false is true."
+```
+
+When I wrote it into `PRE-STAGING-CHECKLIST.md` I appended the expiry assertion's custom message from the
+source, on the assumption that it was the one that failed. **PHPUnit prints a custom message before the
+standard text** — verified here by planting a one-second drift and reading the output — so a failure of the
+expiry assertion would have begun *"temporary_expires_at must equal joined_at + 30 days"*. The recorded
+message was bare. The only bare `assertTrue` in that test is `assertTrue($member->isTemporary())`.
+
+`line: 73` said nothing either way: that is the **method declaration**, and the same 73 comes back from a
+failure of any assertion in the test.
+
+**Demonstrated, not deduced.** Checking the test file out at the gate's own commit `a2a0a36` and making one
+change — `temporary_members_enabled` resolving false — reproduces the recorded signature byte for byte:
+`line: 73`, message `Failed asserting that false is true.`
+
+### The mechanism
+
+`is_temporary` is a **conditionally visible** toggle:
+
+```php
+Toggle::make('is_temporary')
+    ->visible(fn (string $operation): bool => $operation === 'create'
+        && (bool) Settings::get('temporary_members_enabled', false))
+```
+
+When that setting resolves false the field is not in the schema, `fillForm(['is_temporary' => true])` fills
+**nothing and reports nothing**, `mutateFormDataBeforeCreate()`'s `if (! empty($data['is_temporary']))`
+never runs, and the member is created STANDARD. Every subsequent assertion about the expiry is then
+irrelevant — the row was never temporary. A hidden field is a silent one, and `fillForm()` on a field that
+does not exist is the quietest failure in a Filament test.
+
+That is the prompt's candidate **(3)** — a Settings read differing between two points — arriving by a route
+none of the three described: not a *number* differing, but a form *field* disappearing.
+
+### So the enrolment code is innocent, and I am saying so rather than changing something
+
+The expiry arithmetic was never wrong. `joined_at` has one writer (`MemberEnrolment::defaults()`),
+`temporary_expires_at` is computed from that same value, both truncate identically on store, and under a
+frozen clock the assertion is arithmetically symmetric — which is exactly why it could not be made to fail
+by any amount of clock pressure. **Per the prompt's own rule for cause (3), the fix does not belong in the
+enrolment code.**
+
+### What was NOT reproduced, stated plainly
+
+**Why the setting resolved false on that one run is still unknown.** `Settings::get()` degrades to its
+`DEFAULTS` value rather than throwing — a written CLAUDE.md requirement, because a stale cache must never
+kill a queued job — and `DEFAULTS['temporary_members_enabled']` is `false`. So any transient failure of that
+read produces exactly this. What triggered one, once, on a machine that was simultaneously running a dev
+server and a Playwright sweep, did not recur here:
+
+| hunt | runs | failures |
+|---|---|---|
+| `TemporaryMemberTest` alone, `--order-by=random`, seeds 1–50 | **50** | **0** |
+| Full suite, `--order-by=random`, seeds 101–103 | **3** | **0** |
+| Full suite, default order, run concurrently with the above (a deliberately loaded machine, which is the condition the original failure occurred under) | **1** | **0** |
+| Full suite, during the pre-staging gate itself, after the one failure | **6** | **0** |
+
+**Sixty runs, no reproduction.** The two full-suite loops were stopped early — deliberately, and this is the
+judgement worth recording: the prompt said *"run the full suite in a loop until it fires"*, which was written
+on the assumption that a reproduction was the only route to the cause. It was not. The cause was demonstrated
+directly, byte for byte, and ten more blind green runs would have added an hour of wall clock and nothing to
+the diagnosis.
+
+`ActiveScope` was ruled out as the trigger: it is a **singleton** (`AppServiceProvider:19`) and
+`setOrganisation()` writes the session as well as the property, so the organisation cannot drift between the
+test's read and the component's. `Settings::set()` flushes the memo on every write, so a stale memo is ruled
+out too.
+
+### What the branch delivers instead of a guess
+
+**Both assertions now say what happened.** The expiry assertion compares formatted timestamps so PHPUnit
+prints a diff, and carries both window reads — the test's `Settings::get($key)` and `CreateMember`'s
+`Settings::get($key, 30)` — plus the frozen clock. The kind assertion names the toggle and prints the
+setting that governs it. Each was proved by planting the corresponding defect and reading the output.
+
+**A per-second tolerance was considered and rejected.** The gate offered it. It would have hidden a real
+base mismatch, and it would have hidden *this* cause completely — the member was STANDARD, which no
+tolerance on a timestamp can detect.
+
+**The precondition is asserted where it is depended on.** Both enrolment tests now assert the toggle exists
+before filling it. The test still fails when the setting degrades; it just fails at the cause instead of
+three steps downstream.
+
+**The gate itself is pinned** — `test_the_temporary_toggle_is_visible_only_while_the_feature_is_enabled`
+asserts the field appears with the feature on and is absent with it off.
+
+**The class, for cause (3):** `SettingsMemoTest` gains
+`test_an_org_value_is_the_same_with_and_without_a_location_in_scope` — the memo key is
+`organisation|location|key`, so the same key read with and without a location in scope is two entries and
+two queries, and they must agree unless a location-scoped row genuinely exists. That is the hazard the
+prompt named, now pinned in both directions — **and it holds**: the invariant passed on first run, so no
+defect was found in `Settings` and none was invented to have something to fix.
+
+**The class, for cause (2):** all eight `Carbon::parse(` sites were reviewed.
+`BatchRecall` (guarded by an empty check), `BreachLogForm` (`blank()`), `AuditFieldFormatter` (a strict
+`YYYY-MM-DD` regex), `LibroSocios` (`?? now()->toDateString()`), `ImportMembers` (`blank()`) and
+`RegistroDispensacion` (a `whereBetween` that excludes NULL) are all guarded. **One was not**:
+`CreateMember` parsed `$data['joined_at']`, and `Carbon::parse(null)` — like `parse('')` — silently returns
+a fresh `now()`. It is unreachable today (a member with no organisation cannot persist), which is precisely
+why it would have sat there. It now requires the base and throws if it is missing, and uses
+`->copy()->addDays()` rather than a re-parse. **This is hardening, not the fix** — the trapdoor never fired.
+
+### The wider lesson
+
+`assertTrue($x)` with no message can only ever print *"Failed asserting that false is true"*, and a gate
+that caught a real intermittent bug red-handed could not say which of five assertions had failed. That cost
+an entire investigation, and it sent the follow-up prompt after the wrong three mechanisms. **A bare
+`assertTrue` in a test with more than one of them is a defect in the test, not a style preference.**
+
+**MySQL was left to CI**, per the running order: `composer check` green on SQLite.
