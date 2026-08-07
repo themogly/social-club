@@ -780,15 +780,15 @@
                          commit() flashes its reason into the colocated block above — never a silent dead control. --}}
                     <button
                         type="button"
-                        wire:click="commit"
+                        wire:click="commitDispensation"
                         data-commit-action
                         wire:loading.attr="disabled"
-                        wire:target="commit"
+                        wire:target="commitDispensation"
                         x-bind:disabled="! online"
                         class="mt-4 h-16 w-full rounded-xl bg-brand text-lg font-bold text-white transition hover:bg-brand-dark focus:outline-none focus:ring-2 focus:ring-brand/40 disabled:cursor-not-allowed disabled:opacity-50"
                     >
-                        <span wire:loading.remove wire:target="commit">{{ __('Registrar aportación') }}</span>
-                        <span wire:loading wire:target="commit">{{ __('Registrando…') }}</span>
+                        <span wire:loading.remove wire:target="commitDispensation">{{ __('Registrar aportación') }}</span>
+                        <span wire:loading wire:target="commitDispensation">{{ __('Registrando…') }}</span>
                     </button>
                 </div>
             </aside>

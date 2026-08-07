@@ -536,7 +536,19 @@ class DispensaryPos extends Component
 
     // --- Commit -----------------------------------------------------------------
 
-    public function commit(): void
+    /**
+     * NOT `commit()` — that name is unreachable from a browser (prompt 195).
+     *
+     * Livewire v4's `$wire` proxy resolves an ALIAS TABLE before it looks for a component method, and that
+     * table maps `commit` → `$commit`, a built-in state flush that returns null. So `wire:click="commit"`
+     * called Livewire's own no-op and this method was never invoked from the counter. Ever. The button was
+     * hit-testable, enabled and produced a 200 — it just ran the wrong thing.
+     *
+     * The 42 tests over this path all call it from PHP (`Livewire::test(...)->call('commit')`), which
+     * invokes the method directly and never meets the proxy. They proved the method works, not that the
+     * button reaches it.
+     */
+    public function commitDispensation(): void
     {
         $this->attemptCommit(override: false);
     }

@@ -260,3 +260,23 @@ Last run (branch `feat/bar-rows-and-cart`), list layout: rows on screen **6 → 
 in portrait; first row **714×106 → 714×68** (portrait 166 → 68); names wrapped **0**; cart hidden below its
 fold **212px → 0px** at every viewport.
 
+## The commit buttons actually reach their actions (prompt 195)
+
+The only script here that needs a **running server**, because it is the one thing a PHP test cannot see: a
+Livewire action named after one of `$wire`'s aliases is unreachable from a browser, and
+`Livewire::test(...)->call('commit')` invokes the PHP method directly so it never meets the alias table.
+Forty-two green tests exercised a path no operator could reach.
+
+```bash
+npm run build
+php artisan serve --port=8123
+node tests/Browser/prove-commit-click.mjs          # MEMBER_QUERY=… to override the member lookup
+```
+
+Logs in as the dev owner, chooses a sede, identifies with a PIN, adds a line, presses the real button, and
+asserts the request names the action (not `$commit`) and an order is recorded.
+
+Last run (branch `fix/commit-action-name-collision`): bar `["commitOrder"]` + *Order recorded.*, orders
+56 → 57; dispensary `["commitDispensation"]`. Against the old names on the same build: `["$commit"]`, flash
+`null`, orders 57 → 57.
+

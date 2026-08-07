@@ -79,7 +79,7 @@ class ChargeAlwaysObservableTest extends TestCase
         Livewire::test(BarPos::class)
             ->call('addArticle', $this->article()->id)
             ->set('offline', true)
-            ->call('commit')
+            ->call('commitOrder')
             ->assertSet('flashType', 'error')
             ->assertSee(__('Sin conexión: no se puede cobrar. La cesta se conserva hasta reconectar.'));
     }
@@ -90,7 +90,7 @@ class ChargeAlwaysObservableTest extends TestCase
         $this->openTill();
         Livewire::test(BarPos::class)
             ->call('addArticle', $this->article()->id)
-            ->call('commit')
+            ->call('commitOrder')
             ->assertSet('flashType', 'error')
             ->assertSee(__('Identifícate con tu PIN antes de continuar.'));
     }
@@ -100,7 +100,7 @@ class ChargeAlwaysObservableTest extends TestCase
         $this->operator();
         $this->openTill();
         Livewire::test(BarPos::class)
-            ->call('commit')
+            ->call('commitOrder')
             ->assertSet('flashType', 'error')
             ->assertSee(__('La cesta está vacía.'));
     }
@@ -110,7 +110,7 @@ class ChargeAlwaysObservableTest extends TestCase
         $this->operator();
         Livewire::test(BarPos::class)
             ->call('addArticle', $this->article()->id)
-            ->call('commit')
+            ->call('commitOrder')
             ->assertSet('flashType', 'error')
             ->assertSee(__('No hay caja abierta en este terminal.'));
     }
@@ -122,7 +122,7 @@ class ChargeAlwaysObservableTest extends TestCase
         Livewire::test(BarPos::class)
             ->call('addArticle', $this->article()->id)
             ->set('walletInput', '5,00')
-            ->call('commit')
+            ->call('commitOrder')
             ->assertSet('flashType', 'error')
             ->assertSee(__('El pago con monedero requiere un socio.'));
     }
@@ -133,7 +133,7 @@ class ChargeAlwaysObservableTest extends TestCase
         $this->openTill();
         Livewire::test(BarPos::class)
             ->set('basket', [['type' => 'misc', 'description' => 'Propina', 'unit_price_cents' => 200, 'qty' => 1, 'reference' => '']])
-            ->call('commit')
+            ->call('commitOrder')
             ->assertSet('flashType', 'error')
             ->assertSee(__('Una línea manual requiere una referencia.'));
     }
@@ -144,7 +144,7 @@ class ChargeAlwaysObservableTest extends TestCase
         $this->openTill();
         Livewire::test(BarPos::class)
             ->call('addArticle', $this->article()->id)
-            ->call('commit')
+            ->call('commitOrder')
             ->assertSet('flashType', 'success')
             ->assertSee(__('Última venta registrada'));
     }
@@ -165,7 +165,7 @@ class ChargeAlwaysObservableTest extends TestCase
     {
         $this->operator();
         Livewire::test(DispensaryPos::class)
-            ->call('commit')
+            ->call('commitDispensation')
             ->assertSet('flashType', 'error')
             ->assertSee(__('Identifica a un socio antes de registrar una dispensación.'));
     }
@@ -178,7 +178,7 @@ class ChargeAlwaysObservableTest extends TestCase
 
         Livewire::test(DispensaryPos::class)
             ->call('selectMember', $member->id)
-            ->call('commit')
+            ->call('commitDispensation')
             ->assertSet('flashType', 'error')
             ->assertSee(__('La cesta está vacía.'));
     }

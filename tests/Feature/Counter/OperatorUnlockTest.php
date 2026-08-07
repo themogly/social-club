@@ -150,7 +150,7 @@ class OperatorUnlockTest extends TestCase
             ->call('chooseGenetic', $this->genetic->id)
             ->set('weightInput', '3.5')
             ->call('addLine')
-            ->call('commit')
+            ->call('commitDispensation')
             ->assertSet('flashType', 'success');
 
         $dispensation = Dispensation::query()->withoutGlobalScopes()->firstOrFail();
@@ -169,7 +169,7 @@ class OperatorUnlockTest extends TestCase
         Livewire::actingAs($this->device)->test(BarPos::class)
             ->set('operatorPin', '4321')->call('unlockOperator')
             ->call('addArticle', $article->id)
-            ->call('commit')
+            ->call('commitOrder')
             ->assertSet('flashType', 'success');
 
         $order = Order::query()->withoutGlobalScopes()->firstOrFail();
@@ -252,14 +252,14 @@ class OperatorUnlockTest extends TestCase
 
         // A commit is now refused SERVER-SIDE (not just hidden behind the overlay): the pad is forced open and
         // nothing is written.
-        $pos->call('commit')
+        $pos->call('commitDispensation')
             ->assertSet('operatorPanelOpen', true)
             ->assertSet('flashType', 'error');
         $this->assertSame(0, Dispensation::query()->withoutGlobalScopes()->count());
 
         // The basket SURVIVED the lock: re-identifying and committing writes the same basket, once.
         $pos->set('operatorPin', '4321')->call('unlockOperator')
-            ->call('commit')
+            ->call('commitDispensation')
             ->assertSet('flashType', 'success');
         $this->assertSame(1, Dispensation::query()->withoutGlobalScopes()->count());
     }

@@ -160,7 +160,7 @@ class TillTerminalPickerTest extends TestCase
             ->set('terminal', 'POS-9') // a terminal with NO open till
             ->call('selectMember', $member->id)
             ->call('chooseGenetic', $genetic->id)->set('weightInput', '1')->call('addLine')
-            ->call('commit')
+            ->call('commitDispensation')
             ->assertSet('flashType', 'error')
             ->assertSee(__('No hay caja abierta en este terminal. Con caja abierta: :terminals', ['terminals' => 'POS-1']));
     }

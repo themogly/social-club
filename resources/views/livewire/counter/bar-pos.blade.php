@@ -534,15 +534,15 @@
                          commit() flashes its reason into the colocated block above — never a silent dead control. --}}
                     <button
                         type="button"
-                        wire:click="commit"
+                        wire:click="commitOrder"
                         data-commit-action
                         wire:loading.attr="disabled"
-                        wire:target="commit"
+                        wire:target="commitOrder"
                         x-bind:disabled="! online"
                         class="mt-4 h-16 w-full rounded-xl bg-brand text-lg font-bold text-white transition hover:bg-brand-dark focus:outline-none focus:ring-2 focus:ring-brand/40 disabled:cursor-not-allowed disabled:opacity-50"
                     >
-                        <span wire:loading.remove wire:target="commit">{{ __('Cobrar') }}</span>
-                        <span wire:loading wire:target="commit">{{ __('Cobrando…') }}</span>
+                        <span wire:loading.remove wire:target="commitOrder">{{ __('Cobrar') }}</span>
+                        <span wire:loading wire:target="commitOrder">{{ __('Cobrando…') }}</span>
                     </button>
                 </div>
             </aside>

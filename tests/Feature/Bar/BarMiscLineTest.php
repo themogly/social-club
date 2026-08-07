@@ -87,7 +87,7 @@ class BarMiscLineTest extends TestCase
             ->call('addMiscLine')
             ->assertHasNoErrors()
             ->set('cashTendered', '2')
-            ->call('commit')
+            ->call('commitOrder')
             ->assertHasNoErrors();
 
         $order = Order::query()->firstOrFail();
