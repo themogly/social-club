@@ -43,22 +43,14 @@
             <span>{{ __('Sin conexión. No se puede registrar ninguna dispensación; la cesta se conserva y se reactivará al reconectar.') }}</span>
         </div>
 
-        {{-- Flash --}}
-        @if ($flashMessage)
-            <div
-                wire:key="flash"
-                role="{{ $flashType === 'error' ? 'alert' : 'status' }}"
-                aria-live="{{ $flashType === 'error' ? 'assertive' : 'polite' }}"
-                @class([
-                    'mb-4 flex items-center justify-between gap-3 rounded-xl border px-4 py-3 text-sm font-medium',
-                    'border-success/30 bg-success/10 text-success' => $flashType === 'success',
-                    'border-warning/30 bg-warning/10 text-warning' => $flashType === 'warning',
-                    'border-error/30 bg-error/10 text-error' => $flashType === 'error',
-                ])
-            >
-                <span>{{ $flashMessage }}</span>
-                <button type="button" wire:click="$set('flashMessage', null)" aria-label="{{ __('Descartar aviso') }}" class="shrink-0 rounded-md px-2 py-1 opacity-70 hover:opacity-100">✕</button>
-            </div>
+        {{-- The flash lived here unconditionally and, with prompt 60's colocated block below, rendered the
+             SAME message twice whenever a basket was on screen (prompt 199). It now follows the bar's shape
+             from 193: two positions, one partial, never both at once.
+
+             Here it belongs only when a blocking state has replaced the work AND the cart column — then the
+             reason has nowhere else to go, exactly as the original comment argued. --}}
+        @if (\App\Support\CounterBlocker::rendersInPage($blocker))
+            @include('livewire.counter.partials.counter-flash', ['anchor' => 'data-blocked-feedback'])
         @endif
     @endif
 
@@ -729,24 +721,10 @@
                         </div>
                     @endif
 
-                    {{-- Colocated confirmation (prompt 60, mirroring the bar POS prompt-41 block): the flash
-                         ALSO renders here at the point of action, so a commit's outcome — success OR a blocked
-                         reason — is visible without scrolling to the page-top banner. --}}
-                    @if ($flashMessage)
-                        <div
-                            wire:key="flash-commit"
-                            role="{{ $flashType === 'error' ? 'alert' : 'status' }}"
-                            aria-live="{{ $flashType === 'error' ? 'assertive' : 'polite' }}"
-                            @class([
-                                'mt-4 rounded-xl border px-4 py-3 text-sm font-semibold',
-                                'border-success/30 bg-success/10 text-success' => $flashType === 'success',
-                                'border-warning/30 bg-warning/10 text-warning' => $flashType === 'warning',
-                                'border-error/30 bg-error/10 text-error' => $flashType === 'error',
-                            ])
-                        >
-                            {{ $flashMessage }}
-                        </div>
-                    @endif
+                    {{-- Prompt 60's colocated block stood here and was REMOVED by prompt 199: it rendered
+                         only when the basket was non-empty, so an empty-basket refusal still had to travel
+                         to the page top, while a refusal WITH a basket rendered twice. The surviving block
+                         sits with the commit action below and covers every basket state. --}}
 
                     @else
                         {{-- Empty basket: no heavy payment apparatus (tender, signature, breakdown), just the
@@ -781,9 +759,14 @@
                 {{-- BOTTOM — the commit, at the foot of the column. Fixed, so it is on screen with an
                      empty basket, a full one, and after the selection pane has been scrolled to its end. --}}
                 <div class="shrink-0">
+                    {{-- The answer to "I pressed Registrar aportación", beside the control (prompts 193/199).
+                         Unlike prompt 60's block it does not depend on the basket, so an empty-basket refusal
+                         lands here too instead of 700px up the page. --}}
+                    @include('livewire.counter.partials.counter-flash', ['anchor' => 'data-commit-feedback'])
+
                     {{-- Commit — ALWAYS shown and disabled ONLY when offline (prompt 60). Every other blocked
                          state (no socio, empty basket, a hard block, missing signature) stays CLICKABLE, and
-                         commit() flashes its reason into the colocated block above — never a silent dead control. --}}
+                         commit() flashes its reason into the block above — never a silent dead control. --}}
                     <button
                         type="button"
                         wire:click="commitDispensation"

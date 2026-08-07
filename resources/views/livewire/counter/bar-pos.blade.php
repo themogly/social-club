@@ -465,25 +465,12 @@
                         </dl>
                     </div>
 
-                    {{-- Colocated confirmation (prompt 41): the same flash ALSO renders here, in the
-                         basket column at the point of action, so a charge (success OR error) is
-                         unmistakable without scrolling back up to the page-top banner. Same
-                         $flashMessage/$flashType mechanism, so it covers cash, wallet and every error. --}}
-                    @if ($flashMessage)
-                        <div
-                            wire:key="flash-basket"
-                            role="{{ $flashType === 'error' ? 'alert' : 'status' }}"
-                            aria-live="{{ $flashType === 'error' ? 'assertive' : 'polite' }}"
-                            @class([
-                                'mt-4 rounded-xl border px-4 py-3 text-sm font-semibold',
-                                'border-success/30 bg-success/10 text-success' => $flashType === 'success',
-                                'border-warning/30 bg-warning/10 text-warning' => $flashType === 'warning',
-                                'border-error/30 bg-error/10 text-error' => $flashType === 'error',
-                            ])
-                        >
-                            {{ $flashMessage }}
-                        </div>
-                    @endif
+                    {{-- Prompt 41's colocated copy stood here and was REMOVED by prompt 199. It was not
+                         wrong — it was first — but 193 added its own colocated block beside Charge without
+                         taking this one out, so every outcome rendered twice, in two live regions with
+                         identical text. A screen reader announced each refusal twice, which is worse than
+                         the 650px distance 193 set out to fix. The surviving one is below, next to the
+                         control: same message, same mechanism, rendered once. --}}
                 </section>
 
                 {{-- Just committed → ticket + void affordance. --}}

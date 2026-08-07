@@ -8806,3 +8806,55 @@ different prices, so the basket genuinely cannot survive it.
 
 **MySQL was left to CI**, per the running order: `composer check` green on SQLite — 1504 tests, Larastan 0,
 Pint clean.
+
+---
+
+## Prompt 199 — 193's colocated outcome was added, not moved
+
+On `main` at `a2a0a36`, pressing **Cobrar** with an empty bar basket rendered *"La cesta está vacía."*
+**twice** — both inside the cart column, both live regions, one with a dismiss and one without.
+
+**Prompt 193's colocation was right and is kept.** The outcome used to render ~650px from the button that
+produced it in an 820px viewport, and moving it beside the control is a real improvement. What 193 did not do
+is remove the message it replaced: it **added a second writer** and left the first. Two live regions with
+identical text means a screen reader announces the same refusal twice, which is worse than the distance
+problem 193 set out to solve.
+
+**One mechanism, not two.** Prompt 202 guessed at "a component property AND a dispatched notification or
+session flash". It is neither: one `$flashMessage` property rendered from two places in the same Blade file —
+prompt 41's inline block inside the scrolling cart section, and 193's `counter-flash` partial in the fixed
+bottom block beside Charge. The surviving one is 193's, because it is the one that cannot scroll out of view.
+
+**The dispensary had the same defect by a different route, and the tests nearly missed it.** 193 never touched
+that screen; its duplicate is prompt 60's colocated block plus the page-top banner, both in the working
+branch. But 60's block renders **only when the basket is non-empty**, so:
+
+- empty basket → one message (and 700px from the control that produced it — 193's problem, unfixed here)
+- basket in progress → two
+
+A test that only ever pressed commit on an empty basket would have called the screen clean. It took a third
+test, with a line in the basket and an under-tender, to see it. The dispensary now follows the bar's shape
+exactly: **two positions, one partial, never both at once** — `data-blocked-feedback` when a blocking state
+has replaced the cart column, `data-commit-feedback` beside the commit otherwise. That also closes the
+empty-basket case, which previously had nowhere near to go.
+
+### The assertion shape is the actual finding
+
+`ChargeAlwaysObservableTest` used `assertSee`, which 193 itself identified as too weak: *true of the markup
+no matter how many copies of it there are*. Two of prompt 41's tests were worse than weak — they asserted
+`assertGreaterThanOrEqual(2, …)`, **encoding the duplication as the requirement**. That is why nobody noticed
+when 193 added a third position: the guard was pointing the wrong way.
+
+Both are rewritten to assert what they were really proving — **position, not repetition**: the outcome
+carries `data-commit-feedback` (beside the control) and the message renders **exactly once**. The new
+`OneOutcomePerCommitTest` counts every case: refusal and success, on both screens, with an empty basket and
+with one in progress.
+
+Counting has one trap worth recording: Livewire serialises public properties into `wire:snapshot`, so
+`$flashMessage` appears in the response once more than it appears on screen. The helper strips the snapshot
+before counting, so the number is what a person would see.
+
+**Nothing about what any message says, or when it is raised, changed** — only how many times it is rendered.
+
+**MySQL was left to CI**, per the running order: `composer check` green on SQLite — 1510 tests, Larastan 0,
+Pint clean.
