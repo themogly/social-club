@@ -6,9 +6,9 @@ use App\Actions\Attendance\CheckInMember;
 use App\Actions\Attendance\CheckOutMember;
 use App\Actions\Attendance\ResolveMemberEligibility;
 use App\Actions\Dispensing\ResolveMemberLimits;
+use App\Actions\Till\SelectTillSession;
 use App\Enums\CheckInMethod;
 use App\Enums\MembershipStatus;
-use App\Enums\TillSessionStatus;
 use App\Exceptions\CheckInBlockedException;
 use App\Livewire\Counter\Concerns\CollectsMembershipFees;
 use App\Livewire\Counter\Concerns\FindsMembers;
@@ -286,13 +286,16 @@ class CheckInScreen extends Component
         return $this->memberId !== null ? Member::query()->find($this->memberId) : null;
     }
 
-    /** Any open till at this sede — a CASH inline fee needs one; a WALLET fee does not (prompt 127). */
+    /**
+     * Any open till at this sede — a CASH inline fee needs one; a WALLET fee does not (prompt 127).
+     *
+     * Through the ONE resolver (code-style audit). This screen used to take `latest('opened_at')` — the
+     * NEWEST open session — while the two POS screens took the oldest; on a two-till sede that was a
+     * different drawer for the same fee. The door has no terminal, so it takes the shared fallback.
+     */
     private function openTill(Location $location): ?TillSession
     {
-        return TillSession::query()->withoutGlobalScopes()
-            ->where('location_id', $location->id)
-            ->where('status', TillSessionStatus::OPEN->value)
-            ->latest('opened_at')->first();
+        return (new SelectTillSession)->handle($location);
     }
 
     private function openCheckIn(Member $member, Location $location): ?CheckIn
