@@ -148,6 +148,10 @@ class Settings
         // operator out, so commits are refused server-side and an unattended tablet stops showing member data
         // until someone re-enters a PIN. Per-location (a quiet sede may want longer). 0 disables the idle lock.
         'counter_idle_lock_minutes' => 5,
+        // Where one link into the counter lands (prompt 189). 'home' = the tile hub, 'screen' = straight to
+        // the first screen the operator may open (prompt 172's per-user resolution, which is the fallback
+        // either way — a till-only operator must always land somewhere they are allowed to be).
+        'counter_landing' => 'home',
         // Panic lockdown (prompt 121), all per-org. The safety-net auto-reactivation runs after this many
         // minutes so a locked-out club — who are the data controller — always regains access to their own
         // statutory register (default 24h). The owner email "way back" link is valid for this many hours.

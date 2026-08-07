@@ -5,6 +5,7 @@ namespace Tests\Feature\Counter;
 use App\Enums\Role;
 use App\Models\Location;
 use App\Models\Organisation;
+use App\Models\Setting;
 use App\Models\User;
 use App\Support\ActiveScope;
 use App\Support\CounterScreens;
@@ -27,12 +28,14 @@ class OneCounterLinkTest extends TestCase
 {
     use RefreshDatabase;
 
+    private Organisation $org;
+
     protected function setUp(): void
     {
         parent::setUp();
         $this->seed(RolePermissionSeeder::class);
         Filament::setCurrentPanel(Filament::getPanel('admin'));
-        $org = Organisation::factory()->create();
+        $org = $this->org = Organisation::factory()->create();
         app(ActiveScope::class)->setOrganisation($org->id);
         app(ActiveScope::class)->setLocation(Location::factory()->create(['organisation_id' => $org->id])->id);
     }
@@ -79,8 +82,24 @@ class OneCounterLinkTest extends TestCase
 
     // --- The trap: it must land somewhere the user is allowed to be ------------------------------------
 
-    public function test_it_lands_on_reception_for_a_user_who_can_be_there(): void
+    public function test_it_lands_on_the_counter_home_by_default(): void
     {
+        // Prompt 189 — the landing screen is now a SETTING and the hub is the default, because the owner
+        // asked for it and a chooser cannot strand anybody. Recepción is one tap from there.
+        $owner = $this->actor(Role::OWNER);
+
+        $this->assertSame('counter.home', CounterScreens::landingRouteFor($owner));
+    }
+
+    public function test_it_lands_on_reception_for_a_user_who_can_be_there_when_configured_to(): void
+    {
+        // Prompt 172's original behaviour, now reached by setting `counter_landing` to 'screen' — a club
+        // that would rather open on the working screen still can, and this is that assertion unchanged.
+        Setting::query()->updateOrCreate(
+            ['organisation_id' => $this->org->id, 'location_id' => null, 'key' => 'counter_landing'],
+            ['value' => 'screen', 'type' => 'STRING'],
+        );
+
         $owner = $this->actor(Role::OWNER);
 
         $this->assertSame('counter.checkin', CounterScreens::landingRouteFor($owner));
@@ -93,6 +112,11 @@ class OneCounterLinkTest extends TestCase
         $user = User::factory()->create();
         $user->givePermissionTo('till.open');
         $this->actingAs($user);
+
+        Setting::query()->updateOrCreate(
+            ['organisation_id' => $this->org->id, 'location_id' => null, 'key' => 'counter_landing'],
+            ['value' => 'screen', 'type' => 'STRING'],
+        );
 
         $this->assertFalse($user->can('checkin.manage'));
         $this->assertSame('counter.till', CounterScreens::landingRouteFor($user));
@@ -111,7 +135,9 @@ class OneCounterLinkTest extends TestCase
                 continue;
             }
 
-            $reachable = array_column(CounterScreens::reachableFor($user), 'route');
+            // The counter home is reachable by anyone who can reach ANY counter screen, so it is always a
+            // legal landing — that IS prompt 172's guarantee, not an exception to it.
+            $reachable = array_merge(['counter.home'], array_column(CounterScreens::reachableFor($user), 'route'));
             $this->assertContains($route, $reachable, "{$role->value} would land on a screen they cannot open.");
         }
     }

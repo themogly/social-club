@@ -41,9 +41,16 @@
     class="flex items-center justify-between border-b border-line px-4 py-3 dark:border-slate-800 sm:px-6"
 >
     <div class="flex min-w-0 items-center gap-3">
-        <span class="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-brand text-base font-bold text-white">
+        {{-- Prompt 189: the brand block is now the way HOME. The hub carries the terminal operations that used
+             to crowd this row, so it has to be one tap from every screen. --}}
+        <a href="{{ route('counter.home') }}"
+           data-counter-home-link
+           wire:navigate.ignore
+           @click.prevent="(! ($store.counter?.dirty) || window.confirm(@js($confirmLeave))) && window.location.assign('{{ route('counter.home') }}')"
+           aria-label="{{ __('Inicio del mostrador') }}"
+           class="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-brand text-base font-bold text-white transition hover:bg-brand-dark">
             {{ mb_substr(config('app.name', 'C'), 0, 1) }}
-        </span>
+        </a>
         {{-- Prompt 130: the brand/title block can shrink and TRUNCATE (min-w-0 + truncate) rather than shoving
              the nav into its neighbours on a narrow (portrait-tablet) header. It stays rendered at every width so
              the counter screen's single <h1> is never dropped from the a11y tree. --}}
@@ -166,7 +173,7 @@
          chrome that is already on every screen and already at the 44px floor. Reading only: identifying and
          switching both happen on the full-screen surface, so there is exactly ONE route to the pad. --}}
     @if ($user !== null && \App\Support\CounterOperator::current() !== null)
-        <p data-operator-name-chip class="hidden items-center gap-2 rounded-lg bg-surface-alt px-3 py-2 text-sm sm:flex dark:bg-slate-800">
+        <p data-operator-name-chip class="hidden items-center gap-2 rounded-lg bg-surface-alt px-3 py-2 text-sm xl:flex dark:bg-slate-800">
             <span class="inline-block h-2.5 w-2.5 rounded-full bg-success" aria-hidden="true"></span>
             <span class="text-ink-muted dark:text-slate-400">{{ __('Trabajando') }}:</span>
             <span data-operator-name class="font-semibold">{{ \App\Support\CounterOperator::current()?->name }}</span>
@@ -177,20 +184,11 @@
          the non-destination actions (Help, Panel, Log out). Both are 44px; the overflow is what lets the widened
          five-destination nav be one flow that cannot overlap a wide fixed group — there isn't one any more. --}}
     <div class="flex shrink-0 items-center gap-1">
-        {{-- Lock now (prompt 120): a 44px affordance to lock the screen on the way out, without waiting for the
-             idle timer. Sets the shared store flag, which raises the overlay and signs the operator out. --}}
-        <button
-            type="button"
-            @click="$store.counter.lockNow()"
-            data-counter-lock-now
-            aria-label="{{ __('Bloquear pantalla') }}"
-            title="{{ __('Bloquear pantalla') }}"
-            class="inline-flex h-11 w-11 items-center justify-center rounded-lg text-ink-muted transition hover:bg-brand-tint hover:text-brand dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-white"
-        >
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" class="h-5 w-5" aria-hidden="true">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 1 0-9 0v3.75m-.75 0h10.5a2.25 2.25 0 0 1 2.25 2.25v6.75a2.25 2.25 0 0 1-2.25 2.25H6.75a2.25 2.25 0 0 1-2.25-2.25v-6.75a2.25 2.25 0 0 1 2.25-2.25Z"/>
-            </svg>
-        </button>
+        {{-- Prompt 189: the dedicated "lock now" button has moved to the counter HOME screen, with the other
+             operations that are not specific to the current transaction (switch operator, switch sede, panel,
+             log out). It was a 44px control on a row that the owner reported as cramped, and locking is not
+             something you do mid-basket. The idle timer (prompt 120) is unchanged and still locks on its own;
+             the home screen is one tap away via the brand block. --}}
 
         {{-- Secondary actions, collapsed behind ONE 44px overflow control (prompt 132). Help, Panel and Log out
              — the three items that are NOT a counter destination — folded into a single dropdown so the widened

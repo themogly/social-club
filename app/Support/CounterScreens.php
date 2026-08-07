@@ -95,6 +95,15 @@ class CounterScreens
             return null;
         }
 
+        // Prompt 189 — the landing screen is a SETTING, not a law. The counter home is the default because
+        // the owner asked for it twice and it is the safer front door: a chooser cannot strand anybody,
+        // whereas landing straight on a working screen assumes we know which work they came to do. A club
+        // that would rather open on Recepción sets `counter_landing` to 'screen' and gets prompt 172's
+        // behaviour back unchanged. Either way the resolution below stays PER USER.
+        if (Settings::get('counter_landing', 'home') === 'home') {
+            return 'counter.home';
+        }
+
         foreach ($reachable as $screen) {
             if ($screen['route'] === 'counter.checkin') {
                 return $screen['route'];
