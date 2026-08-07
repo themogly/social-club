@@ -93,6 +93,7 @@ class ExpenseForm
                         FileUpload::make('receipt_path')
                             ->label(__('Justificante'))
                             ->disk('documents')
+                            ->getUploadedFileUsing(DocumentUpload::withoutDirectUrl())
                             ->visibility('private')
                             ->maxSize(DocumentUpload::maxKilobytes())
                             ->helperText(DocumentUpload::helperText())

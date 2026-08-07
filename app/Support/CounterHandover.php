@@ -2,6 +2,8 @@
 
 namespace App\Support;
 
+use App\Http\Middleware\EnforceCounterHandover;
+
 /**
  * Handed-over mode: the counter tablet is in the hands of someone who is not a member yet (prompt 173).
  *
@@ -37,7 +39,7 @@ class CounterHandover
 
     /**
      * Hand the tablet over. The operator is recorded so the audit entry names who did it, and the URL the
-     * applicant was sent to is recorded so {@see \App\Http\Middleware\EnforceCounterHandover} can put them
+     * applicant was sent to is recorded so {@see EnforceCounterHandover} can put them
      * back there when they wander off it.
      */
     public static function begin(string $operatorId, ?string $locationId, ?string $returnUrl = null): void

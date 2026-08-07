@@ -121,6 +121,32 @@ class UploadLimitsTest extends TestCase
         ], $checked, 'The set of documents-disk uploads changed — re-check this branch covers the new one.');
     }
 
+    public function test_no_documents_disk_upload_hands_out_a_direct_disk_url(): void
+    {
+        // Security audit, Phase C carry-forward. Filament calls $storage->temporaryUrl() for ANY field with
+        // visibility('private'), which on S3 is a live presigned bucket-direct URL to an Article-9 object —
+        // no policy, no user binding, no DocumentAccessLog row. previewable(false) does NOT prevent it.
+        // Every field on this disk must therefore hand the URL job back to us.
+        $offenders = [];
+
+        foreach ($this->phpFilesIn(app_path()) as $file) {
+            $source = (string) file_get_contents($file);
+
+            foreach ($this->fileUploadChains($source) as $chain) {
+                if (! str_contains($chain, "disk('documents')")) {
+                    continue;
+                }
+                if (! str_contains($chain, 'DocumentUpload::withoutDirectUrl()')) {
+                    $offenders[] = Str::after($file, app_path().'/');
+                }
+            }
+        }
+
+        $this->assertSame([], array_unique($offenders),
+            'FileUpload(s) on the private documents disk missing '.
+            '->getUploadedFileUsing(DocumentUpload::withoutDirectUrl()): '.implode(', ', array_unique($offenders)));
+    }
+
     public function test_no_documents_disk_upload_anywhere_in_the_app_is_missing_the_limit(): void
     {
         // The schema walk above cannot reach uploads declared on Filament Pages or inside action

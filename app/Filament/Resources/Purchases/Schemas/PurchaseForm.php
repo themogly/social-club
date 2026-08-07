@@ -65,6 +65,7 @@ class PurchaseForm
                         FileUpload::make('invoice_path')
                             ->label(__('Factura'))
                             ->disk('documents')
+                            ->getUploadedFileUsing(DocumentUpload::withoutDirectUrl())
                             ->visibility('private')
                             ->maxSize(DocumentUpload::maxKilobytes())
                             ->helperText(DocumentUpload::helperText())

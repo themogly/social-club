@@ -4,6 +4,7 @@ namespace Tests\Feature\Security;
 
 use App\Enums\Role;
 use App\Filament\Resources\Members\MemberResource;
+use App\Http\Middleware\EnforceCounterHandover;
 use App\Livewire\Counter\TillSession;
 use App\Models\Location;
 use App\Models\Member;
@@ -29,7 +30,7 @@ use Tests\TestCase;
  * bookmark reached the whole admin panel. Measured before the fix: `GET /` returned 200 with the dashboard
  * and the member list returned 200 with a member's surname in the HTML.
  *
- * These are the denial tests for {@see \App\Http\Middleware\EnforceCounterHandover}. They assert both halves:
+ * These are the denial tests for {@see EnforceCounterHandover}. They assert both halves:
  * that the privileged surfaces are refused, AND that the four things the handover legitimately needs still
  * answer — because a gate that strands the tablet is its own kind of failure.
  */

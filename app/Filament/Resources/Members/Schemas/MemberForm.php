@@ -94,6 +94,7 @@ class MemberForm
                         FileUpload::make('document_scan_path')
                             ->label(__('Escaneo del documento'))
                             ->disk('documents')
+                            ->getUploadedFileUsing(DocumentUpload::withoutDirectUrl())
                             ->visibility('private')
                             ->directory('member-id-scans')
                             ->saveUploadedFileUsing(fn (TemporaryUploadedFile $file): string => DocumentVault::storeUpload($file, 'member-id-scans'))
@@ -142,6 +143,7 @@ class MemberForm
                             ->label(__('Certificado médico'))
                             ->visible(fn (Get $get): bool => (bool) $get('is_therapeutic'))
                             ->disk('documents')
+                            ->getUploadedFileUsing(DocumentUpload::withoutDirectUrl())
                             ->visibility('private')
                             ->directory('member-medical-certs')
                             ->saveUploadedFileUsing(fn (TemporaryUploadedFile $file): string => DocumentVault::storeUpload($file, 'member-medical-certs'))
@@ -160,6 +162,7 @@ class MemberForm
                             ->label(__('Foto'))
                             ->image()
                             ->disk('documents')
+                            ->getUploadedFileUsing(DocumentUpload::withoutDirectUrl())
                             ->directory('member-photos')
                             ->visibility('private')
                             // Encrypted at rest through the vault, like the ID scan (prompt 113) — so no inline
