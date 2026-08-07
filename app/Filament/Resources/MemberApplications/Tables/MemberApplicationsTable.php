@@ -68,7 +68,12 @@ class MemberApplicationsTable
                 ViewAction::make(),
                 ...MemberApplicationResource::recordActions(),
                 EditAction::make(),
-            ]);
+            ])
+            // Day one of a real club, EVERY one of these tables is empty; a framework shrug is the
+            // first thing a new owner sees (admin audit, Phase C). Say what the screen is for and
+            // what to do first.
+            ->emptyStateHeading(__('Sin solicitudes'))
+            ->emptyStateDescription(__('Las solicitudes llegan cuando invitas a alguien: usa «Generar invitación» y envíale el enlace para que rellene sus datos.'));
         // No bulk delete: MemberApplicationPolicy grants no `delete` (applications are the
         // invite/review record, not disposable) — the action would have been inert (prompt 37).
     }

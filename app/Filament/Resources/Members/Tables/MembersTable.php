@@ -144,6 +144,11 @@ class MembersTable
                     DeleteBulkAction::make(),
                     RestoreBulkAction::make(),
                 ]),
-            ]);
+            ])
+            // Day one of a real club, EVERY one of these tables is empty; a framework shrug is the
+            // first thing a new owner sees (admin audit, Phase C). Say what the screen is for and
+            // what to do first.
+            ->emptyStateHeading(__('Sin socios'))
+            ->emptyStateDescription(__('El libro de socios está vacío. Da de alta a la primera persona, o invítala para que rellene sus datos desde su móvil.'));
     }
 }

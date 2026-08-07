@@ -13,9 +13,14 @@ use Illuminate\Support\Facades\Auth;
 /**
  * Salud del sistema — the operational health panel. The failure mode of a broken scheduler
  * or a stuck queue is silence, so this makes liveness observable: the scheduler heartbeat
- * age (with an alert when stale), the queue depth and dead-letter count, and backup/restore
- * placeholders. OWNER only. Every figure is live (never cached — it is exactly the state you
- * must not stale-cache).
+ * age (with an alert when stale) and the queue depth and dead-letter count. OWNER only. Every
+ * figure is live (never cached — it is exactly the state you must not stale-cache).
+ *
+ * NOT "backup/restore placeholders" — this docblock said so until the admin audit, long after prompt 180
+ * replaced that section with a statement of fact: backups are the club's own infrastructure, and this
+ * application neither performs them nor checks their state. The stale sentence is worth recording rather
+ * than quietly deleting, because it is exactly how the claim propagated: it was repeated as a known gap in
+ * the Phase C work order and again in the security report, on the strength of a comment nobody re-read.
  */
 class SystemHealth extends Page
 {

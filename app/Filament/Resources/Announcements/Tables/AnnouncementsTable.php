@@ -41,6 +41,11 @@ class AnnouncementsTable
                     DeleteBulkAction::make(),
                     RestoreBulkAction::make(),
                 ]),
-            ]);
+            ])
+            // Day one of a real club, EVERY one of these tables is empty; a framework shrug is the
+            // first thing a new owner sees (admin audit, Phase C). Say what the screen is for and
+            // what to do first.
+            ->emptyStateHeading(__('Sin avisos'))
+            ->emptyStateDescription(__('Publica un aviso para que llegue a la app de tus socios. Puedes programarlo y ponerle fecha de caducidad.'));
     }
 }

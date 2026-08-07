@@ -56,7 +56,12 @@ class ArticlesTable
                     DeleteBulkAction::make(),
                     RestoreBulkAction::make(),
                 ]),
-            ]);
+            ])
+            // Day one of a real club, EVERY one of these tables is empty; a framework shrug is the
+            // first thing a new owner sees (admin audit, Phase C). Say what the screen is for and
+            // what to do first.
+            ->emptyStateHeading(__('Sin artículos'))
+            ->emptyStateDescription(__('Los artículos son lo que se vende en la barra y la tienda: bebidas, comida, mecheros, camisetas. Crea el primero para poder cobrarlo en el TPV de barra.'));
     }
 
     /** Reponer — add units to stock through the ledger (an ADJUSTMENT movement). */

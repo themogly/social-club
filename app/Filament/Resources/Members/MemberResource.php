@@ -11,8 +11,10 @@ use App\Actions\Members\SetMemberLimits;
 use App\Actions\Members\TransitionMemberStatus;
 use App\Actions\Members\UpdateDeclaredForecast;
 use App\Actions\Members\WaiveCarencia;
+use App\Enums\DataRequestType;
 use App\Enums\MemberDocumentType;
 use App\Enums\MemberStatus;
+use App\Filament\Resources\DataRequests\DataRequestResource;
 use App\Filament\Resources\Members\Pages\CreateMember;
 use App\Filament\Resources\Members\Pages\EditMember;
 use App\Filament\Resources\Members\Pages\ListMembers;
@@ -31,6 +33,7 @@ use App\Filament\Resources\Members\RelationManagers\WalletTransactionsRelationMa
 use App\Filament\Resources\Members\Schemas\MemberForm;
 use App\Filament\Resources\Members\Schemas\MemberInfolist;
 use App\Filament\Resources\Members\Tables\MembersTable;
+use App\Models\DataRequest;
 use App\Models\Member;
 use App\Models\User;
 use App\Support\Settings;
@@ -117,6 +120,7 @@ class MemberResource extends Resource
             self::extendTemporaryAction(),
             self::makeTemporaryAction(),
             self::exportDataAction(),
+            self::requestErasureAction(),
         ];
     }
 
@@ -390,6 +394,51 @@ class MemberResource extends Resource
                     fn () => print ((string) json_encode($data, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE)),
                     'member-'.$record->member_no.'.json',
                 );
+            });
+    }
+
+    /**
+     * Supresión (RGPD Art. 17) — reachable FROM the member, which is the whole point (admin audit, Phase C).
+     *
+     * Erasure already existed and already worked, in `DataRequestResource::eraseSubject()` → `AnonymiseMember`
+     * (anonymise-not-delete: the financial and consumption ledger survives, which is what makes the club's
+     * books still add up afterwards). What did not exist was any way to GET there from the person you are
+     * looking at. The member record offered `Eliminar`, which soft-deletes — the name, DNI, email, phone,
+     * photo and ID scan all remain in the database and on the encrypted disk — and an owner told *"erase this
+     * person"* would reasonably press it and believe they had complied. That is an Article 17 misreading with
+     * legal consequences, and the fix is a signpost, not a second writer.
+     *
+     * So this creates the ERASE request and sends the operator to it. It deliberately does NOT anonymise here:
+     * the DataRequest record IS the evidence that the club received a request and answered it in time, which
+     * is itself an obligation, and fulfilment stays behind `data.erase` on the one screen that owns it.
+     */
+    public static function requestErasureAction(): Action
+    {
+        return Action::make('requestErasure')
+            ->label(__('Solicitar supresión (RGPD)'))
+            ->icon(Heroicon::OutlinedShieldExclamation)
+            ->color('danger')
+            ->visible(fn (): bool => Auth::user()?->can('data.request.handle') ?? false)
+            ->requiresConfirmation()
+            ->modalHeading(__('Registrar una solicitud de supresión'))
+            ->modalDescription(__('Se registra la solicitud y se abre para tramitarla. La supresión anonimiza al socio: el libro contable y de consumo se conservan, como exige la normativa. «Eliminar» NO es una supresión — solo oculta la ficha.'))
+            ->modalSubmitActionLabel(__('Registrar solicitud'))
+            ->action(function (Member $record): void {
+                $request = DataRequest::create([
+                    'organisation_id' => $record->organisation_id,
+                    'member_id' => $record->id,
+                    'type' => DataRequestType::ERASE,
+                    'requested_at' => now(),
+                ]);
+
+                Notification::make()
+                    ->title(__('Solicitud de supresión registrada'))
+                    ->body(__('Trámitala en Solicitudes RGPD.'))
+                    ->success()
+                    ->send();
+
+                // The resource has index + create pages only; the fulfilment actions live on the list row.
+                redirect(DataRequestResource::getUrl('index', ['tableSearch' => $record->member_no]));
             });
     }
 

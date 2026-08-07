@@ -37,6 +37,11 @@ class MemberDocumentsTable
             ])
             ->recordActions([
                 MemberDocumentResource::viewDocumentAction(),
-            ]);
+            ])
+            // Day one of a real club, EVERY one of these tables is empty; a framework shrug is the
+            // first thing a new owner sees (admin audit, Phase C). Say what the screen is for and
+            // what to do first.
+            ->emptyStateHeading(__('Sin documentos'))
+            ->emptyStateDescription(__('Los documentos se generan desde la ficha del socio (solicitud de alta, previsión de consumo). Aquí solo se consultan.'));
     }
 }

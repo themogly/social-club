@@ -42,6 +42,11 @@ class LocationsTable
                     DeleteBulkAction::make(),
                     RestoreBulkAction::make(),
                 ]),
-            ]);
+            ])
+            // Day one of a real club, EVERY one of these tables is empty; a framework shrug is the
+            // first thing a new owner sees (admin audit, Phase C). Say what the screen is for and
+            // what to do first.
+            ->emptyStateHeading(__('Sin sedes'))
+            ->emptyStateDescription(__('Cada sede es un local con su propio stock, caja y aforo. Crea una para poder abrir caja y dispensar.'));
     }
 }

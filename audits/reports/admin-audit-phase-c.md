@@ -60,13 +60,16 @@ as fact in the work order and in the security report and would otherwise be carr
   — that part is sound and is why this is not a data-loss finding. Two things follow from it that are still
   wrong:
 
-  1. **There is no way back.** `MembersTable` has no `TrashedFilter` and `EditMember` no `RestoreAction`,
-     while `Articles`, `Discounts` and `Announcements` — far less consequential records — have both. A
-     deleted member simply vanishes from the panel, and `MemberPolicy::restore()` exists but nothing in the
-     UI can call it. Recovering one means SQL. → Give Members the same `TrashedFilter` + `RestoreAction`
-     the other soft-deleting resources already use, and drop the bulk delete (a mis-click on "select all"
-     should not be able to take the member register off the screen).
-  2. **It reads as erasure and is not.** After a soft delete the member's name, DNI, email, phone, photo and
+  1. ~~**There is no way back.**~~ **WITHDRAWN — this half of the finding was wrong, and the correction is
+     the point of leaving it here.** Checked against this report's own starting commit `f14b693`:
+     `MembersTable` already had `TrashedFilter::make()` and `RestoreBulkAction::make()`, and `EditMember`
+     already had `RestoreAction::make()`. A deleted member is recoverable from the panel, by a filter and a
+     button, exactly like Articles and Announcements. Nothing was changed for this, and the bulk delete is
+     **kept**: with restore present and confirmed a mis-click is recoverable, and removing a working
+     affordance on a premise that turned out to be false would be the worse error. Recorded rather than
+     quietly deleted — this report opens by correcting two inherited stale claims, and it does not get to
+     exempt its own.
+  2. **It reads as erasure and is not.** *(This half is real, and is what was fixed.)* After a soft delete the member's name, DNI, email, phone, photo and
      ID scan are all still in the database and on the encrypted disk. The real erasure path is
      `AnonymiseMember`, reachable **only** by creating a Data Request — nothing on the member record points
      at it. An owner told "erase this person" will use the button labelled Delete and reasonably believe
@@ -76,7 +79,7 @@ as fact in the work order and in the security report and would otherwise be carr
   "strands the owner". This is the softer version of both, and the Article 17 misreading is the part with
   legal consequences.
 
-**Review:** _pending — fixes follow this commit._
+**Review:** both fixed — see Outcome below. One half of the second finding was withdrawn as wrong.
 
 ---
 
@@ -91,7 +94,7 @@ as fact in the work order and in the security report and would otherwise be carr
   framework shrug. It is the brief's own test ("could they do their weekly tasks without a manual?") failing
   at the first screen, and it is the single highest-leverage owner-UX change in the panel.
 
-**Review:** _pending._
+**Review:** fixed — see Outcome below.
 
 ---
 
@@ -105,7 +108,7 @@ as fact in the work order and in the security report and would otherwise be carr
   propagate into the work order and the security report (below), and it is the kind of thing the next
   reader trusts.
 
-**Review:** _pending._
+**Review:** fixed — see Outcome below.
 
 ---
 
@@ -172,3 +175,55 @@ Both were handed to this audit as known gaps. Both are false, and both have alre
 
 `PERMISSION_CACHE_STORE=database`, the panic lockdown's ordinary-looking 503, `FILESYSTEM_DISK=local` being
 inert, and the dispensation receipt's legal wording. None was changed.
+
+---
+
+## Outcome
+
+Every finding closed, one half of one finding withdrawn as wrong. `composer check` green: **1490 tests**
+(up from 1482 — eight new, all denial-shaped), Larastan 0, Pint clean.
+
+### PHASE 1
+
+**1. The ungated application status writer — closed, with denial tests.**
+`MemberApplicationForm` now edits `location_id` and nothing else; `status` and `reject_reason` are gone from
+the schema (removed, not disabled — a disabled field is still a field, and Livewire data is addressable by
+anyone who can open the page). The `create` page went with them: an application hand-made in the panel has no
+invite token, so nobody could ever fill it in, and that page was the second route to the free Select.
+
+`ApplicationStatusHasOneWriterTest` asserts the hole is CLOSED rather than that the happy path still works:
+the fields do not exist, a STAFF user filling `status = APPROVED` on the 14-year-old's application and saving
+moves nothing and creates no member, the create route 404s, and the `approve` Action on the view page still
+refuses that same application **for the right reason** — because the age gate is on the Action's path, which
+is the entire argument for removing the form field.
+
+`FormCompletenessTest` caught the other end of this immediately: removing the create page made the resource
+undocumented, so it is now in `FORMLESS` with its reason. That test doing its job unprompted is worth noting.
+
+**2. "Eliminar" is not erasure — closed by a signpost, not a second writer.**
+The member record gains **Solicitar supresión (RGPD)**: it registers the `ERASE` DataRequest and sends the
+operator to the screen that fulfils it. It deliberately does **not** anonymise on the spot — the DataRequest
+row is itself the evidence that the club received a request and answered it in time, and fulfilment stays
+behind `data.erase` in `DataRequestResource::eraseSubject()` → `AnonymiseMember`, which keeps the financial
+and consumption ledger intact.
+
+`ErasureIsReachableFromTheMemberTest` covers the route, that registering does not anonymise, the denial (a
+MANAGER — who can edit the member but does not hold `data.request.handle` — never sees the action), and pins
+the claim the finding rests on: a soft delete keeps `first_name`, `last_name` and every other identifying
+field. If that ever stops being true the signpost is redundant, and this fails rather than nobody noticing.
+
+The other half of this finding was **withdrawn** — see the strikethrough above.
+
+### PHASE 2
+
+**26 of 26 resource tables now have a designed empty state** (25 added; `MessageThreads` already had one).
+Each says what the screen is *for* and what to do *first*, in the club's own vocabulary — not a framework
+shrug. Verified in the browser on an empty table: *"No breaches recorded — This screen being empty is the
+normal state. If there is ever a personal-data incident, record it here so it can be notified to the AEPD
+within 72 hours."* All 33 new strings ship in both locales.
+
+### PHASE 3
+
+**`SystemHealth`'s docblock corrected**, with a note about *why* it is worth a commit: that stale sentence is
+how the "backup section is a placeholder" claim propagated into the work order and the security report. A
+comment nobody re-reads is a load-bearing comment.
