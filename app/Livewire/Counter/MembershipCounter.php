@@ -6,7 +6,6 @@ use App\Actions\Attendance\ResolveMemberEligibility;
 use App\Actions\Dispensing\ResolveMemberLimits;
 use App\Actions\Till\SelectTillSession;
 use App\Enums\DispensationStatus;
-use App\Enums\MembershipStatus;
 use App\Livewire\Counter\Concerns\CollectsMembershipFees;
 use App\Livewire\Counter\Concerns\FindsMembers;
 use App\Livewire\Counter\Concerns\IdentifiesOperator;
@@ -210,10 +209,7 @@ class MembershipCounter extends Component
     /** The member's latest active membership at this sede (whether or not anything is owed) — for the summary. */
     private function latestMembership(Member $member, Location $location): ?Membership
     {
-        return $member->memberships()->withoutGlobalScopes()
-            ->where('location_id', $location->id)
-            ->where('status', MembershipStatus::ACTIVE->value)
-            ->latest('id')->first();
+        return $member->activeMembershipAt($location);
     }
 
     /** Through the ONE resolver — see CheckInScreen::openTill(); this screen had the same divergent copy. */

@@ -8,7 +8,6 @@ use App\Actions\Attendance\ResolveMemberEligibility;
 use App\Actions\Dispensing\ResolveMemberLimits;
 use App\Actions\Till\SelectTillSession;
 use App\Enums\CheckInMethod;
-use App\Enums\MembershipStatus;
 use App\Exceptions\CheckInBlockedException;
 use App\Livewire\Counter\Concerns\CollectsMembershipFees;
 use App\Livewire\Counter\Concerns\FindsMembers;
@@ -309,11 +308,7 @@ class CheckInScreen extends Component
 
     private function activeMembership(Member $member, Location $location): ?Membership
     {
-        return $member->memberships()->withoutGlobalScopes()
-            ->where('location_id', $location->id)
-            ->where('status', MembershipStatus::ACTIVE->value)
-            ->latest('id')
-            ->first();
+        return $member->activeMembershipAt($location);
     }
 
     private function activeSanction(Member $member): ?MemberSanction

@@ -13,7 +13,6 @@ use App\Actions\ResolveLocale;
 use App\Actions\Stock\SelectBatch;
 use App\Actions\Till\SelectTillSession;
 use App\Enums\DispensationStatus;
-use App\Enums\MembershipStatus;
 use App\Enums\TillSessionStatus;
 use App\Exceptions\DebtLimitExceededException;
 use App\Exceptions\DispensationBlockedException;
@@ -1681,11 +1680,7 @@ class DispensaryPos extends Component
 
     private function activeMembership(Member $member, Location $location): ?Membership
     {
-        return $member->memberships()->withoutGlobalScopes()
-            ->where('location_id', $location->id)
-            ->where('status', MembershipStatus::ACTIVE->value)
-            ->latest('id')
-            ->first();
+        return $member->activeMembershipAt($location);
     }
 
     private function activeSanction(Member $member): ?MemberSanction

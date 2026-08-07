@@ -157,6 +157,29 @@ class Member extends Model implements Authenticatable, HasLocalePreference
         return $this->hasMany(Membership::class);
     }
 
+    /**
+     * This socio's ACTIVE membership at one sede — the single answer to a question four screens were each
+     * asking in their own words (code-style audit).
+     *
+     * `CheckInScreen::activeMembership()`, `DispensaryPos::activeMembership()`,
+     * `MembershipCounter::latestMembership()` and `CollectsMembershipFees::outstandingMembership()` all wrote
+     * the same query by hand while `Membership::scopeActive()` sat unused. They agreed, which is the only
+     * reason it was Phase 2 and not Phase 1 — the till resolver on the same branch is what that looks like
+     * once four copies of a rule stop agreeing.
+     *
+     * `withoutGlobalScopes()` deliberately: a socio is org-wide and every caller has already resolved the
+     * sede it means, which it passes in explicitly. `latest('id')` is the tie-break for a member re-enrolled
+     * at the same sede: the most recent enrolment is the live one.
+     */
+    public function activeMembershipAt(Location $location): ?Membership
+    {
+        return $this->memberships()->withoutGlobalScopes()
+            ->where('location_id', $location->id)
+            ->active()
+            ->latest('id')
+            ->first();
+    }
+
     /** @return HasMany<CheckIn, $this> */
     public function checkIns(): HasMany
     {
