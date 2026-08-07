@@ -25,7 +25,13 @@ class TopbarHarnessTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_the_topbar_is_one_flow_with_secondary_actions_behind_one_overflow_control(): void
+    /**
+     * **Updated by prompt 205, not deleted.** The five-destination row this was written for is gone — the hub
+     * is the menu — but *"no two controls overlap, none under 44px, at four widths"* is as valuable on a short
+     * row as on a long one, and a short row is exactly where somebody would stop checking. The structural
+     * half asserts the new contents; `measure-topbar.mjs` still measures the pixels.
+     */
+    public function test_the_topbar_is_one_flow_of_terminal_controls(): void
     {
         $this->seed(RolePermissionSeeder::class);
         $org = Organisation::factory()->create();
@@ -41,21 +47,27 @@ class TopbarHarnessTest extends TestCase
 
         $html = $this->get(route('counter.checkin'))->getContent();
 
-        // All five counter destinations are present and reachable directly (not collapsed).
+        // The destinations are NOT here any more — they are the hub's tiles (prompt 205).
         foreach (['counter.checkin', 'counter.members', 'counter.pos', 'counter.bar', 'counter.till'] as $route) {
-            $this->assertStringContainsString('data-counter-screen="'.$route.'"', $html);
+            $this->assertStringNotContainsString('data-counter-screen="'.$route.'"', $html);
         }
 
-        // The three non-destination actions are behind ONE overflow control — not loose in the bar.
-        $this->assertStringContainsString('data-counter-overflow-trigger', $html);
-        $this->assertStringContainsString('data-counter-help', $html);        // help folded into the overflow
-        $this->assertStringContainsString('data-counter-dashboard', $html);   // Panel, inside the overflow
-        $this->assertStringContainsString('data-counter-logout', $html);      // Log out, inside the overflow
+        // What the row carries instead: the terminal facts, each loose and each in exactly one place.
+        $this->assertStringContainsString('data-counter-home-link', $html);        // labelled, not a logo
+        $this->assertStringContainsString('data-counter-sede-region', $html);
+        $this->assertStringContainsString('data-operator-name-chip', $html);
+        $this->assertStringContainsString('data-counter-lock', $html);
+        $this->assertStringContainsString('data-counter-dashboard', $html);        // Panel
+        $this->assertStringContainsString('data-counter-logout', $html);
+        $this->assertStringContainsString('data-counter-panic', $html);            // discreet, icon-only
 
-        // Uniform, breakpoint-gated labelling (never a mixture); nav items and the overflow trigger are 44px.
+        // The overflow is gone with the strip that made it necessary.
+        $this->assertStringNotContainsString('data-counter-overflow-trigger', $html);
+
+        // Uniform, breakpoint-gated labelling (never a mixture); the icon-only controls are 44px.
         $this->assertStringContainsString('hidden lg:inline', $html);
         $this->assertStringNotContainsString('hidden md:inline', $html);
-        $this->assertStringContainsString('h-11 w-11', $html);                 // 44px overflow trigger
+        $this->assertStringContainsString('h-11 w-11', $html);                     // 44px panic control
 
         // Write the harness (with built CSS inlined) for the Playwright measurement, when assets are built.
         $css = '';

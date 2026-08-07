@@ -22,6 +22,7 @@ use App\Models\Order;
 use App\Models\TillSession;
 use App\Models\User;
 use App\Support\ActiveScope;
+use App\Support\BusinessDay;
 use App\Support\Period;
 use App\Support\Settings;
 use App\Support\StockCeiling;
@@ -97,6 +98,53 @@ class Dashboard
     {
         return (int) $this->scopeByLocation(CheckIn::query()->withoutGlobalScopes())
             ->whereNull('checked_out_at')->count();
+    }
+
+    /**
+     * Sign-ins recorded today at the sedes in scope (prompt 205).
+     *
+     * The counter hub needed it and nothing else computed it — `insideNow()` counts people who have not
+     * checked OUT, which answers a different question. Added HERE rather than on the hub, because the rule
+     * is one writer per fact and the hub is a screen.
+     *
+     * The day is the club's business day (prompt 30's boundary), not midnight: a session that runs past
+     * 00:00 is one evening's work and one number.
+     */
+    public function checkInsToday(): int
+    {
+        // Per location, because the business-day cutoff is a per-sede setting: one query per sede in scope
+        // (exactly ONE on the counter hub, which always has a single active sede; a handful on the owner
+        // rollup). Summing a shared window would silently mis-slice a sede that closes at a different hour.
+        return $this->scopeLocations()->sum(function (Location $location): int {
+            [$start, $end] = BusinessDay::window($location);
+
+            return (int) CheckIn::query()->withoutGlobalScopes()
+                ->where('location_id', $location->id)
+                ->whereBetween('checked_in_at', [$start, $end])
+                ->count();
+        });
+    }
+
+    /**
+     * The operators who have recorded something at these sedes today (prompt 205's "On shift").
+     *
+     * Derived from what people actually DID — the operator stamped on today's dispensations and bar orders —
+     * rather than from a presence table, because there isn't one and inventing one to fill a panel is how a
+     * number becomes decoration. Two queries, both indexed on (location_id, created_at).
+     *
+     * @return list<string>
+     */
+    public function operatorsOnShift(): array
+    {
+        $ids = $this->dispensations(Period::today())->distinct()->pluck('operator_id')
+            ->merge($this->orders(Period::today())->distinct()->pluck('operator_id'))
+            ->filter()->unique()->values();
+
+        if ($ids->isEmpty()) {
+            return [];
+        }
+
+        return User::query()->whereIn('id', $ids)->orderBy('name')->pluck('name')->all();
     }
 
     public function transactionCount(?Period $period = null): int

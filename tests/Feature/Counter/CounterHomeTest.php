@@ -132,7 +132,13 @@ class CounterHomeTest extends TestCase
 
     // --- The terminal operations that came off the bar ------------------------------------------------
 
-    public function test_the_home_screen_carries_the_operations_that_left_the_top_bar(): void
+    /**
+     * **Reversed by prompt 205, deliberately.** 189 moved the terminal operations here and left them in the
+     * bar as well; the owner reported the result as "just duplicate data". They are facts about the TERMINAL,
+     * not about whichever screen is open, so they live in the bar — and this asserts the hub no longer draws
+     * a second copy of any of them. The bar's own copies are asserted in `CounterOneControlPerThingTest`.
+     */
+    public function test_the_home_screen_no_longer_duplicates_the_terminal_operations(): void
     {
         $user = $this->actor(Role::OWNER);
         CounterOperator::set($user);
@@ -144,39 +150,56 @@ class CounterHomeTest extends TestCase
             'data-counter-home-lock',
             'data-counter-home-panel',
             'data-counter-home-logout',
+            'data-counter-home-sede',
         ] as $hook) {
-            $this->assertStringContainsString($hook, $html, "The home screen is missing {$hook}.");
+            $this->assertStringNotContainsString($hook, $html, "The hub still draws {$hook} — the bar owns it.");
         }
     }
 
-    public function test_the_sede_switcher_on_home_offers_only_sedes_the_operator_may_work_at(): void
+    /**
+     * The sede switcher offers only sedes the operator may work at — asserted on the BAR, which now owns it.
+     *
+     * The rule this guards has not changed and is the one that matters: the switcher can never offer a sede
+     * the validated POST would refuse. Only its address moved (prompt 205).
+     */
+    public function test_the_sede_switcher_offers_only_sedes_the_operator_may_work_at(): void
     {
         $user = $this->actor(Role::MANAGER);
         $second = Location::factory()->create(['organisation_id' => $this->org->id]);
         $user->locations()->attach($second->id);
         $forbidden = Location::factory()->create(['organisation_id' => $this->org->id]);
         CounterOperator::set($user);
-        // Choose a sede first: with two assigned and none chosen the chain is on the SEDE step, and home's
-        // own switcher sits PAST that blocker by design (the bar's is the answer to it).
         session(['counter.location_id' => $this->location->id]);
 
-        $html = Livewire::actingAs($user)->test(CounterHome::class)->html();
+        $html = (string) $this->actingAs($user)->get(route('counter.home'))->assertOk()->getContent();
 
-        $this->assertStringContainsString('data-counter-home-sede="'.$this->location->id.'"', $html);
-        $this->assertStringContainsString('data-counter-home-sede="'.$second->id.'"', $html);
-        $this->assertStringNotContainsString('data-counter-home-sede="'.$forbidden->id.'"', $html);
+        $this->assertStringContainsString('data-counter-sede="'.$this->location->id.'"', $html);
+        $this->assertStringContainsString('data-counter-sede="'.$second->id.'"', $html);
+        $this->assertStringNotContainsString('data-counter-sede="'.$forbidden->id.'"', $html);
     }
 
-    public function test_the_lock_button_has_left_the_top_bar_for_the_home_screen(): void
+    /**
+     * **The lock came back to the bar, and that closes prompt 198.**
+     *
+     * 189 moved it off the row on the grounds that "locking is not something you do mid-basket". That premise
+     * was wrong — locking is exactly what you do when you step away from a counter with a member in front of
+     * you — and 198 measured the cost: with the only control on `/counter`, reaching it crossed 196's
+     * unsaved-work confirm, so the operator's real choice mid-order was to leave the terminal unlocked or
+     * abandon the sale. 198 patched that by folding the lock into the bar's overflow. 205 removes the
+     * overflow and makes it a first-class control: one tap, on every screen, no navigation, no confirm.
+     */
+    public function test_the_lock_is_a_first_class_control_in_the_bar_on_every_screen(): void
     {
         $user = $this->actor(Role::OWNER);
         CounterOperator::set($user);
 
-        $bar = $this->actingAs($user)->get(route('counter.checkin'))->getContent();
+        foreach (['counter.checkin', 'counter.home'] as $route) {
+            $html = (string) $this->actingAs($user)->get(route($route))->assertOk()->getContent();
 
-        // It was a 44px control on a row the owner reported as cramped, and locking is not something you do
-        // mid-basket. The idle timer is unchanged; the home screen is one tap away via the brand block.
-        $this->assertStringNotContainsString('data-counter-lock-now', $bar);
-        $this->assertStringContainsString('data-counter-home-link', $bar);
+            $this->assertStringContainsString('data-counter-lock', $html, "{$route} has no lock control");
+            $this->assertStringContainsString('data-counter-home-link', $html, "{$route} has no way home");
+            // No confirm on the lock: 198's guarantee is that work SURVIVES it, so asking would be the bug.
+            $this->assertStringNotContainsString('data-counter-overflow', $html, 'the overflow is gone (prompt 205)');
+        }
     }
 }

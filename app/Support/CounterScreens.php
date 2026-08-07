@@ -22,7 +22,33 @@ use App\Models\User;
 class CounterScreens
 {
     /**
-     * Every counter screen, in tab-strip order, with its gate resolved for this user.
+     * What each screen is FOR, one line, for the hub's tiles (prompt 205).
+     *
+     * Here rather than on the tile markup, because this is the same "one list, in one place" rule the class
+     * exists for — a sixth screen gets its purpose line in the same edit as its route and its gate.
+     *
+     * A method rather than a `const` so each string is a literal `__()` call: `php artisan lang:sync` scans
+     * for those, and a constant read through a variable is invisible to it — the English would have gone
+     * missing silently, which is exactly what the enforced key parity exists to prevent.
+     */
+    public static function purposeFor(string $route): string
+    {
+        return match ($route) {
+            'counter.checkin' => __('Identifica al socio y registra su entrada'),
+            'counter.members' => __('Ficha, cuota y alta de socios'),
+            'counter.pos' => __('Dispensa por peso y registra la aportación'),
+            'counter.bar' => __('Cobra bebidas y artículos'),
+            'counter.till' => __('Abre, arquea y cierra la caja'),
+            default => '',
+        };
+    }
+
+    /**
+     * Every counter screen, in hub order, with its gate resolved for this user.
+     *
+     * **Recepción is first, and that is now load-bearing** (prompt 205): the hub's hero tile is the first
+     * destination the operator may open, so this order decides which screen gets the big one. Recepción
+     * earns it on frequency — every visit starts at the door.
      *
      * @return list<array{route: string, label: string, granted: bool, icon: string}>
      */

@@ -11,6 +11,7 @@ use App\Exceptions\TillClosedException;
 use App\Livewire\Counter\Concerns\FindsMembers;
 use App\Livewire\Counter\Concerns\HandlesTender;
 use App\Livewire\Counter\Concerns\IdentifiesOperator;
+use App\Livewire\Counter\Concerns\PersistsBasket;
 use App\Livewire\Counter\Concerns\ResolvesCounterLocation;
 use App\Livewire\Counter\Concerns\ShowsSettledOutcome;
 use App\Models\Article;
@@ -64,7 +65,7 @@ use Throwable;
 #[Layout('components.layouts.counter', ['fullHeight' => true])] // prompt 176: the page must not scroll; the selection pane does
 class BarPos extends Component
 {
-    use FindsMembers, HandlesTender, IdentifiesOperator, ResolvesCounterLocation, ShowsSettledOutcome;
+    use FindsMembers, HandlesTender, IdentifiesOperator, PersistsBasket, ResolvesCounterLocation, ShowsSettledOutcome;
 
     // --- Identity / scope -------------------------------------------------------
     // The ONE lookup field ($lookup) lives in FindsMembers (prompt 194). The bar used to offer a name box with
@@ -167,6 +168,14 @@ class BarPos extends Component
         }
 
         $this->idempotencyKey = (string) Str::ulid();
+
+        // Prompt 205 — a basket left on this screen comes back. Last, because it needs the sede above.
+        $this->restoreBasket();
+    }
+
+    protected function basketScreen(): string
+    {
+        return 'bar';
     }
 
     // --- Attach / detach a socio (optional) -------------------------------------

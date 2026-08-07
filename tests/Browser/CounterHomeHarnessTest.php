@@ -53,18 +53,24 @@ class CounterHomeHarnessTest extends TestCase
         }
         file_put_contents(storage_path('app/counter-home.html'), $html);
 
-        // A tile per destination an OWNER may open — all five — and the operations that left the bar.
+        // A tile per destination an OWNER may open — all five — with Recepción as the hero (prompt 205).
         foreach (['counter.checkin', 'counter.members', 'counter.pos', 'counter.bar', 'counter.till'] as $route) {
             $this->assertStringContainsString('data-counter-home-tile="'.$route.'"', $html);
         }
-        $this->assertStringContainsString('data-counter-home-switch-operator', $html);
-        $this->assertStringContainsString('data-counter-home-lock', $html);
-        $this->assertStringContainsString('data-counter-home-sedes', $html);
-        // And the lock BUTTON is still gone from the row it used to crowd (prompt 189). Prompt 198 put an
-        // in-place lock back in the bar's overflow MENU — a menu item, not a control on the row — because
-        // reaching the home tile mid-basket crossed 196's unsaved-work confirm and destroyed the basket the
-        // lock exists to preserve. The row's geometry is unchanged; measure-topbar.mjs still reads 7 controls.
-        $this->assertStringNotContainsString('data-counter-lock-now', $html);
-        $this->assertStringContainsString('data-counter-overflow-lock', $html);
+        $this->assertStringContainsString('data-counter-home-hero', $html);
+        $this->assertStringContainsString('data-counter-home-tile="counter.checkin"', $html);
+
+        // The live rail, every figure of it from App\ViewModels\Dashboard.
+        foreach (['data-panel="presence"', 'data-panel="today"', 'data-panel="alerts"'] as $panel) {
+            $this->assertStringContainsString($panel, $html, "the hub is missing {$panel}");
+        }
+
+        // And NOT a second copy of anything the bar owns — the owner's "just duplicate data".
+        foreach ([
+            'data-counter-home-switch-operator', 'data-counter-home-lock',
+            'data-counter-home-sedes', 'data-counter-home-panel', 'data-counter-home-logout',
+        ] as $duplicate) {
+            $this->assertStringNotContainsString($duplicate, $html, "the hub still draws {$duplicate}");
+        }
     }
 }

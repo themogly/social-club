@@ -2,6 +2,12 @@
 // intersect, and none is under 44×44, at 768 / 800 / 1024 / 1280 (1024 landscape is the one that matters and is
 // NOT the narrowest — a fixed-width check catches what the extremes miss). This is what prompt 130 lacked.
 //
+// **Updated by prompt 205, not deleted.** The five-destination row it was written for is gone — the hub is the
+// menu — but "no two controls overlap, none under 44px, at four widths" is as valuable on a short row, and a
+// short row is exactly where somebody would stop checking. The selector list had to move with it: left
+// unchanged it matched ONE element and reported ALL PASS, which is the same defect as an axe sweep that
+// audits a redirect. It now asserts a MINIMUM control count, so an empty measurement can never pass again.
+//
 // Playwright is intentionally NOT a CI dependency (it needs a ~100MB browser). Run it by hand:
 //   npm install --no-save playwright && node_modules/.bin/playwright install chromium-headless-shell
 //   npm run build
@@ -16,12 +22,20 @@ import { resolve } from 'node:path';
 
 const harness = pathToFileURL(resolve('storage/app/topbar-harness.html')).href;
 const WIDTHS = [768, 800, 1024, 1280];
-const SELECTOR = [
-  '[data-counter-topbar] [data-counter-screen]',
-  '[data-counter-topbar] [data-counter-sede-current]',
-  '[data-counter-topbar] [data-counter-lock-now]',
-  '[data-counter-topbar] [data-counter-overflow-trigger]',
-].join(', ');
+// Every interactive control the bar carries after prompt 205. Keyed by attribute so a renamed hook fails
+// loudly (the count check below) rather than quietly shrinking what is measured.
+const CONTROLS = [
+  ['data-counter-home-link', 'home'],
+  ['data-counter-sede-current', 'sede'],
+  ['data-counter-sede-state', 'sede'],
+  ['data-operator-name-chip', 'operator'],
+  ['data-counter-lock', 'lock'],
+  ['data-counter-dashboard', 'panel'],
+  ['data-counter-logout', 'logout'],
+  ['data-counter-panic', 'panic'],
+];
+const SELECTOR = CONTROLS.map(([attr]) => `[data-counter-topbar] [${attr}]`).join(', ');
+const MIN_CONTROLS = 6;   // home, sede, operator, lock, panel, logout — panic depends on the fixture's role
 
 const browser = await chromium.launch();
 let failed = false;
@@ -35,9 +49,13 @@ for (const width of WIDTHS) {
     nodes
       .map((n) => {
         const r = n.getBoundingClientRect();
-        const label =
-          n.getAttribute('data-counter-screen') ||
-          (n.hasAttribute('data-counter-overflow-trigger') ? 'overflow' : 'sede');
+        const hooks = [
+          ['data-counter-home-link', 'home'], ['data-counter-sede-current', 'sede'],
+          ['data-counter-sede-state', 'sede'], ['data-operator-name-chip', 'operator'],
+          ['data-counter-lock', 'lock'], ['data-counter-dashboard', 'panel'],
+          ['data-counter-logout', 'logout'], ['data-counter-panic', 'panic'],
+        ];
+        const label = (hooks.find(([attr]) => n.hasAttribute(attr)) ?? [null, '?'])[1];
         return { label, x: r.x, right: r.right, y: r.y, bottom: r.bottom, w: r.width, h: r.height };
       })
       .filter((e) => e.w > 0 && e.h > 0),
@@ -59,6 +77,13 @@ for (const width of WIDTHS) {
   const under44 = els.filter((e) => e.h < 44 || e.w < 44).map((e) => `${e.label}(${Math.round(e.w)}x${Math.round(e.h)})`);
 
   const ok = overlaps.length === 0 && under44.length === 0 && !pageScroll;
+  // A measurement that found nothing must never report PASS — that is how the selector list going stale
+  // reads as "no violations" (prompt 205; the same defect the axe sweep had).
+  if (els.length < MIN_CONTROLS) {
+    console.log(`  MEASURED ONLY ${els.length} CONTROLS — the selector list is stale, nothing was audited`);
+    failed = true;
+  }
+
   if (!ok) failed = true;
   console.log(`=== ${width}px === ${ok ? 'PASS' : 'FAIL'} (${els.length} controls) hScroll=${pageScroll}`);
   if (overlaps.length) console.log('  overlaps:', overlaps.join(', '));

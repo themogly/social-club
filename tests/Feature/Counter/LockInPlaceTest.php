@@ -70,8 +70,9 @@ class LockInPlaceTest extends TestCase
     /**
      * The reported bug, as a guard: an in-place lock on every counter screen.
      *
-     * Fails against main, where `[data-counter-overflow-lock]` exists nowhere and the only control is
-     * `[data-counter-home-lock]` on `/counter`.
+     * 198 put it in the bar's overflow MENU (one tap to open, one to press). Prompt 205 removed the overflow
+     * and made it a first-class control on the row — `[data-counter-lock]`, ONE tap — which is the strongest
+     * form of what 198 asked for. The hook changed; the guarantee is unchanged and is asserted harder.
      */
     public function test_every_counter_screen_offers_a_lock_that_does_not_leave_the_screen(): void
     {
@@ -82,7 +83,7 @@ class LockInPlaceTest extends TestCase
             $html = $this->get(route($route))->assertOk()->getContent();
 
             $this->assertStringContainsString(
-                'data-counter-overflow-lock',
+                'data-counter-lock',
                 (string) $html,
                 $route.' must offer a lock without navigating away — locking is a mid-transaction action.',
             );
@@ -100,7 +101,7 @@ class LockInPlaceTest extends TestCase
         $this->operator();
         $html = (string) $this->get(route('counter.bar'))->assertOk()->getContent();
 
-        $start = strpos($html, 'data-counter-overflow-lock');
+        $start = strpos($html, 'data-counter-lock');
         $this->assertNotFalse($start, 'the in-place lock must exist');
 
         // The control's own markup, up to the end of its element.

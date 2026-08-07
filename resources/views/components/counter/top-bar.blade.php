@@ -21,45 +21,66 @@
     $noSede = $availableSedes->isEmpty();
     $sedeSwitchError = session('counterLocationError');
 
-    // The screen switcher. Each entry is shown ONLY if the current user passes that screen's real
-    // per-screen gate (mirrored from each Livewire component's mount()), so a link to a 403 is never
-    // rendered. The list moved to App\Support\CounterScreens (prompt 172) so the panel's single counter
-    // link can ask the same question — "can this user reach the counter, and where should one link land
-    // them?" — without a second copy of the rule. Destinations, gates and layout are unchanged.
-    $screens = \App\Support\CounterScreens::reachableFor($user);
+    // Prompt 205: the destinations are NOT read here any more. The tab strip is gone — the hub is the menu,
+    // and App\Support\CounterScreens is consumed by the hub's tiles. Every control now exists in exactly one
+    // place, which is the whole of the owner's "just duplicate data" complaint.
 @endphp
 
 {{--
-    The one shared counter header. Every counter screen renders THIS component (via the
-    counter layout), so a future fifth screen gets the back-to-dashboard affordance for
-    free. Minimal-chrome, kiosk-feel: brand + screen title on the left; a permission-
-    filtered "Panel" link and "Log out" on the right. Leaving with unsaved work
-    (Alpine store `counter.dirty`, set by the POS/till screens) confirms first.
+    The one shared counter header — **the terminal strip** (prompt 205).
+
+    The owner: *"this dashboard doesn't work, you go to it and can't get back to it. Also it's just duplicate
+    data."* Both checked out. The route home was a 44×44 brand-blue square with one letter in it and an
+    `aria-label`; the words beside it that looked like they belonged to it were a separate, unclickable div.
+    **The route home was a logo**, which is why it read as missing — so it is a LABELLED link now, and it is
+    the most-used control in the product.
+
+    And after prompt 189 nearly everything here was in two places: the five destinations were in this bar AND
+    on the hub, and so were the sede, the working operator, Panel and Log out. 189's prompt said non-transaction
+    operations belong on the home screen; they were added there and never removed from here.
+
+    So the split is now clean, and it is the model the owner chose:
+      · this bar   — Home, the sede, who is working (and Switch), Lock screen, Panel, Log out, panic
+      · the hub    — the destinations, and the live panels
+    The tab strip is gone. The overflow is gone. Nothing renders in both.
+
+    Leaving the counter entirely still confirms unsaved work (Alpine store `counter.dirty`); moving BETWEEN
+    counter screens no longer needs to, because prompt 205 made the basket survive navigation.
 --}}
 <header
     data-counter-topbar
     class="flex items-center justify-between border-b border-line px-4 py-3 dark:border-slate-800 sm:px-6"
 >
     <div class="flex min-w-0 items-center gap-3">
-        {{-- Prompt 189: the brand block is now the way HOME. The hub carries the terminal operations that used
-             to crowd this row, so it has to be one tap from every screen. --}}
+        {{-- HOME — a labelled link, not a logo (prompt 205).
+
+             The reported bug in one line: this was a 44×44 brand-blue square with one letter in it and an
+             `aria-label`, and the words beside it were a separate, unclickable `div`. Nobody could see the
+             route home because there was nothing that looked like one. It is now one control, carrying the
+             brand mark AND the word, and it is the only route between screens — the most-used control in
+             the product.
+
+             It keeps 196's unsaved-work confirm, but the confirm now almost never fires: prompt 205 made the
+             basket survive navigation, so `counter.dirty` is set only when work would GENUINELY be lost. --}}
         <a href="{{ route('counter.home') }}"
            data-counter-home-link
            wire:navigate.ignore
            @click.prevent="(! ($store.counter?.dirty) || window.confirm(@js($confirmLeave))) && window.location.assign('{{ route('counter.home') }}')"
-           aria-label="{{ __('Inicio del mostrador') }}"
-           class="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-brand text-base font-bold text-white transition hover:bg-brand-dark">
-            {{ mb_substr(config('app.name', 'C'), 0, 1) }}
+           @class([
+               'flex min-h-11 shrink-0 items-center gap-2 rounded-xl px-2 text-left transition sm:px-3',
+               'bg-brand-tint text-brand dark:bg-slate-800 dark:text-white' => request()->routeIs('counter.home'),
+               'text-ink hover:bg-brand-tint hover:text-brand dark:text-slate-100 dark:hover:bg-slate-800' => ! request()->routeIs('counter.home'),
+           ])
+           @if (request()->routeIs('counter.home')) aria-current="page" @endif>
+            <span class="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-brand text-sm font-bold text-white" aria-hidden="true">{{ mb_substr(config('app.name', 'C'), 0, 1) }}</span>
+            <span class="min-w-0 leading-tight">
+                {{-- The accessible name is a WORD, which is the whole fix. --}}
+                <span class="block truncate text-sm font-semibold">{{ __('Inicio') }}</span>
+                {{-- The counter screen's one <h1> (a11y): the shared header renders it for every terminal,
+                     so headings below can start at h2 without skipping a level. --}}
+                <h1 class="truncate text-xs font-normal text-ink-muted dark:text-slate-400">{{ $title ?? __('Mostrador') }}</h1>
+            </span>
         </a>
-        {{-- Prompt 130: the brand/title block can shrink and TRUNCATE (min-w-0 + truncate) rather than shoving
-             the nav into its neighbours on a narrow (portrait-tablet) header. It stays rendered at every width so
-             the counter screen's single <h1> is never dropped from the a11y tree. --}}
-        <div class="min-w-0 leading-tight">
-            <p class="truncate text-sm font-semibold">{{ config('app.name') }}</p>
-            {{-- The counter screen's one <h1> (a11y): the shared header renders it for every
-                 terminal, so headings below can start at h2 without skipping a level. --}}
-            <h1 class="truncate text-xs text-ink-muted dark:text-slate-400">{{ $title ?? __('Mostrador') }}</h1>
-        </div>
 
         {{-- Which sede this terminal is working at (prompt 89) — shown on EVERY counter screen, from the
              one shared header. Zero sedes: a warning. One sede: a static badge (nothing to switch to).
@@ -131,203 +152,115 @@
         </div>
     </div>
 
-    @if (count($screens) > 0)
-        {{-- Screen switcher (prompt 42/130): jump straight between the counter screens the operator is allowed
-             to use — the current one marked active, not a link. Same unsaved-work confirm as the Panel link.
-             Prompt 130: it is a flex-1, min-w-0, horizontally-SCROLLABLE strip, so it takes only the middle
-             space between the brand/sede block and the right-hand actions and can NEVER overlap them (116's
-             `md:inline` labelled all five destinations at 768px, which on a portrait tablet overflowed into the
-             neighbours). Labels appear UNIFORMLY only from `lg` up, where a labelled strip actually fits; below
-             that every item is an equal 44px icon-only target and the strip scrolls if it still runs out. --}}
-        <nav aria-label="{{ __('Cambiar de pantalla') }}" class="flex min-w-0 flex-1 items-center gap-1 overflow-x-auto">
-            @foreach ($screens as $screen)
-                @php $active = request()->routeIs($screen['route']); @endphp
-                @if ($active)
-                    <span
-                        aria-current="page"
-                        data-counter-screen="{{ $screen['route'] }}"
-                        class="inline-flex h-11 shrink-0 items-center gap-1.5 rounded-lg bg-brand-tint px-3 text-sm font-semibold text-brand dark:bg-slate-800 dark:text-white"
-                    >
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" class="h-5 w-5" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="{{ $screen['icon'] }}"/></svg>
-                        <span class="hidden lg:inline">{{ $screen['label'] }}</span>
-                    </span>
-                @else
-                    <a
-                        href="{{ route($screen['route']) }}"
-                        data-counter-screen="{{ $screen['route'] }}"
-                        data-counter-switch="{{ $screen['route'] }}"
-                        wire:navigate.ignore
-                        @click.prevent="(! ($store.counter?.dirty) || window.confirm(@js($confirmLeave))) && window.location.assign('{{ route($screen['route']) }}')"
-                        class="inline-flex h-11 shrink-0 items-center gap-1.5 rounded-lg px-3 text-sm font-medium text-ink-muted transition hover:bg-brand-tint hover:text-brand dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-white"
-                    >
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" class="h-5 w-5" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="{{ $screen['icon'] }}"/></svg>
-                        <span class="hidden lg:inline">{{ $screen['label'] }}</span>
-                    </a>
-                @endif
-            @endforeach
-        </nav>
-    @endif
+    {{-- The five-destination tab strip stood here and is GONE (prompt 205). The hub is the menu now: the
+         destinations were in this bar AND on the hub after 189, which is the "duplicate data" the owner
+         reported, and a strip that took prompts 116, 130 and 132 to fit on a portrait tablet was the more
+         expensive of the two copies to keep. `CounterScreens` is unchanged and is read by the tiles. --}}
+    <div class="min-w-0 flex-1"></div>
 
-    {{-- WHO IS WORKING (prompt 173). The inline operator strip is retired — it was a normal-flow block that
-         pushed the page down when its PIN pad opened — so the operator's name lives here instead, in the
-         chrome that is already on every screen and already at the 44px floor. Reading only: identifying and
-         switching both happen on the full-screen surface, so there is exactly ONE route to the pad. --}}
-    @if ($user !== null && \App\Support\CounterOperator::current() !== null)
-        <p data-operator-name-chip class="hidden items-center gap-2 rounded-lg bg-surface-alt px-3 py-2 text-sm xl:flex dark:bg-slate-800">
-            <span class="inline-block h-2.5 w-2.5 rounded-full bg-success" aria-hidden="true"></span>
-            <span class="text-ink-muted dark:text-slate-400">{{ __('Trabajando') }}:</span>
-            <span data-operator-name class="font-semibold">{{ \App\Support\CounterOperator::current()?->name }}</span>
-        </p>
-    @endif
-
-    {{-- Trailing controls (prompts 120 + 132): the "lock now" button plus ONE overflow control that collapses
-         the non-destination actions (Help, Panel, Log out). Both are 44px; the overflow is what lets the widened
-         five-destination nav be one flow that cannot overlap a wide fixed group — there isn't one any more. --}}
+    {{-- ============ THE TERMINAL CONTROLS ============
+         Every one of these was in TWO places after 189 — here and on the hub's "Terminal" panel. They live
+         here now and only here (prompt 205), because they are facts about this terminal rather than about
+         whichever screen happens to be open. Labels collapse below `lg`, where a labelled row does not fit a
+         portrait tablet; every target stays at the 44px floor either way. --}}
     <div class="flex shrink-0 items-center gap-1">
-        {{-- Prompt 189 moved the dedicated "lock now" BUTTON off this row to the counter home, with the other
-             operations that are not specific to the current transaction. That was right for the row — it was a
-             44px control the owner had called cramped — but the premise that came with it, "locking is not
-             something you do mid-basket", was wrong, and prompt 198 measured the cost.
-
-             Locking is precisely what you do mid-basket: it is what happens when you step away from a counter
-             with a member in front of you. With the only control on `/counter`, reaching it crossed prompt
-             196's unsaved-work confirm — correct, newly working, and exactly what made it expensive — so the
-             operator's real choice mid-order was to leave the terminal unlocked or abandon the sale. The idle
-             timer, firing in place, always kept the basket; the DELIBERATE control was the one that lost it.
-
-             So the lock comes back to the bar as a MENU ITEM rather than a button: one tap more than before,
-             no new furniture in the row, no navigation, and the overflow is already an x-data island so the
-             handler binds (prompt 196). The home tile stays as the discoverable route. --}}
-
-        {{-- Secondary actions, collapsed behind ONE 44px overflow control (prompt 132). Help, Panel and Log out
-             — the three items that are NOT a counter destination — folded into a single dropdown so the widened
-             five-destination row runs into no wide fixed secondary group. data-counter-help /
-             data-counter-dashboard / data-counter-logout preserved for the tests. --}}
-        <div
-            x-data="{ open: false }"
-            class="relative"
-            data-counter-overflow
-            data-counter-help
-        >
-        <button
-            type="button"
-            @click="open = ! open"
-            aria-haspopup="true"
-            :aria-expanded="open.toString()"
-            aria-label="{{ __('Más opciones') }}"
-            data-counter-overflow-trigger
-            class="inline-flex h-11 w-11 items-center justify-center rounded-lg text-ink-muted transition hover:bg-brand-tint hover:text-brand dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-white"
-        >
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" class="h-5 w-5" aria-hidden="true">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M6.75 12a.75.75 0 1 1-1.5 0 .75.75 0 0 1 1.5 0ZM12.75 12a.75.75 0 1 1-1.5 0 .75.75 0 0 1 1.5 0ZM18.75 12a.75.75 0 1 1-1.5 0 .75.75 0 0 1 1.5 0Z"/>
-            </svg>
-        </button>
-
-        <div
-            x-show="open"
-            x-cloak
-            @click.outside="open = false"
-            @keydown.escape.window="open = false"
-            class="absolute right-0 z-40 mt-1 w-80 max-w-[90vw] rounded-xl border border-line bg-surface p-2 text-left shadow-lg dark:border-slate-700 dark:bg-slate-900"
-        >
-            {{-- Lock, first (prompt 198): the only item here that does NOT leave the counter, and the one
-                 with a person waiting. Deliberately NOT behind the unsaved-work confirm the two below carry
-                 — locking preserves the basket by design, so asking whether work would be lost is both
-                 wrong and the whole bug. `lockNow()` is the store's own method, unchanged: it flips the
-                 overlay AND dispatches `counter-lock`, which signs the operator out server-side. --}}
+        {{-- WHO IS WORKING, and Switch — one control (prompt 173's rule: exactly ONE route to the pad, which
+             is 173's own full-screen surface; this dispatches to it and does not draw a second one). --}}
+        @if ($user !== null && \App\Support\CounterOperator::current() !== null)
             <button
                 type="button"
-                data-counter-overflow-lock
-                @click="open = false; $store.counter.lockNow()"
-                class="flex min-h-11 w-full items-center gap-2 rounded-lg px-3 text-sm font-medium text-ink-muted transition hover:bg-brand-tint hover:text-brand dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-white"
+                data-operator-name-chip
+                data-counter-switch-operator
+                @click="window.Livewire.dispatch('counter-switch-operator')"
+                class="inline-flex min-h-11 items-center gap-2 rounded-lg bg-surface-alt px-3 text-sm transition hover:bg-brand-tint hover:text-brand dark:bg-slate-800 dark:hover:bg-slate-700"
+            >
+                <span class="inline-block h-2.5 w-2.5 shrink-0 rounded-full bg-success" aria-hidden="true"></span>
+                <span class="hidden text-ink-muted xl:inline dark:text-slate-400">{{ __('Trabajando') }}:</span>
+                <span data-operator-name class="max-w-[9rem] truncate font-semibold">{{ \App\Support\CounterOperator::current()?->name }}</span>
+                <span class="sr-only">· {{ __('Cambiar') }}</span>
+            </button>
+        @endif
+
+        {{-- LOCK — prompt 198's requirement, settled: a first-class control in the bar, on every screen,
+             one tap, no navigation and no confirm. 198 existed because the only lock was on the hub, so
+             locking mid-sale meant leaving the screen; with the lock here that trip is gone entirely.
+             `lockNow()` is the store's own method: it raises the overlay AND dispatches `counter-lock`,
+             which signs the operator out server-side so writes are refused, not merely hidden. --}}
+        <button
+            type="button"
+            data-counter-lock
+            @click="$store.counter.lockNow()"
+            class="inline-flex min-h-11 items-center gap-2 rounded-lg px-3 text-sm font-medium text-ink-muted transition hover:bg-brand-tint hover:text-brand dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-white"
+        >
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" class="h-5 w-5 shrink-0" aria-hidden="true">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 1 0-9 0v3.75m-.75 0h10.5a2.25 2.25 0 0 1 2.25 2.25v6.75a2.25 2.25 0 0 1-2.25 2.25H6.75a2.25 2.25 0 0 1-2.25-2.25v-6.75a2.25 2.25 0 0 1 2.25-2.25Z"/>
+            </svg>
+            <span class="hidden lg:inline">{{ __('Bloquear pantalla') }}</span>
+        </button>
+
+        {{-- PANEL + LOG OUT — both LEAVE the counter, so both keep 196's confirm. --}}
+        @if ($canPanel)
+            <a
+                href="{{ url('/') }}"
+                data-counter-dashboard
+                wire:navigate.ignore
+                @click.prevent="(! ($store.counter?.dirty) || window.confirm(@js($confirmLeave))) && window.location.assign('{{ url('/') }}')"
+                aria-label="{{ __('Panel') }}"
+                class="inline-flex min-h-11 items-center gap-2 rounded-lg px-3 text-sm font-medium text-ink-muted transition hover:bg-brand-tint hover:text-brand dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-white"
             >
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" class="h-5 w-5 shrink-0" aria-hidden="true">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 1 0-9 0v3.75m-.75 0h10.5a2.25 2.25 0 0 1 2.25 2.25v6.75a2.25 2.25 0 0 1-2.25 2.25H6.75a2.25 2.25 0 0 1-2.25-2.25v-6.75a2.25 2.25 0 0 1 2.25-2.25Z"/>
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M2.25 12 12 2.25 21.75 12M4.5 9.75v9.75a.75.75 0 0 0 .75.75H9.75V15.75a1.5 1.5 0 0 1 1.5-1.5h1.5a1.5 1.5 0 0 1 1.5 1.5v4.5h4.5a.75.75 0 0 0 .75-.75V9.75"/>
                 </svg>
-                {{ __('Bloquear pantalla') }}
+                <span class="hidden lg:inline" aria-hidden="true">{{ __('Panel') }}</span>
+            </a>
+        @endif
+
+        <form
+            method="POST"
+            action="{{ route('filament.admin.auth.logout') }}"
+            @submit="($store.counter?.dirty && ! window.confirm(@js($confirmLeave))) && $event.preventDefault()"
+        >
+            @csrf
+            <button
+                type="submit"
+                data-counter-logout
+                aria-label="{{ __('Cerrar sesión') }}"
+                class="inline-flex min-h-11 items-center gap-2 rounded-lg px-3 text-sm font-medium text-ink-muted transition hover:bg-black/5 dark:text-slate-400 dark:hover:bg-white/5"
+            >
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" class="h-5 w-5 shrink-0" aria-hidden="true">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0 0 13.5 3h-6a2.25 2.25 0 0 0-2.25 2.25v13.5A2.25 2.25 0 0 0 7.5 21h6a2.25 2.25 0 0 0 2.25-2.25V15M12 9l-3 3m0 0 3 3m-3-3h12.75"/>
+                </svg>
+                <span class="hidden lg:inline" aria-hidden="true">{{ __('Cerrar sesión') }}</span>
             </button>
+        </form>
 
-            {{-- Panel + Log out (44px rows) — both LEAVE the counter, so both keep 196's confirm. --}}
-            @if ($canPanel)
-                <a
-                    href="{{ url('/') }}"
-                    data-counter-dashboard
-                    wire:navigate.ignore
-                    @click.prevent="(! ($store.counter?.dirty) || window.confirm(@js($confirmLeave))) && window.location.assign('{{ url('/') }}')"
-                    class="flex min-h-11 items-center gap-2 rounded-lg px-3 text-sm font-medium text-ink-muted transition hover:bg-brand-tint hover:text-brand dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-white"
-                >
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" class="h-5 w-5 shrink-0" aria-hidden="true">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M2.25 12 12 2.25 21.75 12M4.5 9.75v9.75a.75.75 0 0 0 .75.75H9.75V15.75a1.5 1.5 0 0 1 1.5-1.5h1.5a1.5 1.5 0 0 1 1.5 1.5v4.5h4.5a.75.75 0 0 0 .75-.75V9.75"/>
-                    </svg>
-                    {{ __('Panel') }}
-                </a>
-            @endif
+        {{-- PANIC (prompt 121). The hardest thing 205 had to rehome: the overflow it lived in is gone, and
+             121 requires it to stay DISCREET and FAST — a labelled button on a hub is neither.
 
+             Resolved as an icon-only 44×44 control at the end of this row: **one tap plus the confirm**,
+             which is one tap FEWER than the overflow it replaces, and it carries no wording that announces
+             itself to a room — the accessible name is there for a screen reader, and the shield is not a
+             word anybody reads across a counter. Everything 121 guarantees is untouched: gated on
+             `lockdown.initiate`, absent from the DOM without it, confirms before firing, and never
+             announced. --}}
+        @if ($user?->can('lockdown.initiate'))
             <form
                 method="POST"
-                action="{{ route('filament.admin.auth.logout') }}"
-                @submit="($store.counter?.dirty && ! window.confirm(@js($confirmLeave))) && $event.preventDefault()"
+                action="{{ route('counter.panic') }}"
+                @submit="! window.confirm(@js(__('¿Activar el bloqueo de seguridad? Cerrará el club entero.'))) && $event.preventDefault()"
             >
                 @csrf
                 <button
                     type="submit"
-                    data-counter-logout
-                    class="flex min-h-11 w-full items-center gap-2 rounded-lg px-3 text-sm font-medium text-ink-muted transition hover:bg-black/5 dark:text-slate-400 dark:hover:bg-white/5"
+                    data-counter-panic
+                    aria-label="{{ __('Bloqueo de seguridad') }}"
+                    class="inline-flex h-11 w-11 items-center justify-center rounded-lg text-ink-muted/60 transition hover:bg-error/10 hover:text-error dark:text-slate-500 dark:hover:bg-error/10"
                 >
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" class="h-5 w-5 shrink-0" aria-hidden="true">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0 0 13.5 3h-6a2.25 2.25 0 0 0-2.25 2.25v13.5A2.25 2.25 0 0 0 7.5 21h6a2.25 2.25 0 0 0 2.25-2.25V15M12 9l-3 3m0 0 3 3m-3-3h12.75"/>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" class="h-5 w-5" aria-hidden="true">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75 11.25 15 15 9.75m-3-7.036A11.959 11.959 0 0 1 3.598 6 11.99 11.99 0 0 0 3 9.749c0 5.592 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285Z"/>
                     </svg>
-                    {{ __('Cerrar sesión') }}
                 </button>
             </form>
-
-            {{-- Panic lockdown (prompt 121): a discreet, staff-reachable trigger — they are the ones in the room.
-                 Confirms first (an accidental trip locks the whole club), then trips the org-wide lockdown; the
-                 next request shows the ordinary "unavailable" screen. Gated on lockdown.initiate. --}}
-            @if ($user?->can('lockdown.initiate'))
-                <form
-                    method="POST"
-                    action="{{ route('counter.panic') }}"
-                    @submit="! window.confirm(@js(__('¿Activar el bloqueo de seguridad? Cerrará el club entero.'))) && $event.preventDefault()"
-                >
-                    @csrf
-                    <button
-                        type="submit"
-                        data-counter-panic
-                        class="mt-1 flex min-h-11 w-full items-center gap-2 rounded-lg border-t border-line px-3 pt-2 text-sm font-medium text-error transition hover:bg-error/5 dark:border-slate-800"
-                    >
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" class="h-5 w-5 shrink-0" aria-hidden="true">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 1 0-9 0v3.75m-.75 0h10.5a2.25 2.25 0 0 1 2.25 2.25v6.75a2.25 2.25 0 0 1-2.25 2.25H6.75a2.25 2.25 0 0 1-2.25-2.25v-6.75a2.25 2.25 0 0 1 2.25-2.25Z"/>
-                        </svg>
-                        {{ __('Bloqueo de seguridad') }}
-                    </button>
-                </form>
-            @endif
-
-            {{-- Ayuda (prompt 92): the same answers to the blocked states staff hit, folded into the one overflow
-                 menu (prompt 132). Static — nothing loads. Rules are NAMED, never a hard-coded value. --}}
-            <div class="mt-1 border-t border-line px-1 pt-2 dark:border-slate-800" data-counter-help-content>
-                <h2 class="px-2 text-sm font-semibold">{{ __('¿Por qué no puedo dispensar a un socio?') }}</h2>
-                <ul class="mt-1 space-y-1 px-2 text-sm text-ink-muted dark:text-slate-400">
-                    <li>· {{ __('No tiene una membresía activa, o no está al corriente de la cuota.') }}</li>
-                    <li>· {{ __('Está en carencia: el período de espera desde el alta aún no ha terminado.') }}</li>
-                    <li>· {{ __('Alcanzaría el límite diario o mensual de gramos configurado.') }}</li>
-                    <li>· {{ __('No cumple la edad mínima, o su documento ha caducado.') }}</li>
-                    <li>· {{ __('Debe dinero por encima del umbral permitido en el monedero.') }}</li>
-                </ul>
-                <p class="mt-2 px-2 text-xs text-ink-muted dark:text-slate-400">{{ __('El mostrador te dice el motivo exacto en cada caso. Un responsable puede autorizar algunas excepciones.') }}</p>
-
-                <h3 class="mt-3 px-2 text-sm font-semibold">{{ __('Términos') }}</h3>
-                <dl class="mt-1 space-y-1 px-2 pb-1 text-xs">
-                    @foreach (['Aportación', 'Dispensación', 'Carencia', 'Arqueo'] as $term)
-                        <div>
-                            <dt class="inline font-semibold text-ink dark:text-slate-200">{{ $term }}:</dt>
-                            <dd class="inline text-ink-muted dark:text-slate-400">{{ __(\App\Support\Help::GLOSSARY[$term]) }}</dd>
-                        </div>
-                    @endforeach
-                </dl>
-            </div>
-        </div>
-        </div>
+        @endif
     </div>
 </header>

@@ -12,7 +12,6 @@
             window.addEventListener('online', () => { this.online = true; $wire.set('offline', false); });
             window.addEventListener('offline', () => { this.online = false; $wire.set('offline', true); });
             if (! this.online) { $wire.set('offline', true); }
-            this.$watch(() => JSON.stringify($wire.basket), value => { try { localStorage.setItem('bar.basket', value); } catch (e) {} });
         },
     }"
     {{-- Prompt 176: the component root carries the height so the two-pane child can resolve `h-full`
