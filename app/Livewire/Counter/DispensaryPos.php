@@ -94,6 +94,30 @@ class DispensaryPos extends Component
     public string $geneticSearch = '';
 
     /**
+     * Which SOURCE the catalogue pane is browsing: `genetics` or `bar` (prompt 212).
+     *
+     * The owner: *"to add bar products to the same transaction you only got a couple of choices on the side.
+     * Instead you should have full access."* The premise was right and the reason worse than "a couple":
+     * `barArticleRows()` is **not capped** — it returned every active in-stock article at the sede and the
+     * cart rendered each as a `+ Name` chip. Five today because the seed has five; a club with forty gets
+     * forty chips stacked in the narrow column that already carries the member, the basket, the tender and
+     * the commit — **no search, no categories, no price, no stock**. It had no browsing model at all, and it
+     * degraded as the club grew rather than as it shrank.
+     *
+     * Meanwhile the centre pane already has everything a catalogue needs. So the bar moved into the pane that
+     * can browse. **The toggle changes what you are BROWSING; it never changes which basket you are filling** —
+     * a genetic tap still opens the weight entry and adds a dispensation line, an article tap still adds a bar
+     * line, and the two records stay on their separate ledgers exactly as prompt 118 left them.
+     */
+    public string $catalogueSource = 'genetics';
+
+    /** The article name/category search, kept apart from `$geneticSearch` so switching source loses neither. */
+    public string $articleSearch = '';
+
+    /** Category filter for the bar source — its own, for the same reason. */
+    public ?string $articleCategoryId = null;
+
+    /**
      * Genetics: LIST by default, grid available, remembered per screen (prompt 176).
      *
      * Loyverse is the only vendor publishing guidance on this and it says grid when items carry images and
@@ -353,6 +377,40 @@ class DispensaryPos extends Component
     public function stepUnits(int $delta): void
     {
         $this->unitQty = max(1, $this->unitQty + $delta);
+    }
+
+    /**
+     * Switch what the pane is browsing.
+     *
+     * Deliberately touches NOTHING else: not the basket, not the member, not the tender, not a weight entry
+     * in progress. If an operator can lose work by looking at the other half of the catalogue, this branch
+     * has made the screen worse rather than better.
+     */
+    public function setCatalogueSource(string $source): void
+    {
+        if (! in_array($source, ['genetics', 'bar'], true)) {
+            return;
+        }
+
+        // A sede with no bar has no bar source at all — not an empty one.
+        if ($source === 'bar' && ! $this->barEnabled()) {
+            return;
+        }
+
+        $this->catalogueSource = $source;
+    }
+
+    /** Whether this sede runs a bar at all (prompt 118's setting, read per sede). */
+    public function barEnabled(): bool
+    {
+        $location = $this->resolveLocation();
+
+        return $location !== null && (bool) Settings::get('bar_enabled', true, $location->id);
+    }
+
+    public function filterArticleCategory(?string $categoryId): void
+    {
+        $this->articleCategoryId = $categoryId;
     }
 
     public function filterProductType(?string $productType): void
@@ -1037,6 +1095,7 @@ class DispensaryPos extends Component
         [$cashPreview, $walletPreview] = $this->tenderSplit($total);
 
         $allGenetics = $this->geneticRows($location, $member);
+        $allArticles = $this->barArticleRows($location);
         $activeGeneticModel = $this->activeGeneticId !== null ? Genetic::query()->find($this->activeGeneticId) : null;
 
         return view('livewire.counter.dispensary-pos', [
@@ -1079,7 +1138,10 @@ class DispensaryPos extends Component
             // Bar side of the same visit (prompt 118) — only where the sede runs a bar. barArticles feeds the
             // quick-add; barLines + barTotalCents render the in-progress bar basket.
             'barEnabled' => $location !== null && (bool) Settings::get('bar_enabled', true, $location->id),
-            'barArticles' => $this->barArticleRows($location),
+            // The bar's catalogue, browsable in the centre pane (prompt 212) — filtered, with its own
+            // categories, instead of every row as a chip in the cart column.
+            'barArticles' => $this->filterArticles($allArticles),
+            'articleCategories' => $this->deriveArticleCategories($allArticles),
             'barLines' => $this->barBasketView($location),
             'barTotalCents' => $this->barBasketTotalCents($member, $location),
         ]);
@@ -1090,16 +1152,88 @@ class DispensaryPos extends Component
      *
      * @return list<array{id: string, name: string, price_cents: int}>
      */
+    /**
+     * The bar's catalogue, in the same shape the genetics side uses (prompt 212).
+     *
+     * It returned `id`/`name`/`price_cents` and the cart rendered a chip per row — every active in-stock
+     * article at the sede, uncapped, in a narrow column. It now carries what a card needs to be browsable:
+     * its category (so the pane's filter works), its price, and its **stock STATE**.
+     *
+     * A state, not a count: 185's rule. The operator needs to know whether to promise it, and a precise
+     * figure invites a race to the counter — the same reasoning that keeps a gram figure off the member menu.
+     * `Article::low_stock_threshold` already exists per article and is what decides it.
+     *
+     * Inactive and out-of-stock are still filtered in the QUERY, so an article that cannot be sold is never
+     * offered rather than offered and refused.
+     *
+     * @return list<array<string, mixed>>
+     */
     private function barArticleRows(?Location $location): array
     {
         if ($location === null) {
             return [];
         }
 
-        return Article::query()->where('location_id', $location->id)->where('active', true)->where('stock', '>', 0)
+        return Article::query()
+            ->where('location_id', $location->id)->where('active', true)->where('stock', '>', 0)
+            ->with('category')
             ->orderBy('name')->get()
-            ->map(fn (Article $a): array => ['id' => $a->id, 'name' => $a->name, 'price_cents' => $a->price_cents->cents])
+            ->map(fn (Article $a): array => [
+                'id' => $a->id,
+                'name' => $a->name,
+                'price_cents' => $a->price_cents->cents,
+                'price_label' => Money::fromCents($a->price_cents->cents)->formatted(),
+                'category_id' => $a->category_id,
+                'category_name' => $a->category?->name,
+                'low_stock' => $a->low_stock_threshold !== null && $a->stock <= $a->low_stock_threshold,
+            ])
             ->all();
+    }
+
+    /**
+     * The bar catalogue after the pane's search and category filter.
+     *
+     * In memory, like `filterGenetics()`: the sellable set was already queried live, and re-querying per
+     * keystroke on a counter tablet buys nothing.
+     *
+     * @param  list<array<string, mixed>>  $rows
+     * @return list<array<string, mixed>>
+     */
+    private function filterArticles(array $rows): array
+    {
+        $term = mb_strtolower(trim($this->articleSearch));
+
+        return array_values(array_filter($rows, function (array $row) use ($term): bool {
+            if ($this->articleCategoryId !== null && (string) $row['category_id'] !== $this->articleCategoryId) {
+                return false;
+            }
+
+            if ($term === '') {
+                return true;
+            }
+
+            return str_contains(mb_strtolower((string) $row['name']), $term)
+                || str_contains(mb_strtolower((string) ($row['category_name'] ?? '')), $term);
+        }));
+    }
+
+    /**
+     * The categories present in the bar catalogue — derived from the rows, like the genetics side's.
+     *
+     * @param  list<array<string, mixed>>  $rows
+     * @return list<array{id: string, name: string}>
+     */
+    private function deriveArticleCategories(array $rows): array
+    {
+        $categories = [];
+
+        foreach ($rows as $row) {
+            if ($row['category_id'] !== null && ! isset($categories[$row['category_id']])) {
+                $categories[$row['category_id']] = ['id' => (string) $row['category_id'], 'name' => (string) $row['category_name']];
+            }
+        }
+
+        return array_values($categories);
     }
 
     /**
