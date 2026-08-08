@@ -9863,7 +9863,13 @@ consent capture all still run in `ApproveApplication` afterwards. 174's argument
 the open one; this is that route with a different keyboard in front of it. Asserted against the **row**: the
 two payloads are compared key-for-key and must have the same shape.
 
-### `OVERNIGHT-DEFAULT — CONFIRM` — the consent decision
+### ~~`OVERNIGHT-DEFAULT — CONFIRM`~~ — the consent decision · **RESOLVED by prompt 218**
+
+> **Resolved:** the owner decided the scan is **not** required — the club already takes the signature on the
+> paper form, and the evidence is that filed form plus this row (channel, attesting operator, text version).
+> Requiring a scan was considered and **deferred**, not rejected; the future upgrade is a signature pad at the
+> alta step rather than a scan. **Do not tighten the `PAPER` channel without the owner asking.** See prompt
+> 218's entry for the reasoning and the tripwire.
 
 **This is a compliance judgement, not a wording one, and it is the reason this branch is not just a label
 change.** The facts on the form — name, birth date, document, contact — are the same facts whoever types them.
@@ -10610,3 +10616,81 @@ three checkboxes sharing one construction; the form still submitting end to end 
 `Ana` / `Bruno` and searched a whole page for those strings, so a random factory name elsewhere collided
 occasionally. The names are unguessable now — a leak is still a leak with an odd name, and a false positive is
 not a leak.
+
+---
+
+## Prompt 218 — the owner's consent decision, recorded so nobody helpfully reverses it
+
+**Docs only.** No application code. It exists because an unrecorded deferral is how a future session
+rediscovers the "gap" and builds the thing the owner declined.
+
+### The decision — 210's marker is RESOLVED
+
+**Is `PAPER` consent acceptable without a scan of the signed form attached to the record?**
+**Yes, for now. The scan is not required.**
+
+The owner's reasoning: **the club already gets their signature** — on the paper form itself. So the
+demonstrability pair is:
+
+1. the **signed paper form, filed at the club**, and
+2. the **digital row** 210 already writes — `ConsentChannel::PAPER`, the **named attesting operator**, and the
+   `consent_text_version` that says *which* text was signed.
+
+Neither half is the evidence on its own; together they are. And sign-up stays simple at a counter with
+somebody standing at it, which is the operational fact the decision turns on.
+
+### The road considered and NOT taken — recorded as deferred, not rejected
+
+The recommendation the owner weighed was to **require the scan**, and the argument is worth keeping because it
+does not stop being true:
+
+- A row alone is the club's **assertion** that consent exists. A row plus the signed form is **evidence**. The
+  gap between those two words is what Article 7(1) demonstrability means in an inspection, and Article 9 asks
+  for *explicit* consent, which raises the bar rather than lowering it.
+- The **infrastructure already exists**: the counter camera flow (157/215) and `DocumentVault`'s encryption,
+  signed-URL serving, access logging and retention. The cost was seconds at the counter, not a build.
+- Requiring it would have **stranded nobody**: the handover and emailed-invitation routes capture the
+  applicant's own on-screen consent and never touch the `PAPER` channel at all.
+
+**Deferred on the owner's judgement about counter friction**, which is his call to make — he is the one who
+knows what a Friday evening at the counter is like. Recorded here as *considered and deferred* so that a later
+reader finds a decision rather than an oversight.
+
+### The cheaper future path, so "later" has a shape
+
+When the club wants to retire paper, **the natural upgrade is not scanning it — it is signing on the tablet.**
+The product already captures on-screen signatures: the dispensation signature pad (`signature_on_dispensation`,
+per sede). The shape would be:
+
+- a **`ConsentChannel` of its own** — the applicant signed the consent text on this device, at the alta step,
+  in front of the operator: their own act, unlike `PAPER`, and stronger than a scan of a form because the
+  artefact and the text are bound at the moment of signing;
+- the signature stored **the way a dispensation signature already is**;
+- the `consent_text_version` **already recorded**, so *which* text was signed needs no new work.
+
+One paragraph now saves a design argument later, and it says plainly that "attach a scan" is the weaker of the
+two futures.
+
+### Standing instruction
+
+> **Do not implement a scan requirement, a signature-pad consent step, or any tightening of the `PAPER`
+> channel without the owner asking for it.**
+
+Same force as a withdrawn prompt. A future session that notices the "missing" scan should read this entry and
+stop, not build.
+
+**What is load-bearing and stays**, because it is what makes the deferral defensible at all: `ConsentChannel`
+as a first-class column, the **named attesting operator**, the versioned consent text, and 210's rule that the
+operator must confirm explicitly with no default. Weakening any of those turns the digital half of the pair
+into nothing, and the decision above assumes both halves.
+
+### The tripwire for revisiting
+
+- **Before the pilot's first real members** — the owner task now sits in `verification/CHECKLIST.md` §H.
+- **Immediately**, if the club's asesor says filed paper plus a digital attestation is not enough.
+
+### Verification
+
+`composer check` green — **1714 tests**, 1711 passed, 3 pre-existing skips, Larastan 0, Pint clean. Nothing it
+checks changed: this branch touched `DECISIONS.md`, `verification/CHECKLIST.md`, and the docblock comment in
+`SignsUpMembers` that pointed at the open marker. **MySQL was left to CI**, per the running order.
