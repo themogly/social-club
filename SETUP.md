@@ -116,10 +116,17 @@ Everything used in code/config appears in `.env.example`. Highlights:
 2. `composer install --no-dev --optimize-autoloader`
 3. `npm ci && npm run build`
 4. `php artisan migrate --force`  — **never** `migrate:fresh`/`migrate:refresh` in production (data loss)
-5. `php artisan storage:link`
-6. Clear + rebuild caches: `php artisan config:clear && php artisan cache:clear` then
+5. **`php artisan csc:sync-permissions`** — converge the roles on `App\Support\Permissions` (prompt 214).
+   Idempotent, and **required on every release**, not only when you think you changed a permission.
+   `RolePermissionSeeder` used to be called only by `csc:install`, which runs once, so a club kept its
+   install-day matrix for ever: a permission added to a role never arrived (the reported symptom was an
+   OWNER told *"ask a manager"*), and one **removed** from a role was never revoked — the more serious
+   direction, because `Permissions::for()` is what everyone reads as the source of truth for who may do what.
+   It fails silently either way. Run `csc:sync-permissions --check` to see the drift without writing.
+6. `php artisan storage:link`
+7. Clear + rebuild caches: `php artisan config:clear && php artisan cache:clear` then
    `config:cache route:cache view:cache` (a stale typed cache silently kills queued mail)
-7. **Restart Horizon LAST:** `php artisan horizon:terminate` (workers must pick up the new code)
+8. **Restart Horizon LAST:** `php artisan horizon:terminate` (workers must pick up the new code)
 
 Also required in production: automated **daily DB backups with a tested restore**; a monitored
 `schedule:run` cron once anything is scheduled; Horizon and the cron as monitored must-be-running

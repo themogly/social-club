@@ -74,6 +74,7 @@ class SystemHealth extends Page
             'importStagingSweep' => $health->importStagingSweep(),
             'queue' => $health->queue(),
             'cache' => $health->cache(),
+            'permissions' => $health->permissions(),
             'mailer' => $health->mailer(),
             'documentsDisk' => $health->documentsDisk(),
             'auditRetentionDays' => $health->auditRetentionDays(),

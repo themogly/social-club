@@ -3,6 +3,7 @@
 namespace App\ViewModels;
 
 use App\Models\HeartbeatLog;
+use App\Support\PermissionDrift;
 use App\Support\Settings;
 use Carbon\CarbonInterface;
 use Illuminate\Support\Facades\Cache;
@@ -182,6 +183,27 @@ class SystemHealth
             'pending' => (int) DB::table('jobs')->count(),
             'failed' => (int) DB::table('failed_jobs')->count(),
         ];
+    }
+
+    /**
+     * Does this club's permission matrix still match the code? (prompt 214)
+     *
+     * The failure this closes is **silence**. `RolePermissionSeeder` was only ever called by `csc:install`,
+     * so a club kept its install-day matrix for ever — a permission added to a role never arrived, and one
+     * removed from a role was never revoked. There was no error and no log line; the only symptom was an
+     * operator being refused something the code says they may do, which reads as an application bug.
+     *
+     * Reported HERE as well as by `csc:sync-permissions --check`, because closing the silence only in the
+     * deploy script leaves anyone who deployed some other way still blind — and this page already reads live
+     * state rather than guessing.
+     *
+     * @return array{in_sync: bool, lines: list<string>}
+     */
+    public function permissions(): array
+    {
+        $report = PermissionDrift::report();
+
+        return ['in_sync' => $report['in_sync'], 'lines' => PermissionDrift::lines()];
     }
 
     /**

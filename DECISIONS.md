@@ -10235,3 +10235,95 @@ permission; and a plain commit unchanged.
 5000 cg fallback. They assert the state machine, not the default, so they now state it against the sede's
 daily allowance — and one, the unit→gram conversion test, **pins** the threshold explicitly, because a moving
 default would have made it quietly about something else.
+
+---
+
+## Prompt 214 — a permission added in code never reached a club that was already installed
+
+The owner, logged in as **Club Owner**, on the dispensary: *"says ask manager but I'm an owner."* The screen
+read *"Ask a manager: you do not have permission to create one."*
+
+**The code was right.** On a freshly seeded database owner, manager and staff can all enrol — prompt 203
+granted `membership.enrol` to all three and `Permissions::ALL` contains it. His database was seeded **before
+203 landed**, so the permission row and its role assignments do not exist there, and `can()` returns false for
+everyone. Reproduced on this machine while building the branch: `csc:sync-permissions --check` reported
+`OWNER no tiene membership.enrol`, `MANAGER no tiene membership.enrol`, `STAFF no tiene membership.enrol,
+applications.review` against a dev database installed weeks ago.
+
+**That is not a local quirk. It is what happens to the live club on every release that touches a permission.**
+
+`RolePermissionSeeder` is idempotent by design — `findOrCreate` + `syncPermissions`, driven from
+`App\Support\Permissions` — and is exactly the right thing to run after a permission changes. **It was called
+from one place**: `Install.php:45`. `csc:install` runs once, at first deploy, and refuses a second run without
+`--force`. The deploy sequence in `SETUP.md` was pull → composer → npm → build → `migrate --force` →
+`storage:link` → caches → Horizon. **Nothing re-synced roles.** So a club keeps its install-day matrix for
+ever:
+
+- **added never arrives** — 203's `membership.enrol` is the live example, and there is no manager who can
+  either, because the same grant is missing from MANAGER;
+- **removed is never revoked** — the worse direction. `Permissions::for()` is the file everyone treats as the
+  source of truth for who may do what, while the database quietly keeps a grant deleted from the code months
+  ago. Prompts 122 and 174 both moved permissions between roles; either could have left a stale grant on a
+  live club;
+- **it fails silently.** No error, no log line. The only symptom is an operator refused something the code
+  says they may do — which reads as an application bug, and was reported as one.
+
+### The mechanism, and why not the other two
+
+**A dedicated idempotent command, `csc:sync-permissions`**, in the deploy sequence at step 5.
+
+- A **migration** runs once, and the matrix keeps changing: it would fix the release it shipped in and leave
+  the next one with the same gap. That is the shape of the problem, not the fix.
+- Putting **`db:seed --class=…`** in the release path works and is one dropped flag away from running
+  `DatabaseSeeder`, which in this repo reaches `DemoDataSeeder`. A production deploy script should not contain
+  a command whose failure mode is *"seeds demo data into a live club"*.
+- A **command** says what it does, can be run on its own when something looks wrong, and can carry `--check`
+  so the code that reports the drift is the code that fixes it.
+
+It **delegates to the seeder** rather than reimplementing the sync — the seeder's idempotency is the property
+being relied on, and a second copy of the sync would be this branch's own bug. It busts the permission cache
+as part of its contract (`PERMISSION_CACHE_STORE=database`, prompt 124): a sync that leaves a stale cache
+behind produces the same silent symptom for the next cache lifetime, and the test asserts `can()` is correct
+**in the same process**.
+
+**`syncPermissions()` revokes what is no longer listed, and that was deliberately not softened** into an
+additive merge to avoid surprising anybody. Asserted explicitly rather than by trusting the library:
+a permission granted to STAFF outside `Permissions::for(STAFF)` is gone after the sync. **Per-user grants
+survive** — `model_has_permissions` is untouched, checked rather than assumed, and asserted.
+
+### Making the silence visible
+
+`App\Support\PermissionDrift` is the read half, and both surfaces use it:
+
+- **`csc:sync-permissions --check`** — writes nothing, prints the drift in both directions, exits non-zero.
+  For a launch gate or a CI step.
+- ***Salud del sistema* → Permisos** — a badge and the drift lines, with the command to run. Because closing
+  the silence only in the deploy script leaves **anyone who deployed some other way still blind**, and that
+  page already reads live state rather than guessing.
+
+The report distinguishes the two directions by name (`missing_grants` vs `stale_grants`), so a reader can tell
+which one they are looking at — *"STAFF no tiene X"* is an inconvenience, *"STAFF conserva permisos retirados
+del código: X"* is a security finding.
+
+### Where it is written down
+
+**`SETUP.md` step 5** of the deploy sequence, worded as required on **every** release rather than only when
+you think you changed a permission — a fix that is not in the script is not a fix. **`verification/CHECKLIST.md`
+§A** (the launch gate): a club whose matrix does not match the code is not ready, in either direction, and it
+is invisible until somebody is refused — or, worse, is not.
+
+`go-live-runbook.md` is still not in this repository (recorded at DECISIONS.md:8932); `SETUP.md` carries the
+deploy sequence and `verification/CHECKLIST.md` gates launch, so both went there.
+
+### Verification
+
+`composer check` green — **1685 tests**, 1682 passed, 3 pre-existing skips, Larastan 0, Pint clean. **MySQL was
+left to CI**, per the running order; the suite ran on SQLite. No change to `App\Support\Permissions`, to
+`RolePermissionSeeder`'s idempotency, or to `csc:install` — which is asserted still to work end to end on a
+clean database, still to refuse a second run without `--force`, and to leave a fresh install already in sync.
+
+**Tests** (`PermissionsSyncOnDeployTest`, 9): a database rolled back to the pre-203 matrix converging, with
+`can()` true in the same process (the owner's screenshot as a test — fails against `main`, where nothing
+re-syncs); a grant the code no longer lists **revoked**; a per-user grant surviving; idempotency; `--check`
+reporting without writing and exiting non-zero, and clean when they agree; the health page seeing drift and
+then clean; the report distinguishing missing from stale; and `csc:install` unchanged.

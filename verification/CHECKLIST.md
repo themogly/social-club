@@ -20,6 +20,11 @@ its real S3 bucket. Write down every failure as a numbered-prompt fix — never 
 - [ ] An **ID scan / member photo** serves ONLY via a short-lived signed URL bound to the viewer: a copied URL fails
   for a second user (403), a guessed path 404s, and **every view writes a `document_access_logs` row**.
 - [ ] MFA enables on an admin account and is enforced next login. Seeded/default credentials removed.
+- [ ] **`php artisan csc:sync-permissions --check` exits 0**, and *Salud del sistema* → Permisos reads *"coinciden
+      con el código"*. A club whose matrix does not match `App\Support\Permissions` is **not ready**, in either
+      direction: a permission the code grants may not have arrived (an OWNER told *"ask a manager"*), and one the
+      code has **withdrawn** may still be live. It is invisible until somebody is refused — or, worse, is not
+      (prompt 214).
 - [ ] Panic lockdown trips org-wide from the counter; the off-terminal reactivation token works once and is throttled.
 - [ ] View-source a member page: **no secret / VAPID private key / API key** in the bundle. `X-Robots-Tag: noindex`
   on every response; `/robots.txt` disallows all; no local `/dev/mail` preview reachable in production.
