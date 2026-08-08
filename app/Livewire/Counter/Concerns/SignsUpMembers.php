@@ -238,10 +238,16 @@ trait SignsUpMembers
      * reads as an applicant tick. The operator must confirm explicitly that the club holds the consent, and
      * that confirmation is what the row then attributes to them.
      *
-     * `OVERNIGHT-DEFAULT — CONFIRM`: whether `PAPER` is acceptable for Article 9 explicit consent **without a
-     * scan of the signed form attached to the record** is the owner's call with their lawyer, not a default
-     * anyone should pick quietly. See `DECISIONS.md`. If the answer is no, the shape is already here — the
-     * channel is a first-class column, so requiring an upload is a rule on this method rather than a redesign.
+     * **RESOLVED (prompt 218).** Whether `PAPER` is acceptable for Article 9 explicit consent without a scan
+     * of the signed form was the owner's call, and he made it: **no scan is required.** The club already takes
+     * the signature on the paper form, so the evidence is that filed form PLUS this row — the channel, the
+     * named attesting operator, and the `consent_text_version` that says which text was signed. Requiring a
+     * scan was considered and **deferred**, not rejected, on his judgement about counter friction.
+     *
+     * **Standing instruction: do not add a scan requirement, a signature-pad consent step, or any other
+     * tightening of the `PAPER` channel without the owner asking for it** — same force as a withdrawn prompt.
+     * The row-level pieces below are load-bearing and stay, because they are the half of the evidence pair
+     * this method is responsible for. See prompt 218 in `DECISIONS.md` for the reasoning and the tripwire.
      */
     public function submitStaffAlta(): void
     {

@@ -75,6 +75,12 @@ its real S3 bucket. Write down every failure as a numbered-prompt fix — never 
   ones unchanged.
 
 ## H. Privacy / RGPD & i18n
+- [ ] **OWNER TASK — ask the club's asesor**, before the pilot: does the **signed paper form filed at the club**,
+      referenced by a **digital record naming the operator and the consent-text version**, satisfy **Art. 7(1)
+      demonstrability for Art. 9 data**? That is the shape prompt 210 built and prompt 218 deliberately left as
+      it is — no scan of the signed form is captured. It is a **legal judgement, not an engineering one**, which
+      is why it sits here rather than in a backlog: parked in the launch gate is what stops it evaporating. If
+      the answer is no, the upgrade path is recorded in prompt 218 (a signature pad at the alta step, not a scan).
 - [ ] A data-export request produces the member's data; **right-to-erasure** anonymises the row AND deletes their photo /
   ID scan / signature from the private disk (retention-obligation docs redacted, not destroyed).
 - [ ] Switch UI EN ⇄ ES (persists to the user, effective next request); the applicant's consent is shown + recorded in

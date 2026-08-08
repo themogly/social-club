@@ -46,7 +46,9 @@ use Tests\TestCase;
  * the applicant agreed to the processing of their data including Article 9 health data. Staff ticking it on
  * someone's behalf turns a record of consent GIVEN into the club's assertion that it WAS. So the staff route
  * does not produce the public form's artefact and does not pretend to — the consent row is stamped `PAPER`
- * and names the operator. See `DECISIONS.md`; it ships as `OVERNIGHT-DEFAULT — CONFIRM`.
+ * and names the operator. The open question — whether that is enough without a scan of the signed form — was
+ * **resolved by prompt 218**: it is, because the club already takes the signature on paper, and the evidence
+ * is that filed form plus this row. Do not tighten the `PAPER` channel without the owner asking.
  */
 class SigningSomeoneUpTest extends TestCase
 {
