@@ -11054,3 +11054,109 @@ JavaScript (Alpine ships inside Livewire's bundle, which cannot load off a `file
 canvas measures at its unscripted intrinsic height — larger than the 150px Alpine gives it, which errs toward
 the panel being reported TALLER than it really is. The CSS half of the body lock is measured here; the Alpine
 half that applies it is asserted in the feature test.
+
+---
+
+## Prompt 222 — the close guard was always one action behind the typing
+
+Measured on `origin/main` = `8797ee2`, in a real browser, three runs:
+
+```
+Esc on the empty chooser            → no confirm, modal closes          ✓
+type "María", blur, wait 2.5s, Esc  → NO confirm, modal closes, LOST    ✗
+type, press "Siguiente", then Esc   → confirm fires, dismiss stays      ✓
+```
+
+221's guard worked **across** steps and never **within** one — so everything typed on the current step was
+unprotected, and the longest, most-typed step (Identidad) was exactly the one a stray Escape or backdrop tap
+threw away silently.
+
+### Why it is structural, not a typo
+
+The confirm was a **server-rendered conditional attribute** (`@if ($signupDirty) wire:confirm=…`) over
+**deferred `wire:model`** fields. Deferred models reach the server on the next ACTION, not on input, so
+`$signupDirty` went true only after a round-trip and the attribute appeared on ✕/backdrop only in the render
+after that. Blur does not help. Waiting does not help — both were tested. **A server-decided guard cannot
+protect state the server has not been told about**, and the current step's typing is exactly that.
+
+Worth recording plainly: 221 implemented 206's lesson — *confirm only when something would genuinely be
+lost* — in the one place where the server's idea of "something" is always one action behind the truth. The
+lesson was right; the place it was evaluated was wrong.
+
+### The fix — decide dirty where the typing is
+
+One Alpine method, `attemptClose()`, in the modal's existing scope (196's rule), consulted by all three close
+routes:
+
+- **DOM half** — any non-empty input, any checked box, any chosen file, any select with a value inside the
+  panel. This is the half that sees the current step.
+- **SERVER half** — read at click time from `data-alta-dirty` on the panel, never snapshotted into Alpine
+  state (188's lesson: Livewire preserves this DOM across re-renders, so anything captured at init goes
+  stale). This is the half that knows about earlier steps after a re-render, and about state that is not an
+  input.
+- Either one says yes ⇒ confirm.
+
+**`.live` on every field was considered and rejected.** It would have made the server's view true at every
+keystroke — and made every keystroke a network round-trip on a counter tablet, for a form whose whole
+purpose (221) was to stop feeling slow. The guard is the only thing that needed the typing; the guard is
+what moved.
+
+**A drawn-but-unsaved signature counts.** It is not an input and reaches no server until *Guardar firma*, so
+nothing outside the pad could tell it from a blank canvas. The shared pad now sets `data-drawn="1"` on its
+canvas at the first stroke and drops it on a clear — three lines in the component, and every consumer gets it.
+
+**Three routes, one guard.** ✕, the backdrop and Escape all call `attemptClose()`; Escape calls it directly
+rather than synthesising a click on the ✕ (221's `$refs.close` trick), so there is one place that answers
+"would closing lose anything?" and a fourth close route cannot quietly skip it. Asserted structurally, because
+three inline copies is precisely how this drifted.
+
+`closeAlta`, the wizard state machine and what a discard does are untouched. The empty chooser still closes
+silently.
+
+### The test had to move to a browser, and that is the finding
+
+221's assertion — *`wire:confirm` is in the HTML once data was entered* — **passed while the guard was
+broken**. A server-side test renders exactly the state the server believes in, which was the thing that was
+wrong; and the static `file://` harnesses carry no JavaScript, so they cannot see a guard that IS JavaScript.
+
+So `measure-close-guard.mjs` drives the real app on a real server: logs in, clears the counter chain, types
+into the real field, and listens for the actual dialog. **It was run against `main`'s guard first and
+reproduces the report exactly** — all three close routes lose the typing with no confirm — and passes on this
+branch. That is the only reason to believe it.
+
+The server-side test is retargeted rather than deleted: it now asserts only what a server-side test can
+honestly see (that the flag is computed and published for the client guard to read).
+
+The confirm is a **native browser dialog**, which is browser chrome and cannot appear in a screenshot. The
+capture in `storage/app/screenshots/222/` is therefore the three frames around it — the wizard empty, the
+wizard typed on step 1, and the wizard still open with *María / García* intact after the confirm was
+dismissed — with the dialog itself evidenced by its event and message text in the run log.
+
+### Found on the way, NOT fixed here
+
+**Prompt 179's MRZ scan trigger never mounts on the staff form.** Measured in the browser: on the first paint
+of step 1 the button is `hidden` with `data-mounted` unset, so the reader is unreachable. It is
+**pre-existing since 215, not caused by 221 or 222** — verified against `878dada`, where the same
+`@vite('resources/js/mrz-reader.js')` sat inside the same Livewire-inserted partial. The cause is that the
+module is loaded by a script tag Livewire injects during a DOM update, so it registers its
+`livewire:update` listener after the update that would have mounted it. The applicant's own form is
+unaffected (ordinary page load). Recorded rather than folded in: it is a different mechanism and deserves its
+own branch and its own test.
+
+**220's one-pad guard fired on this branch as a false positive** and was corrected. It matched the string
+`data-signature-canvas` anywhere in a template, and the close guard has to name that hook in a selector to
+ask whether a signature has been drawn. The rule was always about a template that RENDERS a second canvas, so
+the reader now looks for the element (`<canvas … data-signature-canvas>`) rather than the string. Same shape
+as 215's parity reader reading its own docblock example — a guard that measures spelling instead of the rule.
+
+### Verification
+
+`composer check` green — **1771 tests**, 1768 passed, 3 pre-existing skips, Larastan 0, Pint clean. **MySQL
+was left to CI**, per the running order. No migration, no new copy (the existing confirm string is reused;
+the harness accepts either locale's rendering of it, which is how an English install caught a hard-coded
+Spanish assertion).
+
+**Harness run** (`measure-close-guard.mjs`, real server, 1180×820): typing on step 1 then closing by Esc, ✕
+and backdrop each raises the confirm and, on dismiss, keeps both the typing and the step position; the empty
+chooser and an untouched wizard close silently; typing then advancing then Escape still confirms; one stroke
+on the pad with every field blanked is unsaved work, and clearing the pad takes it back.

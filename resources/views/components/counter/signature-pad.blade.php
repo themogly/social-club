@@ -27,6 +27,9 @@
      Behaviour is prompt 113's, unchanged: canvas → base64 → the host stores it through `DocumentVault`,
      encrypted at rest on the private documents disk, never plaintext.
 
+     `data-drawn="1"` lands on the canvas at the first stroke and goes with a clear (prompt 222) — the only
+     way anything outside the pad can know a signature exists before it is saved.
+
      Touch: `touch-none` on the canvas so a drawn stroke is not a page scroll, and every control clears the
      44px floor — this is used with a finger on a phone (prompt 217's audience) as well as on a tablet. --}}
 @props([
@@ -62,10 +65,14 @@
                     this.ctx = c.getContext('2d'); this.ctx.lineWidth = 2; this.ctx.lineCap = 'round'; this.ctx.strokeStyle = '#2563eb';
                 },
                 point(e) { const r = this.$refs.pad.getBoundingClientRect(); const t = e.touches ? e.touches[0] : e; return { x: t.clientX - r.left, y: t.clientY - r.top }; },
-                start(e) { this.drawing = true; const p = this.point(e); this.ctx.beginPath(); this.ctx.moveTo(p.x, p.y); },
+                {{-- Prompt 222: mark the canvas on the FIRST stroke. A drawn-but-unsaved signature reaches no
+                     server and is not an input, so nothing else can tell it apart from a blank pad — and it
+                     is the one thing on the form the member themselves did. The counter's close guard reads
+                     this attribute; the pad itself does not care. --}}
+                start(e) { this.drawing = true; this.$refs.pad.dataset.drawn = '1'; const p = this.point(e); this.ctx.beginPath(); this.ctx.moveTo(p.x, p.y); },
                 move(e) { if (! this.drawing) return; const p = this.point(e); this.ctx.lineTo(p.x, p.y); this.ctx.stroke(); },
                 stop() { this.drawing = false; },
-                wipe() { this.ctx.clearRect(0, 0, this.$refs.pad.width, this.$refs.pad.height); },
+                wipe() { this.ctx.clearRect(0, 0, this.$refs.pad.width, this.$refs.pad.height); delete this.$refs.pad.dataset.drawn; },
                 signed: false,
                 save() {
                     const data = this.$refs.pad.toDataURL('image/png');
