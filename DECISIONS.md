@@ -10517,3 +10517,96 @@ trusting: `main` **0/2 badged**; after, **1/2**, carrying **≈1 días** while t
 resolver's own arithmetic; voided dispensations not setting the rate; each fallback above; both thresholds
 being settings; the member menu carrying the state and none of the figures; and the cover queries not scaling
 with the catalogue.
+
+---
+
+## Prompt 217 — the one phone-first page had the smallest touch targets in the product
+
+`socio/application.blade.php` is the only genuinely phone-first surface here: an applicant on their own
+device, or holding the club's tablet in portrait. **Every other harness in `tests/Browser` measures desktop
+or tablet, which is exactly how this page was missed.**
+
+Re-measured at **390×844 with touch**, assets rebuilt, in both of the page's states. The enumeration found
+**10** controls under the 44px floor — the 9 reported, plus one more the report's own list did not reach:
+
+| measured | control |
+|---|---|
+| 31×24 / 32×24 | the two locale buttons |
+| 316×36 / 316×36 | the `photo` and `document_scan` file inputs |
+| 152×42 | the `document_type` **select** |
+| 316×42 | the `declared_monthly_g` **select** |
+| 290×40 / 290×20 | the two `<summary>` disclosures — *the text an applicant must open to read what they are consenting to* |
+| 290×40 / 290×40 | the two consent labels |
+
+After: **0**, in both states, light and dark.
+
+**`is_therapeutic` is the sharp one, and worth stating precisely.** The report measured its bare input at
+**16×20**. My enumerator maps a checkbox to its wrapping `<label>` — which is what a finger actually hits —
+and on that basis its label already cleared the floor through an incidental `p-3`, while the two *consent*
+labels beside it, at 290×40, did not. Either way the construction was three different ones: a card with
+padding, and two bare `flex items-start gap-2` rows. **All three now render from one partial**
+(`socio/partials/consent-check`) with an explicit `min-h-11`, so the target is a stated rule rather than a
+side effect of whatever padding that row happened to have. It matters more here than elsewhere: a therapeutic
+declaration is a health-adjacent fact, and mis-ticking it in either direction is worse than mistyping a
+phone number.
+
+**The four the report could not have listed** are the selects and the summaries, and they join by the
+prompt's own rule — same page, same finger. The selects were 42px because `SocioForm::FIELD` had `py-2.5` and
+no floor; the floor is on the shared class now, so it is true of every control that wears it, including the
+next one. `min-h-11` grew hit areas only: no layout, type or glyph changed anywhere, and the screenshots are
+the check.
+
+**The MRZ chips did not need the fix**, which is the question the prompt asked. Prompt 179's confirm controls
+render only *after* a successful read, so a static page load never shows them — the harness drives the page
+into that state through `MrzPrefill`, which is exactly what the reader's POST leaves behind. Measured: **24**
+controls in the scanned state against 20 in the initial one, and **none** of the four extra is under the
+floor.
+
+### The harness
+
+`tests/Browser/measure-applicant-form.mjs` measures at **390×844 with touch** (`devices['iPhone 14 Pro']`),
+enumerates every `a[href] · button · input · select · textarea · summary`, maps checkboxes to their label,
+and exits non-zero on anything under 44×44 — in **both** states.
+
+**It asserts its own sample count.** A selector matching three elements would otherwise print ALL PASS over a
+page with twenty-two, which is the defect prompt 205 found in `measure-topbar.mjs` and the reason that script
+gained a `MIN_CONTROLS` floor. Here the floors are 20 (initial) and 24 (scanned). Playwright stays out of CI,
+per the README; the run is recorded below.
+
+### Verification
+
+`composer check` green — **1714 tests**, 1711 passed, 3 pre-existing skips, Larastan 0, Pint clean. **MySQL was
+left to CI**, per the running order; the suite ran on SQLite. No copy changed, so no locale work.
+
+`node tests/Browser/measure-applicant-form.mjs`:
+
+```
+=== initial / light === PASS (20 controls sampled, 0 under 44px) hScroll=false
+=== initial / dark  === PASS (20 controls sampled, 0 under 44px) hScroll=false
+=== scanned / light === PASS (24 controls sampled, 0 under 44px) hScroll=false
+=== scanned / dark  === PASS (24 controls sampled, 0 under 44px) hScroll=false
+```
+
+Screenshots at 390×844, light and dark, both states, before and after (`storage/app/screenshots/217/`) —
+full page. Before: 10 under the floor in every frame. After: 0.
+
+**Tests** (`ApplicantFormTouchTargetsTest`, 6, in `composer check`): every checkbox inside a tap target that
+clears the floor — asserted on the CONSTRUCTION, not by listing the three we know about, so a fourth cannot
+arrive without one (fails against `main` on `is_therapeutic`); the file inputs and the locale buttons; all
+three checkboxes sharing one construction; the form still submitting end to end with every box ticked; and
+173's guarantee that this page gains no counter chrome.
+
+**Two guards retargeted, and both were measuring the wrong thing:**
+
+- **Prompt 98's target-size check** asserted the literal strings `min-h-[1.5rem]` / `min-w-[1.75rem]`, so
+  raising the socio switcher to `min-h-11` — strictly larger, and the whole point of this branch — read as a
+  regression. **A guard that fails when you exceed it is measuring the spelling, not the rule.** It reads a
+  floor in CSS px now, from a small explicit table.
+- **Prompt 215's field-parity reader** scanned one file's bytes for `name="…"`, so moving the three
+  checkboxes into a partial looked like the public form losing three fields. It follows `@include`s now,
+  which it should have done from the start: a form's fields are what it RENDERS.
+
+**And a flake of my own, fixed rather than re-run:** prompt 207's *"the hub never names a member"* test seeded
+`Ana` / `Bruno` and searched a whole page for those strings, so a random factory name elsewhere collided
+occasionally. The names are unguessable now — a leak is still a leak with an odd name, and a false positive is
+not a leak.

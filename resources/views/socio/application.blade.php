@@ -110,7 +110,9 @@
                 <div>
                     <label class="mb-1 block text-sm font-medium" for="photo">{{ __('Foto (opcional)') }}</label>
                     <input id="photo" name="photo" @error('photo') aria-invalid="true" aria-describedby="photo-error" @enderror type="file" accept="image/*" capture="user"
-                           class="block w-full text-sm text-ink file:mr-3 file:rounded-lg file:border-0 file:bg-brand-tint file:px-3 file:py-2 file:text-sm file:font-medium file:text-brand dark:text-slate-200 dark:file:bg-slate-800 dark:file:text-slate-100">
+                           {{-- Prompt 217: `min-h-11` + vertical padding on the INPUT, so the whole row is the target rather
+                                than the styled `file:` pseudo-button alone. Measured 316×36 before. --}}
+                           class="block min-h-11 w-full py-2 text-sm text-ink file:mr-3 file:min-h-9 file:rounded-lg file:border-0 file:bg-brand-tint file:px-3 file:py-2 file:text-sm file:font-medium file:text-brand dark:text-slate-200 dark:file:bg-slate-800 dark:file:text-slate-100">
                     <x-socio.field-error name="photo" />
                     <p class="mt-1 text-xs text-ink-muted dark:text-slate-400">{{ \App\Support\DocumentUpload::helperText(__('Ayuda a que te reconozcan al llegar. Se comparará contigo en el mostrador. Puedes omitirla y hacerla en la sede.')) }}</p>
                 </div>
@@ -127,7 +129,9 @@
                 <div>
                     <label class="mb-1 block text-sm font-medium" for="document_scan">{{ __('Documento de identidad (opcional)') }}</label>
                     <input id="document_scan" name="document_scan" @error('document_scan') aria-invalid="true" aria-describedby="document_scan-error" @enderror type="file" accept="image/*,application/pdf"
-                           class="block w-full text-sm text-ink file:mr-3 file:rounded-lg file:border-0 file:bg-brand-tint file:px-3 file:py-2 file:text-sm file:font-medium file:text-brand dark:text-slate-200 dark:file:bg-slate-800 dark:file:text-slate-100">
+                           {{-- Prompt 217: `min-h-11` + vertical padding on the INPUT, so the whole row is the target rather
+                                than the styled `file:` pseudo-button alone. Measured 316×36 before. --}}
+                           class="block min-h-11 w-full py-2 text-sm text-ink file:mr-3 file:min-h-9 file:rounded-lg file:border-0 file:bg-brand-tint file:px-3 file:py-2 file:text-sm file:font-medium file:text-brand dark:text-slate-200 dark:file:bg-slate-800 dark:file:text-slate-100">
                     <x-socio.field-error name="document_scan" />
                     <p class="mt-1 text-xs text-ink-muted dark:text-slate-400">{{ \App\Support\DocumentUpload::helperText(__('Foto o PDF de tu DNI, NIE o pasaporte. Se guarda cifrado, solo se abre con un enlace firmado y cada consulta queda registrada. Si tu solicitud no se aprueba, se borra. Puedes omitirlo y enseñarlo en el mostrador.')) }}</p>
 
@@ -181,10 +185,14 @@
                     <p class="mt-1 text-xs text-ink-muted dark:text-slate-400">{{ __('El socio/a que te presenta. Si no lo sabes, déjalo en blanco y la asociación te orientará.') }}</p>
                 </div>
 
-                <label class="flex items-start gap-2 rounded-lg bg-surface-alt p-3 text-sm dark:bg-slate-950">
-                    <input type="checkbox" name="is_therapeutic" value="1" @checked(old('is_therapeutic', data_get($payload, 'is_therapeutic'))) class="mt-0.5 h-5 w-5 rounded border-line text-brand dark:border-slate-600 dark:bg-slate-900">
-                    <span class="text-ink-muted dark:text-slate-300">{{ __('Uso terapéutico (podré aportar certificado médico)') }}</span>
-                </label>
+                {{-- Prompt 217 — the same construction the two consent rows use. It had none: a bare 16×20
+                     checkbox on the one phone-first page in the product. --}}
+                @include('socio.partials.consent-check', [
+                    'name' => 'is_therapeutic',
+                    'label' => __('Uso terapéutico (podré aportar certificado médico)'),
+                    'checked' => (bool) old('is_therapeutic', data_get($payload, 'is_therapeutic')),
+                    'tone' => 'card',
+                ])
 
                 {{-- Informed consent (prompt 97): the two texts the applicant is agreeing to are SHOWN here,
                      tagged with the exact version stamped on their consent record. Two SEPARATE ticks — data
@@ -200,24 +208,31 @@
 
                     <div>
                         <details class="mb-2" data-consent-privacy>
-                            <summary class="cursor-pointer font-medium">{{ __('Información sobre el tratamiento de tus datos') }}</summary>
+                            {{-- Prompt 217: a disclosure the applicant must open to read what they are about to
+                                 consent to. It measured 290×40 and 290×20 at 390×844 — the second one because
+                                 a shorter string wraps to one line. Both clear the floor now. --}}
+                            <summary class="flex min-h-11 cursor-pointer items-center font-medium">{{ __('Información sobre el tratamiento de tus datos') }}</summary>
                             <p class="mt-2 whitespace-pre-line text-ink-muted dark:text-slate-400">{{ \App\Support\ConsentText::privacy() }}</p>
                         </details>
-                        <label class="flex items-start gap-2">
-                            <input type="checkbox" name="consent_data" value="1" required @checked(old('consent_data')) class="mt-0.5 h-5 w-5 rounded border-line text-brand dark:border-slate-600 dark:bg-slate-900">
-                            <span class="text-ink-muted dark:text-slate-300">{{ __('He leído y acepto el tratamiento de mis datos.') }}</span>
-                        </label>
+                        @include('socio.partials.consent-check', [
+                            'name' => 'consent_data',
+                            'label' => __('He leído y acepto el tratamiento de mis datos.'),
+                            'required' => true,
+                            'checked' => (bool) old('consent_data'),
+                        ])
                     </div>
 
                     <div>
                         <details class="mb-2" data-consent-statutes>
-                            <summary class="cursor-pointer font-medium">{{ __('Estatutos de la asociación') }}</summary>
+                            <summary class="flex min-h-11 cursor-pointer items-center font-medium">{{ __('Estatutos de la asociación') }}</summary>
                             <p class="mt-2 whitespace-pre-line text-ink-muted dark:text-slate-400">{{ \App\Support\ConsentText::statutes() }}</p>
                         </details>
-                        <label class="flex items-start gap-2">
-                            <input type="checkbox" name="consent_statutes" value="1" required @checked(old('consent_statutes')) class="mt-0.5 h-5 w-5 rounded border-line text-brand dark:border-slate-600 dark:bg-slate-900">
-                            <span class="text-ink-muted dark:text-slate-300">{{ __('He leído y acepto los estatutos de la asociación.') }}</span>
-                        </label>
+                        @include('socio.partials.consent-check', [
+                            'name' => 'consent_statutes',
+                            'label' => __('He leído y acepto los estatutos de la asociación.'),
+                            'required' => true,
+                            'checked' => (bool) old('consent_statutes'),
+                        ])
                     </div>
                 </div>
 

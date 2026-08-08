@@ -279,20 +279,24 @@ class AlertsLandOnTheSubjectTest extends TestCase
      */
     public function test_the_hub_never_names_a_member_in_any_alert_state(): void
     {
+        // Deliberately unguessable names. This assertion searches a WHOLE PAGE for a string, and 'Ana' /
+        // 'Bruno' are common enough that a random factory name elsewhere on it — an operator, an org, another
+        // member — collides now and then and fails the test for the wrong reason. A leak is still a leak with
+        // an odd name; a false positive is not.
         foreach ([Role::OWNER, Role::MANAGER, Role::STAFF] as $role) {
             $this->operator($role);
 
-            $member = $this->member('Ana', 'Ruiz');
+            $member = $this->member('Zzqwertyx', 'Vbnmkjhg');
             $this->expiringMembership($member);
             MemberApplication::factory()->submitted()->create([
                 'organisation_id' => $this->org->id,
                 'location_id' => $this->location->id,
-                'payload' => ['first_name' => 'Bruno', 'last_name' => 'Sáez'],
+                'payload' => ['first_name' => 'Ppoiuytr', 'last_name' => 'Lkjhgfds'],
             ]);
 
             $html = (string) $this->get(route('counter.home'))->assertOk()->getContent();
 
-            foreach (['Ana', 'Ruiz', 'Bruno', 'Sáez', (string) $member->member_no, $member->id] as $leak) {
+            foreach (['Zzqwertyx', 'Vbnmkjhg', 'Ppoiuytr', 'Lkjhgfds', (string) $member->member_no, $member->id] as $leak) {
                 $this->assertStringNotContainsString($leak, $html, "[{$role->value}] the hub leaked '{$leak}'");
             }
         }

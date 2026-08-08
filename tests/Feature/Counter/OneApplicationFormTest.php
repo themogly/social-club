@@ -73,13 +73,34 @@ class OneApplicationFormTest extends TestCase
         return $user;
     }
 
-    /** Every `name="…"` the applicant's public form posts. */
+    /**
+     * Every field the applicant's public form posts — **following its includes**.
+     *
+     * Prompt 217 moved the three checkboxes into `socio/partials/consent-check`, and this reader found
+     * nothing there and reported drift. That was the guard working on a false positive, and the honest fix
+     * is the reader: a form's fields are what it RENDERS, not what one file's bytes happen to contain, and a
+     * reader that stops at the first `@include` would miss the next partial too.
+     */
     private function publicFormFields(): array
     {
         $blade = (string) file_get_contents(resource_path('views/socio/application.blade.php'));
-        preg_match_all('/\bname="([a-z_]+)"/', $blade, $matches);
 
-        return array_values(array_unique($matches[1]));
+        // Pull in every partial the form includes, so a field rendered from one still counts.
+        preg_match_all("/@include\('([a-z0-9._-]+)'/i", $blade, $includes);
+
+        foreach (array_unique($includes[1]) as $view) {
+            $path = resource_path('views/'.str_replace('.', '/', $view).'.blade.php');
+
+            if (is_file($path)) {
+                $blade .= (string) file_get_contents($path);
+            }
+        }
+
+        // `name="x"` on a rendered input, and `'name' => 'x'` where an include declares the field it renders.
+        preg_match_all('/\bname="([a-z_]+)"/', $blade, $direct);
+        preg_match_all("/'name'\s*=>\s*'([a-z_]+)'/", $blade, $viaInclude);
+
+        return array_values(array_unique(array_merge($direct[1], $viaInclude[1])));
     }
 
     /** Every field the staff form binds — `wire:model="altaForm.x"` plus its two upload properties. */

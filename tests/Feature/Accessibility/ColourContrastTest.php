@@ -105,10 +105,16 @@ class ColourContrastTest extends TestCase
         $this->assertGreaterThanOrEqual(self::AA, $this->ratio('#2563eb', self::SURFACE_ALT));
     }
 
+    /**
+     * WCAG 2.2 Target Size (Minimum) 24×24 — asserted at the markup level, since there is no browser here.
+     *
+     * **Asserted as a FLOOR rather than a literal spelling** (prompt 217). It used to require the exact
+     * strings `min-h-[1.5rem]` / `min-w-[1.75rem]`, so raising the socio switcher to `min-h-11` — strictly
+     * larger, and the whole point of 217 — read as a regression. A guard that fails when you exceed it is
+     * measuring the spelling, not the rule.
+     */
     public function test_the_language_switchers_meet_the_minimum_target_size(): void
     {
-        // WCAG 2.2 Target Size (Minimum) 24×24 — asserted at the markup level (min-w ≥ 28px, min-h ≥ 24px),
-        // since there is no browser here to measure rendered pixels.
         foreach ([
             // The socio switcher moved out of the layout into its own component (prompt 167) so it can
             // render on screens with no member chrome — the target-size floor moved with it.
@@ -116,8 +122,39 @@ class ColourContrastTest extends TestCase
             'resources/views/livewire/locale-switcher.blade.php',
         ] as $file) {
             $markup = (string) file_get_contents(base_path($file));
-            $this->assertStringContainsString('min-h-[1.5rem]', $markup, "{$file} locale button needs a ≥24px min height");
-            $this->assertStringContainsString('min-w-[1.75rem]', $markup, "{$file} locale button needs a ≥24px min width");
+
+            $this->assertGreaterThanOrEqual(24, $this->minSizePx($markup, 'h'), "{$file} locale button needs a ≥24px min height");
+            $this->assertGreaterThanOrEqual(24, $this->minSizePx($markup, 'w'), "{$file} locale button needs a ≥24px min width");
         }
+    }
+
+    /**
+     * The largest `min-h` / `min-w` floor the markup declares, in CSS px.
+     *
+     * A small explicit table rather than a clever pattern: there are two spellings in this codebase and the
+     * point of the method is that the guard measures the RULE (≥24px) instead of one spelling of it. A table
+     * is also the thing a reader can check at a glance, which a guard should be.
+     */
+    private function minSizePx(string $markup, string $axis): float
+    {
+        $floors = [
+            'min-'.$axis.'-[1.5rem]' => 24.0,
+            'min-'.$axis.'-[1.75rem]' => 28.0,
+            'min-'.$axis.'-[2.75rem]' => 44.0,
+            'min-'.$axis.'-6' => 24.0,
+            'min-'.$axis.'-7' => 28.0,
+            'min-'.$axis.'-11' => 44.0,
+            'min-'.$axis.'-12' => 48.0,
+        ];
+
+        $best = 0.0;
+
+        foreach ($floors as $class => $px) {
+            if (str_contains($markup, $class)) {
+                $best = max($best, $px);
+            }
+        }
+
+        return $best;
     }
 }
