@@ -29,7 +29,8 @@ class Permissions
         // 'membership.enrol' (prompt 203) = open a membership at the sede you are working at, on the tier's
         // DEFAULT fee — a new one or a lapsed one restored. Moving a membership between sedes is a different
         // act with another sede's register in it and stays at 'members.transfer'.
-        'membership.enrol', 'membership.fee.override', 'membership.fee.collect', 'carencia.waive',
+        'membership.enrol', 'membership.fee.override', 'membership.fee.collect', 'membership.fee.waive',
+        'carencia.waive',
         // Attendance
         'checkin.manage', 'checkin.override',
         // Counter
@@ -60,7 +61,8 @@ class Permissions
         'reports.view', 'reports.export',
         'members.view', 'members.create', 'members.edit', 'members.transfer', 'members.import',
         'member.sanction', 'applications.review',
-        'membership.enrol', 'membership.fee.override', 'membership.fee.collect', 'carencia.waive',
+        'membership.enrol', 'membership.fee.override', 'membership.fee.collect', 'membership.fee.waive',
+        'carencia.waive',
         'checkin.manage', 'checkin.override',
         'pos.use', 'pos.bar', 'dispensation.void', 'order.void', 'limits.override', 'dispensation.price.override',
         'genetics.manage', 'prices.manage', 'stock.manage', 'stock.merma', 'stock.transfer',
@@ -78,6 +80,13 @@ class Permissions
         'pos.use', 'pos.bar', 'checkin.manage',
         'members.view',
         'expenses.record', 'membership.fee.collect', 'till.open',
+        // Prompt 219, the owner's explicit decision, and the 174 shape again: waiving is ROUTINE at this club
+        // — therapeutic members, and members already paying at another sede — and one person is usually
+        // working, so mirroring `membership.fee.override` (MANAGER+) would mean the common case needs someone
+        // who is not there. The route is open BECAUSE it is audited: a waiver is a row with a named operator,
+        // a required reason and an audit entry, and it enters no revenue figure. A club that disagrees revokes
+        // it from STAFF in the panel.
+        'membership.fee.waive',
         // Prompt 203, the same reasoning as 174 one step further along: a member whose membership lapsed —
         // or who has never been enrolled HERE — was a dead end whose own remedy text sent the operator to a
         // panel STAFF cannot act in. On a Friday evening with one person working, that means turning the

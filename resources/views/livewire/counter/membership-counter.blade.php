@@ -463,6 +463,10 @@
                             </div>
                             <x-button type="submit" size="md" class="w-full" wire:loading.attr="disabled" wire:target="collectFee">{{ __('Cobrar cuota') }}</x-button>
                         </form>
+
+                        {{-- Prompt 219 — WITH the collect control and secondary to it, never a fourth copy of
+                             the form. One partial, three hosts. --}}
+                        @include('livewire.counter.partials.fee-waiver')
                     @endif
                 @else
                     {{-- Prompt 194 — the SAME lookup as the door, the dispensary, the till and the bar. This

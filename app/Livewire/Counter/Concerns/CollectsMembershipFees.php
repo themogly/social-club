@@ -4,6 +4,7 @@ namespace App\Livewire\Counter\Concerns;
 
 use App\Actions\Memberships\RecordFeePayment;
 use App\Enums\FeePaymentMethod;
+use App\Enums\MembershipStatus;
 use App\Exceptions\DebtLimitExceededException;
 use App\Models\Location;
 use App\Models\Member;
@@ -37,6 +38,21 @@ trait CollectsMembershipFees
 
     /** CASH (into the drawer) or WALLET (posts a FEE ledger movement — no drawer needed). */
     public string $feeMethod = 'CASH';
+
+    /**
+     * The waiver form (prompt 219): open, which reason, and the free text when it is `OTHER`.
+     *
+     * The owner: *"need an option to waive the fee — often they waive it if they are medical, or if they have
+     * a membership at another club."* Today the only ways out of an outstanding fee are collecting it or a
+     * manager quietly not chasing it, so a club that routinely waives shows members permanently "owing" money
+     * it has decided not to take — and the door nags about it for ever.
+     */
+    public bool $waiveOpen = false;
+
+    /** `THERAPEUTIC` · `OTHER_SEDE` · `OTHER` — see {@see self::waiveReasonOptions()}. */
+    public string $waiveReason = '';
+
+    public string $waiveReasonText = '';
 
     public function selectFeeMember(string $memberId): void
     {
@@ -107,6 +123,168 @@ trait CollectsMembershipFees
                 ? __('Cuota cobrada: :amount. Pendiente: :remaining', ['amount' => Money::fromCents($cents)->formatted(), 'remaining' => Money::fromCents($remaining)->formatted()])
                 : __('Cuota cobrada por completo: :amount.', ['amount' => Money::fromCents($cents)->formatted()]),
         ];
+    }
+
+    /**
+     * Forgo the outstanding fee — a recorded decision, through the SAME writer as a payment.
+     *
+     * `RecordFeePayment` with method `WAIVED`, so the debt clears everywhere `amount_cents` is summed: the
+     * door notice, the `unpaid_fee` verdict, the fee panels, renewal. No edit to `fee_cents` — the club
+     * charged €20 and chose to forgo it, which is a different fact from "the fee was €0", and the register
+     * should hold the first one.
+     *
+     * **No open till required**, unlike a CASH fee: a waiver moves no cash and posts no wallet movement, so
+     * the drawer has nothing to reconcile. The arqueo is untouched.
+     *
+     * Partial waivers fall out for free — waive €10 of €20 and the rest stays collectable — because it is
+     * just another row against the same sum.
+     *
+     * @return array{type: string, message: string}
+     */
+    protected function waiveFeeThrough(Location $location, User $user): array
+    {
+        if (! $user->can('membership.fee.waive')) {
+            return ['type' => 'error', 'message' => __('No tienes permiso para condonar cuotas.')];
+        }
+
+        $member = $this->feeMemberId !== null ? Member::query()->find($this->feeMemberId) : null;
+        if ($member === null) {
+            return ['type' => 'error', 'message' => __('Selecciona un socio.')];
+        }
+
+        $membership = $this->outstandingMembership($member, $location);
+        if ($membership === null) {
+            return ['type' => 'error', 'message' => __('Este socio no tiene cuota pendiente en esta sede.')];
+        }
+
+        $reason = $this->resolvedWaiveReason();
+
+        // Refused HERE as well as at the writer: a reason is what turns forgoing income into a governance
+        // record rather than a hole, and the UI disabling a button is not a rule.
+        if ($reason === null) {
+            return ['type' => 'error', 'message' => __('Indica el motivo de la condonación.')];
+        }
+
+        $owed = $this->owedCents($membership);
+        $typed = $this->parseFeeCents();
+
+        // Blank amount = the whole outstanding balance, which is the common case; a typed amount waives part.
+        $cents = ($typed === null || $typed <= 0) ? $owed : $typed;
+
+        if ($cents > $owed) {
+            return ['type' => 'error', 'message' => __('El importe supera la cuota pendiente (:owed).', ['owed' => Money::fromCents($owed)->formatted()])];
+        }
+
+        (new RecordFeePayment)->handle($membership, $cents, FeePaymentMethod::WAIVED, [
+            'operator_id' => CounterOperator::id() ?? $user->id,
+            'reason' => $reason,
+        ]);
+
+        $remaining = $owed - $cents;
+        $this->resetWaiveForm();
+        $this->reset(['feeMemberId', 'feeAmount']);
+        $this->feeMethod = 'CASH';
+
+        // The amount is named because the field it was typed into has just been reset (prompt 202).
+        return [
+            'type' => 'success',
+            'message' => $remaining > 0
+                ? __('Cuota condonada: :amount. Pendiente: :remaining', ['amount' => Money::fromCents($cents)->formatted(), 'remaining' => Money::fromCents($remaining)->formatted()])
+                : __('Cuota condonada por completo: :amount.', ['amount' => Money::fromCents($cents)->formatted()]),
+        ];
+    }
+
+    /**
+     * Waive for a member ALREADY on screen — the door verdict and the POS member card.
+     *
+     * The same shape as `collectInlineFeeFor`: point the shared state at that member, then run the one core.
+     * The hosts hold their member in `$memberId` and Socios in `$feeMemberId`, which is the same difference
+     * prompt 211 had to bridge in `OpensMemberships` — and the same answer: bridge it in the concern, once.
+     *
+     * @return array{type: string, message: string}
+     */
+    protected function waiveInlineFeeFor(Member $member, Location $location, User $user): array
+    {
+        $this->feeMemberId = $member->id;
+
+        return $this->waiveFeeThrough($location, $user);
+    }
+
+    /** The reason as it will be stored, or null when the operator has not given one. */
+    private function resolvedWaiveReason(): ?string
+    {
+        $option = collect($this->waiveReasonOptions())->firstWhere('value', $this->waiveReason);
+
+        if ($option === null) {
+            return null;
+        }
+
+        if ($option['value'] !== 'OTHER') {
+            return (string) $option['label'];
+        }
+
+        $text = trim($this->waiveReasonText);
+
+        return $text !== '' ? $text : null;
+    }
+
+    /**
+     * The reasons on offer — **structured, because the two common ones are data the system already holds**.
+     *
+     * A free-text box alone produces "ok" and "si". The therapeutic reason is offered when the member's own
+     * `is_therapeutic` flag is set, and the other-sede reason when they hold an ACTIVE membership somewhere
+     * else in this club (prompt 203's case, where the second fee is commonly forgone) — so the two routine
+     * waivers are one tap, each already justified by the record. Everything else is free text, required
+     * non-empty.
+     *
+     * @return list<array{value: string, label: string, suggested: bool}>
+     */
+    public function waiveReasonOptions(): array
+    {
+        $member = $this->feeMemberId !== null ? Member::query()->find($this->feeMemberId) : null;
+        $location = $this->resolveLocation();
+
+        $therapeutic = (bool) ($member?->is_therapeutic);
+        $elsewhere = $member !== null && $location !== null && $member->memberships()->withoutGlobalScopes()
+            ->where('location_id', '!=', $location->id)
+            ->where('status', MembershipStatus::ACTIVE->value)
+            ->exists();
+
+        $options = [];
+
+        if ($therapeutic) {
+            $options[] = ['value' => 'THERAPEUTIC', 'label' => __('Terapéutico'), 'suggested' => true];
+        }
+
+        if ($elsewhere) {
+            $options[] = ['value' => 'OTHER_SEDE', 'label' => __('Socio en otra sede'), 'suggested' => true];
+        }
+
+        $options[] = ['value' => 'OTHER', 'label' => __('Otro motivo'), 'suggested' => false];
+
+        return $options;
+    }
+
+    /** Open the waiver, pre-selecting the record-backed reason when there is exactly one obvious candidate. */
+    public function toggleWaive(): void
+    {
+        $this->waiveOpen = ! $this->waiveOpen;
+
+        if (! $this->waiveOpen) {
+            $this->resetWaiveForm();
+
+            return;
+        }
+
+        $suggested = collect($this->waiveReasonOptions())->firstWhere('suggested', true);
+        $this->waiveReason = (string) ($suggested['value'] ?? '');
+    }
+
+    private function resetWaiveForm(): void
+    {
+        $this->waiveOpen = false;
+        $this->waiveReason = '';
+        $this->waiveReasonText = '';
     }
 
     /**

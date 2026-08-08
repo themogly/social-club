@@ -10694,3 +10694,106 @@ into nothing, and the decision above assumes both halves.
 `composer check` green — **1714 tests**, 1711 passed, 3 pre-existing skips, Larastan 0, Pint clean. Nothing it
 checks changed: this branch touched `DECISIONS.md`, `verification/CHECKLIST.md`, and the docblock comment in
 `SignsUpMembers` that pointed at the open marker. **MySQL was left to CI**, per the running order.
+
+---
+
+## Prompt 219 — waiving a fee is a recorded decision, not a payment that never happens
+
+The owner, collecting a fee at the door: *"need an option to waive the fee — often they waive it if they are
+medical, or if they have a membership at another club."*
+
+Before this, the only ways out of an outstanding fee were **collecting it** or **a manager quietly not
+chasing it**. A club that routinely waives — and this one does — had no way to say so, so the register showed
+members permanently *owing* money the club had decided not to take, and the door nagged about it for ever.
+
+### A payment-shaped event, not a fee edit — and that is the whole design
+
+A waiver is a `MembershipFeePayment` row with method **`WAIVED`**. `owedCents()` and `VerdictRemedy`'s copy of
+the same sum total `amount_cents` **regardless of method**, so one row clears the debt everywhere at once —
+the door notice, the `unpaid_fee` verdict, the fee panels, renewal — with **no second write path and no
+consumer changed**. That is why it was done this way rather than by editing the fee:
+
+- **The tier's fee stays the fact.** The club charged €20 and chose to forgo it; that is a different truth
+  from *"the fee was €0"*, and the register should hold the first one. `EnrolMembership` and its
+  `membership.fee.override` gate are untouched — enrolment still writes the tier default.
+- **The forgoing has an author.** Amount, method, the PIN-identified operator, a **required reason**, and an
+  audit entry. A fee that quietly became €0 is invisible at the assembly; a waiver line is governance.
+- **No drawer, no wallet.** It moves no cash and posts no ledger movement, so it needs **no open till** —
+  unlike a CASH fee — and it attaches to no session even when one is offered. The arqueo is untouched.
+- **Partial waivers fall out for free** (waive €10 of €20, collect the rest), because it is just another row
+  against the same sum.
+
+### Who may waive — the owner's decision
+
+**STAFF, MANAGER and OWNER alike, with a reason always required.** The owner chose this deliberately over
+mirroring `membership.fee.override` (MANAGER+): waivers are **routine** at this club — therapeutic members,
+members of another sede — and one person is usually working, so a manager-only rule would mean the common
+case needs somebody who is not there.
+
+This is 174's shape for the third time: **the route is open *because* it is audited.** A waiver is a row with
+a named operator, a required reason and an audit entry, and it enters no revenue figure. A club that
+disagrees revokes `membership.fee.waive` from STAFF in the panel. **214's sync carries it to installed
+databases** — asserted, because a matrix change that never arrives is exactly 214's finding and this branch
+adds one.
+
+### The reason is structured, because the two common ones are already data
+
+A free-text box alone produces *"ok"* and *"si"*. So:
+
+| offered | when | why |
+|---|---|---|
+| **Terapéutico** | the member's own `is_therapeutic` flag is set | one tap, pre-justified by the record — and it is the pre-selected default, rendered `checked` on the first paint as well as in state |
+| **Socio en otra sede** | they hold an ACTIVE membership elsewhere in the club | prompt 203's case, where the second fee is commonly forgone |
+| **Otro** | always | free text, required non-empty |
+
+Refused **server-side** — at the screen *and* at `RecordFeePayment` — so no future caller can skip it. A
+reason is what turns forgoing income into a governance record rather than a hole.
+
+### `OVERNIGHT-DEFAULT — CONFIRM` — waiving for membership of ANOTHER CLUB
+
+The owner's words were *"a membership at another club"*. What this branch built is **another sede of this
+asociación** (203's case), because that is the one the system can evidence.
+
+**If the intended reason is a different asociación entirely, that interacts with the sole-association
+declaration** (`sole_association_declared_at`): a member who declares they belong to no other club, and whose
+fee is then waived *because* they belong to another club, has a register that contradicts itself. That is a
+compliance question rather than a UI one — **it belongs on the asesor list, and this records it rather than
+resolving it.** The free-text reason can carry it meanwhile, which is honest: it says what happened without
+the system asserting a fact it cannot check.
+
+### Waived amounts are governance, never revenue
+
+`FeePaymentMethod::isRevenue()` is the one place that question is answered, and every surface that sums fee
+payments reads it:
+
+- **`FinancialReport`** — the *Cuotas* series, total income, and the payment-method mix all exclude `WAIVED`;
+- **`DashboardCharts`** — the same, on the dashboard's own series;
+- **`TillSummary`** — already filtered to CASH, so the arqueo was correct without a change, and it is asserted
+  rather than assumed;
+- **`owedCents` / `VerdictRemedy` / `ResolveMemberEligibility`** — these *should* count it, and do, unchanged.
+
+And a new **`Cuotas condonadas`** table reports what the club chose not to take, with the reason and the
+operator beside it. Counting it as *Cuotas* would say the club took money it declined; leaving it out
+entirely would hide a decision the assembly has every right to see.
+
+**The guard for the class** seeds one CASH, one BANK and one WAIVED payment and asserts the waived amount
+appears in **no** revenue figure and **in** the waived line — written by iterating the report surfaces rather
+than the two anyone happened to check.
+
+### Verification
+
+`composer check` green — **1725 tests**, 1722 passed, 3 pre-existing skips, Larastan 0, Pint clean. **MySQL was
+left to CI**, per the running order. One migration (a nullable `reason` column). 201's and 127's fee tests
+pass untouched.
+
+Screenshots at 1180×820 and 820×1180, light and dark (`storage/app/screenshots/219/`): the fee panel with the
+waiver open on its record-backed reason, and the door **before and after** — the notice gone. The shoot
+script asserts the pair rather than trusting it: the owing frame nags, the cleared frame does not, and no
+waiver control is under 44px.
+
+**Tests** (`MembershipFeeWaiverTest`, 11): waiving clearing the debt **and the verdict** from all three hosts
+(fails against `main` — no waive path exists); no till needed, while a CASH fee still refuses without one;
+the partial waiver and the mixed history; STAFF holding the permission on all three matrices; an empty reason
+refused at the screen and at the writer; the audit row asserted field by field; each structured reason offered
+only when the record backs it, and checked on first paint; the revenue guard across every surface; the arqueo
+unmoved; and 214's sync carrying the new permission to a database seeded without it.
