@@ -270,8 +270,48 @@
                     {{-- Prompt 176: stacks until lg. At 820 portrait the selection pane is ~470px and
                          title + view toggle + search do not fit on one row without clipping. --}}
                     <div class="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-                        <h2 class="text-base font-semibold">{{ __('Genéticas') }}</h2>
-                        {{-- List / grid. LIST is the default for genetics — see DispensaryPos::$geneticLayout. --}}
+                        {{-- THE TOGGLE IS THE HEADING (prompt 212).
+
+                             The owner asked for the heading to read *"Dispensario"*. Two reasons it does
+                             something slightly different instead. **"Genéticas" was wrong on the facts**, so
+                             the rename is right: `ProductType` is FLOWER / CONCENTRATE / PREROLL / EDIBLE and
+                             prompt 66's own filters say so — the word under-described what was already in the
+                             pane. But *"Dispensario"* would name the panel after the screen it sits on (the
+                             bar already reads "· Dispensario"), and once the pane holds bar products it is not
+                             the dispensary; it is a catalogue with two sources.
+
+                             So the toggle is the heading, with nothing above it. It names what you are
+                             browsing, it is the control you came to press, and it removes a word rather than
+                             replacing one. A heading AND a toggle saying the same thing would be worse than
+                             either. --}}
+                        <div role="group" aria-label="{{ __('Qué estás mirando') }}" data-catalogue-source="{{ $catalogueSource }}"
+                             class="flex w-fit shrink-0 gap-1 self-start rounded-xl border border-line p-1 dark:border-slate-700">
+                            {{-- Block form, not `@php(…)`: Blade lifts raw PHP out with a non-greedy
+                                 `/(?<!@)@php(.*?)@endphp/s` BEFORE compiling directives, so a shorthand in a
+                                 file that uses the block form later pairs with THAT file's next `@endphp` and
+                                 swallows everything between (prompt 207 hit the same trap). --}}
+                            @php
+                                $sources = $barEnabled
+                                    ? ['genetics' => __('Dispensario'), 'bar' => __('Barra')]
+                                    : ['genetics' => __('Dispensario')];
+                            @endphp
+                            @foreach ($sources as $source => $label)
+                                <button
+                                    type="button"
+                                    wire:click="setCatalogueSource('{{ $source }}')"
+                                    data-source-option="{{ $source }}"
+                                    aria-pressed="{{ $catalogueSource === $source ? 'true' : 'false' }}"
+                                    @class([
+                                        'inline-flex min-h-11 items-center rounded-lg px-4 text-base font-semibold transition',
+                                        'bg-brand text-white' => $catalogueSource === $source,
+                                        'text-ink-muted hover:bg-surface-alt dark:text-slate-400 dark:hover:bg-slate-800' => $catalogueSource !== $source,
+                                    ])
+                                >{{ $label }}</button>
+                            @endforeach
+                        </div>
+                        {{-- List / grid. LIST is the default for genetics — see DispensaryPos::$geneticLayout.
+                             Applies to BOTH sources (prompt 212): it is a density preference about cards, not
+                             a fact about cannabis, and an operator who prefers a grid prefers it for both. --}}
                         <div role="group" aria-label="{{ __('Vista') }}" class="flex w-fit shrink-0 gap-1 self-start rounded-xl border border-line p-1 dark:border-slate-700">
                             @foreach ([['list', __('Lista'), '☰'], ['grid', __('Cuadrícula'), '▦']] as [$mode, $label, $glyph])
                                 <button
@@ -289,19 +329,36 @@
                             @endforeach
                         </div>
 
-                        <input
-                            type="text"
-                            wire:model.live.debounce.300ms="geneticSearch" aria-label="{{ __('Buscar genética…') }}"
-                            autocomplete="off"
-                            placeholder="{{ __('Buscar genética…') }}"
-                            class="h-11 w-full rounded-xl border border-line bg-surface px-4 text-sm text-ink placeholder:text-ink-muted focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/40 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 sm:w-56"
-                        >
+                        {{-- One search box per source, and they keep their own terms: switching source to check
+                             a price and switching back must not have cleared what you were looking for. NOT a
+                             member search (194) — this is a catalogue. --}}
+                        @if ($catalogueSource === 'bar')
+                            <input
+                                type="text"
+                                wire:model.live.debounce.300ms="articleSearch" aria-label="{{ __('Buscar artículo…') }}"
+                                data-article-search
+                                autocomplete="off"
+                                placeholder="{{ __('Buscar artículo…') }}"
+                                class="h-11 w-full rounded-xl border border-line bg-surface px-4 text-sm text-ink placeholder:text-ink-muted focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/40 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 sm:w-56"
+                            >
+                        @else
+                            <input
+                                type="text"
+                                wire:model.live.debounce.300ms="geneticSearch" aria-label="{{ __('Buscar genética…') }}"
+                                autocomplete="off"
+                                placeholder="{{ __('Buscar genética…') }}"
+                                class="h-11 w-full rounded-xl border border-line bg-surface px-4 text-sm text-ink placeholder:text-ink-muted focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/40 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 sm:w-56"
+                            >
+                        @endif
                     </div>
 
                     {{-- "Their usual" (prompt 133): the member's recent genetics, one tap each, only those
                          sellable at this sede right now. Combined with a weight preset, a regular's order is one
                          or two taps. Sourced once on identification. --}}
-                    @if (! empty($usualGenetics))
+                    {{-- Genetics only (prompt 212): it is built from this member's DISPENSATION history, so on
+                         the bar source it would either be empty or, worse, show genetics while you are
+                         browsing drinks. Hidden for that source rather than shown empty. --}}
+                    @if ($catalogueSource === 'genetics' && ! empty($usualGenetics))
                         <div class="mt-3" data-usual-genetics>
                             <p class="mb-1 text-xs font-medium text-ink-muted dark:text-slate-400">{{ __('Su habitual') }}</p>
                             <div class="flex flex-wrap gap-2">
@@ -326,7 +383,19 @@
                          at the top, always visible, and the axes are one tap away — labelled as before
                          (prompt 66: unlabelled, the three read as duplicates), and opened automatically when
                          a filter is already applied so an active filter is never hidden from the operator. --}}
-                    @php $activeFilters = collect([$categoryId, $productType, $strainType])->filter()->count(); @endphp
+                    {{-- Which of these apply to ARTICLES (prompt 212): Categoría does — an article carries one,
+                         and it is the same club-authored taxonomy. Tipo and Variedad do not: `ProductType` and
+                         strain are facts about cannabis and would render as an empty row on the bar source,
+                         which is the "shown empty" this branch was told to avoid. So the bar gets one filter
+                         row, its own, and the pane's furniture follows the source. --}}
+                    @php
+                        $paneCategories = $catalogueSource === 'bar' ? $articleCategories : $categories;
+                        $activeCategoryId = $catalogueSource === 'bar' ? $articleCategoryId : $categoryId;
+                        $categoryAction = $catalogueSource === 'bar' ? 'filterArticleCategory' : 'filterCategory';
+                        $activeFilters = $catalogueSource === 'bar'
+                            ? ($articleCategoryId !== null ? 1 : 0)
+                            : collect([$categoryId, $productType, $strainType])->filter()->count();
+                    @endphp
                     <div x-data="{ open: {{ $activeFilters > 0 ? 'true' : 'false' }} }" class="mt-3">
                         <button
                             type="button"
@@ -344,19 +413,19 @@
                         <div x-show="open" x-cloak>
                     {{-- Each filter row is LABELLED (prompt 66) — Categoría (club data), Tipo (product type)
                          and Variedad (strain) are different axes; unlabelled, they read as duplicates. --}}
-                    @if (! empty($categories))
+                    @if (! empty($paneCategories))
                         <div class="mt-3">
                             <p class="mb-1 text-xs font-medium text-ink-muted dark:text-slate-400">{{ __('Categoría') }}</p>
                             <div role="group" aria-label="{{ __('Categoría') }}" class="flex flex-wrap gap-2">
-                                <button type="button" wire:click="filterCategory(null)" @class(['inline-flex items-center rounded-full border min-h-11 px-4 text-sm', 'border-brand bg-brand text-white' => $categoryId === null, 'border-line text-ink-muted dark:border-slate-700 dark:text-slate-400' => $categoryId !== null])>{{ __('Todas') }}</button>
-                                @foreach ($categories as $category)
-                                    <button type="button" wire:click="filterCategory('{{ $category['id'] }}')" @class(['inline-flex items-center rounded-full border min-h-11 px-4 text-sm', 'border-brand bg-brand text-white' => $categoryId === $category['id'], 'border-line text-ink-muted dark:border-slate-700 dark:text-slate-400' => $categoryId !== $category['id']])>{{ $category['name'] }}</button>
+                                <button type="button" wire:click="{{ $categoryAction }}(null)" @class(['inline-flex items-center rounded-full border min-h-11 px-4 text-sm', 'border-brand bg-brand text-white' => $activeCategoryId === null, 'border-line text-ink-muted dark:border-slate-700 dark:text-slate-400' => $activeCategoryId !== null])>{{ __('Todas') }}</button>
+                                @foreach ($paneCategories as $category)
+                                    <button type="button" wire:click="{{ $categoryAction }}('{{ $category['id'] }}')" @class(['inline-flex items-center rounded-full border min-h-11 px-4 text-sm', 'border-brand bg-brand text-white' => $activeCategoryId === $category['id'], 'border-line text-ink-muted dark:border-slate-700 dark:text-slate-400' => $activeCategoryId !== $category['id']])>{{ $category['name'] }}</button>
                                 @endforeach
                             </div>
                         </div>
                     @endif
 
-                    @if (! empty($productTypes))
+                    @if ($catalogueSource === 'genetics' && ! empty($productTypes))
                         <div class="mt-2">
                             <p class="mb-1 text-xs font-medium text-ink-muted dark:text-slate-400">{{ __('Tipo') }}</p>
                             <div role="group" aria-label="{{ __('Tipo') }}" class="flex flex-wrap gap-2">
@@ -368,7 +437,7 @@
                         </div>
                     @endif
 
-                    @if (! empty($strainTypes))
+                    @if ($catalogueSource === 'genetics' && ! empty($strainTypes))
                         <div class="mt-2">
                             <p class="mb-1 text-xs font-medium text-ink-muted dark:text-slate-400">{{ __('Variedad') }}</p>
                             <div role="group" aria-label="{{ __('Variedad') }}" class="flex flex-wrap gap-2">
@@ -382,6 +451,50 @@
                         </div>
                     </div>
 
+                    {{-- THE BAR SOURCE — the same card shape, the same layout toggle, the same 44px floor.
+                         A tap adds a BAR line (`addBarItem`), never a dispensation: the toggle changes what
+                         you browse, not which basket you fill, and the cart keeps them in two labelled
+                         sections. Stock is a STATE (185), never a count. --}}
+                    @if ($catalogueSource === 'bar')
+                        <div @class([
+                            'mt-4',
+                            'flex flex-col gap-2' => $geneticLayout === 'list',
+                            'grid gap-3 sm:grid-cols-2' => $geneticLayout === 'grid',
+                        ])>
+                            @forelse ($barArticles as $article)
+                                <button
+                                    type="button"
+                                    wire:click="addBarItem('{{ $article['id'] }}')"
+                                    data-product
+                                    data-bar-article="{{ $article['id'] }}"
+                                    @class([
+                                        'flex min-h-11 rounded-xl border border-line p-3 text-left transition hover:border-brand hover:bg-brand-tint dark:border-slate-700 dark:hover:bg-slate-800',
+                                        'flex-col' => $geneticLayout === 'grid',
+                                        'flex-col gap-1 lg:flex-row lg:items-center lg:justify-between lg:gap-4' => $geneticLayout === 'list',
+                                    ])
+                                >
+                                    <span class="min-w-0">
+                                        <span class="block truncate font-semibold">{{ $article['name'] }}</span>
+                                        <span class="mt-0.5 flex flex-wrap items-center gap-1.5 text-xs text-ink-muted dark:text-slate-400">
+                                            @if ($article['category_name'])
+                                                <span>{{ $article['category_name'] }}</span>
+                                            @endif
+                                            @if ($article['low_stock'])
+                                                <span data-bar-stock-state class="rounded-full bg-warning/10 px-2 py-0.5 font-semibold text-warning">{{ __('Quedan pocas') }}</span>
+                                            @endif
+                                        </span>
+                                    </span>
+                                    <span class="shrink-0 font-semibold tabular-nums">{{ $article['price_label'] }}</span>
+                                </button>
+                            @empty
+                                <p class="rounded-xl border border-dashed border-line px-4 py-6 text-center text-sm text-ink-muted dark:border-slate-700 dark:text-slate-400">
+                                    {{ $articleSearch !== '' || $articleCategoryId !== null
+                                        ? __('Ningún artículo coincide con la búsqueda.')
+                                        : __('No hay artículos disponibles en esta sede.') }}
+                                </p>
+                            @endforelse
+                        </div>
+                    @else
                     <div @class([
                         'mt-4',
                         'flex flex-col gap-2' => $geneticLayout === 'list',
@@ -431,6 +544,7 @@
                             <p class="col-span-full rounded-xl border border-dashed border-line px-4 py-8 text-center text-sm text-ink-muted dark:border-slate-700 dark:text-slate-400">{{ __('No hay genéticas con precio activo en esta sede.') }}</p>
                         @endforelse
                     </div>
+                    @endif
                 </section>
             </div>
 
@@ -530,7 +644,7 @@
                         </section>
                     @endif
 
-                <section class="rounded-2xl border border-line bg-surface p-4 dark:border-slate-800 dark:bg-slate-900">
+                <section data-cart-dispensation-section class="rounded-2xl border border-line bg-surface p-4 dark:border-slate-800 dark:bg-slate-900">
                     <div class="flex items-center justify-between">
                         <h2 class="text-base font-semibold">{{ __('Cesta') }}</h2>
                         @if (! empty($basketLines))
@@ -574,7 +688,9 @@
                          into the margin by a payment form for a transaction that does not exist. This governs
                          what is SHOWN; once shown, blocked controls still stay clickable and explain (prompt 60). --}}
                     @if (! empty($basketLines))
-                    {{-- Total --}}
+                    {{-- Total. Labelled *aportación* deliberately — this half of the visit is a shared-cost
+                         contribution and never a sale, and the bar section below is labelled as the sale it
+                         is. Two sections, two ledgers, one settle (prompt 118, unchanged by 212). --}}
                     <div class="mt-3 flex items-center justify-between rounded-xl bg-surface-alt px-4 py-3 dark:bg-slate-800">
                         <span class="font-semibold">{{ __('Total aportación') }}</span>
                         <span class="text-lg font-bold tabular-nums">{{ $this->money($basketTotalCents) }}</span>
@@ -584,7 +700,7 @@
                          once — one payment, but a dispensation AND a bar order on their separate ledgers. Only
                          where the sede runs a bar. The shared tender below covers the combined total. --}}
                     @if ($barEnabled)
-                        <div class="mt-3 rounded-xl border border-line p-3 dark:border-slate-700">
+                        <div data-cart-bar-section class="mt-3 rounded-xl border border-line p-3 dark:border-slate-700">
                             <p class="text-xs font-semibold uppercase tracking-wide text-ink-muted dark:text-slate-400">{{ __('Barra y tienda (misma visita)') }}</p>
 
                             @if (! empty($barLines))
@@ -601,12 +717,15 @@
                                 </ul>
                             @endif
 
-                            @if (! empty($barArticles))
-                                <div class="mt-2 flex flex-wrap gap-1.5">
-                                    @foreach ($barArticles as $article)
-                                        <button type="button" wire:click="addBarItem('{{ $article['id'] }}')" class="rounded-full border border-line px-3 py-1 text-sm text-ink transition hover:bg-surface-alt dark:border-slate-700 dark:text-slate-100 dark:hover:bg-slate-800">+ {{ $article['name'] }}</button>
-                                    @endforeach
-                                </div>
+                            {{-- The chip list stood here and is GONE (prompt 212). It rendered EVERY active
+                                 in-stock article at the sede as a `+ Name` chip — uncapped, no search, no
+                                 category, no price, no stock — in the one column already carrying the member,
+                                 the basket, the tender and the commit. Five looked fine; forty is the same
+                                 code. Browsing lives in the centre pane now, where it can. --}}
+                            @if (empty($barLines))
+                                <p class="mt-2 text-xs text-ink-muted dark:text-slate-400">
+                                    {{ __('Cambia a Barra arriba para añadir artículos a esta visita.') }}
+                                </p>
                             @endif
 
                             @if (! empty($barLines))

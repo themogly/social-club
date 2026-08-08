@@ -10057,3 +10057,105 @@ the permission getting an explanation, no control and no instruction they cannot
 refused either way; every `EligibilityRule` case declaring what an operator can do; no remedy naming the panel
 where a counter fix exists; the retired string absent from both locales; all three screens showing the same
 wording; and no second member lookup on any of them.
+
+---
+
+## Prompt 212 — one catalogue, two sources: the bar was a chip list in a cart column
+
+The owner, on `/counter/pos`: *"to add bar products to the same transaction you only got a couple of choices
+on the side. Instead you should have full access — where it says Genetics, maybe have a toggle to bar
+products. Also instead of saying Genetics, change it."*
+
+**The premise is right and the reason is worse than "a couple of choices."** `barArticleRows()` was never
+capped — it returned **every** active in-stock article at the sede, and the cart rendered each as a `+ Name`
+chip. Five today because the seed has five; a club with forty gets forty chips stacked in the narrow column
+that already carries the member, the basket, the tender and the commit, with **no search, no categories, no
+prices and no stock**. So it was not that the bar side was too small: it had **no browsing model at all**, and
+it degraded as the club grew rather than as it shrank. Meanwhile the centre pane already had search, category
+/ product-type / strain filters, list and grid views, and stock and price on every card — used for one of the
+two things a visit can contain.
+
+**Measured on the before frame**, seeded at forty as the complaint deserves: 40 chips in the cart column, and
+every one of them **under the 44px touch floor** (`px-3 py-1`, ~28px). The list was not only unbrowsable, it
+was never tappable to this codebase's own standard.
+
+### The naming decision, which is not quite what was asked for
+
+The owner asked for the heading to read *"Dispensario"*. Two reasons it does something slightly different:
+
+- **"Genéticas" is wrong on the facts, so the rename is right.** `ProductType` is `FLOWER`, `CONCENTRATE`,
+  `PREROLL`, `EDIBLE` — prompt 66's own filters say so. The word under-described what was already in the pane.
+- **But "Dispensario" would name the panel after the screen it sits on** (the bar already reads *"·
+  Dispensario"*), and once the pane holds bar products it is not the dispensary; it is a catalogue with two
+  sources.
+
+**So the toggle is the heading**: `[ Dispensario | Barra ]`, with nothing above it. It names what you are
+browsing, it is the control you came to press, and it **removes a word rather than replacing one**. Shipping
+both a heading and a toggle that say the same thing would be worse than either.
+
+### The line this does not blur
+
+**The toggle changes what you are BROWSING. It never changes which basket you are filling.** A genetic tap
+still opens the weight entry and adds a dispensation line through `CommitDispensation`; an article tap still
+adds a bar line on its own ledger. `CommitDispensation`, the combined settle and `addBarItem` are unchanged —
+this branch is browsing and layout.
+
+The cart keeps **two labelled sections** (`data-cart-dispensation-section` / `data-cart-bar-section`), worded
+for what each becomes: *Total aportación* for the shared-cost half, *Barra y tienda* for the sale. Asserted
+both ways — the sections render, and a visit with one of each produces exactly one `Dispensation` and one
+`Order`.
+
+**Switching source disturbs nothing**: not the basket, not the member, not the tender, not a weight entry in
+progress — and each source keeps **its own search term**, so a glance at the other half loses neither. If an
+operator could lose work by looking at the other side of the catalogue, this would have made the screen worse.
+
+### The pane's own furniture, per source
+
+| control | genetics | bar | why |
+|---|---|---|---|
+| search | ✓ | ✓ | its own term each |
+| **Categoría** | ✓ | ✓ | an article carries one, from the same club-authored taxonomy |
+| **Tipo** (`ProductType`) | ✓ | — | a fact about cannabis; it would render as an empty row |
+| **Variedad** (strain) | ✓ | — | same |
+| list / grid | ✓ | ✓ | a density preference about cards, not a fact about cannabis |
+| **"Su habitual"** (133) | ✓ | — | built from DISPENSATION history: on the bar source it would be empty, or worse, show genetics while you browse drinks |
+
+Hidden for the source rather than shown empty, which is the distinction the prompt asked for.
+
+**185 holds on the article card**: the stock badge is a **state** (*Quedan pocas*), never a figure. Asserted
+against the card's own visible text with a stock value no other number on the card could be mistaken for.
+Inactive and out-of-stock articles are still excluded in the **query**, so one that cannot be sold is never
+offered rather than offered and refused.
+
+**A sede with no bar has no bar source at all** — not an empty one — and cannot reach it by asking:
+`setCatalogueSource('bar')` is refused when `bar_enabled` is off for that sede.
+
+**The standalone Bar screen stays.** It serves guests and members with no dispensation, and it keeps no MEMBER
+blocker for that reason; the dispensary's catalogue sits behind that blocker exactly as it always has.
+
+### The Blade trap, twice now
+
+`@php($x = …)` shorthand in a file that also uses the `@php … @endphp` block form pairs with that file's next
+`@endphp` and swallows everything between — here it ate the filter block and left `$activeFilters` undefined
+on every counter screen that renders the POS. Prompt 207 hit the same thing. The block form is used, with the
+reason in a comment beside it.
+
+### Verification
+
+`composer check` green — **1665 tests**, 1662 passed, 3 pre-existing skips, Larastan 0, Pint clean. **MySQL was
+left to CI**, per the running order; the suite ran on SQLite.
+
+Screenshots at 1180×820 and 820×1180, light and dark, **on each source, before and after**
+(`storage/app/screenshots/212/`), seeded with forty articles so the before frame shows the forty chips. The
+shoot script asserts what a picture cannot: the commit action **inside the fold** on both sources (176), no
+control under 44px, no horizontal page scroll, and **zero** chips left in the cart column after. `before`
+violations are reported as findings rather than failures — the before state IS the defect, and that is how
+the 28px chips were measured.
+
+**Tests** (`OneCatalogueTwoSourcesTest`, 12): every one of 41 articles reachable, with the last found by
+search (fails against `main`, where reaching an article means rendering a chip); the chip list gone; each
+source filling its own half of the visit, asserted against `dispensations` and `orders`; the cart's two
+labelled sections; switching source disturbing nothing in progress; each source keeping its own search;
+inactive and empty articles not offered; a sede with no bar having no bar source; the stock state without the
+figure; the pane's furniture following the source; the bar category filter filtering; and no second member
+lookup on either source.
