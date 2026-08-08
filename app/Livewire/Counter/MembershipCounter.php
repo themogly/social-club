@@ -30,6 +30,7 @@ use Livewire\Attributes\Layout;
 use Livewire\Attributes\Locked;
 use Livewire\Attributes\Url;
 use Livewire\Component;
+use Livewire\WithFileUploads;
 
 /**
  * Socios — the counter tab for membership (prompt 127). The deliberate-visit case: find a member, see their
@@ -53,7 +54,7 @@ use Livewire\Component;
 #[Layout('components.layouts.counter')]
 class MembershipCounter extends Component
 {
-    use CollectsMembershipFees, FindsMembers, IdentifiesOperator, OpensMemberships, ResolvesCounterLocation, SignsUpMembers;
+    use CollectsMembershipFees, FindsMembers, IdentifiesOperator, OpensMemberships, ResolvesCounterLocation, SignsUpMembers, WithFileUploads;
 
     /** How many past collections the counter will show. A counter answers a question; it is not an export. */
     private const HISTORY_LIMIT = 5;

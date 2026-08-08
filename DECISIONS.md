@@ -10327,3 +10327,101 @@ clean database, still to refuse a second run without `--force`, and to leave a f
 re-syncs); a grant the code no longer lists **revoked**; a per-user grant surviving; idempotency; `--check`
 reporting without writing and exiting non-zero, and clean when they agree; the health page seeing drift and
 then clean; the report distinguishing missing from stale; and `csc:install` unchanged.
+
+---
+
+## Prompt 215 — two hand-written copies of the application form, and the staff one was missing a third of it
+
+The owner, on the staff sign-up form prompt 210 built: *"this form is not the same as the handover form —
+missing image uploads and multiple fields. It should include all the same and the same functions, like ID
+scan prefill."*
+
+**Measured:** the applicant's public form posts **16** fields; `SignsUpMembers::BLANK_ALTA_FORM` had **10**.
+Missing were the member **photo**, the **`document_scan`**, prompt 179's whole **MRZ prefill**, and
+**`declared_monthly_g`**. The shoot script counts it: staff form **0/4 → 4/4**, 14 fields → 18.
+
+- **`declared_monthly_g` is the one nobody would notice.** It becomes `declared_monthly_cg`, which the club
+  uses for its cultivation forecast and which sits behind `StockCeiling::forLocation()`. A member signed up by
+  staff arrived with none, so **the number the club plans its legal grow against was quietly short by one
+  member every time.**
+- **The photo is the sharpest irony.** The counter nags about a missing one on three screens — *"Sin foto en
+  ficha. Verifica con el documento y hazla ahora."* — and the form staff use to create members could not
+  capture one.
+
+### Why one source rather than four added fields
+
+There were **two hand-written field lists** — `BLANK_ALTA_FORM`, and the `name="…"` inputs in
+`socio/application.blade.php` — with nothing making them agree. 210 got the **writer** right (both routes go
+through `SubmitApplication`), so the writer was simply handed less by one caller than the other, **silently**.
+Adding four fields fixes today; it does not stop the fifth.
+
+**`App\Support\ApplicationShape` is the declaration**: the facts and their rules, the two files and their
+rules, the four MRZ-fillable fields, and the consent difference **named**. `SubmitApplicationRequest::factRules()`
+returns it, and the staff form's state is `ApplicationShape::blankStaffForm()` — so a field added there reaches
+that route's state *and* its validation with no second edit.
+
+The half code cannot enforce — that both forms *render* it — is enforced by **`OneApplicationFormTest`**, which
+reads both templates and compares them field-for-field against the declaration. It found a real gap while
+being written: `is_therapeutic` had been in `BLANK_ALTA_FORM`'s state since 210 **with no control to set it**.
+
+### The third instance in a week
+
+Worth writing down once, because it is now a pattern rather than an incident: **a reusable piece built and
+wired to one of its consumers.**
+
+| built | consumers it had | closed by |
+|---|---|---|
+| `OpensMemberships` (203) | Socios only — while the door and the POS showed the dead end it was written for | 211 |
+| the MRZ partial + `readMrz()` (179) | the public form only | this branch |
+| the application's field list (210) | one list per route, agreeing by hand | this branch |
+
+Each shipped green: the unit worked, and nothing asserted that everything which *should* consume it does. The
+guards written for 211 (iterate the trait's consumers) and here (compare both templates to the declaration)
+are the shape that catches the fourth.
+
+### What was ported, and the two details not ported blindly
+
+- **Photo and document scan** — plain file inputs with `capture="user"` / `capture="environment"`. A device
+  with a camera opens it; one without ignores the attribute, so this is the same progressive enhancement 157
+  and 179 built, and **the form is fully usable with no camera at all** (asserted: it submits with no files).
+  Both go through `SubmitApplication` → `DocumentVault`, so they are encrypted before write, on the private
+  disk, under a non-guessable name, served only by signed access-logged URL — asserted against the disk and
+  the stored path. **177 is untouched: capturing is not displaying**, and nothing at the counter renders a
+  scan.
+- **MRZ prefill** — the same `readMrz()` and the same `MrzParser`, including the ICAO check-digit rule that
+  makes an imperfect reader safe (`valid !== true` fills nothing). What differs is only how the read arrives:
+  the public form POSTs the raw zone to a tokenised route because it *has* a token; the staff form has no
+  application until submit, so the browser hands the string to the component. The test uses the parser's own
+  known-good fixture — one reader, one parser, one fixture.
+- **`declared_monthly_g`** — the same guided presets from `forecast_options_g` (97), not a free number.
+- **210's consent decision stands, untouched.** The staff route still records `PAPER` in the operator's name
+  and does not present the applicant's two acceptances as if staff could give them. It is *named* in
+  `ApplicationShape::consentFields()` so the parity guard excludes it **explicitly**, and a test asserts the
+  consent fields are not in `facts()` — parity can never be satisfied by making staff tick them.
+
+**One normalisation was needed and is worth recording**: the public route reaches the writer through
+`ConvertEmptyStringsToNull`, and Livewire does not. An unanswered *"consumo mensual"* therefore arrived as
+`''` and reached `Weight::fromGrams('')`, which throws. The staff route normalises before calling the writer —
+because the point of one writer is that both callers hand it the same thing.
+
+### Verification
+
+`composer check` green — **1694 tests**, 1691 passed, 3 pre-existing skips, Larastan 0, Pint clean. **MySQL was
+left to CI**, per the running order; the suite ran on SQLite.
+
+Screenshots of both forms, before and after, at 1180×820 and 820×1180, light and dark
+(`storage/app/screenshots/215/`). The shoot script counts the four pieces rather than trusting the pictures:
+staff **0/4 → 4/4**. The staff form clears the 44px floor at both orientations. **A finding, reported not
+fixed:** the applicant's public form has **8** sub-44px controls (`locale` ×2, `document_type`, `photo`,
+`document_scan`, `declared_monthly_g` and two consent labels) — pre-existing, on a phone-first page outside
+this branch's scope, and stated rather than hidden by widening the check.
+
+**Tests** (`OneApplicationFormTest`, 9): both templates compared field-for-field to the declaration (fails
+against `main`); the validator derived from it; the consent difference named and excluded explicitly; a
+staff-created application carrying photo, scan and declared figure, asserted against the row **and the
+encrypted disk**; the form submitting with no files; both enhancements degrading to an upload; MRZ filling the
+declared four; a failed read leaving the form untouched and usable; and no scan rendered at the counter.
+
+**Retargeted:** 194's one-lookup guard flagged `altaDocumentScan` because its NAME matches the
+`(search|scan|lookup)` heuristic. Added as a **named exception** rather than by loosening the heuristic — that
+heuristic is the half of the guard that catches a screen growing its own member box.

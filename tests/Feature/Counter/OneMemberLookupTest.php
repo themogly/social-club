@@ -54,7 +54,15 @@ class OneMemberLookupTest extends TestCase
      *
      * @var list<string>
      */
-    private const NON_MEMBER_SEARCHES = ['geneticSearch', 'articleSearch'];
+    /**
+     * Bindings whose NAME trips the `(search|scan|lookup)` heuristic without being a member search.
+     *
+     * `geneticSearch` / `articleSearch` are catalogue searches (212). `altaDocumentScan` is prompt 215's ID
+     * DOCUMENT upload on the staff sign-up form — a file input, not a search box; it matches only because
+     * "scan" is in its name. Kept as a named exception rather than by loosening the heuristic, which is the
+     * half of this guard that catches a sixth screen growing its own box.
+     */
+    private const NON_MEMBER_SEARCHES = ['geneticSearch', 'articleSearch', 'altaDocumentScan'];
 
     private Organisation $org;
 

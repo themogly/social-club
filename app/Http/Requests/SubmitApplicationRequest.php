@@ -2,13 +2,12 @@
 
 namespace App\Http\Requests;
 
-use App\Enums\IdDocumentType;
+use App\Support\ApplicationShape;
 use App\Support\DocumentUpload;
 use App\Support\MemberEligibility;
 use App\Support\MrzPrefill;
 use Illuminate\Contracts\Validation\Validator;
 use Illuminate\Foundation\Http\FormRequest;
-use Illuminate\Validation\Rule;
 
 /**
  * Validates a prospect's application, submitted on their phone via a tokenised invite
@@ -37,36 +36,20 @@ class SubmitApplicationRequest extends FormRequest
      *
      * @return array<string, mixed>
      */
+    /**
+     * The rules for an application's FACTS, shared with the counter's staff-typed route (prompt 210) and
+     * **declared once** since prompt 215.
+     *
+     * `App\Support\ApplicationShape` is now the single source. There used to be two hand-written field
+     * lists — these rules and `BLANK_ALTA_FORM` in `SignsUpMembers` — with nothing making them agree, so 210's
+     * staff route reached the same writer with a third of the form missing. Both derive from the declaration
+     * now, and a test reads both templates and fails if either drifts from it.
+     *
+     * @return array<string, mixed>
+     */
     public static function factRules(): array
     {
-        return [
-            'first_name' => ['required', 'string', 'max:255'],
-            'last_name' => ['required', 'string', 'max:255'],
-            'email' => ['required', 'email', 'max:255'],
-            'phone' => ['nullable', 'string', 'max:50'],
-            'date_of_birth' => ['required', 'date', 'before:today'],
-            'address' => ['nullable', 'string', 'max:500'],
-            'document_type' => ['required', Rule::enum(IdDocumentType::class)],
-            'document_number' => ['required', 'string', 'max:64'],
-            // Optional identity photo (prompt 157) — NEVER required (an applicant who cannot upload must still
-            // be able to apply). It is checked against them at the counter; the form copy says so.
-            // The size ceiling is the SHARED one (prompt 164) — it used to be its own hardcoded 8 MB, a
-            // seventh number nobody could see next to the six on the staff forms.
-            'photo' => ['nullable', 'image', 'mimes:jpeg,jpg,png,webp', DocumentUpload::maxRule()],
-            // Optional identity DOCUMENT (prompt 178 — 155's part B, decided by the controller: capture at
-            // the counter plus an optional upload here). A DIFFERENT artefact from `photo` above: that is a
-            // FACE for the counter check, this is the compliance record of the document itself. Never merged,
-            // never required — an applicant who cannot or will not upload must still be able to apply, and a
-            // test asserts exactly that. PDF is allowed because a DNI is two-sided and people scan both to one
-            // file; the ceiling is the same shared one (prompt 164), not a new number.
-            'document_scan' => ['nullable', 'file', 'mimes:jpeg,jpg,png,webp,pdf', DocumentUpload::maxRule()],
-            'is_therapeutic' => ['sometimes', 'boolean'],
-            'declared_monthly_g' => ['nullable', 'numeric', 'min:0', 'max:1000'],
-            // Sponsor by NAME or number (prompt 97): a prospect knows the person, not their member number.
-            // Never required at the form — the avalador_policy is enforced (and waived) at approval, so an
-            // applicant who cannot supply one is not silently blocked here.
-            'avalador_ref' => ['nullable', 'string', 'max:255'],
-        ];
+        return array_merge(ApplicationShape::facts(), ApplicationShape::files());
     }
 
     /**
