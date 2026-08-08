@@ -47,6 +47,7 @@ use App\Support\Money;
 use App\Support\PriceResult;
 use App\Support\Settings;
 use App\Support\SettledOutcome;
+use App\Support\StockCover;
 use App\Support\VaultUrl;
 use App\Support\Wallet;
 use App\Support\Weight;
@@ -1578,6 +1579,14 @@ class DispensaryPos extends Component
             ->orderBy('name')
             ->get();
 
+        // Prompt 216 — trailing consumption and first-sale dates for the WHOLE grid in two grouped queries,
+        // not one pair per card. This pane re-renders on every basket change, every weight keystroke and
+        // every source switch, so a per-card query here would be prompt 79's landing-page N+1 again on the
+        // screen that renders most.
+        $geneticIds = $genetics->pluck('id')->all();
+        $trailingCg = StockCover::trailingCgFor($geneticIds, $location->id);
+        $firstDispensed = StockCover::firstDispensedAtFor($geneticIds, $location->id);
+
         $rows = [];
 
         foreach ($genetics as $genetic) {
@@ -1611,7 +1620,16 @@ class DispensaryPos extends Component
                 'price_label' => $price->label(),
                 'remaining_cg' => $remainingCg,
                 'remaining_units' => $remainingUnits,
-                'low_stock' => $genetic->isLowStockAt($remainingCg, $location->id),
+                // The one resolver, handed the bulk figures — never a second calculation on the screen.
+                'cover' => $cover = StockCover::verdict(
+                    $genetic, $location->id, $remainingCg,
+                    $trailingCg[$genetic->id] ?? 0,
+                    $firstDispensed[$genetic->id] ?? null,
+                ),
+                'low_stock' => $cover['low'],
+                // Staff screens may carry quantities; the member menu may not (185). "Runs out in about two
+                // days at the current rate" is information — the word "low" is not.
+                'cover_label' => StockCover::label($cover['days']),
                 'has_batch' => (new SelectBatch)->fefo($genetic, $location) !== null,
             ];
         }

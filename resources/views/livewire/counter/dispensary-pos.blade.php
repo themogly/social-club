@@ -528,8 +528,17 @@
                                 </div>
                                 <div class="mt-2 flex items-center justify-between text-xs">
                                     <span class="text-ink-muted dark:text-slate-400">{{ __('Stock') }}: {{ $g['is_unit'] ? $g['remaining_units'].' '.__('uds').' ('.$this->grams($g['remaining_cg']).')' : $this->grams($g['remaining_cg']) }}</span>
+                                    {{-- Prompt 216 — the badge is the FIGURE, not the word. "Runs out in about
+                                         two days at the current rate" is information; "low" is a judgement
+                                         the operator cannot check. Staff screens may carry quantities; the
+                                         member menu may not (185), and `availabilityAt()` gives them a state
+                                         word and nothing else.
+
+                                         `cover_label` is null when the verdict came from an explicit
+                                         threshold or from thin history — there is no rate to state, so it
+                                         falls back to the word rather than inventing a number. --}}
                                     @if ($g['has_batch'] && $g['low_stock'])
-                                        <span class="inline-flex items-center gap-1 text-warning"><span class="h-2 w-2 rounded-full bg-warning"></span>{{ __('Stock bajo') }}</span>
+                                        <span data-stock-cover="{{ $g['cover']['basis'] }}" class="inline-flex items-center gap-1 text-warning"><span class="h-2 w-2 rounded-full bg-warning"></span>{{ $g['cover_label'] ?? __('Stock bajo') }}</span>
                                     @elseif ($g['has_batch'])
                                         <span class="inline-flex items-center gap-1 text-success"><span class="h-2 w-2 rounded-full bg-success"></span>{{ __('Con lote') }}</span>
                                     @else

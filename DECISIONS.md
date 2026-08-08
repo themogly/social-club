@@ -10425,3 +10425,95 @@ declared four; a failed read leaving the form untouched and usable; and no scan 
 **Retargeted:** 194's one-lookup guard flagged `altaDocumentScan` because its NAME matches the
 `(search|scan|lookup)` heuristic. Added as a **named exception** rather than by loosening the heuristic — that
 heuristic is the half of the guard that catches a screen growing its own member box.
+
+---
+
+## Prompt 216 — "low stock" measured against demand: days of cover, not a flat figure
+
+**Resolves 213's `OVERNIGHT-DEFAULT — CONFIRM`.** The owner asked for a recommendation and confirmed it: the
+frame is **cover, not quantity**. The marker in `Genetic::derivedLowStockThresholdCg()` is now marked
+resolved, and that method survives with one job — the thin-history fallback.
+
+### Two wrong defaults, facing opposite ways
+
+Prompt 54 shipped a flat **50 g**. On a club under a legal stock ceiling every genetic sat below it, so the
+badge was on permanently — furniture, and 213 was right to kill it.
+
+Prompt 213's replacement was one member's daily allowance: **3.5 g**. On the same seeded holdings (12.95 g –
+32.66 g) **nothing badges at all**, and a genetic only badges once it can no longer fill a single full order —
+at which point it is not low, **it is gone**. Measured on the before/after frames: `main` badges **0 of 2**
+genetics that hold identical stock and sell at 30× different rates.
+
+**Always-on and fires-too-late are the same failure wearing different clothes.**
+
+### The base was the problem, not the multiple
+
+An allowance measures what members **may** take; consumption measures what they **do**. Any flat threshold
+overstates urgency for a slow mover and understates it for the popular genetic — which is precisely the one
+that runs out. And the owner's own question answers itself: *low relative to the ceiling* is a club operating
+lawfully, so it is permanent and says nothing. **Low relative to demand is the only thing worth painting.**
+
+**Days of cover** = on-hand ÷ (trailing dispensing ÷ window), per genetic, per sede. Trailing is real
+`DispensationLine.grams_cg` over **COMPLETED** dispensations at this sede — voided excluded, the way 177
+excludes them from a member's history, because a voided dispensation did not happen. Unit genetics ride the
+same column: `CommitDispensation` writes the gram equivalent there, which is what lets one figure serve both
+kinds, exactly as `onHandCgAt()` documents on the stock side.
+
+- **Window: 14 days** (`stock_cover_window_days`) — long enough to smooth a quiet Tuesday, short enough to
+  notice a trend.
+- **Warn below: 2 days** (`stock_cover_low_days`) — **two rather than one, because a warning that arrives the
+  day you run out is a notification.**
+
+Both per-sede settings, like every other counter threshold. **Deliberately no knob per genetic**: the per-sede
+`low_stock_threshold_cg` on `GeneticPrice` already exists for a genetic a club wants to state a figure for.
+
+### One resolver, two renderings
+
+`App\Support\StockCover` is the single source; `Genetic::isLowStockAt()` and `availabilityAt()` both read it,
+and no screen computes its own.
+
+- **Staff POS — the badge is the FIGURE.** *"≈1 días"* rather than *"Stock bajo"*: "runs out in about a day at
+  the current rate" is information the operator can check; "low" is a judgement they cannot. Staff screens may
+  carry quantities.
+- **Member menu — a state word, and nothing else.** The LOW band's **meaning** improved; its **shape** did
+  not. 185's rule is the sharpest constraint on this branch precisely because the temptation to pass the
+  useful new number through is the mistake — asserted against the raw body for the cover label, the trailing
+  sum, and any `≈` anywhere on the page.
+
+### The fallbacks, each decided rather than discovered
+
+| case | behaviour | why |
+|---|---|---|
+| **Explicit override** — non-zero per-sede `GeneticPrice`, then the org setting | wins, as an absolute floor | a club that has stated a figure has stated it; 54's and 213's precedence, unchanged |
+| **Thin history** — never dispensed here, or first dispensed *inside* the window | falls back to 213's allowance figure | there is no rate to divide by, and a new genetic must not read as infinitely covered |
+| **Zero trailing with stock on hand** | **no badge** | nothing is running out; it is **not moving**. That may be its own problem, but it is not this badge's — and painting it would put the badge back on permanently for every slow mover, which is the failure this branch exists to end |
+| **Zero rate** | guarded **before** the division | `∞ días` is not a thing to render, and a division by zero is not a thing to catch |
+
+### The query budget
+
+The dispensary re-renders on every basket change, every weight keystroke and every source switch, so trailing
+consumption for the **whole grid is two grouped queries** — the trailing sum, and the first-sold-here date the
+thin-history rule needs — never one pair per card.
+
+**Asserted honestly, and the scope is the honest part.** The grid was *already* per-genetic before this
+branch: `ResolvePrice`, `SelectBatch::fefo()` and the remaining-stock read all run per card, and that predates
+216 by a long way. Asserting "the whole grid is flat" would fail on `main` too and would be this branch
+claiming a fix it did not make. So the test counts the **cover** queries by their own signatures at 4 genetics
+and again at 24: **4 both times** (two per build, and the screen builds its rows twice — once for the grid,
+once for *"Su habitual"*, which also predates this). The pre-existing per-card cost is recorded here rather
+than quietly absorbed.
+
+### Verification
+
+`composer check` green — **1706 tests**, 1703 passed, 3 pre-existing skips, Larastan 0, Pint clean. **MySQL was
+left to CI**, per the running order; the suite ran on SQLite. Prompt 185's own tests pass untouched.
+
+Screenshots before and after at 1180×820 and 820×1180, light and dark (`storage/app/screenshots/216/`): two
+genetics, **identical 20 g on hand**, selling at 15 g/day and 0.5 g/day. The shoot script counts rather than
+trusting: `main` **0/2 badged**; after, **1/2**, carrying **≈1 días** while the slow mover reads *Con lote*.
+
+**Tests** (`LowStockIsDaysOfCoverTest`, 11): identical stock with different demand diverging (fails against
+`main`, where a flat threshold makes them behave identically — the finding); the figure equal to the
+resolver's own arithmetic; voided dispensations not setting the rate; each fallback above; both thresholds
+being settings; the member menu carrying the state and none of the figures; and the cover queries not scaling
+with the catalogue.

@@ -61,6 +61,8 @@ class ManageSettings extends Page
         'temporary_reminder_lead_days' => SettingType::INT,
         'temporary_count_toward_cap' => SettingType::BOOL,
         'batch_expiry_window_days' => SettingType::INT,
+        'stock_cover_window_days' => SettingType::INT,
+        'stock_cover_low_days' => SettingType::INT,
         'discounts_stack' => SettingType::BOOL,
         'data_retention_days' => SettingType::INT,
         'audit_retention_days' => SettingType::INT,
@@ -220,6 +222,10 @@ class ManageSettings extends Page
                 Section::make(__('Existencias'))
                     ->schema([
                         TextInput::make('batch_expiry_window_days')->label(__('Ventana de caducidad de lote (días)'))->numeric()->required(),
+                        TextInput::make('stock_cover_window_days')->label(__('Ventana de consumo (días)'))->numeric()->minValue(1)->required()
+                            ->helperText(__('Sobre cuántos días de dispensaciones reales se calcula el ritmo de cada genética.')),
+                        TextInput::make('stock_cover_low_days')->label(__('Avisar por debajo de (días de stock)'))->numeric()->minValue(1)->required()
+                            ->helperText(__('«Stock bajo» se mide contra la demanda: cuántos días duraría al ritmo actual. Un aviso que llega el día que te quedas sin existencias no es un aviso.')),
                         Toggle::make('discounts_stack')->label(__('Los descuentos se acumulan')),
                     ])->columns(2),
 
