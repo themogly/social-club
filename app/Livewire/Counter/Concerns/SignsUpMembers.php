@@ -54,8 +54,33 @@ trait SignsUpMembers
     /** Set when approval hit a duplicate — the matches to show, and the decision to take. */
     public bool $altaDuplicateBlocked = false;
 
-    /** Whether the Alta panel is expanded in the Socios tab. */
+    /**
+     * Whether the sign-up SURFACE is open (prompt 221 — it is a modal now, not an inline panel).
+     *
+     * The name and the meaning are unchanged on purpose: *the sign-up is open*. 210's and 215's tests drive
+     * `toggleAlta()` → `toggleStaffAltaForm()` and go on working, because what those two do has not changed
+     * either — the first opens the sign-up, the second enters the staff-typed route. Only where they draw
+     * moved. This branch is presentation and flow; nothing it touches changes what anything DOES.
+     */
     public bool $altaOpen = false;
+
+    /**
+     * Which step of the staff wizard is on screen (prompt 221): 1 Identidad · 2 Contacto · 3 Membresía ·
+     * 4 Firma.
+     *
+     * The fields live on the component, not in the step, so stepping backwards and forwards keeps whatever
+     * has been typed — a wizard that loses a half-typed application on Back is worse than the long form it
+     * replaced.
+     */
+    public int $altaStep = 1;
+
+    /**
+     * The invitation was sent — the chooser's green confirmation row (prompt 221).
+     *
+     * A flash message alone said it in the wrong place: the operator's eyes are in the modal, and the flash
+     * renders on the screen behind it.
+     */
+    public bool $altaInviteSent = false;
 
     /**
      * The staff-typed form (prompt 210) — open, its fields, and how consent was captured.
@@ -101,15 +126,174 @@ trait SignsUpMembers
      */
     public array $altaMrzFilled = [];
 
+    /**
+     * WHERE each field of the shared application shape is asked (prompt 221).
+     *
+     * Declared once, here, because two things read it — the wizard's markup and `altaNext()`'s validation —
+     * and a third thing GUARDS it: `SignupWizardTest` asserts this covers `ApplicationShape` exactly, so a
+     * field added to the shared declaration cannot reach the public form and quietly miss the wizard. That is
+     * the 215 defect in a new costume, and it is the only reason this is a constant rather than markup.
+     *
+     * The two uploads and prompt 179's reader sit on **Identidad** deliberately: the MRZ scan reads the
+     * document file the operator has just chosen (`mountStaffMrzScan` binds the trigger to `[data-alta-scan]`,
+     * so they must render together), and it PREFILLS four identity fields — putting it anywhere else would
+     * mean scanning on one step to fill another. The face photo joins them because a photo compared with the
+     * person at the counter is identity too, not contact detail.
+     *
+     * @var array<int, list<string>>
+     */
+    public const WIZARD_STEPS = [
+        1 => ['first_name', 'last_name', 'date_of_birth', 'document_type', 'document_number', 'photo', 'document_scan'],
+        2 => ['email', 'phone', 'address', 'avalador_ref'],
+        3 => ['is_therapeutic', 'declared_monthly_g'],
+        4 => [ApplicationShape::SIGNATURE_FIELD],
+    ];
+
+    /**
+     * The stepper's labels, keyed by step.
+     *
+     * Here rather than in the markup so the labels and {@see self::WIZARD_STEPS} cannot end up describing
+     * different wizards — and because a trait CONSTANT is not addressable through the trait's own name in
+     * PHP, so a template reaching for one gets a fatal rather than a number.
+     *
+     * @return array<int, string>
+     */
+    public function altaStepLabels(): array
+    {
+        return [
+            1 => __('Identidad'),
+            2 => __('Contacto'),
+            3 => __('Membresía'),
+            4 => __('Firma'),
+        ];
+    }
+
+    /** The last step — derived from the map, so adding a step is one edit. */
+    public function lastAltaStep(): int
+    {
+        return (int) array_key_last(self::WIZARD_STEPS);
+    }
+
     public function toggleAlta(): void
     {
-        $this->altaOpen = ! $this->altaOpen;
+        $this->altaOpen ? $this->closeAlta() : $this->altaOpen = true;
+    }
+
+    /**
+     * Close the sign-up and leave nothing half-held.
+     *
+     * The CONFIRM is not here — it is rendered onto the closing controls only when there is something to
+     * lose ({@see self::altaHasEnteredData()}). 206's lesson: a guard that fires when nothing would be lost
+     * teaches the operator to dismiss guards.
+     */
+    public function closeAlta(): void
+    {
+        $this->altaOpen = false;
+        $this->altaStaffFormOpen = false;
+        $this->altaInviteSent = false;
+        $this->resetAltaForm();
+        $this->altaConsentHeld = false;
+        $this->reset(['altaApplicationId', 'altaTierId', 'altaDuplicateBlocked']);
+        $this->resetValidation();
+    }
+
+    /**
+     * Has the operator typed anything that closing would throw away?
+     *
+     * Server-side, because it is the server that knows what the form holds. Deliberately narrow: a chosen
+     * method with an untouched form is not "data entered", and neither is an email left in the invite box
+     * after it was sent.
+     */
+    public function altaHasEnteredData(): bool
+    {
+        $typed = collect($this->altaForm)->contains(fn (mixed $v): bool => is_bool($v) ? $v : filled($v));
+
+        return $typed
+            || $this->altaPhoto !== null
+            || $this->altaDocumentScan !== null
+            || $this->altaSignaturePath !== null
+            || (! $this->altaInviteSent && trim($this->altaInviteEmail) !== '');
+    }
+
+    /**
+     * The fields asked on a step, whatever the shared declaration currently holds.
+     *
+     * @return list<string>
+     */
+    public function altaStepFields(int $step): array
+    {
+        return self::WIZARD_STEPS[$step] ?? [];
+    }
+
+    /**
+     * Forward a step — validating ONLY what this step asked, with the rules the route already has.
+     *
+     * No second validator: `staffAltaRules()` is the whole rule set (which is `SubmitApplicationRequest`'s,
+     * namespaced), and this takes the slice belonging to the current step. So a step cannot enforce something
+     * the submit does not, or miss something it does.
+     */
+    public function altaNext(): void
+    {
+        $rules = array_intersect_key($this->staffAltaRules(), array_flip($this->altaStepRuleKeys($this->altaStep)));
+
+        if ($rules !== []) {
+            $this->validate($rules, [], $this->staffAltaAttributes());
+        }
+
+        $this->altaStep = min($this->altaStep + 1, $this->lastAltaStep());
+    }
+
+    /**
+     * Jump to a step already reached — BACKWARDS only.
+     *
+     * The stepper is a map of where you are, and tapping a circle you have filled in is the ordinary way back.
+     * Forwards stays behind `altaNext()`, because that is where the step's own rules run: a stepper that let
+     * you tap straight to Firma would be a way around validation, not a shortcut.
+     */
+    public function goToAltaStep(int $step): void
+    {
+        if ($step < 1 || $step >= $this->altaStep) {
+            return;
+        }
+
+        $this->resetValidation();
+        $this->altaStep = $step;
+    }
+
+    /** Back a step — and from the first step, back to the method chooser. */
+    public function altaBack(): void
+    {
+        $this->resetValidation();
+
+        if ($this->altaStep <= 1) {
+            $this->altaStaffFormOpen = false;
+
+            return;
+        }
+
+        $this->altaStep--;
+    }
+
+    /**
+     * The rule keys belonging to a step — the wizard's field names mapped onto how the rules are namespaced.
+     *
+     * @return list<string>
+     */
+    private function altaStepRuleKeys(int $step): array
+    {
+        return array_map(fn (string $field): string => match ($field) {
+            'photo' => 'altaPhoto',
+            'document_scan' => 'altaDocumentScan',
+            ApplicationShape::SIGNATURE_FIELD => 'altaSignaturePath',
+            default => 'altaForm.'.$field,
+        }, $this->altaStepFields($step));
     }
 
     /** Open (or close) the staff-typed form — one of three ways to do the one job, not a separate job. */
     public function toggleStaffAltaForm(): void
     {
         $this->altaStaffFormOpen = ! $this->altaStaffFormOpen;
+        $this->altaStep = 1;
 
         if ($this->altaStaffFormOpen && $this->altaForm === []) {
             $this->resetAltaForm();
@@ -170,6 +354,7 @@ trait SignsUpMembers
         $this->altaDocumentScan = null;
         $this->altaMrzFilled = [];
         $this->altaSignaturePath = null;
+        $this->altaStep = 1;
     }
 
     /**
@@ -337,7 +522,7 @@ trait SignsUpMembers
         $this->resetAltaForm();
         $this->altaConsentHeld = false;
         $this->altaStaffFormOpen = false;
-        $this->flash(__('Solicitud creada. Revísala abajo para dar de alta.'), 'success');
+        $this->flash(__('Solicitud creada. Revísala para dar de alta.'), 'success');
     }
 
     /**
@@ -415,7 +600,7 @@ trait SignsUpMembers
         }
 
         $this->altaInviteEmail = '';
-        $this->flash(__('Invitación enviada. Aparecerá en la lista de solicitudes pendientes.'), 'success');
+        $this->altaInviteSent = true;
     }
 
     /**

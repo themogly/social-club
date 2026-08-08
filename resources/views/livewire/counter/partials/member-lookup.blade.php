@@ -25,6 +25,11 @@
 
     $autofocus — the screen whose entire purpose is identifying somebody focuses this; a cart column does not
     steal focus from the basket.
+
+    $large (prompt 221) — the screen where finding somebody IS the page, rather than one control in a cart
+    column: a taller field with a search glyph, and the label read by screen readers but not repeated on
+    screen, because the page's own H1 and subtitle already say it. Presentation only; every other host is
+    byte-identical to before.
 --}}
 @php($results = $this->lookupResults())
 
@@ -71,9 +76,16 @@
     }"
 >
     <form wire:submit="submitLookup">
-        <label for="member-lookup" class="block text-sm font-medium text-ink-muted dark:text-slate-400">
+        <label for="member-lookup" @class([
+            'block text-sm font-medium text-ink-muted dark:text-slate-400',
+            'sr-only' => $large ?? false,
+        ])>
             {{ $this->lookupLabel() }}
         </label>
+        <div class="relative">
+            @if ($large ?? false)
+                <span aria-hidden="true" class="pointer-events-none absolute inset-y-0 left-4 flex items-center text-lg text-ink-muted dark:text-slate-400">🔍</span>
+            @endif
         <input
             id="member-lookup"
             data-member-lookup
@@ -93,8 +105,13 @@
             @keydown.escape.prevent="reset(); $wire.clearLookup()"
             @input="reset()"
             placeholder="{{ $this->lookupPlaceholder() }}"
-            class="mt-2 h-12 w-full rounded-xl border border-line bg-surface px-4 text-base text-ink placeholder:text-ink-muted focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/40 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
+            @class([
+                'w-full rounded-xl border border-line bg-surface text-ink placeholder:text-ink-muted focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/40 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100',
+                'mt-2 h-12 px-4 text-base' => ! ($large ?? false),
+                'h-14 pl-12 pr-4 text-lg' => $large ?? false,
+            ])
         >
+        </div>
     </form>
 
     {{-- Camera scan is the one part that IS feature-detectable, and the component already does it: it hides

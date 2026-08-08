@@ -52,7 +52,8 @@ for (const { key, file } of PAGES) {
       const find = (text) => Array.from(document.querySelectorAll('h2')).find((h) => h.textContent.trim() === text);
       const top = (el) => (el ? Math.round(el.getBoundingClientRect().top + window.scrollY) : null);
       const jobs = {
-        signup: top(document.querySelector('[data-alta-panel]')),
+        // Prompt 221: the sign-up left the page for a modal, so its position on the page is its entrance's.
+        signup: top(document.querySelector('[data-alta-panel]') ?? document.querySelector('[data-alta-toggle]')),
         fee: top(find('Cobro de cuota')),
         record: top(document.querySelector('[data-member-column] [data-member-identity]')
           ?? document.querySelector('[data-member-identity]')),

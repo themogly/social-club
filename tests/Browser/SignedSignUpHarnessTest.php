@@ -13,6 +13,7 @@ use App\Support\ActiveScope;
 use App\Support\CounterOperator;
 use Database\Seeders\RolePermissionSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Livewire\Features\SupportTesting\Testable;
 use Livewire\Livewire;
 use Tests\Browser\Concerns\InlinesBuiltCss;
 use Tests\TestCase;
@@ -30,6 +31,23 @@ use Tests\TestCase;
 class SignedSignUpHarnessTest extends TestCase
 {
     use InlinesBuiltCss, RefreshDatabase;
+
+    /** The staff wizard, walked to its signature step (prompt 221). */
+    private function atTheSignatureStep(): Testable
+    {
+        return Livewire::test(MembershipCounter::class)
+            ->call('toggleAlta')
+            ->call('toggleStaffAltaForm')
+            ->set('altaForm.first_name', 'Lucía')
+            ->set('altaForm.last_name', 'García')
+            ->set('altaForm.email', 'lucia@example.es')
+            ->set('altaForm.date_of_birth', now()->subYears(30)->format('Y-m-d'))
+            ->set('altaForm.document_type', 'DNI')
+            ->set('altaForm.document_number', '12345678Z')
+            ->call('altaNext')
+            ->call('altaNext')
+            ->call('altaNext');
+    }
 
     public function test_it_writes_the_signed_forms(): void
     {
@@ -55,10 +73,10 @@ class SignedSignUpHarnessTest extends TestCase
 
         // The staff-typed form, open, inside the counter's chrome (prompt 215's composition).
         $page = (string) $this->get(route('counter.members'))->assertOk()->getContent();
-        $held = Livewire::test(MembershipCounter::class)
-            ->call('toggleAlta')
-            ->call('toggleStaffAltaForm')
-            ->html();
+        // Prompt 221 made the staff route a four-step wizard, and the pad is step 4 — so the harness walks
+        // to it rather than expecting it on the first screen. Retargeted deliberately: what 220 shoots is the
+        // signature step, and the signature step is still exactly where 220 put it, one wizard later.
+        $held = $this->atTheSignatureStep()->html();
 
         $open = (int) strpos($page, '<main');
         $close = (int) strrpos($page, '</main>');
@@ -67,9 +85,7 @@ class SignedSignUpHarnessTest extends TestCase
 
         // And the CAPTURED state, server-rendered — the pad's stored branch, which is the only way to shoot the
         // confirmation panel without a browser running Livewire's Alpine.
-        $captured = Livewire::test(MembershipCounter::class)
-            ->call('toggleAlta')
-            ->call('toggleStaffAltaForm')
+        $captured = $this->atTheSignatureStep()
             ->call('saveAltaSignature', 'data:image/png;base64,'.base64_encode('drawn'))
             ->html();
         $capturedPage = substr($page, 0, (int) strpos($page, '>', $open) + 1).$captured.substr($page, $close);
