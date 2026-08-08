@@ -78,7 +78,11 @@ class SociosLayoutHarnessTest extends TestCase
 
         file_put_contents(storage_path('app/socios-210.html'), $this->inlineBuiltCss($page));
 
-        $this->assertStringContainsString('data-alta-panel', $page);
+        // Prompt 221 moved the sign-up off the page and onto a modal, so what this harness measures as
+        // "the sign-up job" is now its ENTRANCE. Retargeted rather than deleted: the measurement — where each
+        // of the three jobs starts, and whether the record is above the fold — is exactly as meaningful
+        // afterwards, and 210's before/after only reads if the after keeps being taken.
+        $this->assertStringContainsString('data-alta-toggle', $page);
         $this->assertStringContainsString('Cobro de cuota', $page);
         $this->assertStringContainsString('Ana Ruiz', $page, 'the harness has no member on screen');
 

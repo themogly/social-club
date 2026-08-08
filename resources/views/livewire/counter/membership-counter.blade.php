@@ -57,20 +57,41 @@
             $worklist = $this->worklist();
         @endphp
 
-        {{-- ============ THE SCREEN'S THREE JOBS, IN THE SPACE IT HAS (prompt 210) ============
+        {{-- ============ THE SCREEN'S THREE JOBS, AND THE ONE THAT OWNS IT (prompts 210 → 221) ============
 
-             This screen carries three: signing somebody up, collecting a fee, and reading a member's record.
-             All three were stacked in one `max-w-xl` column, so at 1180×820 the record — the job an operator
-             spends the most time reading — began below the fold with the width unused on both sides. That is
-             the same finding the design audit made about the Caja.
+             210 gave this screen two columns because it carried three jobs — signing somebody up, collecting
+             a fee, reading a record — stacked in one `max-w-xl` column with the record below the fold. That
+             was the right fix for the screen as it was.
 
-             Two columns from `lg`, which is where a labelled counter row fits at all (206 measured that same
-             threshold on the top bar): sign-up on the left, because it is a task you finish and leave; the
-             member's record on the right, because it is the thing you read while you work. Below `lg` they
-             stack in exactly the previous order, so the portrait tablet — how the device is held when it IS
-             handed over — is unchanged. --}}
-        <div class="lg:grid lg:grid-cols-[minmax(0,26rem)_minmax(0,1fr)] lg:items-start lg:gap-6">
-        <div data-alta-column class="min-w-0">
+             221 removes the reason for it. The owner: the sign-up *"is too small and still has the collect on
+             the side… make it more user friendly."* Both halves are the same move — the sign-up becomes a
+             modal (`alta-modal`) and fee collection gets the screen back as one centred column. Nothing about
+             either job changed; only which surface each one owns. --}}
+        <div class="mx-auto w-full max-w-[760px]">
+
+        {{-- The screen's own heading and its one entrance. This button is the ONLY way into a sign-up now, so
+             it is the page's single primary action — gated exactly as the panel it replaces was.
+
+             An `<h2>`, not the `<h1>` the design draws: 130's rule is that the shared counter header renders
+             the one `<h1>` (the screen's name in the top bar), so everything below starts at h2. The design's
+             hierarchy is reproduced by SIZE, which is what it was expressing; the document outline is not the
+             place to express it twice. --}}
+        <div class="flex flex-wrap items-start justify-between gap-3">
+            <div class="min-w-0">
+                <h2 id="fee-collection-heading" class="text-2xl font-bold">{{ __('Cobro de cuota') }}</h2>
+                <p class="mt-1 text-sm text-ink-muted dark:text-slate-400">{{ __('Escanea una tarjeta o busca a un socio/a por nombre o número.') }}</p>
+            </div>
+            @if ($this->userCan('applications.review'))
+                {{-- `data-alta-toggle=""`, not the bare attribute: a component attribute BAG renders a bare name as
+                     `name="name"`, which reads as two occurrences to anything counting the hook. --}}
+                <x-button wire:click="toggleAlta" data-alta-toggle="" size="md" class="shrink-0 shadow-lg shadow-brand/30">
+                    <span aria-hidden="true" class="mr-2 text-lg leading-none">+</span>{{ __('Nuevo socio/a') }}
+                </x-button>
+            @endif
+        </div>
+
+
+        <div data-member-column class="mt-5 min-w-0">
         @if ($worklist !== null)
             <div class="mb-4">
                 <section data-alert-worklist="{{ $alert }}" class="rounded-2xl border border-brand/30 bg-brand-tint p-4 dark:border-slate-700 dark:bg-slate-800">
@@ -98,153 +119,8 @@
                 </section>
             </div>
         @endif
-
-        {{-- ============ Prompt 174 — Alta at the counter ============
-
-             Inside the Socios tab, NOT a sixth destination on the counter strip: that strip took prompts
-             116, 130 and 132 to fit five on a portrait tablet, and "add a new one" is the same job Socios
-             already does. It creates an APPLICATION, never a member — the age gate, the duplicate search
-             and the versioned consent capture all live in ApproveApplication and stay there. --}}
-        @if ($this->userCan('applications.review'))
-            <div class="mb-4">
-                <section data-alta-panel class="rounded-2xl border border-line bg-surface p-4 dark:border-slate-800 dark:bg-slate-900">
-                    <div class="flex items-center justify-between gap-3">
-                        <h2 class="text-base font-semibold">{{ __('Alta de socio/a') }}</h2>
-                        <button
-                            type="button"
-                            wire:click="toggleAlta"
-                            data-alta-toggle
-                            aria-expanded="{{ $altaOpen ? 'true' : 'false' }}"
-                            class="inline-flex h-11 items-center rounded-xl border border-line px-4 text-sm font-medium text-ink-muted transition hover:bg-surface-alt dark:border-slate-700 dark:text-slate-400 dark:hover:bg-slate-800"
-                        >{{ $altaOpen ? __('Cerrar') : __('Dar de alta') }}</button>
-                    </div>
-
-                    @if ($altaOpen)
-                        @php $pending = $this->pendingAltaApplications(); @endphp
-
-                        {{-- Reviewing one that has come back --}}
-                        @if ($this->altaApplication())
-                            @php $application = $this->altaApplication(); $payload = $application->payload ?? []; @endphp
-                            <div data-alta-review class="mt-4 space-y-3">
-                                <div class="rounded-xl bg-surface-alt p-3 text-sm dark:bg-slate-800">
-                                    <p class="font-semibold">{{ trim(($payload['first_name'] ?? '').' '.($payload['last_name'] ?? '')) ?: __('Solicitud sin nombre') }}</p>
-                                    <p class="text-ink-muted dark:text-slate-400">{{ $payload['email'] ?? '—' }}</p>
-                                    <p class="mt-1 text-xs text-ink-muted dark:text-slate-400">
-                                        {{ __('Documento') }}: {{ $payload['document_type'] ?? '—' }} ·
-                                        {{ __('Nacimiento') }}: {{ $payload['date_of_birth'] ?? '—' }}
-                                    </p>
-                                </div>
-
-                                <div>
-                                    <label for="alta-tier" class="block text-xs font-medium text-ink-muted dark:text-slate-400">{{ __('Cuota / tier') }}</label>
-                                    <select id="alta-tier" wire:model="altaTierId" class="mt-1 h-12 w-full rounded-xl border border-line bg-surface px-4 text-base dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100">
-                                        <option value="">{{ __('Elige una cuota…') }}</option>
-                                        @foreach ($this->altaTiers() as $tier)
-                                            <option value="{{ $tier->id }}">{{ $tier->name }}</option>
-                                        @endforeach
-                                    </select>
-                                </div>
-
-                                {{-- A duplicate is a DECISION, never a default. The matches are named so the
-                                     staff member can tell "this is the same person" from "same surname". --}}
-                                @if ($altaDuplicateBlocked)
-                                    <div data-alta-duplicates class="rounded-xl border border-warning/40 bg-warning/10 p-3 text-sm">
-                                        <p class="font-semibold text-warning">{{ __('Ya existe un socio que coincide') }}</p>
-                                        <ul class="mt-1 space-y-0.5">
-                                            @foreach ($this->altaDuplicateMatches() as $match)
-                                                <li class="text-ink dark:text-slate-200">· {{ $match->fullName() }} ({{ $match->member_no }})</li>
-                                            @endforeach
-                                        </ul>
-                                        <button
-                                            type="button"
-                                            wire:click="approveAlta(true)"
-                                            data-alta-override
-                                            wire:confirm="{{ __('¿Aprobar de todas formas? Quedará registrado que se creó pese a la coincidencia.') }}"
-                                            class="mt-3 inline-flex h-11 items-center rounded-xl border border-warning/50 px-4 text-sm font-semibold text-warning transition hover:bg-warning/10"
-                                        >{{ __('Es otra persona: dar de alta igualmente') }}</button>
-                                    </div>
-                                @endif
-
-                                <div class="flex gap-2">
-                                    <button type="button" wire:click="approveAlta" data-alta-approve class="h-12 flex-1 rounded-xl bg-brand text-base font-semibold text-white transition hover:bg-brand-dark">{{ __('Aprobar y dar de alta') }}</button>
-                                    <button type="button" wire:click="cancelAltaReview" class="inline-flex h-12 items-center rounded-xl border border-line px-4 text-sm text-ink-muted dark:border-slate-700 dark:text-slate-400">{{ __('Cancelar') }}</button>
-                                </div>
-                            </div>
-                        @else
-                            {{-- ONE JOB, THREE WAYS (prompt 210).
-
-                                 The headline used to be *"Entregar la tablet para que rellene sus datos"* —
-                                 which read wrong not because the words were badly chosen but because it was
-                                 **describing the only mechanism there was**. `handOverForAlta()` and
-                                 `sendAltaInvitation()` were the two ways to begin a sign-up, so a member of
-                                 staff with the person in front of them could reach the form only by handing
-                                 the device over. The owner: *"more than likely the staff will do it for
-                                 them."*
-
-                                 So the job is named — dar de alta — and how it gets typed is a choice
-                                 underneath it. Each option says what CONSENT ARTEFACT it produces, because
-                                 that is the one part that is not interchangeable: two of these end with the
-                                 applicant's own tick and one ends with the club's record of a paper consent,
-                                 and an operator choosing between them is choosing between those. --}}
-                            <div class="mt-4 space-y-4">
-                                <button type="button" wire:click="toggleStaffAltaForm" data-alta-staff-form
-                                        aria-expanded="{{ $altaStaffFormOpen ? 'true' : 'false' }}"
-                                        class="flex min-h-[3.5rem] w-full items-center justify-between gap-3 rounded-xl bg-brand px-4 text-left text-white transition hover:bg-brand-dark">
-                                    <span>
-                                        <span class="block text-base font-semibold">{{ __('Rellenar sus datos aquí') }}</span>
-                                        <span class="block text-xs text-white">{{ __('Con el consentimiento firmado en papel') }}</span>
-                                    </span>
-                                    <span aria-hidden="true" class="shrink-0 text-lg">{{ $altaStaffFormOpen ? '×' : '+' }}</span>
-                                </button>
-
-                                @if ($altaStaffFormOpen)
-                                    @include('livewire.counter.partials.alta-staff-form')
-                                @endif
-
-                                <button type="button" wire:click="handOverForAlta" data-alta-handover
-                                        class="flex min-h-[3.5rem] w-full items-center justify-between gap-3 rounded-xl border border-line px-4 text-left transition hover:bg-surface-alt dark:border-slate-700 dark:hover:bg-slate-800">
-                                    <span>
-                                        <span class="block text-base font-semibold">{{ __('Entregar la tablet') }}</span>
-                                        <span class="block text-xs text-ink-muted dark:text-slate-400">{{ __('Rellena y acepta el consentimiento en persona') }}</span>
-                                    </span>
-                                </button>
-
-                                <div>
-                                    <label for="alta-email" class="block text-xs font-medium text-ink-muted dark:text-slate-400">{{ __('…o enviar una invitación por email') }}</label>
-                                    <div class="mt-1 flex gap-2">
-                                        <input id="alta-email" type="email" inputmode="email" wire:model="altaInviteEmail" autocomplete="off" placeholder="socio@example.es" class="h-12 min-w-0 flex-1 rounded-xl border border-line bg-surface px-4 text-base dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100">
-                                        <button type="button" wire:click="sendAltaInvitation" data-alta-invite class="inline-flex h-12 shrink-0 items-center rounded-xl border border-line px-4 text-sm font-semibold transition hover:bg-surface-alt dark:border-slate-700 dark:hover:bg-slate-800">{{ __('Enviar') }}</button>
-                                    </div>
-                                </div>
-
-                                @if ($pending->isNotEmpty())
-                                    <div>
-                                        <p class="text-xs font-medium text-ink-muted dark:text-slate-400">{{ __('Solicitudes pendientes de revisar') }}</p>
-                                        <ul data-alta-pending class="mt-1 divide-y divide-line overflow-hidden rounded-xl border border-line dark:divide-slate-800 dark:border-slate-800">
-                                            @foreach ($pending as $application)
-                                                @php $p = $application->payload ?? []; @endphp
-                                                <li>
-                                                    <button type="button" wire:click="reviewAltaApplication('{{ $application->id }}')" class="flex min-h-11 w-full items-center justify-between gap-3 bg-surface px-4 py-3 text-left text-sm transition hover:bg-surface-alt dark:bg-slate-900 dark:hover:bg-slate-800">
-                                                        <span class="min-w-0 truncate">{{ trim(($p['first_name'] ?? '').' '.($p['last_name'] ?? '')) ?: ($application->applicant_email ?? __('Solicitud')) }}</span>
-                                                        <span class="shrink-0 text-xs text-ink-muted dark:text-slate-400">{{ $application->submitted_at?->format('d/m/Y') }}</span>
-                                                    </button>
-                                                </li>
-                                            @endforeach
-                                        </ul>
-                                    </div>
-                                @endif
-                            </div>
-                        @endif
-                    @endif
-                </section>
-            </div>
-        @endif
-
-        </div>{{-- /alta column --}}
-
-        <div data-member-column class="min-w-0">
-            <section class="rounded-2xl border border-line bg-surface p-4 dark:border-slate-800 dark:bg-slate-900">
-                <h2 class="text-base font-semibold">{{ __('Cobro de cuota') }}</h2>
+            {{-- Named by the visible heading above rather than repeating it: one heading, one region. --}}
+            <section aria-labelledby="fee-collection-heading" class="rounded-2xl border border-line bg-surface p-4 dark:border-slate-800 dark:bg-slate-900">
 
                 @if ($feeMember)
                     <div class="mt-3 flex items-start justify-between gap-3 rounded-xl bg-surface-alt p-3 dark:bg-slate-800">
@@ -472,8 +348,8 @@
                     {{-- Prompt 194 — the SAME lookup as the door, the dispensary, the till and the bar. This
                          tab's own name box could not resolve a scanned card at all. Identifying somebody is
                          the whole purpose of this screen's empty state, so it takes the cursor. --}}
-                    <div class="mt-3">
-                        @include('livewire.counter.partials.member-lookup', ['autofocus' => true])
+                    <div>
+                        @include('livewire.counter.partials.member-lookup', ['autofocus' => true, 'large' => true])
                     </div>
                 @endif
             </section>
@@ -490,7 +366,17 @@
                 </div>
             @endunless
         </div>{{-- /member column --}}
-        </div>{{-- /the two columns --}}
+        </div>{{-- /the centred column --}}
+
+        {{-- The sign-up, on its own surface. Rendered only when open, and only for somebody who may review
+             applications — the same gate the inline panel carried. --}}
+        @if ($altaOpen && $this->userCan('applications.review'))
+            @include('livewire.counter.partials.alta-modal')
+        @endif
+
+        {{-- Nothing scrolls behind an open modal. `x-effect` rather than `x-init`, so it reacts BOTH ways: an
+             `x-init` inside the modal would add the class on open and have nothing left to remove it. --}}
+        <div x-data x-effect="document.body.classList.toggle('overflow-hidden', $wire.altaOpen)"></div>
     @endif
 @endif
 </div>

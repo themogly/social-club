@@ -28,3 +28,20 @@
 [x-cloak] {
     display: none !important;
 }
+
+/* The sign-up modal's entrance (prompt 221). The design asks for a ~0.22s pop-in; CLAUDE.md requires every
+   effect to be gated behind `prefers-reduced-motion`, and requires content to be visible without JS or
+   animation. Both hold here: the rule exists only under `no-preference`, so a reduced-motion operator gets the
+   panel already in place rather than a hidden element waiting for an animation that will not run. */
+@media (prefers-reduced-motion: no-preference) {
+    .counter-modal-pop {
+        animation: counter-modal-pop 0.22s ease-out;
+    }
+}
+
+@keyframes counter-modal-pop {
+    from {
+        opacity: 0;
+        transform: translateY(10px) scale(0.98);
+    }
+}
