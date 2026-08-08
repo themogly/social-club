@@ -218,6 +218,32 @@
             @endunless
         </x-filament::section>
 
+        {{-- Permission drift (prompt 214). `RolePermissionSeeder` was only ever called by `csc:install`, so a
+             club kept its install-day matrix for ever: a permission added to a role never arrived, and one
+             REMOVED from a role was never revoked — the worse direction, because `App\Support\Permissions`
+             is the file everyone reads as the source of truth for who may do what.
+
+             It failed silently. The only symptom was an operator refused something the code grants them,
+             which reads as an application bug — and that is exactly how it was reported: an OWNER told
+             *"ask a manager"*. This panel is the half that reaches somebody who never sees a deploy log. --}}
+        <x-filament::section :heading="__('Permisos')" icon="heroicon-o-key">
+            <div style="display:flex;align-items:center;gap:.5rem;margin-bottom:.5rem;">
+                <x-filament::badge :color="$permissions['in_sync'] ? 'success' : 'danger'" data-permission-drift="{{ $permissions['in_sync'] ? 'in-sync' : 'drift' }}">
+                    {{ $permissions['in_sync'] ? __('Coinciden con el código') : __('No coinciden con el código') }}
+                </x-filament::badge>
+            </div>
+            @if ($permissions['in_sync'])
+                <p style="font-size:.8rem;opacity:.75;">{{ __('Los roles de esta base de datos son exactamente los que describe el código.') }}</p>
+            @else
+                <ul style="font-size:.8rem;display:grid;gap:.3rem;margin-bottom:.6rem;">
+                    @foreach ($permissions['lines'] as $line)
+                        <li>· {{ $line }}</li>
+                    @endforeach
+                </ul>
+                <p style="font-size:.8rem;opacity:.75;">{{ __('Ejecuta «php artisan csc:sync-permissions» en el servidor. Hasta entonces, alguien puede tener permisos que el código ya retiró, o que no le llegan.') }}</p>
+            @endif
+        </x-filament::section>
+
         {{-- Cache / Redis reachability (prompt 124). This page is designed to SURVIVE what it reports on:
              authorisation runs off the database store, so it renders and simply shows the cache as degraded. --}}
         <x-filament::section :heading="__('Caché')" icon="heroicon-o-circle-stack">
