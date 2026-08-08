@@ -9,6 +9,9 @@
 // tablet — which is exactly how this page was missed. It enumerates EVERY interactive element and exits
 // non-zero on any under 44×44.
 //
+// Prompt 220 added the signature pad to this page, so it also checks the pad is here and big enough to sign
+// on with a finger — a collapsed canvas passes every touch-target assertion while being unusable.
+//
 // It also asserts its own SAMPLE COUNT. A selector that matched three elements would otherwise print ALL PASS
 // over a page with twenty-two, which is the same defect prompt 205 found in measure-topbar.mjs.
 
@@ -17,9 +20,11 @@ import { access } from 'node:fs/promises';
 import { pathToFileURL } from 'node:url';
 import { resolve } from 'node:path';
 
+// Counts rose by two in prompt 220: the shared signature pad puts Borrar + Guardar firma on this page.
+// Bumped deliberately — the point of asserting the sample count is that it moves when the page does.
 const STATES = [
-  { key: 'initial', file: 'storage/app/applicant-217-initial.html', minControls: 20 },
-  { key: 'scanned', file: 'storage/app/applicant-217-scanned.html', minControls: 24 },
+  { key: 'initial', file: 'storage/app/applicant-217-initial.html', minControls: 22 },
+  { key: 'scanned', file: 'storage/app/applicant-217-scanned.html', minControls: 26 },
 ];
 const FLOOR = 44;
 
@@ -59,6 +64,18 @@ for (const state of STATES) {
           .filter((t) => t.box.height < FLOOR || t.box.width < FLOOR)
           .map((t) => `${Math.round(t.box.width)}×${Math.round(t.box.height)} ${t.what}`),
         hScroll: document.documentElement.scrollWidth > document.documentElement.clientWidth,
+        // Prompt 220's pad. The canvas is not in the selector list above (it is a drawing surface, not a
+        // control), so it is measured explicitly: a signature drawn with a finger on a 390px phone needs
+        // room, and a pad that collapsed to nothing would still have passed every assertion above.
+        pad: (() => {
+          const pad = document.querySelector('[data-signature-pad]');
+          if (! pad) return null;
+          const canvas = pad.querySelector('[data-signature-canvas]');
+          if (! canvas) return { canvas: null };
+          const box = canvas.getBoundingClientRect();
+
+          return { canvas: `${Math.round(box.width)}×${Math.round(box.height)}`, width: box.width, height: box.height };
+        })(),
       };
     }, FLOOR);
 
@@ -68,8 +85,11 @@ for (const state of STATES) {
     }
     if (r.under.length) fail(`${state.key}/${theme}: ${r.under.length} under ${FLOOR}px — ${r.under.join('; ')}`);
     if (r.hScroll) fail(`${state.key}/${theme}: horizontal page scroll at 390px`);
+    if (! r.pad) fail(`${state.key}/${theme}: the signature pad is not on the applicant's form`);
+    else if (! r.pad.canvas) fail(`${state.key}/${theme}: the pad rendered without a canvas`);
+    else if (r.pad.height < 100 || r.pad.width < 240) fail(`${state.key}/${theme}: the signature canvas is ${r.pad.canvas} — too small to sign with a finger`);
 
-    console.log(`=== ${state.key} / ${theme} === ${r.under.length === 0 ? 'PASS' : 'FAIL'} (${r.sampled} controls sampled, ${r.under.length} under ${FLOOR}px) hScroll=${r.hScroll}`);
+    console.log(`=== ${state.key} / ${theme} === ${r.under.length === 0 ? 'PASS' : 'FAIL'} (${r.sampled} controls sampled, ${r.under.length} under ${FLOOR}px) pad=${r.pad?.canvas ?? 'MISSING'} hScroll=${r.hScroll}`);
     await page.close();
   }
 }

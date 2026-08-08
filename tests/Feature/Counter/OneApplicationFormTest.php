@@ -96,11 +96,18 @@ class OneApplicationFormTest extends TestCase
             }
         }
 
-        // `name="x"` on a rendered input, and `'name' => 'x'` where an include declares the field it renders.
+        // `name="x"` on a rendered input, `'name' => 'x'` where an include declares the field it renders,
+        // and — prompt 220 — a field whose name comes from the DECLARATION itself, which is stronger than a
+        // literal: `:name="ApplicationShape::SIGNATURE_FIELD"` cannot drift from the shape it points at.
         preg_match_all('/\bname="([a-z_]+)"/', $blade, $direct);
         preg_match_all("/'name'\s*=>\s*'([a-z_]+)'/", $blade, $viaInclude);
 
-        return array_values(array_unique(array_merge($direct[1], $viaInclude[1])));
+        $viaConstant = [];
+        if (str_contains($blade, 'ApplicationShape::SIGNATURE_FIELD')) {
+            $viaConstant[] = ApplicationShape::SIGNATURE_FIELD;
+        }
+
+        return array_values(array_unique(array_merge($direct[1], $viaInclude[1], $viaConstant)));
     }
 
     /** Every field the staff form binds — `wire:model="altaForm.x"` plus its two upload properties. */
@@ -111,9 +118,15 @@ class OneApplicationFormTest extends TestCase
         preg_match_all('/wire:model="altaForm\.([a-z_]+)"/', $blade, $facts);
         preg_match_all('/wire:model="(altaPhoto|altaDocumentScan)"/', $blade, $files);
 
+        $signature = [];
+        if (str_contains($blade, 'saveAltaSignature')) {
+            $signature[] = ApplicationShape::SIGNATURE_FIELD;   // prompt 220 — the pad, on its own property
+        }
+
         return array_values(array_unique(array_merge(
             $facts[1],
             array_map(fn (string $p): string => $p === 'altaPhoto' ? 'photo' : 'document_scan', $files[1]),
+            $signature,
         )));
     }
 
@@ -198,6 +211,9 @@ class OneApplicationFormTest extends TestCase
             ->set('altaPhoto', UploadedFile::fake()->image('cara.jpg'))
             ->set('altaDocumentScan', UploadedFile::fake()->image('dni.jpg'))
             ->set('altaConsentHeld', true)
+            // Prompt 220: with `signature_on_application` on — the default the owner asked for — the member's
+            // own signature is the consent evidence and is required server-side on every route.
+            ->set('altaSignaturePath', 'data:image/png;base64,'.base64_encode('signature-bytes'))
             ->call('submitStaffAlta')
             ->assertHasNoErrors();
 
@@ -234,6 +250,7 @@ class OneApplicationFormTest extends TestCase
             ->set('altaForm.document_type', 'DNI')
             ->set('altaForm.document_number', '12345678Z')
             ->set('altaConsentHeld', true)
+            ->set('altaSignaturePath', 'data:image/png;base64,'.base64_encode('signature-bytes'))   // prompt 220
             ->call('submitStaffAlta')
             ->assertHasNoErrors();
 

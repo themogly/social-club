@@ -8,6 +8,7 @@ use App\Enums\MessageAuthor;
 use App\Models\AssemblyAttendance;
 use App\Models\ConvocatoriaRecipient;
 use App\Models\Member;
+use App\Models\MemberApplication;
 use App\Models\Message;
 use App\Models\MessageThread;
 use Illuminate\Support\Facades\Storage;
@@ -46,7 +47,7 @@ class AnonymiseMember
         'member_documents' => 'HANDLED here: files deleted; retention-obligation docs redacted, others destroyed.',
         'member_tokens' => 'reference + hash-only credential (no PII); revoked here.',
         'member_login_tokens' => 'reference + hash-only credential (no PII).',
-        'consent_records' => 'reference + consent version/date/locale (no name/DNI); the identity is the member row.',
+        'consent_records' => 'HANDLED here: reference + version/date/locale (no name/DNI), but a prompt-220 signature IS the person\'s hand — the file is deleted and the pointer nulled, keeping the consent row itself as evidence that consent was given.',
         'member_sanctions' => 'reference + conduct free-text about the sanction, not identity.',
         'member_discounts' => 'reference + discount assignment (no PII).',
         'memberships' => 'reference + tier/dates/fee (no PII).',
@@ -81,6 +82,24 @@ class AnonymiseMember
         foreach ($member->dispensations()->withoutGlobalScopes()->whereNotNull('signature_path')->get() as $dispensation) {
             Storage::disk('documents')->delete((string) $dispensation->signature_path);
             $dispensation->forceFill(['signature_path' => null])->save();
+        }
+
+        // A drawn consent signature (prompt 220) is the member's own hand over the declaration — the same
+        // kind of artefact as a POS signature, on a row that must SURVIVE (the consent is the club's lawful
+        // basis). So: delete the encrypted file, null the pointer, keep the record. The identical path also
+        // sits on the source application's payload, which erasure cannot walk to (it hangs off
+        // `resulting_member_id`, not `member_id`) — nulled there too, so no row points at a deleted artefact.
+        foreach ($member->consents()->whereNotNull('signature_path')->get() as $consent) {
+            Storage::disk('documents')->delete((string) $consent->signature_path);
+            $consent->forceFill(['signature_path' => null])->save();
+        }
+        foreach (MemberApplication::query()->withoutGlobalScopes()->where('resulting_member_id', $member->id)->get() as $application) {
+            $payload = $application->payload ?? [];
+            if (isset($payload['signature_path'])) {
+                Storage::disk('documents')->delete((string) $payload['signature_path']);
+                unset($payload['signature_path']);
+                $application->forceFill(['payload' => $payload])->save();
+            }
         }
 
         // The name is needed AFTER the row is scrubbed, to find where it survives as free text elsewhere

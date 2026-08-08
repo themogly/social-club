@@ -829,44 +829,18 @@
                         </dl>
                     </div>
 
-                    {{-- Signature (only when the sede requires it). --}}
+                    {{-- Signature (only when the sede requires it). Prompt 220 extracted the pad to
+                         `x-counter.signature-pad` — same markup, same Alpine behaviour, same vault path; it is
+                         a component now because it has a second consumer (the application form). --}}
                     @if ($requireSignature)
                         <div class="mt-4 border-t border-line pt-4 dark:border-slate-800">
-                            <p class="text-sm font-medium">{{ __('Firma del socio') }}</p>
-                            @if ($signaturePath)
-                                <div class="mt-2 flex items-center justify-between rounded-xl border border-success/30 bg-success/10 px-3 py-2 text-sm text-success">
-                                    <span>✓ {{ __('Firma capturada') }}</span>
-                                    <button type="button" wire:click="clearSignature" class="rounded-md px-2 py-0.5 text-success/80 hover:text-success">{{ __('Rehacer') }}</button>
-                                </div>
-                            @else
-                                <div
-                                    x-data="{
-                                        drawing: false, ctx: null,
-                                        init() {
-                                            const c = this.$refs.pad; c.width = c.offsetWidth; c.height = 150;
-                                            this.ctx = c.getContext('2d'); this.ctx.lineWidth = 2; this.ctx.lineCap = 'round'; this.ctx.strokeStyle = '#2563eb';
-                                        },
-                                        point(e) { const r = this.$refs.pad.getBoundingClientRect(); const t = e.touches ? e.touches[0] : e; return { x: t.clientX - r.left, y: t.clientY - r.top }; },
-                                        start(e) { this.drawing = true; const p = this.point(e); this.ctx.beginPath(); this.ctx.moveTo(p.x, p.y); },
-                                        move(e) { if (! this.drawing) return; const p = this.point(e); this.ctx.lineTo(p.x, p.y); this.ctx.stroke(); },
-                                        stop() { this.drawing = false; },
-                                        wipe() { this.ctx.clearRect(0, 0, this.$refs.pad.width, this.$refs.pad.height); },
-                                        save() { $wire.saveSignature(this.$refs.pad.toDataURL('image/png')); },
-                                    }"
-                                    class="mt-2"
-                                >
-                                    <canvas
-                                        x-ref="pad"
-                                        class="w-full touch-none rounded-xl border border-line bg-white dark:border-slate-700"
-                                        @mousedown="start($event)" @mousemove="move($event)" @mouseup="stop()" @mouseleave="stop()"
-                                        @touchstart.prevent="start($event)" @touchmove.prevent="move($event)" @touchend="stop()"
-                                    ></canvas>
-                                    <div class="mt-2 flex gap-2">
-                                        <button type="button" @click="wipe()" class="h-11 flex-1 rounded-lg border border-line bg-surface-alt text-sm font-medium text-ink-muted dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300">{{ __('Borrar') }}</button>
-                                        <button type="button" @click="save()" class="h-11 flex-1 rounded-lg bg-brand text-sm font-semibold text-white hover:bg-brand-dark">{{ __('Guardar firma') }}</button>
-                                    </div>
-                                </div>
-                            @endif
+                            <x-counter.signature-pad
+                                capture="saveSignature"
+                                clear="clearSignature"
+                                :stored="(bool) $signaturePath"
+                                :label="__('Firma del socio')"
+                                class="mt-0"
+                            />
                         </div>
                     @endif
 

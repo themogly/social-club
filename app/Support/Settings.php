@@ -111,6 +111,15 @@ class Settings
         // (Replaces the org-wide pos_require_checked_in / pos_signature_required, which no UI ever wrote.)
         'restrict_pos_to_checked_in' => false,  // only dispense to members checked in at the door
         'signature_on_dispensation' => false,   // capture an on-screen signature per withdrawal (acta-grade)
+
+        // Prompt 220 — the applicant SIGNS the consent text at sign-up, on every route. **Default ON, and
+        // that is the owner's explicit decision rather than an overnight default**: he asked for it. With it
+        // on, the signature is required server-side on all three routes and the staff route's paper-consent
+        // checkbox disappears — the signature replaces it as the evidence, and is stronger, because it is the
+        // member's own act rather than the club's account of one (prompt 210's distinction, now resolved in
+        // the applicant's favour). OFF exists for a club that wants paper, and restores 210's behaviour
+        // exactly, checkbox included.
+        'signature_on_application' => true,
         // Whether this sede runs MORE THAN ONE till at once (prompt 102). Default false: most clubs run one
         // drawer, so opening a caja asks only for the float and uses the sede's single terminal. Turn on for a
         // multi-terminal sede, and the operator picks which configured terminal to open.

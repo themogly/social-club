@@ -54,6 +54,9 @@ class ApplicationShape
             'is_therapeutic' => ['sometimes', 'boolean'],
             'declared_monthly_g' => ['nullable', 'numeric', 'min:0', 'max:1000'],
             'avalador_ref' => ['nullable', 'string', 'max:255'],
+            // Prompt 220. `nullable` here and REQUIRED by the club's setting in `SubmitApplication`, so a
+            // club with signatures off is not asked for one it does not want.
+            self::SIGNATURE_FIELD => ['nullable', 'string'],
         ];
     }
 
@@ -73,6 +76,19 @@ class ApplicationShape
             'document_scan' => ['nullable', 'file', 'mimes:jpeg,jpg,png,webp,pdf', DocumentUpload::maxRule()],
         ];
     }
+
+    /**
+     * The applicant's own signature over the consent text (prompt 220), as a PNG data URL.
+     *
+     * Declared HERE rather than wired per form, which is the whole point of 215: it reaches the public form
+     * and the staff form through the one shape, and 215's parity guard proves both render it. It is not a
+     * `file()` — nothing is uploaded; the pad draws it and `SubmitApplication` puts the bytes in the same
+     * vault the dispensation signature uses.
+     *
+     * Whether it is REQUIRED is `signature_on_application`, enforced in `SubmitApplication` — a rule about
+     * the club rather than about the field.
+     */
+    public const SIGNATURE_FIELD = 'signature';
 
     /** The four fields prompt 179's reader can fill from a document. */
     public const MRZ_FIELDS = ['first_name', 'last_name', 'date_of_birth', 'document_number'];
@@ -110,6 +126,13 @@ class ApplicationShape
         $blank = [];
 
         foreach (array_keys(self::facts()) as $field) {
+            // The signature is not a text field the operator types — it lives on its own property, drawn by
+            // the pad (prompt 220). Seeding a blank one here would put an empty `signature` key in the form
+            // array, and `$data + [...]` keeps the LEFT operand's keys, so the drawn one would be discarded.
+            if ($field === self::SIGNATURE_FIELD) {
+                continue;
+            }
+
             $blank[$field] = $field === 'is_therapeutic' ? false : '';
         }
 

@@ -3,11 +3,15 @@
 namespace App\Filament\Resources\Members\RelationManagers;
 
 use App\Models\ConsentRecord;
+use App\Models\User;
+use App\Support\VaultUrl;
+use Filament\Actions\Action;
 use Filament\Resources\RelationManagers\RelationManager;
 use Filament\Tables\Columns\IconColumn;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\Auth;
 
 /**
  * The member's consent history — one row per consent per version (consent is never a
@@ -38,7 +42,27 @@ class ConsentsRelationManager extends RelationManager
                     ->label(__('Vigente'))
                     ->state(fn (ConsentRecord $record): bool => $record->withdrawn_at === null)
                     ->boolean(),
+                // HOW the consent was captured (prompts 210 + 220). Without this the table shows a version and
+                // a date for three materially different things: the person's own tick, a paper form a member of
+                // staff attested, and a signature drawn on screen. The channel is the whole distinction.
+                TextColumn::make('channel')->label(__('Vía'))
+                    ->badge()
+                    ->formatStateUsing(fn (ConsentRecord $record): string => $record->channel->label())
+                    ->color(fn (ConsentRecord $record): string => $record->channel->isApplicantsOwnAct() ? 'success' : 'warning'),
+                TextColumn::make('attestedBy.name')->label(__('Registrado por'))->placeholder('—')->toggleable(),
                 TextColumn::make('ip')->label(__('IP'))->placeholder('—')->toggleable(),
+            ])
+            ->recordActions([
+                // A signed consent is only evidence if somebody can produce the signature (prompt 220). Short-
+                // lived, user-bound, access-logged signed URL — never a path, never a public file.
+                Action::make('signature')
+                    ->label(__('Ver firma'))
+                    ->icon('heroicon-m-pencil-square')
+                    ->visible(fn (ConsentRecord $record): bool => $record->isSigned())
+                    ->url(fn (ConsentRecord $record): ?string => ($user = Auth::user()) instanceof User
+                        ? VaultUrl::consentSignature($record, $user)
+                        : null)
+                    ->openUrlInNewTab(),
             ])
             ->emptyStateHeading(__('Sin consentimientos registrados'))
             ->emptyStateDescription(__('Los consentimientos RGPD del socio se capturan al aprobar su alta y aparecerán aquí.'));

@@ -7,6 +7,7 @@ use App\Enums\ApplicationStatus;
 use App\Enums\ConsentChannel;
 use App\Enums\MemberStatus;
 use App\Enums\Role;
+use App\Enums\SettingType;
 use App\Livewire\Counter\MembershipCounter;
 use App\Models\Location;
 use App\Models\Member;
@@ -19,6 +20,7 @@ use App\Support\ActiveScope;
 use App\Support\ApplicationSpamGuard;
 use App\Support\CounterHandover;
 use App\Support\CounterOperator;
+use App\Support\Settings;
 use Database\Seeders\RolePermissionSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
@@ -83,6 +85,27 @@ class SigningSomeoneUpTest extends TestCase
         return $user;
     }
 
+    /** A drawn signature, in the shape the pad produces. */
+    private function drawnSignature(): string
+    {
+        return 'data:image/png;base64,'.base64_encode('signature-bytes');
+    }
+
+    /**
+     * Pin `signature_on_application` OFF.
+     *
+     * **Prompt 220 amended these tests deliberately rather than deleting them.** 220 made the signature the
+     * default evidence on all three routes, and with it on the staff route's paper checkbox is neither shown
+     * nor required — the member's own signature replaces it. The assertions below that are ABOUT prompt 210's
+     * paper attestation are still worth keeping, because OFF restores that behaviour exactly for a club that
+     * wants paper; they pin the setting so they test the path they were written for. The ones that are about
+     * the ROUTE working now carry a signature, which is the default a club gets.
+     */
+    private function withPaperConsent(): void
+    {
+        Settings::set('signature_on_application', false, SettingType::BOOL);
+    }
+
     /** @param  array<string, mixed>  $overrides */
     private function typeTheForm(array $overrides = []): Testable
     {
@@ -102,6 +125,7 @@ class SigningSomeoneUpTest extends TestCase
                 'avalador_ref' => '',
             ], $overrides))
             ->set('altaConsentHeld', true)
+            ->set('altaSignaturePath', Settings::get('signature_on_application', true) ? $this->drawnSignature() : null)
             ->call('submitStaffAlta');
     }
 
@@ -185,6 +209,7 @@ class SigningSomeoneUpTest extends TestCase
             'document_number' => '12345678Z',
             'consent_data' => '1',
             'consent_statutes' => '1',
+            'signature' => Settings::get('signature_on_application', true) ? $this->drawnSignature() : '',
             ApplicationSpamGuard::HONEYPOT => '',
             ApplicationSpamGuard::TIMESTAMP => $token,
         ], $overrides));
@@ -253,6 +278,7 @@ class SigningSomeoneUpTest extends TestCase
      */
     public function test_a_staff_typed_consent_is_recorded_as_paper_and_names_the_operator(): void
     {
+        $this->withPaperConsent();   // prompt 220: this asserts 210's PAPER path, which OFF restores exactly
         $staff = $this->staff();
         $tier = $this->tier();
 
@@ -282,6 +308,7 @@ class SigningSomeoneUpTest extends TestCase
     /** The applicant's own tick is still exactly that — the public route is untouched by any of this. */
     public function test_the_public_form_still_records_the_applicants_own_act(): void
     {
+        $this->withPaperConsent();   // prompt 220: this asserts 210's PAPER path, which OFF restores exactly
         $staff = $this->staff();
         $tier = $this->tier();
 
@@ -315,6 +342,7 @@ class SigningSomeoneUpTest extends TestCase
      */
     public function test_the_staff_route_cannot_produce_a_weaker_consent_artefact(): void
     {
+        $this->withPaperConsent();   // prompt 220: this asserts 210's PAPER path, which OFF restores exactly
         $this->staff();
 
         // Without the explicit confirmation, nothing is written at all.

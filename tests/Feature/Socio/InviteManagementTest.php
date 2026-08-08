@@ -116,6 +116,7 @@ class InviteManagementTest extends TestCase
             'first_name' => 'María', 'last_name' => 'García', 'email' => 'maria@example.es',
             'date_of_birth' => now()->subYears(30)->format('Y-m-d'),
             'document_type' => 'DNI', 'document_number' => '12345678Z', 'consent_data' => '1', 'consent_statutes' => '1',
+            'signature' => 'data:image/png;base64,'.base64_encode('sig'),
             ApplicationSpamGuard::HONEYPOT => '',
             ApplicationSpamGuard::TIMESTAMP => $renderToken,
         ])->assertRedirect();

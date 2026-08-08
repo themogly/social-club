@@ -33,6 +33,7 @@ class RecordMemberConsent
         ?string $locale = null,
         ConsentChannel $channel = ConsentChannel::APPLICANT,
         ?string $attestedBy = null,
+        ?string $signaturePath = null,
     ): ConsentRecord {
         return $member->consents()->create([
             'purpose' => $purpose,
@@ -46,6 +47,10 @@ class RecordMemberConsent
             // whatever the caller captured at submit — NOT the current app locale. Left null when unknown (a
             // paper-register import, or a caller that did not observe one): absent means absent, never guessed.
             'locale' => $locale,
+            // The applicant's own drawn signature over the text (prompt 220), already in the vault. Evidence
+            // of the act sits with the record of the act — otherwise a SIGNED consent points at nothing that
+            // erasure or a portability pack could ever walk to.
+            'signature_path' => $signaturePath,
             'granted_at' => $grantedAt ?? now(),
             'ip' => $ip,
         ]);
