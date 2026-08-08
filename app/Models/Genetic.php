@@ -10,6 +10,7 @@ use App\Enums\StrainType;
 use App\Enums\UnitType;
 use App\Models\Concerns\BelongsToOrganisation;
 use App\Observers\GeneticObserver;
+use App\Support\ActiveScope;
 use App\Support\Settings;
 use Database\Factories\GeneticFactory;
 use Illuminate\Database\Eloquent\Attributes\ObservedBy;
@@ -179,7 +180,42 @@ class Genetic extends Model
             ->whereNull('tier_id')
             ->value('low_stock_threshold_cg');
 
-        return (int) ($perLocation ?? Settings::get('low_stock_threshold_cg', 5000));
+        if ($perLocation !== null) {
+            return (int) $perLocation;
+        }
+
+        $configured = (int) Settings::get('low_stock_threshold_cg', 0);
+
+        return $configured > 0 ? $configured : self::derivedLowStockThresholdCg($locationId);
+    }
+
+    /**
+     * What "low" means for a club that may not hold much (prompt 213).
+     *
+     * **The default was 50 g and it was permanently true.** `low_stock_threshold_cg` fell back to 5000 cg —
+     * a figure chosen for a shop. This product is for clubs operating under a legal stock ceiling:
+     * `stock_ceiling_days` defaults to 5 and `StockCeiling::forLocation()` exists precisely because a Spanish
+     * CSC may not hold much. On the seeded data all six genetics — 12.95 g to 32.66 g — badged "Low stock"
+     * at once, which makes the badge **furniture rather than a warning**, and trains the operator to read
+     * past the one that matters.
+     *
+     * So it is derived from what this club may lawfully dispense rather than being a fixed gram figure: a
+     * genetic is low when **less than one member's daily allowance** is left of it, because that is the point
+     * at which you can no longer serve the next person a full order. It scales with the sede's own
+     * `daily_limit_cg`, it needs no second knob, and an explicit `low_stock_threshold_cg` still wins — as
+     * does the per-sede figure on `GeneticPrice`, which prompt 213 did not touch.
+     *
+     * `OVERNIGHT-DEFAULT — CONFIRM` (see DECISIONS.md): whether one daily allowance is the right multiple,
+     * and whether "low" is even the right frame when a ceiling makes low normal.
+     */
+    public static function derivedLowStockThresholdCg(?string $locationId): int
+    {
+        $daily = (int) app(ActiveScope::class)->forLocation(
+            $locationId,
+            fn (): int => (int) Settings::get('daily_limit_cg', 300),
+        );
+
+        return max(1, $daily);
     }
 
     /**

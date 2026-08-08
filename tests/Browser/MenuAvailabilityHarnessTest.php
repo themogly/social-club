@@ -42,7 +42,10 @@ class MenuAvailabilityHarnessTest extends TestCase
             'tier_id' => $tier->id, 'status' => MembershipStatus::ACTIVE,
         ]);
 
-        foreach ([['Amnesia Haze', 50000], ['Critical Kush', 1000], ['Lemon Skunk', 0]] as [$name, $cg]) {
+        // 1 cg for the low one: prompt 213 made the default threshold DERIVED from the sede's daily
+        // allowance, so a figure that used to sit under the 5000 cg shop default no longer does. The picture
+        // still needs one genetic in each of the three states.
+        foreach ([['Amnesia Haze', 50000], ['Critical Kush', 1], ['Lemon Skunk', 0]] as [$name, $cg]) {
             $genetic = Genetic::factory()->create([
                 'organisation_id' => $org->id, 'name' => $name, 'active' => true, 'published' => true,
             ]);

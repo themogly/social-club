@@ -10159,3 +10159,79 @@ labelled sections; switching source disturbing nothing in progress; each source 
 inactive and empty articles not offered; a sede with no bar having no bar source; the stock state without the
 figure; the pane's furniture following the source; the bar category filter filtering; and no second member
 lookup on either source.
+
+---
+
+## Prompt 213 — two things on the sale screen were always on, so neither meant anything
+
+**Neither of these was reported.** Both came out of reading the screen, and both are judgement calls rather
+than defects — so both should be looked at rather than assumed welcome.
+
+### 1. Every genetic said "Stock bajo"
+
+All six on the seeded dispensary — Amnesia Haze 23.11 g, CBD Charlotte 23.36 g, Critical Kush 12.95 g, Moby
+Dick 14.55 g, Northern Lights 19.41 g, Purple Haze 32.66 g — **badged at once**. Measured, not asserted: the
+before frame counts **6/6**.
+
+`Genetic::lowStockThresholdCg()` fell back to `Settings::get('low_stock_threshold_cg', 5000)` — **50 g**, a
+figure chosen for a shop. This product is for clubs operating under a legal stock ceiling:
+`stock_ceiling_days` defaults to 5 and `StockCeiling::forLocation()` exists precisely because a Spanish CSC
+may not hold much. A club holding a lawful few days of one genetic sits under 50 g **permanently**, so the
+badge was on permanently — **furniture rather than a warning**, and it trains the operator to read past the
+one that matters.
+
+**What it is derived from now.** A genetic is low when **less than one member's daily allowance is left of
+it** — the sede's own `daily_limit_cg`. That is the point at which you can no longer serve the next person a
+full order, so it is a fact about service rather than a number about inventory; it **scales with the club's
+own configuration** instead of being a constant; and it needs no second knob. The setting still exists and
+still wins when set — `DEFAULTS['low_stock_threshold_cg']` is now **0, meaning "derive"** — and the per-sede
+`low_stock_threshold_cg` on `GeneticPrice` is untouched, as the prompt required. After: **0/6**, with a
+genetic under one daily allowance still badging.
+
+`OVERNIGHT-DEFAULT — CONFIRM`: **whether one daily allowance is the right multiple**, and — the better
+question — **whether "low" is the right frame at all when a ceiling makes low normal.** A club that may
+lawfully hold five days of stock is never "well stocked" in a shop's sense, so the honest signal might be
+*"enough for N more members today"* rather than a binary badge. That is a product decision about what the
+counter should say, not a number, and it is the owner's.
+
+### 2. The price override was a permanently open text box
+
+The cart rendered *"Ajustar precio (queda registrado) — Nuevo total (€) / Motivo"* inline, always, on every
+sale, above the commit button.
+
+**Prompt 91 already settled this principle on the till**: a consequential action *"must not be the loudest
+control on a tablet being scrolled mid-shift"*, and it demoted the close-out accordingly. An override that
+rewrites what a member is charged — recorded, with a reason, **because it matters** — was sitting open in the
+ordinary flow. Two costs: it invites use, and it is a free-text **price** field an operator scrolls past
+hundreds of times a shift with a live basket. The void action on the same screen already does this correctly,
+behind a deliberate step.
+
+It is behind one deliberate tap now, inside an Alpine `<template>` — so the fields are **absent from the DOM**
+and therefore not in the tab order either, which is the distinction between demoting a control and merely
+styling it down. Measured: override fields in the DOM **1 → 0**, with a labelled toggle **0 → 1**.
+
+**Nothing about who may override, what is recorded, or the reason requirement changed.** `ResolvePrice`,
+`CommitDispensation`, the `dispensation.price.override` permission, the reason and `original_total_cents` are
+all exactly as they were — asserted against the row (€24.00 → €10.00 with the original kept and the operator
+named), and a commit with no override asserted unchanged in every respect.
+
+### Verification
+
+`composer check` green — **1675 tests**, 1672 passed, 3 pre-existing skips, Larastan 0, Pint clean. **MySQL was
+left to CI**, per the running order; the suite ran on SQLite.
+
+Screenshots before and after at 1180×820 and 820×1180, light and dark (`storage/app/screenshots/213/`), seeded
+with the exact holdings from the report. The shoot script counts what the pictures are about rather than
+trusting them: badged-low **6/6 → 0/6**, override fields in the DOM **1 → 0**.
+
+**Tests** (`SignalsThatNeverVaryTest`, 9): a lawful holding for a club under its ceiling not badged — asserted
+against `StockCeiling::forLocation()`'s own figures, with a precondition proving the old 50 g default really
+was above a lawful holding; a genuinely low genetic still badged; the per-sede threshold and an explicit org
+setting both still winning; no threshold figure leaking to the screen; the override absent until opened and
+its toggle present; an override still recording everything it did; no override offered without the
+permission; and a plain commit unchanged.
+
+**Retargeted, not deleted:** four of prompt 185's menu-availability fixtures stated their stock against the
+5000 cg fallback. They assert the state machine, not the default, so they now state it against the sede's
+daily allowance — and one, the unit→gram conversion test, **pins** the threshold explicitly, because a moving
+default would have made it quietly about something else.

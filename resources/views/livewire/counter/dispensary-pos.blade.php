@@ -737,15 +737,43 @@
                     @endif
 
                     {{-- Price override (prompt 64): permission-gated, reasoned. Comp defective product or a
-                         €0 give-away. Leaving the amount blank charges the resolved price. --}}
+                         €0 give-away. Leaving the amount blank charges the resolved price.
+
+                         **Behind one deliberate tap since prompt 213**, and prompt 91 is the reason: it
+                         settled that a consequential action *"must not be the loudest control on a tablet
+                         being scrolled mid-shift"* and demoted the till close-out accordingly. This rewrites
+                         what a member is charged — it is recorded, with a reason, precisely because it
+                         matters — and it was sitting open in the ordinary flow, above the commit, on every
+                         transaction. Two costs: it invites use, and it is a free-text PRICE field an operator
+                         scrolls past hundreds of times a shift with a live basket. The void on this same
+                         screen already does this correctly.
+
+                         **Nothing about who may override, what is recorded, or the reason requirement
+                         changes** — this is where the control sits, not what it does. The fields are absent
+                         from the DOM until opened, so they are not in the tab order either. --}}
                     @can('dispensation.price.override')
-                        <div class="mt-3 rounded-xl border border-warning/30 bg-warning/5 p-3">
-                            <label class="block text-xs font-medium text-warning">{{ __('Ajustar precio (queda registrado)') }}</label>
+                        <div x-data="{ open: false }" class="mt-3">
+                            <button
+                                type="button"
+                                x-on:click="open = ! open"
+                                x-bind:aria-expanded="open ? 'true' : 'false'"
+                                data-price-override-toggle
+                                class="inline-flex min-h-11 w-full items-center justify-between gap-2 rounded-xl border border-line px-4 text-sm font-medium text-ink-muted transition hover:bg-surface-alt dark:border-slate-700 dark:text-slate-400 dark:hover:bg-slate-800"
+                            >
+                                <span>{{ __('Ajustar precio (queda registrado)') }}</span>
+                                <span aria-hidden="true" x-text="open ? '\u25b4' : '\u25be'"></span>
+                            </button>
+
+                            <template x-if="open">
+                        <div data-price-override class="mt-2 rounded-xl border border-warning/30 bg-warning/5 p-3">
+                            <p class="block text-xs font-medium text-warning">{{ __('Ajustar precio (queda registrado)') }}</p>
                             <div class="mt-1 grid gap-2 sm:grid-cols-2">
                                 <input type="text" inputmode="decimal" wire:model.blur="priceOverrideEuros" autocomplete="off" placeholder="{{ __('Nuevo total (€)') }}" class="h-11 w-full rounded-xl border border-line bg-surface px-3 text-base text-ink placeholder:text-ink-muted focus:border-warning focus:outline-none focus:ring-2 focus:ring-warning/40 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100">
                                 <input type="text" wire:model.blur="priceOverrideReason" autocomplete="off" placeholder="{{ __('Motivo (p. ej. producto defectuoso)') }}" class="h-11 w-full rounded-xl border border-line bg-surface px-3 text-base text-ink placeholder:text-ink-muted focus:border-warning focus:outline-none focus:ring-2 focus:ring-warning/40 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100">
                             </div>
                             <p class="mt-1 text-[11px] text-ink-muted dark:text-slate-400">{{ __('Deja el importe vacío para cobrar el precio normal. 0 € = gratis.') }}</p>
+                        </div>
+                            </template>
                         </div>
                     @endcan
 

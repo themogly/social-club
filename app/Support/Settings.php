@@ -79,7 +79,12 @@ class Settings
         'counter_hero' => 'counter.pos',
 
         // Stock
-        'low_stock_threshold_cg' => 5000,
+        // 0 = DERIVE (prompt 213). It was 5000 cg — 50 g, a shop's figure — and a club under a legal stock
+        // ceiling sits below it permanently, so every genetic badged "low" at once and the badge carried no
+        // information. Genetic::derivedLowStockThresholdCg() reads the sede's daily allowance instead: a
+        // genetic is low when there is less than one member's day left of it. A club that sets a number here
+        // gets that number.
+        'low_stock_threshold_cg' => 0,
         'batch_expiry_window_days' => 30,
 
         // Discounts
