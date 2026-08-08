@@ -10938,3 +10938,119 @@ handover at 1024×768, and the staff form at 1024×768 — each empty and signed
 **captured** state on the staff form. The ink is drawn through the canvas's own 2D context with the component's
 own settings: these are `file://` pages with no JavaScript (Alpine ships inside Livewire's bundle, which cannot
 load off a file URL), so a mouse stroke would have drawn nothing and every "signed" shot would have been a lie.
+
+---
+
+## Prompt 221 — the sign-up becomes a modal wizard, and fee collection gets the screen back
+
+The owner designed this in Claude Design and asked for it built: *"copy it all apart from the hand-over-tablet
+part — we already have that done; Claude Design couldn't see it so it made it up."* His brief to the design
+tool was that the sign-up panel *"is too small and still has the collect on the side… make it more user
+friendly"*, and both halves are one move: the sign-up leaves the page for a modal, and fee collection stops
+sharing a screen with it.
+
+**It is presentation and flow.** `SubmitApplication` is still the one writer; the search, 219's waive, the
+invite route, the duplicate search and the age gate are untouched; 215's parity guard and 220's signature
+tests pass **unamended**. What changed is where things are drawn and in what order they are asked.
+
+### The measurement that makes the complaint concrete
+
+Shot on `main` and on this branch, same seed, both orientations (`storage/app/screenshots/221/`):
+
+| | sign-up panel height | its submit button | viewport |
+|---|---|---|---|
+| **before** (`main`, inline, open) | **1446px** at 1180×820 · **1576px** at 820×1180 | y=1345 / y=1475 | 820 / 1180 |
+| **after** (modal, deepest step) | 697px | y=742 (sticky footer) | 820 |
+
+So the form ran 626–396px past the bottom of the screen and the button that submits it was never on it. "Too
+small" was the polite version: it was a sixteen-field form in a 416px column with the page scrolled to reach
+its own submit. The modal is capped at `min(780px, 92vh)`, the body scrolls inside it, and the footer is
+always on screen at both orientations.
+
+### What is the design's, and what was corrected — the owner's own instruction
+
+| the design | what shipped |
+|---|---|
+| method chooser, modal shell, 4-step stepper, sticky footer, big search + dashed empty state | **kept**, through the project's tokens |
+| a handover MODE inside its own wizard (a banner, a fake form) | **not built.** Card 2 calls the real `handOverForAlta()` — 173's session handover, the real tokenised public form, the PIN as the way back. A lookalike would have been a second sign-up path to keep in step, which is how this codebase has been bitten five times |
+| one combined consent tick over a bare canvas | **superseded by 220**: the shared pad, two acceptances where the applicant consents, 210's channel recording, `consent_text_version`, and the `signature_on_application` setting |
+| a field list missing the photo, the ID document and the MRZ prefill | **the shared shape**, which 215's guard enforces anyway |
+| inline hex colours | the brand palette; intent (hierarchy, size, spacing), not magic numbers |
+| `<h1>Fee collection` | an `<h2>` at the design's SIZE. 130's rule is that the counter's shared header renders the one `<h1>`; the guard caught the second one immediately |
+
+### Where the shared shape's fields landed, and why
+
+`SignsUpMembers::WIZARD_STEPS` is the one declaration — the markup renders from it and `altaNext()` validates
+from it, so a step cannot enforce something the submit does not:
+
+- **1 Identidad** — name, surname, DOB, document type + number, **plus both uploads and 179's MRZ reader.**
+  The reader READS the document file chosen here and PREFILLS four of these fields, and `mountStaffMrzScan`
+  binds its trigger to the document input, so they must render together or the control silently does nothing.
+  The face photo joins them because a photo compared with the person at the counter is identity, not contact.
+- **2 Contacto** — email, phone, address, avalador.
+- **3 Membresía** — therapeutic use (a health declaration, so the whole row is the tap target), and the
+  declared monthly consumption.
+- **4 Firma** — 220.
+
+**`declared_monthly_g` met the design's range select unchanged**, which is the happy case: prompt 97 already
+made it a GUIDED preset list from `forecast_options_g` with *"Prefiero no indicarlo ahora"* as the empty
+option, because a free number an applicant has no basis for is not a declaration. The design drew what the
+field already was.
+
+**A guard for the class, not for today's list:** `SignupWizardTest` asserts the step map covers
+`ApplicationShape` exactly, with no field on two steps. That is 215's defect in a new costume — a field added
+to the shared declaration reaches the public form for free and would silently miss a four-step wizard whose
+fields were listed by hand.
+
+### The close guard, and the two things deliberately NOT built
+
+**The confirm fires only when something would be lost** — `altaHasEnteredData()`, server-side, rendered onto
+✕, the backdrop and Escape (Escape clicks the ✕ so all three go through one guarded control). A chosen method
+with an untouched form is not "data entered", and neither is an email left in the box after it was sent.
+206's lesson: a guard that fires over nothing teaches the operator to dismiss guards.
+
+**No focus trap.** The a11y audit considered and REJECTED trapping focus on counter overlays: the failure mode
+of `inert` left on is a counter that looks fine and responds to nothing, and this component has produced two
+such bugs. Followed here, and now asserted, so a future session reading "a modal should trap focus" finds the
+decision instead of reintroducing it. Every write behind the surface is refused server-side regardless.
+
+**`z-40`, below 173's `z-50` surface** — a lock, an idle timeout or a handover must cover a staff form, never
+the other way round. Asserted by reading the layer off each surface's own class attribute, because a prose
+mention of the other's z-index is not a second layer.
+
+### Two small things found on the way
+
+- **`x-cloak` is styled nowhere** was fixed in 220; this branch is the first to depend on it (`@disabled`
+  stepper circles and the pad's confirmation are server-rendered, but the modal's own states are not).
+- **A Blade comment can fail a regex guard.** The wizard's docblock explained that 215's parity reader scans
+  this file for bound fields — and wrote an EXAMPLE of one. The reader is a regex over these bytes, so the
+  sample read as a real field called `x` and failed the guard. The comment now says so.
+
+### Verification
+
+`composer check` green — **1770 tests**, 1767 passed, 3 pre-existing skips, Larastan 0, Pint clean. **MySQL
+was left to CI**, per the running order. No migration.
+
+**Tests** — `SignupWizardTest` (22): the closed screen carrying fee collection and exactly one entrance
+(fails against `main`, where the panel and its three options are inline); each chooser route reaching its real
+mechanism, including the handover asserted as 173's session handover to the real invite URL and a file-level
+check that no lookalike was built; the step map against the shape; partial data surviving Back/Next; a step
+refusing to advance on its own invalid fields; the stepper walking back but never forward; the close confirm
+appearing only once data was entered; close-and-reopen landing on a clean chooser; the wizard still refusing a
+signature-less submit and still producing the ordinary application; 210's paper route with signatures off; the
+review step; 207's alert opening onto the pending list; 194's one lookup; no focus trap; the layer order; the
+body-scroll lock wired both ways.
+
+**Retargeted, not deleted:** 210's `SociosLayoutHarnessTest` measured the sign-up's fold position from
+`[data-alta-panel]` on the page. The job left the page, so it measures its ENTRANCE — the measurement (where
+each of the three jobs starts, is the record above the fold) is exactly as meaningful, and 210's before/after
+only reads if the after keeps being taken. 220's screenshot harness now walks the wizard to its signature
+step, because that is where the step it shoots now lives.
+
+**Measured** (`measure-signup-wizard.mjs`, 1180×820 and 820×1180, light and dark, touch): panel inside the
+viewport top and bottom, footer on screen, no control under 44×44 including the stepper circles, no horizontal
+scroll, and `overflow-hidden` on `<body>` actually locking the page behind. These harness pages carry no
+JavaScript (Alpine ships inside Livewire's bundle, which cannot load off a `file://` URL), so the signature
+canvas measures at its unscripted intrinsic height — larger than the 150px Alpine gives it, which errs toward
+the panel being reported TALLER than it really is. The CSS half of the body lock is measured here; the Alpine
+half that applies it is asserted in the feature test.

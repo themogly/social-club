@@ -413,6 +413,57 @@ class SignupWizardTest extends TestCase
         $this->assertStringContainsString('data-alta-pending', $html, 'the applications waiting to be reviewed are not on it');
     }
 
+    /**
+     * **No focus trap, and no `inert` — the recorded decision, not an oversight.**
+     *
+     * The a11y audit considered trapping focus on counter overlays and rejected it: the failure mode of
+     * `inert` left on is a counter that looks fine and responds to nothing, and this component has already
+     * produced two such bugs. A future session reading "a modal should trap focus" should find this test and
+     * the entry behind it rather than reintroducing it.
+     */
+    public function test_the_modal_does_not_trap_focus(): void
+    {
+        $this->staff();
+
+        $html = Livewire::test(MembershipCounter::class)->call('toggleAlta')->html();
+
+        $this->assertStringNotContainsString('inert', $html, 'the modal reintroduced inert on the content behind it');
+        $this->assertStringContainsString('aria-modal="true"', $html);
+        $this->assertStringContainsString('data-alta-close', $html, 'there is no way out of the modal');
+    }
+
+    /** 173's surface outranks this one: a lock, an idle timeout or a handover must cover a staff form. */
+    public function test_the_modal_sits_below_the_counter_surface(): void
+    {
+        // Read the LAYER off each surface's own class attribute, not off the file's bytes — a prose mention
+        // of the other one's z-index in a comment is not a second layer.
+        $layer = function (string $view): int {
+            $blade = (string) file_get_contents(resource_path('views/livewire/counter/partials/'.$view.'.blade.php'));
+            preg_match('/class="fixed inset-0 z-(\d+)/', $blade, $m);
+
+            $this->assertNotEmpty($m, "{$view} has no fixed full-screen layer");
+
+            return (int) $m[1];
+        };
+
+        $this->assertLessThan(
+            $layer('counter-surface'),
+            $layer('alta-modal'),
+            'the sign-up modal can now cover a lock or a handover',
+        );
+    }
+
+    /** The page behind an open modal does not scroll — and the lock is released when it closes. */
+    public function test_the_page_behind_the_modal_is_locked_both_ways(): void
+    {
+        $blade = (string) file_get_contents(resource_path('views/livewire/counter/membership-counter.blade.php'));
+
+        // `x-effect`, not `x-init`: an init inside the modal would add the class on open and have nothing
+        // left to remove it, which is a counter that has silently lost its scrollbar.
+        $this->assertStringContainsString('x-effect="document.body.classList.toggle(', $blade, 'the body scroll lock is not wired');
+        $this->assertStringContainsString('\'overflow-hidden\', $wire.altaOpen)', $blade, 'the lock does not follow the modal\'s own state');
+    }
+
     /** Type a valid identity + contact and stop on the signature step. */
     private function wizardThrough(): Testable
     {
