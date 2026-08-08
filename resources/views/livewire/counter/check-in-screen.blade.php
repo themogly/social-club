@@ -148,7 +148,8 @@
                                         @continue($rule['satisfied'])
                                         @php
                                             $isBlock = in_array($rule['mode'], ['BLOCK', 'OVERRIDE'], true);
-                                            $remedy = \App\Support\VerdictRemedy::describe($rule, $member, $location);
+                                            // The ACTOR too (prompt 211) — see the POS's copy of this block.
+                                            $remedy = \App\Support\VerdictRemedy::describe($rule, $member, $location, auth()->user());
                                         @endphp
                                         {{-- Prompt 135: name the rule in the member's terms (dates, amounts) and, where a
                                              fix exists, say it — never a generic "no cumple". WARN vs BLOCK stay distinct. --}}
@@ -171,6 +172,10 @@
                                             ? __('Un responsable con permiso debe autorizar la entrada para continuar.')
                                             : __('Puede entrar; el aviso queda registrado.') }}
                                     </p>
+                                    {{-- The SECOND report — "there's no link here either to add membership."
+                                         Same verdict, same resolver, same missing action; 203's panel, from
+                                         the one shared partial (prompt 211). --}}
+                                    @include('livewire.counter.partials.membership-fix')
                                     @include('livewire.counter.partials.inline-fee')
                                 </div>
                             @endif

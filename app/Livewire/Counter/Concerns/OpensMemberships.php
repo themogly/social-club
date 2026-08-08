@@ -45,13 +45,68 @@ use Illuminate\Support\Collection;
  * default: someone with `membership.fee.override` set that figure deliberately, and a staff renewal must not
  * quietly undo it.
  *
- * The host must expose `flash()`, `resolveLocation()`, `currentUser()`, `requireOperator()` and the
- * `$feeMemberId` state of {@see CollectsMembershipFees} — `MembershipCounter` has all five.
+ * **Prompt 211 — the same dead end was still on the other two screens, and this trait had one consumer.**
+ * 203 did the architecture right and stopped one screen short: it extracted this concern, and then only
+ * `MembershipCounter` used it. `CheckInScreen` and `DispensaryPos` render the SAME verdict, from the SAME
+ * resolver, and showed the SAME *"sin membresía activa en esta sede"* with nothing to press — reported twice,
+ * once for each. So 211 wires this concern to both rather than building anything: the enrol/renew route, its
+ * uniqueness guard, its `membership.enrol` gate and its refusal to touch a non-default fee are 203's, unchanged.
+ *
+ * The host must expose `flash()`, `resolveLocation()`, `currentUser()`, `requireOperator()` and a member on
+ * screen. **Which property holds that member differs per host** — Socios calls it `$feeMemberId` (it is the
+ * socio a fee would be collected from), the door and the POS call it `$memberId` — so hosts override
+ * {@see self::membershipSubjectId()}. That indirection is the whole of what 211 had to add here.
  */
 trait OpensMemberships
 {
     /** The tier chosen for a new enrolment. Never a fee — see the class docblock. */
     public ?string $openTierId = null;
+
+    /**
+     * The socio this concern acts on.
+     *
+     * Defaults to `CollectsMembershipFees`' `$feeMemberId`, which is what 203's only host used. The door and
+     * the POS hold their member in `$memberId` and override this. Deliberately a METHOD rather than a
+     * property name convention: a host that resolves its subject some other way can, and the trait cannot be
+     * silently pointed at the wrong person by a property that happens to share a name.
+     */
+    protected function membershipSubjectId(): ?string
+    {
+        return $this->feeMemberId;
+    }
+
+    /**
+     * Everything a screen needs to render the fix panel, or null when there is nothing to fix.
+     *
+     * Resolved HERE so the three screens cannot disagree about which of 203's three cases a member is in —
+     * the panel is one shared partial reading one shared resolver.
+     *
+     * @return array{case: string, lapsed: ?Membership, elsewhere: Collection<int, Membership>, tiers: Collection<int, MembershipTier>, member: Member}|null
+     */
+    public function membershipFix(): ?array
+    {
+        $location = $this->resolveLocation();
+        $id = $this->membershipSubjectId();
+        $member = $id !== null ? Member::query()->find($id) : null;
+
+        if ($member === null || $location === null) {
+            return null;
+        }
+
+        $case = $this->membershipCase($member, $location);
+
+        if ($case === 'active') {
+            return null;
+        }
+
+        return [
+            'case' => $case,
+            'lapsed' => $this->lapsedMembershipHere($member, $location),
+            'elsewhere' => $this->membershipsElsewhere($member, $location),
+            'tiers' => $this->openTiers($location),
+            'member' => $member,
+        ];
+    }
 
     /**
      * Restore the lapsed membership this member already holds at this sede.
@@ -228,7 +283,8 @@ trait OpensMemberships
             return [null, null, null];
         }
 
-        $member = $this->feeMemberId !== null ? Member::query()->find($this->feeMemberId) : null;
+        $subjectId = $this->membershipSubjectId();
+        $member = $subjectId !== null ? Member::query()->find($subjectId) : null;
 
         if ($member === null) {
             $this->flash(__('Selecciona un socio.'), 'error');
@@ -250,6 +306,9 @@ trait OpensMemberships
      */
     private function afterMembershipOpened(Member $member, string $message): void
     {
+        // Keep the socio on screen. The host's OWN subject property is already pointing at them — that is how
+        // we got here — so this only has to hold Socios' fee target, which every host has because they all
+        // carry `CollectsMembershipFees` (the default `membershipSubjectId()` reads it).
         $this->feeMemberId = $member->id;
         $this->flash($message, 'success');
     }

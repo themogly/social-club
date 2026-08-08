@@ -22,6 +22,7 @@ use App\Livewire\Counter\Concerns\CollectsMembershipFees;
 use App\Livewire\Counter\Concerns\FindsMembers;
 use App\Livewire\Counter\Concerns\HandlesTender;
 use App\Livewire\Counter\Concerns\IdentifiesOperator;
+use App\Livewire\Counter\Concerns\OpensMemberships;
 use App\Livewire\Counter\Concerns\PersistsBasket;
 use App\Livewire\Counter\Concerns\ResolvesCounterLocation;
 use App\Livewire\Counter\Concerns\ShowsSettledOutcome;
@@ -82,7 +83,7 @@ use RuntimeException;
 #[Layout('components.layouts.counter', ['fullHeight' => true])] // prompt 176: the page must not scroll; the selection pane does
 class DispensaryPos extends Component
 {
-    use CollectsMembershipFees, FindsMembers, HandlesTender, IdentifiesOperator, PersistsBasket, ResolvesCounterLocation, ShowsSettledOutcome;
+    use CollectsMembershipFees, FindsMembers, HandlesTender, IdentifiesOperator, OpensMemberships, PersistsBasket, ResolvesCounterLocation, ShowsSettledOutcome;
 
     // --- Identity ---------------------------------------------------------------
     // The ONE lookup field ($lookup) and everything behind it live in FindsMembers (prompt 194). This screen
@@ -1811,5 +1812,14 @@ class DispensaryPos extends Component
 
         $this->flashMessage = $message;
         $this->flashType = $type;
+    }
+
+    /**
+     * Prompt 211 — the socio held at the POS. 203's concern defaults to Socios' `\$feeMemberId`; this screen's subject is the
+     * member the operator pulled in to dispense to.
+     */
+    protected function membershipSubjectId(): ?string
+    {
+        return $this->memberId;
     }
 }
