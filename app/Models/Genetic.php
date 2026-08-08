@@ -12,6 +12,7 @@ use App\Models\Concerns\BelongsToOrganisation;
 use App\Observers\GeneticObserver;
 use App\Support\ActiveScope;
 use App\Support\Settings;
+use App\Support\StockCover;
 use Database\Factories\GeneticFactory;
 use Illuminate\Database\Eloquent\Attributes\ObservedBy;
 use Illuminate\Database\Eloquent\Builder;
@@ -175,6 +176,18 @@ class Genetic extends Model
      */
     public function lowStockThresholdCg(?string $locationId): int
     {
+        return $this->explicitLowStockThresholdCg($locationId) ?? self::derivedLowStockThresholdCg($locationId);
+    }
+
+    /**
+     * A threshold the CLUB has stated, or null — the absolute floor, ahead of anything derived.
+     *
+     * Split out by prompt 216 so `StockCover` can ask the question it actually needs: *"has anybody set a
+     * figure here?"* Precedence is 54's and 213's, unchanged — per-sede `GeneticPrice` row, then the org
+     * setting, and a club that has stated a number has stated it.
+     */
+    public function explicitLowStockThresholdCg(?string $locationId): ?int
+    {
         $perLocation = $this->prices()->withoutGlobalScopes()
             ->where('location_id', $locationId)
             ->whereNull('tier_id')
@@ -186,7 +199,7 @@ class Genetic extends Model
 
         $configured = (int) Settings::get('low_stock_threshold_cg', 0);
 
-        return $configured > 0 ? $configured : self::derivedLowStockThresholdCg($locationId);
+        return $configured > 0 ? $configured : null;
     }
 
     /**
@@ -205,8 +218,15 @@ class Genetic extends Model
      * `daily_limit_cg`, it needs no second knob, and an explicit `low_stock_threshold_cg` still wins — as
      * does the per-sede figure on `GeneticPrice`, which prompt 213 did not touch.
      *
-     * `OVERNIGHT-DEFAULT — CONFIRM` (see DECISIONS.md): whether one daily allowance is the right multiple,
-     * and whether "low" is even the right frame when a ceiling makes low normal.
+     * **RESOLVED by prompt 216**, on the recommendation the owner asked for: the frame is COVER, not
+     * quantity — days of stock at the rate the genetic is actually going ({@see StockCover}).
+     * 213's own default turned out to be wrong from the other side: one daily allowance is 3.5 g, so on the
+     * seeded holdings nothing badged at all and a genetic only badged once it could no longer fill a single
+     * order — at which point it is not low, it is gone. The base was the problem, not the multiple.
+     *
+     * This method survives as the **thin-history fallback**: a genetic never dispensed at this sede, or first
+     * dispensed inside the trailing window, has no rate to divide by, and must not read as infinitely
+     * covered. That is the one place an allowance figure is still the right answer.
      */
     public static function derivedLowStockThresholdCg(?string $locationId): int
     {
@@ -225,7 +245,11 @@ class Genetic extends Model
      */
     public function isLowStockAt(int $remainingCg, ?string $locationId): bool
     {
-        return $remainingCg <= $this->lowStockThresholdCg($locationId);
+        if ($locationId === null) {
+            return $remainingCg <= $this->lowStockThresholdCg(null);
+        }
+
+        return StockCover::verdict($this, $locationId, $remainingCg)['low'];
     }
 
     /** The member-facing availability states (prompt 185). A STATE, never a quantity. */
@@ -276,6 +300,10 @@ class Genetic extends Model
             return self::UNAVAILABLE;
         }
 
-        return $this->isLowStockAt($onHand, $locationId) ? self::LOW : self::AVAILABLE;
+        // Prompt 216 changed what LOW MEANS — "running out soon at the rate it is going", not "under a flat
+        // gram line" — and deliberately did not change its SHAPE. A state word reaches the member and
+        // nothing else: no cover figure, no window, no rate. 185's rule is the sharpest constraint on this
+        // branch, because the temptation to pass the useful new number through here is exactly the mistake.
+        return StockCover::verdict($this, $locationId, $onHand)['low'] ? self::LOW : self::AVAILABLE;
     }
 }

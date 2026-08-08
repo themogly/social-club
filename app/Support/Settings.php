@@ -84,7 +84,21 @@ class Settings
         // information. Genetic::derivedLowStockThresholdCg() reads the sede's daily allowance instead: a
         // genetic is low when there is less than one member's day left of it. A club that sets a number here
         // gets that number.
+        // 0 = DERIVE. Since prompt 216 the derivation is DAYS OF COVER (App\Support\StockCover): on-hand
+        // divided by the rate the genetic is actually going. 213's own default — one member's daily
+        // allowance — turned out to be wrong from the other side: at 3.5 g nothing badged at all, and a
+        // genetic only badged once it could no longer fill a single order, which is not low, it is gone.
+        // A club that sets a number here still gets that number, as an absolute floor.
         'low_stock_threshold_cg' => 0,
+
+        // Days-of-cover (prompt 216). The trailing window is a fortnight: long enough to smooth a quiet
+        // Tuesday, short enough to notice a trend. The warning fires below TWO days rather than one, because
+        // a warning that arrives the day you run out is a notification. Per sede, like every other counter
+        // threshold — and deliberately NOT a knob per genetic: the per-sede `low_stock_threshold_cg` on
+        // GeneticPrice already exists for a genetic a club wants to state a figure for, and it still wins.
+        'stock_cover_window_days' => 14,
+        'stock_cover_low_days' => 2,
+
         'batch_expiry_window_days' => 30,
 
         // Discounts

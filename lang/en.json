@@ -257,6 +257,7 @@
     "Avalador (nombre o nº)": "Sponsor (name or no.)",
     "Avalados": "Sponsored members",
     "Avisar": "Warn",
+    "Avisar por debajo de (días de stock)": "Warn below (days of stock)",
     "Aviso": "Notice",
     "aviso": "notice",
     "Aviso de saldo bajo (€)": "Low balance alert (€)",
@@ -2110,6 +2111,7 @@
     "Sin visitas.": "No visits.",
     "Sistema": "System",
     "Sistema temporalmente no disponible": "System temporarily unavailable",
+    "Sobre cuántos días de dispensaciones reales se calcula el ritmo de cada genética.": "How many days of real dispensing each genetic's rate is calculated over.",
     "Sobre tu solicitud de socio/a": "About your membership application",
     "Socio": "Member",
     "socio": "member",
@@ -2396,6 +2398,7 @@
     "Venta barra": "Bar sale",
     "Ventajas": "Benefits",
     "Ventana de caducidad de lote (días)": "Batch expiry window (days)",
+    "Ventana de consumo (días)": "Consumption window (days)",
     "Ventana de reembolso (días)": "Refund window (days)",
     "Ventana mensual": "Monthly window",
     "Ventana temporal (días)": "Temporary window (days)",
@@ -2434,6 +2437,7 @@
     "¡Bienvenido/a a la asociación! Tu solicitud ha sido aprobada y ya eres socio/a.": "Welcome to the association! Your application has been approved and you are now a member.",
     "¡Gracias! Hemos recibido tu solicitud. La asociación la revisará y te avisará por correo.": "Thank you! We have received your application. The association will review it and notify you by email.",
     "¡Gracias! Hemos recibido tu solicitud. La asociación la revisará y, si se aprueba, recibirás por correo tu tarjeta de socio/a con un código QR para identificarte. La revisión puede tardar unos días.": "Thank you! We have received your application. The association will review it and, if approved, you will receive your membership card by email with a QR code to identify yourself. The review may take a few days.",
+    "«Stock bajo» se mide contra la demanda: cuántos días duraría al ritmo actual. Un aviso que llega el día que te quedas sin existencias no es un aviso.": "“Low stock” is measured against demand: how many days it would last at the current rate. A warning that arrives the day you run out is not a warning.",
     "¿Activar el bloqueo de seguridad? Cerrará el club entero.": "Activate the security lockdown? It will close the whole club.",
     "¿Anular la dispensación? Se revertirán stock y monedero.": "Void the dispensation? Stock and wallet will be reversed.",
     "¿Anular la venta? Se revertirán stock y monedero.": "Void the sale? Stock and wallet will be reversed.",
@@ -2461,5 +2465,6 @@
     "… o añade un terminal nuevo": "… or add a new terminal",
     "… o escribe un motivo": "… or type a reason",
     "…o enviar una invitación por email": "…or send an invitation by email",
-    "€/g": "€/g"
+    "€/g": "€/g",
+    "≈:n días": "≈:n days"
 }

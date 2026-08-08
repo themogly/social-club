@@ -257,6 +257,7 @@
     "Avalador (nombre o nº)": "Avalador (nombre o nº)",
     "Avalados": "Avalados",
     "Avisar": "Avisar",
+    "Avisar por debajo de (días de stock)": "Avisar por debajo de (días de stock)",
     "Aviso": "Aviso",
     "aviso": "aviso",
     "Aviso de saldo bajo (€)": "Aviso de saldo bajo (€)",
@@ -2110,6 +2111,7 @@
     "Sin visitas.": "Sin visitas.",
     "Sistema": "Sistema",
     "Sistema temporalmente no disponible": "Sistema temporalmente no disponible",
+    "Sobre cuántos días de dispensaciones reales se calcula el ritmo de cada genética.": "Sobre cuántos días de dispensaciones reales se calcula el ritmo de cada genética.",
     "Sobre tu solicitud de socio/a": "Sobre tu solicitud de socio/a",
     "Socio": "Socio",
     "socio": "socio",
@@ -2396,6 +2398,7 @@
     "Venta barra": "Venta barra",
     "Ventajas": "Ventajas",
     "Ventana de caducidad de lote (días)": "Ventana de caducidad de lote (días)",
+    "Ventana de consumo (días)": "Ventana de consumo (días)",
     "Ventana de reembolso (días)": "Ventana de reembolso (días)",
     "Ventana mensual": "Ventana mensual",
     "Ventana temporal (días)": "Ventana temporal (días)",
@@ -2434,6 +2437,7 @@
     "¡Bienvenido/a a la asociación! Tu solicitud ha sido aprobada y ya eres socio/a.": "¡Bienvenido/a a la asociación! Tu solicitud ha sido aprobada y ya eres socio/a.",
     "¡Gracias! Hemos recibido tu solicitud. La asociación la revisará y te avisará por correo.": "¡Gracias! Hemos recibido tu solicitud. La asociación la revisará y te avisará por correo.",
     "¡Gracias! Hemos recibido tu solicitud. La asociación la revisará y, si se aprueba, recibirás por correo tu tarjeta de socio/a con un código QR para identificarte. La revisión puede tardar unos días.": "¡Gracias! Hemos recibido tu solicitud. La asociación la revisará y, si se aprueba, recibirás por correo tu tarjeta de socio/a con un código QR para identificarte. La revisión puede tardar unos días.",
+    "«Stock bajo» se mide contra la demanda: cuántos días duraría al ritmo actual. Un aviso que llega el día que te quedas sin existencias no es un aviso.": "«Stock bajo» se mide contra la demanda: cuántos días duraría al ritmo actual. Un aviso que llega el día que te quedas sin existencias no es un aviso.",
     "¿Activar el bloqueo de seguridad? Cerrará el club entero.": "¿Activar el bloqueo de seguridad? Cerrará el club entero.",
     "¿Anular la dispensación? Se revertirán stock y monedero.": "¿Anular la dispensación? Se revertirán stock y monedero.",
     "¿Anular la venta? Se revertirán stock y monedero.": "¿Anular la venta? Se revertirán stock y monedero.",
@@ -2461,5 +2465,6 @@
     "… o añade un terminal nuevo": "… o añade un terminal nuevo",
     "… o escribe un motivo": "… o escribe un motivo",
     "…o enviar una invitación por email": "…o enviar una invitación por email",
-    "€/g": "€/g"
+    "€/g": "€/g",
+    "≈:n días": "≈:n días"
 }
