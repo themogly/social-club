@@ -23,9 +23,12 @@
                     lang="{{ $loc }}"
                     aria-label="{{ $loc === 'es' ? __('Cambiar a español') : __('Cambiar a inglés') }}"
                     @class([
-                        // ≥ 24×24 CSS px target (WCAG 2.2 Target Size, prompt 98) — a control
-                        // non-native speakers depend on, so it keeps its floor here too.
-                        'inline-flex min-h-[1.5rem] min-w-[1.75rem] items-center justify-center rounded-md px-2 py-1 text-xs font-semibold uppercase transition',
+                        // 44×44 (prompt 217). It was 31×24 — WCAG 2.2's 24px minimum, which prompt 98 set
+                        // deliberately — and that was defensible until the page it sits on was measured as a
+                        // whole: this is the product's one phone-first surface, and every other control on it
+                        // now clears 44. The GLYPH is unchanged; the padding grew. It stays visually discreet
+                        // because it is chrome, not content.
+                        'inline-flex min-h-11 min-w-11 items-center justify-center rounded-md px-3 text-xs font-semibold uppercase transition',
                         'bg-brand text-white' => app()->getLocale() === $loc,
                         'text-ink-muted hover:text-brand dark:text-slate-400' => app()->getLocale() !== $loc,
                     ])>{{ $loc }}</button>
