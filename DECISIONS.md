@@ -10671,13 +10671,21 @@ per sede). The shape would be:
 One paragraph now saves a design argument later, and it says plainly that "attach a scan" is the weaker of the
 two futures.
 
-### Standing instruction
+### Standing instruction — ~~in force~~ **LIFTED for the signature pad by the owner, prompt 220**
 
-> **Do not implement a scan requirement, a signature-pad consent step, or any tightening of the `PAPER`
-> channel without the owner asking for it.**
+> ~~**Do not implement a scan requirement, a signature-pad consent step, or any tightening of the `PAPER`
+> channel without the owner asking for it.**~~
+>
+> **Prompt 220: the owner asked for it.** The instruction is not deleted, because its reasoning is what made
+> the answer right — it says *without the owner asking*, and he has. What 220 built is the **cheaper future
+> path this entry described**, arriving sooner than expected: signing on the tablet, not scanning paper.
+>
+> **What is still in force:** the **scan requirement** is still not wanted, and `PAPER` is still a legitimate
+> channel — a club that turns `signature_on_application` off gets 210's attestation back, unchanged and
+> undamaged. Do not remove it, and do not add a scan.
 
-Same force as a withdrawn prompt. A future session that notices the "missing" scan should read this entry and
-stop, not build.
+Same force as a withdrawn prompt for the half that remains. A future session that notices the "missing" scan
+should read this entry and stop, not build.
 
 **What is load-bearing and stays**, because it is what makes the deferral defensible at all: `ConsentChannel`
 as a first-class column, the **named attesting operator**, the versioned consent text, and 210's rule that the
@@ -10797,3 +10805,136 @@ the partial waiver and the mixed history; STAFF holding the permission on all th
 refused at the screen and at the writer; the audit row asserted field by field; each structured reason offered
 only when the record backs it, and checked on first paint; the revenue guard across every surface; the arqueo
 unmoved; and 214's sync carrying the new permission to a database seeded without it.
+
+---
+
+## Prompt 220 — the sign-up is signed: one pad, three routes, the member's own act
+
+218 recorded the owner's decision that filed paper plus a digital attestation was enough, and wrote a standing
+instruction against building a signature step *without him asking*. **He asked.** So this branch builds the
+"cheaper future path" that entry sketched — signing on the tablet rather than scanning a form — and the 218
+entry is amended rather than replaced: the guard against a **scan requirement** stands, and `PAPER` survives
+intact for a club that wants it.
+
+### The pad was already built, and wired to one consumer
+
+Prompt 113 built a working signature pad and left it **inline in `dispensary-pos.blade.php`** — canvas, Alpine
+behaviour, capture/clear contract, all of it. That is this project's most-repeated defect, and this is the
+**fifth** time it has been paid for:
+
+| built once, wired once | wired to the rest by |
+|---|---|
+| `OpensMemberships` (203, Socios only) | 211 |
+| MRZ reader partial (179, public form only) | 215 |
+| application field list (210, two hand-written copies) | 215 |
+| **signature pad (113, dispensation only)** | **220** |
+
+Every one shipped `composer check` green, because a green suite proves the unit WORKS, never that everything
+which should use it DOES. So the pad is now `resources/views/components/counter/signature-pad.blade.php`, and
+`SignaturePadConsumersTest` asserts the **rule** rather than today's list: a signature canvas may exist in
+exactly one file, and each consumer renders the shared component. A sixth screen hand-rolling a sixth canvas
+fails the suite.
+
+### Two mechanics, one pad — decided on the HOST, not the artefact
+
+The public application form is a plain POST with no component behind it; the dispensation POS and the
+staff-typed alta both sit inside Livewire. So `mode` picks how the drawing travels — a hidden input submitted
+with the form, or `$wire.<capture>()` — and nothing an operator or an applicant touches differs. Getting this
+backwards is silent (a `form` pad inside Livewire posts nothing; a `livewire` pad on the public form calls
+`$wire` on a page that has none), so it is asserted per consumer.
+
+### Required means required, and it means SERVER-SIDE
+
+`signature_on_application` (org-level, default **on**) is enforced inside `SubmitApplication`, which is the one
+writer all three routes go through — **not** in a disabled button, because a disabled button is not a rule and
+the club's evidence cannot depend on which screen was used. A signature-less submit is refused identically on
+the emailed link, the handover and the staff form.
+
+**Org-level, not per-location**, unlike `signature_on_dispensation`. Two reasons: it is a decision about what
+evidence of consent the club keeps, not a counter-workflow preference that varies by premises; and the emailed
+link has no active location in session, so a per-location toggle would quietly fall back to the org value on
+exactly the route where the applicant is alone with the form — signed on the tablet, unsigned by email, for no
+reason anyone could see. It sits on the org settings page under *Membresía*.
+
+### A drawn signature outranks a paper attestation
+
+`ConsentChannel::SIGNED` is a third case, and where a signature exists it **wins** — on the staff route the
+channel is promoted to `SIGNED` and `consent_attested_by` is nulled. That is deliberate: `PAPER` means *the
+club asserts this person consented*; a signature means *this person consented, here is their hand*. Recording
+the weaker of the two when the stronger is in the vault would understate captured evidence, which is the one
+wrong answer. `isApplicantsOwnAct()` therefore returns true for `SIGNED`, and the staff form's paper checkbox
+is not even rendered while the setting is on.
+
+### Where the signature LIVES — the decision that carries the weight
+
+The image goes to `DocumentVault` (encrypted, private disk, `signatures/<ULID>.png`) like every other Article-9
+artefact. The question was what points at it afterwards, and the answer is a new nullable
+**`consent_records.signature_path`**, populated at approval from the application payload — the same file, never
+a copy, exactly as `ApproveApplication` already does for the photo and the ID scan.
+
+Leaving it only on the application payload would have been cheaper and wrong: **erasure cannot walk there.**
+`member_applications` hangs off `resulting_member_id`, not `member_id`, so `AnonymiseMember` — and the guard
+test that enumerates `member_id` tables — would never have seen it, and an anonymised member's handwritten
+signature would have survived indefinitely on an approved application that retention deliberately never prunes.
+Evidence of the act belongs with the record of the act, and the consent row is the thing a DPO produces.
+
+**Found and NOT fixed, recorded rather than absorbed:** the same reasoning means an approved application's
+payload keeps the applicant's name, DOB and document number after the member is anonymised. That is a
+**pre-existing erasure gap wider than this branch** — 220 nulls only its own `signature_path` there, so no row
+points at a deleted artefact. The general fix (walking `resulting_member_id` in `AnonymiseMember`, or scrubbing
+approved payloads down to the fields approval consumed) is a prompt of its own.
+
+### Reachable, or it is not evidence
+
+A stored artefact nothing can display is the "complete Action nobody calls" defect in another costume. So:
+`consents.signature.show` → `MemberMediaController::consentSignature` → `VaultStream`'s five protections, minted
+by `VaultUrl::consentSignature`, reached from a **Ver firma** action on the member's consents table — which also
+gained the `channel` and `attested_by` columns it had been missing since 210. Without those the table showed a
+version and a date for three materially different things.
+
+Authorised through a new **`MemberPolicy::viewConsentSignature`** rather than plain `view`, for the reason 113
+gave `viewPhoto` one: a route-model-bound endpoint gets no query-time global scope to lean on, so the org check
+has to be in the gate.
+
+### `x-cloak` was styled nowhere — eighteen uses, no rule
+
+Caught by looking at the screenshot: the applicant's pad announced **"✓ Firma capturada" over an empty canvas**.
+`x-cloak` appears 18 times across 8 templates and **no CSS backed any of them**, so every one painted the wrong
+state until Alpine booted. One rule in `app.css` fixes all eighteen. It is in scope because on this branch the
+flash is a false claim of evidence, on the one screen the branch exists to make evidential.
+
+### Verification
+
+`composer check` green — **1747 tests**, 1744 passed, 3 pre-existing skips, Larastan 0, Pint clean. **MySQL was
+left to CI**, per the running order. One migration (a nullable `signature_path` on `consent_records`).
+
+**Existing tests were amended deliberately, never deleted.** Turning the signature on by default refuses every
+signature-less submit, so every test that posts the application form now supplies one, with the reason recorded
+in `SigningSomeoneUpTest::withPaperConsent()`: the assertions that are ABOUT 210's paper attestation pin the
+setting **off** and still test the path they were written for; the ones about the route working carry a
+signature, which is what a club actually gets.
+
+**Tests** — `SignedSignUpTest` (16): all three routes ending in a vault-stored PNG with the consent version;
+the bytes ciphertext at rest; each route refusing a signature-less submit server-side; a signed staff alta
+recorded as `SIGNED` with nobody attesting; the setting off restoring 210's `PAPER` route and letting the
+public form through; an abandoned handover leaving no orphan file; approval carrying the path to every consent
+row; the signed URL producing the image; **denials** — no `members.view` is refused and not logged as a view,
+and a URL issued to somebody else cannot be replayed; erasure destroying the file and both pointers; retention
+deleting a rejected applicant's signature; and the portability pack reporting `signed` without leaking a vault
+path. `SignaturePadConsumersTest` (4) holds the one-pad rule.
+
+The cross-**organisation** half of `viewConsentSignature` is deliberately **not** asserted: `ActiveScope`
+resolves to the only organisation in a single-org install, so a second org's manager reads as in-scope in a
+test exactly as they would in production. The clause is there for the multi-org keying the schema carries, and
+it gets a real test the day a second organisation does.
+
+**Measured, not assumed** (`measure-applicant-form.mjs`, 390×844 with touch, both themes): 22 controls initial
+/ 26 scanned — the sample counts moved by two because the page did — none under 44px, no horizontal scroll, and
+the canvas measured explicitly at 290×146, because a collapsed pad passes every touch-target assertion while
+being impossible to sign on.
+
+**Screenshots** (`storage/app/screenshots/220-signature/`), light and dark: the emailed link at 390×844, the
+handover at 1024×768, and the staff form at 1024×768 — each empty and signed — plus the server-rendered
+**captured** state on the staff form. The ink is drawn through the canvas's own 2D context with the component's
+own settings: these are `file://` pages with no JavaScript (Alpine ships inside Livewire's bundle, which cannot
+load off a file URL), so a mouse stroke would have drawn nothing and every "signed" shot would have been a lie.

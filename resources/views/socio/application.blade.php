@@ -236,6 +236,30 @@
                     </div>
                 </div>
 
+                {{-- Prompt 220 — the applicant SIGNS the consent text, on this device, before submitting.
+                     The owner: *"I want a digital signature when they sign up — whether it's handed over, or
+                     they're sent an application, or staff sign them up."*
+
+                     Placed AFTER the two consent ticks and the texts they refer to, because a signature over
+                     something unread is not evidence of anything. `mode="form"` because this page is a plain
+                     POST: the pad writes the drawing into a hidden field and it travels with the submission —
+                     the same pad component the dispensation uses, the same vault at the far end.
+
+                     `signature_on_application` decides whether it is required; the rule is enforced in
+                     `SubmitApplication`, not by this markup. --}}
+                @if (\App\Support\Settings::get('signature_on_application', true))
+                    <div class="rounded-lg border border-line bg-surface-alt p-3 dark:border-slate-700 dark:bg-slate-950">
+                        <x-counter.signature-pad
+                            mode="form"
+                            :name="\App\Support\ApplicationShape::SIGNATURE_FIELD"
+                            :label="__('Tu firma')"
+                            :hint="__('Firma para confirmar lo que acabas de aceptar. Se guarda cifrada con tu solicitud.')"
+                            class="mt-0"
+                        />
+                        <x-socio.field-error :name="\App\Support\ApplicationShape::SIGNATURE_FIELD" />
+                    </div>
+                @endif
+
                 {{-- What happens next (prompt 97): set the expectation before they submit. --}}
                 <p class="rounded-lg bg-brand-tint/60 p-3 text-xs text-ink-muted dark:bg-slate-800/60 dark:text-slate-400">
                     {{ __('Qué ocurre después: la asociación revisará tu solicitud. Si se aprueba, recibirás por correo tu tarjeta de socio/a con un código QR para identificarte en la sede. La revisión puede tardar unos días.') }}

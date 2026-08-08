@@ -16,7 +16,7 @@ class ConsentRecord extends Model
     use HasFactory, HasUlids;
 
     protected $fillable = [
-        'member_id', 'purpose', 'consent_text_version', 'locale', 'channel', 'attested_by',
+        'member_id', 'purpose', 'consent_text_version', 'locale', 'channel', 'attested_by', 'signature_path',
         'granted_at', 'withdrawn_at', 'ip',
     ];
 
@@ -38,6 +38,12 @@ class ConsentRecord extends Model
     public function attestedBy(): BelongsTo
     {
         return $this->belongsTo(User::class, 'attested_by');
+    }
+
+    /** Was this consent signed on screen by the person themselves (prompt 220)? */
+    public function isSigned(): bool
+    {
+        return filled($this->signature_path);
     }
 
     /** @return BelongsTo<Member, $this> */

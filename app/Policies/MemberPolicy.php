@@ -58,6 +58,20 @@ class MemberPolicy
     }
 
     /**
+     * View the signature the member drew over a consent text at sign-up (prompt 220).
+     *
+     * Its own ability rather than plain `view` for the same reason prompt 113 gave `viewPhoto` one: this is a
+     * direct, route-model-bound endpoint on an Article-9 artefact, so it cannot lean on the query-time global
+     * scopes an admin table gets — the org check has to be IN the gate. Same right as seeing the member
+     * (`members.view`): whoever may read the record may see what they signed, and nobody else.
+     */
+    public function viewConsentSignature(User $user, Member $model): bool
+    {
+        return $user->can('members.view')
+            && $model->organisation_id === app(ActiveScope::class)->organisationId();
+    }
+
+    /**
      * Capture (or replace) a member's identity PHOTO at the counter (prompt 157). This happens at the door and
      * the POS, performed by the STAFF who run them — so it is gated on operating one of those surfaces
      * (`checkin.manage` OR `pos.use`, both STAFF-held), NOT on the manager-only `members.edit`. Gating it on

@@ -54,6 +54,7 @@ class PublicApplicationFormTest extends TestCase
             'date_of_birth' => now()->subYears(30)->format('Y-m-d'),
             'document_type' => 'DNI', 'document_number' => '12345678Z',
             'declared_monthly_g' => '30', 'consent_data' => '1', 'consent_statutes' => '1',
+            'signature' => 'data:image/png;base64,'.base64_encode('sig'),
             ApplicationSpamGuard::HONEYPOT => '',
             // A render token aged past the minimum submit time, so a genuine submit isn't taken for a bot.
             ApplicationSpamGuard::TIMESTAMP => $this->agedToken(ApplicationSpamGuard::MIN_SECONDS + 2),

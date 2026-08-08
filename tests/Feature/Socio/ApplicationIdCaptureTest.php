@@ -77,6 +77,7 @@ class ApplicationIdCaptureTest extends TestCase
             'document_number' => '12345678Z',
             'consent_data' => '1',
             'consent_statutes' => '1',
+            'signature' => 'data:image/png;base64,'.base64_encode('sig'),
             ApplicationSpamGuard::HONEYPOT => '',
             ApplicationSpamGuard::TIMESTAMP => $this->agedToken(ApplicationSpamGuard::MIN_SECONDS + 2),
         ], $overrides);

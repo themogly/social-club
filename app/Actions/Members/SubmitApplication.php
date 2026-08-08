@@ -7,12 +7,15 @@ use App\Enums\MemberStatus;
 use App\Models\Member;
 use App\Models\MemberApplication;
 use App\Models\MrzFieldStat;
+use App\Support\ApplicationShape;
 use App\Support\DocumentVault;
 use App\Support\MrzPrefill;
 use App\Support\Settings;
 use App\Support\Weight;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\RateLimiter;
+use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
 
 /**
  * An invited applicant submits their details (code-style audit).
@@ -73,6 +76,21 @@ class SubmitApplication
             'consent_attested_by' => $data['consent_attested_by'] ?? null,
         ];
 
+        // Prompt 220 — the applicant's own signature over the consent text they just read. Stored through the
+        // SAME vault path family as a dispensation signature (prompt 113): encrypted at rest, private disk,
+        // signed-URL display, and already known to `AnonymiseMember`'s erasure sweep.
+        $signaturePath = $this->storeSignature($data[ApplicationShape::SIGNATURE_FIELD] ?? null);
+
+        if ($signaturePath !== null) {
+            $payload['signature_path'] = $signaturePath;
+
+            // A drawn signature is the MEMBER's act. On the staff route it therefore outranks 210's
+            // paper attestation: understating captured evidence is the one wrong answer, so the channel says
+            // SIGNED and the attesting operator falls away — nobody is asserting anything on their behalf.
+            $payload['consent_channel'] = ConsentChannel::SIGNED->value;
+            $payload['consent_attested_by'] = null;
+        }
+
         $photo = $files['photo'] ?? null;
         $scan = $files['document_scan'] ?? null;
         $allowed = $this->storageAllowed($photo !== null || $scan !== null, $ip);
@@ -103,6 +121,36 @@ class SubmitApplication
         $application->update(['payload' => $payload, 'submitted_at' => now()]);
 
         return $application;
+    }
+
+    /**
+     * Put the drawn signature in the vault, or refuse the submission when the club requires one.
+     *
+     * **Required means server-side** (prompt 220): a club with `signature_on_application` on refuses a
+     * signature-less application on every route — the public form, the handover and the staff form — rather
+     * than relying on a disabled button, because a disabled button is not a rule.
+     */
+    private function storeSignature(mixed $dataUrl): ?string
+    {
+        $prefix = 'data:image/png;base64,';
+        $binary = is_string($dataUrl) && str_starts_with($dataUrl, $prefix)
+            ? base64_decode(substr($dataUrl, strlen($prefix)), true)
+            : false;
+
+        if ($binary === false || $binary === '') {
+            if ((bool) Settings::get('signature_on_application', true)) {
+                throw ValidationException::withMessages([
+                    ApplicationShape::SIGNATURE_FIELD => __('Falta la firma.'),
+                ]);
+            }
+
+            return null;
+        }
+
+        $path = 'signatures/'.Str::ulid().'.png';
+        DocumentVault::put($path, $binary);
+
+        return $path;
     }
 
     /**

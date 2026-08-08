@@ -18,6 +18,7 @@ use App\Models\MembershipTier;
 use App\Models\User;
 use App\Support\ApplicationShape;
 use App\Support\Mrz\MrzParser;
+use App\Support\Settings;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
 use RuntimeException;
@@ -83,6 +84,15 @@ trait SignsUpMembers
     public mixed $altaPhoto = null;
 
     public mixed $altaDocumentScan = null;
+
+    /**
+     * The member's signature over the consent text, once drawn (prompt 220).
+     *
+     * Held as the raw data URL rather than a stored path, deliberately: on the staff route the application
+     * does not exist until submit, and writing bytes to the vault for a form somebody abandons would leave
+     * orphans nothing owns. `SubmitApplication` stores it at the same moment it stores the record.
+     */
+    public ?string $altaSignaturePath = null;
 
     /**
      * Which fields prompt 179's reader filled, so the operator can see what to check.
@@ -159,6 +169,30 @@ trait SignsUpMembers
         $this->altaPhoto = null;
         $this->altaDocumentScan = null;
         $this->altaMrzFilled = [];
+        $this->altaSignaturePath = null;
+    }
+
+    /**
+     * The member signs, on this tablet, in front of the operator (prompt 220).
+     *
+     * The same `x-counter.signature-pad` the dispensation uses, and the same contract — the drawing arrives
+     * as a PNG data URL. It is NOT written to the vault here: the application does not exist yet, and bytes
+     * written for a form somebody abandons are orphans nothing owns. `SubmitApplication` stores it with the
+     * record, in one moment.
+     */
+    public function saveAltaSignature(string $dataUrl): void
+    {
+        if (! str_starts_with($dataUrl, 'data:image/png;base64,')) {
+            return;
+        }
+
+        $this->altaSignaturePath = $dataUrl;
+        $this->flash(__('Firma capturada.'), 'success');
+    }
+
+    public function clearAltaSignature(): void
+    {
+        $this->altaSignaturePath = null;
     }
 
     /**
@@ -257,11 +291,10 @@ trait SignsUpMembers
             return;
         }
 
-        $data = $this->validate(
-            $this->staffAltaRules(),
-            [],
-            $this->staffAltaAttributes(),
-        )['altaForm'];
+        // The signature is validated alongside the facts but lives on its own property, so it is pulled out
+        // rather than read from the `altaForm` array.
+        $this->validate($this->staffAltaRules(), [], $this->staffAltaAttributes());
+        $data = $this->altaForm;
 
         // The public route reaches `SubmitApplication` through `ConvertEmptyStringsToNull`, which turns an
         // unanswered optional field into null; Livewire hands over the empty string as typed. Normalising
@@ -278,8 +311,12 @@ trait SignsUpMembers
         (new SubmitApplication)->handle(
             $application,
             $data + [
+                // `SubmitApplication` promotes this to SIGNED when a signature is present — the member's own
+                // act outranks the club's attestation, and understating captured evidence is the one wrong
+                // answer (prompt 220).
                 'consent_channel' => ConsentChannel::PAPER,
                 'consent_attested_by' => $operator->id,
+                ApplicationShape::SIGNATURE_FIELD => $this->altaSignaturePath,
             ],
             // The photo and the ID document, through the SAME writer and therefore the SAME vault: encrypted
             // before write, on the private disk, served only by signed access-logged URL (prompt 215). 177's
@@ -315,7 +352,12 @@ trait SignsUpMembers
      */
     private function staffAltaRules(): array
     {
-        $rules = ['altaConsentHeld' => ['accepted']];
+        // With signatures on (prompt 220) the member's own signature IS the consent evidence, so the paper
+        // attestation is neither shown nor required — it would be asking staff to assert something the member
+        // has just done for themselves. With signatures off, 210's rule returns exactly.
+        $rules = (bool) Settings::get('signature_on_application', true)
+            ? [ApplicationShape::SIGNATURE_FIELD => ['required', 'string']]
+            : ['altaConsentHeld' => ['accepted']];
 
         foreach (ApplicationShape::facts() as $field => $rule) {
             $rules['altaForm.'.$field] = $rule;
@@ -325,6 +367,12 @@ trait SignsUpMembers
         // array), and are validated by the SAME rules the public form uses — prompt 215's declaration.
         foreach (ApplicationShape::files() as $field => $rule) {
             $rules[$field === 'photo' ? 'altaPhoto' : 'altaDocumentScan'] = $rule;
+        }
+
+        // The signature lives on `$altaSignaturePath`; the rule above names the shared field, so map it.
+        if (isset($rules[ApplicationShape::SIGNATURE_FIELD])) {
+            $rules['altaSignaturePath'] = $rules[ApplicationShape::SIGNATURE_FIELD];
+            unset($rules[ApplicationShape::SIGNATURE_FIELD]);
         }
 
         return $rules;
@@ -341,6 +389,7 @@ trait SignsUpMembers
             'altaForm.document_type' => __('Tipo de documento'),
             'altaForm.document_number' => __('Número de documento'),
             'altaConsentHeld' => __('Consentimiento'),
+            'altaSignaturePath' => __('Firma'),
         ];
     }
 

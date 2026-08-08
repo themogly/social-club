@@ -3,6 +3,7 @@
 namespace App\Actions\Members;
 
 use App\Models\Member;
+use Illuminate\Support\Arr;
 
 /**
  * RGPD portability: assemble a single data pack of everything the club holds on a
@@ -55,7 +56,13 @@ class ExportMemberData
                     'amount_cents' => $t->amount_cents?->cents,
                     'balance_after_cents' => $t->balance_after_cents?->cents,
                 ])->all(),
-            'consents' => $member->consents()->get()->toArray(),
+            // Consents carry the prompt-220 signature POINTER. A portability pack is the member's own data, so
+            // the fact that they signed and which consent it covers both belong in it — but the raw vault path
+            // is an internal address, not their data, so it is reported as a flag. The image itself is served
+            // the way every other vault artefact is: a signed, access-logged URL, never a path in a JSON blob.
+            'consents' => $member->consents()->get()
+                ->map(fn ($c) => Arr::except($c->toArray(), ['signature_path']) + ['signed' => $c->isSigned()])
+                ->all(),
         ];
     }
 }

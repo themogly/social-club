@@ -108,10 +108,18 @@ class ApproveApplication
             ? $payload['consent_attested_by']
             : null;
 
+        // And the signature they drew over it (prompt 220) — the SAME vault object the application holds, not
+        // a copy, for the same reason as the photo and the ID scan: one file, one path, so the member's
+        // evidence and the application's can never diverge, and erasure disposes of it once.
+        $consentSignature = isset($payload['signature_path']) && is_string($payload['signature_path'])
+            ? $payload['signature_path']
+            : null;
+
         foreach (($payload['consents'] ?? ['membership', 'data_processing']) as $purpose) {
             (new RecordMemberConsent)->handle(
                 $member, $purpose, request()->ip(), $consentVersion,
                 locale: $consentLocale, channel: $consentChannel, attestedBy: $consentAttestedBy,
+                signaturePath: $consentSignature,
             );
         }
 

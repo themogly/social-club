@@ -161,6 +161,28 @@
         @endif
     </div>
 
+    {{-- Prompt 220 — **the signature moment.** Staff type the facts; the member signs. This is the route
+         where the meaning changes most: a signature the member drew is THEIR act, and strictly stronger
+         evidence than prompt 210's staff-attested paper checkbox — which is why, with the setting on, the
+         checkbox below disappears and this replaces it.
+
+         Same pad component as the dispensation and the applicant's own form. Hand the tablet over for this
+         one control and take it back: no 173 handover is needed, because nothing of the club's is hidden and
+         no session changes — the member draws, staff submit. --}}
+    @if (\App\Support\Settings::get('signature_on_application', true))
+        <div class="mt-4 rounded-xl border border-brand/30 bg-brand-tint p-3 dark:border-slate-700 dark:bg-slate-800">
+            <x-counter.signature-pad
+                capture="saveAltaSignature"
+                clear="clearAltaSignature"
+                :stored="(bool) $altaSignaturePath"
+                :label="__('Firma del socio/a')"
+                :hint="__('Pásale la tablet: firma quien se da de alta, no tú.')"
+                class="mt-0"
+            />
+            @error(\App\Support\ApplicationShape::SIGNATURE_FIELD) <p class="mt-1 text-xs text-error">{{ $message }}</p> @enderror
+        </div>
+    @endif
+
     {{-- THE PART THAT IS NOT A UX QUESTION.
 
          The facts above are the same facts whoever types them. The consent is not: `SubmitApplication` stamps
@@ -171,6 +193,7 @@
          So this route does not produce the public form's artefact and does not pretend to: the consent row is
          stamped PAPER and names the operator who recorded it. Choosing to type it here IS that choice, which
          is why the confirmation below is explicit and has no default. --}}
+    @unless (\App\Support\Settings::get('signature_on_application', true))
     <div class="mt-4 rounded-xl border border-warning/40 bg-warning/10 p-3">
         <label class="flex min-h-11 items-start gap-3 text-sm">
             <input type="checkbox" wire:model="altaConsentHeld" data-alta-consent-held
@@ -182,6 +205,7 @@
         </label>
         @error('altaConsentHeld') <p class="mt-1 text-xs text-error">{{ $message }}</p> @enderror
     </div>
+    @endunless
 
     <button type="button" wire:click="submitStaffAlta" data-alta-staff-submit
             class="mt-4 h-14 w-full rounded-xl bg-brand text-base font-semibold text-white transition hover:bg-brand-dark">

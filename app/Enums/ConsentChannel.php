@@ -29,17 +29,29 @@ enum ConsentChannel: string
     /** Signed on paper, held by the club; a member of staff recorded it at the counter and is named on the row. */
     case PAPER = 'PAPER';
 
+    /**
+     * The applicant **signed the consent text on screen** (prompt 220) — the owner's ask, and the upgrade
+     * prompt 218 named in advance.
+     *
+     * Distinct from `APPLICANT` deliberately, though both are the member's own act: a tick records that they
+     * agreed, a signature records the same agreement with an artefact bound to the version of the text they
+     * were shown. It is the strongest of the three, and it is what a staff-typed application records when the
+     * member signs — never `PAPER`, because understating captured evidence is the one wrong answer.
+     */
+    case SIGNED = 'SIGNED';
+
     public function label(): string
     {
         return match ($this) {
             self::APPLICANT => __('Aceptado por el socio'),
             self::PAPER => __('Consentimiento en papel'),
+            self::SIGNED => __('Firmado en pantalla'),
         };
     }
 
     /** Whether this channel's evidence is the applicant's own act, rather than the club's account of it. */
     public function isApplicantsOwnAct(): bool
     {
-        return $this === self::APPLICANT;
+        return $this === self::APPLICANT || $this === self::SIGNED;
     }
 }

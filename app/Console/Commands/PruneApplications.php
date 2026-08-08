@@ -13,7 +13,7 @@ use Illuminate\Support\Facades\Storage;
 /**
  * Scheduled application-retention sweep (closes a security-audit finding on prompt 157). A member APPLICATION is
  * pre-membership Article-9-adjacent data: its `payload` holds the applicant's name, DOB, email and document
- * number, and — since prompts 157 and 178 — an OPTIONAL face photo AND an OPTIONAL identity document, both on the encrypted `documents` disk. An application
+ * number, and — since prompts 157 and 178 — an OPTIONAL face photo, an OPTIONAL identity document AND (prompt 220) the applicant's drawn signature, all on the encrypted `documents` disk. An application
  * that was REJECTED or abandoned (invited or submitted but never approved) must not keep that indefinitely; the
  * prompt-157 comment that claimed prompt 142's sweep covered it was wrong (that sweep only prunes member-import
  * CSVs). This ANONYMISES every such application past `application_retention_days` — deletes BOTH vault files and
@@ -66,7 +66,8 @@ class PruneApplications extends Command
         $anonymised = 0;
         $photosDeleted = 0;
         $scansDeleted = 0;
-        $due()->chunkById(500, function ($rows) use (&$anonymised, &$photosDeleted, &$scansDeleted): void {
+        $signaturesDeleted = 0;
+        $due()->chunkById(500, function ($rows) use (&$anonymised, &$photosDeleted, &$scansDeleted, &$signaturesDeleted): void {
             foreach ($rows as $application) {
                 $photo = data_get($application->payload, 'photo_path');
                 if (is_string($photo) && $photo !== '') {
@@ -84,6 +85,16 @@ class PruneApplications extends Command
                     $scansDeleted++;
                 }
 
+                // And the applicant's drawn signature (prompt 220), counted as its own artefact for the same
+                // reason: it is the person's hand over a consent text that this row is about to stop
+                // evidencing. Never reached for an APPROVED application — the member's consent record points
+                // at this same file, and approved rows are excluded above.
+                $signature = data_get($application->payload, 'signature_path');
+                if (is_string($signature) && $signature !== '') {
+                    Storage::disk('documents')->delete($signature);
+                    $signaturesDeleted++;
+                }
+
                 $application->forceFill([
                     'payload' => null,
                     'applicant_email' => null,
@@ -98,12 +109,13 @@ class PruneApplications extends Command
                 'anonymised' => $anonymised,
                 'photos_deleted' => $photosDeleted,
                 'id_scans_deleted' => $scansDeleted,
+                'signatures_deleted' => $signaturesDeleted,
                 'up_to' => $cutoff->toDateString(),
             ]);
         }
 
         HeartbeatLog::beat(self::HEARTBEAT);
-        $this->info("Anonymised {$anonymised} application(s) past retention ({$photosDeleted} photo(s), {$scansDeleted} ID scan(s) deleted, up to {$cutoff->toDateString()}).");
+        $this->info("Anonymised {$anonymised} application(s) past retention ({$photosDeleted} photo(s), {$scansDeleted} ID scan(s), {$signaturesDeleted} signature(s) deleted, up to {$cutoff->toDateString()}).");
 
         return self::SUCCESS;
     }

@@ -19,3 +19,12 @@
         Helvetica, Arial, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol',
         'Noto Color Emoji';
 }
+
+/* `x-cloak` — hide a thing until Alpine has decided whether it should be visible.
+   Found inert in prompt 220: eighteen uses across eight templates and no rule behind any of them, so every
+   `x-cloak` element painted on load and disappeared once Alpine booted. That is a flash of the WRONG state,
+   which for this branch is a pad announcing "✓ Firma capturada" over an empty canvas — a false claim of
+   evidence, on the one screen this branch exists to make evidential. One rule fixes all eighteen. */
+[x-cloak] {
+    display: none !important;
+}

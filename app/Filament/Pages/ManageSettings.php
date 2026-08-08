@@ -55,6 +55,7 @@ class ManageSettings extends Page
         'expiring_soon_days' => SettingType::INT,
         'renewal_reminder_lead_days' => SettingType::INT,
         'invite_expiry_days' => SettingType::INT,
+        'signature_on_application' => SettingType::BOOL,
         'refund_window_days' => SettingType::INT,
         'temporary_members_enabled' => SettingType::BOOL,
         'temporary_window_days' => SettingType::INT,
@@ -204,6 +205,12 @@ class ManageSettings extends Page
                             ->helperText(__('Una invitación de alta sin usar caduca tras estos días.')),
                         TextInput::make('refund_window_days')->label(__('Ventana de reembolso (días)'))->numeric()->minValue(0)->required()
                             ->helperText(__('Una dispensación más antigua que esta ventana no puede reembolsarse en mostrador (0 = sin límite).')),
+                        // Prompt 220. ORG-level, not per-location (unlike `signature_on_dispensation`): this is
+                        // what evidence the club keeps of the applicant's OWN act of consent, and the emailed-link
+                        // route has no active location in session — a per-location toggle would silently fall back
+                        // to the org value on exactly the route where the applicant is alone with the form.
+                        Toggle::make('signature_on_application')->label(__('Firma en el alta'))
+                            ->helperText(__('El alta se firma en pantalla, por las tres vías. Si se desactiva, el personal declara que tiene el consentimiento en papel.')),
                     ])->columns(3),
 
                 Section::make(__('Socios temporales'))

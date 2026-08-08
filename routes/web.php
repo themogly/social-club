@@ -38,6 +38,11 @@ Route::middleware(['web', 'auth', 'signed'])
 Route::middleware(['web', 'auth', 'signed'])
     ->get('dispensations/signature/{dispensation}', [MemberMediaController::class, 'signature'])
     ->name('dispensations.signature.show');
+// The consent signature (prompt 220) — the same endpoint family, because a consent the member SIGNED is
+// only evidence if somebody can produce the signature.
+Route::middleware(['web', 'auth', 'signed'])
+    ->get('members/consents/{consent}/signature', [MemberMediaController::class, 'consentSignature'])
+    ->name('consents.signature.show');
 
 // No public web routes. This app has no public/marketing surface (Spanish CSCs
 // may not advertise — a legal constraint, see NOTES §A). The Filament admin panel

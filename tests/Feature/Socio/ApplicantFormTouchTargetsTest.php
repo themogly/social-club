@@ -203,6 +203,7 @@ class ApplicantFormTouchTargetsTest extends TestCase
             'is_therapeutic' => '1',
             'consent_data' => '1',
             'consent_statutes' => '1',
+            'signature' => 'data:image/png;base64,'.base64_encode('sig'),
             ApplicationSpamGuard::HONEYPOT => '',
             ApplicationSpamGuard::TIMESTAMP => $token,
         ]);

@@ -2,6 +2,7 @@
 
 namespace App\Support;
 
+use App\Models\ConsentRecord;
 use App\Models\Dispensation;
 use App\Models\Member;
 use App\Models\User;
@@ -26,6 +27,14 @@ class VaultUrl
     {
         return filled($dispensation->signature_path)
             ? self::signed('dispensations.signature.show', ['dispensation' => $dispensation->id], $actor)
+            : null;
+    }
+
+    /** The signature the member drew over a consent text at sign-up (prompt 220). */
+    public static function consentSignature(ConsentRecord $consent, User $actor): ?string
+    {
+        return filled($consent->signature_path)
+            ? self::signed('consents.signature.show', ['consent' => $consent->id], $actor)
             : null;
     }
 
