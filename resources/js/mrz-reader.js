@@ -120,4 +120,58 @@ export function mountMrzScan(root = document) {
     });
 }
 
-document.addEventListener('DOMContentLoaded', () => mountMrzScan());
+/**
+ * Prompt 215 — the same reader, on the counter's staff sign-up form.
+ *
+ * 179 built `readMrz()` as a reusable read and wired it to one consumer: the applicant's public form, which
+ * POSTs the raw zone to a tokenised route. The staff form has no application yet — the token is minted at
+ * submit — so the read goes straight to the Livewire component, which parses it with the SAME `MrzParser`
+ * and the same ICAO check-digit rule. One reader, one parser, two callers.
+ *
+ * Mounted on every Livewire update as well as on load, because the form appears behind a disclosure and
+ * Livewire replaces its markup. Idempotent: the trigger is re-found each time and the listener re-bound to
+ * the new element.
+ */
+export function mountStaffMrzScan(root = document) {
+    const trigger = root.querySelector('[data-alta-mrz-scan]');
+    const fileInput = root.querySelector('[data-alta-scan]');
+    const status = root.querySelector('[data-alta-mrz-status]');
+
+    if (!trigger || !fileInput || trigger.dataset.mounted === '1') {
+        return;
+    }
+
+    trigger.dataset.mounted = '1';
+    trigger.hidden = false;
+
+    trigger.addEventListener('click', async () => {
+        const file = fileInput.files?.[0];
+
+        if (!file) {
+            if (status) status.textContent = trigger.dataset.needsFile || '';
+            return;
+        }
+
+        trigger.disabled = true;
+        if (status) status.textContent = trigger.dataset.reading || '';
+
+        const mrz = await readMrz(file);
+
+        trigger.disabled = false;
+        if (status) status.textContent = '';
+
+        // A failed read is ordinary and says nothing — the operator types the four fields, as they would
+        // have anyway. The component decides whether a successful read is TRUSTWORTHY (the check digit).
+        if (mrz) {
+            window.Livewire?.find(trigger.closest('[wire\\:id]')?.getAttribute('wire:id'))?.call('applyMrz', mrz);
+        }
+    });
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    mountMrzScan();
+    mountStaffMrzScan();
+});
+
+document.addEventListener('livewire:navigated', () => mountStaffMrzScan());
+document.addEventListener('livewire:update', () => mountStaffMrzScan());

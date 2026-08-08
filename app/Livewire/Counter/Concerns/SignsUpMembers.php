@@ -16,6 +16,8 @@ use App\Models\Member;
 use App\Models\MemberApplication;
 use App\Models\MembershipTier;
 use App\Models\User;
+use App\Support\ApplicationShape;
+use App\Support\Mrz\MrzParser;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
 use RuntimeException;
@@ -67,7 +69,7 @@ trait SignsUpMembers
      *
      * @var array<string, mixed>
      */
-    public array $altaForm = self::BLANK_ALTA_FORM;
+    public array $altaForm = [];
 
     /**
      * The operator's explicit confirmation that the club holds this person's consent — see the consent
@@ -77,11 +79,17 @@ trait SignsUpMembers
 
     public bool $altaStaffFormOpen = false;
 
-    private const BLANK_ALTA_FORM = [
-        'first_name' => '', 'last_name' => '', 'email' => '', 'phone' => '',
-        'date_of_birth' => '', 'address' => '', 'document_type' => '', 'document_number' => '',
-        'is_therapeutic' => false, 'avalador_ref' => '',
-    ];
+    /** The photo the counter nags about on three screens, and the ID document. Both optional (prompt 215). */
+    public mixed $altaPhoto = null;
+
+    public mixed $altaDocumentScan = null;
+
+    /**
+     * Which fields prompt 179's reader filled, so the operator can see what to check.
+     *
+     * @var list<string>
+     */
+    public array $altaMrzFilled = [];
 
     public function toggleAlta(): void
     {
@@ -93,8 +101,12 @@ trait SignsUpMembers
     {
         $this->altaStaffFormOpen = ! $this->altaStaffFormOpen;
 
+        if ($this->altaStaffFormOpen && $this->altaForm === []) {
+            $this->resetAltaForm();
+        }
+
         if (! $this->altaStaffFormOpen) {
-            $this->altaForm = self::BLANK_ALTA_FORM;
+            $this->resetAltaForm();
             $this->altaConsentHeld = false;
             $this->resetValidation();
         }
@@ -131,6 +143,67 @@ trait SignsUpMembers
         $this->beginHandover($application->inviteUrl());
 
         $this->redirect($application->inviteUrl(), navigate: false);
+    }
+
+    /**
+     * Blank the form from the one declaration (prompt 215).
+     *
+     * It used to be a `BLANK_ALTA_FORM` constant listing ten fields by hand while the public form posted
+     * sixteen. Derived now, so a field added to `ApplicationShape::facts()` reaches this route's state and
+     * validation with no second edit — including `declared_monthly_g`, which feeds the cultivation forecast
+     * and the stock ceiling, and which staff-created members arrived without.
+     */
+    private function resetAltaForm(): void
+    {
+        $this->altaForm = ApplicationShape::blankStaffForm();
+        $this->altaPhoto = null;
+        $this->altaDocumentScan = null;
+        $this->altaMrzFilled = [];
+    }
+
+    /**
+     * Prompt 179's ID-scan prefill, on the staff form (prompt 215).
+     *
+     * The reader is the SAME `readMrz()` the public form uses, and the parse is the SAME `MrzParser` —
+     * 179 built both as reusable and wired them to one consumer. What differs is only how the read arrives:
+     * the public form POSTs the raw zone to a tokenised route because it has a token, and this form has no
+     * application yet, so the browser hands the raw string straight to the component.
+     *
+     * The ICAO check digit still decides. `valid !== true` means a mis-read, and a mis-read must never
+     * prefill a document number — 128 built the parser correct-or-invalid for exactly that. A failed or
+     * absent read leaves the form untouched and usable, which is what makes an imperfect reader safe.
+     */
+    public function applyMrz(string $raw): void
+    {
+        $this->altaMrzFilled = [];
+
+        if ($raw === '' || mb_strlen($raw) > 200) {
+            return;
+        }
+
+        $parsed = (new MrzParser)->parse($raw);
+
+        if ($parsed === null || $parsed['valid'] !== true) {
+            $this->flash(__('No se ha podido leer el documento. Escribe los datos a mano.'), 'warning');
+
+            return;
+        }
+
+        $read = array_filter([
+            'first_name' => $parsed['given_names'],
+            'last_name' => $parsed['surname'],
+            'document_number' => $parsed['document_number'],
+            // The only nullable one: a TD1/TD3 date can fail to parse while the rest of the zone reads.
+            'date_of_birth' => $parsed['birth_date'],
+        ], fn (?string $v): bool => filled($v));
+
+        foreach ($read as $field => $value) {
+            $this->altaForm[$field] = $value;
+        }
+
+        // Named, so the operator knows which four to check against the document in their hand — the same
+        // "the person is the check" rule the public form's confirmation partial encodes.
+        $this->altaMrzFilled = array_keys($read);
     }
 
     /**
@@ -184,6 +257,12 @@ trait SignsUpMembers
             $this->staffAltaAttributes(),
         )['altaForm'];
 
+        // The public route reaches `SubmitApplication` through `ConvertEmptyStringsToNull`, which turns an
+        // unanswered optional field into null; Livewire hands over the empty string as typed. Normalising
+        // here keeps the two callers handing the ONE writer the same thing — which is this branch's whole
+        // point, and without it an unanswered "consumo mensual" reached `Weight::fromGrams('')` and threw.
+        $data = array_map(fn (mixed $v): mixed => $v === '' ? null : $v, $data);
+
         $application = $this->issueApplication($operator, email: $data['email'] ?: null, reference: __('Alta en el mostrador'));
 
         if ($application === null) {
@@ -196,7 +275,13 @@ trait SignsUpMembers
                 'consent_channel' => ConsentChannel::PAPER,
                 'consent_attested_by' => $operator->id,
             ],
-            files: [],
+            // The photo and the ID document, through the SAME writer and therefore the SAME vault: encrypted
+            // before write, on the private disk, served only by signed access-logged URL (prompt 215). 177's
+            // rule that no scan is RENDERED at the counter is untouched — capturing is not displaying.
+            files: [
+                'photo' => $this->altaPhoto?->getRealPath() !== null ? $this->altaPhoto : null,
+                'document_scan' => $this->altaDocumentScan?->getRealPath() !== null ? $this->altaDocumentScan : null,
+            ],
             token: (string) $application->invite_token,
             ip: request()->ip(),
         );
@@ -206,7 +291,7 @@ trait SignsUpMembers
             'consent_channel' => ConsentChannel::PAPER->value,
         ]);
 
-        $this->altaForm = self::BLANK_ALTA_FORM;
+        $this->resetAltaForm();
         $this->altaConsentHeld = false;
         $this->altaStaffFormOpen = false;
         $this->flash(__('Solicitud creada. Revísala abajo para dar de alta.'), 'success');
@@ -226,12 +311,14 @@ trait SignsUpMembers
     {
         $rules = ['altaConsentHeld' => ['accepted']];
 
-        foreach (SubmitApplicationRequest::factRules() as $field => $rule) {
-            if (in_array($field, ['photo', 'document_scan'], true)) {
-                continue;
-            }
-
+        foreach (ApplicationShape::facts() as $field => $rule) {
             $rules['altaForm.'.$field] = $rule;
+        }
+
+        // The two uploads live on their own properties (Livewire holds a TemporaryUploadedFile, not a form
+        // array), and are validated by the SAME rules the public form uses — prompt 215's declaration.
+        foreach (ApplicationShape::files() as $field => $rule) {
+            $rules[$field === 'photo' ? 'altaPhoto' : 'altaDocumentScan'] = $rule;
         }
 
         return $rules;
