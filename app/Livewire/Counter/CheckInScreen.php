@@ -12,6 +12,7 @@ use App\Exceptions\CheckInBlockedException;
 use App\Livewire\Counter\Concerns\CollectsMembershipFees;
 use App\Livewire\Counter\Concerns\FindsMembers;
 use App\Livewire\Counter\Concerns\IdentifiesOperator;
+use App\Livewire\Counter\Concerns\OpensMemberships;
 use App\Livewire\Counter\Concerns\ResolvesCounterLocation;
 use App\Models\CheckIn;
 use App\Models\Location;
@@ -48,7 +49,7 @@ use Livewire\Component;
 #[Layout('components.layouts.counter')]
 class CheckInScreen extends Component
 {
-    use CollectsMembershipFees, FindsMembers, IdentifiesOperator, ResolvesCounterLocation;
+    use CollectsMembershipFees, FindsMembers, IdentifiesOperator, OpensMemberships, ResolvesCounterLocation;
 
     // The ONE lookup field ($lookup) and everything behind it live in FindsMembers (prompt 194) — this screen
     // used to stack a scan box above a name box, each already accepting what the other asked for.
@@ -361,5 +362,14 @@ class CheckInScreen extends Component
     {
         $this->flashMessage = $message;
         $this->flashType = $type;
+    }
+
+    /**
+     * Prompt 211 — the socio at the door. Same override as the POS, and for the same reason: 203's concern defaults to
+     * Socios' `\$feeMemberId`.
+     */
+    protected function membershipSubjectId(): ?string
+    {
+        return $this->memberId;
     }
 }

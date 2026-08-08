@@ -3,11 +3,13 @@
 namespace App\Support;
 
 use App\Actions\Attendance\ResolveMemberEligibility;
+use App\Enums\EligibilityRule;
 use App\Enums\MembershipStatus;
 use App\Models\Location;
 use App\Models\Member;
 use App\Models\Membership;
 use App\Models\MembershipFeePayment;
+use App\Models\User;
 use Illuminate\Support\Carbon;
 
 /**
@@ -21,49 +23,104 @@ use Illuminate\Support\Carbon;
  * The unpaid-fee ACTION is already inline at the door and POS (prompt 127); this names every other rule and adds
  * the remedy note. It never changes a verdict or makes a rule easier to pass.
  *
- * @phpstan-type Remedy array{detail: string, remedy: ?string}
+ * **Prompt 211 — a remedy can now carry an ACTION, not just a sentence.** Prompt 203 closed the
+ * membership dead end: a member with a lapsed or absent membership could be enrolled or renewed at the
+ * counter, by STAFF, through audited Actions. It closed it **on the Socios screen** and left this shared
+ * string untouched — so the dispensary and the door went on saying *"Renueva su cuota desde su ficha"*,
+ * naming the admin panel that 203 exists because staff cannot use. The same defect, on two more screens,
+ * from one sentence.
+ *
+ * So the fix belongs HERE rather than in a screen's blade: the door, the dispensary and Socios all read this,
+ * and patching one of them would have left the other two saying the wrong thing tomorrow — which is how this
+ * arrived twice already. A rule that has a fix a permitted operator can perform says so and offers it; a rule
+ * that does not keeps today's behaviour, and {@see EligibilityRule} makes each of those an
+ * explicit declaration rather than a `default`.
+ *
+ * The remedy is still PURE PRESENTATION. It says a fix EXISTS on this terminal and what it is called; the
+ * screen renders 203's own panel (`partials/membership-fix`) to perform it. It changes what the operator can
+ * reach, never whether the commit is refused: a BLOCKS verdict still blocks, and `ResolveMemberEligibility`
+ * is untouched.
+ *
+ * @phpstan-type Remedy array{detail: string, remedy: ?string, action: ?array{label: string, inline: bool}}
  */
 class VerdictRemedy
 {
     /**
      * @param  array{rule: string, satisfied: bool, mode: string, message: string}  $rule
+     * @param  ?User  $actor  the operator reading it — a remedy must never instruct somebody to do something
+     *                        they hold no permission for, so the WORDING changes with the actor, not just the
+     *                        presence of a button
      * @return Remedy
      */
-    public static function describe(array $rule, Member $member, Location $location): array
+    public static function describe(array $rule, Member $member, Location $location, ?User $actor = null): array
     {
-        return match ($rule['rule']) {
-            'carencia' => [
-                'detail' => $member->carencia_ends_at instanceof Carbon
+        $case = EligibilityRule::tryFrom($rule['rule']);
+
+        if ($case === null) {
+            return ['detail' => $rule['message'], 'remedy' => null, 'action' => null];
+        }
+
+        return match ($case) {
+            EligibilityRule::CARENCIA => self::plain(
+                $member->carencia_ends_at instanceof Carbon
                     ? __('En carencia hasta el :date (puede entrar, aún no dispensarse).', ['date' => $member->carencia_ends_at->format('d/m/Y')])
                     : $rule['message'],
-                'remedy' => null,
-            ],
-            'unpaid_fee' => [
-                'detail' => self::feeDetail($member, $location) ?? $rule['message'],
-                'remedy' => null, // the collect-fee action is already inline (prompt 127)
-            ],
-            'debt' => [
-                'detail' => self::debtDetail($member, $location) ?? $rule['message'],
-                'remedy' => __('Debe saldar el monedero para poder continuar.'),
-            ],
-            'membership' => [
-                'detail' => $rule['message'],
-                'remedy' => __('Renueva su cuota desde su ficha para poder dispensarle.'),
-            ],
-            'sanction' => [
-                'detail' => $rule['message'],
-                'remedy' => __('No se resuelve en el mostrador: consulta con un responsable.'),
-            ],
-            'aforo' => [
-                'detail' => self::aforoDetail($location),
-                'remedy' => null,
-            ],
-            'photo' => [
-                'detail' => $rule['message'],
-                'remedy' => __('Haz la foto ahora, con el documento delante.'),
-            ],
-            default => ['detail' => $rule['message'], 'remedy' => null],
+            ),
+            // The collect-fee control is already inline beside the verdict (prompt 127), so this must not
+            // describe an action somewhere else — the one that exists is a few pixels away.
+            EligibilityRule::UNPAID_FEE => self::plain(self::feeDetail($member, $location) ?? $rule['message']),
+            EligibilityRule::DEBT => self::plain(
+                self::debtDetail($member, $location) ?? $rule['message'],
+                __('Debe saldar el monedero para poder continuar.'),
+            ),
+            EligibilityRule::MEMBERSHIP => self::membershipRemedy($rule, $member, $location, $actor),
+            EligibilityRule::SANCTION => self::plain($rule['message'], __('No se resuelve en el mostrador: consulta con un responsable.')),
+            EligibilityRule::AFORO => self::plain(self::aforoDetail($location)),
+            EligibilityRule::PHOTO => self::plain($rule['message'], __('Haz la foto ahora, con el documento delante.')),
+            // No counter fix and never one — it was falling through a `default` before, which is
+            // indistinguishable from an oversight. Explicit now.
+            EligibilityRule::AGE => self::plain($rule['message']),
         };
+    }
+
+    /**
+     * The rule prompt 211 exists for.
+     *
+     * An operator holding `membership.enrol` — which prompt 203 granted STAFF and MANAGER — can put this
+     * right at the counter, so the remedy says so and carries the way there. One who does not gets a sentence
+     * that asks for the person who can, rather than one naming a screen they cannot open.
+     *
+     * @param  array{rule: string, satisfied: bool, mode: string, message: string}  $rule
+     * @return Remedy
+     */
+    private static function membershipRemedy(array $rule, Member $member, Location $location, ?User $actor): array
+    {
+        if ($actor === null || ! $actor->can(EligibilityRule::MEMBERSHIP->actionPermission() ?? '')) {
+            return self::plain($rule['message'], __('Pide a un responsable que le dé de alta en esta sede.'));
+        }
+
+        return [
+            'detail' => $rule['message'],
+            'remedy' => __('Puedes darle de alta o renovarle aquí mismo.'),
+            // **In place, not a jump.** Sending the operator to Socios with the socio loaded was the other
+            // defensible option and was built first; it lost because 203 had already extracted
+            // `OpensMemberships` and left it with one consumer. Wiring that concern to the door and the POS
+            // is less code than a navigation, keeps the basket and the queue where they are, and answers the
+            // door's report too — a jump from a door with people at it is worse than a jump from a POS.
+            // So the remedy declares that a fix exists HERE and names the gate; the screen renders 203's
+            // panel, from one shared partial.
+            'action' => ['label' => __('Resolver su membresía'), 'inline' => true],
+        ];
+    }
+
+    /**
+     * A remedy with no action — the common and correct case.
+     *
+     * @return Remedy
+     */
+    private static function plain(string $detail, ?string $remedy = null): array
+    {
+        return ['detail' => $detail, 'remedy' => $remedy, 'action' => null];
     }
 
     private static function feeDetail(Member $member, Location $location): ?string

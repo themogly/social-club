@@ -9947,3 +9947,113 @@ staff route cannot produce a weaker artefact and cannot run at all without the e
 staff form refuses what the public form refuses; an existing consent row still reads as an applicant tick;
 handing over still leaks nothing; the emailed invitation still works; no document artefact renders for any
 role; no second lookup; and a user without `applications.review` sees no panel.
+
+---
+
+## Prompt 211 — 203 fixed the dead end on one screen; the dispensary and the door still said "go to their record"
+
+Reported on `/counter/pos` with a member attached: *"if you pull in a member with no membership you can't
+click on them to take you to add a membership — there should be an action button."* Then, on
+`/counter/checkin`, with the same member: *"there's no link here either to add membership."* **Three screens,
+one verdict, one missing action.**
+
+### This is 203's finding again, not a new one
+
+203 closed exactly this dead end — a member with a lapsed or absent membership, and a remedy that sent staff
+to a panel they hold no permission to act in. It closed it **on the Socios screen**, granted `membership.enrol`
+to STAFF and MANAGER, and left the shared string in `VerdictRemedy` untouched:
+
+```php
+'remedy' => __('Renueva su cuota desde su ficha para poder dispensarle.'),
+```
+
+So the fix existed one screen away while the sentence that is supposed to say what to do went on naming
+*"their record"* — **the place 203 was written because staff cannot use it.** `describe()` is read by the door
+(`check-in-screen.blade.php:151`), the dispensary (`dispensary-pos.blade.php:498`) and Socios, which is why
+the fix belongs at that layer: patching one blade leaves the other two saying the wrong thing tomorrow, which
+is how this came to be reported twice.
+
+### 203 did the architecture right and stopped one screen short
+
+`app/Livewire/Counter/Concerns/OpensMemberships.php` — whose own docblock describes this exact dead end,
+handles all three cases, enrols on the tier's default fee and carries the uniqueness guard and the
+`membership.enrol` gate — **had exactly one consumer.** So this branch mostly wires an existing, audited
+concern to the two screens that already showed the problem it was written for. No new writer, no second
+validator, no second consent of any kind: `EnrolMembership` / `RenewMembership` are untouched.
+
+**Two things had to be added to make the concern host-agnostic**, and only two:
+
+- **`membershipSubjectId()`** — the socio the concern acts on. 203's only host calls it `$feeMemberId` (it is
+  who a fee would be collected from); the door and the POS call it `$memberId`. A method rather than a
+  property-name convention, so the trait cannot be silently pointed at the wrong person by a property that
+  happens to share a name.
+- **`membershipFix()`** — the three-case state the panel needs, resolved in the concern so the three screens
+  cannot disagree about which case a member is in.
+
+And 203's panel became **one shared partial** (`partials/membership-fix.blade.php`), included by all three.
+Three copies of a panel that enrols members is exactly the drift CLAUDE.md forbids, and the copy that drifted
+would be the one deciding a register fact.
+
+### Where the action lands, and why
+
+**In place, on whichever screen is showing the problem.** The other option — jump to Socios with the socio
+loaded — was built first and discarded:
+
+- 203 had already extracted the concern. Wiring it to two more hosts is **less code than a navigation**, and
+  it reuses the audited route rather than reaching it.
+- The second report is the **door**, which is a queue. A jump away from a door with people at it is worse
+  than a jump away from a POS, and the POS's own case keeps the basket and the weight entry where they are.
+- A jump would have needed an arrival parameter on Socios; it was written, and removed with the decision.
+
+The remedy therefore declares that a fix exists **here** (`'action' => ['label' => …, 'inline' => true]`) and
+the screen renders 203's panel. The remedy layer stays pure presentation: it says a fix exists and what it is
+called; it never performs one, and `ResolveMemberEligibility` is untouched. **A BLOCKS verdict still blocks** —
+asserted at `CommitDispensation`, with and without `membership.enrol`, because a line on a basket is not a
+dispensation and that boundary is where the assertion means something.
+
+### Permission-aware in the WORDING, not only the button
+
+An operator without `membership.enrol` gets *"Pide a un responsable que le dé de alta en esta sede."* and no
+control — where the old sentence named *"su ficha"*, the admin panel, **to exactly the user who cannot open
+it**. `describe()` takes the actor now, so the words change with who is reading them. The stale string is
+deleted from `lang/en.json` and `lang/es.json`, not merely unused, and a test asserts its absence from both.
+
+### The per-rule audit
+
+`App\Enums\EligibilityRule` declares the rule set, and every method on it is a `match ($this)` with **no
+default**, so Larastan fails the build on a rule that has not said what an operator can do about it.
+
+| rule | counter-side fix? | what the remedy says |
+|---|---|---|
+| `membership` | **yes** — 203's enrol/renew, now on all three screens | the fix, and its gate |
+| `unpaid_fee` | yes, and already inline (127) — so the remedy carries **no** separate action, because the control is a few pixels away | the amount owed |
+| `photo` | yes — the door is where a missing photo gets taken (157) | take it now, with the document |
+| `carencia` | no — it resolves on a **date**, and the remedy names which | until when |
+| `debt` | no — settling a wallet debt is money through the till, not a verdict button | the amount over |
+| `sanction` | no, deliberately: a suspension is a governance act | ask a manager |
+| `aforo` | no — somebody has to leave | how full |
+| `age` | no, and never | the rule, plainly |
+
+**`age` is the one this enum changes.** It had no case at all: it fell through a `default` to the resolver's
+own sentence with no remedy — which is indistinguishable from a rule that deliberately has none, and is
+exactly what an eighth rule would have inherited. It is an explicit "nothing here" now.
+
+### Verification
+
+`composer check` green — **1652 tests**, 1649 passed, 3 pre-existing skips, Larastan 0, Pint clean. **MySQL was
+left to CI**, per the running order; the suite ran on SQLite.
+
+Screenshots before and after at 1180×820 and 820×1180, light and dark (`storage/app/screenshots/211/`) — the
+blocked member on the dispensary, which is the reported screen. The shoot script asserts the difference rather
+than trusting the pictures: `before` has **0** controls on the verdict, `after` has **1**, both show the member
+blocked, and the control clears the 44px floor.
+
+**Tests** (`RemedyCarriesTheActionTest`, 11): a member with no membership resolved **on the dispensary** and
+then dispensed to with no navigation at all; the same from **the door**, then checked in (the second report);
+the lapsed case on both screens, still one row extended rather than a second alta; **every consumer of
+`OpensMemberships` iterated** — found by reflecting over the counter components rather than listed, so a
+fourth screen cannot ship half-wired and the concern cannot quietly lose a consumer again; an operator without
+the permission getting an explanation, no control and no instruction they cannot follow; the commit still
+refused either way; every `EligibilityRule` case declaring what an operator can do; no remedy naming the panel
+where a counter fix exists; the retired string absent from both locales; all three screens showing the same
+wording; and no second member lookup on any of them.

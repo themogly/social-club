@@ -495,7 +495,10 @@
                                             @continue($rule['satisfied'])
                                             @php
                                                 $isBlock = in_array($rule['mode'], ['BLOCK', 'OVERRIDE'], true);
-                                                $remedy = \App\Support\VerdictRemedy::describe($rule, $member, $location);
+                                                // The ACTOR, not just the rule (prompt 211): a remedy must never
+                                                // instruct somebody to do something they hold no permission for, so
+                                                // the wording changes with who is reading it and not only the button.
+                                                $remedy = \App\Support\VerdictRemedy::describe($rule, $member, $location, auth()->user());
                                             @endphp
                                             {{-- Prompt 135: name the rule in the member's terms + attach the fix; WARN vs BLOCK distinct. --}}
                                             <div @class([
@@ -515,6 +518,10 @@
                                         @if (! empty($hardBlockRules))
                                             <p class="text-sm font-medium text-error">{{ __('No se puede dispensar a este socio.') }}</p>
                                         @endif
+                                        {{-- The reported dead end, closed where it is read (prompt 211): 203's
+                                             own enrol/renew panel, from the one shared partial, on the screen
+                                             that was telling the operator to go somewhere they cannot. --}}
+                                        @include('livewire.counter.partials.membership-fix')
                                         @include('livewire.counter.partials.inline-fee')
                                     </div>
                                 @endif

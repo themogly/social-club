@@ -344,60 +344,7 @@
                              and stays in the panel behind `members.transfer`.
 
                          No fee box anywhere: `membership.fee.override` has not moved. --}}
-                    @if ($membershipCase !== 'active')
-                        <div data-membership-fix class="mt-3 rounded-xl border border-brand/30 bg-brand-tint p-3 dark:border-slate-700 dark:bg-slate-800">
-                            @if (! $this->canOpenMembership())
-                                {{-- A clear refusal, never a dead panel: the operator is told who CAN do it
-                                     rather than being shown a button that will not work. --}}
-                                <p data-membership-fix-denied class="text-sm text-ink-muted dark:text-slate-400">
-                                    {{ __('Este socio necesita una membresía en esta sede. Pídeselo a un responsable: no tienes permiso para darla de alta.') }}
-                                </p>
-                            @elseif ($membershipCase === 'lapsed_here')
-                                <p class="text-sm font-medium">{{ __('Su membresía en esta sede ha vencido.') }}</p>
-                                <p class="mt-0.5 text-xs text-ink-muted dark:text-slate-400">
-                                    {{ __('Cuota') }}: {{ $lapsedHere?->tier?->name ?? '—' }}
-                                    @if ($lapsedHere?->expires_at)
-                                        · {{ __('Venció') }} {{ $lapsedHere->expires_at->format('d/m/Y') }}
-                                    @endif
-                                </p>
-                                <button
-                                    type="button"
-                                    wire:click="renewMembership"
-                                    data-membership-renew
-                                    class="mt-3 inline-flex h-11 w-full items-center justify-center rounded-xl bg-brand px-4 text-sm font-semibold text-white transition hover:bg-brand-dark focus:outline-none focus:ring-2 focus:ring-brand/40"
-                                >{{ __('Renovar membresía') }}</button>
-                            @else
-                                <p class="text-sm font-medium">
-                                    {{ $elsewhere->isNotEmpty() ? __('Es socio del club, pero no de esta sede.') : __('Todavía no es socio de ninguna sede.') }}
-                                </p>
-                                @if ($elsewhere->isNotEmpty())
-                                    <p class="mt-0.5 text-xs text-ink-muted dark:text-slate-400">
-                                        {{ __('Su membresía en la otra sede no cambia: aquí se añade una nueva.') }}
-                                    </p>
-                                @endif
-
-                                <label for="open-tier" class="mt-3 block text-xs font-medium text-ink-muted dark:text-slate-400">{{ __('Cuota') }}</label>
-                                <select
-                                    id="open-tier"
-                                    wire:model="openTierId"
-                                    data-membership-tier
-                                    class="mt-1 h-11 w-full rounded-xl border border-line bg-surface px-3 text-sm text-ink focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/40 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
-                                >
-                                    <option value="">{{ __('Elige una cuota') }}</option>
-                                    @foreach ($openTiers as $tier)
-                                        <option value="{{ $tier->id }}">{{ $tier->name }} · {{ $this->money($tier->default_fee_cents->cents) }}</option>
-                                    @endforeach
-                                </select>
-
-                                <button
-                                    type="button"
-                                    wire:click="enrolAtThisSede"
-                                    data-membership-enrol
-                                    class="mt-3 inline-flex h-11 w-full items-center justify-center rounded-xl bg-brand px-4 text-sm font-semibold text-white transition hover:bg-brand-dark focus:outline-none focus:ring-2 focus:ring-brand/40"
-                                >{{ $elsewhere->isNotEmpty() ? __('Dar de alta también en esta sede') : __('Dar de alta en esta sede') }}</button>
-                            @endif
-                        </div>
-                    @endif
+                    @include('livewire.counter.partials.membership-fix')
 
                     <div data-member-record class="mt-3 space-y-3">
                         {{-- What they may still have — the same figures the POS puts on its cart. --}}
@@ -449,7 +396,11 @@
                                     <ul class="mt-1 space-y-1">
                                         @foreach ($verdict->rules as $rule)
                                             @continue($rule['satisfied'])
-                                            @php $remedy = \App\Support\VerdictRemedy::describe($rule, $feeMember, $location); @endphp
+                                            {{-- The actor, for the WORDING (prompt 211). No action button here:
+                                                 this IS the screen the action leads to, and 203's three-case
+                                                 membership panel is a few pixels below — a link back to the page
+                                                 you are on is worse than no link. --}}
+                                            @php $remedy = \App\Support\VerdictRemedy::describe($rule, $feeMember, $location, auth()->user()); @endphp
                                             <li>
                                                 <span class="{{ in_array($rule['mode'], ['BLOCK', 'OVERRIDE'], true) ? 'text-error' : 'text-warning' }}">·</span>
                                                 <span class="text-ink dark:text-slate-200">{{ $remedy['detail'] ?? $rule['message'] }}</span>
