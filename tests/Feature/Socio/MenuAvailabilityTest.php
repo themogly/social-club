@@ -128,10 +128,13 @@ class MenuAvailabilityTest extends TestCase
         $member = $this->memberAt($this->a);
 
         $plenty = $this->priced('Amnesia Haze', $this->a);
-        $this->stock($plenty, $this->a, cg: 50000);          // well over the 5000cg default
+        $this->stock($plenty, $this->a, cg: 50000);          // well over any threshold
 
+        // Under the derived default (prompt 213): a genetic is low when less than one member's DAILY
+        // allowance is left of it, so the fixture is stated against the sede's own limit rather than
+        // against the 5000 cg shop figure that used to be the fallback.
         $low = $this->priced('Critical Kush', $this->a);
-        $this->stock($low, $this->a, cg: 1000);              // under it
+        $this->stock($low, $this->a, cg: max(1, (int) Settings::get('daily_limit_cg', 300) - 1));
 
         $none = $this->priced('Lemon Skunk', $this->a);
         $this->stock($none, $this->a, cg: 0);
@@ -190,7 +193,7 @@ class MenuAvailabilityTest extends TestCase
     public function test_a_per_sede_threshold_overrides_the_org_default(): void
     {
         $genetic = $this->priced('Gorilla Glue', $this->a);
-        $this->stock($genetic, $this->a, cg: 6000); // above the 5000 org default
+        $this->stock($genetic, $this->a, cg: 6000); // comfortably above the derived default
 
         $this->assertSame(Genetic::AVAILABLE, $genetic->availabilityAt($this->a->id));
 
@@ -203,16 +206,46 @@ class MenuAvailabilityTest extends TestCase
         $this->assertSame(Genetic::LOW, $genetic->fresh()->availabilityAt($this->a->id));
     }
 
-    public function test_with_no_per_sede_row_the_org_default_applies(): void
+    public function test_with_no_per_sede_row_an_explicit_org_setting_applies(): void
     {
         $genetic = $this->priced('White Widow', $this->a);
         $this->stock($genetic, $this->a, cg: 3000);
 
-        // No per-price threshold set → the org setting (default 5000) → 3000 is low.
-        $this->assertSame(Genetic::LOW, $genetic->availabilityAt($this->a->id));
+        // No per-price threshold and no configured setting → DERIVED (prompt 213), and 30 g is not low.
+        $this->assertSame(Genetic::AVAILABLE, $genetic->availabilityAt($this->a->id));
+
+        // An explicit org setting still wins in both directions — that is what "0 = derive" preserves.
+        Settings::set('low_stock_threshold_cg', 5000, SettingType::INT);
+        $this->assertSame(Genetic::LOW, $genetic->fresh()->availabilityAt($this->a->id));
 
         Settings::set('low_stock_threshold_cg', 1000, SettingType::INT);
         $this->assertSame(Genetic::AVAILABLE, $genetic->fresh()->availabilityAt($this->a->id));
+    }
+
+    /**
+     * The default is DERIVED from what this club may dispense, not a fixed gram figure (prompt 213).
+     *
+     * The old fallback was 5000 cg — 50 g, a shop's number. A club under a legal stock ceiling
+     * (`stock_ceiling_days` defaults to 5) sits below that permanently, so every genetic badged "low" at
+     * once and the badge stopped carrying information.
+     */
+    public function test_the_default_threshold_follows_the_sedes_daily_allowance(): void
+    {
+        $daily = (int) Settings::get('daily_limit_cg', 300);
+
+        // A genetic each, because stock() ADDS a batch rather than replacing one.
+        $normal = $this->priced('Northern Lights', $this->a);
+        $this->stock($normal, $this->a, cg: $daily * 10);
+        $this->assertSame(Genetic::AVAILABLE, $normal->availabilityAt($this->a->id), 'a normal holding badged low');
+
+        $scarce = $this->priced('Purple Haze', $this->a);
+        $this->stock($scarce, $this->a, cg: max(1, $daily - 1));
+        $this->assertSame(Genetic::LOW, $scarce->availabilityAt($this->a->id), 'a genuinely low holding did not badge');
+
+        // And it MOVES with the club's own configuration rather than being a constant: raise the sede's
+        // daily allowance and the same holding becomes low.
+        Settings::set('daily_limit_cg', $daily * 20, SettingType::INT);
+        $this->assertSame(Genetic::LOW, $normal->fresh()->availabilityAt($this->a->id));
     }
 
     // --- an unavailable genetic stays on the menu --------------------------------------------------------
@@ -233,11 +266,16 @@ class MenuAvailabilityTest extends TestCase
     {
         $preroll = $this->priced('Preroll', $this->a, ProductType::PREROLL); // 1 g per unit
 
-        // 80 units × 1 g = 8000 cg, over the 5000 default.
+        // The threshold is PINNED here: this test is about units being converted to their gram equivalent,
+        // not about what the default is (prompt 213 made that derived, and a moving default would make this
+        // test quietly about something else).
+        Settings::set('low_stock_threshold_cg', 5000, SettingType::INT);
+
+        // 80 units × 1 g = 8000 cg, over 5000.
         $this->stock($preroll->fresh(), $this->a, units: 80);
         $this->assertSame(Genetic::AVAILABLE, $preroll->fresh()->availabilityAt($this->a->id));
 
-        // 30 units × 1 g = 3000 cg, under it.
+        // 30 units × 1 g = 3000 cg, under 5000.
         Batch::query()->withoutGlobalScopes()->where('genetic_id', $preroll->id)->update(['remaining_units' => 30]);
         $this->assertSame(Genetic::LOW, $preroll->fresh()->availabilityAt($this->a->id));
 
