@@ -36,29 +36,82 @@
     };
 @endphp
 
+{{-- THE close guard (prompt 222), and why it is not a `wire:confirm`.
+
+     221 rendered the confirm as a SERVER-DECIDED conditional attribute over a server flag
+     (`altaHasEnteredData()`), and the wizard's fields are deferred `wire:model` — they reach the server on
+     the next ACTION, not on input. So the flag went true only after a round-trip, and the attribute appeared
+     one render after that. Measured on `8797ee2`: typing a name and pressing Escape closed the modal with no
+     confirm and lost it; the same typing followed by *Siguiente* then Escape confirmed correctly. The guard
+     worked across steps and never within one — leaving the longest, most-typed step unprotected, which is the
+     opposite of what it was for.
+
+     No server can fix that: the current step's typing exists only in the DOM. So dirty is decided HERE, at
+     close time, from the DOM — **or** the server flag, which is what knows about earlier steps after a
+     re-render and about state that is not an input (a saved signature). Making every field `.live` was
+     considered and rejected: a round-trip per keystroke on a counter tablet, for a form whose whole point
+     was to stop feeling slow.
+
+     ONE method, three routes. ✕, the backdrop and Escape all call `attemptClose()`; a fourth way out added
+     later cannot skip the guard without deliberately not using it. --}}
 <div
     data-alta-modal
-    x-data
-    @keydown.escape.window="$refs.close?.click()"
+    x-data="{
+        {{-- Read at CLICK time, never snapshotted into state: Livewire preserves this DOM across re-renders,
+             so anything captured at init goes stale the moment the server's view changes (prompt 188). --}}
+        serverSaysDirty() {
+            return $el.querySelector('[data-alta-panel]')?.dataset.altaDirty === '1'
+        },
+
+        {{-- Anything the operator has put into this modal that has not reached the server yet. --}}
+        domSaysDirty() {
+            const fields = $el.querySelectorAll('[data-alta-panel] input, [data-alta-panel] select, [data-alta-panel] textarea')
+
+            for (const field of fields) {
+                if (field.type === 'checkbox' || field.type === 'radio') {
+                    if (field.checked) return true
+                } else if (field.type === 'file') {
+                    if (field.files?.length) return true
+                } else if ((field.value ?? '').trim() !== '') {
+                    return true
+                }
+            }
+
+            {{-- A signature drawn but not yet saved is the sharpest case: it is not an input, it never
+                 reaches the server until Guardar firma, and it is the one thing on this form the member
+                 themselves did. The pad marks its canvas on the first stroke. --}}
+            return !! $el.querySelector('[data-signature-canvas][data-drawn=\'1\']')
+        },
+
+        attemptClose() {
+            if ((this.serverSaysDirty() || this.domSaysDirty()) && ! window.confirm(@js(__('¿Descartar esta alta? Se perderá lo que has escrito.')))) {
+                return
+            }
+
+            $wire.closeAlta()
+        },
+    }"
+    @keydown.escape.window="attemptClose()"
     class="fixed inset-0 z-40 flex items-start justify-center overflow-y-auto bg-slate-950/60 p-4 backdrop-blur-sm sm:items-center"
     role="dialog"
     aria-modal="true"
     aria-labelledby="alta-modal-title"
 >
     {{-- The backdrop is its own layer so a click on it closes, while a click INSIDE the panel does not.
-         Guarded by the same confirm as ✕: losing a half-typed application to a stray tap beside the panel is
-         the failure mode of every modal, and the one the operator would never see coming. --}}
+         Through the same guard as ✕ and Escape: losing a half-typed application to a stray tap beside the
+         panel is the failure mode of every modal, and the one the operator would never see coming. --}}
     <button
         type="button"
         data-alta-backdrop
-        wire:click="closeAlta"
-        @if ($signupDirty) wire:confirm="{{ __('¿Descartar esta alta? Se perderá lo que has escrito.') }}" @endif
+        @click="attemptClose()"
         tabindex="-1"
         aria-hidden="true"
         class="absolute inset-0 h-full w-full cursor-default"
     ></button>
 
-    <div data-alta-panel class="counter-modal-pop relative my-auto flex max-h-[min(780px,92vh)] w-[min(720px,100%)] flex-col overflow-hidden rounded-[18px] border border-line bg-surface shadow-2xl dark:border-slate-700 dark:bg-slate-900">
+    {{-- The SERVER's half of the answer, published where the client guard can read it after every render:
+         earlier steps that have already synced, and state that is not an input at all. --}}
+    <div data-alta-panel data-alta-dirty="{{ $signupDirty ? '1' : '0' }}" class="counter-modal-pop relative my-auto flex max-h-[min(780px,92vh)] w-[min(720px,100%)] flex-col overflow-hidden rounded-[18px] border border-line bg-surface shadow-2xl dark:border-slate-700 dark:bg-slate-900">
 
         {{-- Header — the title is fixed, the subtitle says where you are. --}}
         <div class="flex items-start justify-between gap-4 border-b border-line px-5 py-4 dark:border-slate-800">
@@ -68,10 +121,8 @@
             </div>
             <button
                 type="button"
-                x-ref="close"
                 data-alta-close
-                wire:click="closeAlta"
-                @if ($signupDirty) wire:confirm="{{ __('¿Descartar esta alta? Se perderá lo que has escrito.') }}" @endif
+                @click="attemptClose()"
                 aria-label="{{ __('Cerrar') }}"
                 class="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-xl text-ink-muted transition hover:bg-surface-alt dark:text-slate-400 dark:hover:bg-slate-800"
             >&times;</button>

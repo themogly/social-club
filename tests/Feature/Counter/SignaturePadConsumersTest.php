@@ -69,7 +69,11 @@ class SignaturePadConsumersTest extends TestCase
 
             $blade = (string) file_get_contents($path);
 
-            if (str_contains($blade, 'data-signature-canvas') || preg_match('/<canvas[^>]*x-ref="pad"/', $blade)) {
+            // A template that RENDERS a canvas, not one that mentions the hook. Prompt 222's close guard has
+            // to ask "is there a drawn signature in this modal?", which means naming the hook in a selector —
+            // and the first version of this reader counted that as a second pad. The rule was always about
+            // rendering; the reader now measures it, by looking for the element rather than the string.
+            if (preg_match('/<canvas[^>]*(data-signature-canvas|x-ref="pad")/s', $blade)) {
                 $offenders[] = $relative;
             }
         }

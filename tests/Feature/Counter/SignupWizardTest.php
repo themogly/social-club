@@ -293,22 +293,48 @@ class SignupWizardTest extends TestCase
     // --- The close guard -------------------------------------------------------------------------
 
     /**
-     * The confirm is rendered only when something would actually be lost (206's lesson: a guard that fires
-     * over nothing teaches the operator to dismiss guards).
+     * The SERVER's half of the close guard: it publishes whether anything it knows about would be lost.
+     *
+     * **Retargeted by prompt 222, deliberately.** 221 asserted a `wire:confirm` attribute here, and that
+     * assertion passed while the guard was broken — which is the finding: the fields are deferred
+     * `wire:model`, so the server learns about typing on the next ACTION, and a server-rendered confirm is
+     * always one action behind. It protected every step except the one being typed on.
+     *
+     * So this test now asserts only what a server-side test CAN honestly see — that the flag is computed and
+     * published to the DOM for the client guard to read — and the behaviour it used to claim is asserted in
+     * a real browser (`measure-close-guard.mjs`), which is the only place it is visible at all.
      */
-    public function test_the_close_confirm_appears_only_once_data_was_entered(): void
+    public function test_the_server_publishes_what_it_knows_about_unsaved_work(): void
     {
         $this->staff();
 
         $component = Livewire::test(MembershipCounter::class)->call('toggleAlta')->call('toggleStaffAltaForm');
 
         $this->assertFalse($component->instance()->altaHasEnteredData());
-        $this->assertStringNotContainsString('wire:confirm', $component->html(), 'an empty form asked to confirm');
+        $this->assertStringContainsString('data-alta-dirty="0"', $component->html(), 'an untouched form reported unsaved work');
 
+        // A round-trip the server DID see (this is the case 221's version could catch).
         $component->set('altaForm.first_name', 'Lucía');
 
         $this->assertTrue($component->instance()->altaHasEnteredData());
-        $this->assertStringContainsString('wire:confirm', $component->html(), 'a half-typed alta closed without a guard');
+        $this->assertStringContainsString('data-alta-dirty="1"', $component->html(), 'the server\'s half of the guard is not published');
+    }
+
+    /**
+     * ONE guard, three routes — asserted structurally, because three inline copies is exactly how this
+     * drifts and how 221 shipped a guard that two of the three routes never re-evaluated.
+     */
+    public function test_all_three_close_routes_resolve_through_one_check(): void
+    {
+        $modal = (string) file_get_contents(resource_path('views/livewire/counter/partials/alta-modal.blade.php'));
+
+        // Escape, ✕ and the backdrop — three call sites, one definition.
+        $this->assertSame(1, preg_match_all('/attemptClose\(\) \{/', $modal), 'the close guard is defined more than once');
+        $this->assertSame(3, preg_match_all('/attemptClose\(\)"/', $modal), 'a close route does not go through the guard');
+
+        // …and no route closes directly, which is what would silently skip it.
+        $this->assertStringNotContainsString('wire:click="closeAlta"', $modal, 'a close route bypasses the guard');
+        $this->assertStringNotContainsString('$refs.close', $modal, 'Escape reaches the guard by clicking another control rather than calling it');
     }
 
     /** Closing forgets everything, so reopening is a clean chooser rather than somebody else's half-form. */
