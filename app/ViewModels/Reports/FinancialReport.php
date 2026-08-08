@@ -8,6 +8,7 @@ use App\Enums\OrderStatus;
 use App\Models\Expense;
 use App\Support\Money;
 use Illuminate\Database\Query\Builder as QueryBuilder;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -37,6 +38,7 @@ class FinancialReport extends AbstractReport
         return [
             $this->takingsByDay(),
             $this->byPaymentMethod(),
+            $this->waivedFees(),
             $this->whereMoneyGoes(),
             $this->supplierBalances(),
             $this->reconciliation(),
@@ -73,9 +75,13 @@ class FinancialReport extends AbstractReport
         $ord = DB::table('orders')->whereIn('location_id', $ids)
             ->where('status', OrderStatus::COMPLETED->value)
             ->where('created_at', '>=', $start)->where('created_at', '<', $end)->get(['created_at', 'total_cents']);
+        // Prompt 219: a WAIVED fee is forgone income, not income. It enters no revenue series — it gets its
+        // own line below, because what the club chose not to take is a governance fact worth reporting and
+        // never a share of a figure that says "we took this".
         $fees = DB::table('membership_fee_payments')
             ->join('memberships', 'membership_fee_payments.membership_id', '=', 'memberships.id')
             ->whereIn('memberships.location_id', $ids)
+            ->whereIn('membership_fee_payments.method', FeePaymentMethod::revenueValues())
             ->where('membership_fee_payments.paid_at', '>=', $start)->where('membership_fee_payments.paid_at', '<', $end)
             ->get(['membership_fee_payments.paid_at as paid_at', 'membership_fee_payments.amount_cents as amount_cents']);
         $exp = $this->expensesQuery()
@@ -154,6 +160,7 @@ class FinancialReport extends AbstractReport
         $feesByMethod = DB::table('membership_fee_payments')
             ->join('memberships', 'membership_fee_payments.membership_id', '=', 'memberships.id')
             ->whereIn('memberships.location_id', $ids)
+            ->whereIn('membership_fee_payments.method', FeePaymentMethod::revenueValues())   // prompt 219
             ->where('membership_fee_payments.paid_at', '>=', $start)->where('membership_fee_payments.paid_at', '<', $end)
             ->groupBy('membership_fee_payments.method')
             ->pluck(DB::raw('SUM(membership_fee_payments.amount_cents) as agg'), 'membership_fee_payments.method');
@@ -180,6 +187,62 @@ class FinancialReport extends AbstractReport
             rows: $rows,
             totals: ['importe' => $total],
             empty: __('Sin ingresos en este período'),
+        );
+    }
+
+    // --- Forgone income ---------------------------------------------------------------
+
+    /**
+     * Fees the club chose not to take (prompt 219).
+     *
+     * **Its own line, and never a share of a revenue figure.** A waiver is forgone income: counting it as
+     * *Cuotas* would say the club took money it declined, and leaving it out entirely would hide a decision
+     * the assembly has every right to see. So it is reported as what it is, with the reason and the operator
+     * beside it, because a waiver is a governance act with an author.
+     */
+    private function waivedFees(): ReportTable
+    {
+        $ids = $this->resolvedLocationIds();
+        [$start, $end] = $this->bounds();
+
+        $rows = DB::table('membership_fee_payments')
+            ->join('memberships', 'membership_fee_payments.membership_id', '=', 'memberships.id')
+            ->join('members', 'memberships.member_id', '=', 'members.id')
+            ->leftJoin('users', 'membership_fee_payments.recorded_by', '=', 'users.id')
+            ->whereIn('memberships.location_id', $ids)
+            ->where('membership_fee_payments.method', FeePaymentMethod::WAIVED->value)
+            ->where('membership_fee_payments.paid_at', '>=', $start)->where('membership_fee_payments.paid_at', '<', $end)
+            ->orderBy('membership_fee_payments.paid_at')
+            ->get([
+                'membership_fee_payments.paid_at as paid_at',
+                'membership_fee_payments.amount_cents as importe',
+                'membership_fee_payments.reason as motivo',
+                'members.member_no as socio',
+                'users.name as operador',
+            ])
+            ->map(fn (object $r): array => [
+                'fecha' => Carbon::parse((string) $r->paid_at)->format('d/m/Y'),
+                'socio' => (string) $r->socio,
+                'motivo' => (string) ($r->motivo ?? '—'),
+                'operador' => (string) ($r->operador ?? '—'),
+                'importe' => (int) $r->importe,
+            ])
+            ->all();
+
+        return new ReportTable(
+            key: 'waived',
+            title: __('Cuotas condonadas'),
+            columns: [
+                ReportColumn::text('fecha', __('Fecha')),
+                ReportColumn::text('socio', __('Socio')),
+                ReportColumn::text('motivo', __('Motivo')),
+                ReportColumn::text('operador', __('Operador')),
+                ReportColumn::money('importe', __('Importe')),
+            ],
+            rows: $rows,
+            totals: ['importe' => array_sum(array_column($rows, 'importe'))],
+            empty: __('Ninguna cuota condonada en este período'),
+            emptyHint: __('Aquí aparece lo que el club ha decidido no cobrar, con su motivo y quién lo registró.'),
         );
     }
 

@@ -401,4 +401,30 @@ class MembershipCounter extends Component
         $this->flashMessage = $message;
         $this->flashType = $type;
     }
+
+    /**
+     * Forgo this member's outstanding fee (prompt 219) — the shared concern does the work.
+     *
+     * A thin resolve-and-call, like `collectFee`: the rule, the reason and the audit live in
+     * {@see CollectsMembershipFees::waiveFeeThrough}, so all three hosts
+     * behave identically and there is one place to read.
+     */
+    public function waiveFee(): void
+    {
+        if (! $this->requireOperator()) {
+            return;
+        }
+
+        $location = $this->resolveLocation();
+        $user = $this->currentUser();
+
+        if ($location === null || $user === null) {
+            $this->flash(__('Sin sede activa.'), 'error');
+
+            return;
+        }
+
+        $result = $this->waiveFeeThrough($location, $user);
+        $this->flash($result['message'], $result['type']);
+    }
 }

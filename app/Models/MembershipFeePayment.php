@@ -17,7 +17,7 @@ class MembershipFeePayment extends Model
     use HasFactory, HasUlids;
 
     protected $fillable = [
-        'membership_id', 'amount_cents', 'method', 'till_session_id',
+        'membership_id', 'amount_cents', 'method', 'reason', 'till_session_id',
         'paid_at', 'recorded_by', 'instalment_of',
     ];
 

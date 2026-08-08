@@ -24,5 +24,9 @@
         @unless ($openTillPresent)
             <p class="mt-1.5 text-[11px] text-warning">{{ __('Sin caja abierta solo se admite el cobro con monedero.') }}</p>
         @endunless
+
+        {{-- Prompt 219 — the waiver follows the fee wherever the fee is collected, for the same reason 127
+             put the collect action here: the fix belongs beside the thing it fixes. It needs no open till. --}}
+        @include('livewire.counter.partials.fee-waiver')
     </div>
 @endif

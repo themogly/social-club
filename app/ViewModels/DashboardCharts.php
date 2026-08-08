@@ -4,6 +4,7 @@ namespace App\ViewModels;
 
 use App\Enums\BatchStatus;
 use App\Enums\DispensationStatus;
+use App\Enums\FeePaymentMethod;
 use App\Enums\MembershipStatus;
 use App\Enums\OrderStatus;
 use App\Enums\Role;
@@ -167,8 +168,10 @@ class DashboardCharts
         $ord = DB::table('orders')->whereIn('location_id', $ids)
             ->where('status', OrderStatus::COMPLETED->value)
             ->where('created_at', '>=', $start)->where('created_at', '<', $end)->get(['created_at', 'total_cents']);
+        // Prompt 219: waived fees are forgone income and never enter a revenue series.
         $fees = DB::table('membership_fee_payments')
             ->join('memberships', 'membership_fee_payments.membership_id', '=', 'memberships.id')
+            ->whereIn('membership_fee_payments.method', FeePaymentMethod::revenueValues())
             ->whereIn('memberships.location_id', $ids)
             ->where('membership_fee_payments.paid_at', '>=', $start)->where('membership_fee_payments.paid_at', '<', $end)
             ->get(['membership_fee_payments.paid_at as paid_at', 'membership_fee_payments.amount_cents as amount_cents']);
