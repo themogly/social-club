@@ -11340,3 +11340,124 @@ bar total (derived from the ledger); a mixed visit still writes both ledgers wit
 
 Screenshots in `storage/app/screenshots/224/`, both orientations, light and dark, before and after — the
 before frame is the bug: two beers tapped and a cart reading *"Cesta vacía"*.
+
+---
+
+## Prompt 225 — a blocked socio replaces the selling surface, and only the basket scrolls
+
+Three findings from the owner, from live use and a Claude Design mock (*POS Redesign v2*, built against this
+repo's own `counter-ux-audit.md`).
+
+### 1 — A present-but-blocked socio now blocks the pane, like every other precondition
+
+> *"If the member is blocked it should just hide the dispensary completely and say the fee is due — take it
+> or waive it — and record it."*
+
+A socio whose verdict BLOCKS got the whole catalogue, a working weight pad and a basket they could fill,
+beside a warning that none of it could be committed. That is 175's own philosophy inverted: **a blocking
+state replaces the work, it does not sit beside it.** Three of the four preconditions on this screen already
+did it — no sede, no till, no member each replace the pane — and the fourth, the only one the operator can
+actually resolve from here, did not. So this extends 175 to the MEMBER-PRESENT case.
+
+The surface carries the block and **its resolutions**, iterated from `EligibilityRule::hasCounterAction()`
+(211's pattern) rather than listed: `unpaid_fee` → 127's collect panel with 219's waiver inside it;
+`membership` → 203's enrol/renew panel through the one shared partial; a rule with no counter-side fix
+(a sanction) → its explanation and **no control at all**. Plus the shared lookup, so a blocked socio is not a
+dead end of a different kind — the operator can move to the next person.
+
+**Decisions recorded rather than discovered:**
+
+- **The basket survives.** A basket built before the block appeared is untouched and committable the moment
+  the block is resolved — tested in the awkward order on purpose (lines rung up, then the fee falls due).
+- **AMBER, never red.** Blocked is a state to resolve; this project reserves red for destructive.
+- **The Barra is unaffected.** A blocked socio can still be sold a coffee — that screen has no MEMBER step in
+  its chain at all, which is its whole design. Tested.
+- **The gate did not become a picture.** `commitDispensation()` refuses this socio server-side exactly as
+  before and says why; a test pins it.
+- **Said once** (199): while the surface is up, the cart column drops its copy of the blocking rules and
+  carries only the warnings, and the fee panel exists in one place, not two.
+
+### 2 — The column: the scroll region is now visibly the scroll region
+
+> *"I don't like the scrolling on the right-hand side… The only part that needs to scroll is the cart, and it
+> should be obvious."*
+
+It always WAS the only scrolling part — 176 built the column that way. Nothing said so: content simply
+stopped at an edge. So the region gets a soft top fade, a stable scrollbar gutter and `overscroll-contain`,
+which stops a flick at the end of the basket from scrolling the page behind it.
+
+- **The photo nag** dropped from an amber box the height of the wallet and the carencia together to **one
+  line with its action beside it**. Nothing it said was lost; the sentence is shorter.
+- **The total is on the commit**: *"Registrar aportación · €14,00"*. The figure and the act are one thing at
+  the moment of pressing, and the operator reads the total from the button they are already looking at rather
+  than from a panel that may have scrolled.
+- **The blocked reason sits under the commit**, once — prompt 60's observable refusal, colocated by
+  construction instead of by discipline.
+- **The tender stays IN the scroll region** rather than pinning above the commit, which is what the mock does
+  and what the shape argues for: the pinned foot is one control and its reason. Pinning a five-field tender
+  block as well would leave the scrolling middle a sliver on a 820px-tall tablet — the exact crowding the
+  owner was complaining about.
+
+**A11y finding, measured not assumed** (the audit's amber-ramp note): the blocked line at `text-warning` on
+`bg-warning/10` measured **5.41:1 in light** — fine — and **2.95:1 in dark**, because the palette's dark
+surfaces come from explicit `dark:` utilities rather than a token swap on `--color-surface`, so a tint with
+no dark override composites the dark amber over a LIGHT base. On `slate-800` the same text computes to
+4.49:1 — under AA by a hundredth — so it sits on `slate-900`: **5.82:1 light, 5.60:1 dark**.
+
+**And the measurement itself had a bug worth recording.** The first version parsed numbers out of
+`getComputedStyle().backgroundColor` — but Tailwind v4 resolves an opacity modifier to `oklab(… / .1)`, so a
+regex read `0.47` as a red channel and reported 2.96:1 for a line that was really 5.4:1. Colours are now
+normalised by painting them to a 1×1 canvas and reading the pixel back: what the browser will actually paint,
+whatever syntax the stylesheet used.
+
+### 3 — Density: halfway to the mock, and consistent across orientations
+
+The owner: compact, but *"maybe not as much as this design."* Measured, six genetics and four articles,
+assets rebuilt:
+
+| row | before (1180×820) | before (820×1180) | after (both) |
+|---|---|---|---|
+| genetic | 50px | **106px** | **52px** |
+| bar article | 52px | 80px | 60px |
+
+The interesting number is the second column. `main`'s list card was three stacked rows that only collapsed
+side-by-side at `lg:`, so the same card was 50px on a landscape tablet and **106px on the same device stood
+up** — and portrait is how a counter tablet is held when it is handed over. The new row is name + one meta
+line on the left, price over stock on the right, at `sm:`, so it is 52px in both. That is halfway between
+`main`'s landscape 50px and the mock's 56px, and half of `main`'s portrait.
+
+**No fact was dropped to get there** — type, strain, THC, CBD, cultivation, the tier price note, the stock
+figure and 216's `≈N días` cover badge are all still on the row. Density is padding (`py-2` → `py-1.5`) and
+type scale (`text-xs` → `text-[11px]` on the meta), never a smaller target: the 44px floor holds and is
+asserted at both orientations.
+
+**Two per-source defaults, which the code had promised and never given.** `$geneticLayout`'s own docblock
+said *"the default is LIST here and GRID on the bar"* — and both sources rendered from that one property, so
+switching to Barra inherited whatever the genetics pane was set to. There is an `$articleLayout` now,
+defaulting to grid, and the one toggle writes to whichever source is on screen. Another
+promised-in-a-comment, wired-to-one-consumer instance.
+
+### Verification
+
+`composer check` green — **1798 tests**, 1795 passed, 3 pre-existing skips, Larastan 0, Pint clean. **MySQL
+was left to CI**, per the running order. No migration.
+
+**Written to fail against `main`, and does**: 7 of 11 in `BlockedMemberReplacesTheCatalogueTest` fail there.
+
+**Seven existing tests were amended deliberately.** They attached a socio built by
+`Member::factory()->create()` with no membership — or with the Membership factory's *random* `fee_cents` —
+and asserted the catalogue's contents. Both are hard blocks, so the catalogue is no longer theirs to see. The
+FIXTURE was amended, never the feature: each is about what the catalogue says, so each now has a socio who
+can be sold to. `GuidedFlowsTest` already carried the comment *"the genetics grid only renders on the usable
+screen — a till open and a socio identified"*; 225 adds *and a socio who may be dispensed to*.
+
+**Geometry** (`measure-pos-column.mjs`, 1180×820 and 820×1180, light and dark, three states, with the cart
+scrolled to its end first): identity pinned in view, commit pinned in view, the page never scrolls, the cart's
+middle is the scroll container, nothing under 44×44, the blocked reason present exactly once, and a blocked
+socio measured with zero catalogue rows and no weight pad.
+
+Screenshots in `storage/app/screenshots/225/`, before and after, both sizes, both themes.
+
+**Taken as intent, not as values:** the mock's inline hexes went through the project's palette, its `<h1>`
+became an `<h2>` (130's one-`<h1>` rule), and its handover invention was not built (224/221's lesson about
+mocks that cannot see the codebase).

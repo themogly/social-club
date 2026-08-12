@@ -57,9 +57,12 @@ class MemberMenuCrashTest extends TestCase
         $member = Member::factory()->create(['organisation_id' => $this->org->id, 'status' => MemberStatus::ACTIVE]);
         if ($location !== null) {
             $tier = MembershipTier::factory()->create(['organisation_id' => $this->org->id]);
+            // Prompt 225: `fee_cents` defaults to a random 10–200 € on the factory, and an unpaid fee is a
+            // hard block — which now replaces the catalogue. This fixture is about a socio who can be served,
+            // so the fee is explicit rather than random.
             Membership::factory()->create([
                 'organisation_id' => $this->org->id, 'member_id' => $member->id, 'location_id' => $location->id,
-                'tier_id' => $tier->id, 'status' => MembershipStatus::ACTIVE,
+                'tier_id' => $tier->id, 'status' => MembershipStatus::ACTIVE, 'fee_cents' => 0,
             ]);
         }
 

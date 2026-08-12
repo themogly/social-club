@@ -3,8 +3,8 @@
 namespace Tests\Browser;
 
 use App\Actions\Till\OpenTill;
-use App\Enums\MemberStatus;
 use App\Enums\MembershipStatus;
+use App\Enums\MemberStatus;
 use App\Enums\Role;
 use App\Livewire\Counter\DispensaryPos;
 use App\Models\Article;
