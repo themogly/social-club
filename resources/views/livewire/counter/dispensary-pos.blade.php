@@ -604,9 +604,20 @@
                                  below drives whatever WARN/OVERRIDE enforcement the sede has configured, and
                                  this is only the fix. Nothing it said was dropped — the sentence is shorter
                                  and the capture control is beside it instead of under it. --}}
-                            <div data-photo-nag class="mt-2.5 flex items-center justify-between gap-2 rounded-xl border border-warning/30 bg-warning/5 px-3 py-1.5">
-                                <p class="min-w-0 text-[11px] font-medium leading-tight text-warning">{{ __('Sin foto — verifica y súbela') }}</p>
-                                <x-counter.photo-capture :member="$member" source="counter" class="shrink-0" />
+                            {{-- `shrink-0` BESIDE `min-w-0` is the anti-pattern this row shipped with
+                                 (prompt 228). In a ~256–288px column the fixed side wins every pixel and the
+                                 text side collapses to ZERO — measured at 298×97 with a 0-to-10px sentence
+                                 wrapped over six lines of single glyphs, in both orientations. The
+                                 component's own `flex-wrap` could have saved it and never engaged, because
+                                 `shrink-0` meant it was never narrowed.
+
+                                 So: the row WRAPS. The sentence takes the full width and the controls drop
+                                 beneath it when they do not fit beside it — which in this column is always.
+                                 Still one line of text plus one line of controls; it must not grow back into
+                                 the tall amber box 225 replaced. --}}
+                            <div data-photo-nag class="mt-2.5 flex flex-wrap items-center gap-x-3 gap-y-1.5 rounded-xl border border-warning/30 bg-warning/5 px-3 py-1.5">
+                                <p class="w-full text-[11px] font-medium leading-tight text-warning">{{ __('Sin foto — verifica y súbela') }}</p>
+                                <x-counter.photo-capture :member="$member" source="counter" />
                             </div>
                         @endunless
                         {{-- Wallet + carencia --}}

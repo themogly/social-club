@@ -87,6 +87,12 @@ class PosColumnHarnessTest extends TestCase
         // 3. A blocked socio: the selling surface replaced by its resolution.
         $this->write('blocked', Livewire::test(DispensaryPos::class)->call('selectMember', $this->member(2500)->id));
 
+        // 4. A socio with NO PHOTO, which is the state prompt 225's three snapshots never covered — every one
+        //    of them carried a photo, so the nag row 225 shipped was never on a page the 44-floor sweep or the
+        //    geometry checks ran against. The assertions were right; the page they ran on did not show the
+        //    thing (prompt 228).
+        $this->write('no-photo', Livewire::test(DispensaryPos::class)->call('selectMember', $clear->id));
+
         $this->assertStringContainsString('data-blocked-member', (string) file_get_contents(storage_path('app/pos-225-blocked.html')));
     }
 
