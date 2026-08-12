@@ -106,8 +106,6 @@
             <p data-alta-mrz-status role="status" aria-live="polite" class="mt-1 text-xs text-ink-muted dark:text-slate-400"></p>
             <p class="mt-1 text-xs text-ink-muted dark:text-slate-400">{{ __('Del DNI o NIE, fotografía el REVERSO. Del pasaporte, la página de la foto.') }}</p>
 
-            @vite('resources/js/mrz-reader.js')
-
             @if (! empty($altaMrzFilled))
                 <div data-alta-mrz-filled class="mt-2 rounded-lg border border-warning/40 bg-warning/5 p-2">
                     <p class="text-[11px] font-medium text-warning">{{ __('Leído del documento. Compruébalo con el documento delante.') }}</p>

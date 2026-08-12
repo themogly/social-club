@@ -11160,3 +11160,94 @@ Spanish assertion).
 and backdrop each raises the confirm and, on dismiss, keeps both the typing and the step position; the empty
 chooser and an untouched wizard close silently; typing then advancing then Escape still confirms; one stroke
 on the pad with every field blanked is unsaved work, and clearing the pad takes it back.
+
+---
+
+## Prompt 223 — the MRZ module arrived inside the markup it was meant to be watching
+
+222 found this and correctly left it for its own branch. Re-measured on `origin/main` = `ad871fe`, in a
+browser, on the staff wizard's step 1:
+
+```
+first paint of Identidad:  trigger in the DOM, hidden, data-mounted unset  → the reader is unreachable
+step 2 and back:           same, every time
+```
+
+So prompt 215's whole point — that staff should not type four fields the document can supply — has never
+worked once. The applicant's own form was fine throughout: an ordinary page load.
+
+### Cause, and the part of the diagnosis that turned out to be worse
+
+`@vite('resources/js/mrz-reader.js')` sat **inside** `alta-staff-form.blade.php`, which only enters the page
+through a Livewire update and is morphed in and out as the wizard steps. The module therefore arrived inside
+the very update that inserted the trigger, so `DOMContentLoaded` had long since fired and the update that
+would have mounted it *was the update that delivered it*. The button stayed `hidden` — the correct
+progressive-enhancement default, and indistinguishable from a browser that cannot run the reader, which is
+why nothing noticed. This is 188 and 209's family seen from the loading side: state bound at a moment the
+page's update mechanism never revisits, except that here the state is a whole module.
+
+**And one third of its mount wiring did not exist.** The module listened for `livewire:update`. That is not a
+Livewire event — the dist dispatches only `livewire:init`, `livewire:initialized`, `livewire:initializing`
+and `livewire:navigate[d|ing]`. It had never fired, once, anywhere. Moving the load without noticing that
+would have produced a module that loads correctly and still never mounts, which is the same bug with a
+better excuse. The real hook is `Livewire.hook('morphed', …)`, registered either immediately or on
+`livewire:init` depending on which bundle executes first, plus a `readyState` guard because a module in an
+entry bundle can execute after `DOMContentLoaded` has been and gone.
+
+### Where it loads now, and why there was no third option
+
+`resources/js/app.js` — the counter's entry, which `layouts/counter.blade.php` already loads with the page.
+
+The prompt offered a second shape ("`@vite` it in the full-page view that hosts the modal"), and there isn't
+one: `membership-counter` **is** the Livewire component, so its entire template is inside the morph target.
+The layout and the entry bundle are the only homes outside it, and the project has no `@stack`/`@push`
+machinery to introduce for this. So the import is the whole change — one line, in the file the layout was
+already fetching.
+
+**Cost measured, not assumed:** the module is ~4KB and it does not carry the engine. `readMrz()` still
+`await import('tesseract.js')` on the click, and the harness proves it: no OCR-shaped request on page load,
+none on choosing a file, seven on pressing the button. A unit test pins the dynamic import so a static one
+cannot creep in and put a megabyte on every counter screen.
+
+**Untouched:** `mountStaffMrzScan()`'s contract, `readMrz`, `applyMrz`, 179's parse-on-the-server boundary,
+and the hidden-until-mounted pattern — that pattern is not the bug, it is what correctly hides a dead control
+on a browser that cannot run the reader. `livewire:navigated` still calls only the staff mount, exactly as
+before: the applicant's mount has no idempotence guard of its own and its page has no Livewire on it, so
+calling it again there could only double-bind a listener.
+
+### The class is closed by a guard, not by remembering
+
+`NoScriptsInLivewireViewsTest`: **no `@vite` and no `<script src>` anywhere under
+`resources/views/livewire/**`**, failing with file and line. Inline `<script>` is deliberately not matched —
+Livewire re-executes those on morph by design. The guard is proved by planting a violation rather than
+assumed, and it fails against `ad871fe` naming `alta-staff-form.blade.php:109`.
+
+The rule generalises past this instance: Livewire owns that markup and replaces it whenever the server says
+so, and a re-inserted `<script src>` with an unchanged URL does not re-execute — so there is nowhere in a
+Livewire view where a script tag can be relied upon. Layouts and full-page views are the allowed homes, which
+is where the applicant form's own `@vite` lives and why it has worked since 179.
+
+### Verification
+
+`composer check` green — **1776 tests**, 1773 passed, 3 pre-existing skips, Larastan 0, Pint clean. **MySQL
+was left to CI**, per the running order. No migration, nothing reaches `lang/*`.
+
+**Browser harness** (`measure-mrz-mount.mjs`, real server, 1180×820) — **run against `main` first, where it
+reports the defect** (`hidden=true, mounted=false`) and then passes here:
+
+```
+first paint of Identidad — the trigger is visible and mounted
+the click listener answers: "Choose a photo of the document first."
+back on Identidad — still visible and still mounted, listener still bound
+nothing OCR-shaped fetched yet (52 requests) · choosing a file does not fetch it either
+pressed: the engine is fetched on demand (7 requests)
+the applicant form still mounts on an ordinary page load
+```
+
+The applicant check runs in its own browser context, because reaching that form means handing the tablet over
+(173) and would otherwise leave a handover in the session the next harness run inherits. 222's login preamble
+was extracted to `counter-session.mjs` when this second harness needed the same thirty lines — three copies
+of a login flow is how one of them quietly stops matching the app.
+
+Capture in `storage/app/screenshots/223/`: step 1 with the reader button visible and its status line
+answering, the same step after pressing it, and the applicant's form at phone width.
