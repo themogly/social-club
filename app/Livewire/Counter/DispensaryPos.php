@@ -3,6 +3,7 @@
 namespace App\Livewire\Counter;
 
 use App\Actions\Attendance\ResolveMemberEligibility;
+use App\Actions\Bar\CommitOrder;
 use App\Actions\Counter\CommitCombinedSettle;
 use App\Actions\Dispensing\CommitDispensation;
 use App\Actions\Dispensing\ResolveMemberLimits;
@@ -863,8 +864,23 @@ class DispensaryPos extends Component
 
             return;
         }
-        if ($this->basket === [] || $this->barBasket === []) {
-            $this->flash(__('Una liquidación combinada necesita cesta de dispensario y de barra.'), 'error');
+        if ($this->barBasket === []) {
+            $this->flash(__('Añade algún artículo de barra para liquidar la visita.'), 'error');
+
+            return;
+        }
+
+        // BAR ONLY (prompt 224). `CommitCombinedSettle` refuses a one-sided settle in terms — *"an empty side
+        // means the caller wants a plain dispensation or a plain order, which have their own single-writer
+        // entry points"* — so this takes that named entry point rather than bending the combined one. No new
+        // writer, and the combined path below is untouched.
+        //
+        // It skips the DISPENSATION guards deliberately: nothing is dispensed, so eligibility, the gram
+        // limits, the carencia and the signature have nothing to be about. That is the same reasoning the
+        // Barra screen is built on — a blocked socio can still be sold a coffee — and the settle it produces
+        // is a SALE on the bar ledger, exactly as if it had been rung up there.
+        if ($this->basket === []) {
+            $this->settleBarOnly($member, $location);
 
             return;
         }
@@ -963,6 +979,68 @@ class DispensaryPos extends Component
         $this->resetBasketState();
         $this->barBasket = [];
         $this->flash(__('Visita liquidada: dispensación y barra.'), 'success');
+    }
+
+    /**
+     * A visit with nothing but bar lines: one Order, on the bar ledger, through `CommitOrder` — the same
+     * single writer the Barra screen calls (prompt 224).
+     *
+     * Reached only from {@see self::settleWithBar()}, after its operator/offline/till guards. Before 224 this
+     * case could not be settled at all: the combined settle required both baskets, so an operator who had
+     * added three soft drinks to a member's visit had to add a flower line to take the money.
+     */
+    private function settleBarOnly(Member $member, Location $location): void
+    {
+        // The bar shares the one drawer, so a sale still needs an OPEN till — resolved here rather than
+        // inherited, because the combined path resolves it after checks this case skips.
+        $till = $this->openTillSession($location);
+
+        if ($till === null) {
+            $this->flash(__('No hay caja abierta en este terminal.'), 'error');
+
+            return;
+        }
+
+        $barTotal = $this->barBasketTotalCents($member, $location);
+        [$cashApplied, $walletApplied] = $this->tenderSplit($barTotal);
+
+        if ($this->isUnderTendered($cashApplied)) {
+            $this->flash(__('El efectivo entregado no cubre el total.'), 'error');
+
+            return;
+        }
+
+        $orderLines = array_map(fn (array $l): array => ['article_id' => (string) $l['article_id'], 'qty' => (int) $l['qty']], $this->barBasket);
+
+        try {
+            $order = (new CommitOrder)->handle($location, $orderLines, [
+                'member_id' => $member->id,
+                'till_session_id' => $till->id,
+                'operator_id' => CounterOperator::id() ?? $this->currentUser()?->id,
+                'cash_cents' => $cashApplied,
+                'wallet_cents' => $walletApplied,
+                'idempotency_key' => $this->idempotencyKey !== null ? $this->idempotencyKey.'-bar' : null,
+            ]);
+        } catch (DebtLimitExceededException) {
+            $this->flash(__('El pago con monedero superaría el saldo disponible del socio.'), 'error');
+
+            return;
+        } catch (TillClosedException) {
+            $this->flash(__('La caja no está abierta.'), 'error');
+
+            return;
+        } catch (RuntimeException) {
+            $this->flash(__('No se pudo cobrar la barra. Revisa la cesta y el stock.'), 'error');
+
+            return;
+        }
+
+        $this->lastOrderId = $order->id;
+        $this->barBasket = [];
+        // The same reset the combined settle uses — it clears the tender fields as well as the basket, and
+        // mints the next idempotency key.
+        $this->resetBasketState();
+        $this->flash(__('Barra cobrada.'), 'success');
     }
 
     /** The charged bar total, priced through the SAME resolver CommitOrder uses so the tender matches. */
@@ -1093,7 +1171,13 @@ class DispensaryPos extends Component
 
         $basketLines = $this->basketView($member, $location);
         $total = (int) array_sum(array_map(fn (array $l): int => (int) $l['total_cents'], $basketLines));
-        [$cashPreview, $walletPreview] = $this->tenderSplit($total);
+
+        // The tender preview is split over the COMBINED total (prompt 224). It used to split the dispensation
+        // total alone while `settleWithBar()` split dispensation + bar, so with a bar line present the
+        // breakdown above the settle button disagreed with the settle button itself — and a bar-only visit had
+        // a breakdown reading €0,00 against real money. One figure, one split, one place.
+        $barTotal = $this->barBasketTotalCents($member, $location);
+        [$cashPreview, $walletPreview] = $this->tenderSplit($total + $barTotal);
 
         $allGenetics = $this->geneticRows($location, $member);
         $allArticles = $this->barArticleRows($location);
@@ -1144,7 +1228,7 @@ class DispensaryPos extends Component
             'barArticles' => $this->filterArticles($allArticles),
             'articleCategories' => $this->deriveArticleCategories($allArticles),
             'barLines' => $this->barBasketView($location),
-            'barTotalCents' => $this->barBasketTotalCents($member, $location),
+            'barTotalCents' => $barTotal,
         ]);
     }
 
@@ -1346,7 +1430,15 @@ class DispensaryPos extends Component
     {
         $location = $this->resolveLocation();
 
-        return $location === null ? 0 : $this->basketTotalCents($this->resolveMember(), $location);
+        if ($location === null) {
+            return 0;
+        }
+
+        // BOTH baskets (prompt 224): "Justo" fills in the cash owed, and what is owed on a visit with a bar
+        // line is the combined amount — the same figure `settleWithBar()` splits.
+        $member = $this->resolveMember();
+
+        return $this->basketTotalCents($member, $location) + $this->barBasketTotalCents($member, $location);
     }
 
     // --- Live view assembly (nothing cached) ------------------------------------
