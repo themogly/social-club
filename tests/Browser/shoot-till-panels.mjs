@@ -11,7 +11,10 @@
 import { chromium } from 'playwright';
 import { mkdirSync } from 'node:fs';
 
-const BASE = process.env.BASE_URL ?? 'http://127.0.0.1:8123';
+// The sign-in preamble is `counter-session.mjs` (prompts 223/226) — one copy, not ten. Everything below is
+// this harness's own: its viewports, its contexts, its measurements.
+import { BASE, SEDE, signInToCounter } from './counter-session.mjs';
+
 const PHASE = process.argv[2] ?? 'after';
 const OUT = `storage/app/screenshots/201`;
 mkdirSync(OUT, { recursive: true });
@@ -21,22 +24,13 @@ const browser = await chromium.launch();
 // One login, reused — logging in per context trips Filament's throttle (learned in prompt 200).
 const auth = await browser.newContext({ viewport: { width: 1180, height: 820 } });
 const login = await auth.newPage();
-await login.goto(`${BASE}/login`, { waitUntil: 'networkidle' });
-await login.fill('input[type="email"]', 'owner@club.test');
-await login.fill('input[type="password"]', 'password');
-await login.press('input[type="password"]', 'Enter');
-await login.waitForURL((u) => !u.pathname.startsWith('/login'), { timeout: 20000 });
 
-// Clear the counter chain once on this session so the till renders its working screen.
-await login.goto(`${BASE}/counter`, { waitUntil: 'networkidle' });
-const sede = await login.$('[data-counter-sede-menu] form button:has-text("Central Branch")');
-if (sede) { await sede.click(); await login.waitForLoadState('networkidle'); }
-const pad = await login.$('[data-counter-surface-unlock]');
-if (pad) {
-  for (const d of '1234') await login.click(`[data-counter-surface] button:has-text("${d}")`).catch(() => {});
-  await pad.click();
-  await login.waitForTimeout(1200);
+// Signed in and through the counter chain once, on this session, so the till renders its working screen.
+if (! await signInToCounter(login, '/counter', { sede: SEDE })) {
+  console.error('FAIL: could not reach the counter — is the dev seed loaded and the server running?');
+  process.exit(1);
 }
+
 const storageState = await auth.storageState();
 await auth.close();
 

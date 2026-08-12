@@ -14,10 +14,9 @@
 
 import { chromium } from 'playwright';
 
-const BASE = process.env.BASE_URL ?? 'http://127.0.0.1:8123';
-const EMAIL = 'owner@club.test';
-const PASSWORD = 'password';
-const PIN = '1234';
+// The sign-in preamble is `counter-session.mjs` (prompts 223/226) — one copy, not ten. Everything below is
+// this harness's own: its viewport, its listeners, its measurements.
+import { BASE, signInToCounter } from './counter-session.mjs';
 
 const browser = await chromium.launch();
 const page = await browser.newPage({ viewport: { width: 1180, height: 820 } });
@@ -37,31 +36,8 @@ page.on('request', (r) => {
   }
 });
 
-// --- log in -------------------------------------------------------------------------------------
-await page.goto(`${BASE}/login`);
-await page.fill('input[type="email"]', EMAIL);
-await page.fill('input[type="password"]', PASSWORD);
-await page.press('input[type="password"]', 'Enter');
-await page.waitForLoadState('networkidle');
-
-// --- the bar ------------------------------------------------------------------------------------
-await page.goto(`${BASE}/counter/bar`);
-await page.waitForLoadState('networkidle');
-
-// A sede may need choosing before anything else (prompt 187's chain).
-if (await page.$('[data-blocker="sede"]')) {
-  // The switcher has its own x-data island and OPENS ITSELF when a sede must be chosen, so clicking the
-  // trigger would close it. Pick straight from the open menu.
-  const sede = await page.$('[data-counter-sede-menu] form button');
-  if (sede) { await sede.click(); await page.waitForLoadState('networkidle'); }
-}
-
-// Identify with a PIN if the surface is up (prompt 173).
-if (await page.$eval('[data-counter-surface]', (n) => n.getAttribute('data-surface-mode') !== 'none').catch(() => false)) {
-  for (const d of PIN.split('')) await page.click(`[data-counter-surface] button:has-text("${d}")`);
-  await page.click('[data-counter-surface-unlock]');
-  await page.waitForTimeout(800);
-}
+// --- log in and reach the bar --------------------------------------------------------------------
+await signInToCounter(page, '/counter/bar');
 
 const before = await page.$$eval('[data-product]', (n) => n.length);
 if (before === 0) { console.error('FAIL: no articles on the bar screen — cannot test the commit'); failed = true; }

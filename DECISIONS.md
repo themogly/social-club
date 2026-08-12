@@ -11461,3 +11461,79 @@ Screenshots in `storage/app/screenshots/225/`, before and after, both sizes, bot
 **Taken as intent, not as values:** the mock's inline hexes went through the project's palette, its `<h1>`
 became an `<h2>` (130's one-`<h1>` rule), and its handover invention was not built (224/221's lesson about
 mocks that cannot see the codebase).
+
+---
+
+## Prompt 226 — 223's extraction had reached one consumer of ten
+
+Verified on `origin/main` = `c3318c8`: ten browser harnesses named the seed credentials, and exactly one
+imported `counter-session.mjs` — the file 223 extracted so the preamble would exist once, with a header
+saying *"Three copies of a login flow is how one of them quietly stops matching the app."* The file it was
+extracted FROM (`measure-close-guard.mjs`) still carried the original inline copy.
+
+**The fifth instance of this project's most-repeated defect**: `OpensMemberships` (203 wired Socios, 211 the
+rest), the MRZ partial (179 the public form, 215 the staff one), the application field list (210 two copies,
+215 one declaration), the signature canvas (113 the POS, 220 the component) — and this. Every one shipped
+green, because a green suite proves a unit WORKS, never that everything which should use it DOES.
+
+### What moved into the helper rather than surviving as a fork
+
+- **Env overrides.** `AUDIT_EMAIL/PASSWORD/PIN/SEDE` (the audit sweeps) and `DEV_EMAIL/PASSWORD/PIN` (the
+  prove-* scripts) were two names for the same three values, and four harnesses had no overrides at all.
+  Both prefixes are honoured — AUDIT, then DEV, then the dev seed — so every existing invocation keeps
+  working exactly as it did.
+- **A named sede.** Four harnesses picked `Central Branch` by name and five took whichever came first;
+  `signInToCounter(page, url, { sede })` does both, defaulting to first.
+- **`shoot-lockdown`'s hard-won lesson**, which was a comment in one file: Filament's login is a Livewire
+  form, so the redirect happens CLIENT-side and `networkidle` can resolve while the URL is still `/login`.
+  Waiting on the load state alone reads a good login as a failure. The helper waits on the URL now, so the
+  next consumer inherits the fix instead of re-finding it.
+- **A `signIn()` that stops there**, because `shoot-lockdown` shoots `/seguridad` — an admin page — and never
+  touches the counter. Failing it on "did the counter come up?" would be the wrong question.
+
+### The parity table — the whole safety argument
+
+Each harness run against the same built tree, same running server, same seed, before and after the port:
+
+| harness | before | after | output |
+|---|---|---|---|
+| `measure-close-guard` | pass (0) | pass (0) | **identical** |
+| `prove-live-lookup` | pass (0) | pass (0) | **identical** |
+| `prove-confirmation-holds-still` | pass (0) | pass (0) | **identical** |
+| `prove-commit-click` | pass (0) | pass (0) | **identical** |
+| `shoot-till-panels` | pass (0) | pass (0) | **identical** |
+| `shoot-lockdown` | pass (0) | pass (0) | **identical** |
+| `axe-sweep` | **fail (1)** | **fail (1)** | **identical**, 51 lines |
+| `design-sweep` | pass (0) | pass (0) | 94 lines both, same 5 overflow findings |
+| `prove-lock-in-place` | **fail (1)** | **fail (1)** | same error, same selector |
+
+Two of the nine **already failed on `main`** and fail identically here — that is parity, not a regression:
+
+- `prove-lock-in-place` times out on `[data-counter-overflow-trigger]`, a selector the top bar stopped
+  rendering (prompt 206 rebuilt it). Its only diff is the LINE NUMBER in the stack trace, because the file
+  lost twelve lines of preamble.
+- `axe-sweep` exits 1 on its own accessibility findings, unchanged.
+
+`design-sweep`'s only diff is the admin dashboard's page HEIGHT (2928→3080px at 1440×900). That is live data
+— the dev database grew while the other harnesses ran — and it is confined to the five dashboard rows; every
+other row, the finding count and the exit code are the same. **Recorded rather than smoothed over**: a
+parity table that claims byte-identical output where the app renders live figures would be the wrong claim.
+
+### The class is closed by a guard
+
+`OneLoginPreambleTest`: the seed credentials appear in exactly **one** file under `tests/Browser/`, and every
+harness that talks to the running server imports the shared preamble. Both fail against `2306824` naming all
+nine, and the guard is proved by planting a violation rather than assumed.
+
+**The second rule needed tightening once, and the reason is worth keeping.** The first version treated any
+harness mentioning a counter selector as a consumer, and caught `shoot-surface-chain.mjs` — which loads
+static `file://` pages and queries the PIN pad's hook only to assert it is there. It has no session to sign
+in to. The rule is now "does it navigate to the running app", which is exactly who needs the login flow to
+stay in step. Same shape as 215's parity reader reading its own docblock and 222's pad guard matching a
+selector: a guard that measures a spelling rather than the rule.
+
+### Verification
+
+`composer check` green — **1801 tests**, 1798 passed, 3 pre-existing skips, Larastan 0, Pint clean. **MySQL
+was left to CI**, per the running order. **No app code**: nothing under `app/`, `resources/`, `routes/` or
+`lang/` changed. `measure-mrz-mount.mjs`, the existing consumer, is untouched and still passes.
