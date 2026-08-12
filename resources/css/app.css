@@ -45,3 +45,24 @@
         transform: translateY(10px) scale(0.98);
     }
 }
+
+/* The counter cart's scroll region (prompt 225). The owner could not tell which part of the right-hand
+   column scrolled — it was always only this one, and nothing said so. A soft fade at the top edge says
+   "there is more above" without adding chrome, and the gutter keeps a real scrollbar visible on the
+   platforms that hide it by default. Gated behind `prefers-reduced-motion` nowhere on purpose: this is a
+   static affordance, not an animation. */
+.counter-scroll-region {
+    scrollbar-gutter: stable;
+    scrollbar-width: thin;
+    -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 12px);
+    mask-image: linear-gradient(to bottom, transparent 0, #000 12px);
+}
+
+.counter-scroll-region::-webkit-scrollbar {
+    width: 8px;
+}
+
+.counter-scroll-region::-webkit-scrollbar-thumb {
+    border-radius: 9999px;
+    background: color-mix(in oklab, currentColor 22%, transparent);
+}

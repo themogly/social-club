@@ -134,6 +134,16 @@ class DispensaryPos extends Component
     #[Session(key: 'counter.pos.genetic_layout')]
     public string $geneticLayout = 'list';
 
+    /**
+     * …and the bar's own layout, which the docblock above promised and the code never gave it (prompt 225).
+     *
+     * Both sources rendered from `$geneticLayout`, so "list for genetics, grid for the bar" was true of the
+     * comment and of nothing else: switching to Barra inherited whatever the genetics pane was set to. Two
+     * properties, one toggle — the control writes to whichever source is on screen.
+     */
+    #[Session(key: 'counter.pos.article_layout')]
+    public string $articleLayout = 'grid';
+
     /** Category filter over the genetics grid (null = all). */
     public ?string $categoryId = null;
 
@@ -425,12 +435,31 @@ class DispensaryPos extends Component
         $this->strainType = $strainType;
     }
 
-    /** List or grid for the genetics pane. Anything else is ignored rather than stored (prompt 176). */
+    /**
+     * List or grid for the pane on screen. Anything else is ignored rather than stored (prompt 176).
+     *
+     * Writes to the ACTIVE source's preference (prompt 225): an operator who prefers a dense list of genetics
+     * and a grid of drinks gets both, and neither choice overwrites the other.
+     */
     public function setGeneticLayout(string $layout): void
     {
-        if (in_array($layout, ['list', 'grid'], true)) {
-            $this->geneticLayout = $layout;
+        if (! in_array($layout, ['list', 'grid'], true)) {
+            return;
         }
+
+        if ($this->catalogueSource === 'bar') {
+            $this->articleLayout = $layout;
+
+            return;
+        }
+
+        $this->geneticLayout = $layout;
+    }
+
+    /** The layout of whichever catalogue is on screen — one place, so the toggle and the grid agree. */
+    public function catalogueLayout(): string
+    {
+        return $this->catalogueSource === 'bar' ? $this->articleLayout : $this->geneticLayout;
     }
 
     public function toggleCalculator(): void

@@ -128,6 +128,14 @@
             };
         @endphp
 
+        @php
+            // A PRESENT but ineligible socio is a blocking state like any other (prompt 225) — it replaces
+            // the work rather than sitting beside it. Read once, because three places branch on it: the
+            // selection pane, the cart's verdict list (which drops its duplicate copy) and the commit's
+            // reason line.
+            $blockedSurface = $member !== null && ! empty($hardBlockRules);
+        @endphp
+
         <div class="flex h-full min-h-0 flex-col gap-4 md:flex-row">
 
             {{-- ================= SELECTION: the only thing that scrolls ================= --}}
@@ -135,6 +143,9 @@
                 data-selection-pane
                 class="flex min-h-0 flex-1 flex-col gap-4 md:overflow-y-auto md:pr-1"
             >
+            @if ($blockedSurface)
+                @include('livewire.counter.partials.blocked-member')
+            @else
                 {{-- Identify — the same shared lookup the member blocking state uses, wrapped in this column's
                      card chrome. Kept here so an operator can scan the next socio without clearing the current
                      one first; the audit's finding 3 (this column eating the top of the screen) is prompt 176.
@@ -319,11 +330,11 @@
                                     wire:click="setGeneticLayout('{{ $mode }}')"
                                     data-layout-option="{{ $mode }}"
                                     aria-label="{{ $label }}"
-                                    aria-pressed="{{ $geneticLayout === $mode ? 'true' : 'false' }}"
+                                    aria-pressed="{{ $this->catalogueLayout() === $mode ? 'true' : 'false' }}"
                                     @class([
                                         'inline-flex h-11 w-11 items-center justify-center rounded-lg text-base transition',
-                                        'bg-brand text-white' => $geneticLayout === $mode,
-                                        'text-ink-muted hover:bg-surface-alt dark:text-slate-400 dark:hover:bg-slate-800' => $geneticLayout !== $mode,
+                                        'bg-brand text-white' => $this->catalogueLayout() === $mode,
+                                        'text-ink-muted hover:bg-surface-alt dark:text-slate-400 dark:hover:bg-slate-800' => $this->catalogueLayout() !== $mode,
                                     ])
                                 >{{ $glyph }}</button>
                             @endforeach
@@ -458,8 +469,8 @@
                     @if ($catalogueSource === 'bar')
                         <div @class([
                             'mt-4',
-                            'flex flex-col gap-2' => $geneticLayout === 'list',
-                            'grid gap-3 sm:grid-cols-2' => $geneticLayout === 'grid',
+                            'flex flex-col gap-2' => $this->catalogueLayout() === 'list',
+                            'grid gap-3 sm:grid-cols-2' => $this->catalogueLayout() === 'grid',
                         ])>
                             @forelse ($barArticles as $article)
                                 <button
@@ -468,14 +479,14 @@
                                     data-product
                                     data-bar-article="{{ $article['id'] }}"
                                     @class([
-                                        'flex min-h-11 rounded-xl border border-line p-3 text-left transition hover:border-brand hover:bg-brand-tint dark:border-slate-700 dark:hover:bg-slate-800',
-                                        'flex-col' => $geneticLayout === 'grid',
-                                        'flex-col gap-1 lg:flex-row lg:items-center lg:justify-between lg:gap-4' => $geneticLayout === 'list',
+                                        'flex w-full min-h-11 rounded-xl border border-line px-3 py-1.5 text-left transition hover:border-brand hover:bg-brand-tint dark:border-slate-700 dark:hover:bg-slate-800',
+                                        'flex-col gap-1' => $this->catalogueLayout() === 'grid',
+                                        'flex-col gap-1 sm:flex-row sm:items-center sm:justify-between sm:gap-4' => $this->catalogueLayout() === 'list',
                                     ])
                                 >
-                                    <span class="min-w-0">
-                                        <span class="block truncate font-semibold">{{ $article['name'] }}</span>
-                                        <span class="mt-0.5 flex flex-wrap items-center gap-1.5 text-xs text-ink-muted dark:text-slate-400">
+                                    <span class="min-w-0 flex-1">
+                                        <span class="block truncate font-semibold leading-tight">{{ $article['name'] }}</span>
+                                        <span class="mt-0.5 flex flex-wrap items-center gap-1.5 text-[11px] leading-tight text-ink-muted dark:text-slate-400">
                                             @if ($article['category_name'])
                                                 <span>{{ $article['category_name'] }}</span>
                                             @endif
@@ -484,7 +495,7 @@
                                             @endif
                                         </span>
                                     </span>
-                                    <span class="shrink-0 font-semibold tabular-nums">{{ $article['price_label'] }}</span>
+                                    <span class="shrink-0 text-sm font-semibold tabular-nums">{{ $article['price_label'] }}</span>
                                 </button>
                             @empty
                                 <p class="rounded-xl border border-dashed border-line px-4 py-6 text-center text-sm text-ink-muted dark:border-slate-700 dark:text-slate-400">
@@ -497,8 +508,8 @@
                     @else
                     <div @class([
                         'mt-4',
-                        'flex flex-col gap-2' => $geneticLayout === 'list',
-                        'grid gap-3 sm:grid-cols-2' => $geneticLayout === 'grid',
+                        'flex flex-col gap-2' => $this->catalogueLayout() === 'list',
+                        'grid gap-3 sm:grid-cols-2' => $this->catalogueLayout() === 'grid',
                     ])>
                         @forelse ($genetics as $g)
                             @php $disabledCard = $member === null || ! $g['has_batch']; @endphp
@@ -508,46 +519,50 @@
                                 @disabled($disabledCard)
                                 data-product
                                 @class([
-                                    'flex rounded-xl border p-3 text-left transition',
-                                    'flex-col' => $geneticLayout === 'grid',
-                                    'flex-col gap-1 lg:flex-row lg:items-center lg:justify-between lg:gap-4' => $geneticLayout === 'list',
+                                    'flex w-full min-h-11 rounded-xl border px-3 py-1.5 text-left transition',
+                                    'flex-col gap-1' => $this->catalogueLayout() === 'grid',
+                                    'flex-col gap-1 sm:flex-row sm:items-center sm:justify-between sm:gap-4' => $this->catalogueLayout() === 'list',
                                     'border-line bg-surface hover:border-brand hover:bg-brand-tint/40 dark:border-slate-700 dark:bg-slate-950 dark:hover:border-brand' => ! $disabledCard,
                                     'cursor-not-allowed border-dashed border-line bg-surface-alt opacity-60 dark:border-slate-800 dark:bg-slate-900' => $disabledCard,
                                 ])
                             >
-                                <div class="flex items-start justify-between gap-2">
-                                    <span class="font-semibold">{{ $g['name'] }}</span>
-                                    <span class="shrink-0 text-sm font-semibold text-brand dark:text-slate-100">{{ $this->money($g['rate_cents']) }}/{{ $g['is_unit'] ? __('ud') : 'g' }}</span>
-                                </div>
-                                <div class="mt-1 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-ink-muted dark:text-slate-400">
-                                    <span class="rounded-full bg-surface-alt px-2 py-0.5 font-semibold text-ink-muted dark:bg-slate-800 dark:text-slate-300">{{ $g['product_type_label'] }}</span>
-                                    @if ($g['strain_type_label'])<span class="rounded-full bg-brand-tint px-2 py-0.5 font-semibold text-brand dark:bg-slate-800 dark:text-slate-200">{{ $g['strain_type_label'] }}</span>@endif
-                                    <span>THC {{ number_format($g['thc_bp'] / 100, 1) }}%</span>
-                                    <span>CBD {{ number_format($g['cbd_bp'] / 100, 1) }}%</span>
-                                    @if ($g['cultivation'])<span>{{ $g['cultivation'] }}</span>@endif
-                                </div>
-                                <div class="mt-2 flex items-center justify-between text-xs">
-                                    <span class="text-ink-muted dark:text-slate-400">{{ __('Stock') }}: {{ $g['is_unit'] ? $g['remaining_units'].' '.__('uds').' ('.$this->grams($g['remaining_cg']).')' : $this->grams($g['remaining_cg']) }}</span>
-                                    {{-- Prompt 216 — the badge is the FIGURE, not the word. "Runs out in about
-                                         two days at the current rate" is information; "low" is a judgement
-                                         the operator cannot check. Staff screens may carry quantities; the
-                                         member menu may not (185), and `availabilityAt()` gives them a state
-                                         word and nothing else.
+                                {{-- LEFT: the name, and one meta line under it. Prompt 225 compacted the card
+                                     from three stacked rows (~90px) to a name plus a meta line (~64px in list
+                                     view) — the owner asked for "compact, maybe not as much as this design",
+                                     so the density comes from padding and type scale and NOT from dropping
+                                     facts: every figure the 90px card carried is still here. --}}
+                                <span class="min-w-0 flex-1">
+                                    <span class="block truncate font-semibold leading-tight">{{ $g['name'] }}</span>
+                                    <span class="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px] leading-tight text-ink-muted dark:text-slate-400">
+                                        <span class="font-semibold text-ink-muted dark:text-slate-300">{{ $g['product_type_label'] }}</span>
+                                        @if ($g['strain_type_label'])<span class="font-semibold text-brand dark:text-slate-200">{{ $g['strain_type_label'] }}</span>@endif
+                                        <span>THC {{ number_format($g['thc_bp'] / 100, 1) }}%</span>
+                                        <span>CBD {{ number_format($g['cbd_bp'] / 100, 1) }}%</span>
+                                        @if ($g['cultivation'])<span>{{ $g['cultivation'] }}</span>@endif
+                                        @if ($g['price_label'])<span class="font-medium text-brand dark:text-slate-300">{{ $g['price_label'] }}</span>@endif
+                                    </span>
+                                </span>
 
-                                         `cover_label` is null when the verdict came from an explicit
-                                         threshold or from thin history — there is no rate to state, so it
-                                         falls back to the word rather than inventing a number. --}}
-                                    @if ($g['has_batch'] && $g['low_stock'])
-                                        <span data-stock-cover="{{ $g['cover']['basis'] }}" class="inline-flex items-center gap-1 text-warning"><span class="h-2 w-2 rounded-full bg-warning"></span>{{ $g['cover_label'] ?? __('Stock bajo') }}</span>
-                                    @elseif ($g['has_batch'])
-                                        <span class="inline-flex items-center gap-1 text-success"><span class="h-2 w-2 rounded-full bg-success"></span>{{ __('Con lote') }}</span>
-                                    @else
-                                        <span class="inline-flex items-center gap-1 text-ink-muted dark:text-slate-400"><span class="h-2 w-2 rounded-full bg-slate-400"></span>{{ __('Sin lote') }}</span>
-                                    @endif
-                                </div>
-                                @if ($g['price_label'])
-                                    <p class="mt-1 text-[11px] font-medium text-brand dark:text-slate-300">{{ $g['price_label'] }}</p>
-                                @endif
+                                {{-- RIGHT: price over stock. 216's cover badge and the stock FIGURE are
+                                     unchanged — a staff screen carries quantities, and "≈2 días" is the
+                                     information the word "bajo" is not. --}}
+                                <span @class([
+                                    'flex shrink-0 items-center gap-3 text-xs',
+                                    'sm:flex-col sm:items-end sm:gap-0.5' => $this->catalogueLayout() === 'list',
+                                    'justify-between' => $this->catalogueLayout() === 'grid',
+                                ])>
+                                    <span class="text-sm font-semibold text-brand tabular-nums dark:text-slate-100">{{ $this->money($g['rate_cents']) }}/{{ $g['is_unit'] ? __('ud') : 'g' }}</span>
+                                    <span class="flex items-center gap-1.5 whitespace-nowrap text-ink-muted dark:text-slate-400">
+                                        <span class="tabular-nums">{{ $g['is_unit'] ? $g['remaining_units'].' '.__('uds') : $this->grams($g['remaining_cg']) }}</span>
+                                        @if ($g['has_batch'] && $g['low_stock'])
+                                            <span data-stock-cover="{{ $g['cover']['basis'] }}" class="inline-flex items-center gap-1 text-warning"><span class="h-2 w-2 rounded-full bg-warning"></span>{{ $g['cover_label'] ?? __('Stock bajo') }}</span>
+                                        @elseif ($g['has_batch'])
+                                            <span class="inline-flex items-center gap-1 text-success"><span class="h-2 w-2 rounded-full bg-success"></span>{{ __('Con lote') }}</span>
+                                        @else
+                                            <span class="inline-flex items-center gap-1"><span class="h-2 w-2 rounded-full bg-slate-400"></span>{{ __('Sin lote') }}</span>
+                                        @endif
+                                    </span>
+                                </span>
                             </button>
                         @empty
                             <p class="col-span-full rounded-xl border border-dashed border-line px-4 py-8 text-center text-sm text-ink-muted dark:border-slate-700 dark:text-slate-400">{{ __('No hay genéticas con precio activo en esta sede.') }}</p>
@@ -555,6 +570,7 @@
                     </div>
                     @endif
                 </section>
+            @endif
             </div>
 
             {{-- ================= CART: fixed. Identity + allowance, basket, commit. ================= --}}
@@ -569,16 +585,28 @@
 
                 {{-- MIDDLE — the basket and the payment apparatus, plus the member detail that informs it
                      (wallet, carencia, sanction, the counter verdict). This is the cart's scroll region:
-                     a long basket lengthens THIS, never the page, so the commit below cannot be pushed off. --}}
-                <div class="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto">
+                     a long basket lengthens THIS, never the page, so the commit below cannot be pushed off.
+
+                     **It has to LOOK scrollable** (prompt 225). The owner: *"I don't like the scrolling on the
+                     right-hand side. It's confusing — there's so much info in there. The only part that needs
+                     to scroll is the cart, and it should be obvious."* It always WAS the only scrolling part;
+                     nothing said so, and content simply stopped at an edge. A visible gutter and a soft top
+                     fade say "there is more above", and `overscroll-contain` stops a flick at the end of the
+                     basket from scrolling the page behind it. --}}
+                <div data-cart-scroll class="counter-scroll-region flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto overscroll-contain pr-1">
                     @if ($member)
                         <section class="rounded-2xl border border-line bg-surface p-4 dark:border-slate-800 dark:bg-slate-900">
                         {{-- No photo on file (prompt 157): identity can't be verified against a face that isn't
                              there. The verdict below drives WARN/OVERRIDE enforcement; this is the fix — take it. --}}
                         @unless ($photoUrl)
-                            <div class="mt-3 rounded-xl border border-warning/30 bg-warning/5 p-3">
-                                <p class="text-xs font-medium text-warning">{{ __('Sin foto en ficha. Verifica con el documento y hazla ahora.') }}</p>
-                                <x-counter.photo-capture :member="$member" source="counter" class="mt-2" />
+                            {{-- ONE LINE with its action (prompt 225), not an amber box the height of the
+                                 wallet and the carencia put together. It is a nag, not a blocker: the verdict
+                                 below drives whatever WARN/OVERRIDE enforcement the sede has configured, and
+                                 this is only the fix. Nothing it said was dropped — the sentence is shorter
+                                 and the capture control is beside it instead of under it. --}}
+                            <div data-photo-nag class="mt-2.5 flex items-center justify-between gap-2 rounded-xl border border-warning/30 bg-warning/5 px-3 py-1.5">
+                                <p class="min-w-0 text-[11px] font-medium leading-tight text-warning">{{ __('Sin foto — verifica y súbela') }}</p>
+                                <x-counter.photo-capture :member="$member" source="counter" class="shrink-0" />
                             </div>
                         @endunless
                         {{-- Wallet + carencia --}}
@@ -618,6 +646,12 @@
                                             @continue($rule['satisfied'])
                                             @php
                                                 $isBlock = in_array($rule['mode'], ['BLOCK', 'OVERRIDE'], true);
+                                            @endphp
+                                            {{-- While the blocked surface is up it states every BLOCKING rule
+                                                 in full, so this column carries only what it does not: the
+                                                 warnings. Said once, in one place (prompt 199). --}}
+                                            @continue($blockedSurface && $isBlock)
+                                            @php
                                                 // The ACTOR, not just the rule (prompt 211): a remedy must never
                                                 // instruct somebody to do something they hold no permission for, so
                                                 // the wording changes with who is reading it and not only the button.
@@ -638,14 +672,18 @@
                                                 <span class="shrink-0 rounded-full border border-current px-2 py-0.5 text-[10px] font-semibold uppercase">{{ $isBlock ? __('Bloquea') : __('Aviso') }}</span>
                                             </div>
                                         @endforeach
-                                        @if (! empty($hardBlockRules))
-                                            <p class="text-sm font-medium text-error">{{ __('No se puede dispensar a este socio.') }}</p>
-                                        @endif
-                                        {{-- The reported dead end, closed where it is read (prompt 211): 203's
-                                             own enrol/renew panel, from the one shared partial, on the screen
-                                             that was telling the operator to go somewhere they cannot. --}}
-                                        @include('livewire.counter.partials.membership-fix')
-                                        @include('livewire.counter.partials.inline-fee')
+                                        {{-- While the blocked SURFACE is up it states the block and carries the
+                                             resolutions, so this column says neither a second time (prompt 199:
+                                             once, in one place). With warnings only — nothing blocking — this
+                                             is still where the fix belongs, beside the verdict that named it. --}}
+                                        @unless ($blockedSurface)
+                                            {{-- The reported dead end, closed where it is read (prompt 211):
+                                                 203's own enrol/renew panel, from the one shared partial, on
+                                                 the screen that was telling the operator to go somewhere they
+                                                 cannot. --}}
+                                            @include('livewire.counter.partials.membership-fix')
+                                            @include('livewire.counter.partials.inline-fee')
+                                        @endunless
                                     </div>
                                 @endif
                             </div>
@@ -965,9 +1003,34 @@
                         x-bind:disabled="! online"
                         class="mt-4 h-16 w-full rounded-xl bg-brand text-lg font-bold text-white transition hover:bg-brand-dark focus:outline-none focus:ring-2 focus:ring-brand/40 disabled:cursor-not-allowed disabled:opacity-50"
                     >
-                        <span wire:loading.remove wire:target="commitDispensation">{{ __('Registrar aportación') }}</span>
+                        {{-- THE TOTAL ON THE BUTTON (prompt 225). The figure and the act are one thing at the
+                             moment of pressing it, and the operator reads the total last — from the button
+                             they are already looking at, not from a panel above it that may have scrolled. --}}
+                        <span wire:loading.remove wire:target="commitDispensation">
+                            {{ $basketTotalCents > 0
+                                ? __('Registrar aportación · :total', ['total' => $this->money($basketTotalCents)])
+                                : __('Registrar aportación') }}
+                        </span>
                         <span wire:loading wire:target="commitDispensation">{{ __('Registrando…') }}</span>
                     </button>
+
+                    {{-- Prompt 60's observable refusal, now COLOCATED BY CONSTRUCTION (prompt 225): the reason
+                         the press will fail sits under the control that will fail, in amber — a state to
+                         resolve, never red, which this project reserves for destructive.
+
+                         Once, and only here: the blocked SURFACE states the rules in full, so this is the
+                         one-line reminder beside the button and not a second list (prompt 199). --}}
+                    @if ($blockedSurface)
+                        {{-- `dark:bg-slate-800` is not decoration. The palette's dark surfaces come from
+                             explicit `dark:` utilities, not from a token swap on `--color-surface`, so a
+                             `bg-warning/10` with no dark override composites the DARK amber (#d97706) over a
+                             LIGHT base. Over slate-800 the same text computes to 4.49:1 — under AA by a
+                             hundredth — so it sits on slate-900, where it is 5.3:1. The audit's amber-ramp
+                             finding, met by measuring rather than by assuming. --}}
+                        <p data-commit-blocked-reason class="mt-2 rounded-lg border border-warning/40 bg-warning/10 px-3 py-2 text-center text-xs font-semibold text-warning dark:bg-slate-900">
+                            {{ __('Bloqueado: resuelve el motivo para poder registrar.') }}
+                        </p>
+                    @endif
                 </div>
             </aside>
         </div>

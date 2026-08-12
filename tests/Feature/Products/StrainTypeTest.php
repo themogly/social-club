@@ -83,7 +83,20 @@ class StrainTypeTest extends TestCase
     private function pos(): Testable
     {
         (new OpenTill)->handle($this->location, 'POS-1', 10000);
-        $member = Member::factory()->create(['organisation_id' => $this->org->id]);
+        // Prompt 225: the dispensary's catalogue renders for a socio who may be DISPENSED TO — a
+        // present-but-blocked member replaces the selling surface exactly as a missing one does. The fixture
+        // is amended, not the feature: this test is about what the catalogue says, so its socio is now a
+        // socio who can be sold to. (The comment above already made 175's version of the point.)
+        $member = Member::factory()->create([
+            'organisation_id' => $this->org->id,
+            'status' => MemberStatus::ACTIVE,
+            'carencia_ends_at' => now()->subMonth(),
+        ]);
+        Membership::factory()->create([
+            'organisation_id' => $this->org->id, 'member_id' => $member->id, 'location_id' => $this->location->id,
+            'tier_id' => MembershipTier::factory()->create(['organisation_id' => $this->org->id])->id,
+            'status' => MembershipStatus::ACTIVE, 'fee_cents' => 0,
+        ]);
 
         return Livewire::test(DispensaryPos::class)->call('selectMember', $member->id);
     }
