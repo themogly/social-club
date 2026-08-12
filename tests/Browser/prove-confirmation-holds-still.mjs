@@ -21,10 +21,10 @@
 import { chromium } from 'playwright';
 import { mkdir } from 'node:fs/promises';
 
-const BASE = process.env.BASE_URL ?? 'http://127.0.0.1:8123';
-const EMAIL = process.env.DEV_EMAIL ?? 'owner@club.test';
-const PASSWORD = process.env.DEV_PASSWORD ?? 'password';
-const PIN = process.env.DEV_PIN ?? '1234';
+// The sign-in preamble is `counter-session.mjs` (prompts 223/226) — one copy, not ten. Everything below is
+// this harness's own: its viewport, its listeners, its measurements.
+import { signInToCounter } from './counter-session.mjs';
+
 const OUT = 'storage/app/screenshots/202';
 
 await mkdir(OUT, { recursive: true });
@@ -35,26 +35,7 @@ let failed = false;
 const fail = (m) => { console.error(`FAIL: ${m}`); failed = true; };
 
 // --- log in, reach a working bar counter -----------------------------------------------------------
-await page.goto(`${BASE}/login`);
-await page.fill('input[type="email"]', EMAIL);
-await page.fill('input[type="password"]', PASSWORD);
-await page.press('input[type="password"]', 'Enter');
-await page.waitForLoadState('networkidle');
-
-await page.goto(`${BASE}/counter/bar`);
-await page.waitForLoadState('networkidle');
-
-if (await page.$('[data-blocker="sede"]')) {
-  // The switcher opens itself when a sede must be chosen, so pick straight from the open menu.
-  const sede = await page.$('[data-counter-sede-menu] form button');
-  if (sede) { await sede.click(); await page.waitForLoadState('networkidle'); }
-}
-
-if (await page.$eval('[data-counter-surface]', (n) => n.getAttribute('data-surface-mode') !== 'none').catch(() => false)) {
-  for (const d of PIN.split('')) await page.click(`[data-counter-surface] button:has-text("${d}")`);
-  await page.click('[data-counter-surface-unlock]');
-  await page.waitForTimeout(900);
-}
+await signInToCounter(page, '/counter/bar');
 
 if (!(await page.$('[data-commit-action]'))) {
   fail('no Charge button on the bar screen — the counter chain is still blocking; nothing was measured');

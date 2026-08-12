@@ -23,10 +23,10 @@
 import { chromium } from 'playwright';
 import { mkdir } from 'node:fs/promises';
 
-const BASE = process.env.BASE_URL ?? 'http://127.0.0.1:8123';
-const EMAIL = process.env.DEV_EMAIL ?? 'owner@club.test';
-const PASSWORD = process.env.DEV_PASSWORD ?? 'password';
-const PIN = process.env.DEV_PIN ?? '1234';
+// The sign-in preamble is `counter-session.mjs` (prompts 223/226) — one copy, not ten. Everything below is
+// this harness's own: its viewport, its listeners, its measurements.
+import { BASE, signInToCounter } from './counter-session.mjs';
+
 const TERM = process.env.MEMBER_QUERY ?? 'ell';   // 2+ chars: the search floor is deliberate
 const OUT = 'storage/app/screenshots/204';
 
@@ -42,24 +42,7 @@ page.on('request', (r) => {
   if (r.url().endsWith('/update') && r.method() === 'POST') posted.push(r.postData() ?? '');
 });
 
-await page.goto(`${BASE}/login`);
-await page.fill('input[type="email"]', EMAIL);
-await page.fill('input[type="password"]', PASSWORD);
-await page.press('input[type="password"]', 'Enter');
-await page.waitForLoadState('networkidle');
-
-await page.goto(`${BASE}/counter/checkin`);
-await page.waitForLoadState('networkidle');
-
-const sede = await page.$('[data-counter-sede-menu] form button');
-if (sede) { await sede.click(); await page.waitForLoadState('networkidle'); }
-
-const mode = await page.$eval('[data-counter-surface]', (n) => n.getAttribute('data-surface-mode')).catch(() => 'none');
-if (mode && mode !== 'none') {
-  for (const d of PIN.split('')) await page.click(`[data-counter-surface] button:has-text("${d}")`);
-  await page.click('[data-counter-surface-unlock]');
-  await page.waitForTimeout(1000);
-}
+await signInToCounter(page, '/counter/checkin');
 
 if (!(await page.$('#member-lookup'))) {
   fail('no lookup on Recepción — the counter chain is still blocking; nothing was measured');

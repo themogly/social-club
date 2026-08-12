@@ -16,11 +16,10 @@
 
 import { chromium } from 'playwright';
 import { mkdirSync, readFileSync } from 'node:fs';
+// Prompt 226: this is the file `counter-session.mjs` was extracted FROM, and it kept the original inline copy
+// for four prompts. One preamble now, and a guard so the eleventh consumer cannot roll its own.
+import { BASE, signInToCounter, openStaffWizard } from './counter-session.mjs';
 
-const BASE = process.env.BASE_URL ?? 'http://127.0.0.1:8123';
-const EMAIL = 'owner@club.test';
-const PASSWORD = 'password';
-const PIN = ['1', '2', '3', '4'];
 const OUT = 'storage/app/screenshots/222';
 // The key IS the Spanish source string (prompt 19), and the app runs in whichever locale the operator has.
 // Both are accepted rather than pinning one, because which language the counter is in is not what this
@@ -39,23 +38,7 @@ const ctx = await browser.newContext({ viewport: { width: 1180, height: 820 }, r
 const page = await ctx.newPage();
 
 // --- sign in and clear the counter chain (sede → PIN) -------------------------------------------
-await page.goto(`${BASE}/login`);
-await page.fill('input[type="email"]', EMAIL);
-await page.fill('input[type="password"]', PASSWORD);
-await page.press('input[type="password"]', 'Enter');
-await page.waitForLoadState('networkidle');
-
-await page.goto(`${BASE}/counter/members`, { waitUntil: 'networkidle' });
-const sede = await page.$('[data-counter-sede-menu] form button');
-if (sede) { await sede.click(); await page.waitForLoadState('networkidle'); }
-const pad = await page.$('[data-counter-surface-unlock]');
-if (pad) {
-  for (const d of PIN) await page.click(`[data-counter-surface] button:has-text("${d}")`).catch(() => {});
-  await pad.click();
-  await page.waitForTimeout(1200);
-}
-
-if (! await page.$('[data-alta-toggle]')) {
+if (! await signInToCounter(page) || ! await page.$('[data-alta-toggle]')) {
   fail('the counter did not reach the Socios screen — is the dev seed loaded and the server running?');
   await browser.close();
   process.exit(1);
@@ -75,12 +58,7 @@ const reset = async () => {
   await page.waitForSelector('[data-alta-toggle]');
 };
 
-const openWizard = async () => {
-  await page.click('[data-alta-toggle]');
-  await page.waitForSelector('[data-alta-modal]');
-  await page.click('[data-alta-staff-form]');
-  await page.waitForSelector('[data-alta-stepper]');
-};
+const openWizard = () => openStaffWizard(page);
 
 /** Run one case: set the modal up, trigger a close route, and report what the guard did. */
 const check = async ({ name, setup, close, expectConfirm, expectStillOpen }) => {

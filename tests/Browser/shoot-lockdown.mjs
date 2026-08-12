@@ -18,6 +18,8 @@
 // the 503 leaks, or if any control on these surfaces is under 44x44.
 
 import { chromium } from 'playwright';
+// The sign-in preamble is `counter-session.mjs` (prompts 223/226) — one copy, not ten.
+import { BASE, signIn } from './counter-session.mjs';
 import { pathToFileURL } from 'node:url';
 import { resolve } from 'node:path';
 import { mkdirSync } from 'node:fs';
@@ -150,23 +152,20 @@ for (const surface of SURFACES) {
 }
 
 // --- Seguridad, from the LIVE server (needs the Filament runtime) --------------------------------
-const BASE = process.env.BASE_URL ?? 'http://127.0.0.1:8123';
 try {
   // Sign in ONCE and reuse the session. Logging in per context tripped Filament's login throttle
   // ("Demasiados intentos") on the fifth attempt and every capture landed back on /login — the script
   // rate-limiting itself, which looks exactly like a broken page if you do not read the error.
+  // `signIn` and not `signInToCounter`: this shoots /seguridad, an ADMIN page, and never touches the
+  // counter — so the sede/PIN steps have nothing to do and "did the counter come up?" is the wrong question
+  // to fail on. The client-side-redirect lesson that used to live here moved INTO the helper (prompt 226).
   const auth = await browser.newContext({ viewport: { width: 1180, height: 820 } });
   const login = await auth.newPage();
-  await login.goto(`${BASE}/login`, { timeout: 20000, waitUntil: 'networkidle' });
-  await login.fill('input[type="email"]', process.env.AUDIT_EMAIL ?? 'owner@club.test');
-  await login.fill('input[type="password"]', process.env.AUDIT_PASSWORD ?? 'password');
-  await login.press('input[type="password"]', 'Enter');
 
-  // Filament's login is a Livewire form: the redirect happens CLIENT-side after the response, so
-  // `networkidle` can resolve while the URL is still /login. Wait for the URL itself, or a perfectly good
-  // login reads as a failure — which is how this first reported "could not sign in".
-  await login.waitForURL((url) => !url.pathname.startsWith('/login'), { timeout: 20000 })
-    .catch(() => { throw new Error(`could not sign in (still at ${login.url()}) — dev seed loaded? throttled?`); });
+  if (! await signIn(login)) {
+    throw new Error(`could not sign in (still at ${login.url()}) — dev seed loaded? throttled?`);
+  }
+
   const storageState = await auth.storageState();
   await auth.close();
 

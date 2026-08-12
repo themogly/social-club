@@ -14,7 +14,10 @@
 import { chromium } from 'playwright';
 import { mkdirSync } from 'node:fs';
 
-const BASE = process.env.BASE_URL ?? 'http://127.0.0.1:8123';
+// The sign-in preamble is `counter-session.mjs` (prompts 223/226) — one copy, not ten. Everything below is
+// this harness's own: its viewports, its contexts, its measurements.
+import { BASE, SEDE, signInToCounter } from './counter-session.mjs';
+
 const OUT = 'storage/app/screenshots/198';
 mkdirSync(OUT, { recursive: true });
 
@@ -26,22 +29,7 @@ for (const vp of [{ name: '1180x820', width: 1180, height: 820 }, { name: '820x1
   const ctx = await browser.newContext({ viewport: { width: vp.width, height: vp.height }, reducedMotion: 'reduce' });
   const page = await ctx.newPage();
 
-  await page.goto(`${BASE}/login`);
-  await page.fill('input[type="email"]', 'owner@club.test');
-  await page.fill('input[type="password"]', 'password');
-  await page.press('input[type="password"]', 'Enter');
-  await page.waitForLoadState('networkidle');
-
-  await page.goto(`${BASE}/counter`);
-  await page.waitForLoadState('networkidle');
-  const sede = await page.$('[data-counter-sede-menu] form button:has-text("Central Branch")');
-  if (sede) { await sede.click(); await page.waitForLoadState('networkidle'); }
-  const pad = await page.$('[data-counter-surface-unlock]');
-  if (pad) {
-    for (const d of '1234') await page.click(`[data-counter-surface] button:has-text("${d}")`).catch(() => {});
-    await pad.click();
-    await page.waitForTimeout(1200);
-  }
+  await signInToCounter(page, '/counter', { sede: SEDE });
 
   // --- a basket in progress on the bar ---
   await page.goto(`${BASE}/counter/bar`, { waitUntil: 'networkidle' });

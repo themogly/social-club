@@ -17,10 +17,9 @@ import { chromium } from 'playwright';
 import { AxeBuilder } from '@axe-core/playwright';
 import { writeFileSync } from 'node:fs';
 
-const BASE = process.env.BASE_URL ?? 'http://127.0.0.1:8123';
-const EMAIL = process.env.AUDIT_EMAIL ?? 'owner@club.test';
-const PASSWORD = process.env.AUDIT_PASSWORD ?? 'password';
-const PIN = process.env.AUDIT_PIN ?? '1234';
+// The sign-in preamble is `counter-session.mjs` (prompts 223/226) — one copy, not ten. Everything below is
+// this sweep's own: its pages, its viewports, its findings.
+import { BASE, EMAIL, SEDE, signInToCounter } from './counter-session.mjs';
 const jsonAt = process.argv.includes('--json') ? process.argv[process.argv.indexOf('--json') + 1] : null;
 
 // Every page type, not every record: one of each SHAPE. Filament resources share their form/table
@@ -76,40 +75,13 @@ const browser = await chromium.launch();
 const context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
 const page = await context.newPage();
 
-// --- sign in once; the context keeps the session cookie for every page below --------------------
-await page.goto(`${BASE}/login`);
-await page.fill('input[type="email"]', EMAIL);
-await page.fill('input[type="password"]', PASSWORD);
-await page.press('input[type="password"]', 'Enter');
-await page.waitForLoadState('networkidle');
-
-if (page.url().includes('/login')) {
-  console.error(`FATAL: could not sign in as ${EMAIL}. Is the dev seed loaded?`);
+// --- sign in once and clear prompt 175's chain (sede → PIN); the context keeps the session for every page
+//     below. Without it every counter page is audited as a blocking state and the real screens — which is
+//     where the density actually is — are never seen at all. (The first run of this script did exactly that:
+//     all six counter pages reported 18 controls, which was the sede chooser six times.)
+if (! await signInToCounter(page, '/counter', { sede: SEDE })) {
+  console.error(`FATAL: could not sign in as ${EMAIL} and reach the counter. Is the dev seed loaded?`);
   process.exit(2);
-}
-
-// The counter screens sit behind prompt 175's chain: choose a sede → identify with a PIN → open a till.
-// Clear all three ONCE here, or every counter page is audited as a blocking state and the real screens —
-// which is where the density actually is — are never seen at all. (The first run of this script did exactly
-// that: all six counter pages reported 18 controls, which was the sede chooser six times.)
-const SEDE = process.env.AUDIT_SEDE ?? 'Central Branch'; // the seeded sede that has an open caja
-await page.goto(`${BASE}/counter`);
-await page.waitForLoadState('networkidle');
-
-// The switcher opens ITSELF when a sede must be chosen, so click straight into the open menu.
-const sede = await page.$(`[data-counter-sede-menu] form button:has-text("${SEDE}")`);
-if (sede) {
-  await sede.click();
-  await page.waitForLoadState('networkidle');
-}
-
-const pinPad = await page.$('[data-counter-surface] [x-ref="pinPad"], [data-counter-surface-unlock]');
-if (pinPad) {
-  for (const digit of PIN) {
-    await page.click(`[data-counter-surface] button:has-text("${digit}")`).catch(() => {});
-  }
-  await pinPad.click().catch(() => {});
-  await page.waitForTimeout(1200);
 }
 
 const findings = [];

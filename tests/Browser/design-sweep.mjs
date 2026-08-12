@@ -13,11 +13,9 @@
 import { chromium } from 'playwright';
 import { mkdirSync } from 'node:fs';
 
-const BASE = process.env.BASE_URL ?? 'http://127.0.0.1:8123';
-const EMAIL = 'owner@club.test';
-const PASSWORD = 'password';
-const PIN = '1234';
-const SEDE = 'Central Branch';
+// The sign-in preamble is `counter-session.mjs` (prompts 223/226) — one copy, not ten. Everything below is
+// this sweep's own: its pages, its viewports, its findings.
+import { BASE, SEDE, signInToCounter } from './counter-session.mjs';
 const only = process.argv.includes('--only') ? process.argv[process.argv.indexOf('--only') + 1] : null;
 
 // A RANGE, not two widths — the in-between sizes are where layouts overfitted to 1440/390 break, and the
@@ -54,23 +52,8 @@ const browser = await chromium.launch();
 const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 } });
 const page = await ctx.newPage();
 
-await page.goto(`${BASE}/login`);
-await page.fill('input[type="email"]', EMAIL);
-await page.fill('input[type="password"]', PASSWORD);
-await page.press('input[type="password"]', 'Enter');
-await page.waitForLoadState('networkidle');
-
-// Clear the counter chain once (sede → PIN), or every counter capture is a blocking state.
-await page.goto(`${BASE}/counter`);
-await page.waitForLoadState('networkidle');
-const sede = await page.$(`[data-counter-sede-menu] form button:has-text("${SEDE}")`);
-if (sede) { await sede.click(); await page.waitForLoadState('networkidle'); }
-const pad = await page.$('[data-counter-surface-unlock]');
-if (pad) {
-  for (const d of PIN) await page.click(`[data-counter-surface] button:has-text("${d}")`).catch(() => {});
-  await pad.click();
-  await page.waitForTimeout(1200);
-}
+// Signed in and through the counter chain once (sede → PIN), or every counter capture is a blocking state.
+await signInToCounter(page, '/counter', { sede: SEDE });
 
 const rows = [];
 
