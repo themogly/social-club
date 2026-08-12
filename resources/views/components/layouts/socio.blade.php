@@ -1,7 +1,19 @@
 @props([
     'title' => __('Área de socio/a'),
     'nav' => true,
+    // Prompt 227 — an OPT-IN wider column, on `md:`+ only.
+    //
+    // This layout is the member app: menu, wallet, bottom nav, phone-first by design and correct that way.
+    // The application form is the one page that is neither — an emailed invitation, opened as often on a
+    // desktop as on a phone, asking for sixteen fields — and it was wrapped in `max-w-sm` INSIDE this
+    // layout's `max-w-md`, so a 2560px screen showed a 384px needle. The owner: *"the form is very squashed
+    // on the screen — can we make it take up more width."*
+    //
+    // An opt-in and not a global widening: every other page here stays byte-identical, because a member
+    // reading their wallet on a phone is who this layout was built for. Only `socio/application` passes it.
+    'wide' => false,
 ])
+@php($shell = $wide ? 'max-w-3xl' : 'max-w-md')
 @php($authed = auth('member')->check())
 <!DOCTYPE html>
 <html lang="{{ str_replace('_', '-', app()->getLocale()) }}" class="h-full">
@@ -42,7 +54,9 @@
 
     @if ($memberChrome || $showsLocale)
         <header class="sticky top-0 z-20 border-b border-line/80 bg-surface/85 backdrop-blur dark:border-slate-800 dark:bg-slate-950/85">
-            <div class="mx-auto flex w-full max-w-md items-center justify-between px-4 py-3">
+            {{-- The header row widens WITH the main column, or the language switcher would sit 400px away
+                 from the form it belongs to on a desktop. --}}
+            <div class="mx-auto flex w-full {{ $shell }} items-center justify-between px-4 py-3">
                 @if ($memberChrome)
                     <a href="{{ route('socio.home') }}" class="flex items-center gap-2 font-semibold">
                         <img src="/socio-icons/favicon-32.png" width="24" height="24" alt="" class="rounded-md">
@@ -74,7 +88,7 @@
         </header>
     @endif
 
-    <main class="mx-auto w-full max-w-md px-4 pt-4 {{ $authed && $nav ? 'pb-28' : 'pb-8' }}">
+    <main class="mx-auto w-full {{ $shell }} px-4 pt-4 {{ $authed && $nav ? 'pb-28' : 'pb-8' }}">
         {{ $slot }}
     </main>
 

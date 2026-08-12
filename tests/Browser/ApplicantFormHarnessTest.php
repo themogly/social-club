@@ -60,6 +60,14 @@ class ApplicantFormHarnessTest extends TestCase
         $scanned = (string) $this->get($url)->assertOk()->getContent();
         file_put_contents(storage_path('app/applicant-217-scanned.html'), $this->inlineBuiltCss($scanned));
 
+        // Prompt 227 — the same page with a failed submit, so the error summary and the per-field messages
+        // can be measured in their own grid cells at desktop width.
+        $this->post(route('socio.application.store', ['token' => $token]), []);
+        file_put_contents(
+            storage_path('app/applicant-217-errors.html'),
+            $this->inlineBuiltCss((string) $this->followingRedirects()->get($url)->assertOk()->getContent()),
+        );
+
         $this->assertStringContainsString('data-mrz-prefilled', $scanned, 'the post-scan state did not render');
         $this->assertSame(4, substr_count($scanned, 'data-mrz-confirm='), 'expected a confirm chip per prefilled field');
     }
