@@ -168,10 +168,38 @@ export function mountStaffMrzScan(root = document) {
     });
 }
 
-document.addEventListener('DOMContentLoaded', () => {
+// WHEN to mount (prompt 223). The applicant's form is on the page at load; the counter's is inserted by a
+// Livewire update when the modal opens and re-inserted on every wizard step, so it needs a hook that fires
+// after a morph.
+//
+// `livewire:update` — which this file listened for — **is not a Livewire event**. The dist dispatches only
+// `livewire:init`, `livewire:initialized`, `livewire:initializing`, `livewire:navigate[d|ing]`. It had never
+// fired once. `morphed` is the real hook and is triggered after each component morph; `mountStaffMrzScan` is
+// idempotent (`data-mounted`, trigger re-found each time), so being called on every morph is free.
+const mountAll = () => {
     mountMrzScan();
     mountStaffMrzScan();
-});
+};
 
+// Registered whichever way round the two bundles execute: if Livewire has already started, hook now;
+// otherwise wait for the event that says it is about to.
+const hookMorphs = () => window.Livewire?.hook('morphed', () => mountStaffMrzScan());
+
+if (window.Livewire) {
+    hookMorphs();
+} else {
+    document.addEventListener('livewire:init', hookMorphs);
+}
+
+// `readyState` guard: loaded from an entry bundle this module may execute after DOMContentLoaded has
+// already fired, and an event that has been and gone never comes back.
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', mountAll);
+} else {
+    mountAll();
+}
+
+// Staff-only on navigate, exactly as before: `mountMrzScan` has no idempotence guard of its own, and the
+// applicant's page is plain Blade with no Livewire on it — so calling it again here could only ever
+// double-bind a listener, never fix one.
 document.addEventListener('livewire:navigated', () => mountStaffMrzScan());
-document.addEventListener('livewire:update', () => mountStaffMrzScan());

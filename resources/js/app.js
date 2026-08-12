@@ -1,3 +1,16 @@
+// Prompt 223 — the counter's entry point, and where prompt 179's MRZ reader is loaded from.
+//
+// It used to be `@vite`d from inside `alta-staff-form.blade.php`, which is markup Livewire MORPHS in and
+// out: the module therefore arrived inside the very update that inserted the trigger it was supposed to
+// mount, so every hook it registered was registered too late, and the button stayed hidden for ever. There
+// is no full-page view to move it to either — `membership-counter` IS the Livewire component, so its whole
+// template is inside the morph target. The layout and this entry are the only homes outside it, and the
+// layout already loads this file on every counter screen.
+//
+// The module itself is ~4KB and the OCR engine is NOT in it: `readMrz()` dynamically imports tesseract.js
+// on the first click, so loading this early costs a few kilobytes and no engine.
+import './mrz-reader.js';
+
 // Counter camera QR scanner (prompt 35) — a progressive enhancement registered on Alpine
 // (which Livewire ships). Uses the native BarcodeDetector where available (Chrome/Edge/
 // Android counter tablets); where it is not, `supported` stays false and the trigger hides
