@@ -11607,3 +11607,85 @@ from a wider column, never from smaller targets.
 the desktop container ≥640px with every pair two-up and the submit spanning; the phone with every `md:` pair
 still stacked and no horizontal scroll; six per-field error messages rendering in their own cells on the
 failed submit. Screenshots before and after in `storage/app/screenshots/227/`.
+
+---
+
+## Prompt 228 — the one-line photo nag was a zero-width column of glyphs
+
+Prompt 225 shipped the photo nag as *"ONE LINE with its action"*. Measured on `2306824` with a photo-less
+socio attached, both orientations, in the harness and in the live app:
+
+| | row | its sentence | camera trigger | upload control |
+|---|---|---|---|---|
+| **before** 1180×820 | 298×**97** | **10px wide, 6 lines** | 133×**40** | 113×**34** |
+| **before** 820×1180 | 266×**97** | **0px wide, 6 lines** | 133×**40** | 113×**34** |
+| **after** 1180×820 | 298×98 | **272px, 1 line** | 127×**44** | 119×**44** |
+| **after** 820×1180 | 266×108 | **240px, 1 line** | 120×**44** | 112×**54** |
+
+### `shrink-0` beside `min-w-0` — the anti-pattern
+
+The row was `flex items-center justify-between gap-2`, the sentence `min-w-0`, the capture component
+`shrink-0`. In a 256–288px column the fixed side takes every pixel it asks for and the text side is *allowed*
+to collapse — so it collapsed to zero and the glyphs overflow-wrapped one per line. The component's own
+`flex-wrap` could have saved it and never engaged, because `shrink-0` meant it was never narrowed.
+
+**The row wraps now**: the sentence takes the full width, the controls drop beneath it. One line of text plus
+one line of controls, which is the shape 225 promised and did not deliver.
+
+`whitespace-nowrap` on the two controls was tried and is worse — refusing to wrap two words makes each demand
+its natural width, so at 266px they stack into two full-width rows and the nag goes to **150px**. Letting
+*"Subir archivo"* take two lines inside its own box costs 10px in portrait and keeps the ceiling.
+
+### The controls were under the floor in EVERY consumer
+
+`size="sm"` is `h-10` (40px) and the upload `<label>` was `py-1.5` (34px) — both under the counter's 44px
+minimum, on the dispensary's nag **and** on the door's member card. Fixed **inside the shared component**,
+not at either call site, because it was never a per-screen problem.
+
+`min-h-11` on the shared button rather than `size="md"`: this is a secondary control on a compact row and
+should meet the floor without becoming a 48px primary. **The `sm` size itself was left alone** — it is used
+on seventeen surfaces, most of them admin, and a floor that belongs to the counter does not belong to all of
+them. `flex-1 basis-0` makes the two share whatever width they are given, which is what keeps them on one
+line in a 266px column and lets them grow at the door.
+
+**The other consumer was re-measured, not assumed**: `measure-photo-nag.mjs` drives the real app to the door,
+identifies a socio, and reports the capture controls at 225×44 / 217×44 (landscape) and 245×44 / 237×44
+(portrait), with no sideways scroll. Fixing a shared component and re-measuring only the screen that reported
+it is how the second consumer breaks.
+
+### The harness gap was NOT state coverage — the prompt's premise was wrong, and the truth is sharper
+
+The prompt says 225's three snapshot states *"all carry a socio with a photo, so no snapshot ever rendered the
+nag."* Checked: `data-photo-nag` is in **all three** of 225's HTML snapshots. The fixture never set a photo.
+
+The nag was on the page and the sweep still missed it, for two reasons — both in the MEASUREMENT:
+
+1. **The harness hid what it should have measured.** The camera trigger carries `x-show="supported" x-cloak`,
+   and the sweep hides every `[x-cloak]` element to stand in for Alpine. So the widest control in the row
+   measured 0×0 and was filtered out as invisible — on a counter tablet, where `getUserMedia` exists, it is
+   the first thing an operator sees. The sweep now reveals the nag's own cloaked controls (and only those —
+   the camera OVERLAY is `x-cloak` too, and revealing it put a black sheet over every screenshot).
+2. **`<label>` was not in the control selector.** The upload affordance is a `<label>` wrapping an `sr-only`
+   input, so the sweep sampled a 1×1 input and never saw the 113×34 thing a finger hits. Labels are sampled
+   now — but only WRAPPING ones: a caption label above its input is not a target, and adding every `<label>`
+   immediately reported *"Buscar socio por nombre"* and *"Monedero (€)"* as under-floor controls. Measure the
+   rule, not the tag.
+
+A named `no-photo` state was added anyway. It currently renders the same fixture as `working`, and it is kept
+deliberately: it is the state whose *name* says the nag must be on it, so a future fixture that gains a photo
+cannot silently take nag coverage away from every state at once.
+
+### Verification
+
+`composer check` green — **1805 tests**, 1802 passed, 3 pre-existing skips, Larastan 0, Pint clean. **MySQL
+was left to CI**, per the running order. Copy unchanged — nothing reached `lang/*`. The nag is still a nag: no
+change to the verdict, the WARN/OVERRIDE enforcement, when it renders, or the capture behaviour.
+
+**Run against `main` first**, and it reports the defect on every state: `1 under 44px — 133×40 button Hacer
+foto` at both orientations in all four states, plus `the nag wraps to 6 lines (298×97)` and `the nag's
+sentence is 0px wide` on the photo-less one. All pass here, and 225's pinned/scroll/amber/density assertions
+are untouched.
+
+Before/after of the nag itself in `storage/app/screenshots/225/{before,after}-photo-nag-*.png`, both
+orientations, light and dark — shot with the cart scrolled to the TOP, because the geometry frame
+deliberately scrolls it to the end and that is the wrong frame for a row that sits at its head.

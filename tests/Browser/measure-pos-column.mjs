@@ -22,7 +22,7 @@ const STAGE = process.argv[2] ?? 'after';
 const OUT = 'storage/app/screenshots/225';
 mkdirSync(OUT, { recursive: true });
 
-const STATES = ['working', 'bar', 'blocked'];
+const STATES = ['working', 'bar', 'blocked', 'no-photo'];
 const SIZES = [{ name: '1180x820', width: 1180, height: 820 }, { name: '820x1180', width: 820, height: 1180 }];
 const FLOOR = 44;
 
@@ -42,6 +42,20 @@ for (const state of STATES) {
         document.querySelectorAll('[data-counter-surface],[x-cloak]').forEach((n) => { n.style.display = 'none'; });
       });
 
+      // The photo nag's camera trigger carries `x-show="supported" x-cloak`, and these pages have no
+      // JavaScript — so without this the widest control in the row is invisible to the measurement and the
+      // row is measured in a state no counter tablet is ever in. Revealed only INSIDE the nag, which is the
+      // worst case for width and precisely the case that collapsed (prompt 228).
+      await page.evaluate(() => {
+        // The ROW's controls only. The camera overlay is `x-cloak` too and is a fixed full-screen dialog —
+        // revealing it would put a black sheet over the column in every screenshot.
+        document.querySelectorAll('[data-photo-nag] [x-cloak]').forEach((n) => {
+          if (n.closest('.fixed') || n.classList.contains('fixed')) return;
+          n.removeAttribute('x-cloak');
+          n.style.display = '';   // the sweep above hid it inline; the attribute alone does not undo that
+        });
+      });
+
       // Scroll the cart's middle to its end: a pinned commit must still be on screen afterwards, which is
       // the whole claim (176's fold measurement, re-taken).
       await page.evaluate(() => {
@@ -55,7 +69,12 @@ for (const state of STATES) {
         const box = (s) => { const el = document.querySelector(s); return el ? el.getBoundingClientRect() : null; };
         const rows = Array.from(document.querySelectorAll('[data-product]')).map((n) => Math.round(n.getBoundingClientRect().height));
 
-        const targets = Array.from(document.querySelectorAll('a[href], button, input, select, textarea'))
+        // A WRAPPING label is a control (prompt 228): the photo nag's upload affordance is a `<label>` around
+        // an `sr-only` input, so the sweep sampled a 1×1 input and never saw the 113×34 thing a finger hits.
+        // A caption label sitting ABOVE its input is not a target and is not sampled — that is the difference
+        // between measuring the rule and measuring the tag.
+        const targets = Array.from(document.querySelectorAll('a[href], button, input, select, textarea, label'))
+          .filter((n) => n.tagName !== 'LABEL' || n.querySelector('input, select, textarea, button'))
           .map((n) => ((n.type === 'checkbox' || n.type === 'radio') ? (n.closest('label') ?? n) : n))
           .map((n) => ({ b: n.getBoundingClientRect(), what: `${n.tagName.toLowerCase()} ${(n.getAttribute('data-product') !== null ? 'product' : (n.getAttribute('name') || n.id || n.textContent.trim().slice(0, 16)))}` }))
           .filter((t) => t.b.width > 1 && t.b.height > 1);
@@ -70,6 +89,34 @@ for (const state of STATES) {
           pageScrolls: document.documentElement.scrollHeight > window.innerHeight + 1,
           hScroll: document.documentElement.scrollWidth > document.documentElement.clientWidth,
           blocked: !! document.querySelector('[data-blocked-member]'),
+          // The photo nag (prompt 225, measured by 228): the row, its sentence and its controls.
+          nag: (() => {
+            const row = document.querySelector('[data-photo-nag]');
+            if (! row) return null;
+
+            const p = row.querySelector('p');
+            const pBox = p?.getBoundingClientRect();
+            // Line count from the rendered height over one line-height — a sentence that has collapsed to a
+            // zero-width column of glyphs reads as six lines, which is what it looked like.
+            const lineHeight = p ? parseFloat(getComputedStyle(p).lineHeight) || 16 : 16;
+            const rowBox = row.getBoundingClientRect();
+
+            return {
+              row: `${Math.round(rowBox.width)}×${Math.round(rowBox.height)}`,
+              rowH: Math.round(rowBox.height),
+              textW: pBox ? Math.round(pBox.width) : 0,
+              lines: pBox ? Math.max(1, Math.round(pBox.height / lineHeight)) : 0,
+              // The ROW's own controls. The camera OVERLAY lives in the same subtree (`x-show="active"`, a
+              // fixed full-screen dialog) and its four buttons are not part of this row's line.
+              controls: Array.from(row.querySelectorAll('button, label'))
+                .filter((n) => ! n.closest('.fixed'))
+                .map((n) => {
+                  const b = n.getBoundingClientRect();
+
+                  return { what: n.textContent.trim().slice(0, 14), w: Math.round(b.width), h: Math.round(b.height) };
+                }),
+            };
+          })(),
           blockedReason: document.querySelectorAll('[data-commit-blocked-reason]').length,
           weightPad: !! document.querySelector('[data-weight-preset]'),
           commitText: document.querySelector('[data-commit-action]')?.innerText.trim().replace(/\s+/g, ' ') ?? null,
@@ -133,6 +180,18 @@ for (const state of STATES) {
         if (r.hScroll) fail(`${label}: horizontal page scroll`);
         if (r.under.length) fail(`${label}: ${r.under.length} under ${FLOOR}px — ${r.under.slice(0, 4).join('; ')}`);
 
+        // The nag's own claim: prompt 225 shipped it as "ONE LINE with its action".
+        if (state === 'no-photo') {
+          if (! r.nag) fail(`${label}: no photo nag on the photo-less state — the harness is measuring nothing`);
+          else {
+            if (r.nag.textW <= 0) fail(`${label}: the nag's sentence is ${r.nag.textW}px wide — it has collapsed`);
+            if (r.nag.lines > 2) fail(`${label}: the nag wraps to ${r.nag.lines} lines (${r.nag.row})`);
+            for (const c of r.nag.controls) {
+              if (c.h < FLOOR || c.w < FLOOR) fail(`${label}: nag control "${c.what}" is ${c.w}×${c.h} — under ${FLOOR}px`);
+            }
+          }
+        }
+
         if (state === 'blocked') {
           if (! r.blocked) fail(`${label}: the blocked surface is missing`);
           if (r.rows) fail(`${label}: a blocked socio still sees ${r.rows.n} catalogue rows`);
@@ -146,7 +205,18 @@ for (const state of STATES) {
         }
       }
 
-      console.log(`${label.padEnd(26)} rows=${r.rows ? `${r.rows.n}@${r.rows.median}px (${r.rows.min}-${r.rows.max})` : '—'} cartScrolls=${r.cartScrolls} pageScrolls=${r.pageScrolls} blocked=${r.blocked} amber=${r.amber ?? '—'} commit="${(r.commitText ?? '').slice(0, 40)}"`);
+      // The nag's own before/after picture: the geometry shot above deliberately scrolls the cart's middle
+      // to its end, which is the wrong frame for looking at a row that sits at its top.
+      if (state === 'no-photo') {
+        await page.evaluate(() => {
+          const region = document.querySelector('[data-cart-scroll]');
+          if (region) region.scrollTop = 0;
+        });
+        const nag = page.locator('[data-photo-nag]').first();
+        if (await nag.count() > 0) await nag.screenshot({ path: `${OUT}/${STAGE}-photo-nag-${size.name}-${theme}.png` });
+      }
+
+      console.log(`${label.padEnd(26)} rows=${r.rows ? `${r.rows.n}@${r.rows.median}px (${r.rows.min}-${r.rows.max})` : '—'} cartScrolls=${r.cartScrolls} pageScrolls=${r.pageScrolls} blocked=${r.blocked} nag=${r.nag ? `${r.nag.row} text=${r.nag.textW}px/${r.nag.lines}ln [${r.nag.controls.map((c) => `${c.w}×${c.h}`).join(' ')}]` : '—'} amber=${r.amber ?? '—'} commit="${(r.commitText ?? '').slice(0, 40)}"`);
       await page.close();
     }
   }
