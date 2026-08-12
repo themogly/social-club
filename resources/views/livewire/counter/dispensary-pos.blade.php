@@ -653,6 +653,22 @@
                         </section>
                     @endif
 
+                {{-- WHAT THE CART HAS IN IT — read once, so no section can gate on somebody else's emptiness
+                     (prompt 224). That is exactly how bar lines came to be held server-side and rendered
+                     nowhere: the bar section, and the tender under it, were nested inside "the DISPENSATION
+                     basket has lines". Before 212 that held by construction — the bar quick-add chips lived
+                     inside the same block, so a bar line could not exist without a flower line. 212 moved bar
+                     browsing to the centre pane, reachable with an empty flower basket, and this gate was
+                     never updated. Taps added real lines to a basket the screen never showed. --}}
+                @php
+                    $hasDispensationLines = ! empty($basketLines);
+                    $hasBarLines = ! empty($barLines);
+                    $hasAnyLines = $hasDispensationLines || $hasBarLines;
+                    // The bar section also appears while the operator is BROWSING the bar, so the first tap
+                    // lands somewhere visible rather than into a section that does not exist yet.
+                    $showBarSection = $barEnabled && ($hasBarLines || $catalogueSource === 'bar' || $hasDispensationLines);
+                @endphp
+
                 <section data-cart-dispensation-section class="rounded-2xl border border-line bg-surface p-4 dark:border-slate-800 dark:bg-slate-900">
                     <div class="flex items-center justify-between">
                         <h2 class="text-base font-semibold">{{ __('Cesta') }}</h2>
@@ -695,20 +711,29 @@
                          transaction has taken shape (a line in the basket). Before that there is nothing to
                          pay for, so the two first actions (identify a socio, choose a genetic) are not pushed
                          into the margin by a payment form for a transaction that does not exist. This governs
-                         what is SHOWN; once shown, blocked controls still stay clickable and explain (prompt 60). --}}
-                    @if (! empty($basketLines))
+                         what is SHOWN; once shown, blocked controls still stay clickable and explain (prompt 60).
+
+                         **The intent was never wrong — it was wrong about WHOSE emptiness counts** (prompt
+                         224). Each section now gates on its own contents and the payment apparatus on either
+                         side having lines, so "no payment form for an empty visit" still holds exactly. --}}
+                    @if ($hasAnyLines)
                     {{-- Total. Labelled *aportación* deliberately — this half of the visit is a shared-cost
                          contribution and never a sale, and the bar section below is labelled as the sale it
-                         is. Two sections, two ledgers, one settle (prompt 118, unchanged by 212). --}}
-                    <div class="mt-3 flex items-center justify-between rounded-xl bg-surface-alt px-4 py-3 dark:bg-slate-800">
-                        <span class="font-semibold">{{ __('Total aportación') }}</span>
-                        <span class="text-lg font-bold tabular-nums">{{ $this->money($basketTotalCents) }}</span>
-                    </div>
+                         is. Two sections, two ledgers, one settle (prompt 118, unchanged by 212).
+
+                         On the DISPENSATION basket, not on "the cart has something in it": a bar-only visit
+                         has no aportación and must not be shown a total for one. --}}
+                    @if ($hasDispensationLines)
+                        <div class="mt-3 flex items-center justify-between rounded-xl bg-surface-alt px-4 py-3 dark:bg-slate-800">
+                            <span class="font-semibold">{{ __('Total aportación') }}</span>
+                            <span class="text-lg font-bold tabular-nums">{{ $this->money($basketTotalCents) }}</span>
+                        </div>
+                    @endif
 
                     {{-- Bar/merch side of the SAME visit (prompt 118): add articles, then settle the whole visit
                          once — one payment, but a dispensation AND a bar order on their separate ledgers. Only
                          where the sede runs a bar. The shared tender below covers the combined total. --}}
-                    @if ($barEnabled)
+                    @if ($showBarSection)
                         <div data-cart-bar-section class="mt-3 rounded-xl border border-line p-3 dark:border-slate-700">
                             <p class="text-xs font-semibold uppercase tracking-wide text-ink-muted dark:text-slate-400">{{ __('Barra y tienda (misma visita)') }}</p>
 
@@ -731,15 +756,30 @@
                                  category, no price, no stock — in the one column already carrying the member,
                                  the basket, the tender and the commit. Five looked fine; forty is the same
                                  code. Browsing lives in the centre pane now, where it can. --}}
-                            @if (empty($barLines))
+                            {{-- Two different empty states, because they answer two different questions: on the
+                                 dispensario source the operator has to be told WHERE the bar is, and on the
+                                 barra source they are already there and need to know the tap will land. --}}
+                            @unless ($hasBarLines)
                                 <p class="mt-2 text-xs text-ink-muted dark:text-slate-400">
-                                    {{ __('Cambia a Barra arriba para añadir artículos a esta visita.') }}
+                                    {{ $catalogueSource === 'bar'
+                                        ? __('Toca un artículo para añadirlo a esta visita.')
+                                        : __('Cambia a Barra arriba para añadir artículos a esta visita.') }}
                                 </p>
-                            @endif
+                            @endunless
 
-                            @if (! empty($barLines))
-                                <button type="button" wire:click="settleWithBar" wire:loading.attr="disabled" wire:target="settleWithBar" x-bind:disabled="! online" class="mt-3 h-12 w-full rounded-xl bg-brand text-base font-semibold text-white transition hover:bg-brand-dark focus:outline-none focus:ring-2 focus:ring-brand/40 disabled:opacity-60">
-                                    {{ __('Liquidar visita · :total', ['total' => $this->money($basketTotalCents + $barTotalCents)]) }}
+                            @if ($hasBarLines)
+                                {{-- The bar's own total, stated on its own line: a bar-only visit had no total
+                                     anywhere on screen, because the only one rendered was the aportación's
+                                     (prompt 224). --}}
+                                <div class="mt-2 flex items-center justify-between border-t border-line pt-2 text-sm dark:border-slate-700">
+                                    <span class="font-semibold">{{ __('Total barra y tienda') }}</span>
+                                    <span class="font-bold tabular-nums">{{ $this->money($barTotalCents) }}</span>
+                                </div>
+
+                                <button type="button" wire:click="settleWithBar" data-settle-visit wire:loading.attr="disabled" wire:target="settleWithBar" x-bind:disabled="! online" class="mt-3 h-12 w-full rounded-xl bg-brand text-base font-semibold text-white transition hover:bg-brand-dark focus:outline-none focus:ring-2 focus:ring-brand/40 disabled:opacity-60">
+                                    {{ $hasDispensationLines
+                                        ? __('Liquidar visita · :total', ['total' => $this->money($basketTotalCents + $barTotalCents)])
+                                        : __('Cobrar barra · :total', ['total' => $this->money($barTotalCents)]) }}
                                 </button>
                             @endif
                         </div>
@@ -760,6 +800,10 @@
                          **Nothing about who may override, what is recorded, or the reason requirement
                          changes** — this is where the control sits, not what it does. The fields are absent
                          from the DOM until opened, so they are not in the tab order either. --}}
+                    {{-- Dispensation-only apparatus (prompt 224): a price override rewrites what the member is
+                         charged for the APORTACIÓN, and the pad captures their signature for it. Neither has
+                         anything to say about a tin of tobacco, so both follow the flower basket. --}}
+                    @if ($hasDispensationLines)
                     @can('dispensation.price.override')
                         <div x-data="{ open: false }" class="mt-3">
                             <button
@@ -785,9 +829,12 @@
                             </template>
                         </div>
                     @endcan
+                    @endif
 
                     {{-- Tender (prompt 74): wallet APPLIED + physical cash TENDERED → change. The cash field is
-                         what the member handed over, never the charge; the recorded contribution is the total. --}}
+                         what the member handed over, never the charge; the recorded contribution is the total.
+                         Rendered for EITHER basket, and the figures are the COMBINED ones — the split the
+                         settle actually applies (prompt 224). --}}
                     <div class="mt-4 space-y-3">
                         <div>
                             <label for="wallet" class="block text-xs font-medium text-ink-muted dark:text-slate-400">{{ __('Monedero (€)') }}</label>
@@ -831,8 +878,11 @@
 
                     {{-- Signature (only when the sede requires it). Prompt 220 extracted the pad to
                          `x-counter.signature-pad` — same markup, same Alpine behaviour, same vault path; it is
-                         a component now because it has a second consumer (the application form). --}}
-                    @if ($requireSignature)
+                         a component now because it has a second consumer (the application form).
+
+                         With the dispensation basket, not the bar's: it is the signature for the aportación,
+                         and `settleWithBar` asks for it only when a dispensation is being written. --}}
+                    @if ($requireSignature && $hasDispensationLines)
                         <div class="mt-4 border-t border-line pt-4 dark:border-slate-800">
                             <x-counter.signature-pad
                                 capture="saveSignature"
@@ -844,8 +894,8 @@
                         </div>
                     @endif
 
-                    {{-- Override (permissioned + reasoned). --}}
-                    @if ($requireOverride)
+                    {{-- Override (permissioned + reasoned). A dispensation limit, so it follows that basket. --}}
+                    @if ($requireOverride && $hasDispensationLines)
                         <div class="mt-4 rounded-xl border border-warning/40 bg-warning/5 p-3">
                             <p class="text-sm font-semibold text-warning">{{ $limitBreach ? __('Supera el límite de consumo') : __('Requiere autorización') }}</p>
                             @if ($canOverride)
@@ -863,8 +913,9 @@
                          sits with the commit action below and covers every basket state. --}}
 
                     @else
-                        {{-- Empty basket: no heavy payment apparatus (tender, signature, breakdown), just the
-                             next step. The commit stays below (prompt 60), it simply has nothing to charge yet. --}}
+                        {{-- BOTH baskets empty: no heavy payment apparatus (tender, signature, breakdown), just
+                             the next step. The commit stays below (prompt 60), it simply has nothing to charge
+                             yet. --}}
                         <p data-empty-basket-hint class="mt-3 rounded-xl border border-dashed border-line px-4 py-6 text-center text-sm text-ink-muted dark:border-slate-700 dark:text-slate-400">
                             {{ __('Identifica a un socio y añade una genética para empezar.') }}
                         </p>

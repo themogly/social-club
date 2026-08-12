@@ -11251,3 +11251,92 @@ of a login flow is how one of them quietly stops matching the app.
 
 Capture in `storage/app/screenshots/223/`: step 1 with the reader button visible and its status line
 answering, the same step after pressing it, and the applicant's form at phone width.
+
+---
+
+## Prompt 224 — bar lines were held server-side and rendered nowhere
+
+The owner, on `/counter/pos` with a member attached and Barra selected: *"something strange — it lets me add
+flower but no bar stuff. I don't know if it's because membership is due."*
+
+**The fee was innocent.** Reproduced on `ad871fe` with a socio who owes nothing and whose verdict is clear:
+`addBarItem` fires, returns 200, the server basket increments — and `[data-cart-bar-section]` is not in the
+DOM. Tapping again stacks quantity invisibly. Measured, both orientations, both themes:
+
+| | bar section | settle control | tender | the amount | "empty basket" hint |
+|---|---|---|---|---|---|
+| **before** (`main`, two beers tapped) | ✗ | ✗ | ✗ | ✗ | **shown** |
+| **after** | ✓ | ✓ | ✓ | €5.00 | — |
+
+### One nesting, and why it was right until 212
+
+The cart's bar section — and the tender below it — sat inside `@if (! empty($basketLines))`: the
+**dispensation** basket. Before prompt 212 that held *by construction*, because the bar quick-add chips lived
+inside the same block, so a bar line could not exist without a flower line above it. **212 moved bar browsing
+to the centre pane**, reachable with an empty flower basket, and this gate was never updated.
+
+Prompt 60 from the other side: the control was not dead, the **result** was silent. And it is the reason 91's
+progressive-disclosure comment above that gate reads as correct — its intent (*no payment form for a
+transaction that does not exist*) was never wrong. It was wrong about **whose** emptiness counts.
+
+### Each section gates on its own contents
+
+Read once, at the top of the cart, so no section can inherit another's emptiness:
+
+- **aportación total** → the dispensation basket has lines;
+- **bar section** → `barEnabled` **and** (bar lines **or** the operator is browsing Barra **or** there are
+  flower lines). Browsing is included deliberately: the first tap must land somewhere that already exists,
+  which is what makes the add observable. With flower lines and no bar lines the section keeps its signpost
+  ("switch to Barra"), which is its designed empty state and not clutter;
+- **tender / cash / change** → **either** side has lines;
+- **price override, signature pad, limit-override block** → the dispensation basket only. A price override
+  rewrites what the member is charged for the *aportación* and the pad captures their signature for it;
+  neither has anything to say about a tin of tobacco;
+- **commit** → always, as prompt 60 requires.
+
+### Two things the prompt did not ask for, and why they were necessary
+
+**1. The tender preview was splitting the wrong total.** `render()` split the dispensation total while
+`settleWithBar()` splits dispensation + bar, so on a mixed visit the breakdown above the settle button
+disagreed with the button, and on a bar-only visit it read €0.00 against real money. Rendering the tender for
+a bar basket without fixing this would have shown the operator a confident wrong figure — worse than showing
+nothing. The preview and `quickCash`'s "Justo" now use the combined total: one figure, one split, one place.
+
+**2. A bar-only visit could not be settled at all** — and the prompt's own test list requires that it can.
+`settleWithBar()` refused unless BOTH baskets were non-empty, so an operator who had added three soft drinks
+to a member's visit had to add a flower line to take the money. The prompt says not to change
+`settleWithBar`; that rule was written believing the server already supported this case, and it does not.
+
+**Deviation stated, and taken the way the architecture already prescribes.** `CommitCombinedSettle` refuses a
+one-sided settle in terms: *"an empty side means the caller wants a plain dispensation or a plain order, which
+have their own single-writer entry points."* So the bar-only branch takes that named entry point —
+**`CommitOrder`, the same single writer the Barra screen calls** — rather than bending the combined one. No
+new writer, and the combined path is untouched.
+
+It skips the DISPENSATION guards deliberately: nothing is dispensed, so eligibility, the gram limits, the
+carencia and the signature have nothing to be about. That is the same reasoning the Barra screen is built on
+— a blocked socio can still be sold a coffee — and what it produces is a SALE on the bar ledger, identical to
+one rung up there. Operator, offline and open-till guards all still apply.
+
+### The guard for the class
+
+`CartSectionsGateOnTheirOwnLinesTest` walks **all four states** — neither, flower-only, bar-only, both — in
+one loop, asserting each section's visibility against its OWN lines, with the catalogue source held on
+*dispensario* throughout so "the bar section is visible" can only be explained by bar lines. Four states, one
+loop, so the next section added to this cart cannot inherit somebody else's gate.
+
+### Verification
+
+`composer check` green — **1785 tests**, 1782 passed, 3 pre-existing skips, Larastan 0, Pint clean. **MySQL
+was left to CI**, per the running order. No migration.
+
+**Written to fail against `main`, and does**: 5 of 9 fail there — the bar line unrendered, the second tap
+invisible, "Justo" offering €16.00 instead of €18.50, the bar-only settle writing nothing, and the four-state
+loop failing on *bar only*. All 9 pass here.
+
+Also asserted: a bar-only settle writes an Order and **no** Dispensation and moves the drawer by exactly the
+bar total (derived from the ledger); a mixed visit still writes both ledgers with the same figures as before
+(118's path, untouched); and a sede with `bar_enabled` off renders no bar section in any state.
+
+Screenshots in `storage/app/screenshots/224/`, both orientations, light and dark, before and after — the
+before frame is the bug: two beers tapped and a cart reading *"Cesta vacía"*.
