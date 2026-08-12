@@ -11537,3 +11537,73 @@ selector: a guard that measures a spelling rather than the rule.
 `composer check` green — **1801 tests**, 1798 passed, 3 pre-existing skips, Larastan 0, Pint clean. **MySQL
 was left to CI**, per the running order. **No app code**: nothing under `app/`, `resources/`, `routes/` or
 `lang/` changed. `measure-mrz-mount.mjs`, the existing consumer, is untouched and still passes.
+
+---
+
+## Prompt 227 — the applicant's form was phone-width on every screen
+
+The owner, opening an emailed invitation in desktop Chrome: *"the form is very squashed on the screen — can
+we make it take up more width."*
+
+**Two phone caps, nested.** `socio/application.blade.php` wrapped itself in `max-w-sm` (384px) INSIDE the
+socio layout's own `max-w-md` (448px), so a 2560px monitor showed a 384px needle. Measured, assets rebuilt:
+
+| | form container | contact / uploads / address pairs |
+|---|---|---|
+| before, 1440×900 | **384px** | stacked |
+| after, 1440×900 | **736px** | two-up |
+| before/after, 390×844 | **358px / 358px** | stacked / stacked |
+
+### An opt-in at the layout, not a global widening
+
+The socio layout is the member app — menu, wallet, bottom nav — and it is phone-first *correctly*: a socio
+checks their balance on a phone. The application form is the one page that is neither, because an invitation
+arrives by email and is opened on whatever the person is sitting at, and it asks for sixteen fields. So the
+layout gained a `wide` prop and **this page is its only caller**; every other socio page renders byte-identical
+`max-w-md`, asserted on the member MENU — the page a regression here would be felt on daily.
+
+The header row widens with `<main>`, or the language switcher would sit 400px from the form it belongs to.
+
+### `max-w-3xl` (768px), and why not wider
+
+The consent texts and the two upload helper paragraphs are the longest lines on the page. 768px keeps them
+near the 65–75 characters prose wants; full-bleed would put a 2000px line of statutes on a wide monitor.
+Line length is a reading concern, not a taste one, and this page's longest text is a legal declaration
+somebody is about to agree to.
+
+### The pairing: adjacent fields only — a deliberate deviation
+
+The prompt asked for **date of birth + declared monthly** and **address + avalador**. Both would mean MOVING
+`declared_monthly_g` up past the document and upload fields — and a grid collapses to DOM order below `md:`,
+so that reorder would land on the phone too. The prompt's own stronger rule is *"Below `md:` nothing changes —
+byte-identical single column"*, and the phone is who this page is mostly for, so the byte-identical rule wins.
+
+The pairs are therefore the ones already next to each other: **email + phone**, **photo + document scan**,
+**address + declared monthly**. Date of birth and the avalador stay full width, and both carry a line of
+helper copy that reads better spanning. Name/surname and doc-type/number keep the always-two-up grid they had
+at every width — untouched.
+
+Each field keeps its own cell, so its `<x-socio.field-error>` and its `mrz-confirm` chip stay under the field
+they belong to; DOM order is reading order, so tab order needs no `tabindex`.
+
+### The signature pad at width — measured, not assumed
+
+The claim was that the pad sizes its bitmap at init (`c.width = c.offsetWidth`) and maps strokes through a
+live `getBoundingClientRect`, so a wider mount just works. That is a statement about code. Measured at
+1440×900: **bitmap 668px = box 668px**, and a stroke placed at 75% across the visible pad inks the pixel under
+the pointer, with `data-drawn="1"` set. Before the change the same pad was 316px.
+
+### Verification
+
+`composer check` green — **1805 tests**, 1802 passed, 3 pre-existing skips, Larastan 0, Pint clean. **MySQL
+was left to CI**, per the running order. View-only: no server contract, no field added, removed, renamed or
+revalidated.
+
+215's application-field parity and 220's signature tests pass **untouched**, as does 217's touch-target
+measurement (22 controls initial / 26 scanned, none under 44px, at 390×844 with touch) — density here came
+from a wider column, never from smaller targets.
+
+`measure-applicant-width.mjs`, both states (initial and a real failed submit), both sizes, light and dark:
+the desktop container ≥640px with every pair two-up and the submit spanning; the phone with every `md:` pair
+still stacked and no horizontal scroll; six per-field error messages rendering in their own cells on the
+failed submit. Screenshots before and after in `storage/app/screenshots/227/`.
