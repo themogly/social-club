@@ -28,14 +28,29 @@
             <div data-fee-waive-form class="mt-2 rounded-xl border border-warning/40 bg-warning/5 p-3">
                 <p class="text-xs font-medium text-warning">{{ __('El club renuncia a cobrar esta cuota. Queda registrado con tu nombre.') }}</p>
 
+                {{-- A `name`, which these radios did not have (prompt 229). Radios are mutually exclusive only
+                     within a name group, so each of these was a group of ONE: clicking a second one checked it
+                     WITHOUT unchecking the first, and both stayed lit until Livewire's round trip morphed the
+                     attribute back. On localhost that window is ~100ms and invisible; on a counter tablet on
+                     wifi it is long, and if the update is dropped it never ends — which is the state the owner
+                     photographed. The "toggle" he asked for IS native radio behaviour; the markup had opted
+                     out of it.
+
+                     Scoped to the component instance, so a future page rendering two hosts cannot put two
+                     waivers in one group. --}}
+                @php($waiveGroup = 'waive-reason-'.$this->getId())
+
                 <div role="radiogroup" aria-label="{{ __('Motivo') }}" class="mt-2 flex flex-col gap-1">
                     @foreach ($waiveOptions as $option)
-                        <label class="flex min-h-11 cursor-pointer items-center gap-2 text-sm">
+                        {{-- Keyed: this list legitimately CHANGES between renders (it is computed from the
+                             member's record), and morphing an unkeyed list that has changed is how a label
+                             ends up paired with another option's checked state. --}}
+                        <label wire:key="{{ $waiveGroup }}-{{ $option['value'] }}" class="flex min-h-11 cursor-pointer items-center gap-2 text-sm">
                             {{-- `@checked` as well as `wire:model`: the model binds on the next round trip, so
                                  without it the record-backed default `toggleWaive()` pre-selected is invisible
                                  on the first paint — the operator sees no reason chosen and picks one that was
                                  already right. --}}
-                            <input type="radio" wire:model.live="waiveReason" value="{{ $option['value'] }}"
+                            <input type="radio" name="{{ $waiveGroup }}" wire:model.live="waiveReason" value="{{ $option['value'] }}"
                                    data-waive-reason="{{ $option['value'] }}"
                                    @checked($waiveReason === $option['value'])
                                    class="h-5 w-5 shrink-0 border-line text-brand focus:ring-brand">

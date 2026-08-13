@@ -11689,3 +11689,79 @@ are untouched.
 Before/after of the nag itself in `storage/app/screenshots/225/{before,after}-photo-nag-*.png`, both
 orientations, light and dark — shot with the cart scrolled to the TOP, because the geometry frame
 deliberately scrolls it to the end and that is the wrong frame for a row that sits at its head.
+
+---
+
+## Prompt 229 — the waiver's radios were never a group, and its reasons never knew the member
+
+The owner, on the door with the waiver open: *"if you click member at another club then click another reason
+it lets you select both options and can't unselect — it should toggle."* His screenshot shows both radios
+lit. Two defects sat under that one report.
+
+### 1 — No `name`, so nothing was a group
+
+Radios are mutually exclusive only within a `name` group. These had **no name at all**, so each was a group
+of one: clicking a second one checked it **without unchecking the first**, natively, and both stayed lit until
+Livewire's round trip morphed the attribute back. On localhost that window is ~100ms and invisible — which is
+why it shipped — and on a counter tablet on wifi it is long. If the update is dropped it never ends, which is
+the state the owner photographed.
+
+**The toggle he asked for IS native radio behaviour; the markup had opted out of it.** One `name`, scoped to
+the component instance so a future page with two hosts cannot put two waivers in one group. `wire:model.live`
+and `@checked` are unchanged — the name adds exclusivity *underneath* them, with no round trip involved.
+
+The loop is keyed while we are in there: this list legitimately CHANGES between renders (that is defect 2),
+and morphing a changed list by position is how a label ends up paired with another option's checked state.
+
+### 2 — The options were member-blind until some other action bridged the member
+
+`waiveReasonOptions()` read `$feeMemberId` — Socios' property. The door and the POS hold their member in
+`$memberId`. **Prompt 211 met this exact host mismatch and bridged it in the concern**, and 219 bridged the
+fee ACTIONS the same way (`collectInlineFeeFor` / `waiveInlineFeeFor` both point `$feeMemberId` at the member
+before running the core). Nobody bridged the **render** path, which is where the reasons are computed.
+
+Measured at the door, with a socio carrying a therapeutic flag AND an active membership at another sede:
+
+| | reasons offered | preselected |
+|---|---|---|
+| **before**, fresh open | **`OTHER` alone** | **nothing** |
+| **before**, after some other action happened to set `$feeMemberId` | all three | — |
+| **after**, fresh open | `THERAPEUTIC`, `OTHER_SEDE`, `OTHER` | `THERAPEUTIC` |
+
+So which reasons an operator saw depended on what they had clicked beforehand — and 219's record-backed
+defaults were dead on two of the three hosts. `feeSubjectId()` is the same overridable-method shape 211
+established, with the two hosts pointing it at their own member.
+
+**A method on `CollectsMembershipFees`, not a call into `OpensMemberships`.** The two traits are used together
+on all three hosts today, but a concern reaching into another concern's method is a coupling nothing declares,
+and it would fatal on the first host that wanted fees without memberships.
+
+**The two defects hid each other**, which is worth recording: on `main` a fresh open at the door renders ONE
+reason, so the exclusivity bug cannot even be reproduced there — the browser harness reports *"only 1
+reason(s) rendered — cannot test exclusivity"*. The owner saw both lit because in his session an earlier
+action had already bridged the member and given him two.
+
+### 3 — No click-to-clear, deliberately
+
+A radio group with a required answer has no "none selected" state to return to: a waive must carry a reason
+(219), and that reason is what makes forgoing income a governance record rather than a hole. So "unselect" is
+selecting the other option, and the way out of the whole form is the existing **"Cancelar la condonación"**,
+which resets it. That is the toggle behaviour asked for; stated here so it does not read as an omission.
+
+### Verification
+
+`composer check` green — **1812 tests**, 1809 passed, 3 pre-existing skips, Larastan 0, Pint clean. **MySQL
+was left to CI**, per the running order. Nothing recorded changed: `waiveFeeThrough`, `resolvedWaiveReason()`,
+the audit line, the WAIVED row and the reason VALUES are untouched, and no new copy reaches `lang/*`.
+
+**One partial and one concern**, so all three hosts get the fix by construction — no host-local patches.
+219's eleven waiver tests and 225's blocked-panel assertions pass unamended.
+
+**Written to fail against `dc97f83`, and does**: 5 of 7 fail there — the door and the POS missing the
+structured reasons, the radios with no name, the two hosts sharing an empty group name, the unkeyed loop, and
+a waive recording nothing because nothing was preselected to switch from.
+
+**Browser** (`measure-waiver-reasons.mjs`, real app, the door): one group; clicking A leaves exactly one lit
+**read immediately after the click, before any round trip could help**; clicking B deselects A the same way;
+the free-text box appears and disappears with its reason. Run against `main` first, where it reports one bare
+option and an empty group name. Before/after in `storage/app/screenshots/229/`.
