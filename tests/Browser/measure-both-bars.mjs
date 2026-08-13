@@ -12,6 +12,7 @@ import { chromium } from 'playwright';
 import { mkdirSync } from 'node:fs';
 import { access } from 'node:fs/promises';
 import { pathToFileURL } from 'node:url';
+import { assertRealFont } from './font-ready.mjs';
 import { resolve } from 'node:path';
 
 const STAGE = process.argv[2] ?? 'after';
@@ -38,6 +39,9 @@ for (const state of STATES) {
       await page.evaluate(() => {
         document.querySelectorAll('[data-counter-surface],[x-cloak]').forEach((n) => { n.style.display = 'none'; });
       });
+
+      // Prompt 233 — prove what this is measuring IN before believing any number it produces.
+      if (! await assertRealFont(page, `${state}/${size.name}/${theme}`, fail)) { await page.close(); continue; }
 
       await page.screenshot({ path: `${OUT}/${STAGE}-${state}-${size.name}-${theme}.png` });
 
