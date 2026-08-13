@@ -66,3 +66,40 @@
     border-radius: 9999px;
     background: color-mix(in oklab, currentColor 22%, transparent);
 }
+
+/* Chrome's autofill paint (prompt 231). The owner's screenshot: Email/Phone/Address on the dark counter,
+   painted WHITE with his own address in them. `-webkit-autofill` sets a UA background that no ordinary
+   `background-color` can override, so it takes an inset box-shadow the size of the field — the standard
+   workaround — plus an explicit text-fill and caret, because the UA also overrides `color`.
+
+   Scoped to this stylesheet's surfaces (counter, socio, login). Filament ships its own theme and is out of
+   scope; the defect was not seen there.
+
+   The fields the browser should NOT be filling are suppressed at the markup (the staff wizard types somebody
+   else's details). This is the paint for whatever still autofills — the applicant's own form, the member
+   login — where filling it is the correct behaviour and only the colour was wrong. */
+input:-webkit-autofill,
+input:-webkit-autofill:hover,
+input:-webkit-autofill:focus,
+textarea:-webkit-autofill,
+select:-webkit-autofill {
+    -webkit-text-fill-color: var(--color-ink);
+    caret-color: var(--color-ink);
+    box-shadow: inset 0 0 0 1000px var(--color-surface);
+    transition: background-color 100000s ease-in-out 0s;
+}
+
+@media (prefers-color-scheme: dark) {
+    :root:not(.light):not([data-theme='light']) input:-webkit-autofill,
+    :root:not(.light):not([data-theme='light']) input:-webkit-autofill:hover,
+    :root:not(.light):not([data-theme='light']) input:-webkit-autofill:focus,
+    :root:not(.light):not([data-theme='light']) textarea:-webkit-autofill,
+    :root:not(.light):not([data-theme='light']) select:-webkit-autofill {
+        /* The counter's dark fields are slate-950; the token set does not carry a dark `--color-surface`
+           (dark surfaces come from explicit `dark:` utilities — prompt 225 found the same thing on the amber
+           ramp), so the value is named here rather than resolved from a token that does not move. */
+        -webkit-text-fill-color: #f1f5f9;
+        caret-color: #f1f5f9;
+        box-shadow: inset 0 0 0 1000px #020617;
+    }
+}

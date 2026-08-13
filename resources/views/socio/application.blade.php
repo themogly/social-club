@@ -57,6 +57,11 @@
 
                 {{-- The required-field convention, stated in instructions (WCAG 3.3.2, prompt 155): fields marked
                      with * are required. The programmatic signal lives on each input's `required` attribute. --}}
+                {{-- Prompt 231 — autofill HELPS here, so the fields say what they are. This form and the
+                     handed-over tablet are the one place a person is typing their OWN details; the staff
+                     wizard is the opposite case and suppresses it, because there the browser would offer the
+                     operator's contact details for somebody else's record. Whose data the form holds is what
+                     decides which way it goes. --}}
                 <p class="text-xs text-ink-muted dark:text-slate-400">
                     <span aria-hidden="true" class="font-medium text-error">*</span> {{ __('Campos obligatorios') }}
                 </p>
@@ -64,13 +69,13 @@
                 <div class="grid grid-cols-2 gap-3">
                     <div>
                         <label class="mb-1 block text-sm font-medium" for="first_name">{{ __('Nombre') }} <x-socio.required-mark /></label>
-                        <input id="first_name" name="first_name" @error('first_name') aria-invalid="true" aria-describedby="first_name-error" @enderror type="text" required value="{{ old('first_name', data_get($payload, 'first_name') ?: ($prefill['first_name'] ?? null)) }}" class="{{ $input }}">
+                        <input id="first_name" name="first_name" autocomplete="given-name" @error('first_name') aria-invalid="true" aria-describedby="first_name-error" @enderror type="text" required value="{{ old('first_name', data_get($payload, 'first_name') ?: ($prefill['first_name'] ?? null)) }}" class="{{ $input }}">
                     <x-socio.field-error name="first_name" />
                         @include('socio.partials.mrz-confirm', ['field' => 'first_name'])
                     </div>
                     <div>
                         <label class="mb-1 block text-sm font-medium" for="last_name">{{ __('Apellidos') }} <x-socio.required-mark /></label>
-                        <input id="last_name" name="last_name" @error('last_name') aria-invalid="true" aria-describedby="last_name-error" @enderror type="text" required value="{{ old('last_name', data_get($payload, 'last_name') ?: ($prefill['last_name'] ?? null)) }}" class="{{ $input }}">
+                        <input id="last_name" name="last_name" autocomplete="family-name" @error('last_name') aria-invalid="true" aria-describedby="last_name-error" @enderror type="text" required value="{{ old('last_name', data_get($payload, 'last_name') ?: ($prefill['last_name'] ?? null)) }}" class="{{ $input }}">
                     <x-socio.field-error name="last_name" />
                         @include('socio.partials.mrz-confirm', ['field' => 'last_name'])
                     </div>
@@ -83,20 +88,20 @@
                 <div class="grid gap-3 md:grid-cols-2">
                     <div>
                         <label class="mb-1 block text-sm font-medium" for="email">{{ __('Correo electrónico') }} <x-socio.required-mark /></label>
-                        <input id="email" name="email" @error('email') aria-invalid="true" aria-describedby="email-error" @enderror type="email" required inputmode="email" value="{{ old('email', data_get($payload, 'email')) }}" class="{{ $input }}">
+                        <input id="email" name="email" autocomplete="email" @error('email') aria-invalid="true" aria-describedby="email-error" @enderror type="email" required inputmode="email" value="{{ old('email', data_get($payload, 'email')) }}" class="{{ $input }}">
                         <x-socio.field-error name="email" />
                     </div>
 
                     <div>
                         <label class="mb-1 block text-sm font-medium" for="phone">{{ __('Teléfono') }}</label>
-                        <input id="phone" name="phone" @error('phone') aria-invalid="true" aria-describedby="phone-error" @enderror type="tel" inputmode="tel" value="{{ old('phone', data_get($payload, 'phone')) }}" class="{{ $input }}">
+                        <input id="phone" name="phone" autocomplete="tel" @error('phone') aria-invalid="true" aria-describedby="phone-error" @enderror type="tel" inputmode="tel" value="{{ old('phone', data_get($payload, 'phone')) }}" class="{{ $input }}">
                         <x-socio.field-error name="phone" />
                     </div>
                 </div>
 
                 <div>
                     <label class="mb-1 block text-sm font-medium" for="date_of_birth">{{ __('Fecha de nacimiento') }} <x-socio.required-mark /></label>
-                    <input id="date_of_birth" name="date_of_birth" @error('date_of_birth') aria-invalid="true" aria-describedby="date_of_birth-error" @enderror type="date" required value="{{ old('date_of_birth', data_get($payload, 'date_of_birth') ?: ($prefill['date_of_birth'] ?? null)) }}" class="{{ $input }}">
+                    <input id="date_of_birth" name="date_of_birth" autocomplete="bday" @error('date_of_birth') aria-invalid="true" aria-describedby="date_of_birth-error" @enderror type="date" required value="{{ old('date_of_birth', data_get($payload, 'date_of_birth') ?: ($prefill['date_of_birth'] ?? null)) }}" class="{{ $input }}">
                     <x-socio.field-error name="date_of_birth" />
                         @include('socio.partials.mrz-confirm', ['field' => 'date_of_birth'])
                     {{-- Explicit format hint (prompt 97): the native picker's displayed order follows the
@@ -189,7 +194,7 @@
                 <div class="grid gap-3 md:grid-cols-2">
                     <div>
                         <label class="mb-1 block text-sm font-medium" for="address">{{ __('Dirección') }}</label>
-                        <input id="address" name="address" @error('address') aria-invalid="true" aria-describedby="address-error" @enderror type="text" value="{{ old('address', data_get($payload, 'address')) }}" class="{{ $input }}">
+                        <input id="address" name="address" autocomplete="street-address" @error('address') aria-invalid="true" aria-describedby="address-error" @enderror type="text" value="{{ old('address', data_get($payload, 'address')) }}" class="{{ $input }}">
                         <x-socio.field-error name="address" />
                     </div>
 

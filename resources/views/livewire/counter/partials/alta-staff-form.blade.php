@@ -19,37 +19,49 @@
      `altaNext()` validates from the same map. Markup that disagreed with it would validate one step and
      render another.
 
-     177's boundary holds: nothing renders a scan back from the vault. Capturing is not displaying. --}}
-<div data-alta-staff-fields class="space-y-4">
+     177's boundary holds: nothing renders a scan back from the vault. Capturing is not displaying.
+
+     **AUTOFILL IS SUPPRESSED HERE** (prompt 231), and the reason is whose data this is. The owner's
+     screenshot showed Chrome painting Email/Phone/Address white with `hawker.ben@gmail.com` in them — the
+     OPERATOR's own contact details, one tap from being saved as a new member's. The applicant's own form and
+     the handed-over tablet are the opposite case and get correct tokens instead; see `socio/application`.
+     `autocomplete="off"` on the form is widely ignored by Chrome for recognised field types, so each field
+     also carries a token Chrome has no saved value for.
+ --}}
+{{-- Prompt 231 compacted this step's vertical rhythm. Measured on `2306824` with the MRZ trigger visible
+     (223 made it mount, and it is the ~44px that decides the fit): **506px of content in a 506px region** at
+     1180×820 in ES — a fit of ZERO — and 42px clipped at 1180×760, with the reader below the fold. Nothing
+     was dropped; the gaps, the label offsets and the reader block's padding gave the pixels back. --}}
+<div data-alta-staff-fields class="space-y-3">
 
     {{-- ============ 1 · IDENTIDAD ============
          The two uploads and 179's reader live here because the reader READS the document file chosen here and
          PREFILLS four of these fields — `mountStaffMrzScan` binds its trigger to `[data-alta-scan]`, so the
          trigger and the input must render together or the control silently does nothing. --}}
     @if ($altaStep === 1)
-        <div class="grid gap-3 sm:grid-cols-2">
+        <div class="grid gap-2.5 sm:grid-cols-2">
             <div>
                 <label for="alta-first-name" class="block text-sm font-medium text-ink-muted dark:text-slate-400">{{ __('Nombre') }}</label>
-                <input id="alta-first-name" type="text" wire:model="altaForm.first_name" autocomplete="off"
-                       class="mt-1.5 h-12 w-full rounded-xl border border-line bg-surface px-4 text-base dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100">
+                <input id="alta-first-name" type="text" wire:model="altaForm.first_name" autocomplete="new-first-name" data-no-autofill
+                       class="mt-1 h-12 w-full rounded-xl border border-line bg-surface px-4 text-base dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100">
                 @error('altaForm.first_name') <p class="mt-1 text-xs text-error">{{ $message }}</p> @enderror
             </div>
             <div>
                 <label for="alta-last-name" class="block text-sm font-medium text-ink-muted dark:text-slate-400">{{ __('Apellidos') }}</label>
-                <input id="alta-last-name" type="text" wire:model="altaForm.last_name" autocomplete="off"
-                       class="mt-1.5 h-12 w-full rounded-xl border border-line bg-surface px-4 text-base dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100">
+                <input id="alta-last-name" type="text" wire:model="altaForm.last_name" autocomplete="new-last-name" data-no-autofill
+                       class="mt-1 h-12 w-full rounded-xl border border-line bg-surface px-4 text-base dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100">
                 @error('altaForm.last_name') <p class="mt-1 text-xs text-error">{{ $message }}</p> @enderror
             </div>
             <div>
                 <label for="alta-dob" class="block text-sm font-medium text-ink-muted dark:text-slate-400">{{ __('Fecha de nacimiento') }}</label>
-                <input id="alta-dob" type="date" wire:model="altaForm.date_of_birth"
-                       class="mt-1.5 h-12 w-full rounded-xl border border-line bg-surface px-4 text-base dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100">
+                <input id="alta-dob" type="date" wire:model="altaForm.date_of_birth" autocomplete="new-date-of-birth" data-no-autofill
+                       class="mt-1 h-12 w-full rounded-xl border border-line bg-surface px-4 text-base dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100">
                 @error('altaForm.date_of_birth') <p class="mt-1 text-xs text-error">{{ $message }}</p> @enderror
             </div>
             <div>
                 <label for="alta-doc-type" class="block text-sm font-medium text-ink-muted dark:text-slate-400">{{ __('Tipo de documento') }}</label>
-                <select id="alta-doc-type" wire:model="altaForm.document_type"
-                        class="mt-1.5 h-12 w-full rounded-xl border border-line bg-surface px-4 text-base dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100">
+                <select id="alta-doc-type" wire:model="altaForm.document_type" autocomplete="off" data-no-autofill
+                        class="mt-1 h-12 w-full rounded-xl border border-line bg-surface px-4 text-base dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100">
                     <option value="">{{ __('Elige…') }}</option>
                     @foreach (\App\Enums\IdDocumentType::cases() as $type)
                         <option value="{{ $type->value }}">{{ $type->label() }}</option>
@@ -59,8 +71,8 @@
             </div>
             <div class="sm:col-span-2">
                 <label for="alta-doc-number" class="block text-sm font-medium text-ink-muted dark:text-slate-400">{{ __('Número de documento') }}</label>
-                <input id="alta-doc-number" type="text" wire:model="altaForm.document_number" autocomplete="off"
-                       class="mt-1.5 h-12 w-full rounded-xl border border-line bg-surface px-4 text-base dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100">
+                <input id="alta-doc-number" type="text" wire:model="altaForm.document_number" autocomplete="new-document-number" data-no-autofill
+                       class="mt-1 h-12 w-full rounded-xl border border-line bg-surface px-4 text-base dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100">
                 @error('altaForm.document_number') <p class="mt-1 text-xs text-error">{{ $message }}</p> @enderror
             </div>
         </div>
@@ -73,20 +85,20 @@
              always there and the form is usable with no camera at all. Both files go through
              `SubmitApplication` to `DocumentVault` — encrypted before write, private disk, signed
              access-logged URL — whichever form uploaded them. --}}
-        <div class="grid gap-3 sm:grid-cols-2">
+        <div class="grid gap-2.5 sm:grid-cols-2">
             <div>
                 <label for="alta-photo" class="block text-sm font-medium text-ink-muted dark:text-slate-400">{{ __('Foto (opcional)') }}</label>
                 <input id="alta-photo" type="file" accept="image/*" capture="user" wire:model="altaPhoto" data-alta-photo
-                       class="mt-1.5 block min-h-11 w-full text-sm text-ink file:mr-3 file:min-h-11 file:rounded-lg file:border-0 file:bg-brand-tint file:px-3 file:text-sm file:font-medium file:text-brand dark:text-slate-200 dark:file:bg-slate-800 dark:file:text-slate-100">
-                <p class="mt-1 text-xs text-ink-muted dark:text-slate-400">{{ __('Se compara con la persona en el mostrador. Puedes omitirla.') }}</p>
+                       class="mt-1 block min-h-11 w-full text-sm text-ink file:mr-3 file:min-h-11 file:rounded-lg file:border-0 file:bg-brand-tint file:px-3 file:text-sm file:font-medium file:text-brand dark:text-slate-200 dark:file:bg-slate-800 dark:file:text-slate-100">
+                <p class="mt-0.5 text-[11px] leading-tight text-ink-muted dark:text-slate-400">{{ __('Se compara con la persona en el mostrador. Puedes omitirla.') }}</p>
                 @error('altaPhoto') <p class="mt-1 text-xs text-error">{{ $message }}</p> @enderror
             </div>
 
             <div>
                 <label for="alta-scan" class="block text-sm font-medium text-ink-muted dark:text-slate-400">{{ __('Documento de identidad (opcional)') }}</label>
                 <input id="alta-scan" type="file" accept="image/*,application/pdf" capture="environment" wire:model="altaDocumentScan" data-alta-scan
-                       class="mt-1.5 block min-h-11 w-full text-sm text-ink file:mr-3 file:min-h-11 file:rounded-lg file:border-0 file:bg-brand-tint file:px-3 file:text-sm file:font-medium file:text-brand dark:text-slate-200 dark:file:bg-slate-800 dark:file:text-slate-100">
-                <p class="mt-1 text-xs text-ink-muted dark:text-slate-400">{{ __('Se guarda cifrado y cada consulta queda registrada.') }}</p>
+                       class="mt-1 block min-h-11 w-full text-sm text-ink file:mr-3 file:min-h-11 file:rounded-lg file:border-0 file:bg-brand-tint file:px-3 file:text-sm file:font-medium file:text-brand dark:text-slate-200 dark:file:bg-slate-800 dark:file:text-slate-100">
+                <p class="mt-0.5 text-[11px] leading-tight text-ink-muted dark:text-slate-400">{{ __('Se guarda cifrado y cada consulta queda registrada.') }}</p>
                 @error('altaDocumentScan') <p class="mt-1 text-xs text-error">{{ $message }}</p> @enderror
             </div>
         </div>
@@ -94,7 +106,7 @@
         {{-- Prompt 179's ID-scan prefill (wired to this form by 215). `hidden` until the script mounts, so a
              browser that cannot run the reader never shows a control that would do nothing — and a failed read
              leaves the form exactly as it was. --}}
-        <div data-alta-mrz-region class="rounded-xl border border-line bg-surface-alt p-3 dark:border-slate-700 dark:bg-slate-800">
+        <div data-alta-mrz-region class="rounded-xl border border-line bg-surface-alt px-3 py-2 dark:border-slate-700 dark:bg-slate-800">
             <button
                 type="button"
                 data-alta-mrz-scan
@@ -103,8 +115,8 @@
                 data-needs-file="{{ __('Elige primero una foto del documento.') }}"
                 class="inline-flex min-h-11 items-center rounded-xl border border-brand/40 bg-brand-tint px-4 text-sm font-semibold text-brand transition hover:bg-brand-tint/70 disabled:opacity-60 dark:bg-slate-900 dark:text-slate-100"
             >{{ __('Rellenar desde el documento') }}</button>
-            <p data-alta-mrz-status role="status" aria-live="polite" class="mt-1 text-xs text-ink-muted dark:text-slate-400"></p>
-            <p class="mt-1 text-xs text-ink-muted dark:text-slate-400">{{ __('Del DNI o NIE, fotografía el REVERSO. Del pasaporte, la página de la foto.') }}</p>
+            <p data-alta-mrz-status role="status" aria-live="polite" class="text-[11px] leading-tight text-ink-muted empty:hidden dark:text-slate-400"></p>
+            <p class="mt-0.5 text-[11px] leading-tight text-ink-muted dark:text-slate-400">{{ __('Del DNI o NIE, fotografía el REVERSO. Del pasaporte, la página de la foto.') }}</p>
 
             @if (! empty($altaMrzFilled))
                 <div data-alta-mrz-filled class="mt-2 rounded-lg border border-warning/40 bg-warning/5 p-2">
@@ -116,29 +128,29 @@
 
     {{-- ============ 2 · CONTACTO ============ --}}
     @if ($altaStep === 2)
-        <div class="grid gap-3 sm:grid-cols-2">
+        <div class="grid gap-2.5 sm:grid-cols-2">
             <div>
                 <label for="alta-email-staff" class="block text-sm font-medium text-ink-muted dark:text-slate-400">{{ __('Email') }}</label>
-                <input id="alta-email-staff" type="email" inputmode="email" wire:model="altaForm.email" autocomplete="off"
-                       class="mt-1.5 h-12 w-full rounded-xl border border-line bg-surface px-4 text-base dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100">
+                <input id="alta-email-staff" type="email" inputmode="email" wire:model="altaForm.email" autocomplete="new-email" data-no-autofill
+                       class="mt-1 h-12 w-full rounded-xl border border-line bg-surface px-4 text-base dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100">
                 @error('altaForm.email') <p class="mt-1 text-xs text-error">{{ $message }}</p> @enderror
             </div>
             <div>
                 <label for="alta-phone" class="block text-sm font-medium text-ink-muted dark:text-slate-400">{{ __('Teléfono') }}</label>
-                <input id="alta-phone" type="tel" inputmode="tel" wire:model="altaForm.phone" autocomplete="off"
-                       class="mt-1.5 h-12 w-full rounded-xl border border-line bg-surface px-4 text-base dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100">
+                <input id="alta-phone" type="tel" inputmode="tel" wire:model="altaForm.phone" autocomplete="new-phone" data-no-autofill
+                       class="mt-1 h-12 w-full rounded-xl border border-line bg-surface px-4 text-base dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100">
                 @error('altaForm.phone') <p class="mt-1 text-xs text-error">{{ $message }}</p> @enderror
             </div>
             <div class="sm:col-span-2">
                 <label for="alta-address" class="block text-sm font-medium text-ink-muted dark:text-slate-400">{{ __('Dirección') }}</label>
-                <input id="alta-address" type="text" wire:model="altaForm.address" autocomplete="off"
-                       class="mt-1.5 h-12 w-full rounded-xl border border-line bg-surface px-4 text-base dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100">
+                <input id="alta-address" type="text" wire:model="altaForm.address" autocomplete="new-address" data-no-autofill
+                       class="mt-1 h-12 w-full rounded-xl border border-line bg-surface px-4 text-base dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100">
                 @error('altaForm.address') <p class="mt-1 text-xs text-error">{{ $message }}</p> @enderror
             </div>
             <div class="sm:col-span-2">
                 <label for="alta-avalador" class="block text-sm font-medium text-ink-muted dark:text-slate-400">{{ __('Avalador (nombre o nº)') }}</label>
-                <input id="alta-avalador" type="text" wire:model="altaForm.avalador_ref" autocomplete="off"
-                       class="mt-1.5 h-12 w-full rounded-xl border border-line bg-surface px-4 text-base dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100">
+                <input id="alta-avalador" type="text" wire:model="altaForm.avalador_ref" autocomplete="new-avalador-ref" data-no-autofill
+                       class="mt-1 h-12 w-full rounded-xl border border-line bg-surface px-4 text-base dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100">
                 @error('altaForm.avalador_ref') <p class="mt-1 text-xs text-error">{{ $message }}</p> @enderror
             </div>
         </div>
@@ -170,7 +182,7 @@
             @endphp
             <label for="alta-declared" class="block text-sm font-medium text-ink-muted dark:text-slate-400">{{ __('Consumo mensual estimado') }}</label>
             <select id="alta-declared" wire:model="altaForm.declared_monthly_g" data-alta-declared
-                    class="mt-1.5 h-12 w-full rounded-xl border border-line bg-surface px-4 text-base dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100">
+                    class="mt-1 h-12 w-full rounded-xl border border-line bg-surface px-4 text-base dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100">
                 <option value="">{{ __('Prefiero no indicarlo ahora') }}</option>
                 @foreach ($forecastOptions as $opt)
                     <option value="{{ $opt }}">{{ __(':n g al mes', ['n' => $opt]) }}</option>
