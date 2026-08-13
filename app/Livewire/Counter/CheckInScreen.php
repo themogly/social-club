@@ -217,7 +217,7 @@ class CheckInScreen extends Component
         }
 
         $result = $this->collectInlineFeeFor($member, $this->openTill($location), $location, $user);
-        $this->flash($result['message'], $result['type']);
+        $this->flashResult($result);
     }
 
     // --- View data (assembled here; the view stays declarative) ----------------
@@ -416,6 +416,6 @@ class CheckInScreen extends Component
         }
 
         $result = $this->waiveInlineFeeFor($member, $location, $user);
-        $this->flash($result['message'], $result['type']);
+        $this->flashResult($result);
     }
 }

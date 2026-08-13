@@ -19,14 +19,24 @@
                 <button type="button" wire:click="$set('feeMethod', 'CASH')" @class(['h-11 rounded-lg border text-sm font-semibold', 'border-brand bg-brand text-white' => $feeMethod === 'CASH', 'border-line text-ink dark:border-slate-700 dark:text-slate-100' => $feeMethod !== 'CASH'])>{{ __('Efectivo') }}</button>
                 <button type="button" wire:click="$set('feeMethod', 'WALLET')" @class(['h-11 rounded-lg border text-sm font-semibold', 'border-brand bg-brand text-white' => $feeMethod === 'WALLET', 'border-line text-ink dark:border-slate-700 dark:text-slate-100' => $feeMethod !== 'WALLET'])>{{ __('Monedero') }}</button>
             </div>
-            <x-button type="submit" size="md" class="w-full" wire:loading.attr="disabled" wire:target="collectMemberFee">{{ __('Cobrar cuota') }}</x-button>
+            {{-- SIDE BY SIDE (prompt 234), collect keeping primary weight. The waiver's own control lives in
+                 its partial so all three hosts get one markup; it is placed in this row rather than under it,
+                 which is the whole of the owner's ask — *"a button next to collect fee… frees up some space."* --}}
+            <div class="grid grid-cols-2 gap-2">
+                <x-button type="submit" size="md" class="w-full" wire:loading.attr="disabled" wire:target="collectMemberFee">{{ __('Cobrar cuota') }}</x-button>
+
+                {{-- Prompt 219 — the waiver follows the fee wherever the fee is collected, for the same reason
+                     127 put the collect action here: the fix belongs beside the thing it fixes. It needs no
+                     open till. --}}
+                @include('livewire.counter.partials.fee-waiver', ['part' => 'trigger'])
+            </div>
         </form>
+
+        {{-- …and its reason form below, full width: a radio group squeezed into half a row is not a choice
+             anybody makes correctly. --}}
+        @include('livewire.counter.partials.fee-waiver', ['part' => 'form'])
         @unless ($openTillPresent)
             <p class="mt-1.5 text-[11px] text-warning">{{ __('Sin caja abierta solo se admite el cobro con monedero.') }}</p>
         @endunless
-
-        {{-- Prompt 219 — the waiver follows the fee wherever the fee is collected, for the same reason 127
-             put the collect action here: the fix belongs beside the thing it fixes. It needs no open till. --}}
-        @include('livewire.counter.partials.fee-waiver')
     </div>
 @endif

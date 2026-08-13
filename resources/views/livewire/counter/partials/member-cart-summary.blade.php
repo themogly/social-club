@@ -65,5 +65,29 @@
                 </p>
             </div>
         @endif
+
+        {{-- THE WALLET, PINNED (prompt 234). The owner: *"the wallet amount should be in the part above."*
+             It is the same class of fact as the allowance — something an operator glances at while working,
+             not something they scroll to — and it sat in a `dl` in the scrolling middle beside a "Carencia"
+             row that said nothing. One line, the same red-when-negative treatment the dl had.
+
+             The TENDER's wallet figures are untouched: this is glanceable context, those are the arithmetic
+             of the transaction in progress. --}}
+        <p data-member-wallet class="mt-2 flex items-baseline justify-between gap-2 border-t border-line pt-2 text-xs dark:border-slate-800">
+            <span class="font-medium text-ink-muted dark:text-slate-400">{{ __('Monedero') }}</span>
+            <span class="text-sm font-bold tabular-nums {{ $walletCents < 0 ? 'text-error' : '' }}">{{ $this->money($walletCents) }}</span>
+        </p>
+
+        {{-- …and the photo nag, which the owner asked to move OUT of the scrolling part and left the where to
+             us (prompt 234). Here, because it is about the person in the identity card and because a nag that
+             scrolls away is a nag nobody acts on — it is the fix for a fact this card is already stating (no
+             photo, so the initials are showing right above it). 228's wrapped row exactly as it is: the
+             sentence full width, the two ≥44px controls beneath. --}}
+        @unless ($photoUrl)
+            <div data-photo-nag class="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1.5 rounded-xl border border-warning/30 bg-warning/5 px-3 py-1.5">
+                <p class="w-full text-[11px] font-medium leading-tight text-warning">{{ __('Sin foto — verifica y súbela') }}</p>
+                <x-counter.photo-capture :member="$member" source="counter" />
+            </div>
+        @endunless
     </section>
 @endif

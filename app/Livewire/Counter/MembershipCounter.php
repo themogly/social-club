@@ -254,7 +254,7 @@ class MembershipCounter extends Component
         // The open drawer at this sede, if any — a CASH fee needs it (collectFeeThrough refuses one without);
         // a wallet fee does not, which is why the Socios tab can take a fee with no till open.
         $result = $this->collectFeeThrough($this->openTill($location), $location, $user);
-        $this->flash($result['message'], $result['type']);
+        $this->flashResult($result);
     }
 
     public function render(): View
@@ -425,6 +425,6 @@ class MembershipCounter extends Component
         }
 
         $result = $this->waiveFeeThrough($location, $user);
-        $this->flash($result['message'], $result['type']);
+        $this->flashResult($result);
     }
 }

@@ -71,7 +71,7 @@ trait CollectsMembershipFees
      * error, 'message' => ...] for the host to flash — no host-flash dependency, so it drops cleanly into any
      * counter screen.
      *
-     * @return array{type: string, message: string}
+     * @return array{type: string, message: ?string}
      */
     protected function collectFeeThrough(?TillSession $session, Location $location, User $user): array
     {
@@ -139,7 +139,7 @@ trait CollectsMembershipFees
      * Partial waivers fall out for free — waive €10 of €20 and the rest stays collectable — because it is
      * just another row against the same sum.
      *
-     * @return array{type: string, message: string}
+     * @return array{type: string, message: ?string}
      */
     protected function waiveFeeThrough(Location $location, User $user): array
     {
@@ -186,12 +186,12 @@ trait CollectsMembershipFees
         $this->feeMethod = 'CASH';
 
         // The amount is named because the field it was typed into has just been reset (prompt 202).
-        return [
-            'type' => 'success',
-            'message' => $remaining > 0
-                ? __('Cuota condonada: :amount. Pendiente: :remaining', ['amount' => Money::fromCents($cents)->formatted(), 'remaining' => Money::fromCents($remaining)->formatted()])
-                : __('Cuota condonada por completo: :amount.', ['amount' => Money::fromCents($cents)->formatted()]),
-        ];
+        // NO MESSAGE (prompt 234). The owner, on this exact toast: *"notifications should only be used if
+        // really needed, and not cover the basket like this too."* A waive's outcome is visible the instant
+        // it lands — the fee notice clears, 225's blocked surface gives the catalogue back, and a partial
+        // waive leaves the panel showing the new balance. The RECORD is the audit row and the WAIVED payment,
+        // which is what a waive is for; the toast only restated a screen the operator was already looking at.
+        return ['type' => 'success', 'message' => null];
     }
 
     /**
@@ -201,13 +201,29 @@ trait CollectsMembershipFees
      * The hosts hold their member in `$memberId` and Socios in `$feeMemberId`, which is the same difference
      * prompt 211 had to bridge in `OpensMemberships` — and the same answer: bridge it in the concern, once.
      *
-     * @return array{type: string, message: string}
+     * @return array{type: string, message: ?string}
      */
     protected function waiveInlineFeeFor(Member $member, Location $location, User $user): array
     {
         $this->feeMemberId = $member->id;
 
         return $this->waiveFeeThrough($location, $user);
+    }
+
+    /**
+     * Flash a fee result — unless it deliberately has nothing to say (prompt 234).
+     *
+     * A success whose outcome the screen already shows is not information, and on this column it costs the
+     * basket its height. `waiveFeeThrough()` returns a null message for exactly that reason; the type is still
+     * returned so a caller can branch on success without a string to print.
+     *
+     * @param  array{type: string, message: ?string}  $result
+     */
+    protected function flashResult(array $result): void
+    {
+        if (($result['message'] ?? null) !== null) {
+            $this->flash($result['message'], $result['type']);
+        }
     }
 
     /** The reason as it will be stored, or null when the operator has not given one. */
@@ -317,7 +333,7 @@ trait CollectsMembershipFees
      * balance, then run the SAME collectFeeThrough core. This is how the fee action follows the unpaid-fee
      * verdict wherever it is shown (prompt 127), with no second write path.
      *
-     * @return array{type: string, message: string}
+     * @return array{type: string, message: ?string}
      */
     protected function collectInlineFeeFor(Member $member, ?TillSession $session, Location $location, User $user): array
     {
