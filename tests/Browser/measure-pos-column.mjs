@@ -16,6 +16,7 @@ import { chromium } from 'playwright';
 import { mkdirSync } from 'node:fs';
 import { access } from 'node:fs/promises';
 import { pathToFileURL } from 'node:url';
+import { assertRealFont } from './font-ready.mjs';
 import { resolve } from 'node:path';
 
 const STAGE = process.argv[2] ?? 'after';
@@ -55,6 +56,9 @@ for (const state of STATES) {
           n.style.display = '';   // the sweep above hid it inline; the attribute alone does not undo that
         });
       });
+
+      // Prompt 233 — prove what this is measuring IN before believing any number it produces.
+      if (! await assertRealFont(page, `${state}/${size.name}/${theme}`, fail)) { await page.close(); continue; }
 
       // Scroll the cart's middle to its end: a pinned commit must still be on screen afterwards, which is
       // the whole claim (176's fold measurement, re-taken).

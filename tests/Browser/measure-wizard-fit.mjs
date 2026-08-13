@@ -16,6 +16,7 @@ import { chromium } from 'playwright';
 import { mkdirSync } from 'node:fs';
 import { access } from 'node:fs/promises';
 import { pathToFileURL } from 'node:url';
+import { assertRealFont } from './font-ready.mjs';
 import { resolve } from 'node:path';
 
 const STAGE = process.argv[2] ?? 'after';
@@ -63,6 +64,10 @@ for (const locale of LOCALES) {
           document.querySelectorAll('[data-signature-canvas]').forEach((c) => { c.style.height = '150px'; });
         });
 
+        // Prompt 233 — prove what this is measuring IN before believing any number it produces.
+        const label = `step${step}/${locale}/${size.name}/${theme}`;
+        if (! await assertRealFont(page, label, fail)) { await page.close(); continue; }
+
         if (step === 1 && size.name === '1180x820') {
           await page.screenshot({ path: `${OUT}/${STAGE}-step1-${locale}-${size.name}-${theme}.png` });
         }
@@ -100,9 +105,7 @@ for (const locale of LOCALES) {
           };
         });
 
-        if (! r) { fail(`step${step}/${locale}/${size.name}: no wizard body found`); await page.close(); continue; }
-
-        const label = `step${step}/${locale}/${size.name}/${theme}`;
+        if (! r) { fail(`${label}: no wizard body found`); await page.close(); continue; }
 
         if (STAGE === 'after') {
           if (r.panelBottom > size.height + 1) fail(`${label}: the panel runs past the viewport (${r.panelBottom} > ${size.height})`);
