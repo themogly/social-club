@@ -154,18 +154,28 @@ class BarCartPanelsTest extends TestCase
 
     // --- The list is a list ---------------------------------------------------------------------------
 
-    public function test_list_mode_renders_rows_and_grid_mode_renders_tiles(): void
+    /**
+     * List and grid are two forms of ONE card (prompt 230).
+     *
+     * 193 asserted this on `data-product-row`, a hook the Bar's own row markup carried. That markup moved into
+     * `x-counter.article-card`, shared with the POS, and the distinction is now the component's `layout`
+     * prop — so the assertion follows it there rather than pinning a hook that moved. What it protects is
+     * unchanged: a list row is a ROW (name and numbers on one line), not the grid tile turned sideways.
+     */
+    public function test_list_mode_and_grid_mode_are_two_forms_of_the_one_card(): void
     {
         $this->article();
 
-        $list = Livewire::test(BarPos::class)->set('articleLayout', 'list')->html();
-        $grid = Livewire::test(BarPos::class)->set('articleLayout', 'grid')->html();
+        $card = (string) file_get_contents(resource_path('views/components/counter/article-card.blade.php'));
+        $this->assertStringContainsString('flex-row items-center gap-3', $card, 'the list form is not a row');
+        $this->assertStringContainsString('flex-col gap-1', $card, 'the grid form is not a tile');
 
-        $this->assertStringContainsString('data-product-row', $list);
-        $this->assertStringNotContainsString('data-product-row', $grid);
-        // The row is its own markup, not the tile rotated: no full-width image block inside it.
-        $this->assertStringNotContainsString('flex h-24 w-full items-center justify-center', $list);
-        $this->assertStringContainsString('flex h-24 w-full items-center justify-center', $grid);
+        $list = Livewire::test(BarPos::class)->call('setArticleLayout', 'list')->html();
+        $grid = Livewire::test(BarPos::class)->call('setArticleLayout', 'grid')->html();
+
+        $this->assertStringContainsString('flex-row items-center gap-3', $list, 'list mode does not render rows');
+        $this->assertStringContainsString('flex-col gap-1', $grid, 'grid mode does not render tiles');
+        $this->assertStringContainsString('data-article-card=', $list, 'the Bar is not rendering the shared card');
     }
 
     public function test_the_thumbnail_column_is_omitted_when_no_article_has_an_image(): void

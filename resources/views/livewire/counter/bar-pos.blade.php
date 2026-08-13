@@ -165,96 +165,19 @@
                         'grid gap-3 sm:grid-cols-2 lg:grid-cols-3' => $articleLayout === 'grid',
                     ])>
                         @forelse ($articles as $a)
-                            @php $soldOut = $a['stock'] <= 0; @endphp
-
-                            @if ($articleLayout === 'list')
-                                {{-- Prompt 193 — a ROW, not the grid tile turned sideways. The old list mode reused
-                                     the tile markup with `lg:flex-row`, and the tile's image block is `h-24 w-full`,
-                                     so in a row it claimed the whole width: measured 714x106 at 1180x820 with the
-                                     name and price crammed into the remainder, and 166px tall below `lg` where the
-                                     tile did not rotate at all. Six rows filled the viewport — worse density than
-                                     the grid it is an alternative to, which left list mode with no reason to exist.
-
-                                     A row is its own component: fixed small thumbnail, name on ONE line, and the
-                                     numbers right-aligned in their own columns so the price and stock scan straight
-                                     down the list. `tabular-nums` is what makes that column actually align. --}}
-                                <button
-                                    type="button"
-                                    @if (! $soldOut) wire:click="addArticle('{{ $a['id'] }}')" @endif
-                                    @disabled($soldOut)
-                                    data-product
-                                    data-product-row
-                                    @class([
-                                        'flex h-[4.25rem] w-full items-center gap-3 rounded-xl border px-3 text-left transition',
-                                        'border-line bg-surface hover:border-brand hover:bg-brand-tint/40 dark:border-slate-700 dark:bg-slate-950 dark:hover:border-brand' => ! $soldOut,
-                                        'cursor-not-allowed border-dashed border-line bg-surface-alt opacity-60 dark:border-slate-800 dark:bg-slate-900' => $soldOut,
-                                    ])
-                                >
-                                    {{-- The thumbnail column exists only if some article at this sede HAS an image.
-                                         None of them does today, and a large empty glyph is a broken-looking gap
-                                         rather than a design (prompt 193). Missing photos are the club's to supply;
-                                         nothing here fabricates one. --}}
-                                    @if ($showThumbs)
-                                        <span class="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-surface-alt dark:bg-slate-800">
-                                            @if ($a['image_url'])
-                                                <img src="{{ $a['image_url'] }}" alt="" class="h-full w-full object-cover">
-                                            @else
-                                                <span class="text-sm font-semibold text-ink-muted dark:text-slate-400">{{ mb_strtoupper(mb_substr($a['name'], 0, 1)) }}</span>
-                                            @endif
-                                        </span>
-                                    @endif
-
-                                    <span data-product-name class="min-w-0 flex-1 truncate font-semibold leading-tight">{{ $a['name'] }}</span>
-
-                                    <span class="shrink-0 text-xs text-ink-muted tabular-nums dark:text-slate-400">
-                                        @if ($soldOut)
-                                            <span class="inline-flex items-center gap-1 text-error"><span class="h-2 w-2 rounded-full bg-error"></span>{{ __('Agotado') }}</span>
-                                        @elseif ($a['low_stock'])
-                                            <span class="inline-flex items-center gap-1 text-warning"><span class="h-2 w-2 rounded-full bg-warning"></span>{{ $a['stock'] }}</span>
-                                        @else
-                                            {{ __('Stock') }}: {{ $a['stock'] }}
-                                        @endif
-                                    </span>
-
-                                    <span class="w-20 shrink-0 text-right text-sm font-semibold tabular-nums text-brand dark:text-slate-100">{{ $this->money($a['price_cents']) }}</span>
-                                </button>
-                            @else
-                                <button
-                                    type="button"
-                                    @if (! $soldOut) wire:click="addArticle('{{ $a['id'] }}')" @endif
-                                    @disabled($soldOut)
-                                    data-product
-                                    @class([
-                                        'flex flex-col overflow-hidden rounded-xl border text-left transition',
-                                        'border-line bg-surface hover:border-brand hover:bg-brand-tint/40 dark:border-slate-700 dark:bg-slate-950 dark:hover:border-brand' => ! $soldOut,
-                                        'cursor-not-allowed border-dashed border-line bg-surface-alt opacity-60 dark:border-slate-800 dark:bg-slate-900' => $soldOut,
-                                    ])
-                                >
-                                    <div class="flex h-24 w-full items-center justify-center bg-surface-alt dark:bg-slate-800">
-                                        @if ($a['image_url'])
-                                            <img src="{{ $a['image_url'] }}" alt="" class="h-full w-full object-cover">
-                                        @else
-                                            <span class="text-3xl opacity-70">🛒</span>
-                                        @endif
-                                    </div>
-                                    <div class="flex flex-1 flex-col p-3">
-                                        <div class="flex items-start justify-between gap-2">
-                                            {{-- min-w-0 lets a long name wrap/clamp instead of forcing the row past the
-                                                 card's overflow-hidden edge and clipping the shrink-0 price. --}}
-                                            <span data-product-name class="min-w-0 font-semibold leading-tight line-clamp-2">{{ $a['name'] }}</span>
-                                            <span class="shrink-0 text-sm font-semibold text-brand dark:text-slate-100">{{ $this->money($a['price_cents']) }}</span>
-                                        </div>
-                                        <div class="mt-2 flex items-center justify-between text-xs">
-                                            <span class="text-ink-muted dark:text-slate-400">{{ __('Stock') }}: {{ $a['stock'] }}</span>
-                                            @if ($soldOut)
-                                                <span class="inline-flex items-center gap-1 text-error"><span class="h-2 w-2 rounded-full bg-error"></span>{{ __('Agotado') }}</span>
-                                            @elseif ($a['low_stock'])
-                                                <span class="inline-flex items-center gap-1 text-warning"><span class="h-2 w-2 rounded-full bg-warning"></span>{{ __('Stock bajo') }}</span>
-                                            @endif
-                                        </div>
-                                    </div>
-                                </button>
-                            @endif
+                            {{-- ONE card, both bars (prompt 230). The owner: *"make the standalone bar POS the
+                                 same design as the other one."* Everything that made these two screens
+                                 disagree — a 68px row against a 60px one, a 166px tile with a 🛒 block, a stock
+                                 count on one and not the other, sold-out visible here and hidden there — is
+                                 the component's to decide now, once. The `addArticle` action stays this
+                                 screen's; 193's row-is-not-a-rotated-tile lesson moved into the component
+                                 with the markup that carried it. --}}
+                            <x-counter.article-card
+                                :article="$a"
+                                :layout="$articleLayout"
+                                action="addArticle"
+                                :thumbs="$showThumbs"
+                            />
                         @empty
                             <p class="col-span-full rounded-xl border border-dashed border-line px-4 py-8 text-center text-sm text-ink-muted dark:border-slate-700 dark:text-slate-400">{{ __('No hay artículos activos en esta sede.') }}</p>
                         @endforelse
@@ -304,7 +227,12 @@
                 data-cart-column
                 class="flex min-h-0 shrink-0 flex-col gap-3 md:w-[19rem] lg:w-[21rem]"
             >
-                <div class="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto">
+                {{-- 225's visible-scroll treatment, so the two counter columns read as one family (prompt
+                     230). It was already the only part of this column that scrolled; nothing said so. The
+                     fade says "there is more above", the stable gutter keeps a real scrollbar on the
+                     platforms that hide it, and `overscroll-contain` stops a flick at the end of the basket
+                     scrolling the page behind it. --}}
+                <div data-cart-scroll class="counter-scroll-region flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto overscroll-contain pr-1">
                 {{-- Prompt 193 — per-sede, and NOT rendered when off (not collapsed, not disabled): most bar
                      sales are a coffee for cash, and with this off the cart column opens on the Basket, which
                      is where the operator's attention belongs. The flag governs INPUT only — a socio recorded
@@ -516,7 +444,15 @@
                         x-bind:disabled="! online"
                         class="mt-4 h-16 w-full rounded-xl bg-brand text-lg font-bold text-white transition hover:bg-brand-dark focus:outline-none focus:ring-2 focus:ring-brand/40 disabled:cursor-not-allowed disabled:opacity-50"
                     >
-                        <span wire:loading.remove wire:target="commitOrder">{{ __('Cobrar') }}</span>
+                        {{-- The total ON the button (prompt 230, completing 224/225's convention): the figure
+                             and the act are one thing at the moment of pressing, and the operator reads it
+                             from the control they are already looking at rather than from a panel above it.
+                             Live — it re-renders with every line. --}}
+                        <span wire:loading.remove wire:target="commitOrder">
+                            {{ $basketTotalCents > 0
+                                ? __('Cobrar · :total', ['total' => $this->money($basketTotalCents)])
+                                : __('Cobrar') }}
+                        </span>
                         <span wire:loading wire:target="commitOrder">{{ __('Cobrando…') }}</span>
                     </button>
                 </div>

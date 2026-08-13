@@ -20,6 +20,7 @@ use App\Models\Member;
 use App\Models\Order;
 use App\Models\TillSession;
 use App\Models\User;
+use App\Support\ArticleImage;
 use App\Support\CounterOperator;
 use App\Support\Money;
 use App\Support\Settings;
@@ -29,7 +30,6 @@ use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Locked;
@@ -739,19 +739,10 @@ class BarPos extends Component
     }
 
     /** A public-disk URL to the article's first image, or null (→ intentional fallback). */
+    /** Prompt 230 — one resolver, because the POS's bar catalogue renders the same card and needs the same URL. */
     private function imageUrl(Article $article): ?string
     {
-        $first = data_get($article->images, '0');
-
-        if (! is_string($first) || $first === '') {
-            return null;
-        }
-
-        try {
-            return Storage::disk('public')->url($first);
-        } catch (Throwable) {
-            return null;
-        }
+        return ArticleImage::url($article);
     }
 
     // --- Resolvers (live queries; nothing cached) -------------------------------

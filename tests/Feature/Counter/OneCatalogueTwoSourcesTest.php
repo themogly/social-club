@@ -160,12 +160,12 @@ class OneCatalogueTwoSourcesTest extends TestCase
         $pos = $this->posWithMember()->call('setCatalogueSource', 'bar');
 
         $pos->set('articleSearch', 'Zumo')
-            ->assertSee('data-bar-article="'.$last->id.'"', false)
+            ->assertSee('data-article-card="'.$last->id.'"', false)
             ->assertDontSee('Artículo 01');
 
         // …and with no search every one of them is in the source, not a subset that fitted.
         $pos->set('articleSearch', '');
-        $this->assertSame(41, substr_count($pos->html(), 'data-bar-article='), 'the catalogue is capped');
+        $this->assertSame(41, substr_count($pos->html(), 'data-article-card='), 'the catalogue is capped');
     }
 
     /** The chip list is gone from the cart — browsing lives in the pane that can browse. */
@@ -289,18 +289,33 @@ class OneCatalogueTwoSourcesTest extends TestCase
     // --- What must not be offered ---------------------------------------------------------------
 
     /** An article that is inactive or out of stock is not offered — refused in the query, never rendered. */
-    public function test_an_inactive_or_empty_article_is_not_offered(): void
+    /**
+     * An INACTIVE article is not offered; a sold-out one is offered DISABLED (prompt 230).
+     *
+     * 212 asserted both were excluded. Hiding a sold-out article is how an operator fails to notice the
+     * coffee has run out — and the standalone Bar had always shown it disabled with its count, so the two
+     * screens disagreed about whether the thing existed. Inactive is different: it is not part of the
+     * catalogue at all, and that half is unchanged.
+     */
+    public function test_an_inactive_article_is_not_offered_and_a_sold_out_one_is_disabled(): void
     {
         $this->operator();
-        $sellable = $this->article('Cerveza sin alcohol');
-        $inactive = $this->article('Retirado', ['active' => false]);
-        $empty = $this->article('Agotado', ['stock' => 0]);
+        $sellable = $this->article('Cerveza', ['stock' => 10]);
+        $inactive = $this->article('Retirada', ['active' => false]);
+        $empty = $this->article('Agotada', ['stock' => 0]);
 
         $html = $this->posWithMember()->call('setCatalogueSource', 'bar')->html();
 
-        $this->assertStringContainsString('data-bar-article="'.$sellable->id.'"', $html);
-        $this->assertStringNotContainsString('data-bar-article="'.$inactive->id.'"', $html);
-        $this->assertStringNotContainsString('data-bar-article="'.$empty->id.'"', $html);
+        $this->assertStringContainsString('data-article-card="'.$sellable->id.'"', $html);
+        $this->assertStringNotContainsString('data-article-card="'.$inactive->id.'"', $html, 'an inactive article is still on the catalogue');
+
+        $at = strpos($html, 'data-article-card="'.$empty->id.'"');
+        $this->assertNotFalse($at, 'the sold-out article is hidden — an operator cannot see what to restock');
+
+        $open = (int) strrpos(substr($html, 0, $at), '<button');
+        $card = substr($html, $open, (int) strpos($html, '</button>', $open) - $open);
+        $this->assertStringContainsString('disabled', $card, 'the sold-out article is not disabled');
+        $this->assertStringContainsString(__('Agotado'), $card, 'the sold-out article does not say so');
     }
 
     /** A sede with no bar offers no bar source at all, rather than an empty one. */
@@ -321,25 +336,32 @@ class OneCatalogueTwoSourcesTest extends TestCase
     }
 
     /** 185: the bar card states a stock STATE, never a published quantity. */
-    public function test_the_bar_card_states_stock_rather_than_publishing_it(): void
+    /**
+     * **The bar card states the COUNT** — reversed by prompt 230, deliberately.
+     *
+     * 212 wrote this assertion citing 185 (*"a state, not a count"*). 185 is the MEMBER MENU's rule: a member
+     * must not be able to race the counter for the last gram. This is a STAFF screen, where 216 already
+     * settled that quantities belong — and the standalone Bar had been showing the count all along, so the
+     * two screens disagreed about the same article. The count stays, on both, with the low-stock state
+     * beside it.
+     */
+    public function test_the_bar_card_states_the_stock_count(): void
     {
         $this->operator();
         // 7 left, low below 9, priced 3,55 € — no digit of the price or the threshold is a 7, so a 7 in the
-        // card's TEXT could only be the stock count itself.
+        // card's TEXT can only be the stock count itself.
         $this->article('Casi agotado', ['stock' => 7, 'low_stock_threshold' => 9, 'price_cents' => 355]);
 
         $html = $this->posWithMember()->call('setCatalogueSource', 'bar')->html();
-        $at = strpos($html, 'data-bar-article=');
+        $at = strpos($html, 'data-article-card=');
         $this->assertNotFalse($at);
         $card = substr($html, $at, (int) strpos($html, '</button>', $at) - $at);
 
-        $this->assertStringContainsString('data-bar-stock-state', $card, 'the low state is not shown at all');
-        $this->assertStringContainsString(__('Quedan pocas'), $card);
+        $this->assertStringContainsString('data-article-stock', $card, 'the stock is not shown at all');
+        $this->assertStringContainsString(__('Quedan pocas'), $card, 'the low state went with the count');
 
-        // The STATE, never the figure — 185's rule, asserted against the card's visible TEXT (the attributes
-        // above it are full of Tailwind digits and a ULID).
         $text = strip_tags(substr($card, (int) strpos($card, '>')));
-        $this->assertDoesNotMatchRegularExpression('/\b7\b/', $text, 'the raw stock count reached the card');
+        $this->assertMatchesRegularExpression('/\b7\b/', $text, 'the count an operator needs is missing');
         $this->assertStringContainsString('3', $text, 'the price is missing, so the card is not readable');
         $this->assertStringContainsString('55', $text);
     }
@@ -378,8 +400,8 @@ class OneCatalogueTwoSourcesTest extends TestCase
             ->call('filterArticleCategory', $drinks->id);
 
         $html = $pos->html();
-        $this->assertStringContainsString('data-bar-article="'.$drink->id.'"', $html);
-        $this->assertStringNotContainsString('data-bar-article="'.$shirt->id.'"', $html);
+        $this->assertStringContainsString('data-article-card="'.$drink->id.'"', $html);
+        $this->assertStringNotContainsString('data-article-card="'.$shirt->id.'"', $html);
     }
 
     /** 194: a catalogue search is not a member search. */
