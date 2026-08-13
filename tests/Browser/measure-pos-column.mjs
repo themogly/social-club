@@ -23,7 +23,11 @@ const STAGE = process.argv[2] ?? 'after';
 const OUT = 'storage/app/screenshots/225';
 mkdirSync(OUT, { recursive: true });
 
-const STATES = ['working', 'bar', 'blocked', 'no-photo'];
+const STATES = ['working', 'bar', 'blocked', 'no-photo', 'flash'];
+
+// Prompt 234's floor: the pinned head grows with the photo nag and the pinned foot with a flash, and the
+// basket is what pays for both unless it has a minimum. `min-h-[9rem]`.
+const BASKET_FLOOR = 144;
 const SIZES = [{ name: '1180x820', width: 1180, height: 820 }, { name: '820x1180', width: 820, height: 1180 }];
 const FLOOR = 44;
 
@@ -90,6 +94,12 @@ for (const state of STATES) {
           commit: box('[data-commit-action]'),
           rows: rows.length ? { n: rows.length, min: Math.min(...rows), max: Math.max(...rows), median: rows.sort((a, b) => a - b)[Math.floor(rows.length / 2)] } : null,
           cartScrolls: scroller ? scroller.scrollHeight > scroller.clientHeight : null,
+          basketH: scroller ? Math.round(scroller.getBoundingClientRect().height) : null,
+          pinnedTopH: (() => {
+            const summary = document.querySelector('[data-member-summary]');
+            return summary ? Math.round(summary.getBoundingClientRect().height) : null;
+          })(),
+          flash: !! document.querySelector('[data-commit-feedback]'),
           pageScrolls: document.documentElement.scrollHeight > window.innerHeight + 1,
           hScroll: document.documentElement.scrollWidth > document.documentElement.clientWidth,
           blocked: !! document.querySelector('[data-blocked-member]'),
@@ -184,6 +194,11 @@ for (const state of STATES) {
         if (r.hScroll) fail(`${label}: horizontal page scroll`);
         if (r.under.length) fail(`${label}: ${r.under.length} under ${FLOOR}px — ${r.under.slice(0, 4).join('; ')}`);
 
+        // The basket never pays for the pinned regions growing (prompt 234).
+        if (r.basketH !== null && r.basketH < BASKET_FLOOR) {
+          fail(`${label}: the basket region is ${r.basketH}px — below its ${BASKET_FLOOR}px floor (pinned top ${r.pinnedTopH}px, flash=${r.flash})`);
+        }
+
         // The nag's own claim: prompt 225 shipped it as "ONE LINE with its action".
         if (state === 'no-photo') {
           if (! r.nag) fail(`${label}: no photo nag on the photo-less state — the harness is measuring nothing`);
@@ -220,7 +235,7 @@ for (const state of STATES) {
         if (await nag.count() > 0) await nag.screenshot({ path: `${OUT}/${STAGE}-photo-nag-${size.name}-${theme}.png` });
       }
 
-      console.log(`${label.padEnd(26)} rows=${r.rows ? `${r.rows.n}@${r.rows.median}px (${r.rows.min}-${r.rows.max})` : '—'} cartScrolls=${r.cartScrolls} pageScrolls=${r.pageScrolls} blocked=${r.blocked} nag=${r.nag ? `${r.nag.row} text=${r.nag.textW}px/${r.nag.lines}ln [${r.nag.controls.map((c) => `${c.w}×${c.h}`).join(' ')}]` : '—'} amber=${r.amber ?? '—'} commit="${(r.commitText ?? '').slice(0, 40)}"`);
+      console.log(`${label.padEnd(26)} rows=${r.rows ? `${r.rows.n}@${r.rows.median}px (${r.rows.min}-${r.rows.max})` : '—'} cartScrolls=${r.cartScrolls} pageScrolls=${r.pageScrolls} blocked=${r.blocked} basket=${r.basketH} top=${r.pinnedTopH} flash=${r.flash} nag=${r.nag ? `${r.nag.row} text=${r.nag.textW}px/${r.nag.lines}ln [${r.nag.controls.map((c) => `${c.w}×${c.h}`).join(' ')}]` : '—'} amber=${r.amber ?? '—'} commit="${(r.commitText ?? '').slice(0, 40)}"`);
       await page.close();
     }
   }

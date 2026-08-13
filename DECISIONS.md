@@ -12114,3 +12114,99 @@ cap are exactly as it left them, because the app was never wrong. The three harn
 threshold they had; only the font under them became real. The live-page harnesses (`measure-mrz-mount`,
 `measure-close-guard`, `measure-photo-nag`, `measure-waiver-reasons`, `measure-applicant-signature`) are
 untouched: they always loaded the real font over HTTP.
+
+---
+
+## Prompt 234 — the column says only what the screen does not already say
+
+The owner, on a clean socio: *"the wallet amount should be in the part above; the waiting period Completed I
+don't think is needed, along with Cleared to dispense — if there's an issue with the account, as we
+discussed, just block the whole page til it's resolved. The upload file — put somewhere not in the scrolling
+part."* And after waiving a fee: *"notifications should only be used if really needed, and not cover the
+basket like this too."*
+
+One principle, which 225 half-built: **the screen's states speak; the column does not narrate them.**
+
+### Each deletion, mapped to where the screen already says it
+
+| deleted | where it is already said |
+|---|---|
+| `Carencia · Cumplida` | An ACTIVE carencia is a verdict rule and lands on 225's blocked surface. "Cumplida" is the rule NOT applying — a row about nothing. |
+| `✓ Apto para dispensar.` | A blocked socio has no catalogue (225). The catalogue's presence IS the verdict; silence is the all-clear. |
+| the standalone `Sanción activa` box | The verdict machinery states a sanction at whatever severity the matrix gives it — blocking on the surface, warn in the list. Said twice was 199's rule broken quietly. |
+
+**What stays** is what needs an operator: the unsatisfied WARN rules with 211's remedies. The whole
+member-detail card now renders only when the verdict has something to say — so **the acceptance test is that a
+clean socio with a photo has NOTHING between the pinned identity and the basket**, and it is the first test in
+the file.
+
+### What moved up, and the nag's new home
+
+`Monedero` joins the pinned identity card as one line under the month bar, red when negative, exactly as the
+`dl` styled it. The tender's own wallet figures are untouched: this is glanceable context, those are the
+arithmetic.
+
+**The photo nag goes into the pinned card too** — the owner delegated the where, so this is the decision:
+beneath the wallet line, because it is about the person that card identifies (the initials are showing right
+above it, which is the fact it is nagging about) and because **a nag that scrolls away is a nag nobody acts
+on**. 228's wrapped construction comes with it unchanged, controls still ≥44px.
+
+**The pinned top's budget**: measured at **292px** with the nag present, at both orientations, and the basket
+region carries a `min-h-[9rem]` floor so neither pinned region can spend it. Measured: 315px (landscape) /
+675px (portrait) normally, **229 / 589 with a flash present** — above the 144px floor in every state.
+
+### The flash economy: kept, killed, and why
+
+The rule: **a success survives only if it carries a figure the screen stops showing.**
+
+| call site | verdict | reason |
+|---|---|---|
+| `Cuota cobrada: X. Pendiente: Y` | **kept** | Money changed hands and the amount field has been reset; after a full collect the panel vanishes taking the figure with it. |
+| `Cuota condonada: X` | **killed** | The owner's exact complaint. The fee notice clears, 225's surface gives the catalogue back, a partial waive leaves the new balance on the panel. The RECORD is the audit row and the WAIVED payment — the toast only restated a screen already in front of the operator. |
+| `Firma capturada.` | **killed** | The pad replaces itself with *"✓ Firma capturada"* and a Rehacer control in the same instant. |
+| settle / commit confirmations (`Visita liquidada`, `Barra cobrada`, the settled outcome) | **kept** | 193/199/202's colocated commit receipt, carrying change due and totals. |
+| void confirmations | **kept** | A destructive action's receipt. |
+| `Comprobante enviado…` | **kept** | An invisible side effect — nothing on screen shows a queued email. |
+| errors and warnings, all of them | **kept** | Prompt 60's observable refusal. |
+
+Surviving successes **auto-dismiss after 6s**, hidden client-side only: the message is in the live region when
+it renders so it is announced once regardless, and a timer that fired a Livewire round trip would spend a
+request to say nothing. Errors persist until dismissed or resolved.
+
+**And a defect the new state exposed**: the flash's own dismiss ✕ measured **27×28** — under the 44px floor
+since prompt 192, and never caught because no harness state had ever carried a flash to measure. The column's
+geometry harness has one now.
+
+### 219's hierarchy, consciously reversed
+
+219 made the waiver *"a quiet link, never a button of equal weight beside Cobrar cuota"*, on the theory that
+collecting is the norm and waiving the exception. The owner, from live use: **_"make waive a fee a button next
+to collect fee — it is more obvious and frees up some space."_**
+
+He is right about his club: it waives routinely, for the two reasons 219 itself made structured (therapeutic
+members, members of another sede). A quiet link buried a daily action and spent a whole row doing it. So
+**Cobrar cuota and Condonar sit side by side**, collect keeping primary weight, waive a full ≥44px secondary —
+and the reason panel opens below them at full width, because a radio group squeezed into half a row is not a
+choice anybody makes correctly.
+
+**Nothing behind the button changed**: the `membership.fee.waive` gate, 229's structured reasons and their
+preselection, the required reason, the audit row and the WAIVED payment are exactly as they were. A louder
+button, the same rules. Recorded here as a reversal rather than left to look like drift — *a reversed decision
+recorded beats a decision silently contradicted*.
+
+### Verification
+
+`composer check` green — **1846 tests**, 1843 passed, 3 pre-existing skips, Larastan 0, Pint clean. **MySQL was
+left to CI**, per the running order. No eligibility, money or verdict behaviour changed: `ResolveMemberEligibility`,
+the blocked surface, the remedies, the fee panel and 219's waive are consumed, not edited — deleting the
+narration of a state did not delete the state, which the sanction and WARN tests pin.
+
+**Written to fail against `6c09582`, and does**: 8 of 13.
+
+225's blocked-state tests, 228's nag tests and 229's waiver tests all pass **unamended** — the nag moved
+partial but kept its hooks and its construction, and the waiver's trigger changed from a link to a button
+without changing a single assertion about the reason form.
+
+**Measured** (`measure-pos-column.mjs`, five states now, both orientations, light and dark, in Inter per 233):
+the basket floor holds in every state including with a flash; nothing under 44×44; the page never scrolls.
+Screenshots in `storage/app/screenshots/225/`.

@@ -334,7 +334,7 @@ class DispensaryPos extends Component
         }
 
         $result = $this->collectInlineFeeFor($member, $this->openTillSession($location), $location, $user);
-        $this->flash($result['message'], $result['type']);
+        $this->flashResult($result);
     }
 
     public function clearMember(): void
@@ -602,8 +602,10 @@ class DispensaryPos extends Component
         $path = 'signatures/'.Str::ulid().'.png';
         // Encrypted at rest through the vault (prompt 113) — never plaintext on the Article-9 disk.
         DocumentVault::put($path, $binary);
+        // No flash (prompt 234): the pad replaces itself with "✓ Firma capturada" and a Rehacer control the
+        // moment this returns. A toast saying the same thing, in the pinned foot, took height from the basket
+        // to repeat what the operator was looking at.
         $this->signaturePath = $path;
-        $this->flash(__('Firma capturada.'), 'success');
     }
 
     public function clearSignature(): void
@@ -2167,6 +2169,6 @@ class DispensaryPos extends Component
         }
 
         $result = $this->waiveInlineFeeFor($member, $location, $user);
-        $this->flash($result['message'], $result['type']);
+        $this->flashResult($result);
     }
 }

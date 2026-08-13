@@ -5,26 +5,42 @@
      a manager quietly not chasing it — so a club that routinely waives showed members permanently "owing"
      money it had decided not to take, and the door nagged about it for ever.
 
-     **Secondary to collecting, deliberately.** Collecting is the norm and waiving is the exception, so this is
-     a quiet link that opens a small form, never a button of equal weight beside "Cobrar cuota". One partial,
-     rendered by all three hosts (Socios, the door, the dispensary) — the logic is in
+     **A PEER BUTTON beside "Cobrar cuota" — prompt 234 REVERSES 219's hierarchy, on the owner's instruction.**
+
+     219 wrote it as *"a quiet link, never a button of equal weight"*, on the theory that collecting is the
+     norm and waiving the exception. The owner, from live use: *"make waive a fee a button next to collect fee
+     — it is more obvious and frees up some space."* His club waives routinely (therapeutic members, members
+     of another sede — the two reasons 219 itself made structured), so the quiet link buried a daily action
+     and spent a whole row doing it.
+
+     Collect keeps primary weight; waive is a full-height secondary beside it. **Nothing behind it changed**:
+     the `membership.fee.waive` gate, 229's structured reasons and their preselection, the required reason,
+     the audit row and the WAIVED payment are all exactly as they were. A louder button, the same rules.
+
+     One partial, rendered by all three hosts (Socios, the door, the dispensary) — the logic is in
      `CollectsMembershipFees` and this is the only markup.
 
      The reasons are STRUCTURED because the two common ones are data the system already holds: *Terapéutico*
      is offered when the member's own flag is set, *Socio en otra sede* when they hold an ACTIVE membership
      elsewhere in the club. A free-text box alone produces "ok" and "si". --}}
+{{-- `$part` (prompt 234): `trigger` is the button that sits BESIDE Cobrar cuota, `form` is the reason panel
+     it opens, which needs the full width. Default `both` keeps every existing caller working unchanged. --}}
+@php($part = $part ?? 'both')
+
 @can('membership.fee.waive')
     @php($waiveOptions = $this->waiveReasonOptions())
-    <div class="mt-2" data-fee-waiver>
+    <div @class(['contents' => $part !== 'both', 'mt-2' => $part === 'both']) data-fee-waiver>
+        @if ($part !== 'form')
         <button
             type="button"
             wire:click="toggleWaive"
             data-fee-waive-toggle
             aria-expanded="{{ $waiveOpen ? 'true' : 'false' }}"
-            class="inline-flex min-h-11 items-center rounded-lg px-3 text-xs font-medium text-ink-muted underline underline-offset-4 transition hover:text-ink dark:text-slate-400 dark:hover:text-slate-200"
-        >{{ $waiveOpen ? __('Cancelar la condonación') : __('Condonar la cuota') }}</button>
+            class="inline-flex min-h-11 w-full items-center justify-center rounded-xl border border-line bg-surface-alt px-4 text-sm font-semibold text-ink transition hover:bg-slate-200 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:hover:bg-slate-700"
+        >{{ $waiveOpen ? __('Cancelar la condonación') : __('Condonar') }}</button>
+        @endif
 
-        @if ($waiveOpen)
+        @if ($waiveOpen && $part !== 'trigger')
             <div data-fee-waive-form class="mt-2 rounded-xl border border-warning/40 bg-warning/5 p-3">
                 <p class="text-xs font-medium text-warning">{{ __('El club renuncia a cobrar esta cuota. Queda registrado con tu nombre.') }}</p>
 

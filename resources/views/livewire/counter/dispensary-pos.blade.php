@@ -578,65 +578,39 @@
                      nothing said so, and content simply stopped at an edge. A visible gutter and a soft top
                      fade say "there is more above", and `overscroll-contain` stops a flick at the end of the
                      basket from scrolling the page behind it. --}}
-                <div data-cart-scroll class="counter-scroll-region flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto overscroll-contain pr-1">
-                    @if ($member)
-                        <section class="rounded-2xl border border-line bg-surface p-4 dark:border-slate-800 dark:bg-slate-900">
-                        {{-- No photo on file (prompt 157): identity can't be verified against a face that isn't
-                             there. The verdict below drives WARN/OVERRIDE enforcement; this is the fix — take it. --}}
-                        @unless ($photoUrl)
-                            {{-- ONE LINE with its action (prompt 225), not an amber box the height of the
-                                 wallet and the carencia put together. It is a nag, not a blocker: the verdict
-                                 below drives whatever WARN/OVERRIDE enforcement the sede has configured, and
-                                 this is only the fix. Nothing it said was dropped — the sentence is shorter
-                                 and the capture control is beside it instead of under it. --}}
-                            {{-- `shrink-0` BESIDE `min-w-0` is the anti-pattern this row shipped with
-                                 (prompt 228). In a ~256–288px column the fixed side wins every pixel and the
-                                 text side collapses to ZERO — measured at 298×97 with a 0-to-10px sentence
-                                 wrapped over six lines of single glyphs, in both orientations. The
-                                 component's own `flex-wrap` could have saved it and never engaged, because
-                                 `shrink-0` meant it was never narrowed.
+                {{-- `min-h-[9rem]` (prompt 234): the pinned head and foot both grow — the head with the nag,
+                     the foot with a flash — and without a floor the basket is what pays for both. The owner:
+                     *"not cover the basket like this."* A flash now costs the region nothing below its
+                     minimum; it scrolls instead. Measured at both orientations, with and without a flash. --}}
+                <div data-cart-scroll class="counter-scroll-region flex min-h-[9rem] flex-1 flex-col gap-4 overflow-y-auto overscroll-contain pr-1">
+                    {{-- The card renders ONLY when the verdict has something an operator must act on. A clean
+                         socio's column is now identity (pinned) → basket, with nothing between them. --}}
+                    @if ($member && $verdict && ! $verdict->isClear())
+                        <section data-member-detail class="rounded-2xl border border-line bg-surface p-4 dark:border-slate-800 dark:bg-slate-900">
+                        {{-- WHAT THIS SECTION NO LONGER SAYS (prompt 234). The owner: *"the waiting period
+                             Completed I don't think is needed, along with Cleared to dispense — if there's an
+                             issue with the account just block the whole page til it's resolved."* He is
+                             describing the principle 225 half-built: **the screen's states speak; the column
+                             does not narrate them.** Each deletion maps to where the screen already says it:
 
-                                 So: the row WRAPS. The sentence takes the full width and the controls drop
-                                 beneath it when they do not fit beside it — which in this column is always.
-                                 Still one line of text plus one line of controls; it must not grow back into
-                                 the tall amber box 225 replaced. --}}
-                            <div data-photo-nag class="mt-2.5 flex flex-wrap items-center gap-x-3 gap-y-1.5 rounded-xl border border-warning/30 bg-warning/5 px-3 py-1.5">
-                                <p class="w-full text-[11px] font-medium leading-tight text-warning">{{ __('Sin foto — verifica y súbela') }}</p>
-                                <x-counter.photo-capture :member="$member" source="counter" />
-                            </div>
-                        @endunless
-                        {{-- Wallet + carencia --}}
-                        <dl class="mt-3 grid grid-cols-2 gap-x-4 gap-y-1.5 text-sm">
+                               · the photo nag → moved to the PINNED identity card, at his request
+                               · `Monedero`    → moved to the pinned card, at his request
+                               · `Carencia · Cumplida` → an ACTIVE carencia is a verdict rule and lands on
+                                 225's blocked surface; "Cumplida" is the rule NOT applying — a row about
+                                 nothing
+                               · `✓ Apto para dispensar.` → the catalogue being present IS the verdict. A
+                                 blocked socio has no catalogue (225), so silence is the all-clear
+                               · the standalone `Sanción activa` box → the verdict machinery already states a
+                                 sanction, at the severity the matrix gives it: blocking on the surface, warn
+                                 in the list below. Said twice was 199's rule broken quietly
+
+                             What stays is what needs an operator: the unsatisfied WARN rules and 211's
+                             remedies. **A clean socio with a photo now has NOTHING between the pinned
+                             identity and the basket** — which is the acceptance test. --}}
+                        {{-- Counter verdict (same shared resolver as the door) — only when it has something
+                             to say. Silence is the all-clear. --}}
+                        @if ($verdict && ! $verdict->isClear())
                             <div>
-                                <dt class="text-ink-muted dark:text-slate-400">{{ __('Monedero') }}</dt>
-                                <dd class="font-semibold {{ $walletCents < 0 ? 'text-error' : '' }}">{{ $this->money($walletCents) }}</dd>
-                            </div>
-                            <div>
-                                <dt class="text-ink-muted dark:text-slate-400">{{ __('Carencia') }}</dt>
-                                <dd class="font-medium">
-                                    @if ($inCarencia)
-                                        <span class="text-warning">{{ __('Hasta') }} {{ $member->carencia_ends_at->format('d/m/Y') }}</span>
-                                    @else
-                                        {{ __('Cumplida') }}
-                                    @endif
-                                </dd>
-                            </div>
-                        </dl>
-                        {{-- Active sanction --}}
-                        @if ($sanction)
-                            <div class="mt-3 rounded-xl border border-error/30 bg-error/10 px-3 py-2 text-sm text-error">
-                                <p class="font-semibold">{{ __('Sanción activa') }} · {{ __($sanction->type->value) }}</p>
-                                @if ($sanction->reason)<p class="mt-0.5">{{ $sanction->reason }}</p>@endif
-                            </div>
-                        @endif
-                        {{-- Counter verdict (same shared resolver as the door). --}}
-                        @if ($verdict)
-                            <div class="mt-4 border-t border-line pt-3 dark:border-slate-800">
-                                @if ($verdict->isClear())
-                                    <div class="flex items-center gap-2 rounded-xl border border-success/30 bg-success/10 px-3 py-2 text-sm font-semibold text-success">
-                                        <span>✓</span><span>{{ __('Apto para dispensar.') }}</span>
-                                    </div>
-                                @else
                                     <div class="space-y-2">
                                         @foreach ($verdict->rules as $rule)
                                             @continue($rule['satisfied'])
@@ -681,7 +655,6 @@
                                             @include('livewire.counter.partials.inline-fee')
                                         @endunless
                                     </div>
-                                @endif
                             </div>
                         @endif
                         </section>

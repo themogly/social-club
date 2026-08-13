@@ -93,7 +93,14 @@ class PosColumnHarnessTest extends TestCase
         //    thing (prompt 228).
         $this->write('no-photo', Livewire::test(DispensaryPos::class)->call('selectMember', $clear->id));
 
+        // 5. A flash in the pinned foot, on a photo-less socio — the two things that grow the pinned regions
+        //    at once. Prompt 234: neither may take the basket below its floor.
+        $this->write('flash', Livewire::test(DispensaryPos::class)
+            ->call('selectMember', $clear->id)
+            ->call('commitDispensation'));
+
         $this->assertStringContainsString('data-blocked-member', (string) file_get_contents(storage_path('app/pos-225-blocked.html')));
+        $this->assertStringContainsString('data-commit-feedback', (string) file_get_contents(storage_path('app/pos-225-flash.html')));
     }
 
     private function genetic(string $name, int $priceCents): Genetic

@@ -15,9 +15,25 @@
     drifting in the ways near-copies drift — Socios had lost its `aria-live` entirely, so a fee confirmation was
     announced to nobody. One block, five screens, one behaviour.
 --}}
+{{-- Prompt 234 — a SUCCESS auto-dismisses; an error does not.
+
+     The owner, after waiving a fee: *"notifications should only be used if really needed, and not cover the
+     basket like this too."* Two answers. Most of that noise is gone at the CALL SITES (see DECISIONS for the
+     kept/killed list — a success that restates a state change the screen already shows was never information).
+     What survives carries figures, and it hides itself after a few seconds so it stops spending the basket's
+     height.
+
+     Hidden CLIENT-SIDE only: the message is in the live region when it renders, so it is announced once
+     whatever happens next, and a timer that fired a Livewire round trip would spend a request to say nothing.
+     An error persists — prompt 60's refusal must stay until it is read or resolved. --}}
 @if ($flashMessage)
     <div
-        wire:key="flash"
+        wire:key="flash-{{ $flashType }}-{{ md5($flashMessage) }}"
+        @if ($flashType === 'success')
+            x-data="{ show: true }"
+            x-show="show"
+            x-init="setTimeout(() => show = false, 6000)"
+        @endif
         {{ $anchor ?? '' }}
         role="{{ $flashType === 'error' ? 'alert' : 'status' }}"
         aria-live="{{ $flashType === 'error' ? 'assertive' : 'polite' }}"
@@ -34,6 +50,9 @@
                  message, with the figures (prompt 202 on top of 199's one-region rule). --}}
             @include('livewire.counter.partials.settled-outcome')
         </div>
-        <button type="button" wire:click="$set('flashMessage', null)" aria-label="{{ __('Descartar aviso') }}" class="shrink-0 rounded-md px-2 py-1 opacity-70 hover:opacity-100">✕</button>
+        {{-- 44×44 (prompt 234). Measured at 27×28 the first time a harness state carried a flash at all — the
+             one control on this block, on a tablet, under the floor since 192. Nothing had a flash on screen
+             to measure until the column's own geometry harness gained one. --}}
+        <button type="button" wire:click="$set('flashMessage', null)" aria-label="{{ __('Descartar aviso') }}" class="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-md opacity-70 hover:opacity-100">✕</button>
     </div>
 @endif
