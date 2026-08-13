@@ -229,6 +229,29 @@ trait CollectsMembershipFees
     }
 
     /**
+     * The socio this concern's READ path acts on (prompt 229).
+     *
+     * Prompt 211 met exactly this host mismatch — the door and the POS hold their member in `$memberId`,
+     * Socios in `$feeMemberId` — and bridged it in the concern with an overridable method. It did so for
+     * `OpensMemberships`, and 219 bridged the fee ACTIONS the same way (`collectInlineFeeFor`,
+     * `waiveInlineFeeFor` both point `$feeMemberId` at the member before running the core).
+     *
+     * What nobody bridged was the RENDER path. `waiveReasonOptions()` and `toggleWaive()`'s preselect run
+     * before any action has happened, so on two of the three hosts they read a `$feeMemberId` that is still
+     * null: the structured reasons never appeared on a fresh open, and only turned up after some *other*
+     * action happened to set it — which is why the operator saw a different set of reasons depending on what
+     * they had clicked first.
+     *
+     * A METHOD of this concern rather than a call into `OpensMemberships`: the two traits are used together
+     * on all three hosts today, but a concern that reaches into another one's method is a coupling nothing
+     * declares, and it would fatal on the first host that wanted fees without memberships.
+     */
+    protected function feeSubjectId(): ?string
+    {
+        return $this->feeMemberId;
+    }
+
+    /**
      * The reasons on offer — **structured, because the two common ones are data the system already holds**.
      *
      * A free-text box alone produces "ok" and "si". The therapeutic reason is offered when the member's own
@@ -241,7 +264,8 @@ trait CollectsMembershipFees
      */
     public function waiveReasonOptions(): array
     {
-        $member = $this->feeMemberId !== null ? Member::query()->find($this->feeMemberId) : null;
+        $subjectId = $this->feeSubjectId();
+        $member = $subjectId !== null ? Member::query()->find($subjectId) : null;
         $location = $this->resolveLocation();
 
         $therapeutic = (bool) ($member?->is_therapeutic);

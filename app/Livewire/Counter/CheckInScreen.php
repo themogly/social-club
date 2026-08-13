@@ -374,6 +374,16 @@ class CheckInScreen extends Component
     }
 
     /**
+     * Prompt 229 — and the same answer for the fee concern's READ path. 219's waiver reasons are computed at
+     * render, before any action has pointed `$feeMemberId` anywhere, so without this the socio at the door has no
+     * structured reasons on a fresh open and nothing is preselected.
+     */
+    protected function feeSubjectId(): ?string
+    {
+        return $this->memberId;
+    }
+
+    /**
      * Forgo this member's outstanding fee (prompt 219) — the shared concern does the work.
      *
      * A thin resolve-and-call, like `collectFee`: the rule, the reason and the audit live in
