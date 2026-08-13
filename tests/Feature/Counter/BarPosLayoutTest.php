@@ -53,13 +53,27 @@ class BarPosLayoutTest extends TestCase
         ]);
     }
 
-    public function test_article_name_wraps_or_clamps_so_the_price_never_clips(): void
+    /**
+     * The property, not the construction: a long name can never push the price off the card.
+     *
+     * Prompt 230 moved this markup into `x-counter.article-card` (shared with the POS), where the name cell
+     * is `min-w-0 flex-1` with a truncating name and the price side is `shrink-0`. That is a stronger
+     * guarantee than the two-line clamp it replaces — a clamp still lets the cell demand its natural width.
+     * The assertion follows the markup to where it lives now rather than pinning a class string that moved.
+     */
+    public function test_a_long_article_name_can_never_push_the_price_off_the_card(): void
     {
         $this->bootOperatorWithArticle();
         $html = Livewire::test(BarPos::class)->html();
 
-        // The name cell can shrink (min-w-0) and clamps to two lines rather than overrunning the price.
-        $this->assertStringContainsString('min-w-0 font-semibold leading-tight line-clamp-2', $html);
+        $card = (string) file_get_contents(resource_path('views/components/counter/article-card.blade.php'));
+
+        $this->assertStringContainsString('min-w-0 flex-1', $card, 'the name cell can no longer shrink');
+        $this->assertStringContainsString('block truncate font-semibold', $card, 'the name no longer truncates');
+        $this->assertStringContainsString("'flex shrink-0 text-xs'", $card, 'the price/stock side can now be squeezed');
+
+        // …and the card the Bar actually renders is that one.
+        $this->assertStringContainsString('data-article-card=', $html);
     }
 
     /**

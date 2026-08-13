@@ -40,6 +40,7 @@ use App\Models\MemberSanction;
 use App\Models\Membership;
 use App\Models\TillSession;
 use App\Models\User;
+use App\Support\ArticleImage;
 use App\Support\CounterOperator;
 use App\Support\DocumentVault;
 use App\Support\EligibilityVerdict;
@@ -852,13 +853,30 @@ class DispensaryPos extends Component
             return;
         }
 
+        $existing = null;
         foreach ($this->barBasket as $i => $line) {
             if ($line['article_id'] === $articleId) {
-                $this->barBasket[$i]['qty']++;
-
-                return;
+                $existing = $i;
+                break;
             }
         }
+
+        // The disabled attribute on the card is presentation; THIS is the rule (prompt 230). Sold-out
+        // articles are VISIBLE on this screen now, so the refusal has to exist and has to say why — a gate
+        // that is only a picture is not a gate. Same figure and same wording as the standalone Bar's.
+        $inBasket = $existing !== null ? (int) $this->barBasket[$existing]['qty'] : 0;
+        if ($inBasket + 1 > (int) $article->stock) {
+            $this->flash(__('No hay stock suficiente de :name.', ['name' => $article->name]), 'warning');
+
+            return;
+        }
+
+        if ($existing !== null) {
+            $this->barBasket[$existing]['qty']++;
+
+            return;
+        }
+
         $this->barBasket[] = ['article_id' => $articleId, 'qty' => 1];
         $this->dismissOutcome();
     }
@@ -1255,6 +1273,9 @@ class DispensaryPos extends Component
             // The bar's catalogue, browsable in the centre pane (prompt 212) — filtered, with its own
             // categories, instead of every row as a chip in the cart column.
             'barArticles' => $this->filterArticles($allArticles),
+            // 193: the thumbnail column exists only where a picture does — asked ONCE for the sede rather
+            // than per card, so a catalogue with no images has no empty column at all.
+            'barHasImages' => collect($allArticles)->contains(fn (array $row): bool => filled($row['image_url'] ?? null)),
             'articleCategories' => $this->deriveArticleCategories($allArticles),
             'barLines' => $this->barBasketView($location),
             'barTotalCents' => $barTotal,
@@ -1288,8 +1309,12 @@ class DispensaryPos extends Component
             return [];
         }
 
+        // SOLD-OUT ARTICLES ARE NOT EXCLUDED (prompt 230). `where('stock', '>', 0)` meant an operator on this
+        // screen could not see that the coffee had run out — and therefore could not know to restock it —
+        // while the standalone Bar showed it disabled with its count. Two screens, same sede, disagreeing
+        // about whether a thing exists. The Bar's semantics were the right ones; this adopts them.
         return Article::query()
-            ->where('location_id', $location->id)->where('active', true)->where('stock', '>', 0)
+            ->where('location_id', $location->id)->where('active', true)
             ->with('category')
             ->orderBy('name')->get()
             ->map(fn (Article $a): array => [
@@ -1299,7 +1324,10 @@ class DispensaryPos extends Component
                 'price_label' => Money::fromCents($a->price_cents->cents)->formatted(),
                 'category_id' => $a->category_id,
                 'category_name' => $a->category?->name,
+                // A COUNT, on a staff screen (prompt 216). 185's state-word rule is the member menu's.
+                'stock' => (int) $a->stock,
                 'low_stock' => $a->low_stock_threshold !== null && $a->stock <= $a->low_stock_threshold,
+                'image_url' => ArticleImage::url($a),
             ])
             ->all();
     }

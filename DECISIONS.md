@@ -11765,3 +11765,85 @@ a waive recording nothing because nothing was preselected to switch from.
 **read immediately after the click, before any round trip could help**; clicking B deselects A the same way;
 the free-text box appears and disappears with its reason. Run against `main` first, where it reports one bare
 option and an empty group name. Before/after in `storage/app/screenshots/229/`.
+
+---
+
+## Prompt 230 — one article card, and the two bars stop disagreeing about stock
+
+The owner, with both screens side by side: *"make the standalone bar POS the same design as the other one."*
+Measured on `9478612`, the same articles on the same sede, at 1180×820:
+
+| | standalone Bar | POS, Barra source |
+|---|---|---|
+| list row | **68px** | 60px (44–54 measured) |
+| grid tile | **166px**, with a 🛒 placeholder | 78px |
+| stock | exact count | **none** |
+| sold-out | visible, disabled | **excluded from the feed** |
+| commit | `"Cobrar"` | totalled (224/225) |
+
+After: **52px list and 58px grid on BOTH**, stock on both, sold-out visible and disabled on both, no
+placeholder, and the Bar's commit reads *"Cobrar · €5.00"*.
+
+### The card is a component, and this is the fifth time
+
+`x-counter.article-card` — the shape, both layout forms, the 44px floor and the stock treatment. The ACTION
+stays the consumer's (`addArticle` on the Bar, `addBarItem` on the POS), passed in.
+
+`ArticleCardConsumersTest` iterates the consumers and fails on any template that calls an add-article action
+from its own markup. That is the **fifth** application of the pattern this project has now paid for five
+times — `OpensMemberships` (203→211), the MRZ partial (179→215), the application field list (210→215), the
+signature canvas (113→220), the login preamble (223→226). Each shipped green with one consumer, because a
+green suite proves a unit WORKS and never that everything which should use it DOES.
+
+### Stock: counts on staff screens, and sold-out is not hidden
+
+**185 is the MEMBER MENU's rule** — a member must not be able to race the counter for the last gram — and the
+POS's bar card had been citing it on a staff screen, which is the member rule misapplied. 216 already settled
+that staff screens carry quantities, and the standalone Bar had shown the count all along, so the two screens
+disagreed about the same article. The count stays, on both.
+
+**And the POS feed stops excluding sold-out articles.** An operator who cannot see that the coffee has run out
+cannot know to restock it — and the Bar's semantics (visible, disabled, with its count) were the right ones.
+212's assertion that both inactive AND empty articles are excluded is amended: inactive is still excluded,
+because it is not part of the catalogue at all; sold-out is now shown.
+
+**The disabled attribute is presentation.** Both servers refuse the add and say why, with the same wording and
+the same figure — the POS gained the guard the Bar already had, and the test asserts the refusal rather than
+trusting the attribute. It is a LIMIT, not a ban: the last unit sells, the one after it does not.
+
+### The placeholder, under 193's own rule
+
+193's *"a large empty glyph is a broken-looking gap rather than a design"* was quoted in the Bar's list mode
+while its grid tile still rendered a 🛒 block. The shared card shows a thumbnail only where an image exists —
+and the sede is asked ONCE whether any article has one, so a catalogue with no pictures has no empty column.
+`ArticleImage::url()` moved out of `BarPos` for it: a card that shows a thumbnail on one screen and not the
+other because only one of them knew how to build the URL is the same divergence in miniature.
+
+### The Bar's column
+
+The commit carries its live total — 224/225's convention, completing. And the basket region gains 225's
+visible-scroll treatment (fade, stable gutter, `overscroll-contain`), so the two counter columns read as one
+family. **Everything else about the Bar's column is untouched**: the tender presets, the manual amount, the
+guest-cash/member-wallet note, the category chips and the search are Bar features, and parity of style is not
+amputation of features. Grid stays the Bar's default, which already matched 225's per-source decision.
+
+### Verification
+
+`composer check` green — **1824 tests**, 1821 passed, 3 pre-existing skips, Larastan 0, Pint clean. **MySQL
+was left to CI**, per the running order. No money or ledger change: `CommitOrder`, the tender split, manual
+amounts and 118's two-ledger design are consumed, not edited; the Bar still needs no member and still serves
+a blocked socio (225's test, re-run).
+
+**Written to fail against `9478612`, and does**: 6 of 11 across the two new files — the sold-out article
+hidden, the POS accepting a sold-out add, the basket going past the stock on hand, the Bar not rendering the
+shared card, two hand-rolled cards, and the placeholder glyph.
+
+**Three existing assertions were amended deliberately**, each with the reason in place: 212's *"states stock
+rather than publishing it"* (185 misapplied on a staff screen), 212's *"an inactive or empty article is not
+offered"* (the empty half), and 193's list/grid distinction, which followed its markup into the component
+rather than pinning a `data-product-row` hook that moved.
+
+**Measured** (`measure-both-bars.mjs`, five states, both orientations, light and dark): the two screens'
+median card heights compared directly and required to agree within 4px, stock stated on every card, the
+sold-out article present, no placeholder, nothing under 44×44, no horizontal scroll. Screenshots before and
+after in `storage/app/screenshots/230/`.

@@ -473,30 +473,15 @@
                             'grid gap-3 sm:grid-cols-2' => $this->catalogueLayout() === 'grid',
                         ])>
                             @forelse ($barArticles as $article)
-                                <button
-                                    type="button"
-                                    wire:click="addBarItem('{{ $article['id'] }}')"
-                                    data-product
-                                    data-bar-article="{{ $article['id'] }}"
-                                    @class([
-                                        'flex w-full min-h-11 rounded-xl border border-line px-3 py-1.5 text-left transition hover:border-brand hover:bg-brand-tint dark:border-slate-700 dark:hover:bg-slate-800',
-                                        'flex-col gap-1' => $this->catalogueLayout() === 'grid',
-                                        'flex-col gap-1 sm:flex-row sm:items-center sm:justify-between sm:gap-4' => $this->catalogueLayout() === 'list',
-                                    ])
-                                >
-                                    <span class="min-w-0 flex-1">
-                                        <span class="block truncate font-semibold leading-tight">{{ $article['name'] }}</span>
-                                        <span class="mt-0.5 flex flex-wrap items-center gap-1.5 text-[11px] leading-tight text-ink-muted dark:text-slate-400">
-                                            @if ($article['category_name'])
-                                                <span>{{ $article['category_name'] }}</span>
-                                            @endif
-                                            @if ($article['low_stock'])
-                                                <span data-bar-stock-state class="rounded-full bg-warning/10 px-2 py-0.5 font-semibold text-warning">{{ __('Quedan pocas') }}</span>
-                                            @endif
-                                        </span>
-                                    </span>
-                                    <span class="shrink-0 text-sm font-semibold tabular-nums">{{ $article['price_label'] }}</span>
-                                </button>
+                                {{-- ONE card, both bars (prompt 230). The ACTION is this screen's
+                                     (`addBarItem` fills the visit's bar side); the shape, the density, the
+                                     stock count and the sold-out state are the component's. --}}
+                                <x-counter.article-card
+                                    :article="$article"
+                                    :layout="$this->catalogueLayout()"
+                                    action="addBarItem"
+                                    :thumbs="$barHasImages"
+                                />
                             @empty
                                 <p class="rounded-xl border border-dashed border-line px-4 py-6 text-center text-sm text-ink-muted dark:border-slate-700 dark:text-slate-400">
                                     {{ $articleSearch !== '' || $articleCategoryId !== null
