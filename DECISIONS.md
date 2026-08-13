@@ -11847,3 +11847,95 @@ rather than pinning a `data-product-row` hook that moved.
 median card heights compared directly and required to agree within 4px, stock stated on every card, the
 sold-out article present, no placeholder, nothing under 44×44, no horizontal scroll. Screenshots before and
 after in `storage/app/screenshots/230/`.
+
+---
+
+## Prompt 231 — the wizard's first step fitted by zero pixels, and Chrome offered the operator's own data
+
+The owner, on the staff wizard in EN on a desktop: *"some of the fields highlight white; also the first part
+of the wizard scrolls in the middle — should be fixed."*
+
+### 1 — A fit is a NUMBER, and this one was 0
+
+Measured on `3e83823`, step 1 **with the MRZ trigger visible** (223 made it mount, and it is the ~44px that
+decides this):
+
+| | content | region | overflow | the reader |
+|---|---|---|---|---|
+| ES, 1180×820 | **506px** | **506px** | 0 | just visible |
+| EN, 1180×760 | 490px | 464px | **26px** | **below the fold** |
+| ES, 1180×760 | 506px | 464px | **42px** | **below the fold** |
+| ES, 1180×650 | 506px | 363px | **143px** | below the fold |
+
+**After: 454px at every fit size, 0 overflow, 72–132px of panel headroom, reader in view.**
+
+An exact fit is treated as a failure by the new harness, and that is the decision worth recording: 506-in-506
+is not a layout, it is luck — the next word of copy, the next locale or the next 60px of browser chrome
+spends it. The bar is ≥40px of headroom in **both locales**, because EN's helper strings and ES's differ by
+16px on this step alone and a fit measured in one locale is not a fit.
+
+**What falls off first is the MRZ reader** — 215's and 223's whole feature — so a fresh operator could never
+learn it exists. That is why the harness asserts the reader is in view on first paint rather than just
+counting pixels.
+
+The pixels came from rhythm, not from facts: block gap `space-y-4`→`space-y-3`, grid `gap-3`→`gap-2.5`,
+label offsets `mt-1.5`→`mt-1`, the two upload helpers and the reader's hint to `text-[11px] leading-tight`,
+and the reader block `p-3`→`px-3 py-2`. Nothing was dropped and the 44px floor holds.
+
+**The cap went `min(780px,92vh)` → `min(880px,92vh)`.** On the counter's own 820px-tall tablet `92vh` binds
+either way, so the fit there was won by the compaction; the raise only stops a tall desktop manufacturing a
+scroll at 780 for no reason.
+
+**And when it genuinely must scroll it says so**: every step's body carries 225's `counter-scroll-region`
+(fade, stable gutter) plus `overscroll-contain`, instead of a cliff that clipped a block mid-sentence.
+
+**Two harness lessons, both the same shape as 228's.** The static pages carry no JavaScript, so the first
+measurement (a) missed the MRZ trigger, which ships `hidden` until its module reveals it — reporting 462px
+for a step that is really 506px — and (b) measured the signature canvas at its unscripted intrinsic ratio,
+~160px taller than the 150px the pad sets at init, so **step 4 read as overflowing a window it fits fine
+in**. Both are now simulated exactly as the components do it. A harness that hides what it is measuring
+reports a page nobody has.
+
+### 2 — Autofill: suppress or guide, decided by WHOSE data the form holds
+
+The owner's second screenshot: Email, Phone and Address on the dark counter painted white by Chrome with
+**his own address** in them. The paint was the symptom; the data was the hazard — the operator's contact
+details, one tap from being saved as a new member's.
+
+So the split is not "turn autofill off":
+
+- **The staff wizard types somebody ELSE's details → suppressed.** `autocomplete="new-…"` tokens Chrome has
+  no saved value for, plus a `data-no-autofill` marker, on every identity and contact field. (A form-level
+  `autocomplete="off"` is widely ignored by Chrome for recognised field types, which is why it is per field.)
+- **The applicant's own form, and the tablet handed to them, is the person typing their OWN → guided**, with
+  the correct tokens (`given-name`, `family-name`, `email`, `tel`, `bday`, `street-address`). There autofill
+  is a kindness, and the handover inherits it because 173/221 send the applicant to that same route — asserted,
+  so a future "handover gets its own template" cannot quietly lose it.
+- **The paint**, for whatever still fills legitimately: `-webkit-autofill` overrides in the app stylesheet
+  with an inset `box-shadow` (the UA background cannot be beaten by `background-color`), `-webkit-text-fill-color`
+  and `caret-color`, light and dark. The dark rule names its surface rather than reading a token, because the
+  palette's dark surfaces come from explicit `dark:` utilities — the same thing 225 found on the amber ramp.
+  Filament ships its own theme and is out of scope; the defect was not seen there.
+
+**A measurement limit, stated:** Playwright cannot trigger real Chrome autofill — no saved profile, no way to
+invoke the UA's filler — so the BEHAVIOUR is not measurable in this repo. The owner's screenshot is the
+observed case; the tests pin the two mechanisms that decide it (which attributes the browser sees, and what
+the fill looks like when it happens), and the assertion that the override survived the build.
+
+### Not a defect — recorded so it is not "fixed" later
+
+The date-of-birth field showing a highlighted `dd` segment is the browser's native focused date-segment UI.
+It is not a styling bug and must not be styled away.
+
+### Verification
+
+`composer check` green — **1829 tests**, 1826 passed, 3 pre-existing skips, Larastan 0, Pint clean. **MySQL
+was left to CI**, per the running order. No field added, removed or renamed — 215's parity passes untouched,
+as do 222's close-guard tests and 223's MRZ harness. No new copy reached `lang/*`.
+
+**Written to fail against `3e83823`, and does**: 4 of 5 autofill assertions, and the EN 1180×760 fit (26px
+clipped, reader below the fold).
+
+Screenshots in `storage/app/screenshots/231/`, step 1 at 1180×820 in both locales, light and dark, before and
+after. The autofilled-field paint is not among them for the reason above — it needs a browser profile with a
+saved address, which is a manual capture.

@@ -111,7 +111,7 @@
 
     {{-- The SERVER's half of the answer, published where the client guard can read it after every render:
          earlier steps that have already synced, and state that is not an input at all. --}}
-    <div data-alta-panel data-alta-dirty="{{ $signupDirty ? '1' : '0' }}" class="counter-modal-pop relative my-auto flex max-h-[min(780px,92vh)] w-[min(720px,100%)] flex-col overflow-hidden rounded-[18px] border border-line bg-surface shadow-2xl dark:border-slate-700 dark:bg-slate-900">
+    <div data-alta-panel data-alta-dirty="{{ $signupDirty ? '1' : '0' }}" class="counter-modal-pop relative my-auto flex max-h-[min(880px,92vh)] w-[min(720px,100%)] flex-col overflow-hidden rounded-[18px] border border-line bg-surface shadow-2xl dark:border-slate-700 dark:bg-slate-900">
 
         {{-- Header — the title is fixed, the subtitle says where you are. --}}
         <div class="flex items-start justify-between gap-4 border-b border-line px-5 py-4 dark:border-slate-800">
@@ -166,7 +166,10 @@
                 @endforeach
             </ol>
 
-            <div class="min-h-0 flex-1 overflow-y-auto px-5 py-4">
+            {{-- 225's visible-scroll treatment (prompt 231). Below some window height ANY content overflows,
+                 and today's cliff clipped a block mid-sentence with nothing to say it had. The fade and the
+                 stable gutter say "there is more", and `overscroll-contain` keeps a flick inside the modal. --}}
+            <div data-alta-body class="counter-scroll-region min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 py-4">
                 @include('livewire.counter.partials.alta-staff-form')
             </div>
 
@@ -192,7 +195,7 @@
         {{-- ============ REVIEWING ONE THAT HAS COME BACK ============ --}}
         @elseif ($altaReviewing !== null)
             @php $payload = $altaReviewing->payload ?? []; @endphp
-            <div data-alta-review class="min-h-0 flex-1 space-y-3 overflow-y-auto px-5 py-4">
+            <div data-alta-body data-alta-review class="counter-scroll-region min-h-0 flex-1 space-y-3 overflow-y-auto overscroll-contain px-5 py-4">
                 <div class="rounded-xl bg-surface-alt p-3 text-sm dark:bg-slate-800">
                     <p class="font-semibold">{{ trim(($payload['first_name'] ?? '').' '.($payload['last_name'] ?? '')) ?: __('Solicitud sin nombre') }}</p>
                     <p class="text-ink-muted dark:text-slate-400">{{ $payload['email'] ?? '—' }}</p>
@@ -245,7 +248,7 @@
              member's own hand, and with them off the staff route ends in the club's record of a paper
              consent. An operator choosing between these is choosing between those. --}}
         @else
-            <div class="min-h-0 flex-1 space-y-3 overflow-y-auto px-5 py-4">
+            <div data-alta-body class="counter-scroll-region min-h-0 flex-1 space-y-3 overflow-y-auto overscroll-contain px-5 py-4">
                 <button type="button" wire:click="toggleStaffAltaForm" data-alta-staff-form
                         class="flex w-full items-center gap-4 rounded-2xl border border-line bg-surface p-4 text-left transition hover:border-brand hover:bg-brand-tint dark:border-slate-700 dark:bg-slate-900 dark:hover:bg-slate-800">
                     <span aria-hidden="true" class="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-brand-tint text-2xl dark:bg-slate-800">📝</span>

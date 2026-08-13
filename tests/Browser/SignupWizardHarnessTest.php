@@ -82,7 +82,19 @@ class SignupWizardHarnessTest extends TestCase
         // 2. The chooser.
         $this->write('chooser', Livewire::test(MembershipCounter::class)->call('toggleAlta'));
 
-        // 3. Every step of the wizard.
+        // 3. Every step of the wizard — in BOTH locales (prompt 231). EN's helper strings are longer than
+        //    ES's, and step 1 fitted its body by zero pixels in ES; the owner's EN window is what tipped it
+        //    over. A fit measured in one locale is not a fit.
+        foreach (['es', 'en'] as $locale) {
+            app()->setLocale($locale);
+
+            foreach ([1, 2, 3, 4] as $step) {
+                $this->write('step'.$step.'-'.$locale, $this->wizardAt($step));
+            }
+        }
+
+        app()->setLocale('es');
+
         foreach ([1, 2, 3, 4] as $step) {
             $this->write('step'.$step, $this->wizardAt($step));
         }
