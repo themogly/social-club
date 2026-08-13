@@ -10,6 +10,10 @@
      So it is a component, and `SignaturePadConsumersTest` iterates its consumers: a third hand-rolled canvas
      fails the suite.
 
+     **The runtime has to be on the page.** Alpine used to arrive only inside Livewire's bundle, so this pad
+     worked on the counter and was DEAD MARKUP on the applicant's plain-Blade form — prompt 232 found the
+     emailed route could not be completed at all. `resources/js/socio.js` ships it there now.
+
      **Two mechanics, one pad.** The counter's hosts are Livewire and the applicant's public form is a plain
      POST, so `mode` decides where the drawing goes — `$wire.<capture>()` for a component, or a hidden input
      submitted with the form. Everything an operator or an applicant touches is identical either way, and the
@@ -29,6 +33,13 @@
 
      `data-drawn="1"` lands on the canvas at the first stroke and goes with a clear (prompt 222) — the only
      way anything outside the pad can know a signature exists before it is saved.
+
+     **THE CANVAS IS WHITE IN BOTH THEMES, ON PURPOSE** (prompt 232 — the owner asked whether it should be
+     dark). These pixels ARE the stored artefact: encrypted into the vault, reviewed in the admin panel, and
+     printed beside scanned paper if an inspection asks for the club's consent evidence. Ink-on-white is the
+     document convention, a dark bitmap prints as a black slab, and inverting it at render time would show
+     something other than the bytes on file — which an audit artefact must never do. It is a paper strip in a
+     framed card, and it should read as one. Do not "fix" it in a theme sweep.
 
      Touch: `touch-none` on the canvas so a drawn stroke is not a page scroll, and every control clears the
      44px floor — this is used with a finger on a phone (prompt 217's audience) as well as on a tablet. --}}

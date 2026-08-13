@@ -7,7 +7,7 @@ export default defineConfig({
         // Inter is self-hosted via @fontsource (imported in resources/css/app.css
         // and bundled by Vite) — not a CDN font. See CLAUDE.md design rules.
         laravel({
-            input: ['resources/css/app.css', 'resources/js/app.js', 'resources/js/mrz-reader.js', 'resources/css/filament/admin/theme.css'],
+            input: ['resources/css/app.css', 'resources/js/app.js', 'resources/js/socio.js', 'resources/js/mrz-reader.js', 'resources/css/filament/admin/theme.css'],
             refresh: true,
         }),
         tailwindcss(),

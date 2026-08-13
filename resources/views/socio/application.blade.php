@@ -318,6 +318,14 @@
                  `npm run build`. Without the build the reader is simply absent, which is the specified
                  behaviour for a browser that cannot run it. --}}
             @if (file_exists(public_path('build/manifest.json')) || file_exists(public_path('hot')))
+                {{-- Prompt 232 — the Alpine runtime the signature pad needs. Until this line the pad's `x-data` was dead
+                 markup on this route: Alpine only ever arrived inside Livewire's bundle, and this page loads no
+                 Livewire. A stroke drew nothing, the hidden field stayed empty and the server (correctly)
+                 refused the submit, so the emailed invite could not be completed at all. Loaded HERE and not
+                 from the layout: this is the only socio view with directives, and the rest of the layout is the
+                 member PWA. `AlpineShipsWhereItIsUsedTest` is what keeps that safe. --}}
+                @vite('resources/js/socio.js')
+
                 @vite('resources/js/mrz-reader.js')
             @endif
 

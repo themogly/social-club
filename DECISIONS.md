@@ -11939,3 +11939,93 @@ clipped, reader below the fold).
 Screenshots in `storage/app/screenshots/231/`, step 1 at 1180×820 in both locales, light and dark, before and
 after. The autofilled-field paint is not among them for the reason above — it needs a browser profile with a
 saved address, which is a manual capture.
+
+---
+
+## Prompt 232 — the applicant's signature pad had no Alpine under it, so the emailed route could not be completed
+
+The owner asked whether the pad's white box should be dark-themed. The box was not a theme — it was the pad's
+corpse. Verified live on `9478612`, on a real invite:
+
+```
+window.Alpine                → undefined on /socio/solicitud/{token}
+canvas                       → 300×150 DEFAULT attributes, CSS-stretched to 668×335
+a drawn stroke               → 0 ink pixels, no data-drawn
+"Guardar firma"              → the hidden field stays empty
+SubmitApplication (220)      → refuses without it, and signature_on_application defaults ON
+```
+
+**So the emailed and handed-over routes could not be completed at all**, on a screen an applicant reaches from
+an email with nobody beside them. Found because somebody asked about a colour.
+
+### The cause: 196's class, one level up
+
+The pad is an Alpine component, and **Alpine only ever arrived inside Livewire's bundle**. The counter loads
+Livewire, so the pad worked there; the socio layout loads a stylesheet and nothing else, so on the applicant's
+page every `x-data`, `@mousedown` and `x-ref` was dead markup.
+
+Prompt 196 caught directives sitting OUTSIDE an `x-data` scope. These sat correctly INSIDE one — 196's guard
+passes — and nobody checked that the RUNTIME ships. Both failures are silent: Alpine does not warn about a
+page it was never loaded on.
+
+**Why 220's harnesses were green** is the part worth keeping. `measure-applicant-form.mjs` asserts the pad is
+present and *"big enough to sign"* (≥100px tall) — and the broken un-initialised canvas is **335px**, so
+**the defect passed the size check because of itself**. `shoot-signature-pad.mjs` renders static `file://`
+pages its own header documents as carrying no JavaScript. Presence and size were measured; function never was.
+
+### Where Alpine loads now
+
+`resources/js/socio.js` (an explicit `alpinejs` dependency), `@vite`d from the application page — **per page,
+not from the layout**. The rest of that layout is the member PWA, phone-first, whose menu and wallet would
+otherwise carry ~16KB gzipped for a component they never render. What makes a page-level load safe rather
+than a thing to remember is the new guard.
+
+Not loaded anywhere Livewire runs: two Alpines on one page is a documented breakage, and the harness asserts
+the counter still has exactly one and logs no Alpine warning.
+
+**The guard**: `AlpineShipsWhereItIsUsedTest` — any socio-family view that uses Alpine must load the entry.
+It follows `<x-…>` components, because the applicant form's directives are not in its own bytes; they arrive
+with the pad, and a reader that only looked at the file would have missed this exact defect. It strips Blade
+comments first, for the reason 215, 222, 228 and 230 each found the hard way.
+
+### The white canvas stays white, in both themes — the owner's actual question
+
+**Those pixels ARE the stored artefact**: encrypted into the vault, reviewed in the admin panel, printed
+beside scanned paper if an inspection asks for the club's consent evidence. Ink-on-white is the document
+convention; a dark bitmap prints as a black slab; and inverting at render would show something other than the
+bytes on file, which an audit artefact must never do. Once the pad initialises it is a 150px paper strip in a
+framed card and reads as intent. Recorded on the component too, so no future theme sweep "fixes" it.
+
+### Three harness traps, all found by insisting on the write
+
+1. **The thank-you page is not proof.** `ApplicationSpamGuard` discards an impossibly-fast submit SILENTLY
+   behind an *identical* thank-you response — good design, and a trap: the first version of this check filled
+   the form in two seconds, saw the thank-you and reported success while **nothing had been written**. It now
+   waits past `MIN_SECONDS` and proves the write by reloading the token: `show()` re-renders the form from
+   the stored payload, so a recorded application comes back carrying its own name and a discarded one comes
+   back empty. ("Is the form gone?" was the second wrong discriminator — a submitted-but-pending invite still
+   opens the form.)
+2. **A shared `storageState` shares one Laravel session**, so the first context's handover put every later
+   context into it. One context per size, both themes emulated inside it.
+3. **Five logins trip Filament's throttle** — `shoot-till-panels` recorded that in prompt 200. Three logins now.
+
+### Found on the way and fixed: playwright was an undeclared dependency
+
+`npm install alpinejs` pruned it, and every browser harness in this repo stopped working. It was in
+`node_modules` and in nobody's `package.json` — so a fresh clone could never have run one. Now a
+`devDependency`.
+
+### Verification
+
+`composer check` green — **1833 tests**, 1830 passed, 3 pre-existing skips, Larastan 0, Pint clean. **MySQL
+was left to CI**, per the running order. No change to the pad's contract, to `storeSignature`, or to 220's
+server-side requirement; the counter pads are untouched and re-asserted; 215's parity, 222's close guard and
+223's MRZ mount all re-run green. Nothing reached `lang/*`.
+
+**Written to fail against `9478612`, and does** — the browser harness reports all five failures at both sizes
+plus the refused submit, and the structural guard names `socio/application.blade.php`.
+
+**After** (`measure-applicant-signature.mjs`, the running app, both sizes, both themes): Alpine present, the
+bitmap matching its box (668×150 and 290×150), a stroke inking 1516 / 908 pixels, `data-drawn` set, a 13402 /
+7650-character PNG data URL in the hidden field, and an application recorded with `signature_path` set and
+`consent_channel = SIGNED`. Before/after frames in `storage/app/screenshots/232/`.
