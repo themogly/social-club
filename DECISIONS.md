@@ -12413,3 +12413,46 @@ so it is the visual record on a device profile, not the proof; the structural gu
 
 `composer check` green — Pint clean, Larastan 0, full suite green. **MySQL left to CI.** No user-facing copy
 changed (no new lang keys). `node --check` clean on the sweep script.
+
+## Prompt 238 — a batch names the sede it belongs to, and says so when it cannot yet dispense there
+
+Stock always belongs to a sede: `batches.location_id` drives the per-premises legal ceiling and the registro
+de dispensación. Intake inherited the sede invisibly from the active scope and REFUSED in the "all sedes"
+rollup (prompt 148 — guessing a sede is a compliance failure). This branch turns that refusal into a choice.
+
+### The sede is a required field, not an inherited scope
+
+`BatchForm` gains a required `Select('location_id')`, first in the section (you choose WHERE before WHAT). It
+defaults to the topbar scope, is BLANK in the rollup so an owner picks deliberately (never a guessed first
+row), and is disabled + pre-filled when the club has a single sede — where there is nothing to choose. It is
+`->dehydrated()` so the locked single-sede value is still submitted, and disabled on edit: a batch's sede is
+fixed at intake, like its genetic. `CreateBatch` now reads `location_id` from the form and passes that
+`Location` to `IntakeBatch`; the old rollup Halt stays only as a fail-closed backstop.
+
+Options are the org's sedes (`Location::query()`, org-scoped), matching every other sede Select in the panel
+(Minutes, Members, Purchase, Expense). Per-role sede filtering is not added here — no existing form does it,
+and it is not this branch's subject; the rollup/single/default behaviour is.
+
+### The confirmation names what went where, and the `no_price` consequence
+
+The created-notification names the quantity, the genetic and the sede — never a bare "created" that hides the
+sede a batch belongs to. And `afterCreate()` closes the silent trap: a genetic with stock but no active price
+at a sede is simply ABSENT from that sede's POS (prompt 95 — filtered, never an error), so an operator could
+add stock and then not find it at the counter. When `! $genetic->hasActivePriceAt($sede)` the confirmation is
+a PERSISTENT warning naming the gap, with a "Poner precio" action linking to the genetic's own edit page
+(where `GeneticPricesRelationManager` lives). The stock is still recorded — the warning is a nudge, not a
+refusal. The add-product guide's "no avisa" line is corrected accordingly: intake now warns.
+
+### The list can be read one sede at a time
+
+`BatchesTable` gains a `SelectFilter('location_id')`, shown only when the org has more than one sede — the same
+conditional the location COLUMN already uses, for the same reason (a control that offers one option on every
+row is noise).
+
+### Verification
+
+`composer check` green — Pint clean, Larastan 0, full suite green. **MySQL left to CI.** New tests in
+`tests/Feature/Batches/BatchNamesItsSedeTest.php`: default-to-scope, blank-in-rollup, single-sede locks +
+pre-fills, a rollup create lands at the CHOSEN sede (fails against the old Halt), required validation, the
+no_price warning fires with a link, a priced genetic gets no warning, and the sede filter narrows the list.
+New copy in both locale files.

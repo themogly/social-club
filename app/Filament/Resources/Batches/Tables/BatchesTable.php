@@ -21,6 +21,7 @@ use Filament\Forms\Components\TextInput;
 use Filament\Notifications\Notification;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Filters\TrashedFilter;
 use Filament\Tables\Table;
 use Illuminate\Support\Facades\Auth;
@@ -68,6 +69,12 @@ class BatchesTable
                 TextColumn::make('expires_on')->label(__('Caduca'))->date()->sortable()->placeholder('—'),
             ])
             ->filters([
+                // Which sede's stock (prompt 238). Only when there is more than one — the same reason the
+                // location COLUMN is conditional: a filter that offers one option on every row is noise.
+                SelectFilter::make('location_id')
+                    ->label(__('Sede'))
+                    ->options(fn (): array => Location::query()->orderBy('name')->pluck('name', 'id')->all())
+                    ->visible(fn (): bool => Location::query()->count() > 1),
                 TrashedFilter::make(),
             ])
             // The worst offender: four labelled buttons, a 335px actions column — a third of the whole

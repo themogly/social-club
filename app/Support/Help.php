@@ -397,10 +397,10 @@ class Help
                     'Para las unidades (prerolls, comestibles) el precio es por unidad, no por gramo.',
                 ]],
                 ['title' => 'Registra un lote con stock', 'body' => [
-                    'Crea un lote y da entrada al stock por el registro de movimientos. El mostrador elige siempre el lote apto más antiguo (no caducado).',
+                    'Crea un lote y elige la sede a la que entra el stock — un lote siempre pertenece a una sede. El mostrador elige luego el lote apto más antiguo (no caducado).',
                 ]],
                 ['title' => 'Comprueba que aparece en el mostrador', 'body' => [
-                    'Una genética Activa y Publicada pero SIN precio en la sede no aparece en el mostrador, y no avisa. El indicador de su ficha te dice qué falta: precio o stock.',
+                    'Una genética Activa y Publicada pero SIN precio en la sede no aparece en el mostrador. Al dar de alta un lote en una sede sin precio la app te avisa en el momento, con un enlace para ponerlo; el indicador de su ficha también te dice qué falta: precio o stock.',
                 ]],
             ],
         ],

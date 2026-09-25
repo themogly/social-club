@@ -85,7 +85,7 @@ class FormCompletenessTest extends TestCase
             'price_cents' => 'entered as euros via price_eur (MoneyCast at the edge).',
         ],
         BatchResource::class => [
-            'location_id' => 'scope: active location.',
+            // location_id is now a required field on the form (prompt 238) — no longer scope-filled.
             'batch_no' => 'system: generated batch number.',
             'initial_cg' => 'entered as grams; converted on intake by IntakeBatch (WEIGHT genetics).',
             'remaining_cg' => 'system-computed: maintained by the stock-movement ledger.',

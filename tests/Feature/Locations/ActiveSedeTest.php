@@ -118,10 +118,14 @@ class ActiveSedeTest extends TestCase
         app(ActiveScope::class)->setLocation(null); // the rollup
         $genetic = Genetic::factory()->create(['organisation_id' => $this->org->id]);
 
+        // Prompt 238 kept this compliance invariant (stock is never guessed into a sede) but moved the
+        // MECHANISM: the rollup no longer Halts with a notification — the sede is a REQUIRED form field, so a
+        // submit that names no sede is refused at validation, before any write. Still refused, still nothing
+        // created; the refusal is now the field the owner must fill rather than a runtime error after the fact.
         Livewire::test(CreateBatch::class)
             ->fillForm(['genetic_id' => $genetic->id, 'grams' => 100, 'cost_per_gram_eur' => 3])
             ->call('create')
-            ->assertNotified();
+            ->assertHasFormErrors(['location_id' => 'required']);
 
         $this->assertSame(0, Batch::query()->withoutGlobalScopes()->count()); // nothing guessed into existence
     }
