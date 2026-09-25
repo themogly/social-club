@@ -183,8 +183,9 @@ class DebtAndLocationSettingsTest extends TestCase
             // Per-location: whether this sede has card readers (prompt 194). It changes the member
             // lookup's wording only, so it belongs on LocationForm, not the org thresholds page.
             'card_readers_enabled',
-            // Per-location INTEGER setting, edited on LocationForm (prompt 120): idle-lock minutes.
-            'counter_idle_lock_minutes',
+            // Per-location INTEGER settings, edited on LocationForm (prompt 120: idle-lock minutes;
+            // prompt 235: PIN attempts before the pad locks out).
+            'counter_idle_lock_minutes', 'counter_pin_max_attempts',
             // Panic-lockdown system settings (prompt 121): the auto-reactivation delay and the owner link TTL are
             // security constants tuned in config, not front-of-house thresholds on the org settings form.
             'lockdown_auto_reactivate_minutes', 'lockdown_reactivation_link_ttl_hours',

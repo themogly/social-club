@@ -12210,3 +12210,77 @@ without changing a single assertion about the reason form.
 **Measured** (`measure-pos-column.mjs`, five states now, both orientations, light and dark, in Inter per 233):
 the basket floor holds in every state including with a flash; nothing under 44×44; the page never scrolls.
 Screenshots in `storage/app/screenshots/225/`.
+
+---
+
+## Prompt 235 — the PIN lockout is clearable from the admin, and the attempt count is a per-sede setting
+
+The owner, preparing the first counter tablet: *"can you make it so I can clear [the PIN lockout] easily in
+the admin panel, and adjust the number of attempts."* Until this branch the only ways out were waiting or
+`cache:clear` over SSH, and the count was a class constant.
+
+### Attempts are a setting; the escalation windows are not
+
+`counter_pin_max_attempts` (default 5, bounded **3–10**) joins the sede form beside 120's
+`counter_idle_lock_minutes` — same `SettingType::INT`, same `settings.manage.location` gate, read through
+`Settings::get('counter_pin_max_attempts', 5, $location->id)`. The read sits inside `UnlockOperator`'s
+existing `safely()`, so a cache blip falls back to 5 and never 503s the counter (124), and the value is
+clamped to the window regardless of what the row holds.
+
+**The escalating `LOCKOUT_WINDOWS` stay constants, deliberately, and the split is the decision.** The attempt
+count is the fat-finger tolerance — a quiet sede with two staff who know their PINs wants three, a busy one
+with cold hands wants more, and that is legitimately a club's call. The escalating windows are what make a
+brute-force attempt cost exponentially more; a club that could set every window to 60 seconds would have a
+throttle in name only, and nobody would notice until it mattered. So one is a knob and the other is not.
+
+Bounds: **below 3, a mistyped digit locks the club out of its own counter; above 10, the escalation is doing
+nothing** because a five-strike attacker never reaches it.
+
+### One home, and the `staff.manage` gate
+
+The **Seguridad** page carries a *"Bloqueos del PIN"* section — every sede plus the *"Sin sede"* bucket, each
+showing locked/clear, the seconds remaining and the strike count, with **Desbloquear** on any bucket that has
+something to clear. One place (199), and this one because Seguridad is already where counter-access security
+lives.
+
+**Gated on `staff.manage`, not a new permission.** Clearing a lockout is an exercise of authority over who
+may work the counter, which is precisely what that permission means — so 214's code-declared matrix is
+untouched and its sync check stays green. In the shipped matrix `staff.manage` is OWNER-held; a MANAGER opens
+Seguridad (via `lockdown.manage`) and sees no lockout section, which the permission test pins from both
+sides — including the SERVER refusal of a crafted `clearPinLockout` call, not merely the hidden button.
+
+### Clearing resets the escalation, on the owner's authority
+
+`clearLockout()` wipes attempts, lockout **and** strikes. The strikes go too, deliberately: the responsable
+clearing it is vouching for the terminal, so leaving the escalation armed would mean the next fat finger locks
+the sede for five minutes instead of one, for a reason nobody can see. The owner clearing it says *"this was
+us"*, and the next lockout starts again at 60s.
+
+**Audit action: `counter.pin.lockout.cleared`**, auditable = the sede (null for the no-sede bucket), `before`
+= the counts it wiped (`attempts`, `strikes`, `was_locked`), `after` names the operator. The log says what was
+forgiven, not only that something was.
+
+### The overlay tells the operator where the key is
+
+The lockout overlay's countdown gains one line: *"Un responsable puede desbloquearlo desde Administración ›
+Seguridad."* The wait is no longer the only way out, and the person staring at the countdown is the one who
+most needs to know that.
+
+### Verification
+
+`composer check` green — **1856 tests**, 1853 passed, 3 pre-existing skips, Larastan 0, Pint clean. **MySQL
+was left to CI**, per the running order. `TillSession::open` and the throttle's shape are untouched: still per
+sede, still shared by every device, still escalating, a correct PIN still clears it.
+
+**Written to fail against `e277da6`, and does**: the per-sede case (sede A at 3 locks on the third failure
+while sede B, unset, locks on the fifth) fails there, where the count is one constant for everybody.
+
+Also covered: the 3–10 form bounds (2 and 11 refused, 3 and 10 accepted and stored); clearing wiping
+everything with the escalation restarting at 60s and one audit row carrying the counts; the no-sede bucket
+clearing the same way; the no-`staff.manage` server refusal; an arbitrary cache key refused (404); and the
+cache-outage degrade to *"estado no disponible"* with the throttle failing open.
+
+Screenshots in `storage/app/screenshots/235/`: the Seguridad section clear and locked (the sede locked
+out-of-band via redis — driving the PIN pad through Alpine across Livewire morphs is unreliable, and the
+feature is pinned by the feature test; the shots are the visual record), the cleared state, the sede form's
+field, and the overlay hint.

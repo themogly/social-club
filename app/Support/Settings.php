@@ -184,6 +184,10 @@ class Settings
         // operator out, so commits are refused server-side and an unattended tablet stops showing member data
         // until someone re-enters a PIN. Per-location (a quiet sede may want longer). 0 disables the idle lock.
         'counter_idle_lock_minutes' => 5,
+        // Prompt 235 — failed PIN attempts before the counter pad locks out, per sede. The ESCALATING
+        // windows behind it are constants in UnlockOperator: the tolerance is a club preference, the
+        // escalation is a security property.
+        'counter_pin_max_attempts' => 5,
         // Where one link into the counter lands (prompt 189). 'home' = the tile hub, 'screen' = straight to
         // the first screen the operator may open (prompt 172's per-user resolution, which is the fallback
         // either way — a till-only operator must always land somewhere they are allowed to be).

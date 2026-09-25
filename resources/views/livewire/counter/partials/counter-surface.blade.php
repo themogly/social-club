@@ -147,6 +147,9 @@
 
             @if ($this->operatorLockedOut())
                 <p class="mt-3 text-center text-sm text-ink-muted dark:text-slate-400">{{ __('Demasiados intentos. Inténtalo en :s s.', ['s' => $this->operatorLockoutSeconds()]) }}</p>
+                {{-- Where the key is (prompt 235): the wait is not the only way out any more, and the person
+                     staring at this countdown is the one who most needs to know that. --}}
+                <p data-lockout-hint class="mt-1 text-center text-xs text-ink-muted dark:text-slate-400">{{ __('Un responsable puede desbloquearlo desde Administración › Seguridad.') }}</p>
             @endif
 
             {{-- Every control at the counter's 44x44 floor (prompts 116/132) — including this pad's own

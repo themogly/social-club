@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\Locations\Schemas;
 
+use App\Actions\UnlockOperator;
 use App\Support\Settings;
 use Filament\Forms\Components\ColorPicker;
 use Filament\Forms\Components\Select;
@@ -39,6 +40,7 @@ class LocationForm
      */
     public const SETTING_INTEGERS = [
         'counter_idle_lock_minutes',
+        'counter_pin_max_attempts',
     ];
 
     /**
@@ -194,6 +196,18 @@ class LocationForm
                     ->minValue(0)
                     ->default(fn (): int => (int) Settings::get('counter_idle_lock_minutes', 5))
                     ->helperText(__('Minutos sin actividad antes de bloquear el mostrador. 0 lo desactiva.')),
+
+                // PIN attempts before the pad locks out (prompt 235). The owner: *"adjust the number of
+                // attempts."* Bounded 3–10: below three a mistyped digit locks the club out of its own
+                // counter, above ten the escalating lockout is doing nothing. The escalation itself is not a
+                // knob — see UnlockOperator.
+                TextInput::make('counter_pin_max_attempts')
+                    ->label(__('Intentos de PIN permitidos'))
+                    ->numeric()
+                    ->minValue(UnlockOperator::MIN_CONFIGURABLE_ATTEMPTS)
+                    ->maxValue(UnlockOperator::MAX_CONFIGURABLE_ATTEMPTS)
+                    ->default(fn (): int => (int) Settings::get('counter_pin_max_attempts', UnlockOperator::MAX_ATTEMPTS))
+                    ->helperText(__('Fallos seguidos antes de bloquear el teclado del mostrador (3–10). Cada bloqueo seguido dura más; un responsable puede desbloquearlo desde Seguridad.')),
 
                 // One-tap weight presets on the dispensary POS (prompt 133). Grams; 3,5 g triggers the eighth
                 // break. A sede sets its own list.

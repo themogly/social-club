@@ -4,6 +4,7 @@ namespace App\Actions;
 
 use App\Models\Location;
 use App\Models\User;
+use App\Support\Settings;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Hash;
@@ -21,8 +22,25 @@ use Illuminate\Support\Facades\Hash;
  */
 class UnlockOperator
 {
-    /** Failed attempts allowed before the pad locks out. */
+    /**
+     * Failed attempts allowed before the pad locks out — the DEFAULT, overridable per sede (prompt 235).
+     *
+     * The owner: *"adjust the number of attempts."* This is the fat-finger tolerance, and it is legitimately
+     * a club's call: a quiet sede with two staff who know their PINs wants three, a busy one with a queue and
+     * cold hands wants more. Bounded 3–10 on the form — below three a mistyped digit locks the club out of
+     * its own counter, above ten the escalation below is doing nothing.
+     *
+     * **The ESCALATION stays a constant**, deliberately. The attempt count answers "how forgiving is the
+     * pad"; the escalating windows are what make a brute-force attempt cost exponentially more, which is a
+     * security property of the product rather than a club preference. A club that could set every window to
+     * 60 seconds would have a throttle in name only, and nobody would notice until it mattered.
+     */
     public const MAX_ATTEMPTS = 5;
+
+    /** The bounds the sede form enforces — declared here, beside the thing they bound. */
+    public const MIN_CONFIGURABLE_ATTEMPTS = 3;
+
+    public const MAX_CONFIGURABLE_ATTEMPTS = 10;
 
     /**
      * Escalating lockout windows (seconds); the last value repeats for further strikes.
@@ -58,9 +76,23 @@ class UnlockOperator
             }
         }
 
-        $this->registerFailure($throttleKey);
+        $this->registerFailure($throttleKey, $this->maxAttemptsAt($location));
 
         return null;
+    }
+
+    /**
+     * How many failures this sede tolerates. Inside the same fail-open reasoning as everything else here: a
+     * settings read that throws must not 503 the counter (prompt 124), so it falls back to the code default.
+     */
+    public function maxAttemptsAt(?Location $location): int
+    {
+        $configured = (int) $this->safely(
+            fn (): int => (int) Settings::get('counter_pin_max_attempts', self::MAX_ATTEMPTS, $location?->id),
+            self::MAX_ATTEMPTS,
+        );
+
+        return max(self::MIN_CONFIGURABLE_ATTEMPTS, min(self::MAX_CONFIGURABLE_ATTEMPTS, $configured));
     }
 
     public function isLockedOut(string $throttleKey): bool
@@ -76,13 +108,13 @@ class UnlockOperator
         return max(0, $until - now()->getTimestamp());
     }
 
-    private function registerFailure(string $throttleKey): void
+    private function registerFailure(string $throttleKey, int $maxAttempts): void
     {
-        $this->safely(function () use ($throttleKey): void {
+        $this->safely(function () use ($throttleKey, $maxAttempts): void {
             $attempts = (int) Cache::get($this->key($throttleKey, 'attempts'), 0) + 1;
             Cache::put($this->key($throttleKey, 'attempts'), $attempts, self::ATTEMPT_TTL);
 
-            if ($attempts < self::MAX_ATTEMPTS) {
+            if ($attempts < $maxAttempts) {
                 return;
             }
 
@@ -94,6 +126,53 @@ class UnlockOperator
             Cache::put($this->key($throttleKey, 'lockout'), now()->getTimestamp() + $window, $window);
             Cache::forget($this->key($throttleKey, 'attempts')); // fresh tally for the next window
         }, null);
+    }
+
+    /**
+     * The state of one bucket, for the admin's lockout listing (prompt 235).
+     *
+     * Degrades to `available: false` rather than throwing — the Seguridad page must survive a cache outage
+     * the same way the counter does, showing "estado no disponible" instead of an error.
+     *
+     * @return array{available: bool, locked: bool, seconds: int, attempts: int, strikes: int}
+     */
+    public function statusFor(string $throttleKey): array
+    {
+        $unavailable = ['available' => false, 'locked' => false, 'seconds' => 0, 'attempts' => 0, 'strikes' => 0];
+
+        /** @var array{available: bool, locked: bool, seconds: int, attempts: int, strikes: int} $status */
+        $status = $this->safely(function () use ($throttleKey): array {
+            $until = (int) Cache::get($this->key($throttleKey, 'lockout'), 0);
+
+            return [
+                'available' => true,
+                'locked' => $until > 0,
+                'seconds' => max(0, $until - now()->getTimestamp()),
+                'attempts' => (int) Cache::get($this->key($throttleKey, 'attempts'), 0),
+                'strikes' => (int) Cache::get($this->key($throttleKey, 'strikes'), 0),
+            ];
+        }, $unavailable);
+
+        return $status;
+    }
+
+    /**
+     * Clear a bucket from the admin (prompt 235) — attempts, lockout AND strikes.
+     *
+     * The strikes go too, deliberately: a responsable clearing a lockout is vouching for that terminal, and
+     * leaving the escalation armed would mean the next fat finger locks the sede for five minutes instead of
+     * one, for a reason nobody can see. The owner clearing it says "this was us"; the count starts again at
+     * 60 seconds. Returns what it wiped, so the caller can audit the figures rather than the act alone.
+     *
+     * @return array{attempts: int, strikes: int, was_locked: bool}
+     */
+    public function clearLockout(string $throttleKey): array
+    {
+        $before = $this->statusFor($throttleKey);
+
+        $this->clear($throttleKey);
+
+        return ['attempts' => $before['attempts'], 'strikes' => $before['strikes'], 'was_locked' => $before['locked']];
     }
 
     private function clear(string $throttleKey): void

@@ -26,6 +26,67 @@
             </div>
         @endif
 
+        {{-- Prompt 235 — the PIN throttle, visible and clearable. The owner: *"can you make it so I can clear
+             [the PIN lockout] easily in the admin panel."* Until this section the only ways out were waiting
+             or `cache:clear` over SSH. One home, here, because this page is already where counter-access
+             security lives (199: one place). Gated on `staff.manage` — the authority over who may work the
+             counter — so no new permission and no 214 matrix edit. --}}
+        @if ($canClearPinLockouts)
+            <div data-pin-lockouts>
+                <h2 class="text-base font-semibold text-gray-950 dark:text-white">{{ __('Bloqueos del PIN') }}</h2>
+                <p class="mt-1 text-sm text-gray-600 dark:text-gray-300">
+                    {{ __('El teclado del mostrador se bloquea tras varios fallos seguidos de PIN. Limpiarlo borra los intentos y reinicia la escalada: el siguiente bloqueo vuelve a durar 1 minuto.') }}
+                </p>
+                <div class="mt-2 overflow-x-auto rounded-xl border border-gray-200 dark:border-white/10">
+                    <table class="w-full text-sm">
+                        <thead class="bg-gray-50 text-left text-xs uppercase text-gray-500 dark:bg-white/5 dark:text-gray-400">
+                            <tr>
+                                <th class="px-3 py-2">{{ __('Sede') }}</th>
+                                <th class="px-3 py-2">{{ __('Estado') }}</th>
+                                <th class="px-3 py-2">{{ __('Intentos') }}</th>
+                                <th class="px-3 py-2">{{ __('Bloqueos seguidos') }}</th>
+                                <th class="px-3 py-2"></th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-gray-100 dark:divide-white/5">
+                            @foreach ($pinBuckets as $bucket)
+                                <tr data-pin-bucket="{{ $bucket['key'] }}">
+                                    <td class="px-3 py-2 font-medium">{{ $bucket['label'] }}</td>
+                                    <td class="px-3 py-2">
+                                        @if (! $bucket['status']['available'])
+                                            {{-- A cache outage degrades to this line, never to a 500 (124). --}}
+                                            <span class="text-gray-500 dark:text-gray-400">{{ __('Estado no disponible') }}</span>
+                                        @elseif ($bucket['status']['locked'])
+                                            <span data-pin-locked class="inline-flex items-center gap-1.5 font-semibold text-error">
+                                                <span class="h-2 w-2 rounded-full bg-error"></span>
+                                                {{ __('Bloqueado · :s s restantes', ['s' => $bucket['status']['seconds']]) }}
+                                            </span>
+                                        @else
+                                            <span class="inline-flex items-center gap-1.5 text-success">
+                                                <span class="h-2 w-2 rounded-full bg-success"></span>{{ __('Libre') }}
+                                            </span>
+                                        @endif
+                                    </td>
+                                    <td class="px-3 py-2 tabular-nums">{{ $bucket['status']['available'] ? $bucket['status']['attempts'] : '—' }}</td>
+                                    <td class="px-3 py-2 tabular-nums">{{ $bucket['status']['available'] ? $bucket['status']['strikes'] : '—' }}</td>
+                                    <td class="px-3 py-2 text-right">
+                                        @if ($bucket['status']['available'] && ($bucket['status']['locked'] || $bucket['status']['strikes'] > 0 || $bucket['status']['attempts'] > 0))
+                                            <button
+                                                type="button"
+                                                wire:click="clearPinLockout('{{ $bucket['key'] }}')"
+                                                data-pin-clear="{{ $bucket['key'] }}"
+                                                class="inline-flex min-h-9 items-center rounded-lg border border-gray-300 px-3 text-xs font-semibold text-gray-700 hover:bg-gray-50 dark:border-white/20 dark:text-gray-200 dark:hover:bg-white/5"
+                                            >{{ __('Desbloquear') }}</button>
+                                        @endif
+                                    </td>
+                                </tr>
+                            @endforeach
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        @endif
+
         <div>
             <h2 class="text-base font-semibold text-gray-950 dark:text-white">{{ __('Historial') }}</h2>
             <div class="mt-2 overflow-x-auto rounded-xl border border-gray-200 dark:border-white/10">
