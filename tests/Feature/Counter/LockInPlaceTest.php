@@ -122,20 +122,28 @@ class LockInPlaceTest extends TestCase
      */
     public function test_the_unsaved_work_guard_still_fires_on_the_routes_that_leave_the_counter(): void
     {
-        $this->operator();
+        $this->operator(); // OWNER — holds staff.manage, so the device logout renders
+
         $html = (string) $this->get(route('counter.bar'))->assertOk()->getContent();
 
-        foreach (['data-counter-admin-link', 'data-counter-logout'] as $marker) {
-            $at = strpos($html, $marker);
-            $this->assertNotFalse($at, $marker.' must be present');
+        // Administración still guards UNSAVED WORK specifically (196/206 behaviour, unchanged).
+        $adminAt = strpos($html, 'data-counter-admin-link');
+        $this->assertNotFalse($adminAt, 'data-counter-admin-link must be present');
+        $this->assertStringContainsString(
+            'dirty',
+            substr($html, max(0, $adminAt - 400), 900),
+            'Administración leaves the counter and must still confirm when work is in progress',
+        );
 
-            // Each of these sits within a few hundred characters of its own guard expression.
-            $this->assertStringContainsString(
-                'dirty',
-                substr($html, max(0, $at - 400), 900),
-                $marker.' leaves the counter and must still confirm when work is in progress',
-            );
-        }
+        // The device logout ALWAYS confirms now (prompt 239 — it ends the shared-tablet session, basket or
+        // not), which SUBSUMES the unsaved-work guard rather than dropping it: leaving still asks first.
+        $logoutAt = strpos($html, 'data-counter-logout');
+        $this->assertNotFalse($logoutAt, 'data-counter-logout must be present for a responsable');
+        $this->assertStringContainsString(
+            'window.confirm(',
+            substr($html, max(0, $logoutAt - 900), 900),
+            'the device logout leaves the counter and must still confirm',
+        );
     }
 
     /**

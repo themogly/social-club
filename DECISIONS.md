@@ -12456,3 +12456,51 @@ row is noise).
 pre-fills, a rollup create lands at the CHOSEN sede (fails against the old Halt), required validation, the
 no_price warning fires with a link, a priced genetic gets no warning, and the sede filter narrows the list.
 New copy in both locale files.
+
+## Prompt 239 — a shift change is a PIN, not a login
+
+A counter tablet is signed in ONCE by a responsable and shared all evening; floor staff identify by PIN. Two
+things the counter got wrong followed from treating the device session and the operator's shift as the same:
+
+### "Cambiar de persona" is the operator's shift-end; the device logout is a responsable's
+
+An operator ending their turn reached for "Cerrar sesión" in the always-visible row — which ended the DEVICE
+session and dropped them at an email/password form they have no credentials for. Their real action is the
+switch chip, now named **"Cambiar de persona"** (title + screen-reader text): clear the PIN, the next person
+enters theirs. The 173 surface and `switchOperator` are untouched — only the naming changed, so the chip reads
+as what it does.
+
+The DEVICE logout is gated on **`staff.manage`** and **always confirms**. Logging the shared tablet out ends a
+session floor staff cannot reopen, so it is a responsable's deliberate act, not a control an operator can hit
+by reflex. Its copy is now "Cerrar sesión del dispositivo" — the word *dispositivo* is the whole point.
+
+**Kept in the leave-group, not a new dropdown.** The summary's "sede/account menu" is honoured by SCOPE, not a
+parallel widget: prompt 206 established `data-counter-leave-group` as the "controls that leave the counter"
+cluster, and its accessibility invariants (one accessible name each, the group membership, no css-hidden-only
+labels) are enforced by `TopBarNamesItsDestinationsTest`. Building a second dropdown menu to hold one control
+would fork that structure for no gain; gating it in the existing cluster, behind staff.manage and a confirm,
+delivers the intent (tucked away from operators, deliberate for responsables) without regressing 206.
+
+### The confirm invariant moved, it did not weaken
+
+Before, both leave links confirmed only on UNSAVED WORK (`$store.counter?.dirty`). Now Administración keeps that
+dirty-aware confirm, and the device logout ALWAYS confirms (it ends the session, basket or not) — a superset,
+not a drop. `LockInPlaceTest`, `TopBarNamesItsDestinationsTest` and `CounterScreenSwitcherTest` are amended to
+assert the device logout's own confirm rather than the dirty one, and `CounterScreenSwitcher`'s actor gains
+`staff.manage` so the responsable-only logout renders for it.
+
+### Remember-me lands session expiry on the PIN surface
+
+`App\Filament\Pages\Auth\Login` now defaults "remember me" to CHECKED. When the session lifetime lapses the
+remember cookie re-authenticates the device, so a shared tablet returns to the counter's PIN surface — identify
+the operator — instead of the login form floor staff cannot complete. A user on a shared back-office computer
+can uncheck it. The PIN, not the device session, is the gate at the counter; rate limits, throttles and MFA are
+untouched. The **till handover is unchanged** (HandOverTill / beginHandover): shift change of the DRAWER is a
+different, already-correct flow.
+
+### Verification
+
+`composer check` green — Pint clean, Larastan 0, full suite green. **MySQL left to CI.** New tests in
+`tests/Feature/Counter/ShiftChangeIsAPinTest.php`: remember-me defaults on, the operator control reads "Cambiar
+de persona", floor staff never see the device logout, a responsable gets it gated + confirmed, and the gate is
+`staff.manage`. New copy in both locale files.

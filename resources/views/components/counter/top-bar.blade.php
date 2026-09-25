@@ -14,6 +14,15 @@
     $confirmLeave = __('Tienes trabajo sin guardar en el mostrador. ¿Seguro que quieres salir?');
     $confirmDiscard = __('Hay datos sin guardar en esta pantalla. Se perderán. ¿Continuar?');
 
+    // Prompt 239 — ending a SHIFT and logging the DEVICE out are different acts, and only the second is a
+    // responsable's. A counter tablet is signed in ONCE (remember-me, see App\Filament\Pages\Auth\Login) and
+    // floor staff then identify by PIN; "Cerrar sesión" in the always-visible row invited an operator to end
+    // the device session — a full re-login floor staff cannot do — when all they wanted was to hand over to
+    // the next person. So the DEVICE logout is gated on `staff.manage` and asks first; the operator's own
+    // "end my turn" is "Cambiar de persona" (the switch chip below), which just clears the PIN.
+    $canManageDevice = $user?->can('staff.manage') ?? false;
+    $confirmDeviceLogout = __('¿Cerrar la sesión de este dispositivo? El personal se identifica con su PIN; para volver a entrar hará falta un responsable.');
+
     // Whose terminal this is (prompt 206). 205 left only the PRODUCT name's first letter in an aria-hidden
     // tile, so nothing on any counter screen said which club the staff were working at — and the product
     // name is the wrong name anyway (prompt 150 records the same mistake on club email). One indexed lookup.
@@ -214,12 +223,16 @@
                 data-operator-name-chip
                 data-counter-switch-operator
                 @click="window.Livewire.dispatch('counter-switch-operator')"
+                title="{{ __('Cambiar de persona') }}"
                 class="inline-flex min-h-11 items-center gap-2 rounded-lg bg-surface-alt px-3 text-sm transition hover:bg-brand-tint hover:text-brand dark:bg-slate-800 dark:hover:bg-slate-700"
             >
                 <span class="inline-block h-2.5 w-2.5 shrink-0 rounded-full bg-success" aria-hidden="true"></span>
                 <span class="hidden text-ink-muted xl:inline dark:text-slate-400">{{ __('Trabajando') }}:</span>
                 <span data-operator-name class="max-w-[9rem] truncate font-semibold">{{ \App\Support\CounterOperator::current()?->name }}</span>
-                <span class="sr-only">· {{ __('Cambiar') }}</span>
+                {{-- Prompt 239 — the operator's shift-end IS this: hand over to the next person, who enters their
+                     own PIN. It replaced "Cerrar sesión" as the thing an operator reaches for at the end of a
+                     turn; the device logout is now a responsable-only action (below). --}}
+                <span class="sr-only">· {{ __('Cambiar de persona') }}</span>
             </button>
         @endif
 
@@ -250,6 +263,7 @@
 
              The divider is decorative and the group is not a landmark: the separation is visual, and the
              accessible names below carry the meaning on their own. --}}
+        @if ($canPanel || $canManageDevice)
         <div data-counter-leave-group class="ml-1 flex items-center gap-1 border-l border-line pl-2 dark:border-slate-800">
             @if ($canPanel)
                 {{-- ADMINISTRACIÓN — was "Panel", which `lang/en.json` rendered as **Dashboard**, making it a
@@ -271,25 +285,32 @@
                 </a>
             @endif
 
-            <form
-                method="POST"
-                action="{{ route('filament.admin.auth.logout') }}"
-                @submit="($store.counter?.dirty && ! window.confirm(@js($confirmLeave))) && $event.preventDefault()"
-            >
-                @csrf
-                <button
-                    type="submit"
-                    data-counter-logout
-                    aria-label="{{ __('Cerrar sesión') }}"
-                    class="inline-flex min-h-11 items-center gap-2 rounded-lg px-3 text-sm font-medium text-ink-muted transition hover:bg-black/5 dark:text-slate-400 dark:hover:bg-white/5"
+            {{-- THE DEVICE session — a responsable's action, not an operator's (prompt 239). Gated on
+                 staff.manage and confirmed: logging the shared tablet out ends the session floor staff cannot
+                 reopen (they have PINs, not passwords), so it must be deliberate. An operator ending their own
+                 turn uses "Cambiar de persona" above. --}}
+            @if ($canManageDevice)
+                <form
+                    method="POST"
+                    action="{{ route('filament.admin.auth.logout') }}"
+                    @submit="(! window.confirm(@js($confirmDeviceLogout))) && $event.preventDefault()"
                 >
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" class="h-5 w-5 shrink-0" aria-hidden="true">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0 0 13.5 3h-6a2.25 2.25 0 0 0-2.25 2.25v13.5A2.25 2.25 0 0 0 7.5 21h6a2.25 2.25 0 0 0 2.25-2.25V15M12 9l-3 3m0 0 3 3m-3-3h12.75"/>
-                    </svg>
-                    <span class="hidden xl:inline" aria-hidden="true">{{ __('Cerrar sesión') }}</span>
-                </button>
-            </form>
+                    @csrf
+                    <button
+                        type="submit"
+                        data-counter-logout
+                        aria-label="{{ __('Cerrar sesión del dispositivo') }}"
+                        class="inline-flex min-h-11 items-center gap-2 rounded-lg px-3 text-sm font-medium text-ink-muted transition hover:bg-black/5 dark:text-slate-400 dark:hover:bg-white/5"
+                    >
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" class="h-5 w-5 shrink-0" aria-hidden="true">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0 0 13.5 3h-6a2.25 2.25 0 0 0-2.25 2.25v13.5A2.25 2.25 0 0 0 7.5 21h6a2.25 2.25 0 0 0 2.25-2.25V15M12 9l-3 3m0 0 3 3m-3-3h12.75"/>
+                        </svg>
+                        <span class="hidden xl:inline" aria-hidden="true">{{ __('Cerrar sesión del dispositivo') }}</span>
+                    </button>
+                </form>
+            @endif
         </div>
+        @endif
 
         {{-- PANIC (prompt 121). The hardest thing 205 had to rehome: the overflow it lived in is gone, and
              121 requires it to stay DISCREET and FAST — a labelled button on a hub is neither.
