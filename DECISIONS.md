@@ -12504,3 +12504,64 @@ different, already-correct flow.
 `tests/Feature/Counter/ShiftChangeIsAPinTest.php`: remember-me defaults on, the operator control reads "Cambiar
 de persona", floor staff never see the device logout, a responsable gets it gated + confirmed, and the gate is
 `staff.manage`. New copy in both locale files.
+
+## Prompt 241 — the till guard ran before the session existed: 236 never fired on a real request
+
+236 shipped green and did nothing in a browser. Verified on the running app: sede adopted, operator identified,
+no till open, and `GET /counter/pos` rendered the POS with no redirect. The suite (1883) was green.
+
+### Cause — global stack runs before StartSession
+
+`bootstrap/app.php` registered `RequireOpenTill` with `$middleware->append()` — the GLOBAL stack, which runs
+OUTSIDE the route middleware groups and therefore BEFORE the web group's `StartSession`. The guard's first
+reads are `session('counter.location_id')` and `CounterOperator::id()` (also session). On a real request the
+session is not started at that point, both read null, and the guard takes 124's degrade-open path — on EVERY
+request. Proven with an ordering probe: a middleware on the global stack sees `session.store->isStarted() ===
+false`; one on the web group sees `true`.
+
+### The in-process-session false-green — added to the catalogue
+
+The 236 tests seed with `session([...])` / `withSession()` and then `$this->get()`. In-process the test and the
+guard share ONE session-store object, so the value is visible to the guard regardless of where it runs — the
+redirect happens and the test passes. In production the value lives in the session driver and is loaded only at
+StartSession, which the global guard runs before. **The test and the app read two different stores, and only
+the test's had anything in it.** This is a new false-green shape, alongside the instrument-audit family (233
+fonts, 237 `100vh`): here the *test harness's own session abstraction* hid the defect. Laravel's HTTP test
+client cannot reproduce a fresh per-request store in-process (every attempt to force one — `forgetDrivers`, a
+directly-seeded row + cookie — broke the session round-trip), which is exactly why the browser harness is the
+real-lifecycle proof, not a feature test.
+
+### Fix — register both session-reading guards after StartSession
+
+`RequireOpenTill` and `EnforceCounterHandover` move from the global stack to the WEB group
+(`$middleware->web(append: [...])`, the `SetLocale` precedent — after StartSession). Order preserved: handover
+before till, then SetLocale. Their LOGIC, allowlist, intended-URL key and 124 degrade-open path are untouched
+(prompt 241's rule) — only their position changed. `EnforceOrgLockdown` stays GLOBAL deliberately: it reads the
+DATABASE, never the session, so it works before StartSession; confirmed and noted. `SecurityHeaders` reads
+neither.
+
+### The sibling was a LIVE SECURITY DEFECT (209), now closed
+
+`EnforceCounterHandover` had the identical defect and it is not a UX one: on a real request the global gate read
+a null session, so `CounterHandover::active()` was false and the applicant holding the tablet could reach the
+admin panel and the member register by URL — 209's Article-9 boundary, OPEN in production. The gate must run
+after StartSession on BOTH surfaces it protects: the WEB group (counter routes) AND the Filament panel's OWN
+middleware stack (the panel runs its own stack, not the web group, and `/` — the dashboard — is a panel route).
+It is now added to `AdminPanelProvider`'s middleware after that stack's StartSession. Verified on the running
+app: after handing the tablet over, `GET /members` redirects to the applicant form and the register does not
+answer. `RequireOpenTill` is NOT added to the panel — it only guards `counter/*`, which are web routes.
+
+### The class guard
+
+`CounterGuardsRunAfterSessionTest` is the structural guard: it parses `bootstrap/app.php`, and any middleware
+registered on the GLOBAL stack (`append`/`prepend`) whose source reads `session(`, `->session()` or
+`CounterOperator::` fails, naming the class and line with the fix in the message (*register it on the web group
+after StartSession*). Proven by a planted `$middleware->append(RequireOpenTill::class)`. It also asserts the two
+guards run after StartSession on the web group, and the handover gate after StartSession on the panel stack.
+
+### Verification
+
+`composer check` green. **MySQL left to CI.** Browser harness `tests/Browser/shoot-till-guard.mjs`, run against
+the server, light and dark: no-till deep link to `/counter/pos` → `/counter/till` (the open screen); open the
+till → `/counter/pos` renders. Screenshots in `storage/app/screenshots/241/`. 236's server-side refusals (door,
+sign-up) are untouched — they never depended on middleware order. No copy changed.

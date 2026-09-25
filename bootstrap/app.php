@@ -38,22 +38,27 @@ return Application::configure(basePath: dirname(__DIR__))
 
         // Org-wide panic lockdown (prompt 121): appended globally so it gates the panel, the counter and the
         // member PWA at once. When the org is locked it returns an ordinary "temporarily unavailable" page.
+        // Stays GLOBAL deliberately: it reads the DATABASE (OrganisationLockdown::active), never the session,
+        // so it works before StartSession — unlike the two session-reading guards below (prompt 241).
         $middleware->append(EnforceOrgLockdown::class);
 
-        // Prompt 173's handover mode as a real boundary (security audit, Phase C carry-forward). Appended
-        // globally for the same reason as the lockdown: the tablet in an applicant's hands is still logged
-        // in as staff, so the gate has to sit in front of EVERY surface, not only the five counter screens
-        // that know the mode exists. Before this, `GET /` served them the admin panel.
-        $middleware->append(EnforceCounterHandover::class);
-
-        // Prompt 236 — no open till, no counter. AFTER the handover gate (a handover is the applicant holding
-        // the tablet; the till step is the operator's, and the two never overlap) and after the lockdown gate
-        // (a locked club answers nothing). Global for the same reason as those two: it gates before routing.
-        $middleware->append(RequireOpenTill::class);
-
-        // Apply the session locale on web routes (after StartSession). The panel
-        // adds it to its own stack in AdminPanelProvider.
-        $middleware->web(append: [SetLocale::class]);
+        // Prompt 241 — the counter's two session-reading guards run on the WEB GROUP, after StartSession, NOT
+        // the GLOBAL stack. Global middleware run OUTSIDE the web group and therefore BEFORE StartSession, so
+        // `session()` is not started yet: their reads returned null on every real request and both silently
+        // degraded open. `EnforceCounterHandover` reads `CounterHandover::active()` → session, and
+        // `RequireOpenTill` reads `counter.location_id` + `CounterOperator::id()` → session. Registered here,
+        // after StartSession, they see the real session. Order is load-bearing: handover before till (a
+        // handover is the applicant holding the tablet; the till step is the operator's), then SetLocale.
+        //
+        // `EnforceCounterHandover` ALSO gates the Filament panel, whose `/` served the applicant the dashboard
+        // before 209. The panel runs its OWN middleware stack (not the web group), so the guard is added there
+        // too, after that stack's StartSession — see AdminPanelProvider. One boundary, both surfaces, each with
+        // a started session behind it.
+        $middleware->web(append: [
+            EnforceCounterHandover::class,
+            RequireOpenTill::class,
+            SetLocale::class,
+        ]);
 
         // Guests are sent to the guard's OWN login: members to the PWA login, staff to
         // the Filament panel (which handles its own auth). The two guards never cross.
