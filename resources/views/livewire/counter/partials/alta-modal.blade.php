@@ -111,7 +111,7 @@
 
     {{-- The SERVER's half of the answer, published where the client guard can read it after every render:
          earlier steps that have already synced, and state that is not an input at all. --}}
-    <div data-alta-panel data-alta-dirty="{{ $signupDirty ? '1' : '0' }}" class="counter-modal-pop relative my-auto flex max-h-[min(880px,92vh)] w-[min(720px,100%)] flex-col overflow-hidden rounded-[18px] border border-line bg-surface shadow-2xl dark:border-slate-700 dark:bg-slate-900">
+    <div data-alta-panel data-alta-dirty="{{ $signupDirty ? '1' : '0' }}" class="counter-modal-pop relative my-auto flex max-h-[min(880px,92svh)] w-[min(720px,100%)] flex-col overflow-hidden rounded-[18px] border border-line bg-surface shadow-2xl dark:border-slate-700 dark:bg-slate-900">
 
         {{-- Header — the title is fixed, the subtitle says where you are. --}}
         <div class="flex items-start justify-between gap-4 border-b border-line px-5 py-4 dark:border-slate-800">

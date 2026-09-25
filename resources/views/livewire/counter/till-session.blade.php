@@ -83,7 +83,7 @@
                  locked, you enter the cash fund, you confirm. --}}
             <section
                 data-till-open-screen
-                class="mx-auto flex min-h-[60vh] w-full max-w-md flex-col justify-center rounded-2xl border border-line bg-surface p-6 text-center dark:border-slate-800 dark:bg-slate-900"
+                class="mx-auto flex min-h-[60svh] w-full max-w-md flex-col justify-center rounded-2xl border border-line bg-surface p-6 text-center dark:border-slate-800 dark:bg-slate-900"
             >
                 <div class="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-surface-alt text-3xl dark:bg-slate-800" aria-hidden="true">💶</div>
 

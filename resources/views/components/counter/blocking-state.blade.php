@@ -28,7 +28,7 @@
 <div
     data-counter-blocker
     data-blocker="{{ $attributes->get('data-blocker') }}"
-    {{ $attributes->except('data-blocker')->class(['flex min-h-[60vh] flex-col items-center justify-center px-6 text-center']) }}
+    {{ $attributes->except('data-blocker')->class(['flex min-h-[60svh] flex-col items-center justify-center px-6 text-center']) }}
 >
     <div class="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-surface-alt text-3xl dark:bg-slate-800" aria-hidden="true">{{ $icon }}</div>
 
