@@ -4,6 +4,7 @@ namespace App\Providers\Filament;
 
 use App\Filament\Pages\Auth\Login;
 use App\Filament\Pages\Auth\RequestPasswordReset;
+use App\Http\Middleware\EnforceCounterHandover;
 use App\Http\Middleware\SetLocale;
 use App\Livewire\LocaleSwitcher;
 use App\Livewire\LocationSwitcher;
@@ -173,6 +174,13 @@ class AdminPanelProvider extends PanelProvider
                 EncryptCookies::class,
                 AddQueuedCookiesToResponse::class,
                 StartSession::class,
+                // Prompt 241 — 209's handover boundary, on the panel's OWN stack, AFTER its StartSession. It
+                // used to gate the panel from the GLOBAL stack, which runs before any StartSession, so it read
+                // a null session and let an applicant holding the tablet reach `/` and the member register by
+                // URL (a live Article-9 leak, confirmed on a real request). Here the session is started, so the
+                // gate actually fires. RequireOpenTill is NOT added — it only guards `counter/*`, which are web
+                // routes, not panel routes.
+                EnforceCounterHandover::class,
                 AuthenticateSession::class,
                 SetLocale::class,
                 ShareErrorsFromSession::class,

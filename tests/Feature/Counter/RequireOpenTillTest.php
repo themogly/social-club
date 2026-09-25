@@ -44,6 +44,16 @@ use Tests\TestCase;
  *
  * The in-page side of the same change — that no screen draws a till card anymore — lives in
  * {@see CounterBlockingStatesTest}. This file owns the redirect.
+ *
+ * **Prompt 241 — read this before trusting a green here.** These redirect cases seed the counter session
+ * IN-PROCESS (`session([...])` / the runGuard helper), so they prove the guard's LOGIC given a STARTED
+ * session. They do NOT prove it fires on a real request: 236 shipped the guard on the GLOBAL stack, which
+ * runs before StartSession, so on a real request the session was unstarted and every read returned null —
+ * and these same in-process tests stayed green because the test process and the guard share one session-store
+ * object. That the guard runs AFTER StartSession is enforced by {@see CounterGuardsRunAfterSessionTest}
+ * (ordering + a structural guard over bootstrap/app.php); the real-lifecycle redirect is shown by the browser
+ * harness `tests/Browser/shoot-till-guard.mjs` against a running server. The in-process-session false-green is
+ * catalogued in DECISIONS (prompt 241).
  */
 class RequireOpenTillTest extends TestCase
 {
