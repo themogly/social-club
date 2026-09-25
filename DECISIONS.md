@@ -12504,3 +12504,15 @@ different, already-correct flow.
 `tests/Feature/Counter/ShiftChangeIsAPinTest.php`: remember-me defaults on, the operator control reads "Cambiar
 de persona", floor staff never see the device logout, a responsable gets it gated + confirmed, and the gate is
 `staff.manage`. New copy in both locale files.
+
+## Prompt 240 — post-hiatus close-out audit (report only)
+
+A verify pass across five sweeps — dependencies/tooling, orphans, instruments-on-real-numbers,
+matrices/config drift, and the launch gate run mechanically — written to `audits/2026-09-post-hiatus.md`. This
+prompt changes NO production code by design; the branch is pushed for review and left UNMERGED.
+
+**Finding:** the build is sound (gate green — 1883 tests, 1880 passing, 3 environment-gated skips; Pint clean;
+Larastan 0; lang parity 2557/2557; no orphaned Actions/notifications/permissions; the font and viewport
+instruments measure real numbers). The one actionable item is routine dependency maintenance — `composer audit`
+reports 7 upstream advisories across Filament, Livewire and league/commonmark, all cleared by a version bump —
+which belongs on its own `chore(deps)` branch and is NOT applied here. Full detail, per sweep, in the report.
