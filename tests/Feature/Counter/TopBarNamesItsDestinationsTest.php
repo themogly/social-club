@@ -380,11 +380,14 @@ class TopBarNamesItsDestinationsTest extends TestCase
         // The assign is the RIGHT operand of `||`+`&&`: refuse the confirm and it never runs.
         $this->assertMatchesRegularExpression('/confirm\(.+\)\)\s*&&\s*window\.location\.assign/s', $admin);
 
-        // Log out is a POST form, so its guard is on submit and cancels the submission itself.
+        // Log out is a POST form, so its guard is on submit and cancels the submission itself. Prompt 239
+        // made the DEVICE logout ALWAYS confirm (it ends the shared-tablet session), so "still confirms" holds
+        // even more strongly — via its own device confirm now, not the dirty one, which lives only on Admin.
         $at = strpos($html, 'data-counter-logout');
         $this->assertNotFalse($at);
         $form = substr($html, max(0, $at - 900), 900);
-        $this->assertStringContainsString('$store.counter?.dirty', $form);
+        $this->assertStringContainsString('window.confirm(', $form);
+        $this->assertStringContainsString(__('¿Cerrar la sesión de este dispositivo? El personal se identifica con su PIN; para volver a entrar hará falta un responsable.'), $form);
         $this->assertStringContainsString('$event.preventDefault()', $form, 'declining must cancel the log out');
     }
 

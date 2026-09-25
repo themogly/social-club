@@ -97,18 +97,23 @@ class CounterScreenSwitcherTest extends TestCase
      */
     public function test_the_confirm_is_on_the_links_that_leave_and_not_on_the_tiles(): void
     {
-        $this->operator(['checkin.manage', 'pos.use', 'pos.bar', 'till.open', 'till.close']);
+        // staff.manage so the device logout renders (prompt 239 — it is a responsable-only leave link now).
+        $this->operator(['checkin.manage', 'pos.use', 'pos.bar', 'till.open', 'till.close', 'staff.manage']);
 
         $html = (string) $this->get(route('counter.home'))->getContent();
 
-        $this->assertStringContainsString('$store.counter?.dirty', $html, 'the confirm is gone entirely');
+        // The device logout is a leave link and carries a confirm — it ends the session, so it always asks.
         $this->assertStringContainsString('data-counter-logout', $html);
+        $logoutAt = strpos($html, 'data-counter-logout');
+        $this->assertStringContainsString('window.confirm(', substr($html, max(0, $logoutAt - 900), 900), 'the leave link lost its confirm');
 
-        // No tile carries it: read each tile's own markup rather than the page's.
+        // No tile carries a leave-confirm: a tile moves within the counter, where the basket is held
+        // server-side, so asking there would be a lie (prompt 205). Read each tile's own markup.
         preg_match_all('/<a[^>]*data-counter-home-tile="[^"]*"[^>]*>/s', $html, $tiles);
         $this->assertNotEmpty($tiles[0], 'no tiles found — nothing was audited');
         foreach ($tiles[0] as $tile) {
             $this->assertStringNotContainsString('$store.counter?.dirty', $tile, 'a tile asks about work it will not lose');
+            $this->assertStringNotContainsString('window.confirm(', $tile);
         }
     }
 
