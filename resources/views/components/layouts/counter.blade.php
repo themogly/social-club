@@ -149,11 +149,19 @@
              home screen, whose lock button and back-to-home guard were dead for exactly this reason. One
              attribute, and the class cannot recur inside the counter. Nested x-data islands (the sede
              switcher, the overflow menu, the 173 surface) are unaffected; Alpine nests scopes. --}}
+        {{-- Prompt 237 — `svh`, not `screen`/`vh`, on the pinning shell. `h-screen`/`min-h-screen` resolve to
+             `100vh`, which on a mobile browser is the LARGEST viewport (URL bar hidden): the shell is taller
+             than what is visible, so the foot of a pinned counter — `Registrar aportación`, `Cobrar` — sits
+             behind the address bar until the operator scrolls, on the very devices (phones handed across the
+             counter) where that button matters most. `svh` is the SMALL viewport height (URL bar shown), the
+             stable floor, so the shell is never taller than the visible area and never shifts as the bar
+             hides. A structural guard (CounterShellUsesStableViewportHeightTest) keeps `screen`/`vh` heights
+             out of the counter shells. --}}
         <div
             x-data="{}"
             @class([
-            'mx-auto flex min-h-screen w-full max-w-6xl flex-col',
-            'md:h-screen md:min-h-0' => $fills,
+            'mx-auto flex min-h-svh w-full max-w-6xl flex-col',
+            'md:h-svh md:min-h-0' => $fills,
         ])>
             {{-- THE CHROME — the skip link and the shared top bar, and it is a COMPONENT (prompt 209).
 

@@ -26,6 +26,12 @@ const VIEWPORTS = [
   { name: '1024x768', width: 1024, height: 768 },
   { name: '1440x560', width: 1440, height: 560 }, // short laptop
   { name: '390x844', width: 390, height: 844 },
+  // Prompt 237 — a real mobile DEVICE profile (touch, isMobile), and a height that is the phone's VISIBLE
+  // area with the URL bar showing (≈844 − a ~180px bar+home-indicator). This is the case `svh` exists for:
+  // the pinned commit must stay above this fold. Headless has no URL bar, so `svh`==`lvh` here and the
+  // screenshot cannot SHOW the difference — that regression is caught structurally by
+  // CounterShellUsesStableViewportHeightTest; this profile is the visual record on a device silhouette.
+  { name: '390x664-device', width: 390, height: 664, isMobile: true, hasTouch: true, deviceScaleFactor: 3 },
 ];
 
 const PAGES = [
@@ -66,6 +72,9 @@ for (const spec of PAGES) {
     for (const theme of ['light', 'dark']) {
       const c = await browser.newContext({
         viewport: { width: vp.width, height: vp.height },
+        // Prompt 237 — a device profile (touch + mobile UA) when the row asks for one, so the counter is
+        // captured on a phone silhouette and not merely at a narrow width.
+        ...(vp.isMobile ? { isMobile: true, hasTouch: true, deviceScaleFactor: vp.deviceScaleFactor ?? 3 } : {}),
         colorScheme: theme,
         reducedMotion: 'reduce',
         ...(spec.auth === false ? {} : { storageState: await ctx.storageState() }),

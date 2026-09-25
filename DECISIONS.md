@@ -12376,3 +12376,40 @@ be true, and that test is about the empty rail, not the gate.
 `composer check` green — Pint clean, Larastan 0, full suite green. **MySQL left to CI**, per the running order.
 `TillSession::open`'s writes, the float, the audit trail and the whole close/count/variance flow are untouched
 — only where it lands the operator afterward changed. Screenshots in `storage/app/screenshots/236/`.
+
+## Prompt 237 — the counter shell measured itself against `100vh`, which is not what the operator can see
+
+The counter's pinning shell (`layouts/counter.blade.php`) sized itself with `min-h-screen` and `md:h-screen`
+— both `100vh`. On a mobile browser `100vh` is the LARGEST viewport, the height with the URL bar HIDDEN, so
+the shell was taller than what was actually on screen while the bar showed. The foot of a pinned counter —
+`Registrar aportación`, `Cobrar`, the check-in button — sat behind the address bar until the operator
+scrolled, worst on the phones handed across the counter where those buttons matter most and the bar is always
+there.
+
+### `svh`, the stable floor
+
+`svh` (small viewport height) is the height with the UA chrome SHOWN — the smallest, stable viewport. A shell
+sized to it is never taller than the visible area and never shifts as the bar hides. The shell is now
+`min-h-svh` + `md:h-svh`. For consistency the three other raw viewport heights in the counter surfaces went
+the same way — the blocking-state min-height, the till open-screen card, and the alta modal's cap
+(`min(880px,92svh)`) — so the counter has no unstable `vh` left. `lvh`/`vh` reintroduce the bug; `dvh` is
+permitted (it never exceeds the visible area) but `svh` is what everything uses.
+
+### The instrument cannot see this one, so the guard is structural
+
+A headless browser has no URL bar, so `100vh` and `100svh` render identically there — a screenshot pass would
+show nothing wrong (the same instrument-audit trap as prompts 228/231/233). `CounterShellUsesStableViewportHeightTest`
+is a structural guard on the class names instead: it strips Blade comments (which NAME the anti-pattern to
+explain the fix) and fails if any counter shell contains `h-screen`/`min-h-screen`/`max-h-screen`, a raw
+`Nvh`, or `lvh`. A planted `h-screen` on any counter view fails it.
+
+### The screenshot matrix gains a device silhouette
+
+`design-sweep.mjs` gains a real mobile DEVICE row (`isMobile`, `hasTouch`, dPR 3) at 390×664 — the phone's
+VISIBLE area with the URL bar showing (≈844 − a ~180px bar+home-indicator). It cannot render the bar itself,
+so it is the visual record on a device profile, not the proof; the structural guard is the proof.
+
+### Verification
+
+`composer check` green — Pint clean, Larastan 0, full suite green. **MySQL left to CI.** No user-facing copy
+changed (no new lang keys). `node --check` clean on the sweep script.
