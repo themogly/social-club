@@ -2,6 +2,7 @@
 
 namespace Tests\Browser;
 
+use App\Actions\Till\OpenTill;
 use App\Enums\Role;
 use App\Livewire\Counter\CounterChrome;
 use App\Livewire\Counter\MembershipCounter;
@@ -48,6 +49,7 @@ class HandoverRecoveryHarnessTest extends TestCase
         $this->actingAs($user);
         session(['counter.location_id' => $location->id]);
         CounterOperator::set($user);
+        (new OpenTill)->handle($location, 'POS-1', 10000); // till-first (prompt 236): starting an alta needs a drawer
 
         // 1–3: hand the tablet over, then Back. This is the page the browser is holding, and its chrome was
         // decided while the handover was active.

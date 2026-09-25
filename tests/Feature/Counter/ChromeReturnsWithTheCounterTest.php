@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\Counter;
 
+use App\Actions\Till\OpenTill;
 use App\Enums\Role;
 use App\Livewire\Counter\BarPos;
 use App\Livewire\Counter\CounterChrome;
@@ -63,6 +64,11 @@ class ChromeReturnsWithTheCounterTest extends TestCase
         $this->actingAs($user);
         session(['counter.location_id' => $this->location->id]);
         CounterOperator::set($user);
+
+        // Till-first (prompt 236): starting a handover alta is counter work, and now refuses without an open
+        // drawer. These tests are about the chrome returning after a handover, not the till — open one so the
+        // handover can begin at all.
+        (new OpenTill)->handle($this->location, 'POS-1', 10000);
 
         return $user;
     }

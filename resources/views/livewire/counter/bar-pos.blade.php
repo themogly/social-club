@@ -30,7 +30,7 @@
         $blocker = \App\Support\CounterBlocker::first([
             \App\Support\CounterBlocker::SEDE => ! $noLocation,
             \App\Support\CounterBlocker::OPERATOR => $this->hasOperator(),
-            \App\Support\CounterBlocker::TILL => $openTill !== null,
+            // No TILL key (prompt 236): RequireOpenTill redirects before this renders; the card is gone too.
         ]);
     @endphp
 
@@ -73,17 +73,6 @@
             icon="🚫"
             :heading="__('Barra desactivada en esta sede')"
             :body="__('Un responsable puede activarla desde la ficha de la sede.')"
-        />
-    @elseif (\App\Support\CounterBlocker::rendersInPage($blocker))
-        {{-- The till, the bar's only remaining precondition — it shares the one drawer. Was a red card with a
-             dark-red button in the basket column; same reason, said once, in navigation colour. --}}
-        <x-counter.blocking-state
-            data-blocker="till"
-            icon="🧾"
-            :heading="__('No hay caja abierta')"
-            :body="__('Abre una caja en este terminal antes de cobrar en barra.')"
-            :action-label="__('Ir a la caja')"
-            :action-href="route('counter.till')"
         />
     @else
         {{-- At lg (1024, the counter's tablet-first width) the basket+Charge (RIGHT) is pinned to a

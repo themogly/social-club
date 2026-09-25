@@ -28,7 +28,8 @@
         $blocker = \App\Support\CounterBlocker::first([
             \App\Support\CounterBlocker::SEDE => ! $noLocation,
             \App\Support\CounterBlocker::OPERATOR => $this->hasOperator(),
-            \App\Support\CounterBlocker::TILL => $openTill !== null,
+            // No TILL key (prompt 236): RequireOpenTill redirects to the open-till screen before this
+            // renders, so an unmet till step never reaches this chain and the card is gone with it.
             \App\Support\CounterBlocker::MEMBER => $member !== null,
         ]);
     @endphp
@@ -62,18 +63,6 @@
                 icon="📍"
                 :heading="$mustChooseLocation ? __('Elige tu sede') : __('Sin sede asignada')"
                 :body="$mustChooseLocation ? __('Trabajas en varias sedes. Selecciona en la barra superior en cuál estás.') : __('No tienes ninguna sede activa. Pide a un responsable que te asigne una para dispensar.')"
-            />
-        @elseif ($blocker === \App\Support\CounterBlocker::TILL)
-            {{-- Was a red card with a dark-red button among the basket's cards. The reason it gave is kept,
-                 said once; the button is navigation, so it is the brand button. Prompt 182 redesigns the
-                 screen it leads to — this branch only stops lying about the colour. --}}
-            <x-counter.blocking-state
-                data-blocker="till"
-                icon="🧾"
-                :heading="__('No hay caja abierta')"
-                :body="__('Abre una caja en este terminal antes de dispensar.')"
-                :action-label="__('Ir a la caja')"
-                :action-href="route('counter.till')"
             />
         @else
             {{-- The member step carries its own fix — the lookup itself, not a link elsewhere. Replaced BOTH

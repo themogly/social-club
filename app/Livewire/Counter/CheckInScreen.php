@@ -155,6 +155,16 @@ class CheckInScreen extends Component
             return;
         }
 
+        // Till-first (prompt 236): a member entering a club that is not trading is exactly the hole the
+        // owner closed. `RequireOpenTill` already redirected the browser here away from the door, but this is
+        // the server-side refusal behind it — the gate is not a picture (CLAUDE.md).
+        [$tillOpen, $tillReason] = $this->sedeTillIsOpen();
+        if (! $tillOpen) {
+            $this->flash($tillReason ?? __('Abre una caja en esta sede antes de continuar.'), 'error');
+
+            return;
+        }
+
         $options = ['method' => $this->scanned ? CheckInMethod::QR : CheckInMethod::MANUAL];
 
         if ($override) {

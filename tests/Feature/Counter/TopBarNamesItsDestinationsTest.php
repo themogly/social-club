@@ -4,6 +4,7 @@ namespace Tests\Feature\Counter;
 
 use App\Actions\Till\OpenTill;
 use App\Enums\Role;
+use App\Exceptions\TillAlreadyOpenException;
 use App\Livewire\Counter\BarPos;
 use App\Livewire\Counter\CounterHome;
 use App\Models\Article;
@@ -81,6 +82,14 @@ class TopBarNamesItsDestinationsTest extends TestCase
 
     private function barHtml(string $route = 'counter.checkin'): string
     {
+        // Till-first (prompt 236): every counter screen now redirects to the open-till screen until a drawer
+        // is open. These tests read the TOP BAR off a rendered counter screen, so they need one open; the bar
+        // is chrome that is identical whether or not a till is open. Idempotent — some tests open one already.
+        try {
+            (new OpenTill)->handle($this->location, 'POS-1', 10000);
+        } catch (TillAlreadyOpenException) {
+        }
+
         return (string) $this->get(route($route))->assertOk()->getContent();
     }
 

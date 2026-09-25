@@ -2,7 +2,9 @@
 
 namespace Tests\Browser;
 
+use App\Actions\Till\OpenTill;
 use App\Enums\Role;
+use App\Exceptions\TillAlreadyOpenException;
 use App\Models\Location;
 use App\Models\Organisation;
 use App\Models\User;
@@ -43,6 +45,10 @@ class TopBar206HarnessTest extends TestCase
             $this->actingAs($user);
             session(['counter.location_id' => $location->id]);
             CounterOperator::set($user);
+            try {
+                (new OpenTill)->handle($location, 'POS-1', 10000);
+            } catch (TillAlreadyOpenException) {
+            } // till-first (prompt 236)
 
             $html = (string) $this->get(route('counter.checkin'))->assertOk()->getContent();
 

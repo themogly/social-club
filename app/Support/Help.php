@@ -429,6 +429,9 @@ class Help
             'title' => 'Cobrar una aportación',
             'intro' => 'Cobrar una aportación de principio a fin en el mostrador, y qué hacer cuando el sistema bloquea.',
             'steps' => [
+                ['title' => 'Abre la caja antes de empezar', 'body' => [
+                    'El mostrador no deja trabajar sin una caja abierta en la sede: si no la hay, te lleva a abrirla y, al terminar, te devuelve a lo que ibas a hacer. Registrar a un socio en un club que no está operando no tiene sentido.',
+                ]],
                 ['title' => 'Identifica al socio', 'body' => [
                     'El mostrador empieza por el socio: sin socio identificado no hay dispensación. Comprueba que aparece al corriente; si no, el sistema te dice el motivo.',
                 ]],

@@ -2,6 +2,7 @@
 
 use App\Http\Middleware\EnforceCounterHandover;
 use App\Http\Middleware\EnforceOrgLockdown;
+use App\Http\Middleware\RequireOpenTill;
 use App\Http\Middleware\SecurityHeaders;
 use App\Http\Middleware\SetLocale;
 use Illuminate\Foundation\Application;
@@ -44,6 +45,11 @@ return Application::configure(basePath: dirname(__DIR__))
         // in as staff, so the gate has to sit in front of EVERY surface, not only the five counter screens
         // that know the mode exists. Before this, `GET /` served them the admin panel.
         $middleware->append(EnforceCounterHandover::class);
+
+        // Prompt 236 — no open till, no counter. AFTER the handover gate (a handover is the applicant holding
+        // the tablet; the till step is the operator's, and the two never overlap) and after the lockdown gate
+        // (a locked club answers nothing). Global for the same reason as those two: it gates before routing.
+        $middleware->append(RequireOpenTill::class);
 
         // Apply the session locale on web routes (after StartSession). The panel
         // adds it to its own stack in AdminPanelProvider.

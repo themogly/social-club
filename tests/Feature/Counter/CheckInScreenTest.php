@@ -169,6 +169,7 @@ class CheckInScreenTest extends TestCase
 
         $this->actingAs($this->operator());
         app(ActiveScope::class)->setLocation($this->location->id);
+        (new OpenTill)->handle($this->location, 'POS-1', 10000); // till-first (prompt 236): the door needs a drawer
 
         Livewire::test(CheckInScreen::class)
             ->set('lookup', $token)

@@ -149,7 +149,12 @@ class CounterBlockingStatesTest extends TestCase
     /**
      * The regression test for the pile. With a sede and an operator but nothing else, main drew THREE things
      * on the dispensary at once (the red till card, the grey member panel and the helper text under the
-     * commit button). Exactly one blocking state renders now, and it is the first unmet link in the chain.
+     * commit button). Exactly one blocking state renders now, and it is the first unmet IN-PAGE link.
+     *
+     * Prompt 236 moved the till step OUT of the page (a `RequireOpenTill` redirect), so with sede + operator
+     * met the first link the screen itself draws is the MEMBER — the till never reaches this component. The
+     * pile is still gone; what "the one" is has shifted down the chain by one, and the till's own proof moved
+     * to {@see RequireOpenTillTest}.
      */
     public function test_the_dispensary_renders_exactly_one_blocking_state_not_a_pile(): void
     {
@@ -157,9 +162,9 @@ class CounterBlockingStatesTest extends TestCase
         $html = Livewire::test(DispensaryPos::class)->html();
 
         $this->assertSame(1, $this->blockerCount($html));
-        $this->assertSame('till', $this->blockerKind($html));
+        $this->assertSame('member', $this->blockerKind($html));
 
-        // The two member statements main showed alongside it are gone, not merely restyled.
+        // The duplicate member statement main showed under the commit button is gone, not merely restyled.
         $this->assertStringNotContainsString(__('Identifica a un socio para poder registrar.'), $html);
     }
 
@@ -184,17 +189,26 @@ class CounterBlockingStatesTest extends TestCase
         }
     }
 
-    /** With the sede and operator met, the till is the next link — on both screens that have one. */
-    public function test_the_screens_with_a_till_step_render_exactly_one_when_only_the_till_is_missing(): void
+    /**
+     * With the sede and operator met and no till open, the till step is no longer drawn IN PAGE (prompt 236 —
+     * it is a `RequireOpenTill` redirect, proven in {@see RequireOpenTillTest}). So no counter screen renders a
+     * till card. What the page shows next is its OWN next link: the dispensary has a member step, so it draws
+     * the member blocker; the bar has neither till nor member in-page, so it is simply usable.
+     */
+    public function test_no_screen_draws_a_till_card_the_till_step_is_now_a_redirect(): void
     {
-        $this->operator();
+        $this->operator(); // sede + operator, no till open
 
-        foreach ([DispensaryPos::class, BarPos::class] as $screen) {
-            $html = Livewire::test($screen)->html();
-
-            $this->assertSame(1, $this->blockerCount($html), $screen);
-            $this->assertSame('till', $this->blockerKind($html), $screen);
+        foreach (self::SCREENS as $screen) {
+            $this->assertStringNotContainsString(
+                'data-blocker="till"',
+                Livewire::test($screen)->html(),
+                $screen.' must not draw a till card — RequireOpenTill redirects before it renders'
+            );
         }
+
+        $this->assertSame('member', $this->blockerKind(Livewire::test(DispensaryPos::class)->html()));
+        $this->assertSame(0, $this->blockerCount(Livewire::test(BarPos::class)->html()));
     }
 
     /** And the screens WITHOUT a till or member step are simply usable at that point — nothing blocks. */
@@ -257,12 +271,18 @@ class CounterBlockingStatesTest extends TestCase
         $this->assertNull(CounterBlocker::first([CounterBlocker::SEDE => true, CounterBlocker::OPERATOR => true]));
     }
 
-    /** The dispensary walks the chain as each link is met: till first, then member, then the work. */
+    /**
+     * The dispensary walks its IN-PAGE chain as each link is met. Prompt 236 took the till OUT of that chain
+     * (a redirect), so with sede + operator the first in-page link is the member, and opening the till does
+     * NOT change what this component renders — it was never the till's in-page card. Selecting a member then
+     * reveals the work. The till's own step is proven at the HTTP layer in {@see RequireOpenTillTest}.
+     */
     public function test_fixing_one_link_reveals_the_next_on_the_dispensary(): void
     {
         $this->operator();
-        $this->assertSame('till', $this->blockerKind(Livewire::test(DispensaryPos::class)->html()));
+        $this->assertSame('member', $this->blockerKind(Livewire::test(DispensaryPos::class)->html()));
 
+        // Opening the till is invisible to this component now — the till is a front-door redirect, not a card.
         $this->openTill();
         $this->assertSame('member', $this->blockerKind(Livewire::test(DispensaryPos::class)->html()));
 
@@ -314,26 +334,23 @@ class CounterBlockingStatesTest extends TestCase
 
     // --- One action, and it resolves what it names -------------------------------
 
-    /** The till state offers exactly one action, and it goes to the Caja screen. */
-    public function test_the_till_blocking_state_has_one_action_that_resolves_it(): void
+    /**
+     * Prompt 236 retargets the two till-card tests that stood here — one for the dispensary, one for the bar.
+     * The till step used to render an in-page card with an "Ir a la caja" button; it is now the counter's
+     * front door, and `RequireOpenTill` redirects before the screen renders. So neither POS carries an
+     * in-page action to the caja anymore. The redirect itself — one destination, the round trip back after
+     * opening — is proven in {@see RequireOpenTillTest}.
+     */
+    public function test_the_till_step_is_a_redirect_not_an_in_page_action(): void
     {
-        $this->operator();
-        $html = Livewire::test(DispensaryPos::class)->html();
+        $this->operator(); // sede + operator, no till open
 
-        $this->assertSame(1, substr_count($html, 'data-blocker-action'));
-        $this->assertStringContainsString(route('counter.till'), $html);
-        $this->assertStringContainsString(__('Ir a la caja'), $html);
-    }
+        foreach ([DispensaryPos::class, BarPos::class] as $screen) {
+            $html = Livewire::test($screen)->html();
 
-    /** The bar's till state carries the same one action to the same place. */
-    public function test_the_bars_till_blocking_state_has_one_action_that_resolves_it(): void
-    {
-        $this->operator();
-        $html = Livewire::test(BarPos::class)->html();
-
-        $this->assertSame('till', $this->blockerKind($html));
-        $this->assertSame(1, substr_count($html, 'data-blocker-action'));
-        $this->assertStringContainsString(route('counter.till'), $html);
+            $this->assertStringNotContainsString('data-blocker="till"', $html, $screen.' must not draw a till card');
+            $this->assertStringNotContainsString(__('Ir a la caja'), $html, $screen.' must not carry an in-page link to the caja');
+        }
     }
 
     /**
@@ -405,31 +422,41 @@ class CounterBlockingStatesTest extends TestCase
 
     // --- Colour has one meaning --------------------------------------------------
 
-    /** Blocked is neutral; red is DESTRUCTIVE. `Ir a la caja` is navigation, so it is the brand button. */
+    /**
+     * Blocked is neutral; red is DESTRUCTIVE. Prompt 236 deleted the till card — the one blocking state that
+     * had ever carried a red button ("Ir a la caja" was `bg-error` on an already-blocked screen). The
+     * invariant stands for the states that remain in-page — sede and member — and neither reaches for the
+     * destructive colour on its remedy.
+     */
     public function test_no_blocking_state_uses_the_destructive_colour(): void
     {
+        // The sede state (nothing met below it).
+        $this->operatorWithoutSede();
+        $sede = Livewire::test(DispensaryPos::class)->html();
+        $this->assertSame('sede', $this->blockerKind($sede));
+        $this->assertStringNotContainsString('bg-error px-', $sede); // no solid destructive button
+
+        // The member state (sede + operator met; the till is a redirect, not an in-page card).
         $this->operator();
-
-        foreach ([DispensaryPos::class, BarPos::class] as $screen) {
-            $html = Livewire::test($screen)->html();
-
-            $this->assertSame('till', $this->blockerKind($html), $screen);
-            $this->assertStringNotContainsString('bg-error px-4', $html, $screen); // the old dark-red button
-            $this->assertMatchesRegularExpression(
-                '/data-blocker-action\s+class="[^"]*bg-brand/',
-                $html,
-                $screen.': Ir a la caja must be the brand button, not the destructive one'
-            );
-        }
+        $member = Livewire::test(DispensaryPos::class)->html();
+        $this->assertSame('member', $this->blockerKind($member));
+        $this->assertStringNotContainsString('bg-error px-', $member);
     }
 
-    /** Every control in a blocking state clears the counter's 44x44 floor. */
+    /**
+     * Every control in a blocking state clears the counter's 44x44 floor. The till card's button used to be
+     * measured here; it is gone (prompt 236 — a redirect). The member state is the in-page blocker that still
+     * carries a control, and its lookup field clears the floor.
+     */
     public function test_blocking_state_controls_meet_the_touch_floor(): void
     {
         $this->operator();
         $html = Livewire::test(DispensaryPos::class)->html();
 
-        $this->assertMatchesRegularExpression('/data-blocker-action\s+class="[^"]*min-h-\[2\.75rem\]/', $html);
+        $this->assertSame('member', $this->blockerKind($html));
+        $this->assertStringContainsString('data-blocker-action', $html); // the inline lookup, one action
+        // The lookup field itself: h-12 (48px), over the 44px floor. Scoped to the input's own tag.
+        $this->assertMatchesRegularExpression('/id="member-lookup"[^>]*h-12/', $html);
     }
 
     // --- The gates are still gates ----------------------------------------------

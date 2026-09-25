@@ -6,10 +6,12 @@ use App\Actions\Members\AnonymiseMember;
 use App\Actions\Members\ApproveApplication;
 use App\Actions\Members\ExportMemberData;
 use App\Actions\Members\IssueApplicationInvite;
+use App\Actions\Till\OpenTill;
 use App\Enums\ApplicationStatus;
 use App\Enums\ConsentChannel;
 use App\Enums\Role;
 use App\Enums\SettingType;
+use App\Exceptions\TillAlreadyOpenException;
 use App\Livewire\Counter\MembershipCounter;
 use App\Models\ConsentRecord;
 use App\Models\DocumentAccessLog;
@@ -100,9 +102,19 @@ class SignedSignUpTest extends TestCase
     /** Route 2: the tablet handed over at the counter — the same public form, a different way in. */
     private function handedOver(): MemberApplication
     {
+        $this->openCounterTill(); // till-first (prompt 236): starting a sign-up at the counter needs a drawer
         Livewire::test(MembershipCounter::class)->call('toggleAlta')->call('handOverForAlta');
 
         return $this->latestApplication();
+    }
+
+    /** Idempotent: the counter sign-up routes need an open drawer; the emailed route (route 1) does not. */
+    private function openCounterTill(): void
+    {
+        try {
+            (new OpenTill)->handle($this->location, 'POS-1', 10000);
+        } catch (TillAlreadyOpenException) {
+        }
     }
 
     /** @param array<string, mixed> $overrides */
@@ -130,6 +142,7 @@ class SignedSignUpTest extends TestCase
     /** Route 3: staff typing it in with the person in front of them, who signs. */
     private function submitStaffForm(?string $signature = null): void
     {
+        $this->openCounterTill(); // till-first (prompt 236): the staff-typed route is counter work too
         Livewire::test(MembershipCounter::class)
             ->call('toggleAlta')
             ->call('toggleStaffAltaForm')

@@ -63,6 +63,7 @@ class BlockingStatesHarnessTest extends TestCase
 
         if ($withLocation) {
             app(ActiveScope::class)->setLocation($this->location->id);
+            session(['counter.location_id' => $this->location->id]); // so RequireOpenTill sees the sede
         }
 
         CounterOperator::set($user);
@@ -133,11 +134,13 @@ class BlockingStatesHarnessTest extends TestCase
         $sede = $this->get(route('counter.pos'))->getContent();
         $this->write('sede', $sede);
 
-        // 2) TILL — a sede and an operator, but no till open at this terminal. This is the COLD START: the
-        // state in which main drew three things at once.
+        // 2) TILL — a sede and an operator, but no till open. Prompt 236 took the till card OUT of the page:
+        // the counter's front door redirects to the open-till screen, which IS the state to capture now (the
+        // remedy the redirect lands on), not an in-page card.
         $this->operator();
         $this->sellableGenetic('Amnesia Haze');
-        $till = $this->get(route('counter.pos'))->getContent();
+        $this->get(route('counter.pos'))->assertRedirect(route('counter.till'));
+        $till = (string) $this->get(route('counter.till'))->getContent();
         $this->write('till', $till);
 
         // 3) MEMBER — the till is open; the last link in the chain, carrying its own lookup.
@@ -150,10 +153,11 @@ class BlockingStatesHarnessTest extends TestCase
         $this->assertSame(1, substr_count($sede, 'data-counter-blocker'));
         $this->assertStringContainsString('data-blocker="sede"', $sede);
 
-        $this->assertSame(1, substr_count($till, 'data-counter-blocker'));
-        $this->assertStringContainsString('data-blocker="till"', $till);
-        // Colour has one meaning: the action is navigation, so it is the brand button, not bg-error.
-        $this->assertMatchesRegularExpression('/data-blocker-action\s+class="[^"]*bg-brand/', $till);
+        // The till is a redirect, not a card (prompt 236): the captured state is the open-till SCREEN with its
+        // one open action — the remedy — rather than a `data-blocker="till"` card that no longer exists.
+        $this->assertStringNotContainsString('data-blocker="till"', $till);
+        $this->assertStringContainsString('data-till-open-screen', $till);
+        $this->assertStringContainsString('data-till-open-action', $till);
 
         $this->assertSame(1, substr_count($member, 'data-counter-blocker'));
         $this->assertStringContainsString('data-blocker="member"', $member);

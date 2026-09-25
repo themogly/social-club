@@ -31,6 +31,13 @@ class CounterBlocker
 
     public const OPERATOR = 'operator';
 
+    /**
+     * The till step. **Prompt 236 reversed this docblock's own note.** It read *"Recepción has no till or
+     * member step"* — the owner overrode it: *"if the till isn't open, make them do it before doing anything
+     * else."* Recording a member entering a club that is not trading, or starting a sign-up with no drawer
+     * open, is exactly the hole. Every counter screen — the hub, the door, Socios, the POS, the Bar — now
+     * requires an open till at the sede, enforced by `RequireOpenTill` rather than a card per screen.
+     */
     public const TILL = 'till';
 
     public const MEMBER = 'member';
@@ -42,7 +49,12 @@ class CounterBlocker
      * The single blocker to show, or null when the screen is usable.
      *
      * @param  array<string, bool>  $met  keyed by constant; a precondition absent from the array does not
-     *                                    apply to this screen (Recepción has no till or member step).
+     *                                    apply to this screen's IN-PAGE chain. The TILL step no longer appears
+     *                                    in any screen's `$met` array — prompt 236 moved it OUT of the page
+     *                                    and into `RequireOpenTill`, a counter-wide guard that redirects to
+     *                                    the open-till screen before the component renders. So the TILL
+     *                                    constant stays for the chain's ORDER (member must not jump it) but is
+     *                                    never a rendered blocker now.
      */
     public static function first(array $met): ?string
     {

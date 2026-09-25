@@ -2,6 +2,7 @@
 
 namespace Tests\Browser;
 
+use App\Actions\Till\OpenTill;
 use App\Enums\DashboardAlert;
 use App\Enums\MembershipStatus;
 use App\Enums\MemberStatus;
@@ -44,6 +45,7 @@ class AlertsHarnessTest extends TestCase
         $this->actingAs($user);
         session(['counter.location_id' => $location->id]);
         CounterOperator::set($user);
+        (new OpenTill)->handle($location, 'POS-1', 10000); // till-first (prompt 236): the counter is gated
 
         $tier = MembershipTier::factory()->create(['organisation_id' => $org->id]);
 

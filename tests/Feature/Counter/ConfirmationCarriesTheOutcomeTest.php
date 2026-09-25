@@ -368,6 +368,7 @@ class ConfirmationCarriesTheOutcomeTest extends TestCase
     public function test_a_check_in_confirms_once(): void
     {
         $this->operator();
+        (new OpenTill)->handle($this->location, 'POS-1', 10000); // till-first (prompt 236): the door needs a drawer
         $member = $this->member();
 
         $html = Livewire::test(CheckInScreen::class)
