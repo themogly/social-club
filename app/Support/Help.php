@@ -235,6 +235,8 @@ class Help
         ]],
         Seguridad::class => ['permission' => 'lockdown.manage', 'title' => 'Seguridad', 'body' => [
             'Desde aquí se activa el bloqueo de seguridad ante una amenaza, se ensaya con un simulacro y se consulta el historial de activaciones.',
+            // Prompt 235: the PIN lockout's key lives here too, and the Manual page says so.
+            'También se ven y se limpian los bloqueos del teclado de PIN del mostrador: si alguien falla el PIN varias veces seguidas, el teclado de esa sede se bloquea un tiempo que crece con cada bloqueo. «Desbloquear» borra los intentos y reinicia la escalada — el siguiente bloqueo vuelve a durar 1 minuto. El número de fallos permitidos se ajusta por sede, en la ficha de la sede.',
             'El guion completo de qué hacer y cómo se vuelve a entrar está en el Manual, en «Bloqueo de seguridad».',
         ]],
         ManageSettings::class => ['permission' => 'settings.manage', 'title' => 'Ajustes de la organización', 'body' => [
