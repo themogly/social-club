@@ -12633,3 +12633,40 @@ Larastan 0; lang parity 2557/2557; no orphaned Actions/notifications/permissions
 instruments measure real numbers). The one actionable item is routine dependency maintenance — `composer audit`
 reports 7 upstream advisories across Filament, Livewire and league/commonmark, all cleared by a version bump —
 which belongs on its own `chore(deps)` branch and is NOT applied here. Full detail, per sweep, in the report.
+
+## Prompt 243 — the counter sign-up refuses at the door, lands on the review, and carries the tier
+
+The staff-filled sign-up worked end to end and told the operator nothing: fill four steps, watch the modal
+reset to the method chooser with a "Solicitud creada. Revísala para dar de alta." flash, and conclude it
+failed. The authorisation the tester asked for existed one screen away, behind a pending list he never opened.
+
+### Refuse at the door, not at the end
+
+236's sign-up refusal lived in `issueApplication()` — the END of the form, after everything was typed. With
+241's guard the counter is unreachable without a till at all, but the observable refusal now fires at the
+OPENING: `toggleAlta()` (the *Nuevo socio* button) checks `sedeTillIsOpen()` and refuses before the wizard
+opens (prompt 60 — the block is seen before the work). The submit still refuses server-side as the backstop.
+
+### The staff route lands on the review
+
+A successful `submitStaffAlta` no longer resets to the chooser with a flash (234 — the screen shows the
+outcome). It sets `altaApplicationId` to the created application and lands on THAT application's review — the
+summary, the photo, the signature status, the tier — with *Aprobar* there (permission `applications.review`,
+held by every role by default). The pending list stays the SECOND path, unchanged, for anything not approved on
+the spot. The applicant and handover routes are untouched — they end at the thank-you page by design.
+
+### Carry the tier — and a corrected premise
+
+The prompt said "step 3 chose the membership tier." It did not: the wizard's Membresía step collected
+`is_therapeutic` + `declared_monthly_g`, and the tier was chosen ONLY at the review. So "Elige una cuota antes
+de aprobar" was not a double-ask — it was the first ask, on a screen the tester reached disorientedly. Honoured
+the intent by making it true: the Membresía step now carries a tier `<select>` bound to the same `altaTierId`
+the review binds, and the staff landing keeps that value, so the review pre-selects it and *Aprobar* does not
+ask again. Left blank in the wizard, the review asks once (the honest block). `ApproveApplication`,
+`approveAlta`'s checks, the tier/fee logic and 220's signature requirement are untouched — what is stored and
+required is the same; only when the operator sees it changed.
+
+### Verification
+
+`composer check` green — including the landing test written to FAIL against `main` (there the submit resets to
+the chooser, `altaApplicationId` null, `data-alta-review` absent). MySQL left to CI. New copy in both locales.

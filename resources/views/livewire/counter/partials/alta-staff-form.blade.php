@@ -158,6 +158,22 @@
 
     {{-- ============ 3 · MEMBRESÍA ============ --}}
     @if ($altaStep === 3)
+        {{-- The membership tier (prompt 243). Chosen HERE, in the Membresía step, and CARRIED to the review so
+             the operator is never asked for the cuota twice — "Elige una cuota antes de aprobar" can only
+             appear if it is left blank here and blank at the review. Same `altaTierId` the review binds, same
+             `altaTiers()` list; optional to advance (the review re-asks only when it was skipped). --}}
+        <div>
+            <label for="alta-wizard-tier" class="block text-sm font-medium text-ink-muted dark:text-slate-400">{{ __('Cuota / tier') }}</label>
+            <select id="alta-wizard-tier" wire:model="altaTierId" data-alta-wizard-tier
+                    class="mt-1 h-12 w-full rounded-xl border border-line bg-surface px-4 text-base dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100">
+                <option value="">{{ __('Elige una cuota…') }}</option>
+                @foreach ($this->altaTiers() as $tier)
+                    <option value="{{ $tier->id }}">{{ $tier->name }}</option>
+                @endforeach
+            </select>
+            <p class="mt-1 text-xs text-ink-muted dark:text-slate-400">{{ __('La confirmas al revisar, antes de dar de alta.') }}</p>
+        </div>
+
         {{-- Uso terapéutico. Article 9 special-category data, so it is a deliberate tick with the applicant
              present, never a default. The whole row is the tap target (217's construction). --}}
         <div>
