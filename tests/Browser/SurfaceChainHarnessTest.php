@@ -2,6 +2,7 @@
 
 namespace Tests\Browser;
 
+use App\Actions\Till\OpenTill;
 use App\Enums\Role;
 use App\Livewire\Counter\TillSession;
 use App\Models\Location;
@@ -82,6 +83,10 @@ class SurfaceChainHarnessTest extends TestCase
 
         // 3) IDENTIFIED — prompt 188's "after". Same sede, now with an operator: the surface is DOWN and the
         // counter is on screen. Paired with with-sede.html this is the before/after of identifying.
+        // A till is open first (prompt 236): with a sede and an operator but no drawer, the counter now
+        // redirects to the open-till screen, so the identified counter is only reachable with one open. It
+        // stays open for step 4's handover, which is a shift change on that same drawer.
+        (new OpenTill)->handle($centro, 'POS-1', 10000);
         session(['counter.location_id' => $centro->id]);
         CounterOperator::set($user);
         $identified = $this->actingAs($user)->get(route('counter.checkin'))->getContent();

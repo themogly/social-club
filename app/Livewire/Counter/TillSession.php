@@ -16,6 +16,7 @@ use App\Enums\TillSessionStatus;
 use App\Enums\UnitType;
 use App\Exceptions\TillAlreadyOpenException;
 use App\Exceptions\TillClosedException;
+use App\Http\Middleware\RequireOpenTill;
 use App\Livewire\Counter\Concerns\IdentifiesOperator;
 use App\Livewire\Counter\Concerns\ResolvesCounterLocation;
 use App\Models\Batch;
@@ -26,6 +27,7 @@ use App\Models\StockTakeLine;
 use App\Models\TillSession as TillSessionModel;
 use App\Models\User;
 use App\Support\CounterOperator;
+use App\Support\CounterScreens;
 use App\Support\Money;
 use App\Support\Settings;
 use App\Support\TerminalName;
@@ -350,14 +352,57 @@ class TillSession extends Component
         try {
             (new OpenTill)->handle($location, $terminal, $floatCents);
         } catch (TillAlreadyOpenException) {
-            $this->flash(__('Ya hay una caja abierta en este terminal.'), 'error');
+            // Two devices, one drawer (prompt 236): another terminal opened this sede's till between the
+            // redirect and this tap. The precondition is now MET, so this is not an error to correct — follow
+            // the operator to where they were heading, exactly as a successful open would.
+            $this->continueToIntended();
 
             return;
         }
 
         $this->terminal = $terminal;
         $this->floatInput = '';
-        $this->flash(__('Caja abierta.'), 'success');
+
+        // Prompt 236 — land the operator on the screen they were sent here from, or the sede's configured
+        // landing. Same consumer as the two-device continue below, so the round trip is written once.
+        $this->continueToIntended();
+    }
+
+    /**
+     * The counter URL the front-door guard stashed when it redirected the operator here, if one is still
+     * pending. A PEEK, not a pull: render() calls it every cycle to decide whether to offer "Continuar", so
+     * consuming it here would drop the destination before the operator taps.
+     */
+    public function pendingContinueUrl(): ?string
+    {
+        $url = session(RequireOpenTill::INTENDED_KEY);
+
+        return is_string($url) && $url !== '' ? $url : null;
+    }
+
+    /**
+     * Follow the operator to where they were heading. Two-device case (prompt 236): device B is sent here with
+     * no till open; before it opens one, device A opens the sede's shared drawer. B's next render flips to the
+     * open-session branch and offers this, so B continues to its intended screen rather than opening a second
+     * till. Also the tail of a successful `open()`. Consumes the stashed URL so it cannot fire again next time.
+     */
+    public function continueToIntended(): void
+    {
+        $url = session()->pull(RequireOpenTill::INTENDED_KEY);
+
+        $this->redirect(is_string($url) && $url !== '' ? $url : $this->landingUrl());
+    }
+
+    /**
+     * Where "continue" lands when there was no intended screen — the counter's own per-user landing (prompt
+     * 189's `counter_landing`, resolved PER USER so a `till.open`-only operator is never sent to a screen they
+     * cannot open). One resolver, not a second copy of the rule.
+     */
+    private function landingUrl(): string
+    {
+        $route = CounterScreens::landingRouteFor($this->currentUser()) ?? 'counter.home';
+
+        return route($route);
     }
 
     // --- Cash movements --------------------------------------------------------

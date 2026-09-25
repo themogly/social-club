@@ -740,6 +740,17 @@ trait SignsUpMembers
      */
     private function issueApplication(User $operator, ?string $email, ?string $reference): ?MemberApplication
     {
+        // Till-first (prompt 236): starting a sign-up at the counter — handover, staff-typed, or emailed
+        // invite — is counter work, so it needs an open till at the sede. The guard already redirected the
+        // browser off Socios; this is the server refusal behind it. The APPLICANT's own emailed form is a
+        // different route (`socio/*`) and never reaches here, so a midnight applicant needs no till.
+        [$tillOpen, $tillReason] = $this->sedeTillIsOpen();
+        if (! $tillOpen) {
+            $this->flash($tillReason ?? __('Abre una caja en esta sede antes de continuar.'), 'error');
+
+            return null;
+        }
+
         try {
             return (new IssueApplicationInvite)->handle($operator, $this->locationId, $email, $reference);
         } catch (\Throwable $e) {

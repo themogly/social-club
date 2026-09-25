@@ -305,6 +305,23 @@
             {{-- ============ Open session: the LIVE summary + movements + close ============ --}}
             @php $b = $breakdown; @endphp
 
+            {{-- Two devices, one drawer (prompt 236). This device was sent here with no till open; another
+                 terminal opened the sede's shared drawer first, so the precondition is now met elsewhere and
+                 the open form has been replaced by this summary. Offer the one thing the operator came for:
+                 continue to where they were heading. Only when the guard actually stashed a destination —
+                 otherwise this is just the ordinary till screen, reached on purpose. --}}
+            @if ($this->pendingContinueUrl())
+                <div data-till-continue class="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-brand/30 bg-brand-tint px-4 py-3 dark:border-brand/40 dark:bg-slate-800">
+                    <p class="text-sm font-medium text-brand-dark dark:text-slate-200">{{ __('Ya hay una caja abierta en esta sede.') }}</p>
+                    <button
+                        type="button"
+                        wire:click="continueToIntended"
+                        data-till-continue-action
+                        class="inline-flex min-h-[2.75rem] items-center justify-center rounded-xl bg-brand px-6 text-sm font-semibold text-white transition hover:bg-brand-dark"
+                    >{{ __('Continuar') }}</button>
+                </div>
+            @endif
+
             {{-- Prompt 186: while a handover count is being taken the breakdown is withheld, exactly as the
                  close-out withholds it. The whole summary section goes with it — leaving the drawer's
                  expected figure on screen a few centimetres above the count box would make the "blind"

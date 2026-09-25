@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\Counter;
 
+use App\Actions\Till\OpenTill;
 use App\Enums\Role;
 use App\Livewire\Counter\CounterHome;
 use App\Models\Location;
@@ -170,6 +171,7 @@ class CounterHomeTest extends TestCase
         $forbidden = Location::factory()->create(['organisation_id' => $this->org->id]);
         CounterOperator::set($user);
         session(['counter.location_id' => $this->location->id]);
+        (new OpenTill)->handle($this->location, 'POS-1', 10000); // till-first (prompt 236): the hub is now gated
 
         $html = (string) $this->actingAs($user)->get(route('counter.home'))->assertOk()->getContent();
 
@@ -192,6 +194,10 @@ class CounterHomeTest extends TestCase
     {
         $user = $this->actor(Role::OWNER);
         CounterOperator::set($user);
+        // Till-first (prompt 236): a single-sede OWNER auto-adopts the sede on the first GET, so the second is
+        // gated. Open a drawer so both screens render — the bar chrome under test is the same either way.
+        session(['counter.location_id' => $this->location->id]);
+        (new OpenTill)->handle($this->location, 'POS-1', 10000);
 
         foreach (['counter.checkin', 'counter.home'] as $route) {
             $html = (string) $this->actingAs($user)->get(route($route))->assertOk()->getContent();

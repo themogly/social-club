@@ -154,6 +154,7 @@ class CounterHubTest extends TestCase
         $user = $this->operator();
         Location::factory()->create(['organisation_id' => $this->org->id, 'name' => 'Sede Norte'])
             ->users()->attach($user->id);
+        (new OpenTill)->handle($this->location, 'POS-1', 10000); // till-first (prompt 236): the hub is gated
 
         $html = (string) $this->get(route('counter.home'))->assertOk()->getContent();
         $stripped = (string) preg_replace('/wire:snapshot="[^"]*"/', '', $html);
@@ -514,6 +515,10 @@ class CounterHubTest extends TestCase
     {
         $staff = $this->operator(Role::STAFF);
         $this->assertTrue($staff->can('lockdown.initiate'));
+        // Till-first (prompt 236): the POS is gated until a drawer is open. One open till at the sede lets both
+        // this operator and the permission-less `$without` below render the POS — the panic control's presence
+        // is what is under test, and the panic path itself is NEVER gated by the till (prompt 121).
+        (new OpenTill)->handle($this->location, 'POS-1', 10000);
 
         $html = (string) $this->get(route('counter.pos'))->getContent();
         $this->assertStringContainsString('data-counter-panic', $html, 'staff must be able to reach it');

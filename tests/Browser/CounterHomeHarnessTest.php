@@ -2,6 +2,7 @@
 
 namespace Tests\Browser;
 
+use App\Actions\Till\OpenTill;
 use App\Enums\Role;
 use App\Models\Location;
 use App\Models\Organisation;
@@ -39,6 +40,7 @@ class CounterHomeHarnessTest extends TestCase
         $this->actingAs($user);
         session(['counter.location_id' => $sede->id]);
         CounterOperator::set($user);
+        (new OpenTill)->handle($sede, 'POS-1', 10000); // till-first (prompt 236): the hub is gated
 
         $html = $this->get(route('counter.home'))->getContent();
 

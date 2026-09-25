@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\Help;
 
+use App\Actions\Till\OpenTill;
 use App\Enums\Role;
 use App\Filament\Pages\Glosario;
 use App\Filament\Resources\Members\MemberResource;
@@ -151,6 +152,8 @@ class HelpTest extends TestCase
         CounterOperator::set($user);
 
         app(ActiveScope::class)->setLocation($this->location->id);
+        session(['counter.location_id' => $this->location->id]);
+        (new OpenTill)->handle($this->location, 'POS-1', 10000); // till-first (prompt 236): the hub is gated
 
         foreach (['es', 'en'] as $locale) {
             app()->setLocale($locale);

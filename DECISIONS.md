@@ -12284,3 +12284,95 @@ Screenshots in `storage/app/screenshots/235/`: the Seguridad section clear and l
 out-of-band via redis — driving the PIN pad through Alpine across Livewire morphs is unreliable, and the
 feature is pinned by the feature test; the shots are the visual record), the cleared state, the sede form's
 field, and the overlay hint.
+
+## Prompt 236 — no open till, no counter: the open-till step becomes the counter's front door
+
+The owner: *"if the till isn't open, make them do it before doing anything else."* Prompt 175's chain is
+`sede → operator → till → member`, but only the POS and the bar ever carried the TILL step in-page — the hub,
+the door and Socios resolved `sede → operator` and stopped. So an operator could reach the door and record a
+member entering a club that was not trading, or start a sign-up, with no drawer open. And where the till DID
+block, it was a red card with a link the operator had to notice and follow.
+
+### The till step left the page and became ONE guard
+
+`App\Http\Middleware\RequireOpenTill`, appended globally (after `EnforceCounterHandover`, like it and
+`EnforceOrgLockdown` and for the same reason: it must gate before the router matches, so it matches on PATHS,
+and `$request->route()` is null there). When a sede is adopted and an operator is identified (175's first two
+steps stay in-page on 173's surface) and the sede has no open till, any counter request is sent to the open
+screen. The hub, the door, Socios, the POS, the bar, and every screen added later are covered by construction
+— not a card per screen.
+
+`CounterBlocker::TILL` STAYS in `CHAIN` for the ORDER (member must never jump the till), but no screen puts
+the TILL key in its `$met` array anymore, so it is never a rendered blocker. The two in-page till cards (POS
+and bar) are deleted. The docblock that once read *"Recepción has no till or member step"* is reversed in
+place with the owner's quote — a reversed decision recorded beats one silently contradicted.
+
+### The allowlist — what answers WITHOUT a till, and why
+
+`counter/till` (the destination — you cannot open the till from a redirect to the till), `counter/location`
+(the sede switcher), `counter/panic` (NEVER gated — prompt 121: a robbery does not wait for a float), the
+receipts (reads of committed transactions), `livewire/*` (the PIN pad, the lock, `open()` itself, every
+counter write), `filament/*` (logout + assets), `up`, and `reactivar/*` (lockdown lift — already not a
+`counter/*` path, kept as documentation of intent). One judgement call: **`counter/members/*/photo` is
+allowlisted** — it is an XHR fired from a member card already on screen (mid-serve, with a till open), it must
+get a real response not a 302 to an HTML page, and identity upkeep is not trading. `guardsPath()` and
+`isAllowedPath()` are the ONE classifier, shared by `handle()` and the class guard test, so a route cannot be
+gated at runtime yet classified differently by the test that polices it.
+
+### Never a 503, never a dead end
+
+The open-till check **degrades OPEN** on any error (prompt 124): a cache/DB blip falls through to the page's
+own in-page blockers, never a redirect loop or an error page. The redirect stashes the intended URL under its
+OWN session key (`counter.till_intended_url`), NOT Laravel's `url.intended` — a stray login round trip must
+never send somebody to a counter screen. GET only: a POST is a write, and replaying it after the till opens is
+not what "continue" means. `TillSession::open()` consumes the stashed URL and lands the operator back where
+they were heading, or on the per-user counter landing (prompt 189 — resolved per user so a `till.open`-only
+operator is never sent to a screen they cannot open).
+
+**Two devices, one drawer.** Device B is sent to the till with no drawer open; device A opens the sede's
+shared till first. B's next render flips to the open-session branch and offers **"Continuar"** to where it was
+heading — it does not open a second till. The `open()` race (B taps Abrir after A already opened) catches
+`TillAlreadyOpenException` and follows through to the intended/landing rather than flashing an error: the
+precondition is now MET, so it is not an error to correct.
+
+**The remedy at the destination.** STAFF — the floor role redirected most — holds `till.open`
+(Permissions.php), so the redirect never traps a counter operator at a 403; the open screen, with its one
+open action, IS the remedy. `TillSession::mount()`'s 403 for a user with NEITHER `till.open` nor `till.close`
+is a genuine authorization boundary and is kept untouched (182's till tests pass unchanged).
+
+### The gate is not a picture — server-side refusals behind the redirect
+
+A redirect is a picture: a crafted Livewire post reaches the door's `checkIn()` or the sign-up's
+`handOverForAlta()` directly (`livewire/*` is allowlisted so the PIN pad works). Both now call
+`ResolvesCounterLocation::sedeTillIsOpen()` before writing and refuse with prompt 60's observable reason. The
+money paths are NOT touched — they already refuse without a till, at the till. **The applicant's own emailed
+form is the explicit carve-out**: `socio/*` is not a counter path, so `RequireOpenTill` never touches it — a
+member finishing an invite at midnight has no till and no counter session and must not be bounced.
+
+### The 175 blocking-state tests, amended in place
+
+Seven `CounterBlockingStatesTest` cases encoded the in-page till CARD. The card is deleted, so: the three that
+walk the POS's in-page chain now expect `member` (the till left the page — the first in-page link with sede +
+operator is the member); the two till-card action tests are retargeted into one asserting the till step is a
+redirect, not an in-page action; the colour and touch-floor invariants are retargeted to the states that
+remain in-page (sede, member). The pure `CounterBlocker::first()` ordering tests are untouched — the chain
+still orders `sede → operator → till → member`. The redirect itself is proven in the new `RequireOpenTillTest`
+(the class guard that classifies every counter route and fails against `main` for the hub/door/Socios; the
+intended-URL round trip; the allowlist reachable without a till; the two server refusals; the applicant
+carve-out; two-device Continuar; and closing the till re-blocking the counter).
+
+### Collateral: a new precondition, honestly propagated
+
+Pre-236 tests that reached a counter SCREEN with an operator and a sede but no till now correctly redirect, so
+each opens a till where it was reaching the screen (Alerts, TopBar, CounterHome, CounterHub, OperatorUnlock,
+ChromeReturns, CheckInScreen, Confirmation, Help) — the thing each test names (an alert's landing, the top
+bar, the handover chrome, a check-in's attribution) is unchanged by a till being open. One exception: the hub
+"nothing pending" empty-state test now renders the component directly, because **an open till is itself an
+`UNRECONCILED_TILL` alert** — "nothing pending" and "a till open enough to reach the hub over HTTP" cannot both
+be true, and that test is about the empty rail, not the gate.
+
+### Verification
+
+`composer check` green — Pint clean, Larastan 0, full suite green. **MySQL left to CI**, per the running order.
+`TillSession::open`'s writes, the float, the audit trail and the whole close/count/variance flow are untouched
+— only where it lands the operator afterward changed. Screenshots in `storage/app/screenshots/236/`.

@@ -82,6 +82,10 @@ class OperatorUnlockTest extends TestCase
 
         $this->assertSame($this->operator->id, CounterOperator::id());
 
+        // Till-first (prompt 236): counter.checkin is gated until a drawer is open. The top bar under test is
+        // the same either way, so open one.
+        $this->openTill();
+
         // "Who is working" moved to the top bar when the inline strip was retired — it renders in the
         // layout, so it is asserted through a real request rather than on the component.
         $this->actingAs($this->device)->get(route('counter.checkin'))
@@ -119,6 +123,7 @@ class OperatorUnlockTest extends TestCase
     {
         CounterOperator::set($this->operator);
         $other = $this->staff('Otro Turno', '9999');
+        $this->openTill(); // till-first (prompt 236): the checkin screen is gated once a sede is adopted
 
         $this->actingAs($this->device)->get(route('counter.checkin'))->assertSee('Marta Operadora');
 
@@ -198,6 +203,7 @@ class OperatorUnlockTest extends TestCase
     public function test_a_check_in_records_the_unlocked_operator(): void
     {
         $member = $this->eligibleMember();
+        $this->openTill(); // till-first (prompt 236): the door refuses entry without an open drawer
 
         Livewire::actingAs($this->device)->test(CheckInScreen::class)
             ->set('operatorPin', '4321')->call('unlockOperator')

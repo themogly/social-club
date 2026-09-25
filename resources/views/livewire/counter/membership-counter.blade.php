@@ -25,12 +25,6 @@
     @else
         @include('livewire.counter.partials.counter-flash', ['anchor' => 'data-commit-feedback'])
 
-        @unless ($openTill)
-            <div class="mb-4 rounded-xl border border-warning/40 bg-warning/10 px-4 py-3 text-sm text-warning">
-                {{ __('No hay caja abierta en esta sede: solo puedes cobrar cuotas con monedero hasta que se abra una.') }}
-            </div>
-        @endunless
-
         {{-- ============ Prompt 207 — the alert that sent you here, with its subjects ============
 
              The hub's *Requiere atención* rail links to this screen, and until 207 that was all it did: an

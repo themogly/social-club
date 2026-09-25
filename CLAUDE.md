@@ -166,6 +166,13 @@ glossary in `DECISIONS.md`; never let "translate" slip into commercial framing (
   `app/Livewire/Counter/TillSession.php` (till open + cash movements + BLIND close), and
   `app/Livewire/Counter/DispensaryPos.php` (member-first weight POS — a THIN shell that only resolves
   + calls the Actions; idempotency key per basket, fail-closed offline, no member ⇒ no commit).
+- Counter-wide precondition guard (a whole class of screens gated in ONE place, not a card per screen):
+  `app/Http/Middleware/RequireOpenTill.php` (prompt 236) — appended globally, matches on PATHS with a
+  shared `guardsPath()`/`isAllowedPath()` classifier, redirects to the open-till screen with the intended
+  URL stashed under its OWN session key, degrades OPEN on error (never 503s the counter, prompt 124), and
+  is backed by server-side refusals in the components (`sedeTillIsOpen()`) so the gate is not a picture. Its
+  contract test `tests/Feature/Counter/RequireOpenTillTest.php` classifies EVERY counter route (a planted
+  one fails until classified).
 - Void / correct (never a silent edit): `app/Actions/Dispensing/VoidDispensation.php` and
   `app/Actions/Bar/VoidOrder.php` — return stock to the originating batch/article and reverse the
   wallet (off-till); grams/cash release automatically (COMPLETED-only arithmetic). A correction is a

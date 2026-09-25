@@ -2,10 +2,12 @@
 
 namespace Tests\Feature\Counter;
 
+use App\Actions\Till\OpenTill;
 use App\Enums\DashboardAlert;
 use App\Enums\MembershipStatus;
 use App\Enums\MemberStatus;
 use App\Enums\Role;
+use App\Exceptions\TillAlreadyOpenException;
 use App\Livewire\Counter\CounterHome;
 use App\Livewire\Counter\MembershipCounter;
 use App\Models\Location;
@@ -62,7 +64,7 @@ class AlertsLandOnTheSubjectTest extends TestCase
         app(ActiveScope::class)->setLocation($this->location->id);
     }
 
-    private function operator(Role $role = Role::OWNER): User
+    private function operator(Role $role = Role::OWNER, bool $withTill = true): User
     {
         $user = User::factory()->create();
         $user->assignRole($role->value);
@@ -71,6 +73,18 @@ class AlertsLandOnTheSubjectTest extends TestCase
         app(ActiveScope::class)->setLocation($this->location->id);
         session(['counter.location_id' => $this->location->id]);
         CounterOperator::set($user);
+
+        // Till-first (prompt 236): the counter now redirects to the open-till screen until a drawer is open,
+        // so an operator who is about to REACH a counter screen over HTTP has one. These tests are about where
+        // an alert lands, not about the till, so opening one keeps them testing what they name. The one test
+        // that needs a genuinely empty alert rail opts OUT — an open till is itself an UNRECONCILED_TILL alert.
+        if ($withTill) {
+            // Some tests call this in a loop over roles; one open drawer at the sede is all the guard needs.
+            try {
+                (new OpenTill)->handle($this->location, 'POS-1', 10000);
+            } catch (TillAlreadyOpenException) {
+            }
+        }
 
         return $user;
     }
@@ -302,12 +316,17 @@ class AlertsLandOnTheSubjectTest extends TestCase
         }
     }
 
-    /** Nothing pending: the designed empty state, not a blank box. */
+    /**
+     * Nothing pending: the designed empty state, not a blank box. Rendered from the hub component directly:
+     * an open till is itself an UNRECONCILED_TILL alert (prompt 236 made the till the counter's front door),
+     * so "nothing pending" and "a till open enough to reach the hub over HTTP" cannot both be true — and this
+     * test is about the empty rail, not the gate. `withTill: false` keeps the rail genuinely empty.
+     */
     public function test_the_empty_state_still_renders_when_nothing_is_pending(): void
     {
-        $this->operator();
+        $this->operator(withTill: false);
 
-        $html = (string) $this->get(route('counter.home'))->assertOk()->getContent();
+        $html = Livewire::test(CounterHome::class)->html();
 
         $this->assertStringContainsString('data-alerts-empty', $html);
         $this->assertStringContainsString(__('Nada pendiente. Todo en orden.'), $html);

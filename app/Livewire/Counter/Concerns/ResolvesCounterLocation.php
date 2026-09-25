@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Counter\Concerns;
 
+use App\Actions\Till\SelectTillSession;
 use App\Models\Location;
 use App\Support\ActiveScope;
 use App\Support\LocationSwitcher;
@@ -66,5 +67,29 @@ trait ResolvesCounterLocation
         if ($this->locationId !== null) {
             app(ActiveScope::class)->useLocation($this->locationId);
         }
+    }
+
+    /**
+     * Does this sede have an open till? (prompt 236) The SERVER side of till-first.
+     *
+     * `RequireOpenTill` redirects a browser away from a till-less counter, but a redirect is a picture: a
+     * crafted Livewire action posts to `livewire/*`, which is allowlisted so the PIN pad still works. So the
+     * writes reachable from a screen the guard blocks — the door's entry recording, the counter sign-up start
+     * — call this before writing, and refuse with prompt 60's observable reason. Not the money paths: those
+     * already refuse without a till, at the till itself.
+     *
+     * @return array{0: bool, 1: ?string} [hasOpenTill, reason-when-not]
+     */
+    protected function sedeTillIsOpen(): array
+    {
+        $location = $this->resolveLocation();
+
+        if ($location === null) {
+            return [false, __('Sin sede activa.')];
+        }
+
+        $open = (new SelectTillSession)->openAt($location)->isNotEmpty();
+
+        return [$open, $open ? null : __('Abre una caja en esta sede antes de continuar.')];
     }
 }
