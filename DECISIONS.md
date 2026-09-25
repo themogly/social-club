@@ -12565,3 +12565,60 @@ guards run after StartSession on the web group, and the handover gate after Star
 the server, light and dark: no-till deep link to `/counter/pos` → `/counter/till` (the open screen); open the
 till → `/counter/pos` renders. Screenshots in `storage/app/screenshots/241/`. 236's server-side refusals (door,
 sign-up) are untouched — they never depended on middleware order. No copy changed.
+
+## Prompt 242 — dependency security bump: Filament, Livewire, league/commonmark
+
+240's `composer audit` found 7 advisories across 3 packages. `composer update filament/filament
+livewire/livewire league/commonmark --with-all-dependencies` cleared all of them — `composer audit` now reports
+**"No security vulnerability advisories found."** MySQL left to CI.
+
+### The advisories cleared
+
+- `filament/filament` v5.7.4 → v5.8.4 — MFA (app) code reuse (CVE-2026-84306, ≥5.7.6) and login
+  password-validity disclosure (CVE-2026-84307, ≥5.7.5).
+- `livewire/livewire` v4.3.3 → v4.4.6 (transitive via Filament) — DOM-based XSS in client-side state
+  (CVE-2026-81887, >4.3.3).
+- `league/commonmark` 2.9.0 → 2.10.3 (transitive via laravel/framework) — two DoS advisories (≥2.10.0).
+
+**59 packages moved** (the resolver's `--with-all-dependencies` closure): the Filament suite to v5.8.4, Livewire
+to v4.4.6, laravel/framework v13.23.0 → v13.33.0, commonmark to 2.10.3, and Symfony/Guzzle/Carbon/etc. patch
+bumps. All within the project's own caret constraints — no major runtime upgrade, no framework major. The full
+from→to list is the `composer.lock` diff on this branch.
+
+### The Livewire-internals guards, re-read (not just passed)
+
+- **195 (reserved-name):** green. It parses `var aliases = {…}` from the vendored Livewire dist and fails if a
+  component action collides with a `$wire` alias. Livewire 4.4 added no alias colliding with an existing action,
+  so nothing was renamed.
+- **223 (mount hook):** the `morphed` hook name still exists in the new dist (grepped in `livewire.esm.js`), so
+  the MRZ mount trigger's hook is intact.
+- **229/222/224 (morph-dependent):** their suites pass unchanged in `composer check`.
+
+### Alpine matched to what Livewire bundles
+
+Livewire 4.4's dist bundles **Alpine 3.17.4**; `package.json` pinned `alpinejs ^3.16.1` (installed 3.16.1).
+Bumped to `^3.17.4` and rebuilt so the socio pages (232's standalone-Alpine surface) ship the SAME Alpine the
+counter pages get through Livewire — never two Alpines in the app. 232's single-Alpine assertion stays green.
+`npm audit --omit=dev` is clean; the one dev-only npm advisory is outside this branch (the audit named nothing
+on the npm side).
+
+### Filament: the panel checked
+
+A minor can move panel markup, so the panel was checked: the full suite (every Filament resource/form/infolist
+test, FormCompleteness, EditPageMount) is green, 239's remember-me login default still asserts on, and a
+screenshot pass (login, dashboard, Seguridad, Users, Locations, batch create — light and dark) renders every
+page HTTP 200 with no markup break. Nothing needed touching. Shots in `storage/app/screenshots/242/`.
+
+### One environment-hardening (§4)
+
+`SystemHealth::documentsDisk()` now checks whether the adapter's **package** is installed
+(`vendor/composer/installed.json`), not whether its class symbol resolves. `class_exists()` gave a false
+"available" under a `--prefer-source` install, where Flysystem is checked out as its monorepo and every
+adapter's code ships even when the adapter package is not a dependency — which flipped
+`DocumentsDiskHealthTest` red on a git-installed sandbox. The check is now about the health question, not how
+vendor was fetched.
+
+### Verification
+
+`composer audit` clean; `composer check` green (1888 tests, 1885 passing, 3 environment-gated skips). MySQL left
+to CI.
