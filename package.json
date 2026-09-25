@@ -18,7 +18,7 @@
     "dependencies": {
         "@fontsource/inter": "^5.3.0",
         "@tesseract.js-data/eng": "^1.0.0",
-        "alpinejs": "^3.16.1",
+        "alpinejs": "^3.17.4",
         "tesseract.js": "^7.0.0"
     }
 }
