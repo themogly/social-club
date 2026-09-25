@@ -176,6 +176,19 @@ trait SignsUpMembers
 
     public function toggleAlta(): void
     {
+        // Prompt 243 — refuse at the DOOR, never at the end. 236's sign-up refusal fired inside
+        // issueApplication(), i.e. after four steps were typed; 241's guard keeps the counter unreachable
+        // without a till at all, and this is the observable refusal at the opening (prompt 60: the block is
+        // seen BEFORE the work). The submit still refuses server-side as the backstop.
+        if (! $this->altaOpen) {
+            [$tillOpen, $tillReason] = $this->sedeTillIsOpen();
+            if (! $tillOpen) {
+                $this->flash($tillReason ?? __('Abre una caja en esta sede antes de continuar.'), 'error');
+
+                return;
+            }
+        }
+
         $this->altaOpen ? $this->closeAlta() : $this->altaOpen = true;
     }
 
@@ -519,10 +532,17 @@ trait SignsUpMembers
             'consent_channel' => ConsentChannel::PAPER->value,
         ]);
 
+        // Prompt 243 — land on THIS application's review, not back on the method chooser. The staff-filled
+        // route's outcome IS the review — the summary, the photo, the signature status, and the tier chosen in
+        // the Membresía step, carried — with Aprobar right there. The pending list stays the SECOND path for
+        // anything not approved on the spot. 234's rule: the screen shows the outcome, so no "revísala" flash.
+        $carriedTier = $this->altaTierId; // the tier chosen in step 3, so the review does not re-ask for it
         $this->resetAltaForm();
         $this->altaConsentHeld = false;
         $this->altaStaffFormOpen = false;
-        $this->flash(__('Solicitud creada. Revísala para dar de alta.'), 'success');
+        $this->altaApplicationId = $application->id;
+        $this->altaTierId = $carriedTier;
+        $this->altaDuplicateBlocked = false;
     }
 
     /**
