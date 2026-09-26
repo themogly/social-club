@@ -6,8 +6,12 @@ use App\Enums\DashboardAlert;
 use App\Enums\Role;
 use App\Filament\Pages\Reports\FinancialReportPage;
 use App\Filament\Pages\Reports\StockReportPage;
+use App\Filament\Resources\Batches\BatchResource;
+use App\Filament\Resources\Genetics\GeneticResource;
 use App\Filament\Resources\Members\MemberResource;
 use App\Filament\Resources\TillSessions\TillSessionResource;
+use App\Models\Batch;
+use App\Models\Genetic;
 use App\Models\Location;
 use App\Models\User;
 use App\Support\ActiveScope;
@@ -17,6 +21,7 @@ use App\Support\Weight;
 use App\ViewModels\Dashboard as DashboardData;
 use App\ViewModels\DashboardCharts;
 use Carbon\CarbonImmutable;
+use Filament\Actions\Action;
 use Filament\Pages\Dashboard as BaseDashboard;
 use Filament\Support\Icons\Heroicon;
 use Illuminate\Contracts\Support\Htmlable;
@@ -61,6 +66,35 @@ class Dashboard extends BaseDashboard
     public function getHeading(): string|Htmlable
     {
         return __('Panel de control');
+    }
+
+    /**
+     * Prompt 247 — the home screen is where a manager reaches the two things they add most: a NEW strain (the
+     * one-flow wizard — sellable when you finish) and MORE STOCK of an existing one (238's batch intake). Both
+     * were buried in the Existencias resources; a club owner opening the panel had no button for either. Each is
+     * gated by the same policy its create page is (`genetics.manage` / `stock.manage`), so STAFF see neither.
+     *
+     * @return array<int, Action>
+     */
+    protected function getHeaderActions(): array
+    {
+        /** @var ?User $user */
+        $user = Auth::user();
+
+        return [
+            Action::make('addStrain')
+                ->label(__('Añadir variedad'))
+                ->icon(Heroicon::OutlinedSparkles)
+                ->url(GeneticResource::getUrl('create'))
+                ->visible(fn (): bool => (bool) $user?->can('create', Genetic::class)),
+
+            Action::make('addStock')
+                ->label(__('Añadir stock'))
+                ->icon(Heroicon::OutlinedArchiveBox)
+                ->color('gray')
+                ->url(BatchResource::getUrl('create'))
+                ->visible(fn (): bool => (bool) $user?->can('create', Batch::class)),
+        ];
     }
 
     /**

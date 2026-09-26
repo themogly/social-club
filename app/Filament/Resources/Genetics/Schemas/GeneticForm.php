@@ -7,6 +7,7 @@ use App\Enums\ConcentrateSubtype;
 use App\Enums\CultivationType;
 use App\Enums\ProductType;
 use App\Enums\StrainType;
+use App\Models\Category;
 use Filament\Forms\Components\FileUpload;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TagsInput;
@@ -30,17 +31,6 @@ class GeneticForm
                             ->label(__('Nombre'))
                             ->required()
                             ->maxLength(255),
-
-                        Select::make('category_id')
-                            ->label(__('Categoría'))
-                            ->relationship(
-                                'category',
-                                'name',
-                                // Only categories that apply to genetics (nice-to-have narrowing).
-                                modifyQueryUsing: fn (Builder $query): Builder => $query->where('applies_to', CategoryAppliesTo::GENETIC->value),
-                            )
-                            ->searchable()
-                            ->preload(),
 
                         Textarea::make('description')
                             ->label(__('Descripción'))
@@ -146,6 +136,23 @@ class GeneticForm
 
                 Section::make(__('Publicación'))
                     ->schema([
+                        // Prompt 247 — the category is a menu GROUP, not a fact about the strain, so it moved out
+                        // of "Datos" (where it rendered as an empty "Select an option" on a club that defined
+                        // none) to here, and is HIDDEN entirely when the organisation has no genetic categories:
+                        // an empty select is a question with no answer. The create flow does not ask it at all;
+                        // the POS filter and everything else that reads category_id are untouched.
+                        Select::make('category_id')
+                            ->label(__('Grupo en el menú (opcional)'))
+                            ->relationship(
+                                'category',
+                                'name',
+                                modifyQueryUsing: fn (Builder $query): Builder => $query->where('applies_to', CategoryAppliesTo::GENETIC->value),
+                            )
+                            ->searchable()
+                            ->preload()
+                            ->visible(fn (): bool => Category::query()
+                                ->where('applies_to', CategoryAppliesTo::GENETIC->value)->exists()),
+
                         Toggle::make('published')
                             ->label(__('Publicada')),
 

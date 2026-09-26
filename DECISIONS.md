@@ -12806,3 +12806,67 @@ stands. `approveAlta` re-runs every check (permission, tier, duplicate, age); a 
 
 `composer check` green. MySQL left to CI. New copy in both locales. 209's handover boundary, the PIN surface
 (245 owns it), `approveAlta`'s checks and `UnlockOperator` are untouched.
+
+## Prompt 247 — "Add a strain" is ONE flow, sellable when you finish
+
+On `main`, adding a strain meant three separate forms — the genetic, a price per sede, a batch — and a genetic
+saved from the first was INVISIBLE at every counter until the other two were also filled, with nothing on screen
+saying so (`sellableAt` needs active + a base price + stock; prompt 95 filters the incomplete one out silently).
+So the common act "put a new strain on the counter" had a three-form assembly and a silent dead end in the middle.
+
+### The create path is a Filament Wizard; the three writers are composed, not reimplemented
+
+`CreateGenetic` is now a `HasWizard` create page whose steps run in the tester's order — **Variedad → Tipo →
+Cantidad → Sede → Precio → Foto** — and whose FINISH (`handleRecordCreation`) writes all three in ONE
+`DB::transaction`, each THROUGH ITS EXISTING SINGLE WRITER: the genetic (active + published), the first batch via
+`IntakeBatch` (238's intake — the INTAKE movement, the ceiling checks, cg conversion), the base price via
+`SaveGeneticPrice`. No compliance rule is re-expressed here; the flow only orders and composes. All or nothing —
+a failure in any later write rolls back the genetic and the batch, so a half-created genetic with no price never
+exists (`test_a_failed_write_rolls_back_the_whole_strain` forces the ceiling to BLOCK with an over-ceiling intake
+and asserts 0 genetics / 0 batches / 0 prices). The confirmation says the OUTCOME the tester was missing — what
+is in stock, at what price, "ya visible en el mostrador" — and if a gap somehow remains (`completenessReason`),
+it warns instead of claiming success.
+
+The full `GeneticForm` stays the EDIT path (`EditGenetic`), with every advanced section. The wizard is deliberately
+the SHORT list — the six things you must answer to make a strain sellable — not a reskin of the full form.
+
+### The sede step is 238's rule, re-asserted
+
+The sede Select defaults to the active scope, is required, is DISABLED when there is only one location, and is
+BLANK in the "all sedes" rollup (there is no scope to inherit — you must choose). Stock always belongs to a sede;
+the rollup may not guess one (`test_the_sede_step_is_blank_and_required_in_the_rollup`).
+
+### No low-stock threshold in the flow
+
+The wizard does not ask for a low-stock/reorder threshold. That is a per-batch operational setting, not one of the
+six things that make a strain sellable, and forcing it into the "add a strain" flow is exactly the over-collection
+247 is removing. It stays where it belongs (the batch/stock surfaces); the flow omits it by design.
+
+### The category is a menu GROUP, not a fact about the strain (§3)
+
+`category_id` moved out of "Datos" — where, on a club that had defined no categories, it rendered as an empty
+"Select an option", a question with no answer — into "Publicación", and is HIDDEN ENTIRELY when the organisation
+has no genetic categories (`->visible(Category::where('applies_to', GENETIC)->exists())`). The wizard never asks
+it at all. Everything that READS `category_id` (the POS menu grouping, filters) is untouched — this is a form
+placement/visibility change, not a data change. Tests:
+`test_the_category_field_is_hidden_when_the_club_has_no_genetic_categories` /
+`..._appears_once_a_genetic_category_exists`.
+
+### The home screen reaches both add-acts (§4)
+
+The dashboard gained two header actions — **Añadir variedad** (the one-flow wizard) and **Añadir stock** (238's
+batch intake for an existing strain) — because a club owner opening the panel had a button for neither; both were
+buried in the Existencias resources. Each is gated by the SAME policy its create page is (`genetics.manage` /
+`stock.manage`), so STAFF, who can create neither, see neither button
+(`test_an_owner_sees_both_add_shortcuts` / `test_a_staff_operator_sees_neither_add_shortcut`).
+
+### The photo step opens the camera
+
+The photo `FileUpload` carries `capture=environment` (rear camera on a tablet/phone), matching 244's counter
+wizard; no photo means no image (193 — never a fabricated placeholder).
+
+### Verification
+
+`composer check` green. MySQL left to CI. New copy in both locales (17 new keys, English house style:
+variedad/genética → "strain", Sede → "Location"). `IntakeBatch`, `SelectBatch`, `SaveGeneticPrice`, `sellableAt`
+and 238's batch form are CONSUMED, not edited.
