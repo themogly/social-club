@@ -73,7 +73,9 @@ trait ResolvesCounterLocation
      * Does this sede have an open till? (prompt 236) The SERVER side of till-first.
      *
      * `RequireOpenTill` redirects a browser away from a till-less counter, but a redirect is a picture: a
-     * crafted Livewire action posts to `livewire/*`, which is allowlisted so the PIN pad still works. So the
+     * crafted Livewire action posts to Livewire's update endpoint (`livewire-<hash>/update`), which that guard
+     * never sees because it acts only on `counter/*` paths (prompt 254 corrected this: it used to say the
+     * endpoint was an allowlisted `livewire/*`, a pattern that never matched anything). So the
      * writes reachable from a screen the guard blocks — the door's entry recording, the counter sign-up start
      * — call this before writing, and refuse with prompt 60's observable reason. Not the money paths: those
      * already refuse without a till, at the till itself.

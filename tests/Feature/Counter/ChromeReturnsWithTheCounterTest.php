@@ -228,13 +228,14 @@ class ChromeReturnsWithTheCounterTest extends TestCase
     public function test_form_state_on_the_screen_underneath_survives_the_recovery(): void
     {
         $this->operator();
+        // The state is typed BEFORE the handover, on the screen that then sits underneath it. (Setting it during
+        // the handover is refused since prompt 254 — only the PIN pad's field answers while an applicant holds the
+        // tablet — and was never what happens: the applicant is on the surface, not the fee form.)
+        $screen = Livewire::test(MembershipCounter::class)->set('feeAmount', '12,50');
         $this->handOver();
 
         CounterOperator::clear();
-        $screen = Livewire::test(MembershipCounter::class)
-            ->set('feeAmount', '12,50')
-            ->set('operatorPin', '4321')
-            ->call('unlockOperator');
+        $screen->set('operatorPin', '4321')->call('unlockOperator');
 
         $screen->assertSet('feeAmount', '12,50');
     }

@@ -3,6 +3,7 @@
 namespace App\Http\Middleware;
 
 use App\Support\CounterHandover;
+use App\Support\CounterHandoverConfinement;
 use Closure;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
@@ -20,8 +21,9 @@ use Symfony\Component\HttpFoundation\Response;
  * So the mode is now an allowlist, appended globally like {@see EnforceOrgLockdown}. While a handover is
  * active only four things answer: the tokenised application form the applicant was handed, the language
  * switcher that sits on it (prompt 167), the five counter SCREENS — which render nothing but the handover
- * surface and its PIN pad — and Livewire's own endpoint, because the PIN pad is how the handover ENDS and
- * blocking it would strand the tablet.
+ * surface and its PIN pad — and Livewire's own update endpoint, because the PIN pad is how the handover ENDS
+ * and blocking it would strand the tablet. What that endpoint may DO during a handover is confined separately,
+ * per call, by {@see CounterHandoverConfinement} (prompt 254).
  *
  * Everything else is redirected back to where the applicant belongs. Deliberately NOT the counter receipts,
  * the photo-capture POST, the sede switcher or the panic POST: all of those live in the top bar, which is
@@ -57,7 +59,6 @@ class EnforceCounterHandover
         'counter/bar',
         'socio/solicitud/*',   // the form the applicant was handed, its submit, and 179's MRZ read
         'socio/idioma',        // prompt 167 — choosing a language is not a member-only act
-        'livewire/*',          // the PIN pad posts here; it is the only way the handover ends
         'up',                  // health check
     ];
 
@@ -68,7 +69,28 @@ class EnforceCounterHandover
      */
     public static function allows(string $path): bool
     {
-        return Str::is(self::ALLOWED_PATHS, ltrim($path, '/'));
+        $path = ltrim($path, '/');
+
+        return Str::is(self::ALLOWED_PATHS, $path) || $path === self::livewireUpdatePath();
+    }
+
+    /**
+     * Livewire's update endpoint — the PIN pad posts here, and it is the only way the handover ends (prompt 254).
+     *
+     * NOT a `livewire/*` pattern. That entry sat in the list from the start and never matched anything: Livewire 4
+     * posts to `livewire-<hash>/update`, the hash derived from APP_KEY (`EndpointResolver::prefix()`). Before 241
+     * nobody noticed, because this middleware read a null session and never fired; 241 moved it after StartSession
+     * and from then on it redirected the PIN pad's own post to the applicant form — the tablet could not be given
+     * back. So the path is asked of Livewire itself (the route it actually registered, which also holds when
+     * routes are cached), never written down.
+     *
+     * Letting the endpoint through is only safe because {@see CounterHandoverConfinement} then refuses every
+     * update and call on it except the handover surface's own — without it, the applicant could call
+     * `lookupResults()` and read the member register.
+     */
+    private static function livewireUpdatePath(): string
+    {
+        return ltrim(app('livewire')->getUpdateUri(), '/');
     }
 
     public function handle(Request $request, Closure $next): Response

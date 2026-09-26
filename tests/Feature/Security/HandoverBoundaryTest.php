@@ -153,7 +153,10 @@ class HandoverBoundaryTest extends TestCase
 
         // The PIN pad posts to Livewire. Whatever Livewire makes of an empty payload, the one thing that must
         // NOT happen is the handover gate bouncing it — that would strand the tablet with no way back.
-        $response = $this->actingAs($this->device)->post('/livewire/update', []);
+        // Livewire's REAL endpoint (prompt 254): this used to post to `/livewire/update`, a path that does not
+        // exist in Livewire 4 (the prefix is hashed from APP_KEY), so it passed while every real PIN post was
+        // redirected. The full PIN round trip is HandoverConfinementOverHttpTest.
+        $response = $this->actingAs($this->device)->post(app('livewire')->getUpdateUri(), [], ['X-Livewire' => '1']);
 
         $this->assertNotSame(302, $response->getStatusCode(),
             'The handover gate blocked Livewire — the PIN pad is how the handover ends.');

@@ -254,7 +254,8 @@ class RequireOpenTillTest extends TestCase
         }
 
         // Livewire writes (open(), the PIN pad, the lock) and the lockdown lift are never this guard's business.
-        $this->assertFalse(RequireOpenTill::guardsPath('livewire/update'));
+        // Livewire's REAL endpoint (`livewire-<hash>/update`, prompt 254), not the non-existent `livewire/update`.
+        $this->assertFalse(RequireOpenTill::guardsPath(ltrim(app('livewire')->getUpdateUri(), '/')));
         $this->assertFalse(RequireOpenTill::guardsPath('reactivar/some-token'));
     }
 
@@ -277,7 +278,7 @@ class RequireOpenTillTest extends TestCase
 
     /**
      * The door's server side. `RequireOpenTill` redirects the browser away from the door, but a crafted
-     * Livewire post reaches `checkIn()` directly (livewire/* is allowlisted so the PIN pad works). The write
+     * Livewire post reaches `checkIn()` directly (the update endpoint is not a `counter/*` path). The write
      * must refuse without a till — a member recorded as present at a club that is not trading is the hole.
      */
     public function test_the_door_refuses_entry_without_an_open_till(): void

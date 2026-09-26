@@ -37,18 +37,29 @@ async function fillAndSubmitApplication(page) {
   for (const box of ['consent_data', 'consent_statutes']) {
     await page.check(`input[name="${box}"]`).catch(() => {});
   }
-  const pad = await page.$('canvas');
-  if (pad) {
-    const b = await pad.boundingBox();
-    if (b) {
-      await page.mouse.move(b.x + 12, b.y + 12);
-      await page.mouse.down();
-      await page.mouse.move(b.x + b.width - 12, b.y + b.height - 12);
-      await page.mouse.up();
+  // The signature pad, scrolled into view first: it sits below the fold, and a bounding box off-screen made
+  // the stroke miss the canvas entirely ("Falta la firma"). A multi-step stroke, as measure-applicant-signature
+  // draws it, so the pad registers a real line rather than a single point.
+  const pad = page.locator('[data-signature-canvas]').first();
+  await pad.scrollIntoViewIfNeeded();
+  const b = await pad.boundingBox();
+  if (b) {
+    await page.mouse.move(b.x + b.width * 0.15, b.y + b.height * 0.6);
+    await page.mouse.down();
+    for (const [dx, dy] of [[0.3, 0.3], [0.45, 0.7], [0.6, 0.35], [0.8, 0.6]]) {
+      await page.mouse.move(b.x + b.width * dx, b.y + b.height * dy, { steps: 6 });
     }
+    await page.mouse.up();
   }
+  // "Guardar firma" is what copies the drawing into the hidden field the server reads (prompt 220) — a stroke
+  // alone leaves the field empty and the server answers "Falta la firma".
+  await page.click('[data-signature-save]');
+  await page.waitForTimeout(400);
   await page.waitForTimeout(3500); // clear the spam guard's minimum dwell
-  await page.click('button[type="submit"]');
+  // The APPLICATION form's submit, scoped to its form. A bare `button[type="submit"]` matched the locale
+  // switcher's ES button first in the DOM (prompt 167's header), so the harness posted a language change and
+  // reloaded an empty form — STOP 1 failed on every viewport for a harness reason, not an app one (prompt 254).
+  await page.click('form[enctype="multipart/form-data"] button[type="submit"]');
   await page.waitForLoadState('networkidle');
 }
 

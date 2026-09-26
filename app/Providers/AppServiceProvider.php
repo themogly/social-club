@@ -3,6 +3,7 @@
 namespace App\Providers;
 
 use App\Support\ActiveScope;
+use App\Support\CounterHandoverConfinement;
 use App\Support\Help;
 use Filament\Schemas\Components\Form;
 use Filament\Tables\Table;
@@ -24,6 +25,9 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        // Prompt 254 — while an applicant holds the counter tablet, Livewire answers only the handover surface.
+        CounterHandoverConfinement::register();
+
         // A click on the primary button must ALWAYS produce a visible answer (prompt 168).
         //
         // Filament renders `->required()` fields with the native HTML `required` attribute, and the
