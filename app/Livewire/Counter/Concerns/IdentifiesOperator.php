@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Counter\Concerns;
 
+use App\Actions\Counter\SignInOperator;
 use App\Actions\RecordAuditLog;
 use App\Actions\UnlockOperator;
 use App\Models\User;
@@ -306,6 +307,8 @@ trait IdentifiesOperator
         }
 
         CounterOperator::set($operator);
+        // Prompt 267 — the PIN IS a sign-in: the session becomes this person everywhere (counter, panel, audit).
+        (new SignInOperator)->handle($operator, $location);
         $this->operatorPanelOpen = false;
         $this->operatorFeedback = null;
         // Tell the idle-lock overlay (prompt 120) to lift — the same PIN pad both identifies a new operator and

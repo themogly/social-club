@@ -14015,3 +14015,51 @@ offered, and one refusal per sweep finding. Full suite unaffected.
 ### Merge
 
 Merged to `main` on Ben's instruction for this session. `composer check` green in `es` and `en`.
+
+## Prompt 267 — the PIN changes who is signed in, everywhere, including the admin panel
+
+### Ben's choice: **Option B — the PIN IS a sign-in.**
+
+### Before (HTTP tests on `main`, `tests/Feature/Security/PinIsASignInTest`)
+
+Owner-logged session, STAFF `panel.access` off, a STAFF PIN at the counter: `GET /users` answered **200** (*"Expected a redirect
+… but received 200"*), as did `/roles-y-permisos` and `/audit-logs` in the tester's browser — the admin panel ran as the tablet's
+login while the counter ran as the PIN person, so a staff member could open Roles y permisos and grant themselves anything,
+recorded as the owner. A manager PIN likewise got the OWNER's panel.
+
+### The fix
+
+- **`App\Actions\Counter\SignInOperator`**, called from `IdentifiesOperator::unlockOperator()` after the unchanged `UnlockOperator`
+  check (per-sede staff list, throttle): `Auth::login($operator)` — which **migrates the session** (a new id, so no fixation; the
+  data kept) and refreshes the password hash `AuthenticateSession` checks. So from the PIN on, counter, panel and audit are ONE
+  person: a staff PIN has no panel (no Administración button; panel URLs go to the counter), a manager PIN gets the MANAGER's panel
+  (Roles y permisos and Personal refused), an owner PIN the owner's.
+- **What carries over a switch:** everything in the session — the counter's sede (`counter.location_id`), the basket, any handover
+  state — because the session is migrated, not replaced (tested: sede + basket survive). The PANEL's sede selection
+  (`scope.location_id`) is dropped so the panel re-resolves for the new person's own sedes; the counter stays on its sede, which a
+  staff PIN still cannot change (246).
+- **Remember-me:** the original account's remember cookie is cleared on the switch (tested) — left in place it would silently sign
+  the tablet's first account back in when the session expired. The switch is audited `counter.operator.signed_in` (who, sede, from
+  which account).
+- **Locked means locked:** `RedirectCounterOnlyAccounts` now also sends a **counter session** (one that has adopted a sede) with
+  **nobody identified** — after the idle lock, "Cambiar de persona", or before the first PIN — to the counter's PIN surface. A new PIN
+  reopens the panel for that person. A password login that never used the counter (the owner on their phone) is untouched (tested).
+  The counter's Administración link also requires someone identified.
+- **Handover (254)** is unchanged: it ends only through the PIN (which now also signs that person in); the confinement still holds.
+- The one-off supervisor PIN (265) is NOT a sign-in — it authorises one act and never touches who is signed in.
+- **This retires 262's "log each tablet in as a staff account" advice**: whatever account first logged the tablet in only gets the
+  device to the counter; the first PIN replaces it.
+
+### Tests
+
+`PinIsASignInTest` (9, HTTP): the reported case, manager → manager's panel, owner PIN on a staff tablet, the idle lock and the
+person switch closing the panel, a fresh counter session with no PIN, a password login that never used the counter, sede + basket
+carried over, the throttle/lockout blocking the switch, session regeneration + remember cookie cleared + the audit row. Existing
+tests adjusted to the new rule (someone identified before expecting the admin link or the panel from a counter session; a photo URL
+bound to the signed-in operator). Real browser (`tests/Browser/shoot-pin-is-a-sign-in.mjs`, owner-logged tablet): after a STAFF PIN
+no Administración button and `/users` → the counter; after a MANAGER PIN Roles y permisos 403 and the panel as the manager
+(`storage/app/screenshots/267/`).
+
+### Merge
+
+Merged to `main` on Ben's instruction for this session. `composer check` green in `es` and `en`.

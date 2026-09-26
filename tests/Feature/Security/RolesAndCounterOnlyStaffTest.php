@@ -3,6 +3,7 @@
 namespace Tests\Feature\Security;
 
 use App\Actions\Roles\SetRolePermission;
+use App\Actions\Till\OpenTill;
 use App\Enums\Role;
 use App\Filament\Pages\Auth\Login;
 use App\Filament\Pages\RolesPermissions;
@@ -269,6 +270,8 @@ class RolesAndCounterOnlyStaffTest extends TestCase
         $this->flushSession();
         session(['counter.location_id' => $this->location->id]);
         $this->actingAs($this->manager);
+        CounterOperator::set($this->manager); // identified at the PIN (267)
+        (new OpenTill)->handle($this->location, 'POS-1', 10000); // identified ⇒ till-first applies (236)
         $this->assertStringContainsString('data-counter-admin-link', (string) $this->get(route('counter.home'))->getContent());
     }
 }

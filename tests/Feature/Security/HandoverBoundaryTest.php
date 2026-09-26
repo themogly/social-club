@@ -123,7 +123,11 @@ class HandoverBoundaryTest extends TestCase
 
         CounterHandover::end();
 
-        // Not bricked: ending the handover restores the device session's ordinary reach.
+        // Not bricked: once someone identifies at the PIN again, the session's ordinary reach is back. (Ending the
+        // handover alone leaves nobody identified — and since prompt 267 a counter session with nobody at the PIN has
+        // no panel: locked means locked.)
+        $this->actingAs($this->device)->get('/')->assertRedirect(route('counter.home'));
+        CounterOperator::set($this->device);
         $this->actingAs($this->device)->get('/')->assertOk();
     }
 

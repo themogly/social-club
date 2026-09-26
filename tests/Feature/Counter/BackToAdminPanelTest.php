@@ -9,6 +9,7 @@ use App\Models\Location;
 use App\Models\Organisation;
 use App\Models\User;
 use App\Support\ActiveScope;
+use App\Support\CounterOperator;
 use Database\Seeders\RolePermissionSeeder;
 use Filament\Facades\Filament;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -58,6 +59,9 @@ class BackToAdminPanelTest extends TestCase
     public function test_a_panel_user_sees_the_shared_administration_link_on_every_counter_screen(): void
     {
         $owner = $this->user(Role::OWNER);
+        // Someone is identified at the PIN (prompt 267: with nobody identified the counter offers no way into the panel).
+        CounterOperator::set($owner);
+        (new OpenTill)->handle($this->location, 'POS-1', 10000); // identified ⇒ till-first applies (236)
 
         foreach ($this->routes as $route) {
             $response = $this->actingAs($owner)->get(route($route));
