@@ -6,6 +6,9 @@
 @php
     use App\Support\Money;
     $isVoided = $order->status === \App\Enums\OrderStatus::VOIDED;
+    // Prompt 252 — a way back when the ticket is opened on its own, staff session only; suppressed inside the
+    // counter's receipt sheet (embedded=1) and for a non-staff viewer; hidden when printing.
+    $showWayBack = auth()->guard('web')->check() && ! request()->boolean('embedded');
 @endphp
 <!DOCTYPE html>
 <html lang="{{ str_replace('_', '-', app()->getLocale()) }}">
@@ -42,14 +45,22 @@
             font: inherit; font-weight: 600; cursor: pointer; background: #2563eb; color: #fff;
             border: none; border-radius: 10px; padding: 12px 24px;
         }
+        .wayback { max-width: 380px; margin: 0 auto 16px; }
+        .wayback a { display: inline-flex; align-items: center; gap: 6px; min-height: 44px; font-size: 13px; font-weight: 600; color: #2563eb; text-decoration: none; }
         @media print {
             body { background: #fff; padding: 0; }
             .ticket { border: none; max-width: none; }
-            .actions { display: none; }
+            .actions, .wayback { display: none; }
         }
     </style>
 </head>
 <body>
+    @if ($showWayBack)
+        <div class="wayback" data-way-back>
+            <a href="{{ route('counter.home') }}">&larr; {{ __('Volver al mostrador') }}</a>
+        </div>
+    @endif
+
     <div class="ticket">
         @if ($isVoided)
             <div class="center"><span class="badge">{{ __('Anulada') }}</span></div>

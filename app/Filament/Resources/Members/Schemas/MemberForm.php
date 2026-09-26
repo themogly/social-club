@@ -25,7 +25,6 @@ use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
 use Illuminate\Support\Facades\Auth;
-use Livewire\Component;
 use Livewire\Features\SupportFileUploads\TemporaryUploadedFile;
 
 class MemberForm
@@ -222,9 +221,9 @@ class MemberForm
     }
 
     /**
-     * "Ver documento" — open a sensitive scan through IssueDocumentUrl: a short-lived
-     * signed URL that access-logs every view and 403s without `member.documents.view`.
-     * The scan is NEVER served from a plain disk URL. Reuses the resource-wide pattern.
+     * "Ver documento" — show a sensitive scan through IssueDocumentUrl (a short-lived signed URL that
+     * access-logs every view and 403s without `member.documents.view`) in a MODAL, never a new tab (prompt
+     * 252). The scan is NEVER served from a plain disk URL. Reuses the resource-wide viewer.
      */
     protected static function viewScanAction(string $key, MemberDocumentType $type): Action
     {
@@ -234,17 +233,22 @@ class MemberForm
             ->visible(fn (?Member $record): bool => $record !== null
                 && (Auth::user()?->can('member.documents.view') ?? false)
                 && $record->documents()->where('type', $type->value)->exists())
-            ->action(function (?Member $record, Component $livewire) use ($type): void {
+            ->modalHeading(__('Documento'))
+            ->modalContent(function (?Member $record) use ($type) {
                 $document = $record?->documents()->where('type', $type->value)->latest()->first();
                 if ($document === null) {
-                    return;
+                    return null;
                 }
 
                 /** @var User $actor */
                 $actor = Auth::user();
-                $url = (new IssueDocumentUrl)->handle($document, $actor);
 
-                $livewire->js('window.open('.json_encode($url, JSON_THROW_ON_ERROR).", '_blank')");
-            });
+                return view('filament.documents.viewer', [
+                    'url' => (new IssueDocumentUrl)->handle($document, $actor),
+                    'isPdf' => str_ends_with(strtolower((string) $document->path), '.pdf'),
+                ]);
+            })
+            ->modalSubmitAction(false)
+            ->modalCancelActionLabel(__('Cerrar'));
     }
 }

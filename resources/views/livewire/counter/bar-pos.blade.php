@@ -401,7 +401,8 @@
                     <section class="rounded-2xl border border-line bg-surface-alt p-4 dark:border-slate-700 dark:bg-slate-800/50">
                         <p class="text-sm font-semibold text-ink-muted dark:text-slate-400">{{ __('Última venta') }}</p>
                         <div class="mt-3 flex flex-col gap-2">
-                            <a href="{{ route('counter.bar.receipt', $lastOrderId) }}" target="_blank" rel="noopener" class="inline-flex h-11 items-center justify-center rounded-xl border border-line bg-surface px-4 text-sm font-semibold text-ink transition hover:bg-surface-alt dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100">{{ __('Ver / imprimir ticket') }}</a>
+                            {{-- Prompt 252 — a SHEET over the POS, not a new tab. Same ticket route, shown in place. --}}
+                            <x-counter.receipt-sheet :url="route('counter.bar.receipt', $lastOrderId)" :label="__('Ver / imprimir ticket')" :heading="__('Ticket')" />
 
                             @if ($canVoid)
                                 <div class="rounded-xl border border-line bg-surface p-3 dark:border-slate-700 dark:bg-slate-900">

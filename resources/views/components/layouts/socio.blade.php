@@ -96,7 +96,7 @@
         @php($item = fn (string $route, bool $on) => $on
             ? 'text-brand dark:text-white'
             : 'text-ink-muted dark:text-slate-400')
-        <nav class="fixed inset-x-0 bottom-0 z-20 border-t border-line bg-surface/95 backdrop-blur dark:border-slate-800 dark:bg-slate-950/95"
+        <nav data-socio-nav class="fixed inset-x-0 bottom-0 z-20 border-t border-line bg-surface/95 backdrop-blur dark:border-slate-800 dark:bg-slate-950/95"
              style="padding-bottom: env(safe-area-inset-bottom);"
              aria-label="{{ __('Navegación de socio/a') }}">
             <div class="mx-auto grid w-full max-w-md grid-cols-5">

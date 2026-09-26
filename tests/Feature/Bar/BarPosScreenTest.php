@@ -302,8 +302,11 @@ class BarPosScreenTest extends TestCase
         $this->assertSame(1, substr_count((string) preg_replace('/wire:snapshot="[^"]*"/', '', $html), __('Pedido registrado.')),
             'and exactly once — two live regions announce the same thing twice');
 
-        // The receipt link resolves to the correct order via counter.bar.receipt.
-        $component->assertSee(route('counter.bar.receipt', $order->id), false);
+        // Prompt 252 — the ticket is now a SHEET over the POS, not a new-tab link. Its iframe base is the
+        // counter.bar.receipt route for THIS order (the URL is @js-encoded in the base, so slashes are escaped).
+        $component->assertSee('data-receipt-sheet', false);
+        $component->assertSee('counter\/bar\/receipt', false);
+        $component->assertSee($order->id, false);
     }
 
     public function test_a_failed_charge_shows_the_error_equally_colocated(): void

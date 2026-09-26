@@ -105,6 +105,18 @@ the system already handles.
 **The panel link stays in the counter's overflow menu.** Staff can still reach a member's full record —
 history, documents, sanctions — when they need it. Nothing routine sends them there.
 
+**The shell is one tab, and nothing leaves it (prompt 252).** The counter is used as an *app* on a tablet, not
+as a website. On Android a new tab is a *hidden* tab — Chrome switches to it and the counter is simply gone,
+with the only way back a browser control the operator was never taught and a kiosk profile may have removed. So
+nothing opens a new tab or window: `target="_blank"`, `window.open` and `openUrlInNewTab` are out. Anything that
+must sit on top of the work is a **modal or a sheet inside the page** — the alta modal, the receipt sheet (the
+ticket shown in an iframe over the POS, printed through the iframe), the admin document/signature viewer. Every
+screen a person can reach carries a **labelled way back** to the counter (or the panel) — the handover
+thank-you card's *Devolver la tablet* (249), the standalone receipt's *Volver al mostrador* — and an overlay
+closes on the Android back gesture (`history.pushState` on open, `popstate` closes) before the page does. The
+rule is enforced, not just written: a structural grep with no allowlist, and a way-back test over every
+counter/socio/receipt route.
+
 ---
 
 ## The work

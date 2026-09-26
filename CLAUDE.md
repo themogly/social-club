@@ -130,6 +130,12 @@ glossary in `DECISIONS.md`; never let "translate" slip into commercial framing (
 - All buttons use shared variants — never a one-off. Reuse/consolidate into shared components; never
   near-copies. Native form controls replaced with branded components on desktop, native on touch.
 - Empty states are INTENTIONAL (designed), never a broken/blank box.
+- **The product is an app in a browser.** No `target="_blank"`, no `window.open`, no `openUrlInNewTab` — a new
+  tab on a tablet is a hidden tab and the counter is gone. Things that sit on top of the work are **modals or
+  sheets inside the page** (the alta modal, the receipt sheet, the document viewer are the canon); every screen
+  has a **labelled way back** to the counter (or the panel); the Android back gesture closes an overlay before
+  it leaves a page (`history.pushState` on open, `popstate` closes). Enforced by
+  `tests/Feature/Design/NothingLeavesTheTabTest` (no allowlist) and a way-back route test (prompt 252).
 
 ## Reference implementations (imitate these — keep updated as the canon)
 
