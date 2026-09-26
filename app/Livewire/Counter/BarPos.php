@@ -226,6 +226,13 @@ class BarPos extends Component
 
     public function addArticle(string $articleId): void
     {
+        // Prompt 266 — selling at the bar is the PIN operator's permission (255), checked where it runs.
+        if ($this->hasOperator() && ! $this->userCan('pos.bar')) {
+            $this->flash(__('Tu usuario no puede vender en la barra.'), 'error');
+
+            return;
+        }
+
         $location = $this->resolveLocation();
 
         if ($location === null) {
@@ -263,6 +270,13 @@ class BarPos extends Component
 
     public function addMiscLine(): void
     {
+        // Prompt 266 — selling at the bar is the PIN operator's permission (255), checked where it runs.
+        if ($this->hasOperator() && ! $this->userCan('pos.bar')) {
+            $this->flash(__('Tu usuario no puede vender en la barra.'), 'error');
+
+            return;
+        }
+
         $description = trim($this->miscDescription);
         $reference = trim($this->miscReference);
         $cents = $this->parseCents($this->miscAmount);
@@ -369,6 +383,13 @@ class BarPos extends Component
      */
     public function commitOrder(): void
     {
+        // Prompt 266 — selling at the bar is the PIN operator's permission (255), checked where it runs.
+        if ($this->hasOperator() && ! $this->userCan('pos.bar')) {
+            $this->flash(__('Tu usuario no puede vender en la barra.'), 'error');
+
+            return;
+        }
+
         $location = $this->resolveLocation();
 
         if ($location === null) {

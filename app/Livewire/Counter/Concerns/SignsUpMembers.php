@@ -669,6 +669,15 @@ trait SignsUpMembers
 
     public function reviewAltaApplication(string $applicationId): void
     {
+        // Prompt 266 — opening someone's application is the reviewer's act; a crafted call from an operator without
+        // `applications.review` opened any applicant's payload. (The staff-typed route's own landing on the review it
+        // just wrote sets the id directly, 243, and is unaffected.)
+        if (! $this->userCan('applications.review')) {
+            $this->flash(__('No tienes permiso para revisar solicitudes.'), 'error');
+
+            return;
+        }
+
         $this->altaApplicationId = $applicationId;
         $this->altaTierId = null;
         $this->altaDuplicateBlocked = false;

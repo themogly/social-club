@@ -333,6 +333,13 @@ class TillSession extends Component
             return;
         }
 
+        // Prompt 266 — opening the drawer is the operator's own permission (255), not only the screen's mount gate.
+        if (! $this->userCan('till.open')) {
+            $this->flash(__('Tu usuario no puede abrir la caja.'), 'error');
+
+            return;
+        }
+
         // Single-till (default): the sede's one terminal, preset — the operator only entered a float. Multi-
         // till: the terminal the operator picked from this sede's CONFIGURED terminals (managed in admin,
         // prompt 102 — no longer free-typed at the counter). OpenTill normalises + registers it (prompt 84).

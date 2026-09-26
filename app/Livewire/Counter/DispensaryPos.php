@@ -471,12 +471,16 @@ class DispensaryPos extends Component
         $this->catalogueSource = $source;
     }
 
-    /** Whether this sede runs a bar at all (prompt 118's setting, read per sede). */
+    /**
+     * Whether the bar is offered on this screen: the sede runs a bar (prompt 118's setting) AND the PIN operator may
+     * sell at it (`pos.bar`, prompt 266 — the operator decides, 255). Without the permission there is no bar source at
+     * all, and the server refuses a crafted bar line too.
+     */
     public function barEnabled(): bool
     {
         $location = $this->resolveLocation();
 
-        return $location !== null && (bool) Settings::get('bar_enabled', true, $location->id);
+        return $location !== null && (bool) Settings::get('bar_enabled', true, $location->id) && $this->userCan('pos.bar');
     }
 
     public function filterArticleCategory(?string $categoryId): void
@@ -901,6 +905,21 @@ class DispensaryPos extends Component
             return;
         }
 
+        // Prompt 266 — each half of the visit is the operator's to charge: the aportación needs `pos.use`, the bar lines
+        // `pos.bar`. Refused with the basket INTACT — bar items already in the visit (the permission revoked mid-shift)
+        // are neither charged silently nor dropped silently.
+        if ($this->basket !== [] && ! $this->userCan('pos.use')) {
+            $this->flash(__('Tu usuario no puede registrar dispensaciones.'), 'error');
+
+            return;
+        }
+
+        if ($this->barBasket !== [] && ! $this->userCan('pos.bar')) {
+            $this->flash(__('Hay artículos de barra en la visita: los cobra alguien con permiso de barra.'), 'error');
+
+            return;
+        }
+
         // Prompt 263 — ONE pay button settles the whole visit. A visit with only bar lines is a bar order on its
         // own ledger; no dispensation, so none of the dispensation's gates below apply to it.
         if ($this->basket === []) {
@@ -1113,6 +1132,13 @@ class DispensaryPos extends Component
     {
         $location = $this->resolveLocation();
         if ($location === null) {
+            return;
+        }
+
+        // Prompt 266 — the hidden Barra switch was the only gate; a crafted call added the line anyway.
+        if (! $this->userCan('pos.bar')) {
+            $this->flash(__('Tu usuario no puede vender en la barra.'), 'error');
+
             return;
         }
 
@@ -1491,7 +1517,7 @@ class DispensaryPos extends Component
             'openTillPresent' => $openTill !== null,
             // Bar side of the same visit (prompt 118) — only where the sede runs a bar. barArticles feeds the
             // quick-add; barLines + barTotalCents render the in-progress bar basket.
-            'barEnabled' => $location !== null && (bool) Settings::get('bar_enabled', true, $location->id),
+            'barEnabled' => $this->barEnabled(), // sede runs a bar AND the operator may sell at it (prompt 266)
             // The bar's catalogue, browsable in the centre pane (prompt 212) — filtered, with its own
             // categories, instead of every row as a chip in the cart column.
             'barArticles' => $this->filterArticles($allArticles),
