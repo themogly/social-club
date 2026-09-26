@@ -85,10 +85,13 @@
 
              The TENDER's wallet figures are untouched: this is glanceable context, those are the arithmetic
              of the transaction in progress. --}}
-        <p data-member-wallet class="mt-2 flex items-baseline justify-between gap-2 border-t border-line pt-2 text-xs dark:border-slate-800">
-            <span class="font-medium text-ink-muted dark:text-slate-400">{{ __('Monedero') }}</span>
-            <span class="text-sm font-bold tabular-nums {{ $walletCents < 0 ? 'text-error' : '' }}">{{ $this->money($walletCents) }}</span>
-        </p>
+        {{-- Prompt 268 — shown when there is something to say: a credit to spend, or a DEBT (in red). Not at exactly €0. --}}
+        @if ($walletCents !== 0)
+            <p data-member-wallet class="mt-2 flex items-baseline justify-between gap-2 border-t border-line pt-2 text-xs dark:border-slate-800">
+                <span class="font-medium text-ink-muted dark:text-slate-400">{{ __('Monedero') }}</span>
+                <span class="text-sm font-bold tabular-nums {{ $walletCents < 0 ? 'text-error' : '' }}">{{ $this->money($walletCents) }}</span>
+            </p>
+        @endif
 
         {{-- …and the photo nag, which the owner asked to move OUT of the scrolling part and left the where to
              us (prompt 234). Here, because it is about the person in the identity card and because a nag that

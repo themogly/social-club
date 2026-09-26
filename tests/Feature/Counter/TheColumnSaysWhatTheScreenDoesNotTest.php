@@ -177,9 +177,8 @@ class TheColumnSaysWhatTheScreenDoesNotTest extends TestCase
         $start = (int) strpos($html, 'data-member-summary');
         $summary = substr($html, $start, (int) strpos($html, 'data-cart-scroll') - $start);
 
-        $this->assertStringContainsString('data-member-wallet', $summary, 'the wallet is not in the pinned card');
-        $this->assertStringContainsString(e(Money::fromCents(0)->formatted()), $summary);
-        $this->assertStringNotContainsString('text-error', substr($html, (int) strpos($html, 'data-member-wallet'), 300));
+        // Prompt 268 — at exactly €0 there is nothing to say, so the card has no wallet line…
+        $this->assertStringNotContainsString('data-member-wallet', $summary, 'a €0 wallet still has a card line');
 
         // …and a socio in debt reads red. The balance is derived from the ledger, so the ledger is what a
         // fixture writes — there is no "set the balance" call, by design.

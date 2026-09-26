@@ -269,10 +269,12 @@
                             <div class="min-w-0 flex-1">
                                 <h3 class="truncate font-bold">{{ $member->fullName() }}</h3>
                                 <p class="text-sm text-ink-muted dark:text-slate-400">{{ $member->member_no }}</p>
-                                <p class="mt-1 text-sm">
-                                    <span class="text-ink-muted dark:text-slate-400">{{ __('Monedero') }}:</span>
-                                    <span class="font-semibold {{ $walletCents < 0 ? 'text-error' : '' }}">{{ $this->money($walletCents) }}</span>
-                                </p>
+                                @if ($walletCents !== 0) {{-- prompt 268: credit or debt, not at exactly €0 --}}
+                                    <p data-member-wallet class="mt-1 text-sm">
+                                        <span class="text-ink-muted dark:text-slate-400">{{ __('Monedero') }}:</span>
+                                        <span class="font-semibold {{ $walletCents < 0 ? 'text-error' : '' }}">{{ $this->money($walletCents) }}</span>
+                                    </p>
+                                @endif
                             </div>
                             <button type="button" wire:click="clearMember" class="shrink-0 rounded-lg px-2 py-1.5 text-sm text-ink-muted transition hover:bg-black/5 dark:text-slate-400 dark:hover:bg-white/5">{{ __('Quitar') }}</button>
                         </div>
@@ -348,7 +350,8 @@
                              to be attached at all (prompt 193). Offering a tender that can never complete is
                              worse than not offering it, so the field goes rather than sitting permanently
                              disabled. --}}
-                        @if ($attachSocioEnabled)
+                        {{-- Prompt 268 — and only when the attached member has something to spend (a positive balance). --}}
+                        @if ($attachSocioEnabled && $member !== null && $walletCents > 0)
                         <div>
                             <label for="wallet" class="block text-xs font-medium text-ink-muted dark:text-slate-400">{{ __('Monedero (€)') }}</label>
                             <input
@@ -361,9 +364,6 @@
                                 placeholder="0,00"
                                 class="mt-1 h-11 w-full rounded-xl border border-line bg-surface px-3 text-base text-ink placeholder:text-ink-muted focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/40 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
                             >
-                            @if ($member === null)
-                                <p class="mt-1 text-xs text-ink-muted dark:text-slate-400">{{ __('Atribuye un socio para pagar con monedero.') }}</p>
-                            @endif
                         </div>
                         @endif
 
@@ -371,7 +371,10 @@
                         <div>
                             {{-- A real <label for>, not a loose <p> plus a placeholder: a placeholder disappears on focus and is
                                  not a label (a11y audit), and this is the field that decides what goes in the drawer. --}}
-                            <label for="bar-cash-tendered" class="block text-xs font-medium text-ink-muted dark:text-slate-400">{{ __('Efectivo entregado') }}</label>
+                            <div class="flex items-center justify-between">
+                                <label for="bar-cash-tendered" class="block text-xs font-medium text-ink-muted dark:text-slate-400">{{ __('Efectivo entregado') }}</label>
+                                <button type="button" wire:click="clearTendered" data-clear-tendered class="min-h-11 px-2 text-xs font-semibold text-ink-muted hover:text-brand dark:text-slate-400">{{ __('Borrar') }}</button>
+                            </div>
                             <div class="mt-1 grid grid-cols-4 gap-2">
                                 <button type="button" wire:click="quickCash" class="h-11 rounded-xl border border-line bg-surface text-sm font-semibold text-ink transition hover:bg-surface-alt dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:hover:bg-slate-800">{{ __('Justo') }}</button>
                                 <button type="button" wire:click="quickCash(500)" class="h-11 rounded-xl border border-line bg-surface text-sm font-semibold text-ink transition hover:bg-surface-alt dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:hover:bg-slate-800">€5</button>
@@ -394,15 +397,24 @@
                                 <dt class="text-ink-muted dark:text-slate-400">{{ __('A cobrar en efectivo') }}</dt>
                                 <dd class="font-semibold tabular-nums">{{ $this->money($cashPostedCents) }}</dd>
                             </div>
-                            <div class="flex items-center justify-between">
-                                <dt class="text-ink-muted dark:text-slate-400">{{ __('Monedero') }}</dt>
-                                <dd class="font-semibold tabular-nums">{{ $this->money($walletAppliedCents) }}</dd>
-                            </div>
-                            <div class="flex items-center justify-between border-t border-line pt-1 dark:border-slate-700">
-                                <dt class="font-medium">{{ __('Cambio') }}</dt>
-                                <dd class="text-base font-bold tabular-nums {{ $changeDueCents > 0 ? 'text-success' : '' }}">{{ $this->money($changeDueCents) }}</dd>
-                            </div>
-                            @if ($member)
+                            @if ($walletAppliedCents > 0)
+                                <div data-tender-wallet class="flex items-center justify-between">
+                                    <dt class="text-ink-muted dark:text-slate-400">{{ __('Monedero') }}</dt>
+                                    <dd class="font-semibold tabular-nums">{{ $this->money($walletAppliedCents) }}</dd>
+                                </div>
+                            @endif
+                            @if ($shortfallCents > 0)
+                                <div data-cash-shortfall class="flex items-center justify-between border-t border-line pt-1 dark:border-slate-700">
+                                    <dt class="font-medium text-error">{{ __('Falta') }}</dt>
+                                    <dd class="text-base font-bold tabular-nums text-error">{{ $this->money($shortfallCents) }}</dd>
+                                </div>
+                            @else
+                                <div data-change-due class="flex items-center justify-between border-t border-line pt-1 dark:border-slate-700">
+                                    <dt class="font-medium">{{ __('Cambio') }}</dt>
+                                    <dd class="text-base font-bold tabular-nums {{ $changeDueCents > 0 ? 'text-success' : '' }}">{{ $this->money($changeDueCents) }}</dd>
+                                </div>
+                            @endif
+                            @if ($member && $walletAppliedCents > 0)
                                 <div class="flex items-center justify-between text-xs text-ink-muted dark:text-slate-400">
                                     <dt>{{ __('Monedero tras la venta') }}</dt>
                                     <dd class="font-medium {{ $projectedWalletCents < 0 ? 'text-error' : '' }}">{{ $this->money($projectedWalletCents) }}</dd>

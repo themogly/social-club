@@ -1155,6 +1155,7 @@
     "Fallidos": "Failed",
     "Fallo": "Failure",
     "Fallos seguidos antes de bloquear el teclado del mostrador (3–10). Cada bloqueo seguido dura más; un responsable puede desbloquearlo desde Seguridad.": "Consecutive failures before the counter's PIN pad locks (3–10). Each consecutive lockout lasts longer; a manager can clear it from Security.",
+    "Falta": "Still to collect",
     "Falta el nombre legal de la asociación": "The association's legal name is missing",
     "Falta el rol :role.": "The :role role is missing.",
     "Falta la firma del socio.": "The member's signature is missing.",

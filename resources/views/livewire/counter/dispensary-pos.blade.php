@@ -840,17 +840,22 @@
                          Rendered for EITHER basket, and the figures are the COMBINED ones — the split the
                          settle actually applies (prompt 224). --}}
                     <div class="mt-4 space-y-3">
+                        {{-- Prompt 268 — the wallet input only when the held member has something to SPEND here (a positive
+                             balance). At €0 or in debt it was noise; the tab (259) sets walletInput itself and needs no box. --}}
+                        @if ($member !== null && $walletCents > 0)
                         <div>
                             <label for="wallet" class="block text-xs font-medium text-ink-muted dark:text-slate-400">{{ __('Monedero (€)') }}</label>
                             <input id="wallet" type="text" inputmode="decimal" wire:model.live.debounce.400ms="walletInput" @disabled($member === null) autocomplete="off" placeholder="0,00" class="mt-1 h-11 w-full rounded-xl border border-line bg-surface px-3 text-base text-ink placeholder:text-ink-muted focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/40 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100">
-                            @if ($member === null)
-                                <p class="mt-1 text-[11px] text-ink-muted dark:text-slate-400">{{ __('Atribuye un socio para pagar con monedero.') }}</p>
-                            @endif
                         </div>
+                        @endif
 
                         {{-- Quick cash --}}
                         <div>
-                            <p class="text-xs font-medium text-ink-muted dark:text-slate-400">{{ __('Efectivo entregado') }}</p>
+                            <div class="flex items-center justify-between">
+                                <p class="text-xs font-medium text-ink-muted dark:text-slate-400">{{ __('Efectivo entregado') }}</p>
+                                {{-- Prompt 268 — the notes ADD now, so a mistaken tap needs an undo. --}}
+                                <button type="button" wire:click="clearTendered" data-clear-tendered class="min-h-11 px-2 text-xs font-semibold text-ink-muted hover:text-brand dark:text-slate-400">{{ __('Borrar') }}</button>
+                            </div>
                             <div class="mt-1 grid grid-cols-4 gap-2">
                                 <button type="button" wire:click="quickCash" class="h-11 rounded-xl border border-line bg-surface text-sm font-semibold text-ink transition hover:bg-surface-alt dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:hover:bg-slate-800">{{ __('Justo') }}</button>
                                 <button type="button" wire:click="quickCash(500)" class="h-11 rounded-xl border border-line bg-surface text-sm font-semibold text-ink transition hover:bg-surface-alt dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:hover:bg-slate-800">€5</button>
@@ -865,18 +870,31 @@
                                 <dt class="text-ink-muted dark:text-slate-400">{{ __('A cobrar en efectivo') }}</dt>
                                 <dd data-cash-due class="font-semibold tabular-nums">{{ $this->money($cashPreviewCents) }}</dd>
                             </div>
-                            <div class="flex items-center justify-between">
-                                <dt class="text-ink-muted dark:text-slate-400">{{ __('Monedero') }}</dt>
-                                <dd class="font-semibold tabular-nums">{{ $this->money($walletPreviewCents) }}</dd>
-                            </div>
-                            <div class="flex items-center justify-between border-t border-line pt-1 dark:border-slate-700">
-                                <dt class="font-medium">{{ __('Cambio') }}</dt>
-                                <dd class="text-base font-bold tabular-nums {{ $changeDueCents > 0 ? 'text-success' : '' }}">{{ $this->money($changeDueCents) }}</dd>
-                            </div>
-                            <div class="flex items-center justify-between text-xs text-ink-muted dark:text-slate-400">
-                                <dt>{{ __('Monedero tras aportación') }}</dt>
-                                <dd class="font-medium {{ $projectedWalletCents < 0 ? 'text-error' : '' }}">{{ $this->money($projectedWalletCents) }}</dd>
-                            </div>
+                            @if ($walletPreviewCents > 0)
+                                <div data-tender-wallet class="flex items-center justify-between">
+                                    <dt class="text-ink-muted dark:text-slate-400">{{ __('Monedero') }}</dt>
+                                    <dd class="font-semibold tabular-nums">{{ $this->money($walletPreviewCents) }}</dd>
+                                </div>
+                            @endif
+                            {{-- Prompt 268 — while less has been handed over than is owed, what is still to collect ("Falta");
+                                 otherwise the change. The commit's own refusal stays the guard. --}}
+                            @if ($shortfallCents > 0)
+                                <div data-cash-shortfall class="flex items-center justify-between border-t border-line pt-1 dark:border-slate-700">
+                                    <dt class="font-medium text-error">{{ __('Falta') }}</dt>
+                                    <dd class="text-base font-bold tabular-nums text-error">{{ $this->money($shortfallCents) }}</dd>
+                                </div>
+                            @else
+                                <div data-change-due class="flex items-center justify-between border-t border-line pt-1 dark:border-slate-700">
+                                    <dt class="font-medium">{{ __('Cambio') }}</dt>
+                                    <dd class="text-base font-bold tabular-nums {{ $changeDueCents > 0 ? 'text-success' : '' }}">{{ $this->money($changeDueCents) }}</dd>
+                                </div>
+                            @endif
+                            @if ($walletPreviewCents > 0)
+                                <div data-tender-wallet class="flex items-center justify-between text-xs text-ink-muted dark:text-slate-400">
+                                    <dt>{{ __('Monedero tras aportación') }}</dt>
+                                    <dd class="font-medium {{ $projectedWalletCents < 0 ? 'text-error' : '' }}">{{ $this->money($projectedWalletCents) }}</dd>
+                                </div>
+                            @endif
                         </dl>
 
                         {{-- Prompt 259 — "Añadir a la cuenta": present ONLY for a member the owner approved for a tab,

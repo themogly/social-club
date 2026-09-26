@@ -74,36 +74,69 @@ trait HandlesTender
         return $tendered === null || $tendered < $cashApplied;
     }
 
-    /** Quick-tender: set cashTendered to a preset (cents) or, when null, the exact cash owed. */
+    /**
+     * Quick-tender (prompt 268): a note (€5/€10/€20) ADDS its value to what has been handed over — a member paying
+     * with two twenties and a ten is three taps, €50,00 — while "Justo" (null) SETS the field to exactly the cash owed.
+     * Each press used to OVERWRITE the field, so €20, €20, €10 read "10.00".
+     */
     public function quickCash(?int $cents = null): void
     {
         [$cashApplied] = $this->tenderSplit($this->tenderableTotalCents());
 
-        $this->cashTendered = $this->eurosString($cents ?? $cashApplied);
+        $this->cashTendered = $cents === null
+            ? $this->eurosString($cashApplied)
+            : $this->eurosString(($this->parseCents($this->cashTendered) ?? 0) + $cents);
+    }
+
+    /** "Borrar" — the undo for a mistaken note now that the notes add up (prompt 268). */
+    public function clearTendered(): void
+    {
+        $this->cashTendered = '';
+    }
+
+    /**
+     * What is still to collect when less cash has been handed over than is owed (prompt 268's "Falta") — the
+     * explanation of the commit's "no cubre el total" refusal, which stays the real guard. 0 when blank or covered.
+     */
+    protected function shortfallCents(int $cashApplied): int
+    {
+        if ($cashApplied <= 0 || trim($this->cashTendered) === '') {
+            return 0;
+        }
+
+        $tendered = $this->parseCents($this->cashTendered);
+
+        return $tendered === null ? 0 : max(0, $cashApplied - $tendered);
     }
 
     /** Each screen provides its LIVE total (the basket total, already price-override-aware). */
     abstract protected function tenderableTotalCents(): int;
 
-    /** Parse a euros string from the edge to integer cents, or null when blank/invalid. */
+    /**
+     * Parse a euros string from the edge to integer cents, or null when blank/invalid. Prompt 268: ONE unambiguous
+     * reading — digits, optionally one separator (`,` or `.`) and one or two decimals ("50,00", "50.00", "50") — the
+     * same rule as grams (257), so "1.000" is refused, never read as €1.
+     */
     protected function parseCents(string $euros): ?int
     {
-        if (trim($euros) === '') {
+        $euros = trim($euros);
+
+        if ($euros === '' || preg_match('/^(\d+)(?:[.,](\d{1,2}))?$/', $euros, $m) !== 1) {
             return null;
         }
 
         try {
-            return Money::fromEuros($euros)->cents;
+            return Money::fromEuros(isset($m[2]) ? $m[1].'.'.$m[2] : $m[1])->cents;
         } catch (InvalidArgumentException) {
             return null;
         }
     }
 
-    /** Integer cents → a plain euros string ("12.50") for an input default — float-free. */
+    /** Integer cents → a euros string for an input ("50,00") — Spanish format like the panel around it (prompt 268). */
     protected function eurosString(int $cents): string
     {
         $cents = max(0, $cents);
 
-        return sprintf('%d.%02d', intdiv($cents, 100), $cents % 100);
+        return sprintf('%d,%02d', intdiv($cents, 100), $cents % 100);
     }
 }

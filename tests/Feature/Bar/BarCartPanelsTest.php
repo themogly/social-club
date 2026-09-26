@@ -99,7 +99,8 @@ class BarCartPanelsTest extends TestCase
         $this->flag('bar_attach_socio_enabled', true);
         $html = Livewire::test(BarPos::class)->html();
         $this->assertStringContainsString(__('Socio (opcional)'), $html);
-        $this->assertStringContainsString(__('Monedero (€)'), $html);          // wallet returns with the socio
+        // Prompt 268 — the wallet INPUT now waits for an attached member with something to spend (none attached here).
+        $this->assertStringNotContainsString(__('Monedero (€)'), $html);
         $this->assertStringNotContainsString(__('Referencia del ticket (opcional)'), $html);
 
         $this->flag('bar_attach_socio_enabled', false);
