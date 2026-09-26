@@ -129,15 +129,17 @@ class BarLargeLayoutTest extends TestCase
     public function test_sold_out_is_disabled_and_visible_in_large_mode(): void
     {
         $this->operator();
-        $this->article('Agotado', 0);
+        // Named so it is not a UI string in either locale (prompt 253): 'Agotado' was also the es sold-out
+        // label, so the name assertion passed on the label alone.
+        $this->article('Tónica Probe', 0);
 
         $html = Livewire::test(BarPos::class)->call('setArticleLayout', 'large')->html();
 
         // 230's rule holds at the new size: the sold-out article is shown, with its count, disabled.
-        $this->assertStringContainsString('Agotado', $html);            // the article name (visible, not hidden)
+        $this->assertStringContainsString(e('Tónica Probe'), $html);    // the article name (visible, not hidden)
         $this->assertStringContainsString('disabled', $html);           // the button carries the disabled attribute
         $this->assertStringContainsString('cursor-not-allowed', $html); // …and the sold-out card styling
-        $this->assertStringContainsString('Sold out', $html);           // the count/state is shown (EN locale)
+        $this->assertStringContainsString(e(__('Agotado')), $html);     // the sold-out state, in the running locale
         $this->assertStringContainsString('!min-h-[120px]', $html, 'the sold-out tile is not the large size');
     }
 

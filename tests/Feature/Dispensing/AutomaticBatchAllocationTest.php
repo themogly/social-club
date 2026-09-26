@@ -274,14 +274,17 @@ class AutomaticBatchAllocationTest extends TestCase
         $operator = $this->operator();
         $member = $this->member();
 
-        $html = Livewire::test(DispensaryPos::class)
+        $pos = Livewire::test(DispensaryPos::class)
             ->call('selectMember', $member->id)
-            ->call('chooseGenetic', $this->genetic->id)
-            ->html();
+            ->call('chooseGenetic', $this->genetic->id);
+        $html = $pos->html();
 
         $this->assertStringContainsString('data-batch-mode="automatic"', $html);
         $this->assertStringNotContainsString('wire:click="selectBatch', $html, 'automatic mode must offer no lote control');
-        $this->assertStringContainsString('In stock:', $html); // the sede total (EN locale)
+        // The sede total, in whatever locale the suite runs (prompt 253) — the copy is computed, never literal.
+        $total = $pos->instance()->activeGeneticStockLabel();
+        $this->assertNotNull($total);
+        $this->assertStringContainsString(e(__('En stock: :total', ['total' => $total])), $html);
     }
 
     public function test_the_pane_shows_the_lote_chips_in_manual(): void
