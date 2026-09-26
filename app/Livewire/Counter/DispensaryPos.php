@@ -1498,6 +1498,7 @@ class DispensaryPos extends Component
             'cashPreviewCents' => $cashPreview,
             'walletPreviewCents' => $walletPreview,
             'changeDueCents' => $this->changeDueCents($cashPreview),
+            'shortfallCents' => $this->shortfallCents($cashPreview), // prompt 268 — "Falta"
             'activeGenetic' => $activeGeneticModel,
             'weightPresets' => $this->weightPresets($activeGeneticModel, $location, $member, $limits),
             'usualGenetics' => $this->usualGenetics($member, $allGenetics),

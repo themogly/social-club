@@ -585,6 +585,7 @@ class BarPos extends Component
             'cashPostedCents' => $cashPosted,
             'walletAppliedCents' => $walletApplied,
             'changeDueCents' => $this->changeDueCents($cashPosted),
+            'shortfallCents' => $this->shortfallCents($cashPosted), // prompt 268 — "Falta"
             'openTill' => $location !== null ? $this->openTillSession($location) : null,
             // Prompt 193 — per-sede: whether the cart offers a socio and a ticket reference at all. Wallet
             // payment REQUIRES a socio, so when attaching one is off the wallet field goes with it rather

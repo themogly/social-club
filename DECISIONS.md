@@ -14063,3 +14063,44 @@ no Administración button and `/users` → the counter; after a MANAGER PIN Role
 ### Merge
 
 Merged to `main` on Ben's instruction for this session. `composer check` green in `es` and `en`.
+
+## Prompt 268 — the cash buttons add up, and the wallet only appears when there is something in it
+
+### Before (`tests/Feature/Counter/TenderPanelTest`, from Ben's tablet photo)
+
+€20, €20, €10 left the tendered field at *"10.00"* (each press overwrote it, in a dot format beside a comma field); a member
+with a €0 wallet still got the "Monedero (€)" box, its card line and the summary's wallet rows.
+
+### The tender (shared `HandlesTender`, so the dispensary AND the Bar)
+
+- **Notes add; "Justo" sets.** `quickCash(500|1000|2000)` adds its value to what is already tendered; `quickCash()` (Justo) sets the
+  field to exactly the cash to charge. The label stays "Justo" (the app's existing word for it). **"Borrar"** (`clearTendered()`)
+  empties the field — the undo for a mistaken tap now that taps accumulate.
+- **Spanish format, no ambiguity.** `eurosString()` writes `50,00`; `parseCents()` accepts `50,00`, `50.00` and `50` — ONE rule,
+  one separator followed by one or two digits (257's grams rule) — so `1.000` is refused, never read as €1. (`Money::fromEuros` is
+  unchanged globally; the strict reading is the tender field's, which is where a human types it. The tab (259) writes
+  `walletInput` through `eurosString()` and still parses.)
+- **"Falta €X".** While less is tendered than the cash to charge, the summary shows what is still to collect (in red) instead of
+  "Cambio €0,00"; when more, "Cambio" as before. The commit's own "El efectivo entregado no cubre el total." stays the guard.
+
+### The wallet visibility rule
+
+- The **wallet INPUT** only when the held member has a **positive** balance at this sede (something to spend) — on the Bar also only
+  with a member attached. Hidden at €0 and in debt.
+- The summary's **wallet rows** ("Monedero", "Monedero tras aportación / la venta") only when a wallet amount is actually applied.
+- The member card's **"Monedero" line** when the balance is **not zero**: a credit is worth seeing, and a **debt stays visible in
+  red**; hidden only at exactly €0.
+- **The tab is unaffected:** "Añadir a la cuenta" sets `walletInput` itself (259) — tested with the input hidden for a €0 approved
+  member, the remainder still goes on the tab. The debt reminder and collect-debt flow are separate and unchanged.
+
+### Tests
+
+`TenderPanelTest` (7): additive notes + Justo, Borrar, both decimal styles and the refused thousands form, the shortfall line with
+the refusal intact, the wallet rule at €0 / €6 / −€5 (red), the tab with the input hidden, and the Bar. Three older tests pinned
+the old behaviour (the `18.50` dot format, the Bar's wallet box with no member, the card line at €0) and now assert the new rules.
+Real browser (`tests/Browser/shoot-tender-panel.mjs`, 820×1180): a €0-wallet member shows no wallet box; €20+€20+€10 reads `50,00`
+with "Cambio" beneath (`storage/app/screenshots/268/`).
+
+### Merge
+
+Merged to `main` on Ben's instruction. `composer check` green in `es` and `en`.
