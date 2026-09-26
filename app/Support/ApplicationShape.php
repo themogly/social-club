@@ -74,6 +74,11 @@ class ApplicationShape
         return [
             'photo' => ['nullable', 'image', 'mimes:jpeg,jpg,png,webp', DocumentUpload::maxRule()],
             'document_scan' => ['nullable', 'file', 'mimes:jpeg,jpg,png,webp,pdf', DocumentUpload::maxRule()],
+            // Prompt 244 — the medical certificate, the EVIDENCE behind `is_therapeutic` (which both routes
+            // already collect). Without it the wizard created therapeutic members with no evidence the admin
+            // form would have required. Optional like the others (a member may bring it later), same vault,
+            // same private encrypted disk; shown only when the therapeutic tick is on.
+            'medical_cert' => ['nullable', 'file', 'mimes:jpeg,jpg,png,webp,pdf', DocumentUpload::maxRule()],
         ];
     }
 

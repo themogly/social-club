@@ -12670,3 +12670,55 @@ required is the same; only when the operator sees it changed.
 
 `composer check` green — including the landing test written to FAIL against `main` (there the submit resets to
 the chooser, `altaApplicationId` null, `data-alta-review` absent). MySQL left to CI. New copy in both locales.
+
+## Prompt 244 — the wizard collects what the admin form does, and the sponsor field says who it resolved to
+
+The admin `MemberForm` carried three things the counter wizard did not — `medical_cert_path`, `is_temporary`,
+`sole_association_declared_at` — and the sponsor field accepted a name that matched nobody, or two people, as
+free text with nobody told. Decided per field, not blindly:
+
+### Medical certificate — added to the wizard (the required parity)
+
+The EVIDENCE behind `is_therapeutic`, which both routes already collect. Added to `ApplicationShape::files()`,
+stored by `SubmitApplication` through the SAME vault family (`member-medical-certs/`, encrypted, private disk),
+carried onto the member by `ApproveApplication`, and already disposed of by `AnonymiseMember` (it lists
+`medical_cert_path`). Rendered on the wizard's Membresía step, revealed by `x-show` when the therapeutic tick is
+on (245's rule, not `x-if`). **Captured IN PERSON only** — the online applicant form deliberately does NOT
+upload it (its copy already reads "podré aportar certificado médico"): Article 9 material is handled at the
+counter, not self-served online. So it is the deliberate staff-only file, excluded from 215's both-forms parity
+like 210's consent difference and asserted separately.
+
+### Temporary member — stays admin-only (recorded)
+
+`is_temporary` drives a time-boxed membership with an auto-removal sweep (`TemporaryMemberTest`,
+`members:remove-temporary`) — a club classification decided by a responsable in the panel, not a fact a floor
+operator establishes while signing somebody up at the counter. The counter creates ordinary members; making one
+temporary stays where the removal policy and the expiry live. Left off the wizard deliberately.
+
+### Sole-association declaration — stays with the signed statutes (recorded, the overnight-default)
+
+`sole_association_declared_at` is a legal declaration the applicant makes. Rather than add a third digital tick
+across all three routes, it is treated as part of the statutes acceptance the applicant already signs (prompt
+220's signature over the consent text, which includes the estatutos): the club captures the sole-association
+declaration on that signed paper/statutes, the admin form stamps the date when it is on file. Recorded here as
+the deliberate policy per the prompt's escape, not an oversight — a club that wants a separate digital tick
+adds it as a consent field across the three routes with the 215 parity guard.
+
+### The sponsor field says what it found
+
+One resolver now — `App\Support\AvaladorResolver` — resolves a member number OR an unambiguous full name to an
+active socio. `SubmitApplication::resolveAvalador()` delegates to it (behaviour unchanged, pinned by the
+existing avalador tests — what it STORES is identical), and the wizard's `avalador_ref` is `.live` (debounced)
+with `avaladorFeedback()` showing the outcome BEFORE submit (prompt 60): the named socio when unambiguous, "no
+member found", or "several — use the number". `avalador_member_id` still stores exactly what it did.
+
+### The camera was never missing on `main`
+
+The wizard's photo input carries `capture="user"`, the scan and the certificate `capture="environment"`, and
+the applicant form's photo `capture="user"` — on Android Chrome these open the camera directly. The tester's
+"no camera" was a stale build; a structural test now asserts the attributes so the next report has a test name.
+
+### Verification
+
+`composer check` green — the medical-cert test written to fail against `main` (`medical_cert` is not in
+`ApplicationShape::files()` there). MySQL left to CI. New copy in both locales.
