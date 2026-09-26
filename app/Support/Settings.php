@@ -136,6 +136,10 @@ class Settings
         'bar_enabled' => true,
         'ring_fenced' => false,
 
+        // Prompt 259 — may a MANAGER at this sede approve a member's tab (set `debt_limit_cents`)? Owner-set,
+        // default OFF: the owner can always approve; a manager only where this is on; staff and the counter never.
+        'managers_can_approve_debt' => false,
+
         // Governance / actas
         'minute_quorum_fraction_bp' => 5000,  // first-call quorum = 50% of active members (basis points)
         'assembly_second_call_quorum_bp' => 0, // second-call quorum (0 = constituted whatever the attendance)

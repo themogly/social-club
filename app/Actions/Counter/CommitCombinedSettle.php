@@ -9,7 +9,6 @@ use App\Models\Dispensation;
 use App\Models\Location;
 use App\Models\Member;
 use App\Models\Order;
-use App\Support\Settings;
 use App\Support\Wallet;
 use Illuminate\Support\Facades\DB;
 use RuntimeException;
@@ -22,11 +21,10 @@ use RuntimeException;
  *
  * The two single writers ({@see CommitDispensation}, {@see CommitOrder}) are unchanged and do all the real
  * work; this only ORCHESTRATES them so the pair is ATOMIC — both commit or neither does — and adds the one
- * thing neither can do alone: a COMBINED wallet-limit check. Each writer records its wallet spend with
- * allow_debt (its own per-writer debt check is bypassed), so a member could otherwise wallet-pay each half
- * within limit yet blow the limit across the two. This validates the combined draw up front, before any write.
+ * thing neither can do alone: a COMBINED wallet check, so a member cannot wallet-pay each half within their tab
+ * yet blow it across the two. This validates the combined draw up front, before any write.
  *
- * @phpstan-type SettleOptions array{till_session_id?: ?string, operator_id?: ?string, dispensation?: array<string, mixed>, order?: array<string, mixed>}
+ * @phpstan-type SettleOptions array{till_session_id?: ?string, operator_id?: ?string, on_tab?: bool, dispensation?: array<string, mixed>, order?: array<string, mixed>}
  */
 class CommitCombinedSettle
 {
@@ -58,13 +56,22 @@ class CommitCombinedSettle
             }
         }
 
-        // COMBINED wallet-limit check — fail-closed BEFORE any write (the point of this action).
+        // COMBINED wallet check — fail-closed BEFORE any write. Prompt 259: the draw may exceed the member's credit
+        // only on the deliberate tab (`on_tab`, passed to BOTH writers, whose SpendFromWallet re-checks each half)
+        // and then only within the member's approved headroom — the same `Wallet::maxDebitCents()` the wallet
+        // writer enforces, so the two halves cannot each fit while the pair blows the limit.
+        $onTab = (bool) ($options['on_tab'] ?? false);
         $walletDraw = (int) ($dispOptions['wallet_cents'] ?? 0) + (int) ($orderOptions['wallet_cents'] ?? 0);
         if ($walletDraw > 0) {
-            $available = Wallet::balance($member->id, $location->id) + $this->debtAllowanceCents($location);
+            $available = $onTab
+                ? Wallet::maxDebitCents($member, $location->id)
+                : max(0, Wallet::balance($member->id, $location->id));
             if ($walletDraw > $available) {
                 throw new DebtLimitExceededException(__('El pago combinado con monedero superaría el saldo disponible del socio.'));
             }
+        }
+        if ($onTab) {
+            $shared['on_tab'] = true;
         }
 
         // Atomic: an outer transaction wraps both single writers (each nests via a savepoint). If the order
@@ -78,15 +85,5 @@ class CommitCombinedSettle
 
             return ['dispensation' => $dispensation, 'order' => $order];
         });
-    }
-
-    /** How far below zero this sede lets a wallet go — the debt cap when debt is allowed, else 0. */
-    private function debtAllowanceCents(Location $location): int
-    {
-        if (! (bool) Settings::get('wallet_debt_allowed', false, $location->id)) {
-            return 0;
-        }
-
-        return (int) Settings::get('wallet_debt_limit_cents', 0, $location->id);
     }
 }

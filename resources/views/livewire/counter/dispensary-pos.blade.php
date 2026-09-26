@@ -643,6 +643,7 @@
                                              resolutions, so this column says neither a second time (prompt 199:
                                              once, in one place). With warnings only — nothing blocking — this
                                              is still where the fix belongs, beside the verdict that named it. --}}
+                                        @include('livewire.counter.partials.member-owes')
                                         @unless ($blockedSurface)
                                             {{-- The reported dead end, closed where it is read (prompt 211):
                                                  203's own enrol/renew panel, from the one shared partial, on
@@ -878,6 +879,27 @@
                                 <dd class="font-medium {{ $projectedWalletCents < 0 ? 'text-error' : '' }}">{{ $this->money($projectedWalletCents) }}</dd>
                             </div>
                         </dl>
+
+                        {{-- Prompt 259 — "Añadir a la cuenta": present ONLY for a member the owner approved for a tab,
+                             and only while they have headroom. It puts the part the cash handed over does not cover
+                             on the tab; disabled (with the reason) when that would pass the approved limit. --}}
+                        @if ($tab !== null && $tab['limit'] > 0 && $tab['headroom'] > 0)
+                            <div data-tab class="rounded-xl border border-line px-4 py-3 text-sm dark:border-slate-700">
+                                <p class="text-xs text-ink-muted dark:text-slate-400">
+                                    {{ __('Cuenta aprobada hasta :limit · debe :owed · margen :headroom', [
+                                        'limit' => $this->money($tab['limit']),
+                                        'owed' => $this->money($tab['owed']),
+                                        'headroom' => $this->money($tab['headroom']),
+                                    ]) }}
+                                </p>
+                                <x-button type="button" variant="secondary" size="md" class="mt-2 w-full" wire:click="commitOnTab" data-add-to-tab :disabled="! $tab['fits']">
+                                    {{ __('Añadir a la cuenta · :money', ['money' => $this->money($tab['remainder'])]) }}
+                                </x-button>
+                                @unless ($tab['fits'])
+                                    <p class="mt-1 text-[11px] text-error">{{ $tab['remainder'] > 0 ? __('Supera el límite de deuda aprobado.') : __('No queda nada por cobrar.') }}</p>
+                                @endunless
+                            </div>
+                        @endif
                     </div>
 
                     {{-- Signature (only when the sede requires it). Prompt 220 extracted the pad to

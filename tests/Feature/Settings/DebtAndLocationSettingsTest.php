@@ -23,11 +23,12 @@ use App\Support\Wallet;
 use Database\Seeders\RolePermissionSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use ReflectionClass;
+use Tests\Concerns\ApprovesMemberTabs;
 use Tests\TestCase;
 
 class DebtAndLocationSettingsTest extends TestCase
 {
-    use RefreshDatabase;
+    use ApprovesMemberTabs, RefreshDatabase;
 
     private Organisation $org;
 
@@ -45,6 +46,7 @@ class DebtAndLocationSettingsTest extends TestCase
     private function member(bool $withMembership = false): Member
     {
         $member = Member::factory()->create(['organisation_id' => $this->org->id, 'date_of_birth' => now()->subYears(30)]);
+        $this->approveTab($member); // prompt 259: the member's grant; these tests exercise the club cap under it
         if ($withMembership) {
             $tier = MembershipTier::factory()->create(['organisation_id' => $this->org->id]);
             Membership::factory()->create([
@@ -176,7 +178,7 @@ class DebtAndLocationSettingsTest extends TestCase
             // check-in / signature requirements (prompt 44 — now genuinely per-location) + camera QR (prompt 35).
             'restrict_pos_to_checked_in', 'signature_on_dispensation', 'camera_scan_enabled',
             // Per-location toggles reconciled to Setting rows (prompt 59/102), edited on LocationForm.
-            'bar_enabled', 'ring_fenced', 'multiple_tills_enabled',
+            'bar_enabled', 'ring_fenced', 'multiple_tills_enabled', 'managers_can_approve_debt',
             // Per-location bar cart panels (prompt 193): attaching a socio and the ticket reference are
             // per-sede input toggles on LocationForm, not org thresholds.
             'bar_attach_socio_enabled', 'bar_ticket_reference_enabled',

@@ -4,8 +4,10 @@ namespace Tests\Feature\Bar;
 
 use App\Actions\Bar\CommitOrder;
 use App\Actions\Till\OpenTill;
+use App\Actions\Wallet\RecordWalletTransaction;
 use App\Enums\OrderStatus;
 use App\Enums\Role;
+use App\Enums\WalletTransactionType;
 use App\Livewire\Counter\BarPos;
 use App\Models\Article;
 use App\Models\Genetic;
@@ -201,6 +203,9 @@ class BarPosScreenTest extends TestCase
         $this->operator();
         $a = $this->article('Bebida', 500, 10);
         $member = $this->member();
+        // The member HAS €2 of credit (prompt 259: a wallet payment beyond the credit is refused — it used to
+        // open a silent tab, which is what this test was unknowingly doing with an empty wallet).
+        (new RecordWalletTransaction)->handle($member, $this->location, 200, WalletTransactionType::TOPUP);
 
         Livewire::test(BarPos::class)
             ->call('addArticle', $a->id)

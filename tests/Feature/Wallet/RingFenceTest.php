@@ -13,11 +13,12 @@ use App\Support\ActiveScope;
 use App\Support\Settings;
 use App\Support\Wallet;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\Concerns\ApprovesMemberTabs;
 use Tests\TestCase;
 
 class RingFenceTest extends TestCase
 {
-    use RefreshDatabase;
+    use ApprovesMemberTabs, RefreshDatabase;
 
     private Organisation $org;
 
@@ -36,6 +37,7 @@ class RingFenceTest extends TestCase
         Settings::set('wallet_debt_limit_cents', 10000, SettingType::CENTS);
 
         $this->member = Member::factory()->create(['organisation_id' => $this->org->id]);
+        $this->approveTab($this->member); // prompt 259: owing needs an approved tab
         $this->creditSite = Location::factory()->create(['organisation_id' => $this->org->id]);
         $this->debtSite = Location::factory()->create(['organisation_id' => $this->org->id]);
 

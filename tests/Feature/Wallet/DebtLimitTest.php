@@ -13,11 +13,12 @@ use App\Support\ActiveScope;
 use App\Support\Settings;
 use App\Support\Wallet;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\Concerns\ApprovesMemberTabs;
 use Tests\TestCase;
 
 class DebtLimitTest extends TestCase
 {
-    use RefreshDatabase;
+    use ApprovesMemberTabs, RefreshDatabase;
 
     private Member $member;
 
@@ -43,6 +44,7 @@ class DebtLimitTest extends TestCase
     {
         Settings::set('wallet_debt_allowed', true, SettingType::BOOL);
         Settings::set('wallet_debt_limit_cents', 5000, SettingType::CENTS);
+        $this->approveTab($this->member); // prompt 259: the member's own grant; the €50 club cap is tighter
 
         $recorder = new RecordWalletTransaction;
 

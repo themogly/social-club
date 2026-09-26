@@ -38,6 +38,12 @@ class CreateLocation extends CreateRecord
             unset($data[$key]);
         }
 
+        // Owner-only (prompt 259): a non-owner creating a sede gets the default (OFF), whatever was posted.
+        foreach (LocationForm::OWNER_TOGGLES as $key) {
+            $this->toggleState[$key] = LocationForm::actorIsOwner() ? (bool) ($data[$key] ?? false) : (bool) Settings::DEFAULTS[$key];
+            unset($data[$key]);
+        }
+
         foreach (LocationForm::SETTING_INTEGERS as $key) {
             $this->integerState[$key] = (int) ($data[$key] ?? Settings::DEFAULTS[$key]);
             unset($data[$key]);
@@ -58,7 +64,7 @@ class CreateLocation extends CreateRecord
 
     protected function afterCreate(): void
     {
-        foreach (LocationForm::SETTING_TOGGLES as $key) {
+        foreach ([...LocationForm::SETTING_TOGGLES, ...LocationForm::OWNER_TOGGLES] as $key) {
             Settings::set($key, $this->toggleState[$key] ?? false, SettingType::BOOL, (string) $this->record->getKey());
         }
 

@@ -2,9 +2,11 @@
 
 namespace App\Policies;
 
+use App\Enums\Role;
 use App\Models\Member;
 use App\Models\User;
 use App\Support\ActiveScope;
+use App\Support\Settings;
 
 /**
  * The member directory is org-wide. Viewing is gated on `members.view`, creation
@@ -93,5 +95,30 @@ class MemberPolicy
     public function setLimits(User $user, Member $model): bool
     {
         return $user->can('member.limits.set');
+    }
+
+    /**
+     * May this user approve (set) the member's tab — `debt_limit_cents` (prompt 259)?
+     *
+     * The OWNER always. A MANAGER only at a sede whose owner-set `managers_can_approve_debt` is ON — judged at
+     * the manager's ACTIVE sede, which must be one they are assigned to; with no sede chosen ("all locations")
+     * a manager cannot. STAFF never, and nothing on the counter reaches this. The limit it grants is global to
+     * the member; the toggle governs only who may grant it.
+     */
+    public function approveDebt(User $user, Member $model): bool
+    {
+        if ($user->hasRole(Role::OWNER->value)) {
+            return true;
+        }
+
+        if (! $user->hasRole(Role::MANAGER->value)) {
+            return false;
+        }
+
+        $locationId = app(ActiveScope::class)->locationId();
+
+        return $locationId !== null
+            && $user->locations()->whereKey($locationId)->exists()
+            && (bool) Settings::get('managers_can_approve_debt', false, $locationId);
     }
 }

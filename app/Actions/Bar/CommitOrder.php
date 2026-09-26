@@ -5,7 +5,7 @@ namespace App\Actions\Bar;
 use App\Actions\Pricing\ResolveArticleDiscount;
 use App\Actions\RecordAuditLog;
 use App\Actions\Stock\RecordStockMovement;
-use App\Actions\Wallet\RecordWalletTransaction;
+use App\Actions\Wallet\SpendFromWallet;
 use App\Enums\OrderStatus;
 use App\Enums\StockMovementType;
 use App\Enums\TillSessionStatus;
@@ -32,7 +32,7 @@ use RuntimeException;
  * location, so a genetic can never appear on a bar order.
  *
  * @phpstan-type OrderLine array{article_id?: string, description?: string, unit_price_cents?: int, qty?: int, reference?: string}
- * @phpstan-type OrderOptions array{operator_id?: ?string, till_session_id?: ?string, member_id?: ?string, cash_cents?: int, wallet_cents?: int, reference?: ?string, idempotency_key?: ?string, reversal_of_id?: ?string}
+ * @phpstan-type OrderOptions array{operator_id?: ?string, till_session_id?: ?string, member_id?: ?string, cash_cents?: int, wallet_cents?: int, reference?: ?string, idempotency_key?: ?string, reversal_of_id?: ?string, on_tab?: bool}
  */
 class CommitOrder
 {
@@ -107,12 +107,11 @@ class CommitOrder
 
                 if ($wallet > 0) {
                     $member = Member::withoutGlobalScopes()->findOrFail($memberId);
-                    (new RecordWalletTransaction)->handle($member, $location, -$wallet, WalletTransactionType::PURCHASE, [
-                        'source' => $order,
+                    // Prompt 259 — the same gate as the dispensary: the tab only by the deliberate choice, within it.
+                    (new SpendFromWallet)->handle($member, $location, $wallet, WalletTransactionType::PURCHASE, $order, (bool) ($options['on_tab'] ?? false), [
                         'operator_id' => $options['operator_id'] ?? Auth::id(),
                         'till_session_id' => $tillSessionId,
                         'reason' => 'Compra en barra',
-                        'allow_debt' => true, // the wallet writer enforces the debt limit itself
                     ]);
                 }
 

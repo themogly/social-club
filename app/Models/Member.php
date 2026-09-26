@@ -98,6 +98,7 @@ class Member extends Model implements Authenticatable, HasLocalePreference
             'temporary_expires_at' => 'datetime',
             'temporary_reminder_sent_at' => 'datetime',
             'is_therapeutic' => 'boolean',
+            'debt_limit_cents' => 'integer',   // prompt 259 — a plain limit integer, not a Money figure; NOT fillable
             'joined_at' => 'datetime',
             'left_at' => 'datetime',
             'carencia_ends_at' => 'datetime',

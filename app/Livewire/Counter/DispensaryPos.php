@@ -13,8 +13,10 @@ use App\Actions\Pricing\ResolvePrice;
 use App\Actions\ResolveLocale;
 use App\Actions\Stock\SelectBatch;
 use App\Actions\Till\SelectTillSession;
+use App\Actions\Wallet\RecordWalletTransaction;
 use App\Enums\DispensationStatus;
 use App\Enums\TillSessionStatus;
+use App\Enums\WalletTransactionType;
 use App\Exceptions\DebtLimitExceededException;
 use App\Exceptions\DispensationBlockedException;
 use App\Exceptions\LimitExceededException;
@@ -680,6 +682,130 @@ class DispensaryPos extends Component
         $this->attemptCommit(override: false);
     }
 
+    /**
+     * "Añadir a la cuenta" was chosen for this sale (prompt 259). Set only by {@see commitOnTab()} and cleared with
+     * the basket; the writers re-check the member's approval and headroom, so a forged `true` gains nothing a
+     * member without an approved tab could use.
+     */
+    public bool $onTab = false;
+
+    /** What the member hands over to pay down what they owe here (euros; blank = all of it). */
+    public string $debtCollectInput = '';
+
+    /**
+     * Put the part of this sale the member is not paying today on their TAB (prompt 259) — the deliberate act the
+     * owner asked for, never a side effect of an empty wallet. The unpaid remainder is the total less the cash
+     * handed over; it is drawn from the wallet, taking it below zero by exactly the part their credit does not
+     * cover. Refused here, with the reason, when the member has no approved tab or the remainder would pass their
+     * limit (measured on their debt across every sede) — and refused again by the writers if anything was forged.
+     */
+    public function commitOnTab(): void
+    {
+        $member = $this->resolveMember();
+        $location = $this->resolveLocation();
+
+        if ($member === null || $location === null) {
+            $this->flash(__('Identifica a un socio antes de registrar una dispensación.'), 'error');
+
+            return;
+        }
+
+        $tab = $this->tabState($member, $location, $this->tenderableTotalCents());
+
+        if ($tab['limit'] <= 0) {
+            $this->flash(__('Este socio no tiene una cuenta aprobada.'), 'error');
+
+            return;
+        }
+
+        if (! $tab['fits']) {
+            $this->flash(__('Supera el límite de deuda aprobado: como mucho :money más en la cuenta.', [
+                'money' => $this->money($tab['headroom']),
+            ]), 'error');
+
+            return;
+        }
+
+        $this->onTab = true;
+        $this->walletInput = $this->eurosString($tab['remainder']);
+
+        $this->barBasket !== [] ? $this->settleWithBar() : $this->attemptCommit(override: false);
+    }
+
+    /**
+     * Collect what the member owes at this sede (prompt 259's reminder) — a cash TOPUP into their wallet, recorded
+     * against the open till so the arqueo expects it (`TillSummary` counts till-attributed top-ups). The same
+     * single wallet writer as every other movement; nothing new writes money.
+     */
+    public function collectDebt(): void
+    {
+        if (! $this->requireOperator()) {
+            return;
+        }
+
+        if (! $this->userCan('pos.use')) {
+            $this->flash(__('No tienes permiso para cobrar.'), 'error');
+
+            return;
+        }
+
+        $member = $this->resolveMember();
+        $location = $this->resolveLocation();
+
+        if ($member === null || $location === null) {
+            return;
+        }
+
+        $owedHere = max(0, -Wallet::balance($member->id, $location->id));
+        $cents = trim($this->debtCollectInput) === '' ? $owedHere : $this->parseCents($this->debtCollectInput);
+
+        if ($cents === null || $cents <= 0) {
+            $this->flash(__('Introduce un importe válido.'), 'error');
+
+            return;
+        }
+
+        $till = $this->openTillSession($location);
+
+        if ($till === null) {
+            $this->flash(__('No hay caja abierta en este terminal.'), 'error');
+
+            return;
+        }
+
+        (new RecordWalletTransaction)->handle($member, $location, $cents, WalletTransactionType::TOPUP, [
+            'operator_id' => CounterOperator::id(),
+            'till_session_id' => $till->id,
+            'reason' => 'Pago de deuda en el mostrador',
+        ]);
+
+        $this->debtCollectInput = '';
+        $this->flash(__('Cobrado :money a cuenta de la deuda.', ['money' => $this->money($cents)]), 'success');
+    }
+
+    /**
+     * The member's tab, as the screen and {@see commitOnTab()} read it: the approved limit, what they owe in total
+     * (every sede), the headroom left, the part of `$total` the cash handed over does not cover, and whether that
+     * part fits (after spending any credit they hold here).
+     *
+     * @return array{limit: int, owed: int, headroom: int, remainder: int, fits: bool}
+     */
+    private function tabState(Member $member, Location $location, int $total): array
+    {
+        $tendered = trim($this->cashTendered) === '' ? 0 : max(0, $this->parseCents($this->cashTendered) ?? 0);
+        $remainder = max(0, $total - $tendered);
+        $headroom = Wallet::tabHeadroomCents($member, $location->id);
+        $credit = max(0, Wallet::balance($member->id, $location->id));
+
+        return [
+            'limit' => (int) ($member->debt_limit_cents ?? 0),
+            'owed' => Wallet::totalDebtCents($member->id),
+            'headroom' => $headroom,
+            'remainder' => $remainder,
+            'fits' => $remainder > 0 && $remainder - $credit <= $headroom,
+        ];
+    }
+
     public function commitWithOverride(): void
     {
         $this->attemptCommit(override: true);
@@ -810,6 +936,7 @@ class DispensaryPos extends Component
             'cash_cents' => $cashCents,
             'wallet_cents' => $walletCents,
             'idempotency_key' => $this->idempotencyKey,
+            'on_tab' => $this->onTab, // prompt 259 — only via "Añadir a la cuenta", and only within the tab
         ];
 
         if ($this->signaturePath !== null) {
@@ -873,6 +1000,11 @@ class DispensaryPos extends Component
             return;
         } catch (AuthorizationException) {
             $this->flash(__('No tienes permiso para autorizar una excepción.'), 'error');
+
+            return;
+        } catch (DebtLimitExceededException $e) {
+            // Prompt 259 — the wallet did not cover it and the tab was not chosen (or would pass the limit).
+            $this->flash($e->getMessage(), 'error');
 
             return;
         } catch (RuntimeException) {
@@ -1042,6 +1174,7 @@ class DispensaryPos extends Component
             $result = (new CommitCombinedSettle)->handle($member, $location, $dispLines, $orderLines, [
                 'till_session_id' => $till->id,
                 'operator_id' => $operatorId,
+                'on_tab' => $this->onTab,
                 'dispensation' => $dispOptions,
                 'order' => [
                     'cash_cents' => $barTotal - $barWallet,
@@ -1119,6 +1252,7 @@ class DispensaryPos extends Component
                 'cash_cents' => $cashApplied,
                 'wallet_cents' => $walletApplied,
                 'idempotency_key' => $this->idempotencyKey !== null ? $this->idempotencyKey.'-bar' : null,
+                'on_tab' => $this->onTab,
             ]);
         } catch (DebtLimitExceededException) {
             $this->flash(__('El pago con monedero superaría el saldo disponible del socio.'), 'error');
@@ -1311,6 +1445,10 @@ class DispensaryPos extends Component
             'sanction' => $member !== null ? $this->activeSanction($member) : null,
             'walletCents' => $walletCents,
             'projectedWalletCents' => $walletCents - $walletPreview,
+            // Prompt 259 — the owe reminder (any debt, anywhere, whatever the toggles) and the tab.
+            'owesCents' => $member !== null ? Wallet::totalDebtCents($member->id) : 0,
+            'owesHereCents' => max(0, -$walletCents),
+            'tab' => $member !== null && $location !== null ? $this->tabState($member, $location, $total + $barTotal) : null,
             'photoUrl' => $member !== null ? $this->photoUrl($member) : null,
             'genetics' => $this->filterGenetics($allGenetics),
             'categories' => $this->deriveCategories($allGenetics),
@@ -2160,7 +2298,7 @@ class DispensaryPos extends Component
         $this->reset([
             'basket', 'activeGeneticId', 'activeBatchId', 'weightInput', 'calculatorMode', 'unitQty',
             'cashTendered', 'walletInput', 'requireOverride', 'limitBreach', 'overrideReason',
-            'priceOverrideEuros', 'priceOverrideReason', 'signaturePath',
+            'priceOverrideEuros', 'priceOverrideReason', 'signaturePath', 'onTab', 'debtCollectInput',
         ]);
         $this->idempotencyKey = (string) Str::ulid();
     }

@@ -13496,3 +13496,85 @@ strain with `1.000`, `1,000` and `1000`: the first two now show the message, the
 ### Merge
 
 Merged to `main` on Ben's instruction ("merge to main"). `composer check` green in `es` and `en`; MySQL to CI.
+
+## Prompt 259 — a member tab: owner-approved only, reminded on sight, added to by one deliberate button
+
+**Supersedes prompt 258's parts B and C.** (258's part A — check-in optional per sede — is its own entry.)
+
+### Before — the hole
+
+`CommitDispensation`, `CommitOrder` (and so `CommitCombinedSettle`) recorded their wallet spend with
+`'allow_debt' => true`, which skipped `RecordWalletTransaction`'s debt check entirely. Test 1 on `main`'s code,
+with `wallet_debt_allowed = false` and the member not approved: *"A tab opened with debt switched off and no
+approval."* — the dispensation paid from an empty wallet committed and left the member owing (the audit
+measured −€7.23). The `CommitDispensation` comment claiming the policy was "enforced separately" was false.
+Refund / void / transfer keep `allow_debt` — reversals must always post (test 8).
+
+### The model
+
+- **`members.debt_limit_cents`** — ONE figure per member ("approved up to €X"); null/0 = no tab (every existing
+  and new member). Plain integer cast. **Not mass-assignable**: the only writer is `SetMemberDebtLimit`
+  (policy-gated, reasoned, audited `member.debt_limit.set`), so no form, import or counter sign-up can set it.
+- **Checked against TOTAL debt across every sede.** `Wallet::totalDebtCents()` = the sum of every sede's
+  NEGATIVE balance. I also added `Wallet::globalBalance()` (the net sum the prompt named) but the limit reads
+  total debt, not the net: a credit at a ring-fenced sede cannot pay a debt elsewhere, so it must not buy extra
+  tab either — the net figure would have let €100 of credit at Norte back a €120 tab at Centro. Never looser.
+  The wallet ledger stays per-location; only the limit check sums.
+- **Precedence (tightest wins):** the sede's `wallet_debt_allowed` is the master switch (off ⇒ nobody owes
+  there, whatever the grant); the member's limit on their total debt; and the club-wide
+  `wallet_debt_limit_cents`, when > 0, on this sede's own balance. A club cap of 0 now means "no club ceiling"
+  (it used to mean "no debt"), which is safe because the per-member grant is now required in every case.
+- **The gate lives in the wallet writer** (`Wallet::maxDebitCents()` = credit here + `tabHeadroomCents()`), so
+  no path skips it. It gates DEBITS only — a payment into a negative wallet always posts (the old check refused
+  top-ups to a member over the cap).
+- **A lowered limit claws nothing back.** Owes €18, limit lowered to €10: no error, nothing reversed; no further
+  debt until they pay under €10 (test 3a: pays €9 → owes €9 → a €1 tab lands, one more cent does not).
+
+### The deliberate button
+
+`App\Actions\Wallet\SpendFromWallet` — the one place a SALE may go on the tab. Used by `CommitDispensation`
+and `CommitOrder` (and through them the combined settle, whose pre-check now uses the same `maxDebitCents`).
+A sale's wallet spend beyond the member's credit is refused unless `on_tab` — set only by the dispensary's
+**"Añadir a la cuenta"** (`DispensaryPos::commitOnTab()`) — and even then only within headroom. Even an
+approved member is never put on the tab silently by an empty wallet (test). Each tab addition is audited
+`wallet.tab.added` (operator, member, added cents, sale type + id, balance after). The button: present only for
+an approved member with headroom > 0; shows limit / owed / headroom; puts the part the cash handed over does not
+cover on the tab; disabled with the reason when that would pass the limit. A forged `onTab = true` for an
+unapproved member is refused by the writers (test).
+
+### The reminder
+
+Any member who owes — anywhere, for any reason, whatever `restrict_pos_to_checked_in` or the door threshold —
+shows **"Este socio debe €X"** on the dispensary's member card the moment they are held (debt at other sedes is
+named separately). Collecting is **"Cobrar ahora"** (`collectDebt()`): a cash TOPUP into this sede's wallet
+against the open till — the existing single wallet writer, and the path `TillSummary` already counts in the
+arqueo — gated on `pos.use` (the permission that takes the sale's money anyway). This deviates from the prompt's
+"reuse `CollectsMembershipFees`": that concern writes FEE payments; a debt is a wallet balance, and paying it
+is a wallet top-up.
+
+### Who may approve
+
+`MemberPolicy::approveDebt`: the owner always; a manager only when their ACTIVE sede (one they are assigned to)
+has `managers_can_approve_debt` ON (owner-set, default OFF, on `LocationForm`); with "all locations" chosen a
+manager cannot; staff never. The toggle is in `LocationForm::OWNER_TOGGLES`: disabled for non-owners AND ignored
+by Create/EditLocation unless the saver is the owner — a manager who may edit their sede still cannot grant
+themselves the power (test). Admin entry point: the "Cuenta del socio" action on the member (shows the member's
+total debt across sedes). No new permission, role matrix unchanged.
+
+### Tests
+
+`tests/Feature/Wallet/MemberTabTest` (18). Existing tests that put members in debt without a grant now approve a
+tab through `SetMemberDebtLimit` (`tests/Concerns/ApprovesMemberTabs`): `DebtLimitTest`, `RingFenceTest`,
+`CrossLocationSettlementTest`, `DebtAndLocationSettingsTest`. `BarPosScreenTest`'s wallet payment was paying €2
+from an EMPTY wallet — a silent tab — and now tops the member up first. The settings-coverage exclusion list
+names `managers_can_approve_debt` as a per-location setting.
+
+### Not verified
+
+No screenshot pass on the new reminder / tab block (the counter's visual canon was reused: the error tint, the
+shared `x-button`). Worth a look on the tablet.
+
+### Merge
+
+Merged to `main` on Ben's instruction. `composer check` green in `es` and `en`; MySQL to CI (the new
+`GROUP BY location_id` sum is plain SQL on both drivers).
