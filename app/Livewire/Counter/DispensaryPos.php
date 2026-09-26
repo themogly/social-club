@@ -828,6 +828,10 @@ class DispensaryPos extends Component
             return;
         }
 
+        if (! $this->checkInSatisfied($member, $location)) {
+            return;
+        }
+
         // Fail closed: a commit made offline cannot be trusted (limits/stock/balances are live-query).
         if ($this->offline) {
             $this->flash(__('Sin conexión: no se puede registrar. La cesta se conserva hasta reconectar.'), 'error');
@@ -1087,6 +1091,9 @@ class DispensaryPos extends Component
             return;
         }
         if (! $this->requireOperator()) {
+            return;
+        }
+        if (! $this->checkInSatisfied($member, $location)) {
             return;
         }
         if ($this->offline) {
@@ -2257,6 +2264,22 @@ class DispensaryPos extends Component
     {
         // Per-location (prompt 44): the LocationForm's "Restringir TPV a socios con check-in" toggle.
         return (bool) Settings::get('restrict_pos_to_checked_in', false);
+    }
+
+    /**
+     * The check-in gate, AT COMMIT (prompt 258A). `holdMember()` refuses a not-checked-in member when the sede
+     * requires it, but `$memberId` is a public property: set directly, it skipped that gate and the commit
+     * dispensed anyway. So both commit paths ask again — with the toggle OFF this is always true.
+     */
+    private function checkInSatisfied(Member $member, Location $location): bool
+    {
+        if ($this->checkedInRequired() && ! $this->isCheckedIn($member, $location)) {
+            $this->flash(__('El socio no ha registrado su entrada. Regístrala primero en recepción.'), 'error');
+
+            return false;
+        }
+
+        return true;
     }
 
     // --- Small helpers ----------------------------------------------------------
