@@ -38,7 +38,9 @@
             :heading="$mustChooseLocation ? __('Elige tu sede') : __('Sin sede asignada')"
             :body="$mustChooseLocation ? __('Trabajas en varias sedes. Selecciona en la barra superior en cuál estás.') : __('No tienes ninguna sede activa. Pide a un responsable que te asigne una.')"
         />
-    @else
+    @elseif ($this->hasOperator())
+        {{-- Prompt 255 — the tiles and panels are the OPERATOR's (their takings, their shift), so nothing renders
+             under the PIN surface until someone is identified. --}}
         @php($panels = $this->panels())
         @php($hero = $this->heroTile())
 

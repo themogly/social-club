@@ -373,8 +373,8 @@ class DispensaryPosScreenTest extends TestCase
         $manager = User::factory()->create();
         $manager->assignRole(Role::MANAGER->value);
         $manager->locations()->sync([$this->location->id]);
-        $this->actingAs($manager);
-        app(ActiveScope::class)->setLocation($this->location->id);
+        // The manager identifies with their PIN — the operator is who is asked (prompt 255), not the login.
+        CounterOperator::set($manager);
 
         Livewire::test(DispensaryPos::class)
             ->set('lastDispensationId', $dispensation->id)

@@ -7,6 +7,7 @@ use App\Models\CheckIn;
 use App\Models\Location;
 use App\Models\User;
 use App\Support\ActiveScope;
+use App\Support\CounterOperator;
 use App\Support\Occupancy;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Collection;
@@ -27,14 +28,14 @@ class WhosInside extends Component
 
     public function mount(): void
     {
-        abort_unless($this->userCan('checkin.manage'), 403);
+        abort_unless($this->deviceCan('checkin.manage'), 403);
 
         $this->locationId = app(ActiveScope::class)->locationId();
     }
 
     public function checkOut(string $checkInId): void
     {
-        abort_unless($this->userCan('checkin.manage'), 403);
+        abort_unless($this->operatorCan('checkin.manage'), 403);
 
         // Scoped to THIS location by construction — a session at another sede is
         // out of reach (authorisation, not just a filter).
@@ -51,7 +52,7 @@ class WhosInside extends Component
 
     public function checkOutAll(): void
     {
-        abort_unless($this->userCan('checkin.manage'), 403);
+        abort_unless($this->operatorCan('checkin.manage'), 403);
 
         $location = $this->resolveLocation();
 
@@ -120,10 +121,21 @@ class WhosInside extends Component
         return $this->locationId !== null ? Location::query()->find($this->locationId) : null;
     }
 
-    private function userCan(string $permission): bool
+    /** May the tablet's login show this list at all? The mount gate — see IdentifiesOperator::deviceUser(). */
+    private function deviceCan(string $permission): bool
     {
         $user = Auth::user();
 
         return $user instanceof User ? $user->can($permission) : false;
+    }
+
+    /**
+     * Checking someone out is the PIN operator's act (prompt 255): asked of the operator, never the tablet's
+     * login, and refused with nobody identified. This child has no PIN pad of its own — the host screen's is
+     * the one pad (173) — so a refusal here is a plain 403.
+     */
+    private function operatorCan(string $permission): bool
+    {
+        return CounterOperator::current()?->can($permission) ?? false;
     }
 }

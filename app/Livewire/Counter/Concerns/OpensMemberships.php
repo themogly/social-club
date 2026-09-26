@@ -52,7 +52,7 @@ use Illuminate\Support\Collection;
  * once for each. So 211 wires this concern to both rather than building anything: the enrol/renew route, its
  * uniqueness guard, its `membership.enrol` gate and its refusal to touch a non-default fee are 203's, unchanged.
  *
- * The host must expose `flash()`, `resolveLocation()`, `currentUser()`, `requireOperator()` and a member on
+ * The host must expose `flash()`, `resolveLocation()`, `counterActor()`, `requireOperator()` and a member on
  * screen. **Which property holds that member differs per host** — Socios calls it `$feeMemberId` (it is the
  * socio a fee would be collected from), the door and the POS call it `$memberId` — so hosts override
  * {@see self::membershipSubjectId()}. That indirection is the whole of what 211 had to add here.
@@ -258,7 +258,7 @@ trait OpensMemberships
     /** May the person at this terminal open a membership at all? Drives copy, not just a hidden button. */
     public function canOpenMembership(): bool
     {
-        return (bool) $this->currentUser()?->can('membership.enrol');
+        return (bool) $this->counterActor()?->can('membership.enrol');
     }
 
     // --- shared plumbing ----------------------------------------------------------
@@ -268,7 +268,7 @@ trait OpensMemberships
      */
     private function openMembershipContext(): array
     {
-        $user = $this->currentUser();
+        $user = $this->counterActor();
         $location = $this->resolveLocation();
 
         if ($user === null || ! $user->can('membership.enrol')) {

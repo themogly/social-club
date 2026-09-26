@@ -4,10 +4,12 @@ namespace App\Livewire\Counter\Concerns;
 
 use App\Actions\RecordAuditLog;
 use App\Actions\UnlockOperator;
+use App\Models\User;
 use App\Support\ActiveScope;
 use App\Support\CounterBlocker;
 use App\Support\CounterHandover;
 use App\Support\CounterOperator;
+use Illuminate\Support\Facades\Auth;
 use Livewire\Attributes\On;
 
 /**
@@ -121,6 +123,50 @@ trait IdentifiesOperator
     public function currentOperatorName(): ?string
     {
         return CounterOperator::current()?->name;
+    }
+
+    /**
+     * THE counter's permission question, asked of the PIN operator — never the tablet's login (prompt 255).
+     *
+     * *"The device is the club's, the sede is the manager's, the PIN is the person's"* (239/246). Every screen
+     * used to answer this with `Auth::user()->can()`, so on an owner-logged tablet a STAFF PIN passed owner-only
+     * checks — a staff operator closed the till (`till.close` is manager+). One implementation now, shared by
+     * every screen and every view flag. With nobody identified it authorises NOTHING: there is no fallback to
+     * the device account, because tablets are logged in under different accounts (Ben: "varies per tablet"),
+     * some of them the owner, and a fallback would hand that account's rights to whoever is standing there.
+     */
+    public function userCan(string $permission): bool
+    {
+        return $this->counterActor()?->can($permission) ?? false;
+    }
+
+    /**
+     * The person at the counter — the actor for every permission check and every `*_by` written from a counter
+     * screen (prompt 255). The same source that already attributes the money (`operator_id`), so there is one
+     * answer to "who did this", not two.
+     */
+    protected function counterActor(): ?User
+    {
+        return CounterOperator::current();
+    }
+
+    /**
+     * The tablet's login. It decides only what the TERMINAL can open — which sedes (`LocationSwitcher`) and
+     * which screens (the mount gates, `CounterScreens`) — because those must resolve before anyone has typed a
+     * PIN, or the PIN pad itself could never render. It never authorises an action and is never an actor. The
+     * one other use is binding a signed vault URL to the session that will fetch it.
+     */
+    protected function deviceUser(): ?User
+    {
+        $user = Auth::user();
+
+        return $user instanceof User ? $user : null;
+    }
+
+    /** May the tablet's login open this screen at all? Mount gates only — see {@see deviceUser()}. */
+    protected function deviceCan(string $permission): bool
+    {
+        return $this->deviceUser()?->can($permission) ?? false;
     }
 
     public function hasOperator(): bool

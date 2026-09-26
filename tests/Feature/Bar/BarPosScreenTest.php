@@ -259,7 +259,8 @@ class BarPosScreenTest extends TestCase
         $manager = User::factory()->create();
         $manager->assignRole(Role::MANAGER->value);
         $manager->locations()->sync([$this->location->id]);
-        $this->actingAs($manager);
+        // The manager identifies with their PIN — the operator is who is asked (prompt 255), not the login.
+        CounterOperator::set($manager);
         app(ActiveScope::class)->setLocation($this->location->id);
 
         Livewire::test(BarPos::class)

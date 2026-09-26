@@ -13,6 +13,7 @@ use App\Models\Location;
 use App\Models\Organisation;
 use App\Models\User;
 use App\Support\ActiveScope;
+use App\Support\CounterOperator;
 use App\Support\Money;
 use App\Support\TillSummary;
 use Database\Seeders\RolePermissionSeeder;
@@ -65,8 +66,11 @@ class TillUiTest extends TestCase
      */
     public function test_the_close_flow_hides_the_expected_figure_until_the_count_is_submitted(): void
     {
-        $this->actingAs($this->manager());
+        $manager = $this->manager();
+        $this->actingAs($manager);
         app(ActiveScope::class)->setLocation($this->location->id);
+        // Closing is the PIN operator's act (prompt 255): it refuses with nobody identified.
+        CounterOperator::set($manager);
 
         // Open with cash so the expected drawer figure is non-zero and distinctive.
         $session = (new OpenTill)->handle($this->location, 'POS-1', 20000); // €200 float

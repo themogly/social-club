@@ -16,7 +16,6 @@ use App\ViewModels\Dashboard;
 use Filament\Facades\Filament;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Collection;
-use Illuminate\Support\Facades\Auth;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Locked;
 use Livewire\Component;
@@ -60,7 +59,7 @@ class CounterHome extends Component
     {
         // Reachable by anyone who can reach ANY counter screen — it is the front door, not a destination of
         // its own. Someone with no counter permission at all has nothing to choose from and is refused.
-        abort_unless(CounterScreens::reachableByAny($this->currentUser()), 403);
+        abort_unless(CounterScreens::reachableByAny($this->deviceUser()), 403);
         $this->resolveCounterLocation();
     }
 
@@ -71,7 +70,7 @@ class CounterHome extends Component
      */
     public function tiles(): array
     {
-        return CounterScreens::reachableFor($this->currentUser());
+        return CounterScreens::reachableFor($this->deviceUser());
     }
 
     /**
@@ -240,10 +239,11 @@ class CounterHome extends Component
 
     private function dashboard(): Dashboard
     {
-        $user = $this->currentUser();
+        $user = $this->counterActor();
 
-        // mount() has already 403'd anyone who is not a counter user, so this cannot be null in practice —
-        // it is asserted rather than assumed, because a null here would silently widen the finance gate.
+        // The OPERATOR's figures (prompt 255) — a staff PIN on an owner-logged tablet must not see the owner's
+        // takings. The view renders the panels only once someone is identified, so this cannot be null in
+        // practice; it is asserted rather than assumed, because a null here would silently widen the gate.
         abort_if($user === null, 403);
 
         return $this->dashboard ??= Dashboard::for($user, Period::today());
@@ -257,7 +257,7 @@ class CounterHome extends Component
      */
     public function availableSedes(): Collection
     {
-        $user = $this->currentUser();
+        $user = $this->deviceUser();
 
         return $user !== null ? app(LocationSwitcher::class)->available($user) : collect();
     }
@@ -265,7 +265,7 @@ class CounterHome extends Component
     /** Can this user reach the admin panel? The same gate the sidebar and the old overflow menu used. */
     public function canReachPanel(): bool
     {
-        $user = $this->currentUser();
+        $user = $this->deviceUser();
 
         return $user !== null && $user->canAccessPanel(Filament::getPanel('admin'));
     }
@@ -282,18 +282,6 @@ class CounterHome extends Component
     private function resolveLocation(): ?Location
     {
         return $this->locationId !== null ? Location::query()->find($this->locationId) : null;
-    }
-
-    private function currentUser(): ?User
-    {
-        $user = Auth::user();
-
-        return $user instanceof User ? $user : null;
-    }
-
-    public function userCan(string $permission): bool
-    {
-        return $this->currentUser()?->can($permission) ?? false;
     }
 
     protected function flash(string $message, string $type): void
