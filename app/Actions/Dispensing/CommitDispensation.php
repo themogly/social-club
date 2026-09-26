@@ -7,7 +7,7 @@ use App\Actions\RecordAuditLog;
 use App\Actions\Stock\AllocateFromBatches;
 use App\Actions\Stock\RecordStockMovement;
 use App\Actions\Stock\SelectBatch;
-use App\Actions\Wallet\RecordWalletTransaction;
+use App\Actions\Wallet\SpendFromWallet;
 use App\Enums\DispensationStatus;
 use App\Enums\MembershipStatus;
 use App\Enums\StockMovementType;
@@ -52,7 +52,7 @@ use RuntimeException;
  *
  * @phpstan-type Line array{genetic_id: string, batch_id?: ?string, grams_cg?: int, units?: int}
  * @phpstan-type NormalisedLine array{genetic_id: string, batch_id: ?string, grams_cg: int, units: ?int}
- * @phpstan-type CommitOptions array{operator_id?: ?string, till_session_id?: ?string, cash_cents?: int, wallet_cents?: int, signature_path?: ?string, idempotency_key?: ?string, reversal_of_id?: ?string, override?: bool, override_by?: ?User, override_reason?: ?string, price_override_cents?: ?int, price_override_reason?: ?string, price_override_by?: ?User, at?: ?\DateTimeInterface}
+ * @phpstan-type CommitOptions array{operator_id?: ?string, till_session_id?: ?string, cash_cents?: int, wallet_cents?: int, signature_path?: ?string, idempotency_key?: ?string, reversal_of_id?: ?string, override?: bool, override_by?: ?User, override_reason?: ?string, price_override_cents?: ?int, price_override_reason?: ?string, price_override_by?: ?User, on_tab?: bool, at?: ?\DateTimeInterface}
  */
 class CommitDispensation
 {
@@ -175,12 +175,12 @@ class CommitDispensation
                 }
 
                 if ($wallet > 0) {
-                    (new RecordWalletTransaction)->handle($member, $location, -$wallet, WalletTransactionType::CONTRIBUTION, [
-                        'source' => $dispensation,
+                    // Prompt 259 — no longer `allow_debt => true` (which opened a tab with debt switched off):
+                    // beyond the member's credit only via the deliberate "Añadir a la cuenta", within their tab.
+                    (new SpendFromWallet)->handle($member, $location, $wallet, WalletTransactionType::CONTRIBUTION, $dispensation, (bool) ($options['on_tab'] ?? false), [
                         'operator_id' => $options['operator_id'] ?? Auth::id(),
                         'till_session_id' => $options['till_session_id'] ?? null,
                         'reason' => 'Aportación por dispensación',
-                        'allow_debt' => true, // debt policy on the wallet spend is enforced separately
                     ]);
                 }
 

@@ -7,6 +7,7 @@ use App\Actions\Members\CancelMembership;
 use App\Actions\Members\ExportMemberData;
 use App\Actions\Members\ManageTemporaryMember;
 use App\Actions\Members\SendMemberCard;
+use App\Actions\Members\SetMemberDebtLimit;
 use App\Actions\Members\SetMemberLimits;
 use App\Actions\Members\TransitionMemberStatus;
 use App\Actions\Members\UpdateDeclaredForecast;
@@ -37,7 +38,9 @@ use App\Models\DataRequest;
 use App\Models\Member;
 use App\Models\User;
 use App\Rules\GramAmount;
+use App\Support\Money;
 use App\Support\Settings;
+use App\Support\Wallet;
 use App\Support\Weight;
 use BackedEnum;
 use Filament\Actions\Action;
@@ -113,6 +116,7 @@ class MemberResource extends Resource
             self::updateDeclaredForecastAction(),
             self::waiveCarenciaAction(),
             self::setLimitsAction(),
+            self::setDebtLimitAction(),
             self::recordBajaAction(),
             self::suspendAction(),
             self::expelAction(),
@@ -268,6 +272,53 @@ class MemberResource extends Resource
                 );
 
                 Notification::make()->title(__('Límites del socio actualizados'))->success()->send();
+            });
+    }
+
+    /**
+     * Cuenta del socio — approve (or withdraw) the member's tab, up to a limit in euros (prompt 259). The ONLY
+     * entry point to `SetMemberDebtLimit`. Visible only to who may approve (`MemberPolicy::approveDebt`: the owner,
+     * or a manager where the sede's owner-set toggle is on); the action re-checks server-side. The limit is one
+     * figure for the member, measured against their debt across every sede — shown here so the approver sees it.
+     */
+    public static function setDebtLimitAction(): Action
+    {
+        return Action::make('setDebtLimit')
+            ->label(__('Cuenta del socio'))
+            ->icon(Heroicon::OutlinedCreditCard)
+            ->visible(fn (Member $record): bool => Auth::user()?->can('approveDebt', $record) ?? false)
+            ->modalDescription(fn (Member $record): string => __('Debe ahora en total (todas las sedes): :money', [
+                'money' => Money::fromCents(Wallet::totalDebtCents($record->id))->formatted(),
+            ]))
+            ->fillForm(fn (Member $record): array => [
+                'debt_limit_eur' => $record->debt_limit_cents !== null ? number_format($record->debt_limit_cents / 100, 2, '.', '') : null,
+            ])
+            ->schema([
+                TextInput::make('debt_limit_eur')
+                    ->label(__('Límite de cuenta (€)'))
+                    ->numeric()->minValue(0)->step('0.01')
+                    ->helperText(__('Hasta cuánto puede deber el socio en total, sumando todas las sedes. Vacío o 0 = sin cuenta. Bajarlo no reclama la deuda existente: solo impide añadir más.')),
+                Textarea::make('reason')
+                    ->label(__('Motivo'))
+                    ->required()
+                    ->helperText(__('Queda registrado en la auditoría.')),
+            ])
+            ->action(function (Member $record, array $data): void {
+                $actor = Auth::user();
+                if (! $actor instanceof User) {
+                    return;
+                }
+
+                $raw = $data['debt_limit_eur'] ?? null;
+
+                (new SetMemberDebtLimit)->handle(
+                    $record,
+                    $actor,
+                    ($raw === null || $raw === '') ? null : Money::fromEuros((string) $raw)->cents,
+                    (string) ($data['reason'] ?? ''),
+                );
+
+                Notification::make()->title(__('Cuenta del socio actualizada'))->success()->send();
             });
     }
 

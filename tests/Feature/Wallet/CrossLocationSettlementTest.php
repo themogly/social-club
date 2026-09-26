@@ -14,6 +14,7 @@ use App\Support\Settings;
 use App\Support\Wallet;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Artisan;
+use Tests\Concerns\ApprovesMemberTabs;
 use Tests\TestCase;
 
 /**
@@ -24,7 +25,7 @@ use Tests\TestCase;
  */
 class CrossLocationSettlementTest extends TestCase
 {
-    use RefreshDatabase;
+    use ApprovesMemberTabs, RefreshDatabase;
 
     private Organisation $org;
 
@@ -43,6 +44,7 @@ class CrossLocationSettlementTest extends TestCase
         Settings::set('wallet_debt_limit_cents', 10000, SettingType::CENTS);
 
         $this->member = Member::factory()->create(['organisation_id' => $this->org->id]);
+        $this->approveTab($this->member); // prompt 259: owing needs an approved tab
         $this->creditSite = Location::factory()->create(['organisation_id' => $this->org->id]);
         $this->debtSite = Location::factory()->create(['organisation_id' => $this->org->id]);
 

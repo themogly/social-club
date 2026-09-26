@@ -18,8 +18,8 @@ use Illuminate\Support\Facades\DB;
 /**
  * The ONLY writer to the wallet ledger. Appends a signed movement, computes
  * balance_after from the prior balance (never free-typed), and enforces the debt
- * limit — a movement that would push debt past the configured cap is refused
- * (unless it is an explicit permissioned adjustment/transfer). Attributed to an
+ * limit — a debit that would take the member past their owner-approved tab is refused
+ * (unless it is a reversal/transfer that must always post — `allow_debt`). Attributed to an
  * operator and, for cash movements, a till session.
  *
  * @phpstan-type Options array{operator_id?: ?string, till_session_id?: ?string, reason?: ?string, source?: ?Model, transfer_pair_id?: ?string, allow_debt?: bool}
@@ -39,7 +39,7 @@ class RecordWalletTransaction
             // locks — prompt 77). Without it the balance SUM below reads a stale MySQL snapshot under
             // REPEATABLE READ, so concurrent debits each pass the debt check and the limit is bypassed.
             // Re-entrant when CommitDispensation already holds the lock (same transaction) — no deadlock.
-            Member::withoutGlobalScopes()->whereKey($member->id)->lockForUpdate()->first();
+            $locked = Member::withoutGlobalScopes()->whereKey($member->id)->lockForUpdate()->first() ?? $member;
 
             $oldBalance = Wallet::balance($member->id, $location->id);
             $newBalance = $oldBalance + $amountCents;
@@ -51,16 +51,17 @@ class RecordWalletTransaction
             $crossedLow = $amountCents < 0 && $oldBalance >= $threshold && $newBalance < $threshold;
             $balanceAfter = $newBalance;
 
-            if ($newBalance < 0 && ! ($options['allow_debt'] ?? false)) {
-                // Scope the debt policy to the MOVEMENT's sede (the balance already is), not whatever is ambient
-                // — this writer is reachable cross-location (the wallet relation-manager's all-sedes picker), so
-                // an ambient read could gate a movement by another sede's policy. Matches RefundDispensation.
-                $debtAllowed = (bool) Settings::get('wallet_debt_allowed', false, $location->id);
-                $limit = (int) Settings::get('wallet_debt_limit_cents', 0, $location->id);
-
-                if (! $debtAllowed || $newBalance < -$limit) {
-                    throw new DebtLimitExceededException(__('Este movimiento superaría el límite de deuda del socio.'));
-                }
+            // THE debt gate (prompt 259). Only a DEBIT can open or deepen a debt — a payment into a wallet that is
+            // already negative always posts (a limit lowered below existing debt gates NEW debt, it never refuses
+            // the member paying it down). A debit that ends below zero must fit `Wallet::maxDebitCents()`: the
+            // member's credit here plus their tab headroom — the sede's `wallet_debt_allowed` master switch, the
+            // member's OWN `debt_limit_cents` measured against their total debt across every sede, and the
+            // club-wide cap where one is set (tightest wins). An unapproved member cannot owe at all. Scoped to
+            // the MOVEMENT's sede, not the ambient one — this writer is reachable cross-location. `allow_debt`
+            // stays for reversals and transfers (refund, void, transfer), which must always post.
+            if ($amountCents < 0 && $newBalance < 0 && ! ($options['allow_debt'] ?? false)
+                && -$amountCents > Wallet::maxDebitCents($locked, $location->id)) {
+                throw new DebtLimitExceededException(__('Este movimiento superaría el límite de deuda del socio.'));
             }
 
             $source = $options['source'] ?? null;

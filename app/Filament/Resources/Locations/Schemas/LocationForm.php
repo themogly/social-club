@@ -3,6 +3,7 @@
 namespace App\Filament\Resources\Locations\Schemas;
 
 use App\Actions\UnlockOperator;
+use App\Enums\Role;
 use App\Support\Settings;
 use Filament\Forms\Components\ColorPicker;
 use Filament\Forms\Components\Select;
@@ -11,6 +12,7 @@ use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\TimePicker;
 use Filament\Forms\Components\Toggle;
 use Filament\Schemas\Schema;
+use Illuminate\Support\Facades\Auth;
 
 class LocationForm
 {
@@ -31,6 +33,23 @@ class LocationForm
         'bar_attach_socio_enabled',
         'bar_ticket_reference_enabled',
     ];
+
+    /**
+     * Per-location toggles only the OWNER may change (prompt 259) — persisted by Create/EditLocation only when
+     * the saving user is the owner, so a manager editing their sede cannot grant themselves the power the toggle
+     * governs. `managers_can_approve_debt`: may a manager here approve a member's tab.
+     *
+     * @var list<string>
+     */
+    public const OWNER_TOGGLES = [
+        'managers_can_approve_debt',
+    ];
+
+    /** Is the current user the owner — the one who may change the {@see OWNER_TOGGLES}? */
+    public static function actorIsOwner(): bool
+    {
+        return Auth::user()?->hasRole(Role::OWNER->value) ?? false;
+    }
 
     /**
      * Per-location INTEGER settings — same location-scoped-Setting-row mechanism as the toggles, but numeric
@@ -217,6 +236,14 @@ class LocationForm
                 Toggle::make('ring_fenced')
                     ->label(__('Monedero por sede (ring-fence)'))
                     ->helperText(__('Si se activa, el crédito de esta sede no salda automáticamente deudas en otras sedes.')),
+
+                // Prompt 259 — who may approve a member's tab here. Only the owner can flip it (disabled for
+                // anyone else, and Create/EditLocation ignore it from a non-owner), so a manager cannot grant
+                // themselves the power. The owner can always approve; a manager only where this is on.
+                Toggle::make('managers_can_approve_debt')
+                    ->label(__('Los responsables pueden aprobar cuentas de socios'))
+                    ->helperText(__('Solo la propiedad puede cambiarlo. La propiedad siempre puede aprobar una cuenta.'))
+                    ->disabled(fn (): bool => ! self::actorIsOwner()),
 
                 // One drawer is the default (prompt 102): OFF, and opening a caja asks only for the float. ON
                 // lets the sede run several terminals at once and the operator picks which to open.

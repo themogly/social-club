@@ -31,7 +31,7 @@ class EditLocation extends EditRecord
      */
     protected function mutateFormDataBeforeFill(array $data): array
     {
-        foreach (LocationForm::SETTING_TOGGLES as $key) {
+        foreach ([...LocationForm::SETTING_TOGGLES, ...LocationForm::OWNER_TOGGLES] as $key) {
             $data[$key] = (bool) Settings::get($key, Settings::DEFAULTS[$key], (string) $this->record->getKey());
         }
 
@@ -61,6 +61,14 @@ class EditLocation extends EditRecord
     {
         foreach (LocationForm::SETTING_TOGGLES as $key) {
             Settings::set($key, (bool) ($data[$key] ?? false), SettingType::BOOL, (string) $this->record->getKey());
+            unset($data[$key]);
+        }
+
+        // Owner-only (prompt 259): persisted only when the owner saves; anyone else leaves the value as it is.
+        foreach (LocationForm::OWNER_TOGGLES as $key) {
+            if (LocationForm::actorIsOwner() && array_key_exists($key, $data)) {
+                Settings::set($key, (bool) $data[$key], SettingType::BOOL, (string) $this->record->getKey());
+            }
             unset($data[$key]);
         }
 
