@@ -3,11 +3,13 @@
 namespace App\Support;
 
 use App\Enums\DispensationStatus;
+use App\Enums\ExpenseKind;
 use App\Enums\FeePaymentMethod;
 use App\Enums\OrderStatus;
 use App\Enums\WalletTransactionType;
 use App\Models\CashMovement;
 use App\Models\Dispensation;
+use App\Models\Expense;
 use App\Models\MembershipFeePayment;
 use App\Models\Order;
 use App\Models\TillSession;
@@ -22,7 +24,7 @@ use Illuminate\Support\Collection;
  * payments are shown but excluded (the distinction naive tills get wrong). Voided
  * transactions are excluded, so a void adjusts the expected figure automatically.
  *
- * @phpstan-type Breakdown array{float: int, cash_contributions: int, wallet_contributions: int, bar_cash: int, top_ups: int, refunds: int, fees_cash: int, cash_in: int, cash_out: int, banked: int, petty_cash: int, expected: int}
+ * @phpstan-type Breakdown array{float: int, cash_contributions: int, wallet_contributions: int, bar_cash: int, top_ups: int, refunds: int, fees_cash: int, cash_in: int, cash_out: int, banked: int, petty_cash: int, petty_cash_items: list<array{category: string, note: ?string, amount_cents: int, recorded_by: string, at: string}>, expected: int}
  */
 class TillSummary
 {
@@ -32,6 +34,29 @@ class TillSummary
     public static function breakdown(TillSession $session): array
     {
         return self::breakdownMany(new Collection([$session]))[$session->id];
+    }
+
+    /**
+     * One session's till expenses as the plain rows every view renders (prompt 265).
+     *
+     * @param  iterable<int, Expense>|null  $expenses
+     * @return list<array{category: string, note: ?string, amount_cents: int, recorded_by: string, at: string}>
+     */
+    private static function pettyCashItems(?iterable $expenses): array
+    {
+        $items = [];
+
+        foreach ($expenses ?? [] as $expense) {
+            $items[] = [
+                'category' => (string) ($expense->category->name ?? '—'),
+                'note' => $expense->note,
+                'amount_cents' => $expense->amount_cents->cents,
+                'recorded_by' => (string) ($expense->recorder->name ?? '—'),
+                'at' => $expense->created_at?->format('H:i') ?? '',
+            ];
+        }
+
+        return $items;
     }
 
     /**
@@ -63,6 +88,17 @@ class TillSummary
             WalletTransaction::query()->withoutGlobalScopes()->where('type', WalletTransactionType::REFUND->value), $ids, 'amount_cents'); // negative
         $feesCash = self::sumBySession(
             MembershipFeePayment::query()->where('method', FeePaymentMethod::CASH->value), $ids, 'amount_cents');
+
+        // Prompt 265 — what each petty-cash expense was FOR. The till expenses behind the PETTY_CASH movements, one
+        // grouped query for all the sessions, itemised per session so every view (the till, the closed arqueo, the
+        // admin session, the till report) reads the SAME list rather than querying expenses on its own.
+        $itemsBySession = Expense::query()->withoutGlobalScopes()
+            ->whereIn('till_session_id', $ids)
+            ->where('kind', ExpenseKind::TILL->value)
+            ->with(['category' => fn ($q) => $q->withoutGlobalScopes(), 'recorder'])
+            ->orderBy('created_at')
+            ->get()
+            ->groupBy('till_session_id');
 
         // Full models (so the enum/Money casts hydrate) grouped by session, then reduced per session below.
         $movementsBySession = CashMovement::query()->whereIn('till_session_id', $ids)
@@ -102,6 +138,7 @@ class TillSummary
                 'cash_out' => $cashOut,
                 'banked' => $banked,
                 'petty_cash' => $pettyCash,
+                'petty_cash_items' => self::pettyCashItems($itemsBySession->get($id)),
                 'expected' => $expected,
             ];
         }

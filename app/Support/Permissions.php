@@ -132,6 +132,57 @@ class Permissions
     ];
 
     /**
+     * Grants that NEED another to be usable (prompt 265) — a flow that asks for a second permission partway through.
+     * The roles page warns (and offers to grant the other in one click); it never changes anything by itself.
+     * ONE list, so a new pair is one line here.
+     *
+     *   · till.close → stock.take: the last close of the day at a sede first requires the blind flower recount
+     *     (`TillSession::reweighRequired()`), which is gated on stock.take — without it the close cannot finish.
+     *   · pos.use / pos.bar / checkin.manage → till.open: the counter sends a till-less sede to open a till first
+     *     (236); without till.open this role can only work once somebody else has opened one.
+     *
+     * @var array<string, list<string>>
+     */
+    public const DEPENDENCIES = [
+        'till.close' => ['stock.take'],
+        'pos.use' => ['till.open'],
+        'pos.bar' => ['till.open'],
+        'checkin.manage' => ['till.open'],
+    ];
+
+    /** Why `$permission` needs `$needs`, in the words the roles page shows the owner (prompt 265). */
+    public static function dependencyReason(string $permission, string $needs): string
+    {
+        return match ($permission) {
+            'till.close' => __('Para cerrar la caja al final del día también hace falta «:needs».', ['needs' => self::label($needs)]),
+            default => __('Sin «:needs», solo podrá trabajar cuando otra persona haya abierto la caja.', ['needs' => self::label($needs)]),
+        };
+    }
+
+    /**
+     * The dependencies a role is missing, as [permission, needs] pairs — for the roles page's warnings.
+     *
+     * @param  list<string>  $held
+     * @return list<array{permission: string, needs: string}>
+     */
+    public static function missingDependencies(array $held): array
+    {
+        $missing = [];
+        foreach (self::DEPENDENCIES as $permission => $needed) {
+            if (! in_array($permission, $held, true)) {
+                continue;
+            }
+            foreach ($needed as $needs) {
+                if (! in_array($needs, $held, true)) {
+                    $missing[] = ['permission' => $permission, 'needs' => $needs];
+                }
+            }
+        }
+
+        return $missing;
+    }
+
+    /**
      * The catalogue by area, for the roles page — the order a person reads it in, not the order it was built.
      *
      * @return array<string, list<string>>

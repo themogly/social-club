@@ -6,6 +6,7 @@ use App\Enums\CashMovementType;
 use App\Enums\TillSessionStatus;
 use App\Models\TillSession;
 use App\Support\Money;
+use App\Support\TillSummary;
 use App\Support\ZReport;
 use Illuminate\Support\Facades\DB;
 
@@ -38,6 +39,7 @@ class TillReport extends AbstractReport
             $sessions = $this->sessions(),
             $this->varianceByOperator($sessions),
             $this->cashMovements(),
+            $this->pettyCashItems(),
         ];
     }
 
@@ -168,6 +170,52 @@ class TillReport extends AbstractReport
     }
 
     // --- Cash movements by type -----------------------------------------------------
+
+    /**
+     * Prompt 265 — each till expense of the period: what the petty cash was spent ON, not one total. From the same
+     * source as every other view (`TillSummary::breakdownMany`), so the report and the arqueo can never disagree.
+     */
+    private function pettyCashItems(): ReportTable
+    {
+        [$start, $end] = $this->bounds();
+
+        $sessions = TillSession::query()->withoutGlobalScopes()
+            ->whereIn('location_id', $this->resolvedLocationIds())
+            ->where('opened_at', '>=', $start)->where('opened_at', '<', $end)
+            ->orderByDesc('opened_at')
+            ->get();
+
+        $rows = [];
+        foreach (TillSummary::breakdownMany($sessions) as $sessionId => $breakdown) {
+            $session = $sessions->firstWhere('id', $sessionId);
+            foreach ($breakdown['petty_cash_items'] as $item) {
+                $rows[] = [
+                    'fecha' => $session?->opened_at,
+                    'terminal' => $session->terminal ?? '—',
+                    'categoria' => $item['category'],
+                    'nota' => $item['note'] ?? '—',
+                    'registrado_por' => $item['recorded_by'].' · '.$item['at'],
+                    'importe' => $item['amount_cents'],
+                ];
+            }
+        }
+
+        return new ReportTable(
+            key: 'petty_cash_items',
+            title: __('Detalle de caja chica'),
+            columns: [
+                ReportColumn::datetime('fecha', __('Caja')),
+                ReportColumn::text('terminal', __('Terminal')),
+                ReportColumn::text('categoria', __('Categoría')),
+                ReportColumn::text('nota', __('Concepto')),
+                ReportColumn::text('registrado_por', __('Registrado por')),
+                ReportColumn::money('importe', __('Importe')),
+            ],
+            rows: $rows,
+            totals: ['importe' => array_sum(array_column($rows, 'importe'))],
+            empty: __('Sin gastos de caja en este período'),
+        );
+    }
 
     private function cashMovements(): ReportTable
     {

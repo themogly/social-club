@@ -79,6 +79,10 @@ class TillSession extends Component
     public string $movementReason = '';
 
     /** Petty-cash (gasto de caja) form — records a PETTY_CASH movement out of the open drawer. */
+    /** The session just closed, for the revealed arqueo's itemised petty cash (prompt 265). Server-set only. */
+    #[Locked]
+    public ?string $closedSessionId = null;
+
     public string $expenseAmount = '';
 
     public ?string $expenseCategoryId = null;
@@ -817,15 +821,36 @@ class TillSession extends Component
         // Success — NOW reveal the figures. The counted value is the one just parsed;
         // expected + variance are read back from the immutable, ledger-derived close.
         $this->countSubmitted = true;
+        $this->closedSessionId = $closed->id; // prompt 265 — the arqueo shows this session's petty cash, itemised
         $this->counted = $counted;
         $this->expected = $closed->expected_cents?->cents;
         $this->variance = $closed->variance_cents?->cents;
         $this->flash(__('Caja cerrada.'), 'success');
     }
 
+    /**
+     * The closed session's petty cash — total and items — from the one source (`TillSummary::breakdown`), scoped to
+     * this counter's sede.
+     *
+     * @return array{total: int, items: list<array{category: string, note: ?string, amount_cents: int, recorded_by: string, at: string}>}|null
+     */
+    private function closedPettyCash(string $sessionId): ?array
+    {
+        $closed = TillSessionModel::query()->withoutGlobalScopes()->where('location_id', $this->locationId)->find($sessionId);
+
+        if ($closed === null) {
+            return null;
+        }
+
+        $breakdown = TillSummary::breakdown($closed);
+
+        return ['total' => -$breakdown['petty_cash'], 'items' => $breakdown['petty_cash_items']];
+    }
+
     /** Clear the reveal and start fresh (ready to open a new session). */
     public function finishClose(): void
     {
+        $this->closedSessionId = null;
         $this->closing = false;
         $this->terminal = '';
         $this->resetCloseState();
@@ -848,6 +873,8 @@ class TillSession extends Component
                 'session' => null,
                 'breakdown' => null,
                 'expenseCategories' => collect(),
+                // Prompt 265 — after the reveal only (never on the blind count): the closed session's petty cash, itemised.
+                'closedPetty' => $this->closedSessionId !== null ? $this->closedPettyCash($this->closedSessionId) : null,
             ]);
         }
 
@@ -876,6 +903,7 @@ class TillSession extends Component
             'location' => $location,
             'session' => $session,
             'breakdown' => $breakdown,
+            'closedPetty' => null,
             'expenseCategories' => $expenseCategories,
             // EOD flower reweigh (prompt 47) — the in-scope batches, only while in that step.
             'reweighBatches' => $this->reweighing ? $this->reweighBatches() : collect(),

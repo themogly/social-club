@@ -56,6 +56,16 @@ class Expense extends Model
         return $this->belongsTo(ExpenseCategory::class, 'category_id');
     }
 
+    /**
+     * Who recorded it — the PIN operator for a till expense since 255 (prompt 265 shows it on the cash-up).
+     *
+     * @return BelongsTo<User, $this>
+     */
+    public function recorder(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'recorded_by');
+    }
+
     /** @return BelongsTo<Supplier, $this> */
     public function supplier(): BelongsTo
     {

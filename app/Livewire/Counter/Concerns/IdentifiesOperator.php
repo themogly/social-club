@@ -324,6 +324,44 @@ trait IdentifiesOperator
     }
 
     /**
+     * A ONE-OFF authorisation by someone else's PIN (prompt 265 — the "supervisor PIN"): the staff member serving
+     * stays the operator of record and stays identified, the basket is untouched, and the person whose PIN it is
+     * becomes the authoriser for this one act. The PIN is checked by the SAME `UnlockOperator` as the pad, against
+     * this sede's staff and with the same sede-wide throttle — a wrong PIN counts towards the lockout. Returns the
+     * authoriser only when they hold `$permission`; otherwise flashes why and returns null. It never touches
+     * `CounterOperator`.
+     */
+    protected function authoriserFromPin(string $pin, string $permission): ?User
+    {
+        $location = $this->resolveLocation();
+        $pin = trim($pin);
+
+        if ($location === null || $pin === '') {
+            $this->flash(__('Introduce el PIN de quien autoriza.'), 'error');
+
+            return null;
+        }
+
+        $authoriser = (new UnlockOperator)->handle($location, $pin, $this->operatorThrottleKey());
+
+        if ($authoriser === null) {
+            $this->flash($this->operatorLockedOut()
+                ? __('Demasiados intentos. Espera un momento antes de reintentar.')
+                : __('PIN no reconocido.'), 'error');
+
+            return null;
+        }
+
+        if (! $authoriser->can($permission)) {
+            $this->flash(__(':name no puede autorizar esta excepción.', ['name' => $authoriser->name]), 'error');
+
+            return null;
+        }
+
+        return $authoriser;
+    }
+
+    /**
      * Guard a counter transaction: an operator must be PIN-identified first. Returns
      * false (and prompts to unlock) when none is — so the caller bails BEFORE writing,
      * never silently attributing the transaction to the device session user.
