@@ -153,6 +153,12 @@ class CheckInScreen extends Component
             return;
         }
 
+        if (! $this->userCan('checkin.manage')) {
+            $this->flash(__('Tu usuario no puede registrar salidas.'), 'error');
+
+            return;
+        }
+
         $member = $this->resolveMember();
         $location = $this->resolveLocation();
 
@@ -173,6 +179,13 @@ class CheckInScreen extends Component
 
     private function attemptCheckIn(bool $override, ?User $authoriser = null): void
     {
+        // Prompt 266 — recording an entry is the PIN operator's permission (255), not only the screen's mount gate.
+        if ($this->hasOperator() && ! $this->userCan('checkin.manage')) {
+            $this->flash(__('Tu usuario no puede registrar entradas.'), 'error');
+
+            return;
+        }
+
         $member = $this->resolveMember();
         $location = $this->resolveLocation();
 

@@ -13973,3 +13973,45 @@ with its one-click grant, and the breach panel as STAFF with "Autorizar con PIN"
 ### Merge
 
 Merged to `main` on Ben's instruction for this session. `composer check` green in `es` and `en`.
+
+## Prompt 266 — "Usar la barra" off means no bar sales from the dispensary either
+
+### Before (owner-logged tablet, STAFF operator; `tests/Feature/Counter/OperatorPermissionIsEnforcedServerSideTest`)
+
+With `pos.bar` revoked from STAFF: `addBarItem()` on the dispensary still added the line, and a forced bar line + the commit
+answered *"success"* and recorded a bar order. The sweep's cases were red the same way — the standalone Bar, the dispensary
+(`pos.use`), the door (`checkin.manage`), opening a till (`till.open`) all *"success"*; and `reviewAltaApplication()` opened any
+applicant for an operator without `applications.review`.
+
+### The bar-path fix
+
+`DispensaryPos::barEnabled()` — which drives the Dispensario/Barra switch, the bar section and `setCatalogueSource('bar')` — is now
+"the sede runs a bar AND the PIN operator holds `pos.bar`" (it read the sede setting only, so the prompt's "correctly hidden"
+switch was hidden only when the sede had no bar). `addBarItem()` refuses without `pos.bar` ("Tu usuario no puede vender en la
+barra."). The ONE commit path (`attemptCommit`, 263) refuses a visit whose bar lines the operator may not charge — "Hay artículos
+de barra en la visita: los cobra alguien con permiso de barra." — with the basket **intact**: bar items already in the visit (the
+permission revoked mid-shift) are neither charged silently nor lost silently. A visit with `pos.bar` still settles both halves.
+
+### What the sweep found
+
+Every `userCan(...)`-gated control in the counter views already had its server check (price override, expenses, fee collect,
+fee waiver, till open/close flags, applications review list/approve, bank, void, limit/door overrides, enrol). The gap was one
+level up: each counter SCREEN's core write relied only on the screen's MOUNT gate, which (255) asks the TABLET's login — so on an
+owner-logged tablet an operator whose role had lost the permission could still act. Now asked of the operator where the write
+runs:
+- dispensary aportación → `pos.use`; bar lines on the dispensary → `pos.bar`;
+- standalone Bar `addArticle` / `addMiscLine` / `commitOrder` → `pos.bar`;
+- door `checkIn` / `confirmOverride` / `checkOut` → `checkin.manage` (the Who's-inside list already asked the operator, 255);
+- `TillSession::open` → `till.open`;
+- `reviewAltaApplication()` → `applications.review` (the staff-typed route's own landing on the review it just wrote sets the id
+  directly, 243, and is unaffected).
+The mount gates stay the device's (a screen must render its PIN pad before anyone is identified — 255's decision).
+
+### Tests
+
+`OperatorPermissionIsEnforcedServerSideTest` (9): the two reported cases, the with-permission combined visit, the switch not
+offered, and one refusal per sweep finding. Full suite unaffected.
+
+### Merge
+
+Merged to `main` on Ben's instruction for this session. `composer check` green in `es` and `en`.
