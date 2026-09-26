@@ -18,11 +18,12 @@ use Database\Seeders\RolePermissionSeeder;
 use Filament\Facades\Filament;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Symfony\Component\HttpFoundation\StreamedResponse;
+use Tests\Concerns\ChangesRolePermissions;
 use Tests\TestCase;
 
 class AccountingExportPageTest extends TestCase
 {
-    use RefreshDatabase;
+    use ChangesRolePermissions, RefreshDatabase;
 
     private Organisation $org;
 
@@ -89,6 +90,9 @@ class AccountingExportPageTest extends TestCase
 
     public function test_the_page_is_forbidden_to_staff(): void
     {
+        // A club that lets staff into the panel (the pre-262 default) — so this still tests the PAGE's own gate.
+        $this->giveStaffThePanel();
+
         $staff = $this->user(Role::STAFF);
         $this->assertFalse($staff->can('reports.export'));
 

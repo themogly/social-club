@@ -18,11 +18,12 @@ use Database\Seeders\RolePermissionSeeder;
 use Filament\Facades\Filament;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
+use Tests\Concerns\ChangesRolePermissions;
 use Tests\TestCase;
 
 class ActasResourceTest extends TestCase
 {
-    use RefreshDatabase;
+    use ChangesRolePermissions, RefreshDatabase;
 
     private Organisation $org;
 
@@ -104,6 +105,9 @@ class ActasResourceTest extends TestCase
 
     public function test_the_actas_index_is_forbidden_to_staff(): void
     {
+        // A club that lets staff into the panel (the pre-262 default) — so this still tests the PAGE's own gate.
+        $this->giveStaffThePanel();
+
         $staff = $this->user(Role::STAFF);
         $this->assertFalse($staff->can('minutes.manage'));
 

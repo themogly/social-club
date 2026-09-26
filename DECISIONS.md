@@ -13782,3 +13782,89 @@ the system says is the signature — worth a quick count at the club.
 ### Merge
 
 Merged to `main` on Ben's instruction ("merge all to main"). `composer check` green in `es` and `en`.
+
+## Prompt 262 — the owner decides what each role can do; staff can see ID scans; counter-only staff land on the counter
+
+### Before
+
+- **Counter-only login (test 6):** with panel access removed and the login unchanged, Filament refused the staff
+  account — *"Estas credenciales no coinciden con nuestros registros."* — locking staff out of the counter too.
+- **ID scan from the counter (test 1):** no such action; staff lacked `member.documents.view`.
+- **Overrides (test 4):** there was no way to store one — `csc:sync-permissions` re-imposes `Permissions::for()`
+  exactly, revoking anything else, and `--check` / Salud del sistema call any difference drift.
+
+### B. Roles page + overrides that survive deploys
+
+- **Sistema ▸ Roles y permisos** (`App\Filament\Pages\RolesPermissions`): two editable columns (Personal, Gerente —
+  the app's existing role labels) and Propietario shown ticked and LOCKED; permissions grouped by area with plain
+  labels (`Permissions::groups()` / `label()`), each cell showing the code default; a per-role "Restaurar valores por
+  defecto"; `Permissions::SENSITIVE` grants carry a badge and a confirmation — warned, not blocked.
+- **Gated on the OWNER ROLE, not a permission** (page, `SetRolePermission`, `RestoreRoleDefaults`): a permission can
+  be granted, and a manager handed "may edit roles" could grant themselves everything. Proven: granting a manager
+  `staff.manage`, `settings.manage` and `audit.view` still leaves the page 403. The owner row cannot be changed — a
+  crafted `toggle('owner', …)` is 403 and the action refuses the OWNER role outright.
+- **The design:** the code keeps the **catalogue** (`Permissions::ALL`) and the **defaults** (`defaultsFor()`); the
+  club's choices are rows in `role_permission_overrides` (role, permission, granted, set_by). `Permissions::for()` is
+  now defaults + overrides (OWNER always ALL). `csc:sync-permissions` → the seeder converges each role on that; a
+  permission new in code arrives with its default; one removed from the catalogue leaves the roles AND its overrides
+  are deleted; an override is never reverted. `PermissionDrift` measures against defaults + overrides, so an owner's
+  choice is not drift; the health page lists the overrides in grey ("N permisos personalizados"). Every change is
+  audited `role.permission.changed` {role, permission, from → to, default}; a restore is `role.permissions.restored`.
+  The 214 deploy tests stand unchanged — the revoke-when-removed guarantee still holds for the catalogue.
+- **Correction:** DECISIONS (219) and `Permissions` said a club could revoke `membership.fee.waive` "in the panel".
+  There was no such screen until now; the sentence is now true (and the comment says where).
+
+### C. Panel access and the counter-only login
+
+- New permission **`panel.access`**: MANAGER on, STAFF **off** by default, OWNER always.
+  `User::canAccessPanel()` = `canUseTheApp()` (active + a role) AND `panel.access`.
+- **The login had to change:** Filament's `Login` admits only `isUserAllowedToAccessPanel()` = `canAccessPanel()`, so
+  a counter-only account was refused as "wrong credentials". `App\Filament\Pages\Auth\Login` overrides it to
+  `canUseTheApp()` — inactive or role-less accounts are still refused (tested). A bound `CounterAwareLoginResponse`
+  then sends a counter-only account to the counter (its intended counter URL, else the front door); a panel user
+  lands on the panel as before.
+- **Panel URLs redirect** a counter-only account to the counter (`RedirectCounterOnlyAccounts`, on the panel stack
+  just after `EnforceCounterHandover` — it must precede `ShareErrorsFromSession`, because Laravel's middleware
+  priority hoists Filament's `Authenticate` right after it and that would answer 403 first). The panel's own
+  sign-in/sign-out routes pass (the counter's "Salir" posts to the panel logout). Counter routes never depended on
+  panel access (verified: the front door answers).
+- The counter's **admin link** follows `canAccessPanel()` (hidden for staff, present for a manager — tested). No
+  other counter link reaches the panel (the only other one is logout, allowed).
+- **What staff lose from the panel, and their counter equivalents:** Socios → the counter member lookup/record;
+  Solicitudes → the Alta review in the counter's alta modal; Cajas → the till screen; Seguridad (the panic button) →
+  the counter's panic button. No gap found.
+
+### A. ID scans
+
+- `member.documents.view` added to the STAFF and MANAGER defaults (OWNER already had it).
+- The counter's member record (Socios) lists the member's ID scans with **"Ver documento"**
+  (`MembershipCounter::viewDocument()`): the PIN operator must hold the permission (255's rule; nobody identified →
+  nothing, 260's rule), the document must be the held member's own ID document, and the URL is the SAME short-lived
+  signed, access-logged one the panel uses (`IssueDocumentUrl`, now taking the operator and signing it in as `op`).
+  The document route asks the OPERATOR while `op` is still the session's operator, and `VaultStream` logs them. It
+  opens in an in-page **sheet** (`x-counter.document-sheet`) — pushState/popstate, a labelled Cerrar, never a tab.
+- **The RAT** did not name roles. RAT-03 (ID documents) now carries an **"Acceso interno"** line computed from the
+  live roles — which hold `member.documents.view` — and that every view is logged with the person's name, at the
+  counter too. It follows whatever the owner sets on the roles page.
+
+### Tests
+
+`tests/Feature/Security/RolesAndCounterOnlyStaffTest` (14). Existing tests adapted to the new defaults the real way
+(`tests/Concerns/ChangesRolePermissions` → `SetRolePermission`): tests of a panel page's own gate for staff first give
+staff the panel (the pre-262 default), so they still test the PAGE and not the redirect; the four "staff/manager
+denied a document" tests revoke the permission first, so they still prove the "without permission" case;
+`CanAccessPanelTest` and `PermissionMatrixTest` state the new defaults; `HandoverBoundaryTest`'s staff device is given
+the panel for its "reach restored" case. Real browser: the page in light and dark; a staff login lands on `/counter`
+with no admin link and `/members` sends it back there.
+
+### What needs Ben
+
+- **STAFF panel access defaults to OFF** — on the next deploy existing staff accounts lose the panel and sign straight
+  into the counter. Grant it back on Roles y permisos if the club wants otherwise.
+- **Log each counter tablet in as a STAFF account**, not the owner — that is what takes the owner panel off the
+  counter. A manager's PIN still has manager powers at the counter (255); the panel is on their own login.
+- **ID scans to staff is an Article-9 widening** — the club's decision; every view is logged by name and the RAT says it.
+
+### Merge
+
+Merged to `main` on Ben's instruction. `composer check` green in `es` and `en`; MySQL to CI.

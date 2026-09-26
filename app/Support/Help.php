@@ -23,6 +23,7 @@ use App\Filament\Pages\Reports\FinancialReportPage;
 use App\Filament\Pages\Reports\MembersReportPage;
 use App\Filament\Pages\Reports\StockReportPage;
 use App\Filament\Pages\Reports\TillReportPage;
+use App\Filament\Pages\RolesPermissions;
 use App\Filament\Pages\Seguridad;
 use App\Filament\Pages\SystemHealth;
 use App\Models\Announcement;
@@ -267,6 +268,11 @@ class Help
         ]],
         ExportacionContable::class => ['permission' => 'reports.export', 'title' => 'Exportación contable', 'body' => [
             'La exportación de los apuntes para la contabilidad. Separa la aportación de socios del ingreso de barra y tienda, para no mezclar la contabilidad de la asociación.',
+        ]],
+        RolesPermissions::class => ['permission' => 'staff.manage', 'title' => 'Roles y permisos', 'body' => [
+            'Aquí decides qué puede hacer el personal y los gerentes. La propiedad siempre lo puede todo y no se edita.',
+            'Cada marca se guarda como decisión del club: sobrevive a las actualizaciones y queda en la auditoría. «Por defecto» es lo que trae la aplicación.',
+            'Sin «Acceso al panel de administración», una cuenta entra directamente al mostrador y nunca ve el panel.',
         ]],
         SystemHealth::class => ['permission' => 'audit.view', 'title' => 'Estado del sistema', 'body' => [
             'El estado técnico de la plataforma (colas, correo, almacenamiento). Sirve para diagnosticar; no cambia nada del club.',

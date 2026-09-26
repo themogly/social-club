@@ -26,6 +26,7 @@ use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Notification;
 use RuntimeException;
+use Tests\Concerns\ChangesRolePermissions;
 use Tests\TestCase;
 
 /**
@@ -34,7 +35,7 @@ use Tests\TestCase;
  */
 class MessagingTest extends TestCase
 {
-    use RefreshDatabase;
+    use ChangesRolePermissions, RefreshDatabase;
 
     private Organisation $org;
 
@@ -172,6 +173,9 @@ class MessagingTest extends TestCase
 
     public function test_the_admin_index_is_forbidden_without_comms_manage(): void
     {
+        // A club that lets staff into the panel (the pre-262 default) — so this still tests the PAGE's own gate.
+        $this->giveStaffThePanel();
+
         Filament::setCurrentPanel(Filament::getPanel('admin'));
         $staff = User::factory()->create();
         $staff->assignRole(Role::STAFF->value);

@@ -7,11 +7,12 @@ use App\Models\User;
 use Database\Seeders\RolePermissionSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Gate;
+use Tests\Concerns\ChangesRolePermissions;
 use Tests\TestCase;
 
 class PermissionMatrixTest extends TestCase
 {
-    use RefreshDatabase;
+    use ChangesRolePermissions, RefreshDatabase;
 
     protected function setUp(): void
     {
@@ -31,12 +32,13 @@ class PermissionMatrixTest extends TestCase
     {
         $staff = $this->user(Role::STAFF);
 
-        foreach (['limits.override', 'dispensation.void', 'member.documents.view', 'expenses.overheads'] as $permission) {
+        foreach (['limits.override', 'dispensation.void', 'expenses.overheads', 'panel.access'] as $permission) {
             $this->assertTrue(Gate::forUser($staff)->denies($permission), "STAFF should be denied {$permission}");
         }
 
-        // ...but retains its own counter powers.
+        // ...but retains its own counter powers — and, since prompt 262 (the owner's decision), opens ID scans.
         $this->assertTrue(Gate::forUser($staff)->allows('pos.use'));
+        $this->assertTrue(Gate::forUser($staff)->allows('member.documents.view'));
     }
 
     public function test_owner_holds_all_permissions(): void
@@ -50,6 +52,9 @@ class PermissionMatrixTest extends TestCase
 
     public function test_staff_admin_resource_is_forbidden_to_staff_but_open_to_owner(): void
     {
+        // A club that lets staff into the panel (the pre-262 default) — so this still tests the PAGE's own gate.
+        $this->giveStaffThePanel();
+
         $indexUrl = route('filament.admin.resources.users.index');
 
         $this->actingAs($this->user(Role::STAFF))->get($indexUrl)->assertForbidden();

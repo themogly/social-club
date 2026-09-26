@@ -17,6 +17,7 @@ use Database\Seeders\RolePermissionSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Mail;
 use Livewire\Livewire;
+use Tests\Concerns\ChangesRolePermissions;
 use Tests\TestCase;
 
 /**
@@ -39,7 +40,7 @@ use Tests\TestCase;
  */
 class ApplicationStatusHasOneWriterTest extends TestCase
 {
-    use RefreshDatabase;
+    use ChangesRolePermissions, RefreshDatabase;
 
     private Organisation $org;
 
@@ -125,6 +126,9 @@ class ApplicationStatusHasOneWriterTest extends TestCase
      */
     public function test_the_resource_has_no_create_page(): void
     {
+        // A club that lets staff into the panel (the pre-262 default) — so this still tests the PAGE's own gate.
+        $this->giveStaffThePanel();
+
         $this->assertArrayNotHasKey('create', MemberApplicationResource::getPages());
 
         $this->staff();

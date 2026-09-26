@@ -2,7 +2,9 @@
 
 namespace App\ViewModels;
 
+use App\Enums\Role as RoleEnum;
 use App\Support\OrganisationIdentity;
+use App\Support\Permissions;
 use App\Support\Settings;
 use Illuminate\Support\Carbon;
 
@@ -31,6 +33,20 @@ class Rat
         return now();
     }
 
+    /**
+     * The internal access to member ID documents, as the roles actually stand (prompt 262): which roles hold
+     * `member.documents.view`, and that every view is logged with the person's name.
+     */
+    private function documentAccessText(): string
+    {
+        $roles = collect(RoleEnum::cases())
+            ->filter(fn (RoleEnum $role): bool => in_array('member.documents.view', Permissions::for($role), true))
+            ->map(fn (RoleEnum $role): string => $role->label())
+            ->implode(', ');
+
+        return __('Acceso interno: :roles (permiso «Ver documentos de identidad de los socios»). Cada consulta queda registrada con el nombre de quien la hace, también en el mostrador.', ['roles' => $roles === '' ? '—' : $roles]);
+    }
+
     /** Shared technical & organisational security measures (RGPD Art. 32). */
     public function securityMeasures(): string
     {
@@ -40,7 +56,7 @@ class Rat
     /**
      * The processing activities, each derived from the real model surface.
      *
-     * @return list<array{ref: string, name: string, purpose: string, legal_basis: string, data_categories: list<string>, article_9: bool, recipients: string, transfers: string, retention: string}>
+     * @return list<array{ref: string, name: string, purpose: string, legal_basis: string, data_categories: list<string>, article_9: bool, recipients: string, transfers: string, retention: string, access?: string}>
      */
     public function activities(): array
     {
@@ -110,6 +126,9 @@ class Rat
                 'recipients' => $noRecipients,
                 'transfers' => $noTransfer,
                 'retention' => __(':base Acceso solo mediante URL firmada (:ttl s) y registrado.', ['base' => $memberRetention, 'ttl' => $ttl]),
+                // Prompt 262 — WHO inside the club can open the ID copies, read from the roles as they stand (the
+                // owner sets them on Sistema ▸ Roles y permisos), so the register follows the club's decision.
+                'access' => $this->documentAccessText(),
             ],
             [
                 'ref' => 'RAT-04',

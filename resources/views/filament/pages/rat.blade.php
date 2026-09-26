@@ -65,6 +65,12 @@
                         <div style="opacity:.65;">{{ __('Destinatarios') }}</div>
                         <div>{{ $activity['recipients'] }}</div>
                     </div>
+                    @if (! empty($activity['access']))
+                        <div data-rat-access>
+                            <div style="opacity:.65;">{{ __('Acceso interno') }}</div>
+                            <div>{{ $activity['access'] }}</div>
+                        </div>
+                    @endif
                     <div>
                         <div style="opacity:.65;">{{ __('Transferencias') }}</div>
                         <div>{{ $activity['transfers'] }}</div>

@@ -6,11 +6,12 @@ use App\Enums\Role;
 use App\Models\User;
 use Database\Seeders\RolePermissionSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\Concerns\ChangesRolePermissions;
 use Tests\TestCase;
 
 class PanelAccessTest extends TestCase
 {
-    use RefreshDatabase;
+    use ChangesRolePermissions, RefreshDatabase;
 
     protected function setUp(): void
     {
@@ -30,6 +31,9 @@ class PanelAccessTest extends TestCase
 
     public function test_active_staff_user_with_a_role_reaches_the_dashboard(): void
     {
+        // A club that lets staff into the panel (the pre-262 default) — so this still tests the PAGE's own gate.
+        $this->giveStaffThePanel();
+
         $user = User::factory()->create();
         $user->assignRole(Role::STAFF->value);
 

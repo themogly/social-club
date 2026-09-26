@@ -2,9 +2,11 @@
 
 namespace App\Filament\Pages\Auth;
 
+use App\Models\User;
 use App\Support\Email;
 use Filament\Auth\Pages\Login as BaseLogin;
 use Filament\Schemas\Components\Component;
+use Illuminate\Contracts\Auth\Authenticatable;
 use SensitiveParameter;
 
 /**
@@ -40,5 +42,17 @@ class Login extends BaseLogin
     protected function getRememberFormComponent(): Component
     {
         return parent::getRememberFormComponent()->default(true);
+    }
+
+    /**
+     * Prompt 262 — ONE login serves the panel and the counter, so it must admit a counter-only account. Filament's own
+     * check is `canAccessPanel()`, which now also needs `panel.access`: without this override a STAFF account (no
+     * panel access by default) was refused with "these credentials do not match our records" and locked out of the
+     * counter too. The check is not weakened — an inactive or role-less account is still refused — and where the
+     * account then lands is `CounterAwareLoginResponse`'s decision.
+     */
+    protected function isUserAllowedToAccessPanel(Authenticatable $user): bool
+    {
+        return $user instanceof User && $user->canUseTheApp();
     }
 }

@@ -67,6 +67,9 @@
                 </ul>
             </div>
             <div class="row"><span class="k">{{ __('Destinatarios') }}:</span> <span class="v">{{ $activity['recipients'] }}</span></div>
+            @if (! empty($activity['access']))
+                <div class="row"><span class="k">{{ __('Acceso interno') }}:</span> <span class="v">{{ $activity['access'] }}</span></div>
+            @endif
             <div class="row"><span class="k">{{ __('Transferencias') }}:</span> <span class="v">{{ $activity['transfers'] }}</span></div>
             <div class="row"><span class="k">{{ __('Conservación') }}:</span> <span class="v">{{ $activity['retention'] }}</span></div>
         </div>

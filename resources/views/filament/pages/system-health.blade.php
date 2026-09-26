@@ -242,6 +242,17 @@
                 </ul>
                 <p style="font-size:.8rem;opacity:.75;">{{ __('Ejecuta «php artisan csc:sync-permissions» en el servidor. Hasta entonces, alguien puede tener permisos que el código ya retiró, o que no le llegan.') }}</p>
             @endif
+            {{-- Prompt 262 — the club's own choices (Roles y permisos): information in a neutral colour, never drift. --}}
+            @if ($permissions['overrides'] !== [])
+                <div data-permission-overrides style="margin-top:.6rem;">
+                    <x-filament::badge color="gray">{{ trans_choice(':count permiso personalizado|:count permisos personalizados', count($permissions['overrides']), ['count' => count($permissions['overrides'])]) }}</x-filament::badge>
+                    <ul style="font-size:.8rem;display:grid;gap:.2rem;margin-top:.4rem;opacity:.8;">
+                        @foreach ($permissions['overrides'] as $line)
+                            <li>· {{ $line }}</li>
+                        @endforeach
+                    </ul>
+                </div>
+            @endif
         </x-filament::section>
 
         {{-- Cache / Redis reachability (prompt 124). This page is designed to SURVIVE what it reports on:
