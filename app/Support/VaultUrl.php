@@ -16,10 +16,15 @@ use Illuminate\Support\Facades\URL;
  */
 class VaultUrl
 {
-    public static function photo(Member $member, User $actor): ?string
+    /**
+     * `$operatorId` (prompt 261): a counter screen passes the PIN operator, signed into the URL, so the access log
+     * names the person looking at the face rather than the tablet's login. The URL stays bound to the session
+     * (`u`); {@see VaultStream} honours `op` only while it is still that session's operator.
+     */
+    public static function photo(Member $member, User $actor, ?string $operatorId = null): ?string
     {
         return filled($member->photo_path)
-            ? self::signed('members.photo.show', ['member' => $member->id], $actor)
+            ? self::signed('members.photo.show', array_filter(['member' => $member->id, 'op' => $operatorId]), $actor)
             : null;
     }
 

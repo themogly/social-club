@@ -4,8 +4,8 @@ namespace App\Actions;
 
 use App\Models\AuditLog;
 use App\Support\ActiveScope;
+use App\Support\CounterRequest;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Request;
 
 /** Writes one append-only audit entry. The canonical Action pattern reference. */
@@ -19,7 +19,9 @@ class RecordAuditLog
     {
         return AuditLog::create([
             'organisation_id' => app(ActiveScope::class)->organisationId(),
-            'actor_id' => Auth::id(),
+            // The PIN operator on a counter request, the logged-in user elsewhere (prompt 261) — never the tablet's
+            // login for a person's act at the counter, and never a stale counter operator for a panel action.
+            'actor_id' => CounterRequest::actorId(),
             'action' => $action,
             'auditable_type' => $auditable?->getMorphClass(),
             'auditable_id' => $auditable?->getKey(),

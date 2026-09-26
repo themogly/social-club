@@ -14,6 +14,7 @@ use App\Models\Organisation;
 use App\Models\User;
 use App\Support\ActiveScope;
 use App\Support\ApplicationSpamGuard;
+use App\Support\CounterOperator;
 use App\Support\DocumentVault;
 use App\Support\VaultUrl;
 use Database\Seeders\RolePermissionSeeder;
@@ -60,6 +61,10 @@ class MemberPhotoCaptureTest extends TestCase
 
     private function postPhoto(User $actor, Member $member, array $data)
     {
+        // The person capturing is the PIN operator (prompt 261: the route refuses with nobody identified, and the
+        // policy is asked of the operator, not the tablet's login).
+        CounterOperator::set($actor);
+
         return $this->actingAs($actor)
             ->withSession(['scope.organisation_id' => $this->org->id])
             ->post(route('counter.members.photo', ['member' => $member->id]), $data);

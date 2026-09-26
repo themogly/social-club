@@ -19,6 +19,7 @@ use App\Models\Member;
 use App\Models\Membership;
 use App\Models\TillSession;
 use App\Models\User;
+use App\Support\CounterOperator;
 use App\Support\Money;
 use App\Support\VaultUrl;
 use App\Support\Wallet;
@@ -382,7 +383,7 @@ class MembershipCounter extends Component
     {
         $actor = Auth::user();
 
-        return $actor instanceof User ? VaultUrl::photo($member, $actor) : null;
+        return $actor instanceof User ? VaultUrl::photo($member, $actor, CounterOperator::id()) : null; // op: prompt 261
     }
 
     /** The member's latest active membership at this sede (whether or not anything is owed) — for the summary. */

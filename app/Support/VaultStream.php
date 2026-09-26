@@ -28,8 +28,14 @@ class VaultStream
 
         abort_unless($path !== '' && Storage::disk(DocumentVault::DISK)->exists($path), 404);
 
+        // Prompt 261 — a view issued by a counter screen carries the PIN operator (`op`, inside the signature). It is
+        // logged as theirs only while it is still THIS session's operator; a stale or foreign `op` falls back to
+        // the logged-in user, never to someone else.
+        $op = $request->query('op');
+        $actorId = is_string($op) && $op !== '' && $op === CounterOperator::id() ? $op : $request->user()?->getKey();
+
         DocumentAccessLog::create(array_merge([
-            'actor_id' => $request->user()?->getKey(),
+            'actor_id' => $actorId,
             'viewed_at' => now(),
             'ip' => $request->ip(),
         ], $logSubject));
