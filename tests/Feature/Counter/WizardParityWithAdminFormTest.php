@@ -98,13 +98,8 @@ class WizardParityWithAdminFormTest extends TestCase
         $this->assertStringStartsWith('member-medical-certs/', $application->payload['medical_cert_path']);
         Storage::disk('documents')->assertExists($application->payload['medical_cert_path']);
 
-        // Approving carries it onto the member, like an admin-created one.
-        Livewire::test(MembershipCounter::class)
-            ->call('reviewAltaApplication', $application->id)
-            ->set('altaTierId', $tier->id)
-            ->call('approveAlta')
-            ->assertSet('flashType', 'success');
-
+        // A tier + an operator holding applications.review auto-approves on submit (prompt 246), so the member
+        // already exists — with the certificate carried onto it, exactly as an admin-created therapeutic one.
         $member = Member::query()->withoutGlobalScopes()->latest('id')->firstOrFail();
         $this->assertTrue($member->is_therapeutic);
         $this->assertSame($application->payload['medical_cert_path'], $member->medical_cert_path);

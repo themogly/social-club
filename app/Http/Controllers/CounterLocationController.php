@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Enums\TillSessionStatus;
 use App\Models\TillSession;
+use App\Support\CounterOperator;
 use App\Support\LocationSwitcher;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -28,11 +29,26 @@ class CounterLocationController extends Controller
             return back()->with('counterLocationError', __('No puedes trabajar en esa sede.'));
         }
 
-        // The till is the thing most likely to end up mis-scoped: refuse leaving a sede whose till is still
-        // open (close the blind arqueo first). A no-op when switching to the same sede.
         $current = session('counter.location_id');
-        if (is_string($current) && $current !== $locationId && $this->tillOpenAt($current)) {
-            return back()->with('counterLocationError', __('Cierra la caja de esta sede antes de cambiar.'));
+        $isChange = is_string($current) && $current !== '' && $current !== $locationId;
+
+        // Prompt 246 — CHANGING an already-adopted sede is the OPERATOR's act, gated on the PIN-identified
+        // person (settings.manage.location — MANAGER+, held by no STAFF), not the device account: an owner-logged
+        // tablet must not let a STAFF operator move the whole terminal by a PIN-less tap. The INITIAL adoption
+        // (no current sede — the sede→operator chain's first step, before any operator is identified) is open,
+        // or a multi-sede STAFF could never start. The gate is not a picture: the top-bar shows a static badge
+        // for a non-manager, and this refuses the crafted POST behind it.
+        if ($isChange) {
+            $operator = CounterOperator::current();
+            if ($operator === null || ! $operator->can('settings.manage.location')) {
+                return back()->with('counterLocationError', __('La sede la cambia un responsable'));
+            }
+
+            // The till is the thing most likely to end up mis-scoped: refuse leaving a sede whose till is still
+            // open (close the blind arqueo first).
+            if ($this->tillOpenAt($current)) {
+                return back()->with('counterLocationError', __('Cierra la caja de esta sede antes de cambiar.'));
+            }
         }
 
         session(['counter.location_id' => $locationId]);

@@ -551,6 +551,17 @@ trait SignsUpMembers
         $this->altaApplicationId = $application->id;
         $this->altaTierId = $carriedTier;
         $this->altaDuplicateBlocked = false;
+
+        // Prompt 246 — a reviewer reviewing their OWN five-minute-old form is friction the tester named. When
+        // the operator who FILLED the wizard holds applications.review, Guardar approves on the spot (243's
+        // review data: the tier from step 3, the photo, the signature) and lands on the new member's card with
+        // the usual Aprobado audit row naming them. Without the permission, 243's review landing stands and the
+        // pending list is the path. HANDOVER and EMAILED applications are never auto-approved — the person who
+        // typed those was not staff, so 209/210's PENDING-until-reviewed rule is untouched. approveAlta re-runs
+        // every check (permission, tier, duplicate, age); a block leaves them on the review to decide.
+        if ($operator->can('applications.review') && $this->altaTierId !== null) {
+            $this->approveAlta();
+        }
     }
 
     /**

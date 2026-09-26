@@ -11,6 +11,7 @@ use App\Models\Location;
 use App\Models\Organisation;
 use App\Models\User;
 use App\Support\ActiveScope;
+use App\Support\CounterOperator;
 use Database\Seeders\RolePermissionSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
@@ -141,6 +142,7 @@ class CounterLocationTest extends TestCase
     {
         $this->actingAs($this->operator([$this->a, $this->b]));
         session(['counter.location_id' => $this->a->id]);
+        CounterOperator::set($this->operator([$this->a, $this->b])); // prompt 246: changing a sede needs the PIN operator with the permission
 
         $this->from(route('counter.pos'))
             ->post(route('counter.location'), ['location_id' => $this->b->id])
