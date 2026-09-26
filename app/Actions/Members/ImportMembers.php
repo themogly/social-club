@@ -13,6 +13,7 @@ use App\Support\ActiveScope;
 use App\Support\MemberEligibility;
 use App\Support\MemberNumber;
 use App\Support\StockCeiling;
+use App\Support\Weight;
 use Carbon\CarbonInterface;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
@@ -164,7 +165,7 @@ class ImportMembers
                     'date_of_birth' => ($data['date_of_birth'] ?? null) ?: null,
                     'document_type' => ($data['document_type'] ?? null) ?: null,
                     'document_number' => ($data['document_number'] ?? null) ?: null,
-                    'declared_monthly_cg' => is_numeric($declaredG) ? (int) round_half_up(((float) $declaredG) * 100) : null,
+                    'declared_monthly_cg' => filled($declaredG) ? Weight::fromGrams((string) $declaredG)->centigrams : null,
                     'status' => $plan['member_status'],
                     'joined_at' => $plan['joined_at'],
                     'left_at' => $plan['left_at'],
@@ -301,6 +302,13 @@ class ImportMembers
 
         if (filled($data['status'] ?? null) && $this->parseMemberStatus($data['status']) === null) {
             $errors[] = "unknown status '".trim((string) $data['status'])."'";
+        }
+
+        // Prompt 257 — the one unambiguous gram reading. `is_numeric()` took "1.000" as ONE gram and dropped
+        // "1,000" silently; a separated or over-precise figure is now a row error the importer sees.
+        $declared = trim((string) ($data['declared_monthly_g'] ?? ''));
+        if ($declared !== '' && Weight::canonicalGrams($declared) === null) {
+            $errors[] = "declared_monthly_g '{$declared}' is not one unambiguous gram amount (write 1000 or 3.5, no thousands separator)";
         }
 
         // A membership needs BOTH a sede and a tier; a name that resolves to neither is a typo worth surfacing.

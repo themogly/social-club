@@ -1014,6 +1014,7 @@
     "Escaneo con cámara": "Camera scan",
     "Escaneo del documento": "Document scan",
     "Escribe al club. No es un canal de pedidos.": "Write to the club. This is not an ordering channel.",
+    "Escribe los gramos sin separador de miles y con dos decimales como máximo (p. ej. 1000 o 3,5).": "Enter the grams without a thousands separator and with at most two decimals (e.g. 1000 or 3.5).",
     "Escribe tu respuesta…": "Write your reply…",
     "Escribe un email válido para enviar la invitación.": "Enter a valid email address to send the invitation.",
     "Espacio privado para personas socias. No es un servicio público.": "A private space for members. It is not a public service.",

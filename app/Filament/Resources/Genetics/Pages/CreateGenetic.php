@@ -12,6 +12,7 @@ use App\Enums\UnitType;
 use App\Filament\Resources\Genetics\GeneticResource;
 use App\Models\Genetic;
 use App\Models\Location;
+use App\Rules\GramAmount;
 use App\Support\ActiveScope;
 use App\Support\DocumentUpload;
 use App\Support\Money;
@@ -77,7 +78,7 @@ class CreateGenetic extends CreateRecord
                         ->options(collect(ConcentrateSubtype::cases())->mapWithKeys(fn (ConcentrateSubtype $case): array => [$case->value => $case->label()])->all())
                         ->visible(fn (Get $get): bool => $get('product_type') === ProductType::CONCENTRATE->value),
                     TextInput::make('grams_per_unit_g')->label(__('Gramos por unidad (g)'))
-                        ->numeric()->minValue(0)->step(0.01)->suffix('g')
+                        ->numeric()->rule(new GramAmount)->minValue(0)->step(0.01)->suffix('g')
                         ->visible(fn (Get $get): bool => self::isUnit($get('product_type')))
                         ->required(fn (Get $get): bool => self::isUnit($get('product_type'))),
                 ])->columns(2),
@@ -86,7 +87,7 @@ class CreateGenetic extends CreateRecord
                 ->description(__('Cuánto stock entra'))
                 ->schema([
                     // The first batch, in the genetic's own unit — 238's intake fields, no more.
-                    TextInput::make('grams')->label(__('Cantidad (g)'))->numeric()->minValue(0)
+                    TextInput::make('grams')->label(__('Cantidad (g)'))->numeric()->minValue(0)->rule(new GramAmount)
                         ->visible(fn (Get $get): bool => ! self::isUnit($get('product_type')))
                         ->required(fn (Get $get): bool => ! self::isUnit($get('product_type'))),
                     TextInput::make('units')->label(__('Cantidad (uds)'))->numeric()->minValue(1)->step(1)

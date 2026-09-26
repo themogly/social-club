@@ -36,6 +36,7 @@ use App\Filament\Resources\Members\Tables\MembersTable;
 use App\Models\DataRequest;
 use App\Models\Member;
 use App\Models\User;
+use App\Rules\GramAmount;
 use App\Support\Settings;
 use App\Support\Weight;
 use BackedEnum;
@@ -348,6 +349,7 @@ class MemberResource extends Resource
                 TextInput::make('declared_monthly_g')
                     ->label(__('Previsión mensual (g)'))
                     ->numeric()
+                    ->rule(new GramAmount)
                     ->minValue(0)
                     ->step(0.01)
                     ->suffix(__('g'))
