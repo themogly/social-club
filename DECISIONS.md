@@ -13868,3 +13868,48 @@ with no admin link and `/members` sends it back there.
 ### Merge
 
 Merged to `main` on Ben's instruction. `composer check` green in `es` and `en`; MySQL to CI.
+
+## Prompt 264 — the pending-application alert opens the application; a sponsor is found by name
+
+### Before
+
+- Following "1 solicitud pendiente" opened the Alta modal on the SIGN-UP chooser ("¿Cómo vais a rellenar la
+  solicitud?") with the application a small row at the bottom — *"Failed asserting that null matches expected
+  '<application id>'"* (the review never opened). The tester read it as "sign up a new member".
+- The admin member form's avalador Select (`relationship('avalador', 'member_no')`) listed and searched member
+  NUMBERS only — searching the sponsor's surname returned *an empty array*.
+
+### 1. How the alert chooses review vs list
+
+`MembershipCounter::mount()`, for `alert=pending_applications` and an operator who holds `applications.review`
+(255: the operator is asked): it reads the same scoped `pendingAltaApplications()` the modal lists (this sede, the
+`awaitingReview` scope the hub counts). **Exactly one** → that application's review, through the same path as 249's
+`?alta=<id>` (`reviewAltaApplication()` + the org-scoped `altaApplication()` check, so a foreign id can never open).
+**Several** → `altaPendingFirst`: the modal leads with the pending list (subtitle "Solicitudes pendientes de revisar"),
+and the sign-up options follow under "o empezar una nueva alta" (the list is one extracted partial,
+`alta-pending-list`, rendered in either position). **Without the permission** nothing opens and no applicant data is
+shown. The hub link stays `?alert=pending_applications` rather than `?alta=<id>`: the hub is names-free by design
+(177 — it only has counts), and resolving on arrival means the destination is right even if the count changed
+between the hub render and the tap.
+
+### 2. The sponsor search and label
+
+The admin Select now searches **first name, last name or member number** in one box
+(`getSearchResultsUsing` → `AvaladorResolver::candidates()`), and labels each option **"Nombre Apellidos · M-00028"**
+(`AvaladorResolver::label()`; the number tells namesakes apart — no DNI or birth date). The pool —
+`AvaladorResolver::pool()`, active members of the organisation — is now the ONE definition of a valid sponsor, shared
+with the counter's resolver (244). The member being edited is excluded from their own list. `preload()` is gone (it
+loaded every member into the page); `AvaladorWithinSponseeCap` and the "required unless therapeutic-exempt" logic are
+untouched. Note: the old relationship Select did NOT filter to active members, so "only active, as today" is now
+actually enforced.
+
+### Tests
+
+`tests/Feature/Counter/PendingAlertAndSponsorSearchTest` (6). `AlertsLandOnTheSubjectTest` and `SignupWizardTest`
+pinned the old one-pending behaviour (the list) and now assert the review with the applicant's name. Real browser
+(`tests/Browser/shoot-pending-alert-and-sponsor.mjs`, 820×1180): the hub alert opens "Zoe Pendiente"'s review with
+no chooser; the admin form's search for "Adams" offers "Elliot Adams · M-00014" (`storage/app/screenshots/264/`).
+
+### Merge
+
+Merged to `main` on Ben's instruction for this session. `composer check` green in `es` and `en`.

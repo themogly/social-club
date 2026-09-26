@@ -164,9 +164,10 @@ class AlertsLandOnTheSubjectTest extends TestCase
 
         $html = $this->follow(DashboardAlert::PENDING_APPLICATIONS->value);
 
-        // The Alta panel is open on arrival, with the application in it — not a closed panel behind a tap.
-        $this->assertStringContainsString('data-alta-pending', $html, 'the Alta panel did not open on arrival');
-        $this->assertStringContainsString($application->id, $html, 'the application is not on the screen');
+        // The Alta panel is open on arrival ON the application — since prompt 264, with exactly one pending, its
+        // REVIEW (not the list, and never the sign-up chooser the tester read as "sign up a new member").
+        $this->assertStringContainsString('data-alta-review', $html, 'the alert did not open the application');
+        $this->assertStringContainsString('Bruno Sáez', $html, 'the application is not on the screen');
     }
 
     /**
