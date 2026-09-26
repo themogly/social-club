@@ -13146,3 +13146,51 @@ line numbers were stale but every cited behaviour was still present and was chan
 path are untouched; the existing dispensary, pricing (83's eighth), refund and stock-take suites stay green. A
 `.mjs` browser script (`shoot-dispensary-batches.mjs`) captures the automatic pane, a split's outcome, and the
 admin dispensation view with two lotes.
+
+## Prompt 253 — the suite is green in `es`, not only on a machine set to `en`
+
+### Before
+
+On `c2946db`, with `APP_LOCALE=es` (the repo default in `.env.example`, which CI copies), two tests failed:
+
+- `AutomaticBatchAllocationTest::test_the_pane_shows_no_lote_control_in_automatic_and_the_sede_total` —
+  `Failed asserting that '<div wire:id=…' contains "In stock:"` (the pane renders `En stock: …`).
+- `BarLargeLayoutTest::test_sold_out_is_disabled_and_visible_in_large_mode` —
+  `Failed asserting that '<div wire:id=…' contains "Sold out"` (the label is `Agotado`).
+
+Both passed on this machine because the local `.env` is `APP_LOCALE=en` — green depended on the runner.
+
+### The two fixes
+
+- **Dispensary pane:** the assertion computes the copy — `__('En stock: :total', ['total' =>
+  $component->activeGeneticStockLabel()])` — rather than adding a `data-sede-stock` hook. The point of the
+  assertion IS the visible sede total, so `__()` is the right tool; no view change was made (test-only, as
+  the prompt required).
+- **Bar large layout:** the article was named `'Agotado'` — the Spanish sold-out LABEL — so in `es` the
+  "article name is visible" assertion passed on the label alone. Renamed to `'Tónica Probe'` (not a UI
+  string in either locale) and the state asserted via `__('Agotado')`. Proven independent: blanking
+  `$article['name']` in `components/counter/article-card.blade.php` turns the name assertion red while the
+  label assertion still holds.
+
+### The sweep (by running)
+
+Full suite in both locales after the fix: `APP_LOCALE=es` → 1953 tests, 15848 assertions, 3 skipped, green;
+`APP_LOCALE=en` → identical, green. The two-locale run surfaced **nothing beyond the two above**. The
+localisation tests that assert English copy already set their own locale.
+
+### Pin, not matrix
+
+`phpunit.xml` now carries `<env name="APP_LOCALE" value="es"/>` — every local run uses the repo default and
+CI's locale, so a test written with a literal English string fails on its author's machine. No reason to
+avoid the pin turned up (no test depends on English framework validation messages). The entry is not
+`force="true"`, so `APP_LOCALE=en php artisan test` still overrides it for a deliberate English run.
+
+### CI
+
+Could not check the latest `main` run — `gh` is not installed in this environment. The inference ("CI red on
+`main` on exactly these two") rests on `ci.yml`'s `cp .env.example .env` and the `es` reproduction above.
+
+### Merge
+
+Merged to `main` directly on Ben's explicit instruction for this session ("merge to main even though it says
+don't") — overriding the prompt's "push the branch; do not merge". Test-only; MySQL left to CI.
