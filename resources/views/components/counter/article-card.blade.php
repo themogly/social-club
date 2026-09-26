@@ -15,7 +15,8 @@
 
      **Contract** — the consumer supplies:
        · `article`  a row: id, name, price_cents|price_label, stock, low_stock, category_name, image_url
-       · `layout`   `list` (default) or `grid`
+       · `layout`   `list` (default), `grid`, or `large` (prompt 248 — the standalone Bar's big-tile size;
+                    list/grid are byte-identical to before, the large classes are additive)
        · `action`   the Livewire method a tap calls — `addArticle` on the Bar, `addBarItem` on the POS. The
                     ACTION is the consumer's; the shape is not.
        · `thumbs`   whether this sede has any article image at all (193: a large empty glyph is a
@@ -53,6 +54,9 @@
         // 225's density, on both screens now: name + meta left, price over stock right.
         'flex-col gap-1' => $layout === 'grid',
         'flex-row items-center gap-3' => $layout === 'list',
+        // Prompt 248 — the LARGE size (standalone Bar only): a big tile, name and price large, stock small.
+        // `!` overrides the base min-h/padding; list/grid never see these (the condition is false there).
+        'flex-col justify-between gap-2 !min-h-[120px] !px-4 !py-3' => $layout === 'large',
         'border-line bg-surface hover:border-brand hover:bg-brand-tint/40 dark:border-slate-700 dark:bg-slate-950 dark:hover:border-brand' => ! $soldOut,
         'cursor-not-allowed border-dashed border-line bg-surface-alt opacity-60 dark:border-slate-800 dark:bg-slate-900' => $soldOut,
     ])
@@ -64,6 +68,7 @@
             'flex shrink-0 items-center justify-center overflow-hidden rounded-lg bg-surface-alt dark:bg-slate-800',
             'h-10 w-10' => $layout === 'list',
             'h-16 w-full' => $layout === 'grid',
+            'h-24 w-full' => $layout === 'large',
         ])>
             @if ($article['image_url'] ?? null)
                 <img src="{{ $article['image_url'] }}" alt="" class="h-full w-full object-cover">
@@ -74,7 +79,7 @@
     @endif
 
     <span class="min-w-0 flex-1">
-        <span data-product-name class="block truncate font-semibold leading-tight">{{ $article['name'] }}</span>
+        <span data-product-name @class(['block truncate font-semibold leading-tight', '!text-lg' => $layout === 'large'])>{{ $article['name'] }}</span>
         @if ($article['category_name'] ?? null)
             <span class="mt-0.5 block truncate text-[11px] leading-tight text-ink-muted dark:text-slate-400">{{ $article['category_name'] }}</span>
         @endif
@@ -83,9 +88,9 @@
     <span @class([
         'flex shrink-0 text-xs',
         'flex-col items-end gap-0.5' => $layout === 'list',
-        'w-full flex-row items-center justify-between' => $layout === 'grid',
+        'w-full flex-row items-center justify-between' => $layout === 'grid' || $layout === 'large',
     ])>
-        <span class="text-sm font-semibold text-brand tabular-nums dark:text-slate-100">{{ $priceLabel ?? $this->money($article['price_cents']) }}</span>
+        <span @class(['text-sm font-semibold text-brand tabular-nums dark:text-slate-100', '!text-xl' => $layout === 'large'])>{{ $priceLabel ?? $this->money($article['price_cents']) }}</span>
 
         {{-- The count, on both screens. Sold-out and low stock are said in words AND colour; neither is
              colour alone. --}}

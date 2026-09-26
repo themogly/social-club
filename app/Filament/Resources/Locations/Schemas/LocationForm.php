@@ -54,6 +54,17 @@ class LocationForm
     ];
 
     /**
+     * Per-location STRING settings — same location-scoped-Setting-row mechanism as the toggles, but a chosen
+     * value from a fixed set (prompt 248: bar_layout_default, the standalone Bar's default article layout for a
+     * fresh device at this sede). Persisted by Create/EditLocation as SettingType::STRING.
+     *
+     * @var list<string>
+     */
+    public const SETTING_STRINGS = [
+        'bar_layout_default',
+    ];
+
+    /**
      * Clean a TagsInput list of gram amounts (strings, comma-or-dot decimals) into a sorted, de-duplicated list
      * of positive numbers for storage — so a fat-fingered "3,5x" or a blank never reaches the POS.
      *
@@ -168,6 +179,19 @@ class LocationForm
                     ->label(__('Barra: referencia del ticket'))
                     ->helperText(__('Un campo libre para eventos o invitados. Apagado en el uso normal.'))
                     ->default(false),
+
+                // Prompt 248 — the standalone Bar's default article layout for a fresh terminal at this sede.
+                // A terminal remembers its own choice after that; this is only the starting point.
+                Select::make('bar_layout_default')
+                    ->label(__('Barra: vista por defecto'))
+                    ->helperText(__('Cómo empieza un terminal nuevo en esta sede. Cada terminal recuerda luego su elección.'))
+                    ->options([
+                        'list' => __('Lista'),
+                        'grid' => __('Cuadrícula'),
+                        'large' => __('Grande'),
+                    ])
+                    ->default('grid')
+                    ->selectablePlaceholder(false),
 
                 Toggle::make('signature_on_dispensation')
                     ->label(__('Firma en dispensación')),

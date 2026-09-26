@@ -180,6 +180,9 @@ class DebtAndLocationSettingsTest extends TestCase
             // Per-location bar cart panels (prompt 193): attaching a socio and the ticket reference are
             // per-sede input toggles on LocationForm, not org thresholds.
             'bar_attach_socio_enabled', 'bar_ticket_reference_enabled',
+            // Per-location: the standalone Bar's default article layout for a fresh terminal (prompt 248),
+            // a Select on LocationForm, not an org threshold.
+            'bar_layout_default',
             // Per-location: whether this sede has card readers (prompt 194). It changes the member
             // lookup's wording only, so it belongs on LocationForm, not the org thresholds page.
             'card_readers_enabled',

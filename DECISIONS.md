@@ -13025,3 +13025,54 @@ current tree.
 `composer check` green. MySQL left to CI. New copy in both locales (*Volver al mostrador*, *Recibo*, *Ticket*,
 *Abrir en el visor*). No new JS dependency — Alpine and the existing modal construction. The receipt content, its
 route, its authorisation and the emailed link are untouched; signed document URLs keep their lifetime.
+
+## Prompt 248 — the Bar's third layout: large tiles, category-first (a toggle beside compact, never a replacement)
+
+The tester wanted the Bar's articles as big, friendly buttons; the owner wanted a toggle between the current
+view and large icons, "rather than modify the current." So this is a SIZE, not a redesign.
+
+### A third size of ONE card, not a second card
+
+`setArticleLayout()` accepts a third value, `large`, beside `list` and `grid` (unknown values still ignored,
+prompt 176). The large tile is a `layout` variant of `x-counter.article-card` — the same card 230 unified across
+both bars, one size up — so `ArticleCardConsumersTest` still sees one card everywhere. The list/grid branches are
+UNTOUCHED: the large classes are additive `@class` entries gated on `$layout === 'large'`, which render nothing
+in compact (a `@class` with only false extra conditions emits exactly the base string), and the conflicting
+size/padding overrides carry `!` so the compact base is never rewritten. `BarLargeLayoutTest` pins the compact
+list/grid card markup and asserts NO large token leaks into it — the "not modify current" promise, proven.
+
+### Category-first is the large mode's arrangement
+
+In large mode the pane leads with one big tile per article category plus **Todo** (≥112px), then the chosen
+category's articles as large tiles (≥120px). The tiles ARE the chips' filter (`filterCategory`) rendered big —
+the category-filter semantics are unchanged. Sold-out tiles are disabled and visible at the new size (230's rule
+holds). No icons are invented: the `Category` model has none, and an optional per-category icon is a SEPARATE
+decision left for the owner.
+
+### Device-level persistence with a per-sede default — and why NOT localStorage
+
+The choice sticks to the DEVICE across a reload and a shift change, via the existing `#[Session]` property on
+`BarPos` (the terminal's browser session; the operator is separate, identified by PIN). A fresh terminal (no
+stored choice) adopts the sede's default, a new per-location Setting `bar_layout_default` (grid unless the
+manager picks otherwise, a Select on `LocationForm`).
+
+The prompt suggested localStorage. We did NOT use it, deliberately: this codebase already MOVED counter state
+off localStorage to the server (`CounterBasket` — "what was there before was a lie… held server-side"), and the
+layout was ALREADY a `#[Session]` property (added after the prompt's `098636d` baseline, which is why the prompt
+described it as lost on reload). `#[Session]` is device-level and survives reload/shift-change, so it meets the
+goal without a second, contradictory source of truth. Recorded per the prompt's request for the "why device-
+level": it is the terminal's screen, not the person's preference.
+
+### Standalone Bar only
+
+Large is `BarPos`'s alone. The POS's Barra source is a SEPARATE component (`DispensaryPos`, its own
+`articleLayout`), living beside the cart column inside a member visit, where a category-first pane has no room —
+it keeps list/grid, untouched. A new per-location `SETTING_STRINGS` category on `LocationForm` (+ Create/Edit)
+carries the string setting, mirroring the existing toggle/integer/array plumbing.
+
+### Verification
+
+`composer check` green. MySQL left to CI. New copy in both locales (Grande/Large, Todo/All, the LocationForm
+labels). `addArticle`, `CommitOrder`, the tender, the category filter's semantics and the compact layouts are
+untouched; 224's and 230's tests pass. A `.mjs` browser script (`shoot-bar-large.mjs`) records tile heights at
+1280×800 and 800×1280, light and dark, and checks the toggle clears 44×44 and commit stays reachable.

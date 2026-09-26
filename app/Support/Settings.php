@@ -204,6 +204,10 @@ class Settings
         'card_readers_enabled' => false,
         'bar_attach_socio_enabled' => false,
         'bar_ticket_reference_enabled' => false,
+        // Prompt 248 — the standalone Bar's DEFAULT article layout for a fresh device at this sede: list | grid
+        // | large. Grid unless the manager picks otherwise; once an operator changes it on a terminal, that
+        // terminal remembers its own choice (a #[Session] property on BarPos — device-level, not per-operator).
+        'bar_layout_default' => 'grid',
         // Panic lockdown (prompt 121), all per-org. The safety-net auto-reactivation runs after this many
         // minutes so a locked-out club — who are the data controller — always regains access to their own
         // statutory register (default 24h). The owner email "way back" link is valid for this many hours.
