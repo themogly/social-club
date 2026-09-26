@@ -210,6 +210,12 @@ class CommitOrder
             }
 
             $unit = (int) $line['unit_price_cents'];
+            // Prompt 256 — reproduced: a forged misc line of −€3 beside a €5 article committed (the total stayed
+            // positive, so the counter's tender check passed), an off-book discount `addMiscLine()` can never
+            // produce. A misc line is a positive amount; a reduction is a void or a discount, never a line.
+            if ($unit <= 0) {
+                throw new RuntimeException(__('Cada línea necesita un importe positivo.'));
+            }
             $lineTotal = $unit * $qty;
             $total += $lineTotal;
 
