@@ -200,7 +200,8 @@ class CounterAltaWizardTest extends TestCase
 
         // Filled in later, it appears in the counter's pending list to be picked up.
         $this->fillInTheForm($application);
-        $pending = Livewire::test(MembershipCounter::class)->instance()->pendingAltaApplications();
+        // Protected since prompt 260 (not a wire action) — read from inside the component, as the view does.
+        $pending = (fn () => $this->pendingAltaApplications())->call(Livewire::test(MembershipCounter::class)->instance());
         $this->assertTrue($pending->contains('id', $application->id));
     }
 

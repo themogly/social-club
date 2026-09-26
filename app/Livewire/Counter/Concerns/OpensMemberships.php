@@ -237,7 +237,7 @@ trait OpensMemberships
      *
      * @return Collection<int, Membership>
      */
-    public function membershipsElsewhere(Member $member, Location $location): Collection
+    protected function membershipsElsewhere(Member $member, Location $location): Collection
     {
         return $member->memberships()->withoutGlobalScopes()
             ->with('location')

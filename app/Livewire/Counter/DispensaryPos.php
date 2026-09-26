@@ -1821,12 +1821,16 @@ class DispensaryPos extends Component
     }
 
     /**
-     * The current member's "usual" genetics (component state) — public entry point for the view and tests.
+     * The current member's "usual" genetics (component state) — the view's entry point. Prompt 260 — not a wire action (the view calls it; Livewire invokes only PUBLIC methods from the browser), and nothing with no operator identified: reads follow 255's rule for writes.
      *
      * @return list<array<string, mixed>>
      */
-    public function theirUsual(): array
+    protected function theirUsual(): array
     {
+        if (! $this->hasOperator()) {
+            return [];
+        }
+
         $location = $this->resolveLocation();
         $member = $this->resolveMember();
 

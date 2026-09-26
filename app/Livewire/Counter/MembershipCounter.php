@@ -163,8 +163,13 @@ class MembershipCounter extends Component
      *
      * @return array{title: string, rows: list<array{member_id: string, name: string, detail: string}>, shown: int, total: int}|null
      */
-    public function worklist(): ?array
+    protected function worklist(): ?array
     {
+        // Prompt 260 — not a wire action (the view calls it; Livewire invokes only PUBLIC methods from the browser), and nothing with no operator identified: reads follow 255's rule for writes.
+        if (! $this->hasOperator()) {
+            return null;
+        }
+
         $location = $this->resolveLocation();
         $alert = DashboardAlert::tryFrom((string) $this->alert);
 
