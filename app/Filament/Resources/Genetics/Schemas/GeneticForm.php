@@ -8,6 +8,7 @@ use App\Enums\CultivationType;
 use App\Enums\ProductType;
 use App\Enums\StrainType;
 use App\Models\Category;
+use App\Rules\GramAmount;
 use Filament\Forms\Components\FileUpload;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TagsInput;
@@ -76,6 +77,7 @@ class GeneticForm
                             ->label(__('Gramos por unidad (g)'))
                             ->helperText(__('Contenido en gramos de cada unidad.'))
                             ->numeric()
+                            ->rule(new GramAmount)
                             ->minValue(0)
                             ->step(0.01)
                             ->suffix('g')

@@ -40,7 +40,9 @@ class MoneyWeightTest extends TestCase
         $this->assertSame(350, Weight::fromGrams('3.5')->centigrams);
         $this->assertSame(350, Weight::fromGrams('3,5')->centigrams);
         $this->assertSame(350, Weight::fromGrams(3.5)->centigrams);
-        $this->assertSame(1, Weight::fromGrams('0.005')->centigrams); // half-up
+        $this->assertSame(1, Weight::fromGrams(0.005)->centigrams); // half-up (numeric input)
+        // A TYPED "0.005" is refused since prompt 257: three digits after a separator is a thousands position in
+        // one convention and beyond our 0.01 g precision in the other — see GramInputIsNeverGuessedTest.
         $this->assertSame(3.5, Weight::fromCentigrams(350)->grams());
     }
 }

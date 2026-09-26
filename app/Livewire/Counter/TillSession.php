@@ -649,7 +649,9 @@ class TillSession extends Component
             }
 
             $raw = trim($this->reweighCounts[$batch->id] ?? '');
-            if ($raw === '' || ! is_numeric($raw) || (float) $raw < 0) {
+            // Prompt 257 — the one unambiguous reading (Weight::canonicalGrams): "1.000" is refused, never
+            // counted as one gram, and the counter's comma decimal ("412,5") is accepted like the POS pad.
+            if (Weight::canonicalGrams($raw) === null) {
                 $this->flash(__('Introduce el peso contado de cada lote, o márcalo como no contado.'), 'error');
 
                 return;

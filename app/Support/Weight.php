@@ -2,6 +2,7 @@
 
 namespace App\Support;
 
+use App\Rules\GramAmount;
 use InvalidArgumentException;
 
 /**
@@ -19,19 +20,46 @@ final class Weight
     }
 
     /**
-     * Parse a grams amount from the edge (weight entry, forecast) to centigrams,
-     * rounding half-up at the conversion boundary. Accepts "3,5" and "3.5".
+     * Parse a grams amount from the edge (weight entry, forecast, intake) to centigrams, rounding half-up at the
+     * conversion boundary.
+     *
+     * THE STRING CONTRACT (prompt 257) — no guessing. A string is accepted only when it can mean exactly one
+     * number: digits, optionally followed by ONE separator (`,` or `.`) and ONE or TWO decimal digits — "1000",
+     * "3,5", "3.50", "1000,5". Both separators are read as the decimal because neither convention groups by one
+     * or two digits (es groups `1.000`, en groups `1,000`), so "3,5" and "3.5" are the same number wherever the
+     * tablet is. Anything else throws: a separator in a thousands position ("1.000", "1,000"), two separators
+     * ("1.000,00"), spaces, a sign, more than two decimals (beyond our 0.01 g precision). This replaced a
+     * `str_replace(',', '.')` that read BOTH "1.000" and "1,000" as ONE gram — a thousand grams of opening
+     * stock became one. A value that cannot be read unambiguously is refused, never rounded to a plausible
+     * wrong answer; form fields validate with {@see GramAmount} so the operator sees why.
+     *
+     * Ints and floats are programmatic (seeders, computed values) and are taken as they are.
      */
     public static function fromGrams(int|float|string $grams): self
     {
         if (is_string($grams)) {
-            $grams = str_replace([' ', ','], ['', '.'], trim($grams));
-            if ($grams === '' || ! is_numeric($grams)) {
-                throw new InvalidArgumentException("Not a valid gram amount: {$grams}");
+            $canonical = self::canonicalGrams($grams);
+            if ($canonical === null) {
+                throw new InvalidArgumentException("Not an unambiguous gram amount: {$grams}");
             }
+            $grams = $canonical;
         }
 
         return new self((int) round_half_up((float) $grams * 100));
+    }
+
+    /**
+     * A typed gram amount as a canonical dot-decimal string ("1000", "3.5"), or null when it is not one
+     * unambiguous number — see {@see fromGrams()} for the contract. The one parser; the validation rule and
+     * the counter's reweigh ask it rather than re-deriving the rule.
+     */
+    public static function canonicalGrams(string $typed): ?string
+    {
+        if (preg_match('/^(\d+)(?:[.,](\d{1,2}))?$/', trim($typed), $m) !== 1) {
+            return null;
+        }
+
+        return isset($m[2]) ? $m[1].'.'.$m[2] : $m[1];
     }
 
     public function grams(): float

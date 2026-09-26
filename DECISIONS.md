@@ -13442,3 +13442,57 @@ to CI (the audit already raced the lock on MySQL; this prompt changes a single f
 ### Merge
 
 Merged to `main` on Ben's explicit instruction for this session.
+
+## Prompt 257 — "1000 g" is stored as 1 g: `Weight::fromGrams` no longer guesses separators
+
+### Before
+
+`Weight::fromGrams()` ran `str_replace([' ', ','], ['', '.'])` then `(float)`. On the untouched tree:
+`1000 => 100000 cg`, **`1.000 => 100 cg`**, **`1,000 => 100 cg`**, `1000,5 => 100050 cg`. So the new-strain
+wizard's "Cantidad (g)", given the separated string a Spanish tablet submits, stored **1 g** of opening stock
+for a thousand. The new tests were red on exactly that: `CreateGenetic` accepted `1.000`/`1,000` with no form
+error, the forecast and refund actions likewise, and the POS helper read `1.000` as 100 cg.
+
+### The contract chosen — refuse the ambiguous, never reinterpret
+
+`fromGrams(string)` accepts ONE rule: digits, optionally ONE separator (`,` or `.`) followed by ONE or TWO
+digits (`1000`, `3,5`, `3.50`, `1000,5`). Both separators read as the decimal because **neither convention
+groups by one or two digits** — es groups `1.000`, en groups `1,000` — so accepting both is not a guess, and the
+counter pads' comma decimal keeps working. Everything else throws: a separator followed by three digits (a
+thousands position in one convention, beyond our 0.01 g precision in the other), two separators (`1.000,00`),
+spaces, a sign. `Weight::canonicalGrams()` is the one parser; `App\Rules\GramAmount` is its field-level face
+("Escribe los gramos sin separador de miles y con dos decimales como máximo (p. ej. 1000 o 3,5)."). Ints/floats
+(programmatic) pass through unchanged, still rounded half-up.
+
+**Deviation from the prompt's test 1, deliberately.** It asked that both `'1.000'` and `'1,000'` store
+100000 cg. No locale-correct parse can: in the app's own locale (es: dot = thousands, comma = decimal) `1,000`
+is ONE gram. Only a "three digits after a separator = thousands" heuristic satisfies it, and that heuristic
+turns an English `1.500` (1.5 g) into 1500 g — a guess by a factor of a thousand, the class of bug being
+fixed. So I took the prompt's own "robust move": a grouped value is a **validation error the operator sees**,
+and a plain `1000` stores 100000 cg. The invariant holds — no typed gram value is silently stored as a
+different number. If the owner would rather the es reading (`1.000` = a thousand) be accepted, that is a
+one-line change in `canonicalGrams`, but it must then refuse `1,000` rather than read it.
+
+### Forms converted
+
+`GramAmount` on: new-strain wizard `grams` + `grams_per_unit_g` (`CreateGenetic`), `GeneticForm`
+`grams_per_unit_g` (edit), `BatchForm` `grams` (new lote → `IntakeBatch`), member "Actualizar previsión
+declarada" `declared_monthly_g`, dispensation refund `weight_g`. Also moved onto the strict parser: the till's
+flower reweigh (was `is_numeric()` → `fromGrams`, which would now have thrown on `1.000`; it now refuses it with
+the existing message, and accepts the counter's comma decimal `412,5` which `is_numeric` used to reject), and
+the member CSV import's `declared_monthly_g` (was `is_numeric()` → `1.000` stored as 1 g, `1,000` silently
+dropped; now a row error). The applicant form's forecast is a `<select>` of whole numbers; the POS pad already
+caught `InvalidArgumentException` and now refuses `1.000` as "Introduce un peso válido" instead of 1 g.
+
+`MoneyWeightTest` pinned half-up with the STRING `'0.005'`; that string is refused now (three-digit tail), so the
+half-up assertion moved to the float `0.005`.
+
+### For Ben (not done here)
+
+Whether any stored figure was already corrupted — a one-off look at `batches.initial_cg` / `members.declared_
+monthly_cg` for suspiciously small values (100 cg where 100000 was meant). And ask the tester to retry the
+strain with `1.000`, `1,000` and `1000`: the first two now show the message, the third stores a thousand.
+
+### Merge
+
+Merged to `main` on Ben's instruction ("merge to main"). `composer check` green in `es` and `en`; MySQL to CI.

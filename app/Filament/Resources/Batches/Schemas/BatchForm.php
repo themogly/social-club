@@ -4,6 +4,7 @@ namespace App\Filament\Resources\Batches\Schemas;
 
 use App\Models\Genetic;
 use App\Models\Location;
+use App\Rules\GramAmount;
 use App\Support\ActiveScope;
 use App\Support\DocumentUpload;
 use Filament\Forms\Components\DatePicker;
@@ -58,6 +59,7 @@ class BatchForm
                         TextInput::make('grams')
                             ->label(__('Cantidad (g)'))
                             ->numeric()
+                            ->rule(new GramAmount)
                             ->minValue(0)
                             ->required(fn (Get $get): bool => ! self::isUnitGenetic($get('genetic_id')))
                             ->visible(fn (string $operation, Get $get): bool => $operation === 'create' && ! self::isUnitGenetic($get('genetic_id'))),

@@ -14,6 +14,7 @@ use App\Filament\Resources\Dispensations\Tables\DispensationsTable;
 use App\Models\Dispensation;
 use App\Models\TillSession;
 use App\Models\User;
+use App\Rules\GramAmount;
 use App\Support\Money;
 use App\Support\Weight;
 use BackedEnum;
@@ -119,7 +120,7 @@ class DispensationResource extends Resource
                     ])),
                 TextInput::make('weight_g')
                     ->label(__('Peso a devolver (g)'))
-                    ->numeric()->minValue(0)->step(0.01)->default('0')->required()
+                    ->numeric()->minValue(0)->step(0.01)->default('0')->required()->rule(new GramAmount)
                     ->helperText(fn (Dispensation $record): string => __('Máximo :weight', [
                         'weight' => Weight::fromCentigrams($record->remainingRefundableGramsCg())->formatted(),
                     ])),
