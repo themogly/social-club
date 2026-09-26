@@ -4,9 +4,11 @@ namespace App\Livewire\Counter;
 
 use App\Actions\Attendance\ResolveMemberEligibility;
 use App\Actions\Dispensing\ResolveMemberLimits;
+use App\Actions\Members\IssueDocumentUrl;
 use App\Actions\Till\SelectTillSession;
 use App\Enums\DashboardAlert;
 use App\Enums\DispensationStatus;
+use App\Enums\MemberDocumentType;
 use App\Livewire\Counter\Concerns\CollectsMembershipFees;
 use App\Livewire\Counter\Concerns\FindsMembers;
 use App\Livewire\Counter\Concerns\IdentifiesOperator;
@@ -16,6 +18,7 @@ use App\Livewire\Counter\Concerns\SignsUpMembers;
 use App\Models\Dispensation;
 use App\Models\Location;
 use App\Models\Member;
+use App\Models\MemberDocument;
 use App\Models\Membership;
 use App\Models\TillSession;
 use App\Models\User;
@@ -287,6 +290,53 @@ class MembershipCounter extends Component
         $this->flashResult($result);
     }
 
+    /**
+     * The signed URL of the ID scan open in the sheet, or null (prompt 262). Minted fresh on each tap by
+     * {@see viewDocument()} — short-lived and bound to this session — so it is never stale and every open is a
+     * logged view.
+     */
+    #[Locked]
+    public ?string $documentViewUrl = null;
+
+    /**
+     * Open a member's ID scan in the counter's sheet (prompt 262 — the owner: "everyone should be able to open
+     * members' ID scans"). The PIN operator must hold `member.documents.view` (255's rule); the scan must be the held
+     * member's own ID document; the URL is the SAME short-lived signed, access-logged one the panel uses
+     * (`IssueDocumentUrl`), with the operator signed into it so the log names them. Nobody identified → nothing (260).
+     */
+    public function viewDocument(string $documentId): void
+    {
+        if (! $this->requireOperator()) {
+            return;
+        }
+
+        if (! $this->userCan('member.documents.view')) {
+            $this->flash(__('No tienes permiso para ver documentos de socios.'), 'error');
+
+            return;
+        }
+
+        $document = $this->feeMemberId === null ? null : MemberDocument::query()
+            ->where('member_id', $this->feeMemberId)
+            ->where('type', MemberDocumentType::ID->value)
+            ->find($documentId);
+
+        $device = $this->deviceUser();
+
+        if ($document === null || $device === null) {
+            $this->flash(__('Documento no encontrado.'), 'error');
+
+            return;
+        }
+
+        $this->documentViewUrl = (new IssueDocumentUrl)->handle($document, $device, $this->counterActor());
+    }
+
+    public function closeDocument(): void
+    {
+        $this->documentViewUrl = null;
+    }
+
     public function render(): View
     {
         $this->applyCounterScope();
@@ -310,6 +360,11 @@ class MembershipCounter extends Component
             'location' => $location,
             'openTill' => $location !== null ? $this->openTill($location) : null,
             'feeMember' => $feeMember,
+            // Prompt 262 — the held member's ID scans, listed only for an operator who may open them (none with nobody
+            // identified: `userCan` asks the operator).
+            'idDocuments' => ($feeMember !== null && $this->userCan('member.documents.view'))
+                ? MemberDocument::query()->where('member_id', $feeMember->id)->where('type', MemberDocumentType::ID->value)->latest()->get(['id', 'created_at'])
+                : collect(),
             'membership' => $membership,
             'owedCents' => $membership !== null ? $this->owedCents($membership) : null,
             'verdict' => $verdict,

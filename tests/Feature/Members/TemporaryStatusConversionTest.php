@@ -24,6 +24,7 @@ use Database\Seeders\RolePermissionSeeder;
 use Filament\Facades\Filament;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
+use Tests\Concerns\ChangesRolePermissions;
 use Tests\TestCase;
 
 /**
@@ -40,7 +41,7 @@ use Tests\TestCase;
  */
 class TemporaryStatusConversionTest extends TestCase
 {
-    use RefreshDatabase;
+    use ChangesRolePermissions, RefreshDatabase;
 
     private Organisation $org;
 
@@ -283,6 +284,9 @@ class TemporaryStatusConversionTest extends TestCase
 
     public function test_a_staff_user_without_the_permission_cannot_convert(): void
     {
+        // A club that lets staff into the panel (the pre-262 default) — so this still tests the PAGE's own gate.
+        $this->giveStaffThePanel();
+
         $staff = $this->actor(Role::STAFF);
         $this->assertFalse($staff->can('members.create'), 'members.create is the gate the action reads.');
 

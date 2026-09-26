@@ -21,11 +21,12 @@ use Filament\Facades\Filament;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Storage;
 use Livewire\Livewire;
+use Tests\Concerns\ChangesRolePermissions;
 use Tests\TestCase;
 
 class GeneratedDocumentsTest extends TestCase
 {
-    use RefreshDatabase;
+    use ChangesRolePermissions, RefreshDatabase;
 
     private Organisation $org;
 
@@ -91,8 +92,10 @@ class GeneratedDocumentsTest extends TestCase
 
     public function test_the_generated_documents_vault_is_forbidden_to_a_manager(): void
     {
-        // documents.generate (manager holds) is distinct from member.documents.view
-        // (owner-only) — a manager may generate but not open the sensitive artifacts.
+        // documents.generate is distinct from member.documents.view — a manager may generate but, WITHOUT the view
+        // permission, not open the sensitive artefacts. Since prompt 262 managers hold it by default (the owner's
+        // decision), so the club that revokes it is the case proven here.
+        $this->setRolePermission(Role::MANAGER, 'member.documents.view', false);
         $manager = $this->user(Role::MANAGER);
         $this->assertTrue($manager->can('documents.generate'));
         $this->assertFalse($manager->can('member.documents.view'));

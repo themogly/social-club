@@ -30,6 +30,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Str;
 use ReflectionClass;
+use Tests\Concerns\ChangesRolePermissions;
 use Tests\TestCase;
 
 /**
@@ -40,7 +41,7 @@ use Tests\TestCase;
  */
 class HelpGuidesTest extends TestCase
 {
-    use RefreshDatabase;
+    use ChangesRolePermissions, RefreshDatabase;
 
     private Organisation $org;
 
@@ -250,6 +251,9 @@ class HelpGuidesTest extends TestCase
 
     public function test_the_manual_renders_for_owner_and_staff_in_both_locales(): void
     {
+        // A club that lets staff into the panel (the pre-262 default) — so this still tests the PAGE's own gate.
+        $this->giveStaffThePanel();
+
         foreach ([Role::OWNER, Role::STAFF] as $role) {
             $this->userWithRole($role);
             foreach (['es', 'en'] as $locale) {
@@ -261,6 +265,9 @@ class HelpGuidesTest extends TestCase
 
     public function test_the_manual_shows_staff_the_counter_guide_but_hides_the_setup_guide(): void
     {
+        // A club that lets staff into the panel (the pre-262 default) — so this still tests the PAGE's own gate.
+        $this->giveStaffThePanel();
+
         $this->userWithRole(Role::STAFF);
         app()->setLocale('es');
 

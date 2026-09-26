@@ -15,11 +15,12 @@ use Database\Seeders\RolePermissionSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Storage;
 use Symfony\Component\HttpKernel\Exception\HttpException;
+use Tests\Concerns\ChangesRolePermissions;
 use Tests\TestCase;
 
 class MemberDocumentAccessTest extends TestCase
 {
-    use RefreshDatabase;
+    use ChangesRolePermissions, RefreshDatabase;
 
     private Organisation $org;
 
@@ -58,6 +59,10 @@ class MemberDocumentAccessTest extends TestCase
 
     public function test_staff_is_denied_a_url_and_nothing_is_logged(): void
     {
+        // Staff hold the scan permission by default since prompt 262 (the owner's decision); a club that revokes it is
+        // the "without the permission" case this denial proves.
+        $this->setRolePermission(Role::STAFF, 'member.documents.view', false);
+
         $staff = $this->userWithRole(Role::STAFF);
 
         try {

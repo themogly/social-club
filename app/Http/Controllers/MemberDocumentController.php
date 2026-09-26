@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\MemberDocument;
+use App\Support\CounterOperator;
 use App\Support\VaultStream;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
@@ -21,10 +22,15 @@ class MemberDocumentController extends Controller
     public function show(Request $request, MemberDocument $document): Response
     {
         // The five protections now live in VaultStream (prompt 113), shared with the photo/signature endpoint.
+        // Prompt 262 — a view issued from the COUNTER carries the PIN operator (`op`, inside the signature); while
+        // it is still this session's operator, the OPERATOR is asked (255's rule), and VaultStream logs them.
+        $op = $request->query('op');
+        $operator = is_string($op) && $op !== '' && $op === CounterOperator::id() ? CounterOperator::current() : null;
+
         return VaultStream::respond(
             $request,
             (string) $document->path,
-            fn () => Gate::authorize('view', $document),
+            fn () => $operator !== null ? Gate::forUser($operator)->authorize('view', $document) : Gate::authorize('view', $document),
             ['member_document_id' => $document->id],
         );
     }

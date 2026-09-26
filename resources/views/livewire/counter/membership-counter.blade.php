@@ -217,6 +217,18 @@
                     @include('livewire.counter.partials.membership-fix')
 
                     <div data-member-record class="mt-3 space-y-3">
+                        {{-- Prompt 262 — the member's ID scan, openable at the counter by any operator who may (staff
+                             included, the owner's decision), in a sheet, every view logged with the operator's name. --}}
+                        @if ($idDocuments->isNotEmpty())
+                            <div data-member-id-documents class="flex flex-wrap items-center gap-2 rounded-xl border border-line p-3 dark:border-slate-700">
+                                <span class="text-xs font-medium text-ink-muted dark:text-slate-400">{{ __('Documento de identidad') }}</span>
+                                @foreach ($idDocuments as $document)
+                                    <x-button type="button" variant="secondary" size="sm" wire:click="viewDocument('{{ $document->id }}')" data-view-document>
+                                        {{ $loop->first ? __('Ver documento') : __('Ver documento del :date', ['date' => $document->created_at?->format('d/m/Y')]) }}
+                                    </x-button>
+                                @endforeach
+                            </div>
+                        @endif
                         {{-- What they may still have — the same figures the POS puts on its cart. --}}
                         @if ($limits)
                             @php
@@ -374,4 +386,5 @@
         <div x-data x-effect="document.body.classList.toggle('overflow-hidden', $wire.altaOpen)"></div>
     @endif
 @endif
+    <x-counter.document-sheet />
 </div>

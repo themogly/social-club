@@ -27,6 +27,7 @@ use Filament\Facades\Filament;
 use Filament\Forms\Components\Select;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
+use Tests\Concerns\ChangesRolePermissions;
 use Tests\TestCase;
 
 /**
@@ -45,7 +46,7 @@ use Tests\TestCase;
  */
 class DiscountFormTest extends TestCase
 {
-    use RefreshDatabase;
+    use ChangesRolePermissions, RefreshDatabase;
 
     private Organisation $org;
 
@@ -300,6 +301,9 @@ class DiscountFormTest extends TestCase
 
     public function test_a_staff_user_cannot_reach_the_discount_form(): void
     {
+        // A club that lets staff into the panel (the pre-262 default) — so this still tests the PAGE's own gate.
+        $this->giveStaffThePanel();
+
         $staff = User::factory()->create();
         $staff->assignRole(Role::STAFF->value);
         $this->actingAs($staff);

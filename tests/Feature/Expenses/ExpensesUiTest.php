@@ -19,11 +19,12 @@ use Database\Seeders\RolePermissionSeeder;
 use Filament\Facades\Filament;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
+use Tests\Concerns\ChangesRolePermissions;
 use Tests\TestCase;
 
 class ExpensesUiTest extends TestCase
 {
-    use RefreshDatabase;
+    use ChangesRolePermissions, RefreshDatabase;
 
     private Organisation $org;
 
@@ -63,6 +64,9 @@ class ExpensesUiTest extends TestCase
      */
     public function test_the_overhead_create_page_is_forbidden_to_a_manager_and_to_staff(): void
     {
+        // A club that lets staff into the panel (the pre-262 default) — so this still tests the PAGE's own gate.
+        $this->giveStaffThePanel();
+
         $createUrl = route('filament.admin.resources.expenses.create');
 
         foreach ([Role::MANAGER, Role::STAFF] as $role) {
@@ -78,6 +82,9 @@ class ExpensesUiTest extends TestCase
 
     public function test_the_supplier_and_purchase_indexes_are_denied_to_staff(): void
     {
+        // A club that lets staff into the panel (the pre-262 default) — so this still tests the PAGE's own gate.
+        $this->giveStaffThePanel();
+
         // STAFF hold expenses.record (petty cash) but NOT purchases.manage.
         $this->actingAs($this->user(Role::STAFF));
 

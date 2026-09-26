@@ -5,6 +5,7 @@ namespace App\Providers\Filament;
 use App\Filament\Pages\Auth\Login;
 use App\Filament\Pages\Auth\RequestPasswordReset;
 use App\Http\Middleware\EnforceCounterHandover;
+use App\Http\Middleware\RedirectCounterOnlyAccounts;
 use App\Http\Middleware\SetLocale;
 use App\Livewire\LocaleSwitcher;
 use App\Livewire\LocationSwitcher;
@@ -181,6 +182,10 @@ class AdminPanelProvider extends PanelProvider
                 // gate actually fires. RequireOpenTill is NOT added — it only guards `counter/*`, which are web
                 // routes, not panel routes.
                 EnforceCounterHandover::class,
+                // Prompt 262 — a counter-only account (no panel.access) asking for a panel URL goes to the counter.
+                // HERE, before ShareErrorsFromSession: Laravel's middleware priority hoists Filament's Authenticate
+                // to just after it, and Authenticate would answer 403 before a later entry could redirect.
+                RedirectCounterOnlyAccounts::class,
                 AuthenticateSession::class,
                 SetLocale::class,
                 ShareErrorsFromSession::class,

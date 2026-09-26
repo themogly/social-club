@@ -2,10 +2,12 @@
 
 namespace App\Providers;
 
+use App\Http\Responses\CounterAwareLoginResponse;
 use App\Support\ActiveScope;
 use App\Support\CounterHandoverConfinement;
 use App\Support\CounterRequest;
 use App\Support\Help;
+use Filament\Auth\Http\Responses\Contracts\LoginResponse;
 use Filament\Schemas\Components\Form;
 use Filament\Tables\Table;
 use Illuminate\Support\ServiceProvider;
@@ -17,6 +19,9 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
+        // Prompt 262 — a counter-only account lands on the counter after signing in, never on the panel.
+        $this->app->bind(LoginResponse::class, CounterAwareLoginResponse::class);
+
         // One active scope per request (current organisation + active location).
         $this->app->singleton(ActiveScope::class);
     }

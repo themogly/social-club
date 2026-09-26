@@ -3,6 +3,8 @@
 namespace App\Support;
 
 use App\Enums\Role as RoleEnum;
+use App\Models\RolePermissionOverride;
+use Illuminate\Support\Facades\Schema;
 use Spatie\Permission\Models\Permission;
 use Spatie\Permission\Models\Role;
 
@@ -83,6 +85,24 @@ class PermissionDrift
             'missing_roles' => $missingRoles,
             'in_sync' => $missingPermissions === [] && $missingGrants === [] && $staleGrants === [] && $missingRoles === [],
         ];
+    }
+
+    /**
+     * The club's deliberate differences from the code's defaults (prompt 262) — information, NOT drift: the roles are
+     * measured against defaults + these, so an owner's choice on Sistema ▸ Roles y permisos never shows red.
+     *
+     * @return list<string>
+     */
+    public static function overrideLines(): array
+    {
+        if (! Schema::hasTable('role_permission_overrides')) {
+            return [];
+        }
+
+        return RolePermissionOverride::query()->orderBy('role')->orderBy('permission')->get()
+            ->map(fn ($o): string => ($o->granted ? __(':role: añadido «:permission»', ['role' => $o->role, 'permission' => Permissions::label($o->permission)])
+                : __(':role: retirado «:permission»', ['role' => $o->role, 'permission' => Permissions::label($o->permission)])))
+            ->all();
     }
 
     /**

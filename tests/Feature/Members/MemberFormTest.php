@@ -23,6 +23,7 @@ use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
 use Livewire\Livewire;
 use Symfony\Component\HttpKernel\Exception\HttpException;
+use Tests\Concerns\ChangesRolePermissions;
 use Tests\TestCase;
 
 /**
@@ -34,7 +35,7 @@ use Tests\TestCase;
  */
 class MemberFormTest extends TestCase
 {
-    use RefreshDatabase;
+    use ChangesRolePermissions, RefreshDatabase;
 
     private Organisation $org;
 
@@ -150,6 +151,10 @@ class MemberFormTest extends TestCase
 
     public function test_the_scan_view_url_is_access_logged_expires_and_403s_without_permission(): void
     {
+        // Staff hold the scan permission by default since prompt 262 (the owner's decision); a club that revokes it is
+        // the "without the permission" case this denial proves.
+        $this->setRolePermission(Role::STAFF, 'member.documents.view', false);
+
         $this->actingAs($this->user(Role::OWNER));
 
         Livewire::test(CreateMember::class)

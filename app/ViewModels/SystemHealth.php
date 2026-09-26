@@ -217,13 +217,13 @@ class SystemHealth
      * deploy script leaves anyone who deployed some other way still blind — and this page already reads live
      * state rather than guessing.
      *
-     * @return array{in_sync: bool, lines: list<string>}
+     * @return array{in_sync: bool, lines: list<string>, overrides: list<string>}
      */
     public function permissions(): array
     {
         $report = PermissionDrift::report();
 
-        return ['in_sync' => $report['in_sync'], 'lines' => PermissionDrift::lines()];
+        return ['in_sync' => $report['in_sync'], 'lines' => PermissionDrift::lines(), 'overrides' => PermissionDrift::overrideLines()];
     }
 
     /**

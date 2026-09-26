@@ -28,11 +28,12 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Testing\TestResponse;
 use Livewire\Livewire;
+use Tests\Concerns\ChangesRolePermissions;
 use Tests\TestCase;
 
 class DashboardScreenTest extends TestCase
 {
-    use RefreshDatabase;
+    use ChangesRolePermissions, RefreshDatabase;
 
     private Organisation $org;
 
@@ -58,6 +59,9 @@ class DashboardScreenTest extends TestCase
 
     public function test_authenticated_staff_reaches_the_dashboard_at_root_with_no_redirect(): void
     {
+        // A club that lets staff into the panel (the pre-262 default) — so this still tests the PAGE's own gate.
+        $this->giveStaffThePanel();
+
         $staff = $this->user(Role::STAFF);
 
         $response = $this->visit($staff, $this->location->id);
@@ -121,6 +125,9 @@ class DashboardScreenTest extends TestCase
 
     public function test_staff_payload_and_screen_withhold_finance_figures(): void
     {
+        // A club that lets staff into the panel (the pre-262 default) — so this still tests the PAGE's own gate.
+        $this->giveStaffThePanel();
+
         $this->dispense(4200, 4200, 0, 420);
         $staff = $this->user(Role::STAFF);
 
@@ -194,6 +201,9 @@ class DashboardScreenTest extends TestCase
 
     public function test_staff_do_not_see_a_system_item_in_the_rendered_sidebar(): void
     {
+        // A club that lets staff into the panel (the pre-262 default) — so this still tests the PAGE's own gate.
+        $this->giveStaffThePanel();
+
         // Belt-and-braces at the HTML level (single request — the built nav is cached
         // per process, so a second differently-scoped visit here would be unreliable):
         // "Ajustes" is the Settings label and appears nowhere in the dashboard body.

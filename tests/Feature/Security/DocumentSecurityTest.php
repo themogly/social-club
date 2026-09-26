@@ -15,6 +15,7 @@ use Database\Seeders\RolePermissionSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Storage;
 use Symfony\Component\HttpKernel\Exception\HttpException;
+use Tests\Concerns\ChangesRolePermissions;
 use Tests\TestCase;
 
 /**
@@ -23,7 +24,7 @@ use Tests\TestCase;
  */
 class DocumentSecurityTest extends TestCase
 {
-    use RefreshDatabase;
+    use ChangesRolePermissions, RefreshDatabase;
 
     private Organisation $org;
 
@@ -128,6 +129,10 @@ class DocumentSecurityTest extends TestCase
 
     public function test_issuance_refuses_a_user_without_the_permission(): void
     {
+        // Staff hold the scan permission by default since prompt 262 (the owner's decision); a club that revokes it is
+        // the "without the permission" case this denial proves.
+        $this->setRolePermission(Role::STAFF, 'member.documents.view', false);
+
         $staff = $this->user(Role::STAFF);   // holds no member.documents.view
         $document = $this->document();
 

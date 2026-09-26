@@ -18,6 +18,7 @@ use Database\Seeders\RolePermissionSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
 use Livewire\Livewire;
+use Tests\Concerns\ChangesRolePermissions;
 use Tests\TestCase;
 
 /**
@@ -36,7 +37,7 @@ use Tests\TestCase;
  */
 class HandoverBoundaryTest extends TestCase
 {
-    use RefreshDatabase;
+    use ChangesRolePermissions, RefreshDatabase;
 
     private Organisation $org;
 
@@ -113,6 +114,10 @@ class HandoverBoundaryTest extends TestCase
 
     public function test_the_panel_is_reachable_again_once_the_handover_ends(): void
     {
+        // The device here is a STAFF login; since prompt 262 staff have no panel by default, so this club lets them in
+        // — the point is that ending the handover restores the device's ORDINARY reach, whatever that is.
+        $this->giveStaffThePanel();
+
         $this->handOver();
         $this->actingAs($this->device)->get('/')->assertRedirect();
 

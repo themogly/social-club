@@ -42,6 +42,16 @@ class User extends Authenticatable implements FilamentUser, HasAppAuthentication
      */
     public function canAccessPanel(Panel $panel): bool
     {
+        // Prompt 262 — panel access is its own switch (`panel.access`, owner-editable per role; STAFF off by default).
+        return $this->canUseTheApp() && $this->can('panel.access');
+    }
+
+    /**
+     * May this account sign in at all — to the counter, and to the panel if it also holds `panel.access`? Active and
+     * holding a role (prompt 262). The login asks THIS, so a counter-only account is not refused as "wrong credentials".
+     */
+    public function canUseTheApp(): bool
+    {
         return $this->active && $this->hasAnyRole(array_column(Role::cases(), 'value'));
     }
 
