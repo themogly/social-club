@@ -12722,3 +12722,41 @@ the applicant form's photo `capture="user"` — on Android Chrome these open the
 
 `composer check` green — the medical-cert test written to fail against `main` (`medical_cert` is not in
 `ApplicationShape::files()` there). MySQL left to CI. New copy in both locales.
+
+## Prompt 245 — "Cambiar de persona" showed two PIN pads: Alpine's `x-if` duplicated the surface across a morph
+
+Tapping the name chip (239's *Cambiar de persona*) dispatched a Livewire round trip that re-rendered the page
+component (operator cleared) while the surface's Alpine state flipped at the same moment. The PIN card lived in
+`<template x-if="padVisible">`: `x-if` INSERTS its clone as a SIBLING of the `<template>`, and Livewire morphs
+the SERVER HTML — which holds only the `<template>` — over a DOM where Alpine had already inserted the card. The
+old clone survived the morph and the re-initialised `x-if` inserted a second: one `[data-counter-surface]`, two
+complete PIN cards side by side.
+
+### The class — Alpine-inserted DOM inside a morph target
+
+This is 188's and 223's family from Alpine's side. 188 was stale Alpine STATE across a morph; 223 was SCRIPTS in
+a morphed view; this is TEMPLATES (`x-if`) in a morphed view. All three are the same seam: **DOM that Alpine
+inserts inside markup Livewire morphs is owned by neither**, so a re-render duplicates or strands it.
+
+### The rule — `x-show` over `x-if` inside `resources/views/livewire/**`
+
+The three `x-if` templates in `counter-surface.blade.php` (the handover resting surface, the PIN pad, the
+back-to-applicant button) and the price-override panel in `dispensary-pos.blade.php` became `x-show` (+
+`x-cloak`) on always-present markup: the element is in the server HTML exactly once and Alpine only toggles its
+visibility, so a morph has nothing to duplicate. `x-for` is untouched — it legitimately requires a `<template>`
+and has no such failure mode. No change to `unlockOperator`, `lockCounter`, `UnlockOperator`, or any mode or
+copy: the rendering mechanism changed, the behaviour did not.
+
+### The guard
+
+`CounterViewsUseXShowNotXIfTest` sweeps every `resources/views/livewire/**` blade, strips Blade comments (which
+name the anti-pattern to explain the fix) and fails on any `x-if`, with `x-show` named as the fix — proven by a
+planted `<template x-if>`. 223 closed scripts-in-morphed-views; this closes templates-in-morphed-views.
+
+### Verification
+
+`composer check` green. MySQL left to CI. Browser harness `tests/Browser/shoot-one-pin-pad.mjs` against the
+running server: after *Cambiar de persona* on POS, Bar and Till, portrait (800×1280) and landscape (1280×800),
+the surface holds EXACTLY ONE `[data-surface-heading]` — the duplication that shipped on `main` is gone.
+Screenshots in `storage/app/screenshots/245/`. 196's Alpine-scope guard and 223's no-scripts guard pass
+untouched. No copy changed.

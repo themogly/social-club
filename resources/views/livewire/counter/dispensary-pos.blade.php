@@ -813,8 +813,9 @@
                                 <span aria-hidden="true" x-text="open ? '\u25b4' : '\u25be'"></span>
                             </button>
 
-                            <template x-if="open">
-                        <div data-price-override class="mt-2 rounded-xl border border-warning/30 bg-warning/5 p-3">
+                        {{-- Prompt 245 — `x-show`, not `x-if`, inside a Livewire-morphed view (the surface's
+                             family): Alpine-inserted DOM inside a morph target is owned by neither. --}}
+                        <div data-price-override x-show="open" x-cloak class="mt-2 rounded-xl border border-warning/30 bg-warning/5 p-3">
                             <p class="block text-xs font-medium text-warning">{{ __('Ajustar precio (queda registrado)') }}</p>
                             <div class="mt-1 grid gap-2 sm:grid-cols-2">
                                 <input type="text" inputmode="decimal" wire:model.blur="priceOverrideEuros" autocomplete="off" placeholder="{{ __('Nuevo total (€)') }}" class="h-11 w-full rounded-xl border border-line bg-surface px-3 text-base text-ink placeholder:text-ink-muted focus:border-warning focus:outline-none focus:ring-2 focus:ring-warning/40 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100">
@@ -822,7 +823,6 @@
                             </div>
                             <p class="mt-1 text-[11px] text-ink-muted dark:text-slate-400">{{ __('Deja el importe vacío para cobrar el precio normal. 0 € = gratis.') }}</p>
                         </div>
-                            </template>
                         </div>
                     @endcan
                     @endif

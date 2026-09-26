@@ -90,8 +90,14 @@
          it screen-specific would mean a counter screen rendering the COUNTER to an applicant, which is the
          leak the whole mode exists to prevent. So the fix is that this surface is complete everywhere, not
          that it stops persisting. --}}
-    <template x-if="mode === 'handover' && ! staffPad">
-        <div data-handover-surface class="flex w-full max-w-md flex-col items-center text-center">
+    {{-- Prompt 245 — `x-show`, never `x-if`, inside a Livewire-morphed view. `x-if` INSERTS its clone as a
+         sibling of the `<template>`; a Livewire morph of the surrounding server HTML (which holds only the
+         `<template>`) does not own that inserted clone, so the old one survived a "Cambiar de persona" morph
+         while the re-initialised `x-if` inserted a SECOND — two PIN cards side by side. `x-show` keeps the
+         card in the server HTML exactly ONCE and only toggles its visibility, so a morph has nothing to
+         duplicate. This is 188/223's family from Alpine's side; the guard is
+         CounterViewsUseXShowNotXIfTest. --}}
+    <div data-handover-surface x-show="mode === 'handover' && ! staffPad" x-cloak class="flex w-full max-w-md flex-col items-center text-center">
             <h2 class="text-xl font-semibold">{{ __('Alta de socio/a') }}</h2>
             <p class="mt-2 text-sm text-ink-muted dark:text-slate-400">{{ __('Rellena tus datos en esta tablet. Cuando termines, devuélvela al personal.') }}</p>
 
@@ -115,12 +121,10 @@
                 class="mt-10 min-h-[2.75rem] rounded-lg px-4 text-xs font-medium text-ink-muted underline underline-offset-4 transition hover:text-ink dark:text-slate-400 dark:hover:text-slate-300"
             >{{ __('Personal del club') }}</button>
         </div>
-    </template>
 
     {{-- LOCKED, UNIDENTIFIED, and HANDED-OVER-with-the-staff-pad-open — the same PIN pad, the same
          UnlockOperator call and therefore the same throttle, differing only in what it says. --}}
-    <template x-if="padVisible">
-        <div class="w-full max-w-xs rounded-2xl border border-line bg-surface p-6 shadow-xl dark:border-slate-800 dark:bg-slate-900">
+    <div x-show="padVisible" x-cloak class="w-full max-w-xs rounded-2xl border border-line bg-surface p-6 shadow-xl dark:border-slate-800 dark:bg-slate-900">
             <div class="flex flex-col items-center text-center">
                 <span class="inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-brand-tint text-brand dark:bg-slate-800">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" class="h-6 w-6" aria-hidden="true">
@@ -168,14 +172,13 @@
 
             {{-- Opened by mistake, or the staff member changed their mind: hand the tablet back to the
                  applicant rather than leaving them facing a PIN pad. Handover mode only. --}}
-            <template x-if="mode === 'handover'">
-                <button
-                    type="button"
-                    data-handover-staff-cancel
-                    @click="staffPad = false; clear()"
-                    class="mt-3 min-h-[2.75rem] w-full rounded-lg px-4 text-xs font-medium text-ink-muted transition hover:text-ink dark:text-slate-400 dark:hover:text-slate-300"
-                >{{ __('Volver a la pantalla del solicitante') }}</button>
-            </template>
+            <button
+                type="button"
+                data-handover-staff-cancel
+                x-show="mode === 'handover'"
+                x-cloak
+                @click="staffPad = false; clear()"
+                class="mt-3 min-h-[2.75rem] w-full rounded-lg px-4 text-xs font-medium text-ink-muted transition hover:text-ink dark:text-slate-400 dark:hover:text-slate-300"
+            >{{ __('Volver a la pantalla del solicitante') }}</button>
         </div>
-    </template>
 </div>
