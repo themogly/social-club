@@ -2,11 +2,13 @@
 
 namespace Tests\Feature\Ops;
 
+use App\Actions\Till\OpenTill;
 use App\Enums\Role;
 use App\Models\Location;
 use App\Models\Organisation;
 use App\Models\User;
 use App\Support\ActiveScope;
+use App\Support\CounterOperator;
 use App\ViewModels\SystemHealth;
 use Database\Seeders\RolePermissionSeeder;
 use Illuminate\Cache\Repository;
@@ -63,9 +65,13 @@ class RedisDegradationTest extends TestCase
         $owner = $this->owner();
         // Warm the permission cache on the database store, then take the DEFAULT (Redis) cache down.
         $owner->can('pos.use');
+        $location = $owner->locations()->firstOrFail();
+        session(['counter.location_id' => $location->id]);
+        (new OpenTill)->handle($location, 'POS-1', 10000); // identified ⇒ till-first applies (236)
         $this->breakDefaultCache();
 
         $this->actingAs($owner);
+        CounterOperator::set($owner); // identified at the PIN — a counter session with nobody identified has no panel (267)
         foreach ([route('counter.pos'), route('counter.bar'), route('counter.till'), route('counter.checkin'), '/'] as $url) {
             $this->get($url)->assertOk(); // was 500 before prompt 124
         }

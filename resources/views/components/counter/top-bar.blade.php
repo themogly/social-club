@@ -3,7 +3,8 @@
     // The SAME gate the sidebar uses (User::canAccessPanel): a fixed counter-only login
     // with no panel access sees no way into admin — that lockdown is intentional.
     $user = auth()->user();
-    $canPanel = $user !== null && $user->canAccessPanel(\Filament\Facades\Filament::getPanel('admin'));
+    // Prompt 267 — the signed-in user IS the PIN person (the PIN is a sign-in); with nobody identified, no way into the panel.
+    $canPanel = $user !== null && \App\Support\CounterOperator::id() !== null && $user->canAccessPanel(\Filament\Facades\Filament::getPanel('admin'));
 
     // TWO confirms, because there are two different losses (prompt 206).
     //   · leaving the counter  — the basket goes with the session; `counter.dirty` is the right question.

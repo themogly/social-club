@@ -156,14 +156,15 @@ class AuditActorIsTheOperatorTest extends TestCase
         $this->identify('1357');
         $this->postPhoto()->assertOk();
 
-        $url = VaultUrl::photo($this->member->fresh(), $this->ownerTablet, CounterOperator::id());
+        // Since prompt 267 the PIN signs the session in as the operator, so the URL is bound (`u`) to them.
+        $url = VaultUrl::photo($this->member->fresh(), $this->staff, CounterOperator::id());
         $this->get($url)->assertOk();
         $this->assertSame($this->staff->id, DocumentAccessLog::query()->latest('viewed_at')->firstOrFail()->actor_id);
 
-        // A stale `op` (the operator has since signed out) is never honoured — the view falls back to the login.
-        CounterOperator::clear();
-        $this->get($url)->assertOk();
-        $this->assertSame($this->ownerTablet->id, DocumentAccessLog::query()->orderByDesc('id')->firstOrFail()->actor_id);
+        // An `op` naming someone who is NOT this session's operator is never honoured — the view falls back to the login.
+        $foreign = VaultUrl::photo($this->member->fresh(), $this->staff, $this->manager->id);
+        $this->get($foreign)->assertOk();
+        $this->assertSame($this->staff->id, DocumentAccessLog::query()->orderByDesc('id')->firstOrFail()->actor_id);
     }
 
     // --- 4. No bleed into the panel -------------------------------------------------------------------------------
