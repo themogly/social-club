@@ -96,7 +96,7 @@ class BreachLogForm
         return '<ol style="margin:.25rem 0 .5rem 1.1rem;padding:0;font-size:.85rem;color:#0f172a;line-height:1.35;">'.$items.'</ol>'
             .'<div style="font-size:.8rem;color:#475569;">'
             .e(__('Sede electrónica de la AEPD para notificar brechas:'))
-            .' <a href="https://sedeagpd.gob.es/" target="_blank" rel="noopener" style="color:#2563eb;">sedeagpd.gob.es</a>'
+            .' <a href="https://sedeagpd.gob.es/" rel="noopener" style="color:#2563eb;">sedeagpd.gob.es</a>'
             .' · '.e(__('Runbook interno: ubicación por definir (config del club).'))
             .'</div>';
     }

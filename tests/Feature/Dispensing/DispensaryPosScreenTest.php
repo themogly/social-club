@@ -282,6 +282,33 @@ class DispensaryPosScreenTest extends TestCase
             ->assertSee('35'); // the €35,00 total on the ticket
     }
 
+    public function test_the_receipt_carries_a_labelled_way_back_for_staff_and_hides_it_when_embedded(): void
+    {
+        $this->priceAt(1000);
+        $batch = $this->batch(100000);
+        $this->openTill();
+        $operator = $this->operator();
+        $member = $this->eligibleMember();
+
+        $dispensation = (new CommitDispensation)->handle(
+            $member, $this->location,
+            [['genetic_id' => $this->genetic->id, 'batch_id' => $batch->id, 'grams_cg' => 350]],
+            ['operator_id' => $operator->id],
+        );
+
+        // Prompt 252 — opened on its own by a staff session: a labelled way back to the counter.
+        $this->get(route('counter.pos.receipt', $dispensation->id))
+            ->assertOk()
+            ->assertSee('data-way-back', false)
+            ->assertSee(route('counter.home'), false)
+            ->assertSee(__('Volver al mostrador'));
+
+        // Inside the counter's receipt sheet (embedded=1) the way back is Cerrar, so the bar is suppressed.
+        $this->get(route('counter.pos.receipt', $dispensation->id).'?embedded=1')
+            ->assertOk()
+            ->assertDontSee('data-way-back', false);
+    }
+
     public function test_the_receipt_is_denied_to_a_user_without_permission(): void
     {
         $this->priceAt(1000);

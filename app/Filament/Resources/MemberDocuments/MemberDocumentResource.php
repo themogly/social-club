@@ -15,7 +15,6 @@ use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\Auth;
-use Livewire\Component;
 
 /**
  * Documentos generados — the org-wide, read-only vault of every generated member document.
@@ -64,8 +63,9 @@ class MemberDocumentResource extends Resource
     }
 
     /**
-     * Ver — issue a short-lived signed URL (logging the access) and open it in a new tab.
-     * Reused by the resource table and the member document-vault relation manager.
+     * Ver — issue a short-lived signed URL (logging the access, on modal open exactly as the click used to) and
+     * show it in a MODAL, never a new tab (prompt 252). Reused by the resource table and the member
+     * document-vault relation manager. Images render inline; a PDF gets an iframe + a same-tab fallback.
      */
     public static function viewDocumentAction(): Action
     {
@@ -73,13 +73,24 @@ class MemberDocumentResource extends Resource
             ->label(__('Ver'))
             ->icon(Heroicon::OutlinedEye)
             ->visible(fn (): bool => Auth::user()?->can('member.documents.view') ?? false)
-            ->action(function (MemberDocument $record, Component $livewire): void {
+            ->modalHeading(__('Documento'))
+            ->modalContent(function (MemberDocument $record) {
                 /** @var User $actor */
                 $actor = Auth::user();
-                $url = (new IssueDocumentUrl)->handle($record, $actor);
 
-                $livewire->js('window.open('.json_encode($url, JSON_THROW_ON_ERROR).", '_blank')");
-            });
+                return view('filament.documents.viewer', [
+                    'url' => (new IssueDocumentUrl)->handle($record, $actor),
+                    'isPdf' => self::isPdf($record),
+                ]);
+            })
+            ->modalSubmitAction(false)
+            ->modalCancelActionLabel(__('Cerrar'));
+    }
+
+    /** A stored document is a PDF when its path says so; everything else (photo, ID image) renders as an image. */
+    private static function isPdf(MemberDocument $record): bool
+    {
+        return str_ends_with(strtolower((string) $record->path), '.pdf');
     }
 
     public static function typeLabel(MemberDocumentType $type): string

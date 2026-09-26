@@ -54,15 +54,18 @@ class ConsentsRelationManager extends RelationManager
             ])
             ->recordActions([
                 // A signed consent is only evidence if somebody can produce the signature (prompt 220). Short-
-                // lived, user-bound, access-logged signed URL — never a path, never a public file.
+                // lived, user-bound, access-logged signed URL — never a path, never a public file. Prompt 252 —
+                // shown in a MODAL (the signature is an image), never a new tab.
                 Action::make('signature')
                     ->label(__('Ver firma'))
                     ->icon('heroicon-m-pencil-square')
                     ->visible(fn (ConsentRecord $record): bool => $record->isSigned())
-                    ->url(fn (ConsentRecord $record): ?string => ($user = Auth::user()) instanceof User
-                        ? VaultUrl::consentSignature($record, $user)
+                    ->modalHeading(__('Firma'))
+                    ->modalContent(fn (ConsentRecord $record) => ($user = Auth::user()) instanceof User
+                        ? view('filament.documents.viewer', ['url' => VaultUrl::consentSignature($record, $user), 'isPdf' => false])
                         : null)
-                    ->openUrlInNewTab(),
+                    ->modalSubmitAction(false)
+                    ->modalCancelActionLabel(__('Cerrar')),
             ])
             ->emptyStateHeading(__('Sin consentimientos registrados'))
             ->emptyStateDescription(__('Los consentimientos RGPD del socio se capturan al aprobar su alta y aparecerán aquí.'));

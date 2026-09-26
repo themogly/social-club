@@ -12959,3 +12959,69 @@ a later full-page GET or `Livewire::test` (production keeps one cookie-backed se
 StartSession). So the feature tests CAPTURE the handover session after the real POST and re-seed it on the
 requests that follow — the exact state production carries — and the `.mjs` harness is the real end-to-end proof.
 This is the same in-process-session subtlety recorded for 241.
+
+## Prompt 252 — the app never leaves the screen: no new tabs, no dead ends, overlays not pop-ups
+
+The owner: *"The website is meant to act like an app. Anything that opens in a new tab, or where there's no way
+to get back to the counter, breaks the experience. Use modals instead of pop-ups."* On an Android tablet a new
+tab is a HIDDEN tab — Chrome switches to it, the counter is gone, and the only way back is a browser control the
+operator was never taught (and a kiosk profile may remove). A page with no link back is the same trap by another
+route (249's thank-you was the worst case). This generalises the 249 rule to the whole shell.
+
+### Receipts are a sheet inside the counter, not a new tab
+
+`x-counter.receipt-sheet` is one component, two consumers (the dispensary and bar POS). *Ver / imprimir
+recibo* opens a modal (`role="dialog"`, Escape and a labelled *Cerrar* close it, the Android back gesture closes
+it — `history.pushState` on open, `popstate` closes) showing the EXISTING receipt view in an `<iframe>` pointed
+at the unchanged receipt route; *Imprimir* calls the IFRAME's `print()`, so the ticket prints exactly as it did
+in a tab. The route, its `Gate::authorize` and the emailed link are untouched — only WHERE it is shown changes.
+`ReceiptSheetTest` pins one-component-two-consumers, closed-by-default, and the iframe base = the receipt route.
+
+**No focus trap, deliberately** — following the alta-modal precedent (the a11y audit rejected trapping focus on
+counter overlays: an `inert` left on is a counter that looks fine and responds to nothing). The prompt asked for
+"focus trapped"; the recorded a11y decision wins. Escape, *Cerrar* and the backdrop all close, and initial focus
+lands on *Cerrar*.
+
+### The receipt page has a way back when opened on its own
+
+`receipt.blade.php` / `bar-receipt.blade.php` show a *Volver al mostrador* bar (`data-way-back` →
+`counter.home`) when the viewer is a staff session (`auth()->guard('web')->check()`), hidden when printing
+(`@media print`) and suppressed inside the sheet (`?embedded=1`, whose way back is *Cerrar*). A non-staff viewer
+is unchanged.
+
+### Admin documents and signatures open in a modal
+
+The three openers (the member-documents resource, the member form's per-type *Ver documento*, the consents
+relation manager's *Ver firma*) `window.open`ed / `openUrlInNewTab`ed a signed URL. They now render it in a
+Filament modal through one shared viewer (`resources/views/filament/documents/viewer.blade.php`): an `<img>` for
+images, an `<iframe>` for PDFs with a SAME-TAB *Abrir en el visor* fallback for a device with no inline PDF
+viewer. The signed URL and its lifetime are unchanged; access is logged on modal open exactly as on the click.
+
+### The rule, written down and enforced
+
+`CLAUDE.md` (Design rules) and `DESIGN-counter-first.md` gain the paragraph: the product is an app in a browser;
+no `target="_blank"` / `window.open` / `openUrlInNewTab`; overlays are modals/sheets; every screen has a labelled
+way back; the Android back gesture closes an overlay before leaving a page. `NothingLeavesTheTabTest` greps
+`resources/views`, `resources/js` and `app/Filament` for the three patterns with NO allowlist (a planted
+violation proves it fails). `EveryScreenHasAWayBackTest` enumerates counter GET routes from the route table and
+asserts each carries the top bar or the surface, and that the member shell carries its `data-socio-nav`; the
+receipt `data-way-back` is pinned in `DispensaryPosScreenTest`.
+
+### The seventh opener the no-allowlist grep required
+
+The inventory listed six openers; the grep (no allowlist) also caught `BreachLogForm`'s external AEPD link
+(`sedeagpd.gob.es`), added after `c4c1f37`. It is an external regulator reference in help text, not an app tab —
+made SAME-TAB (dropped `target="_blank"`) rather than allowlisted, consistent with the one-tab rule. Reporting a
+breach to the DPA is a deliberate departure, not a mid-form action.
+
+### Ordering note
+
+Like 249, this prompt was authored against `c4c1f37` and says "run after 249"; by the time it ran, 244–249 had
+all landed. The six inventory line numbers were stale but every target was still present and was fixed on the
+current tree.
+
+### Verification
+
+`composer check` green. MySQL left to CI. New copy in both locales (*Volver al mostrador*, *Recibo*, *Ticket*,
+*Abrir en el visor*). No new JS dependency — Alpine and the existing modal construction. The receipt content, its
+route, its authorisation and the emailed link are untouched; signed document URLs keep their lifetime.

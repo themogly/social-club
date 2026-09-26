@@ -925,7 +925,8 @@
                              prompt 202. The one that announces the commit is beside the commit. --}}
                         <p class="text-sm font-semibold text-ink-muted dark:text-slate-400">{{ __('Última dispensación') }}</p>
                         <div class="mt-3 flex flex-col gap-2">
-                            <a href="{{ route('counter.pos.receipt', $lastDispensationId) }}" target="_blank" rel="noopener" class="inline-flex h-11 items-center justify-center rounded-xl border border-line bg-surface px-4 text-sm font-semibold text-ink transition hover:bg-surface-alt dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100">{{ __('Ver / imprimir recibo') }}</a>
+                            {{-- Prompt 252 — a SHEET over the POS, not a new tab. Same receipt route, shown in place. --}}
+                            <x-counter.receipt-sheet :url="route('counter.pos.receipt', $lastDispensationId)" :label="__('Ver / imprimir recibo')" />
 
                             <button type="button" wire:click="emailReceipt" wire:loading.attr="disabled" wire:target="emailReceipt" class="inline-flex h-11 items-center justify-center rounded-xl border border-line bg-surface px-4 text-sm font-semibold text-ink transition hover:bg-surface-alt disabled:opacity-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100">{{ __('Enviar comprobante por email') }}</button>
 
