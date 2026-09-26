@@ -171,7 +171,7 @@ class PosQuickEntryTest extends TestCase
         $this->history($member, $sellable, '2026-01-10 10:00:00');
         $this->history($member, $unpriced, '2026-01-11 10:00:00'); // more recent, but not sellable
 
-        $usual = collect(Livewire::test(DispensaryPos::class)->call('selectMember', $member->id)->instance()->theirUsual());
+        $usual = collect($this->usualOf(Livewire::test(DispensaryPos::class)->call('selectMember', $member->id)->instance()));
 
         $this->assertSame(['Sellable'], $usual->pluck('name')->all()); // the unpriced one is filtered out
     }
@@ -182,7 +182,7 @@ class PosQuickEntryTest extends TestCase
         $this->genetic('Anything', 1000);
         $member = $this->member();
 
-        $this->assertSame([], Livewire::test(DispensaryPos::class)->call('selectMember', $member->id)->instance()->theirUsual());
+        $this->assertSame([], $this->usualOf(Livewire::test(DispensaryPos::class)->call('selectMember', $member->id)->instance()));
     }
 
     public function test_their_usual_does_not_add_a_query_per_suggestion(): void
@@ -211,5 +211,16 @@ class PosQuickEntryTest extends TestCase
         DB::disableQueryLog();
 
         $this->assertLessThanOrEqual($withOne + 2, $withThree);
+    }
+
+    /**
+     * `theirUsual()` is no longer a wire action (prompt 260) — protected, read by the view. The test reads it the
+     * way the view does, from inside the component.
+     *
+     * @return list<array<string, mixed>>
+     */
+    private function usualOf(DispensaryPos $pos): array
+    {
+        return (fn (): array => $this->theirUsual())->call($pos);
     }
 }

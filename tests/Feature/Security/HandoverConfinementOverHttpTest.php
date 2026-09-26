@@ -162,9 +162,11 @@ class HandoverConfinementOverHttpTest extends TestCase
         $this->actingAs($this->device);
         $this->post(route('counter.location'), ['location_id' => $this->location->id]);
         $this->identifyThroughHttp('/counter/members', 'counter.membership-counter');
+        // Since prompt 260 `lookupResults` is not a wire action and returns no DNI at all — the control is the
+        // rendered result row (the surname), which is what the lookup shows a working operator.
         $control = $this->livewirePost($this->snapshotFrom('/counter/members', 'counter.membership-counter'),
-            ['lookup' => 'Zubi'], [['lookupResults']]);
-        $this->assertStringContainsString('99887766Q', (string) $control->getContent(), 'control: unconfined, the lookup returns the planted member');
+            ['lookup' => 'Zubi']);
+        $this->assertStringContainsString('Zubizarreta', (string) $control->getContent(), 'control: unconfined, the lookup renders the planted member');
         CounterOperator::clear();
 
         $this->handOverThroughHttp();
@@ -291,7 +293,7 @@ class HandoverConfinementOverHttpTest extends TestCase
         $this->identifyThroughHttp('/counter/checkin', 'counter.check-in-screen')->assertOk();
 
         $this->livewirePost($this->snapshotFrom('/counter/checkin', 'counter.check-in-screen'),
-            ['lookup' => 'Zu'], [['lookupResults'], ['openOperatorPanel']])->assertOk();
+            ['lookup' => 'Zu'], [['openOperatorPanel']])->assertOk();
         $this->assertSame(0, $this->refusedCallsLogged());
     }
 }

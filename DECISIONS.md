@@ -13610,3 +13610,54 @@ the toggle is on the admin location form and persists per sede only.
 ### Merge
 
 Merged to `main` on Ben's instruction. `composer check` green in `es` and `en`; no new copy.
+
+## Prompt 260 — with nobody at the PIN, the counter reads nothing either (audit F4)
+
+### Before (real HTTP requests to the real endpoint, on the untouched tree)
+
+`lookupResults`, `altaApplication`, `pendingAltaApplications`, `worklist` all answered **200** as wire actions,
+with or without an operator (`"lookupResults answered as a wire action — Failed asserting that 200 is not
+identical to 200"`); `lookupResults` returned whole `Member` rows — 254's own positive control had already shown
+the planted DNI in that response. `Member::toArray()` carried `document_hash`.
+
+### The methods — gated, and no longer wire actions
+
+Made **`protected`**: `FindsMembers::lookupResults`, `SignsUpMembers::altaApplication` /
+`pendingAltaApplications`, `MembershipCounter::worklist`, `DispensaryPos::theirUsual`,
+`OpensMemberships::membershipsElsewhere`. Verified empirically, both halves: a Livewire 4 view still calls a
+protected method on `$this` (the lookup suite is unchanged and green), and Livewire invokes only PUBLIC methods
+from the wire (`MethodNotFoundException` — the new tests prove the call is refused). A method that exists to
+feed the view is no longer something the browser can call and receive a serialised model from. `#[Computed]`
+was not needed.
+
+**Gated on an identified operator** (255's rule, now for reads): `lookupResults` → null, `altaApplication` →
+null, `worklist` → null, `theirUsual` → []; `pendingAltaApplications` was already empty with no operator via the
+operator-based `userCan`. So nothing renders under the PIN surface either (tested: typing into the lookup with
+nobody identified renders no result rows). The `?alta=` entry after a submitted handover still works — 249's
+flow sets the operator before redirecting.
+
+**Shaping.** With the methods off the wire, the only thing that reaches the browser is what the view renders —
+the result row (name, member number, status). The tests assert that, with an operator, the rendered lookup shows
+the surname and member number and carries no DNI, date of birth, `is_therapeutic`, `document_hash` or their
+field names. I did not rewrite the methods to return arrays: they no longer serialise anywhere, and the views use
+the models' own accessors.
+
+### `$hidden` on Member
+
+`document_hash` only — the unsalted blind index of the DNI, with no client use (every reader queries the column
+or the attribute; none goes through `toArray()`). Deliberately NOT `document_number`, `date_of_birth` or
+`is_therapeutic`: Filament fills its edit forms from `attributesToArray()`, which `$hidden` would blank.
+
+### Tests
+
+`tests/Feature/Security/CounterReadsNeedAnOperatorTest` (4), HTTP-kernel requests via 254's concern, with
+`app.debug` off — the production error page a real tablet gets (with debug on, a refused call's stack trace
+quotes the test's own source, planted values included, back into the response). Adjusted: 254's positive controls
+called `lookupResults` over the wire — one now asserts the rendered row instead, and would otherwise have passed
+FALSELY (the debug page quoted the planted DNI from the test source); `PosQuickEntryTest` and
+`CounterAltaWizardTest` read the now-protected methods from inside the component, as the view does. 254's
+handover confinement suite is green.
+
+### Merge
+
+Merged to `main` on Ben's instruction. `composer check` green in `es` and `en`; no new copy.

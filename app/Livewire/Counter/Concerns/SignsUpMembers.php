@@ -648,9 +648,12 @@ trait SignsUpMembers
     /**
      * Applications submitted at this sede and waiting to be finished.
      *
+     * Prompt 260 — not a wire action (the view calls it; Livewire invokes only PUBLIC methods from the browser),
+     * and nothing with no operator identified (no operator ⇒ `userCan` is false ⇒ empty).
+     *
      * @return Collection<int, MemberApplication>
      */
-    public function pendingAltaApplications(): Collection
+    protected function pendingAltaApplications(): Collection
     {
         if ($this->locationId === null || ! $this->userCan('applications.review')) {
             return collect();
@@ -756,8 +759,13 @@ trait SignsUpMembers
             ->orderBy('name')->get();
     }
 
-    public function altaApplication(): ?MemberApplication
+    protected function altaApplication(): ?MemberApplication
     {
+        // Prompt 260 — not a wire action (the view calls it; Livewire invokes only PUBLIC methods from the browser), and nothing with no operator identified: reads follow 255's rule for writes.
+        if (! $this->hasOperator()) {
+            return null;
+        }
+
         // Prompt 249 — SCOPE to the counter's own organisation. `altaApplicationId` is a public, client-settable
         // property, and the URL entry (`?alta=`) sets it too, so an unscoped `find()` would render ANOTHER
         // organisation's applicant on this counter — a cross-org IDOR. This is the one query behind the URL

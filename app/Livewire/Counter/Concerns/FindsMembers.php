@@ -151,8 +151,14 @@ trait FindsMembers
      *
      * @return Collection<int, Member>|null
      */
-    public function lookupResults(): ?Collection
+    protected function lookupResults(): ?Collection
     {
+        // Prompt 260 — not a wire action (the view calls it; Livewire invokes only PUBLIC methods from the browser), and nothing with no operator identified: reads follow 255's rule for writes. It returned whole
+        // `Member` rows (DNI, date of birth, `is_therapeutic`, `document_hash`) to a tablet with nobody at the PIN.
+        if (! $this->hasOperator()) {
+            return null;
+        }
+
         $term = trim($this->lookup);
 
         if (mb_strlen($term) < 2) {

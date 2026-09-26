@@ -61,6 +61,15 @@ class Member extends Model implements Authenticatable, HasLocalePreference
         };
     }
 
+    /**
+     * Never serialised to a client by accident (prompt 260). `document_hash` is the deterministic blind index of
+     * the DNI — no screen, export or receipt reads it from `toArray()`. Deliberately NOT `document_number` et al.:
+     * Filament fills its forms from `attributesToArray()`, which `$hidden` would blank.
+     *
+     * @var list<string>
+     */
+    protected $hidden = ['document_hash'];
+
     protected $fillable = [
         'organisation_id', 'member_no', 'first_name', 'last_name', 'email', 'phone', 'locale',
         'date_of_birth', 'address', 'photo_path', 'document_type', 'document_number', 'document_hash',
