@@ -155,6 +155,16 @@ class BarPos extends Component
         // The bar can be turned off per sede (prompt 59) — refuse the POS with a friendly state.
         $this->barDisabled = $this->locationId !== null && ! (bool) Settings::get('bar_enabled', true);
 
+        // Prompt 248 — a FRESH device (no stored choice) adopts the sede's default layout; once the operator
+        // picks one it is remembered per device (the #[Session] above — the terminal's browser session, which
+        // survives a reload and a shift change; the operator is separate, identified by PIN). We keep it in the
+        // session rather than localStorage deliberately: the codebase moved counter state server-side (see
+        // CounterBasket, "localStorage was a lie"), and a #[Session] property is already device-level.
+        if (session()->missing('counter.bar.article_layout')) {
+            $default = (string) Settings::get('bar_layout_default', 'grid', $this->locationId);
+            $this->articleLayout = in_array($default, ['list', 'grid', 'large'], true) ? $default : 'grid';
+        }
+
         // Adopt the single open till at this sede so cash lands on the shared drawer.
         if ($this->terminal === '' && $this->locationId !== null) {
             $terminals = TillSession::query()->withoutGlobalScopes()
@@ -196,10 +206,16 @@ class BarPos extends Component
 
     // --- Article grid → basket --------------------------------------------------
 
-    /** Grid or list for the articles pane. Anything else is ignored rather than stored (prompt 176). */
+    /**
+     * List, grid or large for the articles pane. Anything else is ignored rather than stored (prompt 176).
+     *
+     * Prompt 248 — `large` is the third SIZE (category-first big tiles), a toggle beside ≡ and ▦, never a
+     * replacement. It is the standalone Bar's alone: the POS's Barra source (a separate component beside the
+     * cart column) keeps list/grid, where a category-first pane has no room.
+     */
     public function setArticleLayout(string $layout): void
     {
-        if (in_array($layout, ['list', 'grid'], true)) {
+        if (in_array($layout, ['list', 'grid', 'large'], true)) {
             $this->articleLayout = $layout;
         }
     }

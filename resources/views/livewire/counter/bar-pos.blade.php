@@ -103,7 +103,7 @@
                         {{-- List / grid. GRID is the default for articles — a name and a price fit a tile,
                              which is the case Loyverse describes; the dispensary defaults the other way. --}}
                         <div role="group" aria-label="{{ __('Vista') }}" class="flex w-fit shrink-0 gap-1 self-start rounded-xl border border-line p-1 dark:border-slate-700">
-                            @foreach ([['list', __('Lista'), '☰'], ['grid', __('Cuadrícula'), '▦']] as [$mode, $label, $glyph])
+                            @foreach ([['list', __('Lista'), '☰'], ['grid', __('Cuadrícula'), '▦'], ['large', __('Grande'), '⬜']] as [$mode, $label, $glyph])
                                 <button
                                     type="button"
                                     wire:click="setArticleLayout('{{ $mode }}')"
@@ -133,7 +133,21 @@
                         </div>
                     </div>
 
-                    @if (! empty($categories))
+                    {{-- Prompt 248 — LARGE mode is category-FIRST: one big tile per category plus Todo (no icons
+                         invented — the model has none), then the chosen category's articles as large tiles. The
+                         filter semantics are the chips' exactly (filterCategory), only rendered as tiles. --}}
+                    @if ($articleLayout === 'large' && ! empty($categories))
+                        <div data-category-tiles class="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3">
+                            <button type="button" wire:click="filterCategory(null)" data-category-tile @class(['flex min-h-[112px] items-center justify-center rounded-xl border p-4 text-center text-lg font-semibold transition', 'border-brand bg-brand text-white' => $categoryId === null, 'border-line bg-surface text-ink hover:border-brand hover:bg-brand-tint/40 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100' => $categoryId !== null])>{{ __('Todo') }}</button>
+                            @foreach ($categories as $category)
+                                <button type="button" wire:click="filterCategory('{{ $category['id'] }}')" data-category-tile @class(['flex min-h-[112px] items-center justify-center rounded-xl border p-4 text-center text-lg font-semibold transition', 'border-brand bg-brand text-white' => $categoryId === $category['id'], 'border-line bg-surface text-ink hover:border-brand hover:bg-brand-tint/40 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100' => $categoryId !== $category['id']])>{{ $category['name'] }}</button>
+                            @endforeach
+                        </div>
+                    @endif
+
+                    {{-- Compact chips — list/grid only. In large mode the big tiles above are the category
+                         control; the markup here is BYTE-IDENTICAL to before (prompt 248: a toggle, not a change). --}}
+                    @if (! empty($categories) && $articleLayout !== 'large')
                         <div class="mt-3 flex flex-wrap gap-2">
                             <button type="button" wire:click="filterCategory(null)" @class(['inline-flex items-center rounded-full border min-h-11 px-4 text-sm', 'border-brand bg-brand text-white' => $categoryId === null, 'border-line text-ink-muted dark:border-slate-700 dark:text-slate-400' => $categoryId !== null])>{{ __('Todas') }}</button>
                             @foreach ($categories as $category)
@@ -148,6 +162,21 @@
                         $showThumbs = collect($articles)->contains(fn (array $a): bool => filled($a['image_url']));
                     @endphp
 
+                    @if ($articleLayout === 'large')
+                        {{-- Large tiles — the same article-card, one size up (prompt 248). --}}
+                        <div class="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3">
+                            @forelse ($articles as $a)
+                                <x-counter.article-card
+                                    :article="$a"
+                                    layout="large"
+                                    action="addArticle"
+                                    :thumbs="$showThumbs"
+                                />
+                            @empty
+                                <p class="col-span-full rounded-xl border border-dashed border-line px-4 py-8 text-center text-sm text-ink-muted dark:border-slate-700 dark:text-slate-400">{{ __('No hay artículos activos en esta sede.') }}</p>
+                            @endforelse
+                        </div>
+                    @else
                     <div @class([
                         'mt-4',
                         'flex flex-col gap-1.5' => $articleLayout === 'list',
@@ -171,6 +200,7 @@
                             <p class="col-span-full rounded-xl border border-dashed border-line px-4 py-8 text-center text-sm text-ink-muted dark:border-slate-700 dark:text-slate-400">{{ __('No hay artículos activos en esta sede.') }}</p>
                         @endforelse
                     </div>
+                    @endif
                 </section>
 
                 {{-- Manual-line entry as an on-demand modal (prompt 126) — opened from the header button, so it is
