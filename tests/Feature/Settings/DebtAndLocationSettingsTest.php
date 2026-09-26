@@ -183,6 +183,9 @@ class DebtAndLocationSettingsTest extends TestCase
             // Per-location: the standalone Bar's default article layout for a fresh terminal (prompt 248),
             // a Select on LocationForm, not an org threshold.
             'bar_layout_default',
+            // Per-location: how the dispensary picks the lote — automatic (FEFO) vs manual (prompt 250),
+            // a Select on LocationForm, not an org threshold.
+            'dispensary_batch_selection',
             // Per-location: whether this sede has card readers (prompt 194). It changes the member
             // lookup's wording only, so it belongs on LocationForm, not the org thresholds page.
             'card_readers_enabled',

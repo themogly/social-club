@@ -4,6 +4,7 @@
      reliably. Reached only via an authorization-checked, ULID route. --}}
 @php
     use App\Support\Money;
+    use App\Support\Weight;
     $isVoided = $dispensation->status === \App\Enums\DispensationStatus::VOIDED;
     // Prompt 252 — a way back when the ticket is opened on its OWN (a bookmark, the admin), for a staff session
     // only. Suppressed inside the counter's receipt sheet (embedded=1), whose way back is Cerrar, and never for
@@ -92,25 +93,36 @@
                 </tr>
             </thead>
             <tbody>
-                @foreach ($dispensation->lines as $line)
-                    @php $isUnit = $line->units_dispensed !== null; @endphp
+                {{-- Prompt 250 — the socio sees PRODUCTS, not lotes. An automatic split stores one row per
+                     batch drawn; here they are grouped by genetic into ONE line, grams and totals summed, so a
+                     member never sees two lines for one bag. The register keeps the rows apart — that is the
+                     point of storing them so. --}}
+                @foreach ($dispensation->lines->groupBy('genetic_name_snapshot') as $name => $parts)
+                    @php
+                        $first = $parts->first();
+                        $isUnit = $first->units_dispensed !== null;
+                        $gramsCg = (int) $parts->sum(fn ($l) => (int) $l->getRawOriginal('grams_cg'));
+                        $units = $isUnit ? (int) $parts->sum(fn ($l) => (int) $l->units_dispensed) : null;
+                        $lineTotalCents = (int) $parts->sum(fn ($l) => (int) $l->getRawOriginal('line_total_cents'));
+                        $note = $parts->pluck('pricing_note')->filter()->first();
+                    @endphp
                     <tr>
-                        <td>{{ $line->genetic_name_snapshot }}@if ($line->pricing_note) <span class="note">· {{ $line->pricing_note }}</span>@endif</td>
+                        <td>{{ $name }}@if ($note) <span class="note">· {{ $note }}</span>@endif</td>
                         <td class="num">
                             @if ($isUnit)
-                                {{ $line->units_dispensed }} {{ __('uds') }} ({{ $line->grams_cg->formatted() }})
+                                {{ $units }} {{ __('uds') }} ({{ Weight::fromCentigrams($gramsCg)->formatted() }})
                             @else
-                                {{ $line->grams_cg->formatted() }}
+                                {{ Weight::fromCentigrams($gramsCg)->formatted() }}
                             @endif
                         </td>
                         <td class="num">
                             @if ($isUnit)
-                                {{ Money::fromCents((int) $line->price_per_unit_cents)->formatted() }}/{{ __('ud') }}
+                                {{ Money::fromCents((int) $first->price_per_unit_cents)->formatted() }}/{{ __('ud') }}
                             @else
-                                {{ Money::fromCents((int) $line->price_per_gram_cents)->formatted() }}/g
+                                {{ Money::fromCents((int) $first->price_per_gram_cents)->formatted() }}/g
                             @endif
                         </td>
-                        <td class="num">{{ $line->line_total_cents->formatted() }}</td>
+                        <td class="num">{{ Money::fromCents($lineTotalCents)->formatted() }}</td>
                     </tr>
                 @endforeach
             </tbody>

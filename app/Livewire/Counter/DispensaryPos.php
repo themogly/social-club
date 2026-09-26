@@ -80,7 +80,7 @@ use RuntimeException;
  * while offline cannot be trusted, so the commit is blocked (client + server) and the
  * basket is preserved until the connection returns.
  *
- * @phpstan-type Line array{genetic_id: string, batch_id: string, grams_cg: int, units: ?int}
+ * @phpstan-type Line array{genetic_id: string, batch_id: ?string, grams_cg: int, units: ?int}
  * @phpstan-type Rule array{rule: string, satisfied: bool, mode: string, message: string}
  */
 #[Layout('components.layouts.counter', ['fullHeight' => true])] // prompt 176: the page must not scroll; the selection pane does
@@ -368,12 +368,41 @@ class DispensaryPos extends Component
         $this->calculatorMode = false;
         $this->unitQty = 1;
 
-        // Default the batch to FEFO (oldest open, non-expired, in stock); overridable below.
+        // Manual mode: default the batch to FEFO (oldest open, non-expired, in stock), overridable below.
+        // Automatic mode (prompt 250): no lote is chosen here — allocation happens at commit — so leave it null.
         $location = $this->resolveLocation();
         $genetic = Genetic::query()->find($geneticId);
-        $this->activeBatchId = ($location !== null && $genetic !== null)
+        $this->activeBatchId = ($location !== null && $genetic !== null && ! $this->automaticBatches())
             ? (new SelectBatch)->fefo($genetic, $location)?->id
             : null;
+    }
+
+    /**
+     * Prompt 250 — automatic (the system draws from the sede's batches oldest-first, splitting when the old
+     * one runs out) vs manual (the operator picks the lote). Per-sede setting, default automatic.
+     */
+    public function automaticBatches(): bool
+    {
+        return Settings::get('dispensary_batch_selection', 'automatic', $this->resolveLocation()?->id) !== 'manual';
+    }
+
+    /** The sede's dispensable total of the active genetic, formatted — shown on the pane in automatic mode. */
+    public function activeGeneticStockLabel(): ?string
+    {
+        $location = $this->resolveLocation();
+        $genetic = $this->activeGeneticId !== null ? Genetic::query()->find($this->activeGeneticId) : null;
+
+        if ($location === null || $genetic === null) {
+            return null;
+        }
+
+        if ($genetic->isUnitType()) {
+            $units = $this->remainingUnits($genetic, $location);
+
+            return trans_choice(':count unidad|:count unidades', $units, ['count' => $units]);
+        }
+
+        return $this->grams($this->remainingCg($genetic, $location));
     }
 
     public function cancelWeightEntry(): void
@@ -517,15 +546,34 @@ class DispensaryPos extends Component
             return;
         }
 
-        // Batch: the chosen one (default FEFO), refused unless dispensable (open, in stock, not expired).
-        $batch = $this->activeBatchId !== null
-            ? Batch::query()->withoutGlobalScopes()->find($this->activeBatchId)
-            : null;
+        // Prompt 250 — automatic mode chooses no lote here: the line carries a null batch_id and the sede's
+        // batches are drawn oldest-first at commit. It still refuses BEFORE the basket when there is nothing to
+        // draw from — the sede's dispensable total (units for UNIT, grams for WEIGHT). Manual mode is unchanged:
+        // the chosen lote, refused unless dispensable (open, in stock, not expired).
+        if ($this->automaticBatches()) {
+            $hasStock = $genetic->isUnitType()
+                ? $this->remainingUnits($genetic, $location) > 0
+                : $this->remainingCg($genetic, $location) > 0;
 
-        if ($batch === null || ! (new SelectBatch)->isDispensable($batch)) {
-            $this->flash(__('No hay lote disponible para dispensar (agotado o caducado).'), 'error');
+            if (! $hasStock) {
+                $this->flash(__('No hay stock disponible para dispensar (agotado o caducado).'), 'error');
 
-            return;
+                return;
+            }
+
+            $batchId = null;
+        } else {
+            $batch = $this->activeBatchId !== null
+                ? Batch::query()->withoutGlobalScopes()->find($this->activeBatchId)
+                : null;
+
+            if ($batch === null || ! (new SelectBatch)->isDispensable($batch)) {
+                $this->flash(__('No hay lote disponible para dispensar (agotado o caducado).'), 'error');
+
+                return;
+            }
+
+            $batchId = $batch->id;
         }
 
         // UNIT genetic → the stepper drives whole units; grams_cg is computed. WEIGHT → grams pad.
@@ -533,7 +581,7 @@ class DispensaryPos extends Component
             $units = max(1, $this->unitQty);
             $line = [
                 'genetic_id' => $genetic->id,
-                'batch_id' => $batch->id,
+                'batch_id' => $batchId,
                 'grams_cg' => $units * (int) $genetic->grams_per_unit_cg,
                 'units' => $units,
             ];
@@ -548,7 +596,7 @@ class DispensaryPos extends Component
 
             $line = [
                 'genetic_id' => $genetic->id,
-                'batch_id' => $batch->id,
+                'batch_id' => $batchId,
                 'grams_cg' => $gramsCg,
                 'units' => null,
             ];
@@ -800,7 +848,8 @@ class DispensaryPos extends Component
         // recomputes the stored grams_cg for UNIT lines from the genetic (authoritative).
         $lines = array_map(fn (array $line): array => [
             'genetic_id' => (string) $line['genetic_id'],
-            'batch_id' => (string) $line['batch_id'],
+            // Null in automatic mode (prompt 250) — CommitDispensation allocates the lote(s) at commit.
+            'batch_id' => $line['batch_id'] !== null ? (string) $line['batch_id'] : null,
             'grams_cg' => (int) $line['grams_cg'],
             'units' => $line['units'] !== null ? (int) $line['units'] : null,
         ], $this->basket);
@@ -976,7 +1025,8 @@ class DispensaryPos extends Component
 
         $dispLines = array_map(fn (array $l): array => [
             'genetic_id' => (string) $l['genetic_id'],
-            'batch_id' => (string) $l['batch_id'],
+            // Null in automatic mode (prompt 250) — CommitDispensation allocates the lote(s) at commit.
+            'batch_id' => $l['batch_id'] !== null ? (string) $l['batch_id'] : null,
             'grams_cg' => (int) $l['grams_cg'],
             'units' => $l['units'] !== null ? (int) $l['units'] : null,
         ], $this->basket);
