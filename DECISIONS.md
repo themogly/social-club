@@ -12870,3 +12870,92 @@ wizard; no photo means no image (193 — never a fabricated placeholder).
 `composer check` green. MySQL left to CI. New copy in both locales (17 new keys, English house style:
 variedad/genética → "strain", Sede → "Location"). `IntakeBatch`, `SelectBatch`, `SaveGeneticPrice`, `sellableAt`
 and 238's batch form are CONSUMED, not edited.
+
+## Prompt 249 — the handed-over tablet has a way back (URGENT)
+
+The tester, on the tablet: after an applicant finished the sign-up form, the app was locked to the thank-you
+screen — every URL (`/`, `/counter`, `/login`, `/socio`) loaded the applicant's form back, filled with their
+name, DNI and e-mail. The surface with the PIN pad existed (173/187) but **nothing on the screen where the
+tablet is handed back led to it**; the only exits were a URL nobody knows or the back gesture pressed twice.
+241 had just made the handover gate real (closing the Article-9 leak that used to "unlock" the tablet), so the
+missing exit became visible.
+
+### Ordering note (this prompt ran out of its planned order)
+
+The prompt was authored against `origin/main = c4c1f37` and says "run before 244/245/246". By the time it was
+run, **244, 245, 246 and 247 had already landed and merged.** So 249 was applied to the CURRENT tree and carries
+their state FORWARD rather than the prompt's assumed order: 245's `x-if → x-show` conversion is already in
+`counter-surface.blade.php`, so the new `staffPad`/`submitted` conditions were written directly onto the
+`x-show` markup (not left for 245 to port); 246's shared-device work is untouched; the `handover stays PENDING`
+rule (nothing here auto-approves a handover) holds. Everything below is the same END STATE the prompt describes.
+
+### A — the boundary sends the operator somewhere they can act
+
+- `EnforceCounterHandover::ALLOWED_PATHS` gains `counter` (189's front door, added after the first five screens
+  and forgotten — it renders only the surface, so it is safe). The stale "runs before the router" comment is
+  rewritten: since 241 this middleware runs on the web group AND the panel's own stack, after StartSession; the
+  list stays paths because ONE list serves both stacks. A new `allows()` helper is the single matcher the guard
+  and its structural test share. `CounterLayoutRoutesAreAllowedTest` enumerates every route whose Livewire
+  component carries `#[Layout('components.layouts.counter')]` from the route table and asserts each is
+  allowlisted — a planted route proves it fails — so a seventh screen cannot be forgotten the way the sixth was.
+- `CounterHandover` gains `markSubmitted($applicationId)` / `submitted()` / `submittedApplicationId()`, and
+  `returnUrl()` returns **null once submitted**. So after the applicant submits, the boundary's fallback lands
+  strays on `counter.checkin` (the pad), never the finished form, and the surface's "Continuar con mi solicitud"
+  disappears by itself. `markSubmitted` is called from `ApplicationController::store()` ONLY when a handover is
+  active and its return URL is this token's form — never on the spam-dropped path, never for an emailed invite.
+- A submitted form is finished: `MemberApplication::acceptsSubmission()` (live AND not submitted) is the one
+  predicate; `store()`/`read()` refuse once submitted (redirect to `show`, change nothing) and `show()` renders
+  the **received state** — the same card, no form, no payload — so a reload or the next applicant's back gesture
+  never re-shows the previous person's data. `MemberApplicationResource::isOutstandingInvite()` reads the same
+  predicate it used to spell by hand.
+
+### B — the way back is on the screen where the tablet is handed back
+
+- The thank-you / received card, **during a handover**, is the counter's copy — *"Gracias. Devuelve la tablet al
+  personal para terminar el alta."* — and one large **"Devolver la tablet al personal"** button
+  (`data-handover-return` → `counter.checkin`). It leads only to the surface, which only offers a PIN pad the
+  applicant cannot pass, so it is safe to show them. Without a handover (an emailed invite on their own phone):
+  today's copy, no button, corrections through the club.
+- The surface, **when submitted**: the pad is open on arrival (`staffPad` seeded from `CounterHandover::submitted()`),
+  the heading reads *"Solicitud recibida"*, and "Volver a la pantalla del solicitante" is not rendered — there is
+  no applicant screen left to return to.
+
+### C — after the PIN, the operator lands on the application's review
+
+- `unlockOperator()`, when the handover it ends was submitted, redirects to `counter.members?alta=<id>` (243's
+  rule: the screen shows the outcome). 188 rejected a redirect after identifying to preserve basket and form
+  state; a handover has already disposed of both (173), so this one case is exempt — noted next to 188's reason.
+- `MembershipCounter` gains `#[Url(as: 'alta')] $altaReview`; `mount()` opens that review for a reviewer, and
+  only when the id resolves.
+- **Scoping (the IDOR fix, not optional).** `SignsUpMembers::altaApplication()` resolved a public,
+  client-settable id with `withoutGlobalScopes()->find()` and no organisation check — so `?alta=<other org's id>`
+  (and `reviewAltaApplication()`) rendered another organisation's applicant on this counter. It now scopes to the
+  counter location's organisation; a foreign id resolves to null and nothing opens.
+
+### The received-state consequence (recorded)
+
+After submission the emailed-invite link shows the received state instead of a re-editable form. This is a
+deliberate behaviour change: corrections go through the club, as the card already says. It closes the leak where
+a reload showed the previous applicant's personal data to whoever next held the device.
+
+### Open decision — the socio idle window (NOT in this prompt)
+
+A handed-over tablet abandoned on the `socio/*` page never locks itself: the socio layout has no idle timer, so
+`lockCounter()`'s timed-out path never fires while the tablet sits on the form. Two options for the owner to
+choose: (a) a server-side expiry on the handover's `started_at`, or (b) ship the counter's idle timer to the
+socio layout during a handover. Left open, deliberately, until the owner picks a window.
+
+### Verification
+
+`composer check` green. MySQL left to CI. New copy in both locales (*Solicitud recibida*, *Devolver la tablet al
+personal*, the counter thank-you). The 41 existing handover tests stay green; `HandoverReturnTest` drives the
+real entries (`handOverForAlta` + a real POST with an aged spam token) and the structural allowlist test guards
+the boundary. A `.mjs` browser script (`shoot-handover-return.mjs`) captures the three stops at 1280×800 and
+800×1280, light and dark, plus the typed-`/` redirect. `SubmitApplication`, `ApproveApplication`,
+`UnlockOperator`, the PIN throttle and `RequireOpenTill` are untouched — only where the person lands changes.
+
+**Test-harness note.** The test env uses `SESSION_DRIVER=array`; a real HTTP POST does not carry its session into
+a later full-page GET or `Livewire::test` (production keeps one cookie-backed session; the panel runs its own
+StartSession). So the feature tests CAPTURE the handover session after the real POST and re-seed it on the
+requests that follow — the exact state production carries — and the `.mjs` harness is the real end-to-end proof.
+This is the same in-process-session subtlety recorded for 241.

@@ -249,8 +249,12 @@ trait IdentifiesOperator
         }
 
         // The PIN is how EVERY mode ends — locked, unidentified and handed over alike. Ending a handover
-        // here is what makes "there is no way out except the PIN" true rather than aspirational.
+        // here is what makes "there is no way out except the PIN" true rather than aspirational. The submitted
+        // application id (if any) is read BEFORE end() disposes of the handover, so the operator can be carried
+        // to its review below.
+        $submittedAlta = null;
         if (CounterHandover::active()) {
+            $submittedAlta = CounterHandover::submittedApplicationId();
             (new RecordAuditLog)->handle('counter.handover.ended', $this->resolveLocation());
             CounterHandover::end();
         }
@@ -262,6 +266,15 @@ trait IdentifiesOperator
         // unlocks an idle-locked screen, so a successful unlock always clears the overlay.
         $this->dispatch('counter-unlocked');
         $this->flash(__('Trabajando: :name', ['name' => $operator->name]), 'success');
+
+        // Prompt 249 — when the handover that just ended had a SUBMITTED form, land the operator on its review
+        // (the counter's 243 rule: the screen shows the outcome, no "revísala" flash). Prompt 188 rejected a
+        // redirect after identifying to preserve basket and form state — but a handover has already disposed of
+        // both (173's "nothing survives"), so this ONE case is exempt. Any other unlock — locked, unidentified,
+        // or a handover abandoned before submit — stays exactly where it is.
+        if ($submittedAlta !== null) {
+            $this->redirect(route('counter.members', ['alta' => $submittedAlta]));
+        }
     }
 
     /**

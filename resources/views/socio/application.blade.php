@@ -10,9 +10,6 @@
      lines on the page and line length is a reading concern rather than a taste one. 768px keeps them near the
      65–75 characters prose wants; a full-width form would put a 2000px line of statutes on a wide monitor. --}}
 <x-layouts.socio :title="__('Solicitud de alta')" :nav="false" wide>
-    @php($input = \App\Support\SocioForm::FIELD)
-    @php($declaredG = data_get($payload, 'declared_monthly_cg') !== null ? (float) data_get($payload, 'declared_monthly_cg') / 100 : null)
-
     {{-- The layout's cap is the only cap now. --}}
     <div>
         <div class="mb-5 text-center">
@@ -21,12 +18,32 @@
             <p class="mt-1 text-sm text-ink-muted dark:text-slate-400">{{ __('Completa tus datos para solicitar ser socio/a. La asociación revisará tu solicitud.') }}</p>
         </div>
 
-        @if (session('status'))
+        @if (session('status') || ($submitted ?? false))
+            {{-- Prompt 249 — the received state. Shown on the submit redirect (session('status')) AND on any
+                 reload of a submitted form ($submitted, from the controller): the same card, no form and no
+                 payload, so the previous applicant's name, document and e-mail never re-appear to whoever
+                 holds the tablet next. --}}
             <div class="rounded-2xl border border-line bg-surface p-6 text-center shadow-sm dark:border-slate-800 dark:bg-slate-900">
                 <p class="text-3xl">✓</p>
-                <p class="mt-2 text-sm text-ink-muted dark:text-slate-300">{{ session('status') }}</p>
+                @if ($handoverActive ?? false)
+                    {{-- On the club's tablet: the counter's copy and the one control on this screen — a way
+                         back to the counter. It leads only to the surface, which offers a PIN pad the applicant
+                         cannot pass (173's construction), so it is safe to put in front of them. Nothing about
+                         e-mail or "unos días": the operator is about to approve at the counter. --}}
+                    <p class="mt-2 text-sm text-ink-muted dark:text-slate-300">{{ __('Gracias. Devuelve la tablet al personal para terminar el alta.') }}</p>
+                    <a href="{{ route('counter.checkin') }}" data-handover-return
+                       class="mt-5 inline-flex min-h-[2.75rem] w-full items-center justify-center rounded-lg bg-brand px-5 text-sm font-semibold text-white transition hover:bg-brand-dark">
+                        {{ __('Devolver la tablet al personal') }}
+                    </a>
+                @else
+                    {{-- An emailed invite on their own phone: today's thank-you, no button. Corrections go
+                         through the club, as the "qué ocurre después" copy already said. --}}
+                    <p class="mt-2 text-sm text-ink-muted dark:text-slate-300">{{ session('status') ?? __('¡Gracias! Hemos recibido tu solicitud. La asociación la revisará y, si se aprueba, recibirás por correo tu tarjeta de socio/a con un código QR para identificarte. La revisión puede tardar unos días.') }}</p>
+                @endif
             </div>
         @else
+            @php($input = \App\Support\SocioForm::FIELD)
+            @php($declaredG = data_get($payload, 'declared_monthly_cg') !== null ? (float) data_get($payload, 'declared_monthly_cg') / 100 : null)
             {{-- The summary stays (it is the fastest way to see everything at once) but it is now announced:
                  role="alert" fires it on return from a failed submit, and each message is ALSO on its own
                  field via <x-socio.field-error> (a11y audit). --}}

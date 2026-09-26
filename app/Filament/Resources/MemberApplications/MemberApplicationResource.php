@@ -216,7 +216,8 @@ class MemberApplicationResource extends Resource
      */
     private static function isOutstandingInvite(MemberApplication $record): bool
     {
-        return $record->isInviteLive() && $record->submitted_at === null;
+        // Same condition as "the form can still take a submission" — one predicate on the model (prompt 249).
+        return $record->acceptsSubmission();
     }
 
     /** Re-display the shareable link (recoverable after the toast is gone — prompt 45). */

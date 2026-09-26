@@ -759,11 +759,19 @@ trait SignsUpMembers
 
     public function altaApplication(): ?MemberApplication
     {
-        if ($this->altaApplicationId === null) {
+        // Prompt 249 — SCOPE to the counter's own organisation. `altaApplicationId` is a public, client-settable
+        // property, and the URL entry (`?alta=`) sets it too, so an unscoped `find()` would render ANOTHER
+        // organisation's applicant on this counter — a cross-org IDOR. This is the one query behind the URL
+        // entry, the pending list's click and `approveAlta()`: a foreign id resolves to null and nothing opens.
+        $orgId = $this->altaLocation()?->organisation_id;
+
+        if ($this->altaApplicationId === null || $orgId === null) {
             return null;
         }
 
-        return MemberApplication::query()->withoutGlobalScopes()->find($this->altaApplicationId);
+        return MemberApplication::query()->withoutGlobalScopes()
+            ->where('organisation_id', $orgId)
+            ->find($this->altaApplicationId);
     }
 
     /**

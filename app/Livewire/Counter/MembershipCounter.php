@@ -112,6 +112,17 @@ class MembershipCounter extends Component
     #[Url(as: 'alert', except: null)]
     public ?string $alert = null;
 
+    /**
+     * The application review to open on arrival, carried in the URL (prompt 249).
+     *
+     * A submitted handover ends on the operator's PIN and lands them HERE, on that application's review — the
+     * counter's 243 rule ("the screen shows the outcome") applied to the handover route. Like `alert`, not
+     * `#[Locked]`: it opens a review only for a holder of `applications.review`, and the id it names is
+     * resolved through the org-scoped `altaApplication()`, so a foreign or forged id opens nothing.
+     */
+    #[Url(as: 'alta', except: null)]
+    public ?string $altaReview = null;
+
     /** A counter answers a question; it is not an export (177's rule, same figure). */
     private const WORKLIST_LIMIT = 10;
 
@@ -125,6 +136,19 @@ class MembershipCounter extends Component
         // second list of the same rows beside it.
         if ($this->alert === DashboardAlert::PENDING_APPLICATIONS->value && $this->userCan('applications.review')) {
             $this->altaOpen = true;
+        }
+
+        // Prompt 249 — arriving from the handover PIN with ?alta=<id>: open that application's review. Only for
+        // a reviewer, and only when the id resolves WITHIN this counter's organisation (the scoping lives in
+        // altaApplication()); a foreign or unknown id opens nothing.
+        if ($this->altaReview !== null && $this->userCan('applications.review')) {
+            $this->reviewAltaApplication($this->altaReview);
+
+            if ($this->altaApplication() !== null) {
+                $this->altaOpen = true;
+            } else {
+                $this->altaApplicationId = null;
+            }
         }
     }
 
