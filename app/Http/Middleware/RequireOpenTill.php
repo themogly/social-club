@@ -69,7 +69,6 @@ class RequireOpenTill
         'reactivar/*',              // lifting a lockdown
         'counter/pos/receipt/*',    // reads of a committed contribution
         'counter/bar/receipt/*',    // reads of a committed sale
-        'livewire/*',               // the PIN pad, the lock, the till's own open() action, every counter write
         'filament/*',               // Filament's own auth (log out) and asset routes
         'up',                       // health check
     ];

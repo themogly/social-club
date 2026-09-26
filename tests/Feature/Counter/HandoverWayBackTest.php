@@ -171,7 +171,8 @@ class HandoverWayBackTest extends TestCase
     {
         $this->handOver();
 
-        Livewire::actingAs($this->device)->test(CheckInScreen::class)->call('lockCounter');
+        // The idle timer's real path (prompt 254 refuses a direct `lockCounter()` call during a handover).
+        Livewire::actingAs($this->device)->test(CheckInScreen::class)->dispatch('counter-lock');
 
         $this->assertFalse(CounterHandover::active());
         $this->assertNull(CounterOperator::id());

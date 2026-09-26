@@ -13194,3 +13194,98 @@ Could not check the latest `main` run — `gh` is not installed in this environm
 
 Merged to `main` directly on Ben's explicit instruction for this session ("merge to main even though it says
 don't") — overriding the prompt's "push the branch; do not merge". Test-only; MySQL left to CI.
+
+## Prompt 254 — the handed-over tablet can be given back, and while it is out the counter answers nothing else
+
+### Root cause
+
+`EnforceCounterHandover::ALLOWED_PATHS` allowed `'livewire/*'`. Livewire 4's update endpoint is
+**`livewire-<hash>/update`**, the hash derived from APP_KEY (`EndpointResolver::prefix()`), so the pattern never
+matched anything. Before **241** the middleware sat on the global stack, read a null session and never fired;
+241 correctly moved it after `StartSession`, and from then on it redirected the PIN pad's own post
+(`302 → /socio/solicitud/<token>`) — the handover could not end, and every URL returned to the form (Shane 3).
+**249's** tests drove the component with `Livewire::test()`, which never passes through HTTP middleware, so
+they could not see the redirect.
+
+### Before (new HTTP tests on the untouched tree)
+
+Every post to the real endpoint answered 302: `test_the_pin_ends_an_unsubmitted_handover…` / `…submitted…` —
+*"Expected response status code [200] but received 302"*; the four refusal tests — *"Expected [403] but
+received 302"*. With the PATH fix alone (the audit's "naive fix"), the PIN tests went green and the refusal
+tests turned to *"Expected [403] but received 200"* — the applicant's `lookupResults()` answered, with the
+planted member's DNI in the response (the positive control in the same test proves that request leaks when
+unconfined).
+
+### The fix — two halves, one branch
+
+1. **The path.** `EnforceCounterHandover::allows()` matches Livewire's update endpoint by asking Livewire for
+   it (`app('livewire')->getUpdateUri()` — the route actually registered, which equals
+   `EndpointResolver::updatePath()` and also holds under cached routes). No hash written down. The dead
+   `'livewire/*'` is gone from both `EnforceCounterHandover` and `RequireOpenTill` (the latter acts only on
+   `counter/*`, so the entry was wrong documentation), and `sedeTillIsOpen()`'s docblock no longer repeats the
+   false premise.
+2. **The confinement.** `App\Support\CounterHandoverConfinement`, registered in `AppServiceProvider::boot()`.
+   **A global Livewire hook, not the `IdentifiesOperator` component hook**, because the trait would only see
+   the counter screens: the page also carries `CounterChrome` (which hears the lock), and a panel component's
+   snapshot taken before the handover can be replayed at the same endpoint. Hooks are on Livewire's
+   **`before`** tier: `SupportEvents` runs a `__dispatch` handler INSIDE its own call hook, so an ordinary
+   listener would refuse an event whose handler had already run.
+
+### The final allowlist while a handover is active
+
+- **Counter screens** (anything composing `IdentifiesOperator`): a bare re-render; update `operatorPin`; call
+  `unlockOperator()`; `__dispatch('counter-lock')` (the idle timer → `lockCounter()` → `timed_out`).
+- **`CounterChrome`**: `__dispatch('counter-lock')` and `__dispatch('counter-unlocked')` (both empty-bodied
+  re-renders — the chrome is on the page and hears the lock in the same round trip). This entry is the one
+  addition to the prompt's list, for that reason.
+- **Everything else**: refused at hydrate — not even a bare re-render.
+
+Refused = `abort(403)` before the update/call runs (no side effect, no data), audit-logged as
+`counter.handover.refused_call` with `{component, method}` — the property name or method, never the payload.
+Hooks judge each call in order, so the right PIN followed by counter work in one request is allowed after the
+PIN (the tablet is the counter's again). A direct `lockCounter()` call is now refused during a handover — the
+real idle timer only ever dispatches the event.
+
+### Tests
+
+`tests/Feature/Security/HandoverConfinementOverHttpTest` (10) and `HandoverPathFollowsAppKeyTest` (1) — real
+HTTP-kernel requests: sign in, choose the sede (`POST counter/location`), PIN, `handOverForAlta` — each via the
+real endpoint, snapshots taken from real `GET`s (`Concerns/PostsLivewireOverHttp`). Covered: the PIN ends
+unsubmitted and submitted handovers (submitted lands on the review, 249), the register lookup refused on all
+four lookup screens with a planted surname/member number/DNI absent from the response, pending applications
+refused, `startClose`+`submitCount` refused with the till still open, a panel component refused, the idle lock
+still ends it (`timed_out` logged), the chrome hears the lock but not `counter-switch-operator`, and outside a
+handover nothing is refused. Test 6 BOOTS the app with a different APP_KEY (set in config right after
+`LoadConfiguration`, before Livewire registers its route — not via env, because Laravel's process-wide
+immutable env writer re-applies `.env` on every boot after the first) and proves the endpoint moved and the PIN
+still answers.
+
+Existing tests adjusted, each because it exercised something the boundary now correctly refuses:
+`HandoverBoundaryTest` posted to `/livewire/update` (a path that does not exist in Livewire 4 — a false green,
+now the real endpoint); `RequireOpenTillTest` classified `livewire/update` (now the real path);
+`CounterSurfaceTest` / `HandoverWayBackTest` called `lockCounter()` directly (now the real `counter-lock`
+dispatch); `CounterSurfaceTest`'s surface-bypass write now asserts the 403 AND, after the handover ends, that
+`requireOperator()` still refuses on its own; `ChromeReturnsWithTheCounterTest` typed form state during the
+handover (now before it, which is what actually happens); `SignedSignUpTest` did a staff alta without ending
+the handover (now ends it, as the PIN would).
+
+### The real-browser harness
+
+`shoot-handover-return.mjs` failed STOP 1 on this machine too, before any change — so not the auditor's
+Chromium. Two harness defects, neither the app's: (1) `page.click('button[type="submit"]')` clicked the
+**locale switcher's ES button**, first in the DOM (167's header), posting a language change and reloading an
+empty form; (2) the signature stroke was drawn off-screen and "Guardar firma" was never pressed, so the hidden
+field was empty ("Falta la firma"). Fixed (form-scoped submit; scroll the pad into view; multi-step stroke;
+save). With the harness fixed and the app untouched it then failed exactly at STOP 3 — the PIN — on all 8 runs,
+which is F1 reproduced in a real browser. After the fix: **all 20 rows PASS**, 1280×800 and 800×1280, light and
+dark (`storage/app/screenshots/249/`).
+
+### Not done here (noted)
+
+F4 — `lookupResults()` still returns whole `Member` models to a working counter. During a handover it is now
+unreachable; narrowing the fields for the ordinary counter is a separate pass (the views consume the models).
+
+### Merge
+
+Merged to `main` on Ben's explicit instruction for this session. `composer check` green in `es` (pinned) and
+`en`; MySQL left to CI. No new copy (a refused call has no UI).

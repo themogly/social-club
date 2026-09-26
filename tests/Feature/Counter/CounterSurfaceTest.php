@@ -224,7 +224,9 @@ class CounterSurfaceTest extends TestCase
         CounterOperator::set($this->operator);
         Livewire::actingAs($this->device)->test(TillSession::class)->call('beginHandover');
 
-        Livewire::actingAs($this->device)->test(TillSession::class)->call('lockCounter');
+        // The idle timer's real path — `Livewire.dispatch('counter-lock')`. A direct `lockCounter()` call is refused
+        // during a handover (prompt 254: only the surface's own traffic answers), so the event is what is tested.
+        Livewire::actingAs($this->device)->test(TillSession::class)->dispatch('counter-lock');
 
         // Handover ended AND no operator — so the surface stays up and the counter is not returned to.
         $this->assertFalse(CounterHandover::active());
@@ -301,6 +303,15 @@ class CounterSurfaceTest extends TestCase
 
         $this->assertNull(CounterOperator::id());
 
+        // During the handover the confinement refuses the write before it runs (prompt 254) — a 403, not a
+        // flash: only the surface's own traffic answers.
+        Livewire::actingAs($this->device)->test(TillSession::class)
+            ->set('terminal', 'POS-1')->assertStatus(403);
+        $this->assertDatabaseCount('till_sessions', 0);
+
+        // And requireOperator() is still a boundary in its own right: a stale tab after the handover has ended,
+        // with nobody identified, is refused by it — the confinement is a second layer, not the only one.
+        CounterHandover::end();
         Livewire::actingAs($this->device)->test(TillSession::class)
             ->set('terminal', 'POS-1')->set('floatInput', '100')->call('open');
 

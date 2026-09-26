@@ -23,6 +23,7 @@ use App\Models\Organisation;
 use App\Models\User;
 use App\Support\ActiveScope;
 use App\Support\ApplicationSpamGuard;
+use App\Support\CounterHandover;
 use App\Support\CounterOperator;
 use App\Support\DocumentVault;
 use App\Support\Settings;
@@ -176,6 +177,9 @@ class SignedSignUpTest extends TestCase
         $this->submitPublicForm($this->handedOver());
         $applications['handover'] = $this->latestApplication();
 
+        // The staff member takes the tablet back (the PIN ends the handover) before typing the next alta —
+        // while it is handed over, the counter answers only the PIN pad (prompt 254).
+        CounterHandover::end();
         CounterOperator::set($staff);
         $this->submitStaffForm();
         $applications['staff typed'] = $this->latestApplication();
