@@ -17,6 +17,7 @@ use App\Models\MemberApplication;
 use App\Models\MembershipTier;
 use App\Models\User;
 use App\Support\ApplicationShape;
+use App\Support\AvaladorResolver;
 use App\Support\Mrz\MrzParser;
 use App\Support\Settings;
 use Illuminate\Support\Collection;
@@ -110,6 +111,9 @@ trait SignsUpMembers
 
     public mixed $altaDocumentScan = null;
 
+    /** The medical certificate (prompt 244) — evidence behind a therapeutic declaration; own property like the others. */
+    public mixed $altaMedicalCert = null;
+
     /**
      * The member's signature over the consent text, once drawn (prompt 220).
      *
@@ -145,7 +149,7 @@ trait SignsUpMembers
     public const WIZARD_STEPS = [
         1 => ['first_name', 'last_name', 'date_of_birth', 'document_type', 'document_number', 'photo', 'document_scan'],
         2 => ['email', 'phone', 'address', 'avalador_ref'],
-        3 => ['is_therapeutic', 'declared_monthly_g'],
+        3 => ['is_therapeutic', 'medical_cert', 'declared_monthly_g'], // medical_cert shown only when therapeutic (prompt 244)
         4 => [ApplicationShape::SIGNATURE_FIELD],
     ];
 
@@ -224,6 +228,7 @@ trait SignsUpMembers
         return $typed
             || $this->altaPhoto !== null
             || $this->altaDocumentScan !== null
+            || $this->altaMedicalCert !== null
             || $this->altaSignaturePath !== null
             || (! $this->altaInviteSent && trim($this->altaInviteEmail) !== '');
     }
@@ -297,6 +302,7 @@ trait SignsUpMembers
         return array_map(fn (string $field): string => match ($field) {
             'photo' => 'altaPhoto',
             'document_scan' => 'altaDocumentScan',
+            'medical_cert' => 'altaMedicalCert',
             ApplicationShape::SIGNATURE_FIELD => 'altaSignaturePath',
             default => 'altaForm.'.$field,
         }, $this->altaStepFields($step));
@@ -365,6 +371,7 @@ trait SignsUpMembers
         $this->altaForm = ApplicationShape::blankStaffForm();
         $this->altaPhoto = null;
         $this->altaDocumentScan = null;
+        $this->altaMedicalCert = null;
         $this->altaMrzFilled = [];
         $this->altaSignaturePath = null;
         $this->altaStep = 1;
@@ -522,6 +529,7 @@ trait SignsUpMembers
             files: [
                 'photo' => $this->altaPhoto?->getRealPath() !== null ? $this->altaPhoto : null,
                 'document_scan' => $this->altaDocumentScan?->getRealPath() !== null ? $this->altaDocumentScan : null,
+                'medical_cert' => $this->altaMedicalCert?->getRealPath() !== null ? $this->altaMedicalCert : null,
             ],
             token: (string) $application->invite_token,
             ip: request()->ip(),
@@ -571,7 +579,11 @@ trait SignsUpMembers
         // The two uploads live on their own properties (Livewire holds a TemporaryUploadedFile, not a form
         // array), and are validated by the SAME rules the public form uses — prompt 215's declaration.
         foreach (ApplicationShape::files() as $field => $rule) {
-            $rules[$field === 'photo' ? 'altaPhoto' : 'altaDocumentScan'] = $rule;
+            $rules[match ($field) {
+                'photo' => 'altaPhoto',
+                'medical_cert' => 'altaMedicalCert',
+                default => 'altaDocumentScan',
+            }] = $rule;
         }
 
         // The signature lives on `$altaSignaturePath`; the rule above names the shared field, so map it.
@@ -711,6 +723,19 @@ trait SignsUpMembers
         $this->altaOpen = false;
 
         $this->flash(__('Socio dado de alta. Cobra la cuota cuando quieras.'), 'success');
+    }
+
+    /**
+     * The live avalador (sponsor) lookup for the wizard (prompt 244) — the SAME resolver SubmitApplication
+     * stores through, so the operator sees what a typed name/number resolved to BEFORE submitting: the named
+     * socio when it is unambiguous, or that it matched nobody / several. `resolveAvalador()` stores the id;
+     * this shows the outcome (prompt 60).
+     *
+     * @return array{status: string, member: ?Member}
+     */
+    public function avaladorFeedback(): array
+    {
+        return AvaladorResolver::resolve($this->altaLocation()?->organisation_id, $this->altaForm['avalador_ref'] ?? null);
     }
 
     /** @return Collection<int, MembershipTier> */

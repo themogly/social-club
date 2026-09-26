@@ -115,8 +115,11 @@ class OneApplicationFormTest extends TestCase
     {
         $blade = (string) file_get_contents(resource_path('views/livewire/counter/partials/alta-staff-form.blade.php'));
 
-        preg_match_all('/wire:model="altaForm\.([a-z_]+)"/', $blade, $facts);
-        preg_match_all('/wire:model="(altaPhoto|altaDocumentScan)"/', $blade, $files);
+        // Allow `wire:model` modifiers (`.live`, `.debounce.400ms`) — the sponsor field is `.live` for its
+        // resolve-on-type feedback (prompt 244), and a naive `wire:model="..."` regex would miss it and read
+        // the field as absent from the staff form.
+        preg_match_all('/wire:model(?:\.[a-z0-9.]+)?="altaForm\.([a-z_]+)"/', $blade, $facts);
+        preg_match_all('/wire:model(?:\.[a-z0-9.]+)?="(altaPhoto|altaDocumentScan)"/', $blade, $files);
 
         $signature = [];
         if (str_contains($blade, 'saveAltaSignature')) {
@@ -142,13 +145,18 @@ class OneApplicationFormTest extends TestCase
     public function test_both_forms_render_exactly_the_declared_field_set(): void
     {
         $declared = array_merge(array_keys(ApplicationShape::facts()), array_keys(ApplicationShape::files()));
+        // Prompt 244 — the medical certificate is Article-9 evidence captured IN PERSON on the wizard, not on
+        // the applicant's online form, which by design defers it ("podré aportar certificado médico"). So it is
+        // a deliberate staff-only file, excluded from the both-forms parity like 210's consent difference; that
+        // it renders on the wizard and NOT the public form is asserted separately below.
+        $declared = array_values(array_diff($declared, ['medical_cert']));
         sort($declared);
 
         // The public form also posts the spam guard's two hidden fields and the consent pair; neither is a
         // fact about the applicant, and the consent difference is prompt 210's deliberate one.
         $ignore = array_merge(
             ApplicationShape::consentFields()['public'],
-            ['mrz'],
+            ['mrz', 'medical_cert'],
         );
 
         $public = array_values(array_diff($this->publicFormFields(), $ignore));

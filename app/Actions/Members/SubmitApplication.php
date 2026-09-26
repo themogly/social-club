@@ -3,11 +3,11 @@
 namespace App\Actions\Members;
 
 use App\Enums\ConsentChannel;
-use App\Enums\MemberStatus;
 use App\Models\Member;
 use App\Models\MemberApplication;
 use App\Models\MrzFieldStat;
 use App\Support\ApplicationShape;
+use App\Support\AvaladorResolver;
 use App\Support\DocumentVault;
 use App\Support\MrzPrefill;
 use App\Support\Settings;
@@ -93,7 +93,8 @@ class SubmitApplication
 
         $photo = $files['photo'] ?? null;
         $scan = $files['document_scan'] ?? null;
-        $allowed = $this->storageAllowed($photo !== null || $scan !== null, $ip);
+        $medicalCert = $files['medical_cert'] ?? null;
+        $allowed = $this->storageAllowed($photo !== null || $scan !== null || $medicalCert !== null, $ip);
 
         // Optional identity photo (prompt 157): encrypted onto the PRIVATE disk now — never the public disk,
         // never an unsigned path — with only the path on the payload. ApproveApplication points the new member
@@ -110,6 +111,12 @@ class SubmitApplication
         // On approval the member points at THIS SAME FILE rather than a copy.
         if ($allowed && $scan !== null) {
             $payload['document_scan_path'] = DocumentVault::storeUpload($scan, 'member-id-scans');
+        }
+
+        // Prompt 244 — the medical certificate behind a therapeutic declaration, same vault family, its own
+        // directory and payload key; on approval the member points at THIS file. Only stored when present.
+        if ($allowed && $medicalCert !== null) {
+            $payload['medical_cert_path'] = DocumentVault::storeUpload($medicalCert, 'member-medical-certs');
         }
 
         // Prompt 179 — the read rate, measured from real use: was each prefilled field corrected? Counts only,
@@ -224,29 +231,11 @@ class SubmitApplication
      */
     private function resolveAvalador(MemberApplication $application, ?string $ref): ?string
     {
-        $ref = trim((string) $ref);
+        // Prompt 244 — ONE resolver for the rule, now shared with the counter wizard's live feedback. Behaviour
+        // is unchanged: an unambiguous match (by number or by exact full name) stores the id, anything else
+        // stores null. The extraction is pinned by the existing avalador tests.
+        $result = AvaladorResolver::resolve($application->organisation_id, $ref);
 
-        if ($ref === '') {
-            return null;
-        }
-
-        $base = fn () => Member::query()->withoutGlobalScopes()
-            ->where('organisation_id', $application->organisation_id)
-            ->where('status', MemberStatus::ACTIVE->value);
-
-        $byNumber = $base()->where('member_no', $ref)->value('id');
-
-        if ($byNumber !== null) {
-            return $byNumber;
-        }
-
-        // A NAME match, only when it is unambiguous (exactly one active socio). Matched in PHP so the
-        // full-name comparison is portable across SQLite (dev) and MySQL (prod).
-        $needle = mb_strtolower($ref);
-        $byName = $base()->get(['id', 'first_name', 'last_name'])
-            ->filter(fn (Member $m): bool => mb_strtolower(trim($m->first_name.' '.$m->last_name)) === $needle)
-            ->pluck('id');
-
-        return $byName->count() === 1 ? (string) $byName->first() : null;
+        return $result['status'] === 'found' ? (string) $result['member']?->id : null;
     }
 }

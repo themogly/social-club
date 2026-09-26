@@ -149,9 +149,20 @@
             </div>
             <div class="sm:col-span-2">
                 <label for="alta-avalador" class="block text-sm font-medium text-ink-muted dark:text-slate-400">{{ __('Avalador (nombre o nº)') }}</label>
-                <input id="alta-avalador" type="text" wire:model="altaForm.avalador_ref" autocomplete="new-avalador-ref" data-no-autofill
+                {{-- Prompt 244 — `.live` (debounced) so the field says what it FOUND before the form is submitted:
+                     a name that matched nobody, or two people, was accepted as free text with nobody told
+                     (prompt 60 for a lookup). Same resolver SubmitApplication stores through — see avaladorFeedback(). --}}
+                <input id="alta-avalador" type="text" wire:model.live.debounce.400ms="altaForm.avalador_ref" autocomplete="new-avalador-ref" data-no-autofill
                        class="mt-1 h-12 w-full rounded-xl border border-line bg-surface px-4 text-base dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100">
                 @error('altaForm.avalador_ref') <p class="mt-1 text-xs text-error">{{ $message }}</p> @enderror
+                @php $avalador = $this->avaladorFeedback(); @endphp
+                @if ($avalador['status'] === 'found')
+                    <p data-avalador-feedback="found" class="mt-1 text-xs font-medium text-success">{{ __('Avalador: :name (:no)', ['name' => $avalador['member']->fullName(), 'no' => $avalador['member']->member_no]) }}</p>
+                @elseif ($avalador['status'] === 'none')
+                    <p data-avalador-feedback="none" class="mt-1 text-xs font-medium text-warning">{{ __('No se encuentra ningún socio con ese nombre.') }}</p>
+                @elseif ($avalador['status'] === 'multiple')
+                    <p data-avalador-feedback="multiple" class="mt-1 text-xs font-medium text-warning">{{ __('Hay varios socios con ese nombre — usa el nº.') }}</p>
+                @endif
             </div>
         </div>
     @endif
@@ -175,10 +186,15 @@
         </div>
 
         {{-- Uso terapéutico. Article 9 special-category data, so it is a deliberate tick with the applicant
-             present, never a default. The whole row is the tap target (217's construction). --}}
-        <div>
+             present, never a default. The whole row is the tap target (217's construction).
+
+             Prompt 244 — the medical certificate (the EVIDENCE) is revealed WHEN the tick is on, so the wizard
+             cannot create a therapeutic member with no evidence the admin form would have required. `x-show`,
+             not `x-if` (245's rule), toggled by Alpine so it appears the instant the box is ticked; the tick's
+             data still goes through `wire:model`. --}}
+        <div x-data="{ therapeutic: @js((bool) ($altaForm['is_therapeutic'] ?? false)) }">
             <label class="flex min-h-11 items-center gap-3 rounded-xl border border-line bg-surface p-4 text-base dark:border-slate-700 dark:bg-slate-900">
-                <input type="checkbox" wire:model="altaForm.is_therapeutic" data-alta-therapeutic
+                <input type="checkbox" wire:model="altaForm.is_therapeutic" @change="therapeutic = $event.target.checked" data-alta-therapeutic
                        class="h-5 w-5 shrink-0 rounded border-line text-brand focus:ring-brand">
                 <span>
                     <span class="block font-medium">{{ __('Uso terapéutico') }}</span>
@@ -186,6 +202,14 @@
                 </span>
             </label>
             @error('altaForm.is_therapeutic') <p class="mt-1 text-xs text-error">{{ $message }}</p> @enderror
+
+            <div x-show="therapeutic" x-cloak class="mt-3">
+                <label for="alta-medical-cert" class="block text-sm font-medium text-ink-muted dark:text-slate-400">{{ __('Certificado médico (opcional)') }}</label>
+                <input id="alta-medical-cert" type="file" accept="image/*,application/pdf" capture="environment" wire:model="altaMedicalCert" data-alta-medical-cert
+                       class="mt-1 block w-full text-sm file:mr-3 file:rounded-lg file:border-0 file:bg-brand-tint file:px-4 file:py-2 file:text-sm file:font-semibold file:text-brand dark:file:bg-slate-800 dark:file:text-slate-200">
+                <p class="mt-1 text-xs text-ink-muted dark:text-slate-400">{{ __('La prueba del uso terapéutico. Se guarda cifrada, como el documento de identidad.') }}</p>
+                @error('altaMedicalCert') <p class="mt-1 text-xs text-error">{{ $message }}</p> @enderror
+            </div>
         </div>
 
         {{-- Consumo mensual estimado (prompt 215) — it becomes `declared_monthly_cg`, which the club uses for

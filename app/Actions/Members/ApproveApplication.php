@@ -86,6 +86,9 @@ class ApproveApplication
             // `applications:prune-retention` correctly leaves APPROVED applications alone, because deleting
             // theirs would blank a real member's document.
             'document_scan_path' => $payload['document_scan_path'] ?? null,
+            // The medical certificate behind a therapeutic member (prompt 244), same vault object the applicant
+            // uploaded — approval points at it, AnonymiseMember disposes of it. Null when not therapeutic / skipped.
+            'medical_cert_path' => $payload['medical_cert_path'] ?? null,
         ]);
         $member->organisation_id = $application->organisation_id;
         // Shared enrolment defaults — the SAME source the direct-create form fills, so the
