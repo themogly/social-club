@@ -426,7 +426,7 @@ class SignupWizardTest extends TestCase
         $this->assertStringNotContainsString('data-alta-stepper', $html, 'the review opened the wizard');
     }
 
-    /** 207's alert still opens the sign-up on the applications waiting to be reviewed. */
+    /** 207's alert opens the sign-up on the application waiting to be reviewed — with one, its review (prompt 264). */
     public function test_the_pending_applications_alert_opens_the_signup(): void
     {
         $staff = $this->staff();
@@ -436,7 +436,8 @@ class SignupWizardTest extends TestCase
         $html = Livewire::test(MembershipCounter::class, ['alert' => 'pending_applications'])->html();
 
         $this->assertStringContainsString('data-alta-modal', $html, 'the alert did not open the sign-up');
-        $this->assertStringContainsString('data-alta-pending', $html, 'the applications waiting to be reviewed are not on it');
+        $this->assertStringContainsString('data-alta-review', $html, 'the application waiting to be reviewed is not open');
+        $this->assertStringContainsString('Pendiente Persona', $html);
     }
 
     /**

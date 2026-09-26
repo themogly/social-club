@@ -32,6 +32,7 @@
     $altaSubtitle = match (true) {
         $altaReviewing !== null => __('Revisa la solicitud y elige la cuota.'),
         $altaStaffFormOpen => __('Paso :n de :total · :name', ['n' => $altaStep, 'total' => $altaLastStep, 'name' => $altaSteps[$altaStep] ?? '']),
+        $altaPendingFirst => __('Solicitudes pendientes de revisar'),
         default => __('¿Cómo vais a rellenar la solicitud?'),
     };
 @endphp
@@ -249,6 +250,16 @@
              consent. An operator choosing between these is choosing between those. --}}
         @else
             <div data-alta-body class="counter-scroll-region min-h-0 flex-1 space-y-3 overflow-y-auto overscroll-contain px-5 py-4">
+                {{-- Prompt 264 — arriving from "N solicitudes pendientes", the list the alert is about comes FIRST;
+                     starting a new sign-up follows, under its own divider. --}}
+                @if ($altaPendingFirst)
+                    @include('livewire.counter.partials.alta-pending-list')
+                    <div class="flex items-center gap-3 pt-1">
+                        <span class="h-px flex-1 bg-line dark:bg-slate-800"></span>
+                        <span class="text-xs font-medium uppercase tracking-wide text-ink-muted dark:text-slate-400">{{ __('o empezar una nueva alta') }}</span>
+                        <span class="h-px flex-1 bg-line dark:bg-slate-800"></span>
+                    </div>
+                @endif
                 <button type="button" wire:click="toggleStaffAltaForm" data-alta-staff-form
                         class="flex w-full items-center gap-4 rounded-2xl border border-line bg-surface p-4 text-left transition hover:border-brand hover:bg-brand-tint dark:border-slate-700 dark:bg-slate-900 dark:hover:bg-slate-800">
                     <span aria-hidden="true" class="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-brand-tint text-2xl dark:bg-slate-800">📝</span>
@@ -292,26 +303,9 @@
                     </div>
                 @endif
 
-                {{-- The applications that came back and are waiting to become members. They belong on this
-                     surface rather than the screen behind it: they ARE sign-ups in progress, and 207's hub
-                     alert opens straight onto them. --}}
-                @php $pending = $this->pendingAltaApplications(); @endphp
-                @if ($pending->isNotEmpty())
-                    <div class="pt-2">
-                        <p class="text-xs font-medium uppercase tracking-wide text-ink-muted dark:text-slate-400">{{ __('Solicitudes pendientes de revisar') }}</p>
-                        <ul data-alta-pending class="mt-2 divide-y divide-line overflow-hidden rounded-xl border border-line dark:divide-slate-800 dark:border-slate-800">
-                            @foreach ($pending as $application)
-                                @php $p = $application->payload ?? []; @endphp
-                                <li>
-                                    <button type="button" wire:click="reviewAltaApplication('{{ $application->id }}')" class="flex min-h-11 w-full items-center justify-between gap-3 bg-surface px-4 py-3 text-left text-sm transition hover:bg-surface-alt dark:bg-slate-900 dark:hover:bg-slate-800">
-                                        <span class="min-w-0 truncate">{{ trim(($p['first_name'] ?? '').' '.($p['last_name'] ?? '')) ?: ($application->applicant_email ?? __('Solicitud')) }}</span>
-                                        <span class="shrink-0 text-xs text-ink-muted dark:text-slate-400">{{ $application->submitted_at?->format('d/m/Y') }}</span>
-                                    </button>
-                                </li>
-                            @endforeach
-                        </ul>
-                    </div>
-                @endif
+                @unless ($altaPendingFirst)
+                    @include('livewire.counter.partials.alta-pending-list')
+                @endunless
             </div>
         @endif
     </div>

@@ -4,6 +4,8 @@ namespace App\Support;
 
 use App\Enums\MemberStatus;
 use App\Models\Member;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Collection;
 
 /**
  * Resolve an "avalador" (sponsor) reference — a member number OR an unambiguous full name — to an active
@@ -25,9 +27,7 @@ class AvaladorResolver
             return ['status' => 'empty', 'member' => null];
         }
 
-        $base = fn () => Member::query()->withoutGlobalScopes()
-            ->where('organisation_id', $organisationId)
-            ->where('status', MemberStatus::ACTIVE->value);
+        $base = fn () => self::pool($organisationId);
 
         $byNumber = $base()->where('member_no', $ref)->first();
         if ($byNumber !== null) {
@@ -46,5 +46,49 @@ class AvaladorResolver
             $byName->count() > 1 => ['status' => 'multiple', 'member' => null],
             default => ['status' => 'none', 'member' => null],
         };
+    }
+
+    /**
+     * WHO may be an avalador at all — the ONE definition the counter's resolver and the admin form's picker share
+     * (prompt 264): active members of this organisation.
+     *
+     * @return Builder<Member>
+     */
+    public static function pool(string $organisationId): Builder
+    {
+        return Member::query()->withoutGlobalScopes()
+            ->where('organisation_id', $organisationId)
+            ->where('status', MemberStatus::ACTIVE->value);
+    }
+
+    /**
+     * The admin member form's search (prompt 264): first name, last name OR member number, in one box — a sponsor is
+     * known by name, not by number. It used to search `member_no` only, so typing the sponsor's surname found nobody.
+     *
+     * @return Collection<int, Member>
+     */
+    public static function candidates(string $organisationId, string $term, ?string $excludeMemberId = null, int $limit = 20): Collection
+    {
+        $term = trim($term);
+
+        if ($term === '') {
+            return new Collection;
+        }
+
+        return self::pool($organisationId)
+            ->when($excludeMemberId !== null, fn (Builder $q) => $q->whereKeyNot($excludeMemberId)) // nobody sponsors themself
+            ->where(fn (Builder $q) => $q
+                ->where('first_name', 'like', '%'.$term.'%')
+                ->orWhere('last_name', 'like', '%'.$term.'%')
+                ->orWhere('member_no', 'like', '%'.$term.'%'))
+            ->orderBy('last_name')->orderBy('first_name')
+            ->limit($limit)
+            ->get(['id', 'first_name', 'last_name', 'member_no']);
+    }
+
+    /** "Nombre Apellidos · M-00028" — the person, and the number that tells two namesakes apart. Never DNI or birth date. */
+    public static function label(Member $member): string
+    {
+        return trim($member->first_name.' '.$member->last_name).' · '.$member->member_no;
     }
 }

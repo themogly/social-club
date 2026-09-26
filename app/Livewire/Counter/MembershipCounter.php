@@ -127,6 +127,9 @@ class MembershipCounter extends Component
     #[Url(as: 'alta', except: null)]
     public ?string $altaReview = null;
 
+    /** Arrived from the alert with several pending applications: the modal leads with the list (prompt 264). */
+    public bool $altaPendingFirst = false;
+
     /** A counter answers a question; it is not an export (177's rule, same figure). */
     private const WORKLIST_LIMIT = 10;
 
@@ -136,10 +139,23 @@ class MembershipCounter extends Component
         $this->resolveCounterLocation();
 
         // Pending applications already had a home on this screen — the Alta panel and its
-        // `pendingAltaApplications()` list (174). Arriving from that alert opens it rather than building a
-        // second list of the same rows beside it.
+        // `pendingAltaApplications()` list (174). Prompt 264: arriving from the alert opens what the alert is
+        // ABOUT, not the sign-up chooser (the tester read that as "sign up a new member"): exactly ONE pending
+        // application → its review, through the same scoped path as ?alta=<id> (249); SEVERAL → the pending list
+        // first. Only for an operator who may review (255: the operator asks); otherwise nothing opens.
         if ($this->alert === DashboardAlert::PENDING_APPLICATIONS->value && $this->userCan('applications.review')) {
             $this->altaOpen = true;
+            $pending = $this->pendingAltaApplications();
+
+            if ($pending->count() === 1) {
+                $this->reviewAltaApplication((string) $pending->first()?->id);
+
+                if ($this->altaApplication() === null) {
+                    $this->altaApplicationId = null;
+                }
+            } elseif ($pending->count() > 1) {
+                $this->altaPendingFirst = true;
+            }
         }
 
         // Prompt 249 — arriving from the handover PIN with ?alta=<id>: open that application's review. Only for

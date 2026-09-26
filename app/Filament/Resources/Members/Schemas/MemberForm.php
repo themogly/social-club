@@ -8,6 +8,8 @@ use App\Enums\MemberDocumentType;
 use App\Models\Member;
 use App\Models\User;
 use App\Rules\AvaladorWithinSponseeCap;
+use App\Support\ActiveScope;
+use App\Support\AvaladorResolver;
 use App\Support\DocumentUpload;
 use App\Support\DocumentVault;
 use App\Support\Email;
@@ -119,11 +121,20 @@ class MemberForm
                             ->helperText(__('Activa el certificado médico y exime del avalador según la política.'))
                             ->live(),
 
+                        // Prompt 264 — found BY NAME: it listed and searched member numbers only, so typing the
+                        // sponsor's surname found nobody. Now name or number in one box, labelled "Nombre
+                        // Apellidos · M-00028", drawn from AvaladorResolver's pool (active members of this
+                        // organisation) — the same definition of a valid sponsor as the counter's sign-up. No
+                        // preload: that would put every member into the page.
                         Select::make('avalador_member_id')
                             ->label(__('Avalador'))
-                            ->relationship('avalador', 'member_no')
                             ->searchable()
-                            ->preload()
+                            ->getSearchResultsUsing(fn (string $search, ?Member $record): array => AvaladorResolver::candidates(
+                                (string) app(ActiveScope::class)->organisationId(), $search, $record?->id,
+                            )->mapWithKeys(fn (Member $m): array => [$m->id => AvaladorResolver::label($m)])->all())
+                            ->getOptionLabelUsing(fn ($value): ?string => ($m = Member::query()->withoutGlobalScopes()->find($value)) instanceof Member
+                                ? AvaladorResolver::label($m) : null)
+                            ->placeholder(__('Busca por nombre o nº de socio'))
                             // Enforce avalador_max_sponsees (prompt 34): an avalador cannot back more than
                             // the configured maximum. No cap was enforced before — it was unlimited.
                             ->rules([new AvaladorWithinSponseeCap])
