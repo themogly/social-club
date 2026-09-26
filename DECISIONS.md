@@ -13076,3 +13076,73 @@ carries the string setting, mirroring the existing toggle/integer/array plumbing
 labels). `addArticle`, `CommitOrder`, the tender, the category filter's semantics and the compact layouts are
 untouched; 224's and 230's tests pass. A `.mjs` browser script (`shoot-bar-large.mjs`) records tile heights at
 1280×800 and 800×1280, light and dark, and checks the toggle clears 44×44 and commit stays reachable.
+
+## Prompt 250 — the dispensary stops asking which lote: oldest first, split when the old one runs out
+
+The owner: at the dispensary, staff should not be asked which batch — everything of a genetic goes into one
+jar and gets mixed. It arrives in bits (say 50 g at a time), so little is on site; take from the previous batch
+while some is left. So the operator weighs and adds, and the system draws the grams FEFO and records which lote
+each gram came from.
+
+### The jar is the operator's unit; the lote is the register's unit
+
+Automatic mode (`dispensary_batch_selection = automatic`, the default, per sede) removes the Lote row from the
+selection pane — it shows only the sede's dispensable total (*"En stock: 51,5 g"*). The basket line carries a
+NULL `batch_id`. Allocation happens at commit, inside the transaction: a new
+`App\Actions\Stock\AllocateFromBatches` draws the quantity from the sede's `dispensable()` batches oldest-first
+(`acquired_or_harvested_on`, then `id` — `SelectBatch`'s ordering), `lockForUpdate` so two tablets cannot both
+drain the last gram, throwing "Stock insuficiente" named for the GENETIC and the sede's total (never a lote) when
+they cannot cover it. `RecordStockMovement` stays the single stock writer — the allocator only decides which
+batches it is called with, once per part. No new columns.
+
+### Price once, store per lote, remainder on the last part
+
+The operator's line is priced exactly as before — the whole quantity through `ResolvePrice`, 83's eighth break
+across the basket at operator-line granularity — and THEN stored as one `dispensation_lines` row per batch
+drawn, each with its own `batch_id`/`batch_no_snapshot`/`grams_cg`(/`units_dispensed`) and a share of
+`line_total_cents` and `discount_cents` proportional to quantity, with the REMAINDER on the last row so the
+parts sum to the priced total exactly (pinned for a 3,33 g split and €0,01 remainders). When one batch covers
+the line — the common case — the stored shape is byte-for-byte the pre-250 shape. A manual line (an explicit
+`batch_id`) is committed exactly as before: one movement, one row, refused if it does not fit.
+
+### Where the parts are shown
+
+The socio sees PRODUCTS, not lotes: the receipt groups stored rows by genetic into one line (grams + totals
+summed); the counter's member history de-duplicates the genetic name (`->unique()`). The outcome card and the
+socio history already showed summed totals with no per-line list, so they needed nothing. The register
+(`RegistroDispensacion`, one row per `dispensation_lines` with `batch_no_snapshot`) and the admin view keep the
+rows apart — that is the whole point of storing them so.
+
+### Refunds
+
+`RefundDispensation`, given no explicit batch for a product refund, now defaults to the LAST stored row's batch
+(`orderByDesc('id')`) — the newest lote, drawn last and most likely still open — so a dispensation that is
+multi-row because of a split does not start asking the operator for a lote. An explicit pick still wins;
+single-line refunds are unchanged (the one row is the last row).
+
+### The setting and its default
+
+`dispensary_batch_selection`: `automatic` (default — the owner's ask) | `manual` (today's behaviour, for a club
+that keeps a separate jar per lote). Per sede, a Select on `LocationForm` beside 235's PIN attempts (via 248's
+`SETTING_STRINGS` mechanism). Manual mode is today's pane and today's commit, untouched — the setting decides at
+render and at commit, and a basket built in one mode and settled after a switch is committed by what each line
+carries (a `batch_id` → manual path; null → allocation).
+
+### Open follow-up (not in this prompt)
+
+Letting an intake TOP UP an existing lote instead of creating a new batch per delivery (the "one big batch in
+50 g pieces" shape) is the natural next step if the owner wants fewer batches rather than smarter picking. Left
+for a future prompt.
+
+### Ordering note
+
+Authored against `c4c1f37` and marked "run after 249"; by the time it ran, 248/249/252 had all landed. The cited
+line numbers were stale but every cited behaviour was still present and was changed on the current tree.
+
+### Verification
+
+`composer check` green. MySQL left to CI. New copy in both locales. The single stock writer, the limits
+(computed on the operator's grams before allocation), `SelectBatch::fefo()`/`isDispensable()`, and the manual
+path are untouched; the existing dispensary, pricing (83's eighth), refund and stock-take suites stay green. A
+`.mjs` browser script (`shoot-dispensary-batches.mjs`) captures the automatic pane, a split's outcome, and the
+admin dispensation view with two lotes.

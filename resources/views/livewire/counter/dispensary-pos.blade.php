@@ -239,27 +239,35 @@
                             </div>
                         @endif
 
-                        {{-- batch selector (FEFO default, overridable to another dispensable batch) --}}
-                        <div class="mt-3">
-                            <p class="text-sm font-medium text-ink-muted dark:text-slate-400">{{ __('Lote') }}</p>
-                            @if ($activeGeneticBatches->isEmpty())
-                                <p class="mt-1 rounded-lg border border-error/30 bg-error/10 px-3 py-2 text-sm text-error">{{ __('Sin lote disponible (agotado o caducado).') }}</p>
-                            @else
-                                <div class="mt-1 flex flex-wrap gap-2">
-                                    @foreach ($activeGeneticBatches as $i => $batch)
-                                        <button type="button" wire:click="selectBatch('{{ $batch->id }}')" @class([
-                                            'rounded-lg border px-3 py-1.5 text-sm transition',
-                                            'border-brand bg-brand text-white' => $activeBatchId === $batch->id,
-                                            'border-line bg-surface text-ink hover:bg-surface-alt dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100' => $activeBatchId !== $batch->id,
-                                        ])>
-                                            {{ $batch->batch_no }}
-                                            <span class="opacity-70">· {{ $activeGenetic->isUnitType() ? $batch->remaining_units.' '.__('uds') : $this->grams($batch->remaining_cg?->centigrams ?? 0) }}</span>
-                                            @if ($i === 0)<span class="ml-1 rounded-full bg-white/20 px-1.5 py-0.5 text-[10px] font-semibold uppercase">FEFO</span>@endif
-                                        </button>
-                                    @endforeach
-                                </div>
-                            @endif
-                        </div>
+                        {{-- Prompt 250 — AUTOMATIC: no Lote row. Everything of a genetic is one jar; the system
+                             draws oldest-first at commit. The pane shows only the sede's dispensable total. --}}
+                        @if ($this->automaticBatches())
+                            <div class="mt-3" data-batch-mode="automatic">
+                                <p class="text-sm font-medium text-ink-muted dark:text-slate-400">{{ __('En stock: :total', ['total' => $this->activeGeneticStockLabel() ?? '—']) }}</p>
+                            </div>
+                        @else
+                            {{-- MANUAL — batch selector (FEFO default, overridable to another dispensable batch). --}}
+                            <div class="mt-3" data-batch-mode="manual">
+                                <p class="text-sm font-medium text-ink-muted dark:text-slate-400">{{ __('Lote') }}</p>
+                                @if ($activeGeneticBatches->isEmpty())
+                                    <p class="mt-1 rounded-lg border border-error/30 bg-error/10 px-3 py-2 text-sm text-error">{{ __('Sin lote disponible (agotado o caducado).') }}</p>
+                                @else
+                                    <div class="mt-1 flex flex-wrap gap-2">
+                                        @foreach ($activeGeneticBatches as $i => $batch)
+                                            <button type="button" wire:click="selectBatch('{{ $batch->id }}')" @class([
+                                                'rounded-lg border px-3 py-1.5 text-sm transition',
+                                                'border-brand bg-brand text-white' => $activeBatchId === $batch->id,
+                                                'border-line bg-surface text-ink hover:bg-surface-alt dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100' => $activeBatchId !== $batch->id,
+                                            ])>
+                                                {{ $batch->batch_no }}
+                                                <span class="opacity-70">· {{ $activeGenetic->isUnitType() ? $batch->remaining_units.' '.__('uds') : $this->grams($batch->remaining_cg?->centigrams ?? 0) }}</span>
+                                                @if ($i === 0)<span class="ml-1 rounded-full bg-white/20 px-1.5 py-0.5 text-[10px] font-semibold uppercase">FEFO</span>@endif
+                                            </button>
+                                        @endforeach
+                                    </div>
+                                @endif
+                            </div>
+                        @endif
 
                         <x-button size="lg" class="mt-4 w-full" wire:click="addLine" wire:loading.attr="disabled" wire:target="addLine">{{ __('Añadir a la cesta') }}</x-button>
                     </section>

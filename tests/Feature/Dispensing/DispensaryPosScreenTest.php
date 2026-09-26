@@ -175,7 +175,7 @@ class DispensaryPosScreenTest extends TestCase
             ->call('selectMember', $member->id)
             ->assertSet('memberId', $member->id)
             ->call('chooseGenetic', $this->genetic->id)
-            ->assertSet('activeBatchId', $batch->id) // FEFO defaulted
+            ->assertSet('activeBatchId', null) // prompt 250 — automatic is the default: the system allocates at commit, no lote picked
             ->set('weightInput', '3.5')
             ->call('addLine')
             ->assertCount('basket', 1)

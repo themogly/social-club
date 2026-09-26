@@ -304,7 +304,8 @@
                                     @forelse ($recent as $dispensation)
                                         <li class="flex items-center justify-between gap-3 px-3 py-2">
                                             <span class="min-w-0">
-                                                <span class="block truncate">{{ $dispensation->lines->pluck('genetic_name_snapshot')->filter()->implode(', ') ?: __('Dispensación') }}</span>
+                                                {{-- Prompt 250 — unique() so an automatic split (one genetic across lotes) never names the product twice. --}}
+                                                <span class="block truncate">{{ $dispensation->lines->pluck('genetic_name_snapshot')->filter()->unique()->implode(', ') ?: __('Dispensación') }}</span>
                                                 <span class="block text-xs text-ink-muted dark:text-slate-400">{{ $dispensation->created_at->format('d/m/Y H:i') }}</span>
                                             </span>
                                             <span class="shrink-0 font-medium tabular-nums">{{ $this->grams((int) $dispensation->lines->sum(fn ($line) => (int) $line->getRawOriginal('grams_cg'))) }}</span>

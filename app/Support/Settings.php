@@ -188,6 +188,10 @@ class Settings
         // windows behind it are constants in UnlockOperator: the tolerance is a club preference, the
         // escalation is a security property.
         'counter_pin_max_attempts' => 5,
+        // Prompt 250 — how the dispensary picks the lote(s) a dispensation draws from, per sede.
+        // 'automatic' (default): the system draws oldest-first and splits when the old batch runs out — the
+        // operator never chooses a lote. 'manual': the operator picks the lote (separate jars per lote).
+        'dispensary_batch_selection' => 'automatic',
         // Where one link into the counter lands (prompt 189). 'home' = the tile hub, 'screen' = straight to
         // the first screen the operator may open (prompt 172's per-user resolution, which is the fallback
         // either way — a till-only operator must always land somewhere they are allowed to be).

@@ -108,8 +108,11 @@ class RefundDispensation
                 throw new RuntimeException('This refund would exceed the weight dispensed.');
             }
 
-            // Resolve the batch the grams came from (single-line: the line's batch; multi-line: caller picks).
-            $batchId = $data['batch_id'] ?? ($grams > 0 ? $locked->lines()->withoutGlobalScopes()->value('batch_id') : null);
+            // Resolve the batch the grams came from. Single-line: the line's batch. Multi-row BECAUSE OF A
+            // SPLIT (prompt 250): default to the LAST stored row's batch — the newest lote, drawn last and most
+            // likely still open — so an automatic split does not start asking the operator for a lote. An
+            // explicit pick (a genuinely multi-genetic dispensation) still wins.
+            $batchId = $data['batch_id'] ?? ($grams > 0 ? $locked->lines()->withoutGlobalScopes()->orderByDesc('id')->value('batch_id') : null);
             if ($grams > 0 && $batchId === null) {
                 throw new RuntimeException('A product refund needs a batch to return the grams to.');
             }

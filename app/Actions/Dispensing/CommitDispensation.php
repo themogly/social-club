@@ -4,6 +4,7 @@ namespace App\Actions\Dispensing;
 
 use App\Actions\Pricing\ResolvePrice;
 use App\Actions\RecordAuditLog;
+use App\Actions\Stock\AllocateFromBatches;
 use App\Actions\Stock\RecordStockMovement;
 use App\Actions\Stock\SelectBatch;
 use App\Actions\Wallet\RecordWalletTransaction;
@@ -44,8 +45,13 @@ use RuntimeException;
  * carries units, and grams_cg is COMPUTED (units × genetic.grams_per_unit_cg) and stored
  * on every line — so limits, ceilings and reports keep reading grams_cg with zero change.
  *
- * @phpstan-type Line array{genetic_id: string, batch_id: string, grams_cg?: int, units?: int}
- * @phpstan-type NormalisedLine array{genetic_id: string, batch_id: string, grams_cg: int, units: ?int}
+ * Prompt 250 — `batch_id` is NULLABLE. A null batch means AUTOMATIC mode: the operator did not choose a lote,
+ * and {@see AllocateFromBatches} draws the quantity from the sede's batches oldest-first
+ * inside this transaction, storing one dispensation_lines row per batch drawn (priced once, split per lote). A
+ * non-null batch is MANUAL mode: one movement, one row, refused if it does not fit — exactly as before.
+ *
+ * @phpstan-type Line array{genetic_id: string, batch_id?: ?string, grams_cg?: int, units?: int}
+ * @phpstan-type NormalisedLine array{genetic_id: string, batch_id: ?string, grams_cg: int, units: ?int}
  * @phpstan-type CommitOptions array{operator_id?: ?string, till_session_id?: ?string, cash_cents?: int, wallet_cents?: int, signature_path?: ?string, idempotency_key?: ?string, reversal_of_id?: ?string, override?: bool, override_by?: ?User, override_reason?: ?string, price_override_cents?: ?int, price_override_reason?: ?string, price_override_by?: ?User, at?: ?\DateTimeInterface}
  */
 class CommitDispensation
@@ -317,7 +323,7 @@ class CommitDispensation
 
                 return [
                     'genetic_id' => $genetic->id,
-                    'batch_id' => (string) $line['batch_id'],
+                    'batch_id' => isset($line['batch_id']) ? (string) $line['batch_id'] : null,
                     'grams_cg' => $units * (int) $genetic->grams_per_unit_cg,
                     'units' => $units,
                 ];
@@ -325,7 +331,7 @@ class CommitDispensation
 
             return [
                 'genetic_id' => $genetic->id,
-                'batch_id' => (string) $line['batch_id'],
+                'batch_id' => isset($line['batch_id']) ? (string) $line['batch_id'] : null,
                 'grams_cg' => (int) ($line['grams_cg'] ?? 0),
                 'units' => null,
             ];
@@ -340,63 +346,110 @@ class CommitDispensation
     private function buildLines(Member $member, array $lines, Location $location, array $options): array
     {
         $resolver = new ResolvePrice;
-        $rows = [];         // per-line snapshot data (line_total_cents finalised after the eighth pass)
-        $eighthInput = [];  // per-line input to the basket-wide eighth break
+        $priced = [];       // per OPERATOR-line: the whole-quantity price + its batch allocation (FEFO parts)
+        $eighthInput = [];  // per OPERATOR-line input to the basket-wide eighth break
 
+        // PASS 1 — price each operator-line on its WHOLE quantity (prompt 250: price once), and decide which
+        // batches it draws from. Manual (a chosen batch_id) is one part; automatic (null) is FEFO across the
+        // sede's dispensable batches. No stock is moved yet — the eighth pass needs every line's total first.
         foreach ($lines as $line) {
-            $batch = Batch::withoutGlobalScopes()->whereKey($line['batch_id'])->firstOrFail();
+            $genetic = Genetic::withoutGlobalScopes()->findOrFail($line['genetic_id']);
             $grams = (int) $line['grams_cg'];
             $units = $line['units'];
+            $quantity = $units ?? $grams; // the allocation unit: whole units for UNIT, centigrams for WEIGHT
 
-            if (! (new SelectBatch)->isDispensable($batch)) {
-                throw new RuntimeException("Batch {$batch->batch_no} is not dispensable (closed, expired or empty).");
+            if ($line['batch_id'] !== null) {
+                // MANUAL: the operator's chosen lote. Must be dispensable and must fit — refused, as before.
+                $batch = Batch::withoutGlobalScopes()->whereKey($line['batch_id'])->firstOrFail();
+                if (! (new SelectBatch)->isDispensable($batch)) {
+                    throw new RuntimeException("Batch {$batch->batch_no} is not dispensable (closed, expired or empty).");
+                }
+                $allocation = [['batch' => $batch, 'qty' => $quantity]];
+            } else {
+                // AUTOMATIC: draw from the sede's batches oldest-first (throws, naming the genetic + the sede's
+                // total, if they cannot cover it — no lote, because the operator chose none).
+                $allocation = (new AllocateFromBatches)->handle($genetic, $location, $quantity);
             }
 
-            $price = $resolver->forGenetic($batch->genetic, $location, $member);
+            $price = $resolver->forGenetic($genetic, $location, $member);
 
             if ($units !== null) {
-                // UNIT line: freeze the per-unit rate; grams_cg was computed in normalise(). No eighth (weight only).
-                $priced = $price->lineForUnits($units);
-                (new RecordStockMovement)->handle($batch, StockMovementType::DISPENSE, -$units, [
-                    'operator_id' => $options['operator_id'] ?? Auth::id(),
-                ]);
-
-                $rateFreeze = ['price_per_gram_cents' => null, 'price_per_unit_cents' => $priced['rate_cents'], 'units_dispensed' => $units];
-                $eighthInput[] = ['grams_cg' => $grams, 'rate_cents' => 0, 'per_gram_total' => $priced['total_cents'], 'eighth_price' => null];
+                $whole = $price->lineForUnits($units); // no eighth (weight only)
+                $rateFreeze = ['price_per_gram_cents' => null, 'price_per_unit_cents' => $whole['rate_cents']];
+                $eighthInput[] = ['grams_cg' => $grams, 'rate_cents' => 0, 'per_gram_total' => $whole['total_cents'], 'eighth_price' => null];
             } else {
-                // WEIGHT line: freeze the per-gram rate, decrement centigrams. Eligible for the eighth break.
-                $priced = $price->lineFor($grams);
-                (new RecordStockMovement)->handle($batch, StockMovementType::DISPENSE, -$grams, [
-                    'operator_id' => $options['operator_id'] ?? Auth::id(),
-                ]);
-
-                $rateFreeze = ['price_per_gram_cents' => $priced['rate_cents'], 'price_per_unit_cents' => null, 'units_dispensed' => null];
-                $eighthInput[] = ['grams_cg' => $grams, 'rate_cents' => $price->effectiveRatePerGramCents(), 'per_gram_total' => $priced['total_cents'], 'eighth_price' => $price->effectiveEighthPriceCents()];
+                $whole = $price->lineFor($grams);
+                $rateFreeze = ['price_per_gram_cents' => $whole['rate_cents'], 'price_per_unit_cents' => null];
+                $eighthInput[] = ['grams_cg' => $grams, 'rate_cents' => $price->effectiveRatePerGramCents(), 'per_gram_total' => $whole['total_cents'], 'eighth_price' => $price->effectiveEighthPriceCents()];
             }
 
-            $rows[] = [
-                'genetic_id' => $batch->genetic_id,
-                'batch_id' => $batch->id,
-                // grams_cg is populated on EVERY line (computed for UNIT) — the load-bearing invariant.
-                'grams_cg' => $grams,
-                'discount_cents' => $priced['discount_cents'],
-                'genetic_name_snapshot' => $batch->genetic->name,
-                'batch_no_snapshot' => $batch->batch_no,
-                ...$rateFreeze,
+            $priced[] = [
+                'genetic' => $genetic,
+                'is_unit' => $units !== null,
+                'quantity' => $quantity,          // total in the allocation unit
+                'discount_cents' => $whole['discount_cents'],
+                'rate_freeze' => $rateFreeze,
+                'allocation' => $allocation,
             ];
         }
 
-        // Eighth (3.5 g) break across the WHOLE basket (prompt 83) — the resolver owns the arithmetic; here we
-        // only apply its per-line result and freeze it into the snapshot. Limits are enforced on grams above,
-        // untouched by pricing. The total is now eighth-aware, so a price override reduces from IT (prompt 64).
+        // Eighth (3.5 g) break across the WHOLE basket (prompt 83), at OPERATOR-line granularity exactly as
+        // before — the split below never changes the eighth arithmetic. The total is eighth-aware so a price
+        // override reduces from IT (prompt 64).
         $adjusted = $resolver->applyEighthBreaks($eighthInput);
+
+        // PASS 2 — for each operator-line, move stock per batch and store one row per batch. The eighth-adjusted
+        // line total and the line discount are split proportional to each part's quantity, with the REMAINDER on
+        // the last part so the stored parts sum to the priced total exactly (prompt 250). One batch ⇒ one row,
+        // byte-for-byte the pre-250 shape.
         $total = 0;
         $lineData = [];
-        foreach ($rows as $i => $row) {
-            $row['line_total_cents'] = $adjusted[$i]['total_cents'];
-            $row['pricing_note'] = $adjusted[$i]['eighth_applied'] ? __('Octavo (1/8)') : null;
-            $total += $row['line_total_cents'];
-            $lineData[] = $row;
+
+        foreach ($priced as $i => $p) {
+            $lineTotal = $adjusted[$i]['total_cents'];
+            $lineDiscount = $p['discount_cents'];
+            $pricingNote = $adjusted[$i]['eighth_applied'] ? __('Octavo (1/8)') : null;
+            $qtyTotal = $p['quantity'];
+            $parts = $p['allocation'];
+            $lastIndex = count($parts) - 1;
+
+            $allocatedTotal = 0;
+            $allocatedDiscount = 0;
+
+            foreach ($parts as $j => $part) {
+                /** @var Batch $batch */
+                $batch = $part['batch'];
+                $partQty = $part['qty'];
+                $isLast = $j === $lastIndex;
+
+                $partTotal = $isLast ? $lineTotal - $allocatedTotal : intdiv($lineTotal * $partQty, $qtyTotal);
+                $partDiscount = $isLast ? $lineDiscount - $allocatedDiscount : intdiv($lineDiscount * $partQty, $qtyTotal);
+                $allocatedTotal += $partTotal;
+                $allocatedDiscount += $partDiscount;
+
+                // The single stock writer — one signed movement per part, against ITS batch. FEFO order.
+                (new RecordStockMovement)->handle($batch, StockMovementType::DISPENSE, -$partQty, [
+                    'operator_id' => $options['operator_id'] ?? Auth::id(),
+                ]);
+
+                $partUnits = $p['is_unit'] ? $partQty : null;
+                $partGrams = $p['is_unit'] ? $partQty * (int) $p['genetic']->grams_per_unit_cg : $partQty;
+
+                $lineData[] = [
+                    'genetic_id' => $p['genetic']->id,
+                    'batch_id' => $batch->id,
+                    // grams_cg is populated on EVERY row (computed for UNIT) — the load-bearing invariant.
+                    'grams_cg' => $partGrams,
+                    'units_dispensed' => $partUnits,
+                    'discount_cents' => $partDiscount,
+                    'line_total_cents' => $partTotal,
+                    'pricing_note' => $pricingNote,
+                    'genetic_name_snapshot' => $p['genetic']->name,
+                    'batch_no_snapshot' => $batch->batch_no,
+                    ...$p['rate_freeze'],
+                ];
+                $total += $partTotal;
+            }
         }
 
         return [$total, $lineData];

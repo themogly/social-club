@@ -62,6 +62,7 @@ class LocationForm
      */
     public const SETTING_STRINGS = [
         'bar_layout_default',
+        'dispensary_batch_selection',
     ];
 
     /**
@@ -191,6 +192,17 @@ class LocationForm
                         'large' => __('Grande'),
                     ])
                     ->default('grid')
+                    ->selectablePlaceholder(false),
+
+                // Prompt 250 — how the dispensary picks the lote a dispensation draws from at this sede.
+                Select::make('dispensary_batch_selection')
+                    ->label(__('Lotes en el dispensario'))
+                    ->helperText(__('Automático toma del lote más antiguo y reparte cuando se agota; manual lo elige el operador (útil solo si guardáis un bote por lote).'))
+                    ->options([
+                        'automatic' => __('Automático (el sistema toma del lote más antiguo)'),
+                        'manual' => __('Manual (el operador elige el lote)'),
+                    ])
+                    ->default('automatic')
                     ->selectablePlaceholder(false),
 
                 Toggle::make('signature_on_dispensation')
