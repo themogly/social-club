@@ -23,10 +23,10 @@ class CounterHandover
 {
     private const KEY = 'counter.handover';
 
-    /** @return array{operator_id: string, location_id: ?string, started_at: string, return_url: ?string}|null */
+    /** @return array{operator_id: string, location_id: ?string, started_at: string, return_url: ?string, submitted_application_id?: ?string}|null */
     public static function current(): ?array
     {
-        /** @var array{operator_id: string, location_id: ?string, started_at: string, return_url: ?string}|null $state */
+        /** @var array{operator_id: string, location_id: ?string, started_at: string, return_url: ?string, submitted_application_id?: ?string}|null $state */
         $state = session(self::KEY);
 
         return is_array($state) ? $state : null;
@@ -52,12 +52,52 @@ class CounterHandover
         ]]);
     }
 
-    /** Where the applicant belongs — the tokenised form they were handed. Null when none was recorded. */
+    /**
+     * Where the applicant belongs — the tokenised form they were handed. Null when none was recorded, AND null
+     * once the form has been submitted (prompt 249): a finished form is nowhere to send anyone back to, so the
+     * boundary's fallback then lands strays on the counter's PIN pad and the surface's "Continuar con mi
+     * solicitud" disappears by itself.
+     */
     public static function returnUrl(): ?string
     {
+        if (self::submitted()) {
+            return null;
+        }
+
         $url = self::current()['return_url'] ?? null;
 
         return is_string($url) && $url !== '' ? $url : null;
+    }
+
+    /**
+     * Record that the handed-over form was submitted (prompt 249). Called from the applicant controller once
+     * `SubmitApplication` has succeeded AND the active handover's form is the one that was submitted — never on
+     * the spam-dropped path, never for an emailed invite that shares nothing with the counter. The id is what
+     * the PIN then carries the operator to: the review of the application they just watched being filled.
+     */
+    public static function markSubmitted(string $applicationId): void
+    {
+        $state = self::current();
+
+        if ($state === null) {
+            return;
+        }
+
+        $state['submitted_application_id'] = $applicationId;
+        session([self::KEY => $state]);
+    }
+
+    public static function submitted(): bool
+    {
+        return self::submittedApplicationId() !== null;
+    }
+
+    /** The application the handed-over form submitted, or null while it is still being filled. */
+    public static function submittedApplicationId(): ?string
+    {
+        $id = self::current()['submitted_application_id'] ?? null;
+
+        return is_string($id) && $id !== '' ? $id : null;
     }
 
     /**

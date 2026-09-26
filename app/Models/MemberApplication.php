@@ -66,6 +66,20 @@ class MemberApplication extends Model
         return $this->status === ApplicationStatus::PENDING && ! $this->isInviteRevoked() && ! $this->isInviteExpired();
     }
 
+    /**
+     * Can this form still take a submission? Live AND not yet submitted (prompt 249).
+     *
+     * The one predicate for "the form is not finished": the applicant controller lets a POST through only when
+     * it is true, and renders the received state (no form, no payload) the moment it is false. It is the SAME
+     * boolean the Invitations board already spelled by hand for `isOutstandingInvite()` — a live link nobody
+     * has submitted — so both now read from one place. `isInviteLive()` keeps its own meaning (openable) for
+     * the board's copy/resend/revoke.
+     */
+    public function acceptsSubmission(): bool
+    {
+        return $this->isInviteLive() && $this->submitted_at === null;
+    }
+
     /** The shareable link, rebuilt from the encrypted token (null once the token is gone). */
     public function inviteUrl(): ?string
     {

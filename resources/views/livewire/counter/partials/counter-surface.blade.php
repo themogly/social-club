@@ -47,7 +47,12 @@
              had a terminal they could not recover without clearing the session. 173 required "the PIN is how
              you get back"; this is that PIN, kept behind one deliberate tap so the applicant is not invited
              to press it, but present, focusable and labelled rather than hidden behind a secret gesture. --}}
-        staffPad: false,
+        {{-- Prompt 249 — a SUBMITTED handover opens the pad on arrival (the applicant has finished; the
+             operator's next act IS the PIN) and titles it "Solicitud recibida". A handover still in progress
+             keeps the tap-to-reveal above, so an applicant mid-form is never handed a PIN pad. Both are server
+             facts, read once at init like every other seed here. --}}
+        staffPad: @js(\App\Support\CounterHandover::submitted()),
+        submitted: @js(\App\Support\CounterHandover::submitted()),
         push(d) { if (this.pin.length < 8) this.pin += d },
         back() { this.pin = this.pin.slice(0, -1) },
         clear() { this.pin = '' },
@@ -132,7 +137,7 @@
                     </svg>
                 </span>
                 <h2 data-surface-heading class="mt-3 text-base font-semibold"
-                    x-text="mode === 'handover' ? @js(__('Recuperar el mostrador')) : (mode === 'locked' ? @js(__('Pantalla bloqueada')) : @js(__('¿Quién está trabajando?')))"></h2>
+                    x-text="mode === 'handover' ? (submitted ? @js(__('Solicitud recibida')) : @js(__('Recuperar el mostrador'))) : (mode === 'locked' ? @js(__('Pantalla bloqueada')) : @js(__('¿Quién está trabajando?')))"></h2>
                 <p class="mt-1 text-sm text-ink-muted dark:text-slate-400"
                    x-text="mode === 'handover' ? @js(__('Introduce tu PIN para finalizar la entrega y volver al mostrador.')) : (mode === 'locked' ? @js(__('Introduce tu PIN para continuar. El trabajo en curso se conserva.')) : @js(__('Introduce tu PIN para identificarte en el mostrador.')))"></p>
             </div>
@@ -171,14 +176,17 @@
                     x-text="mode === 'handover' ? @js(__('Recuperar el mostrador')) : (mode === 'locked' ? @js(__('Desbloquear')) : @js(__('Identificarse')))"></button>
 
             {{-- Opened by mistake, or the staff member changed their mind: hand the tablet back to the
-                 applicant rather than leaving them facing a PIN pad. Handover mode only. --}}
-            <button
-                type="button"
-                data-handover-staff-cancel
-                x-show="mode === 'handover'"
-                x-cloak
-                @click="staffPad = false; clear()"
-                class="mt-3 min-h-[2.75rem] w-full rounded-lg px-4 text-xs font-medium text-ink-muted transition hover:text-ink dark:text-slate-400 dark:hover:text-slate-300"
-            >{{ __('Volver a la pantalla del solicitante') }}</button>
+                 applicant rather than leaving them facing a PIN pad. Handover mode only — and NOT once the
+                 form is submitted (prompt 249): there is no applicant screen left to return to. --}}
+            @unless (\App\Support\CounterHandover::submitted())
+                <button
+                    type="button"
+                    data-handover-staff-cancel
+                    x-show="mode === 'handover'"
+                    x-cloak
+                    @click="staffPad = false; clear()"
+                    class="mt-3 min-h-[2.75rem] w-full rounded-lg px-4 text-xs font-medium text-ink-muted transition hover:text-ink dark:text-slate-400 dark:hover:text-slate-300"
+                >{{ __('Volver a la pantalla del solicitante') }}</button>
+            @endunless
         </div>
 </div>

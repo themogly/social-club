@@ -8,6 +8,7 @@ use App\Http\Requests\SubmitApplicationRequest;
 use App\Models\Member;
 use App\Models\MemberApplication;
 use App\Support\ApplicationSpamGuard;
+use App\Support\CounterHandover;
 use App\Support\Mrz\MrzParser;
 use App\Support\MrzPrefill;
 use Illuminate\Http\RedirectResponse;
@@ -41,6 +42,19 @@ class ApplicationController extends Controller
             return view('socio.application-closed', ['reason' => __('Esta invitación ha caducado. Pide una nueva a la asociación.')]);
         }
 
+        // Prompt 249 — once submitted, the form is finished: the RECEIVED state, the same card with no form and
+        // no payload, so a reload (or the next applicant's back gesture) never re-shows the previous person's
+        // name, document number and e-mail. During a handover it carries the way back to the counter; on an
+        // emailed invite it is today's thank-you and corrections go through the club, as the card already says.
+        if ($application->submitted_at !== null) {
+            return view('socio.application', [
+                'token' => $token,
+                'application' => $application,
+                'submitted' => true,
+                'handoverActive' => CounterHandover::active(),
+            ]);
+        }
+
         // First view marks the invite "started" (for the Invitations status board).
         if ($application->opened_at === null) {
             $application->update(['opened_at' => now()]);
@@ -65,6 +79,12 @@ class ApplicationController extends Controller
             abort(404);
         }
 
+        // Already submitted (prompt 249): a second POST changes nothing. Land on the received state, not a
+        // re-editable form — the finished form is not a place to write again.
+        if (! $application->acceptsSubmission()) {
+            return redirect()->route('socio.application', ['token' => $token]);
+        }
+
         // Spam mitigation on top of the route rate limit: a filled honeypot or an
         // impossibly-fast submit is discarded SILENTLY (identical thank-you response),
         // so an automated submitter never learns its rows aren't landing.
@@ -82,6 +102,15 @@ class ApplicationController extends Controller
             $token,
             $request->ip(),
         );
+
+        // Prompt 249 — if this form is the one a handover was handed over FOR, record the handover as submitted:
+        // returnUrl() goes null (strays fall through to the counter's PIN pad and the surface's "Continuar con
+        // mi solicitud" disappears), and the PIN then lands the operator on this application's review. Guarded
+        // to this token's form so it never fires on an emailed invite that shares no handover with the counter;
+        // the spam-dropped path returned above, so it is never marked either.
+        if (CounterHandover::active() && CounterHandover::returnUrl() === route('socio.application', ['token' => $token])) {
+            CounterHandover::markSubmitted($application->id);
+        }
 
         return $this->submittedRedirect($token);
     }
@@ -104,6 +133,11 @@ class ApplicationController extends Controller
 
         if ($application === null || ! $application->isInviteLive()) {
             abort(404);
+        }
+
+        // Already submitted (prompt 249): the reader changes nothing on a finished form.
+        if (! $application->acceptsSubmission()) {
+            return redirect()->route('socio.application', ['token' => $token]);
         }
 
         // Rate limited like any unauthenticated write, and bounded in size — an MRZ is at most three lines
