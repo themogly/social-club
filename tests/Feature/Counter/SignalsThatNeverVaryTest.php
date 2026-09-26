@@ -198,10 +198,13 @@ class SignalsThatNeverVaryTest extends TestCase
     // --- 2. The override that was always open --------------------------------------------------
 
     /**
-     * The override is **not in the DOM** until it is opened, so it is not in the tab order either — and
-     * opening it is a deliberate act with its own control.
+     * The override is **hidden until it is opened**, so it is not in the tab order either — and opening it is a
+     * deliberate act with its own control. Prompt 245 moved this disclosure from `x-if` (removed from the DOM)
+     * to `x-show` (present but `display:none`), because `x-if` inside a Livewire-morphed view duplicates on a
+     * re-render. `display:none` keeps the same guarantee that matters here: a hidden field is not focusable,
+     * not tabbable and not announced — the accessibility property 91 drew — while a morph can no longer clone it.
      */
-    public function test_the_override_is_absent_until_it_is_opened(): void
+    public function test_the_override_is_hidden_until_it_is_opened(): void
     {
         $this->operator();
         $member = $this->member();
@@ -217,11 +220,12 @@ class SignalsThatNeverVaryTest extends TestCase
         // The way in is there, and it is one deliberate tap.
         $this->assertStringContainsString('data-price-override-toggle', $html);
 
-        // The fields are inside an Alpine <template>, so they are not rendered, not focusable and not
-        // tabbable until the operator opens it — the distinction prompt 91 drew for the till close-out.
+        // The fields sit behind `x-show="open"` (prompt 245): `display:none` until the operator opens it, so
+        // they are not focusable, not tabbable and not announced — the distinction prompt 91 drew — but now a
+        // Livewire morph cannot clone them the way an `x-if` template's insert would.
         $at = strpos($html, 'data-price-override-toggle');
         $this->assertNotFalse($at);
-        $this->assertStringContainsString('<template', substr($html, $at, 600), 'the fields are not behind a disclosure');
+        $this->assertMatchesRegularExpression('/data-price-override\s+x-show="open"/', substr($html, $at, 1100), 'the fields are not behind an x-show disclosure');
         $this->assertStringNotContainsString('placeholder="'.e(__('Nuevo total (€)')).'"', substr($html, 0, $at));
     }
 
