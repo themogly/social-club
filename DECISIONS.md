@@ -12760,3 +12760,49 @@ running server: after *Cambiar de persona* on POS, Bar and Till, portrait (800×
 the surface holds EXACTLY ONE `[data-surface-heading]` — the duplication that shipped on `main` is gone.
 Screenshots in `storage/app/screenshots/245/`. 196's Alpine-scope guard and 223's no-scripts guard pass
 untouched. No copy changed.
+
+## Prompt 246 — a shared device: the sede is a manager's setting, the admin's way back is labelled, staff sign-ups skip the review
+
+The counter is a shared tablet with a fixed home. The model, in one sentence: **the device is the club's, the
+sede is the manager's, the PIN is the person's.** Runbook: log each tablet in ONCE, set its sede ONCE.
+
+### Switching sede is a manager's act (and the initial adoption is not "switching")
+
+The sede is always ON SCREEN (89), but CHANGING it is a responsable's act, gated on the PIN-identified
+OPERATOR — not the device account. An owner-logged tablet must not let a STAFF operator move the whole terminal
+by a PIN-less tap; 239 made the device the club's and the person the PIN's, and this control finally matches.
+The top-bar renders a static badge ("La sede la cambia un responsable") for a non-manager operator, and
+`CounterLocationController::switch()` refuses the crafted POST behind it — the gate is not a picture.
+
+**The permission is `settings.manage.location`, not `staff.manage`.** 246 named `staff.manage`, but that is
+OWNER-only here (235) while 246 also wants MANAGER to switch; `settings.manage.location` is the existing
+permission MANAGER and OWNER hold and STAFF does not — the intended line, and 214's matrix stays untouched.
+
+**The INITIAL adoption stays open.** A change is `current sede set AND target differs`. The first-ever choice on
+a fresh terminal (`mustChooseSede` — the sede→operator chain's first step, before any operator is even
+identified) is NOT a change and is not gated, or a multi-sede STAFF would deadlock with no way to start. Once a
+sede is set, a STAFF is locked to it. Switching still confirms unsaved work and refuses while the sede's till is
+open (89), and clears the operator on change.
+
+### The admin's way back is a labelled word
+
+The admin link's label was `hidden xl:inline`, so in portrait an administrator saw an unlabelled briefcase and
+could not find the way back to the panel. The label shows at EVERY width now. Kept as "Administración" (206's
+deliberate word — the way into the back office, distinct from the counter hub, which 205 keeps as the home
+logo); 246 suggested "Panel/Dashboard", but the gap the tester hit was the missing LABEL, not the word, and
+reviving "Dashboard" is exactly the Home-synonym 206 removed.
+
+### Staff-made sign-ups are approved on submit
+
+When the operator who FILLED the wizard holds `applications.review`, Guardar approves on the spot (243's tier
+from step 3, the photo, the signature) and lands on the new member's card with the Aprobado audit row naming
+them — no reviewer reviewing their own five-minute-old form. Because STARTING a counter sign-up already requires
+`applications.review` (IssueApplicationInvite, prompt 174), the auto-approve fires whenever a tier is chosen; a
+submit with NO tier is 243's review landing (confirm the cuota there). HANDOVER and EMAILED applications are
+never auto-approved — the person who typed those was not staff — so 209/210's PENDING-until-reviewed rule
+stands. `approveAlta` re-runs every check (permission, tier, duplicate, age); a block leaves them on the review.
+
+### Verification
+
+`composer check` green. MySQL left to CI. New copy in both locales. 209's handover boundary, the PIN surface
+(245 owns it), `approveAlta`'s checks and `UnlockOperator` are untouched.

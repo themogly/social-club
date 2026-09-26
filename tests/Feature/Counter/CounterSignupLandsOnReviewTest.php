@@ -109,51 +109,54 @@ class CounterSignupLandsOnReviewTest extends TestCase
 
     /**
      * The landing assertion, written to FAIL against `main`: there, a successful submit resets to the chooser
-     * (`altaApplicationId` null, the wizard/chooser shown), so `data-alta-review` is absent and the operator
-     * is dropped back to a menu. Here it lands on the review of the created application with the tier carried.
+     * (`altaApplicationId` null, the wizard/chooser shown), so `data-alta-review` is absent and the operator is
+     * dropped back to a menu. Here a submit with NO tier lands on the review of the created application.
+     *
+     * (Prompt 246: a staff submit WITH a tier chosen in step 3 auto-approves — because starting a counter
+     * sign-up already requires `applications.review`, so the tier + that permission always approve on the spot.
+     * The review landing is therefore the no-tier case, where the operator confirms the cuota on the review.)
      */
-    public function test_a_staff_submit_lands_on_the_review_with_the_tier_carried(): void
+    public function test_a_staff_submit_without_a_tier_lands_on_the_review(): void
     {
         $this->operator();
-        $tier = $this->tier();
 
-        $component = $this->wizardTo(Livewire::test(MembershipCounter::class), $tier->id)
+        $component = $this->wizardTo(Livewire::test(MembershipCounter::class), null) // no tier → no auto-approve
             ->call('submitStaffAlta')
             ->assertHasNoErrors();
 
         $application = MemberApplication::query()->withoutGlobalScopes()->latest('id')->firstOrFail();
 
-        // Landed on THAT application's review, not the chooser…
+        // Landed on THAT application's review, not the chooser.
         $component->assertSet('altaApplicationId', $application->id)
-            ->assertSet('altaStaffFormOpen', false)
-            ->assertSet('altaTierId', $tier->id); // …with the tier from step 3 carried, not blanked
+            ->assertSet('altaStaffFormOpen', false);
 
         $html = $component->html();
         $this->assertStringContainsString('data-alta-review', $html);
         $this->assertStringContainsString('data-alta-approve', $html);
         $this->assertStringNotContainsString('data-alta-stepper', $html, 'the submit reopened the wizard');
+        $this->assertSame(0, Member::query()->withoutGlobalScopes()->count(), 'no member without a chosen tier');
     }
 
-    public function test_aprobar_from_the_landing_creates_the_active_member_with_the_tier(): void
+    public function test_aprobar_from_the_landing_creates_the_active_member(): void
     {
         $this->operator();
         $tier = $this->tier();
 
-        $this->wizardTo(Livewire::test(MembershipCounter::class), $tier->id)
+        // No tier in the wizard → lands on the review; pick the cuota there and approve.
+        $this->wizardTo(Livewire::test(MembershipCounter::class), null)
             ->call('submitStaffAlta')
             ->assertHasNoErrors()
-            ->call('approveAlta') // Aprobar is right there — no re-choosing the cuota
+            ->set('altaTierId', $tier->id)
+            ->call('approveAlta')
             ->assertSet('flashType', 'success');
 
         $member = Member::query()->withoutGlobalScopes()->latest('id')->firstOrFail();
         $this->assertSame(MemberStatus::ACTIVE, $member->status);
 
-        // Enrolled on the carried tier, at this sede.
         $membership = Membership::query()->withoutGlobalScopes()->where('member_id', $member->id)->firstOrFail();
         $this->assertSame($tier->id, $membership->tier_id);
         $this->assertSame($this->location->id, $membership->location_id);
 
-        // The application carried the signature the wizard drew (220).
         $application = MemberApplication::query()->withoutGlobalScopes()->latest('id')->firstOrFail();
         $this->assertArrayHasKey('signature_path', $application->payload);
     }
