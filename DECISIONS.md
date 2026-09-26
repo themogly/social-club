@@ -13578,3 +13578,35 @@ shared `x-button`). Worth a look on the tablet.
 
 Merged to `main` on Ben's instruction. `composer check` green in `es` and `en`; MySQL to CI (the new
 `GROUP BY location_id` sum is plain SQL on both drivers).
+
+## Prompt 258 (part A only) — check-in is optional per sede
+
+**Parts B and C (and tests 2–5) were NOT built** — the prompt's own banner: prompt 259 superseded them with the
+owner's final debt design, merged just before this.
+
+### "Member checking" resolved
+
+Read as the door check-in gate, `restrict_pos_to_checked_in` (prompt 44): a per-location toggle on
+`LocationForm` ("Restringir TPV a socios con check-in"), read by `DispensaryPos` through the location-first
+`Settings::get`. Not the photo-on-file rule (157), which is per SURFACE, not per sede. It already existed and
+already worked: OFF dispenses without a check-in; ON refuses holding a member who has not checked in, with
+"El socio no ha registrado su entrada. Regístrala primero en recepción." — each sede on its own. **Confirm this
+reading with the tester**; if he meant identity/photo, that is a different change.
+
+### The one gap found, closed
+
+The gate lived only in `holdMember()` (when a member is SELECTED). `$memberId` is a public Livewire property, so
+with the toggle ON a forged `memberId` skipped it and the commit dispensed to a member who never checked in —
+reproduced red (*"Expected 'error', Actual 'success'"*). Both commit paths (`attemptCommit`, `settleWithBar`)
+now re-ask through `checkInSatisfied()`; with the toggle OFF it is always true, so nothing changes for a sede
+that does not require check-in.
+
+### Tests
+
+`tests/Feature/Counter/CheckInOptionalPerSedeTest` (5): OFF dispenses end to end; ON refuses with the message
+and a checked-in member then passes; two sedes with opposite toggles; the forged `memberId` refused at commit;
+the toggle is on the admin location form and persists per sede only.
+
+### Merge
+
+Merged to `main` on Ben's instruction. `composer check` green in `es` and `en`; no new copy.
