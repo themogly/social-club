@@ -233,9 +233,7 @@
                                     {{ __('Autorizar y registrar entrada') }}
                                 </button>
                             @else
-                                <p class="mt-3 text-sm text-ink-muted dark:text-slate-400">
-                                    {{ __('Un responsable con permiso (checkin.override) debe autorizar esta excepción.') }}
-                                </p>
+                                @include('livewire.counter.partials.authorise-with-pin', ['action' => 'confirmOverrideWithPin', 'reasonModel' => 'overrideReason'])
                             @endif
                         </div>
                     @endif

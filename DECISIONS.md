@@ -13913,3 +13913,63 @@ no chooser; the admin form's search for "Adams" offers "Elliot Adams · M-00014"
 ### Merge
 
 Merged to `main` on Ben's instruction for this session. `composer check` green in `es` and `en`.
+
+## Prompt 265 — cash-up shows what each expense was for; the till and limit screens tell staff what to do
+
+### Before
+
+- Two till expenses ("Leche y café" €12,50, "Bolsas de basura" €7,20) showed as ONE "Caja chica" line during the shift,
+  NOTHING on the closed arqueo, one line in the admin session view and nothing in the till report —
+  *"Undefined array key 'petty_cash_items'"*, and the closed arqueo *"does not show Leche y café"*.
+- STAFF granted only "Cerrar caja" were stuck at the end-of-day close: *"Primero hay que recontar la flor"* then *"No tienes
+  permiso para recontar el inventario"*; the roles page gave no hint.
+- A staff member at a limit breach read *"Un responsable con permiso (limits.override) debe autorizar esta excepción"* — a raw
+  key and no way forward. The same raw key shape was on the door ("(checkin.override)") and the till ("(till.close)").
+
+### 1. The itemised breakdown — one source
+
+`TillSummary::breakdownMany()` now returns `petty_cash_items` for each session: the TILL-kind expenses behind the PETTY_CASH
+movements (category, note, amount, who recorded it — the PIN operator since 255 — and the time), in ONE grouped query for all
+the sessions. Every view reads that list: the till screen (under "Caja chica" during the shift), the revealed arqueo after the
+close (the total and its items — where a short drawer gets explained; the component keeps the closed session's id, `#[Locked]`,
+for it), the admin till-session view ("Detalle de caja chica") and a new "Detalle de caja chica" table in the till report. The
+count stays **blind**: the items live with the breakdown that is shown today and never on the count step (tested). `Expense`
+gained a `recorder()` relation.
+
+### 2. The dependency list
+
+`Permissions::DEPENDENCIES` (one place; a new pair is one line):
+- **till.close → stock.take** — the last close of the day at a sede requires the blind flower recount first
+  (`TillSession::reweighRequired()`), which is gated on stock.take. The reported case.
+- **pos.use / pos.bar / checkin.manage → till.open** — found in the sweep: the counter sends a till-less sede to open a till
+  first (236), so without till.open that role can only work once someone else has opened one.
+No other mid-flow second-permission check turned up (application approval, enrolment and fee collection each need only their own).
+The roles page shows each missing dependency as a warning with **"Conceder también «…»"** (one audited click through the same
+writer). It warns; it never changes anything by itself.
+
+### 3. Plain words, and the supervisor PIN (SHIPPED)
+
+- Counter copy no longer shows permission keys: the breach panel says *"Hace falta que un encargado autorice esta excepción."*,
+  the door the same, the till *"Cerrar la caja lo hace alguien con permiso: que se identifique con su PIN."* A guard test scans
+  every counter view and component for `__()` copy containing any catalogue key.
+- **"Autorizar con PIN"** (`IdentifiesOperator::authoriserFromPin()`, used by `DispensaryPos::commitWithAuthoriserPin()` and
+  `CheckInScreen::confirmOverrideWithPin()`): someone who holds the override permission types THEIR PIN and a reason; the PIN is
+  checked by the same `UnlockOperator` against this sede's staff with the same sede-wide throttle (a wrong PIN counts towards the
+  lockout); `CounterOperator` is never touched — the staff member stays the operator of record and stays identified, and the
+  basket is untouched. The override is audited as the authoriser's (`dispensation.limit.override` / `checkin.override`,
+  `authorised_by`); a PIN without the permission is refused by name. The price override has no staff-facing panel (it is shown
+  only to someone who may use it), so it needed nothing; the till close gets plain words (a person with the permission
+  identifies instead) — a supervisor PIN there is a possible follow-up.
+- **A 255 gap closed on the way:** six counter views gated controls with Blade `@can(...)`, which asks the TABLET's login, not
+  the PIN operator (price override, expenses, fee collect, till open/close, fee waiver). They now use `$this->userCan()`.
+
+### Tests
+
+`tests/Feature/Till/CashUpItemisedTest` (5) and `tests/Feature/Counter/CounterGuidanceTest` (6). Real browser
+(`tests/Browser/shoot-cash-up-and-guidance.mjs`, 820×1180): the closed arqueo itemising both expenses, the roles-page warning
+with its one-click grant, and the breach panel as STAFF with "Autorizar con PIN" and no permission key
+(`storage/app/screenshots/265/`).
+
+### Merge
+
+Merged to `main` on Ben's instruction for this session. `composer check` green in `es` and `en`.

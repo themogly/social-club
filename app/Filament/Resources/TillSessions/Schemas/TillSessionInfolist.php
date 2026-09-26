@@ -58,6 +58,16 @@ class TillSessionInfolist
                         self::money('cash_out', __('Salidas de efectivo')),
                         self::money('banked', __('Ingresado en banco')),
                         self::money('petty_cash', __('Caja chica')),
+                        // Prompt 265 — what each petty-cash expense was for, from the same breakdown the counter uses.
+                        TextEntry::make('petty_cash_items')
+                            ->label(__('Detalle de caja chica'))
+                            ->state(fn (TillSession $record): array => array_map(
+                                fn (array $i): string => ($i['note'] ?: __('Sin nota')).' — '.$i['category'].' · '.Money::fromCents($i['amount_cents'])->formatted().' · '.$i['recorded_by'].' · '.$i['at'],
+                                (array) (self::report($record)['petty_cash_items'] ?? []),
+                            ))
+                            ->listWithLineBreaks()->bulleted()
+                            ->placeholder(__('Sin gastos de caja'))
+                            ->columnSpanFull(),
                     ])
                     ->columns(3),
 

@@ -808,7 +808,7 @@
                          charged for the APORTACIÓN, and the pad captures their signature for it. Neither has
                          anything to say about a tin of tobacco, so both follow the flower basket. --}}
                     @if ($hasDispensationLines)
-                    @can('dispensation.price.override')
+                    @if ($this->userCan('dispensation.price.override'))
                         <div x-data="{ open: false }" class="mt-3">
                             <button
                                 type="button"
@@ -832,7 +832,7 @@
                             <p class="mt-1 text-[11px] text-ink-muted dark:text-slate-400">{{ __('Deja el importe vacío para cobrar el precio normal. 0 € = gratis.') }}</p>
                         </div>
                         </div>
-                    @endcan
+                    @endif
                     @endif
 
                     {{-- Tender (prompt 74): wallet APPLIED + physical cash TENDERED → change. The cash field is
@@ -927,7 +927,7 @@
                                 <textarea wire:model="overrideReason" rows="2" placeholder="{{ __('Motivo de la excepción (queda registrado)') }}" class="mt-2 w-full rounded-xl border border-warning/40 bg-surface px-3 py-2 text-sm focus:border-warning focus:outline-none focus:ring-2 focus:ring-warning/40 dark:bg-slate-950"></textarea>
                                 <button type="button" wire:click="commitWithOverride" wire:loading.attr="disabled" wire:target="commitWithOverride" x-bind:disabled="! online" class="mt-2 h-12 w-full rounded-xl bg-warning px-4 text-base font-semibold text-white transition hover:opacity-90 disabled:opacity-60">{{ __('Autorizar y registrar') }}</button>
                             @else
-                                <p class="mt-2 text-sm text-ink-muted dark:text-slate-400">{{ __('Un responsable con permiso (limits.override) debe autorizar esta excepción.') }}</p>
+                                @include('livewire.counter.partials.authorise-with-pin', ['action' => 'commitWithAuthoriserPin', 'reasonModel' => 'overrideReason'])
                             @endif
                         </div>
                     @endif

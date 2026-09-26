@@ -14,6 +14,24 @@
         @endforeach
     </div>
 
+    {{-- Prompt 265 — a grant that needs another to be usable: warned, with the other offered in one click. Never
+         changed automatically — it is the owner's choice. --}}
+    @foreach ($roles as $role)
+        @foreach ($dependencies[$role->value] as $dependency)
+            <div data-dependency-warning="{{ $role->value }}:{{ $dependency['permission'] }}"
+                 class="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-warning-300 bg-warning-50 px-4 py-3 text-sm text-warning-800 dark:border-warning-500/40 dark:bg-warning-500/10 dark:text-warning-300">
+                <span>
+                    <strong>{{ $role->label() }}:</strong>
+                    {{ \App\Support\Permissions::label($dependency['permission']) }} —
+                    {{ \App\Support\Permissions::dependencyReason($dependency['permission'], $dependency['needs']) }}
+                </span>
+                <x-filament::button size="xs" color="warning" wire:click="grantDependency('{{ $role->value }}', '{{ $dependency['needs'] }}')">
+                    {{ __('Conceder también «:needs»', ['needs' => \App\Support\Permissions::label($dependency['needs'])]) }}
+                </x-filament::button>
+            </div>
+        @endforeach
+    @endforeach
+
     @foreach ($groups as $group => $permissions)
         <x-filament::section :heading="$group">
             <div class="overflow-x-auto">

@@ -52,6 +52,17 @@
                     </div>
                 </dl>
 
+                {{-- Prompt 265 — the petty cash that left the drawer, itemised: this is where a difference gets explained. --}}
+                @if ($closedPetty !== null && $closedPetty['items'] !== [])
+                    <div data-arqueo-petty-cash class="mt-4 border-t border-line pt-3 text-sm dark:border-slate-800">
+                        <div class="flex items-center justify-between">
+                            <span class="font-medium">{{ __('Caja chica') }}</span>
+                            <span class="font-semibold tabular-nums">{{ $this->money($closedPetty['total']) }}</span>
+                        </div>
+                        @include('livewire.counter.partials.petty-cash-items', ['items' => $closedPetty['items']])
+                    </div>
+                @endif
+
                 @if ($varianceOff && filled($closeNote))
                     <div class="mt-4 rounded-xl border border-line bg-surface-alt px-4 py-3 text-sm dark:border-slate-800 dark:bg-slate-800">
                         <p class="font-medium">{{ __('Nota') }}</p>
@@ -385,9 +396,12 @@
                         <dt class="text-ink-muted dark:text-slate-400">{{ __('Ingresado en banco') }}</dt>
                         <dd class="font-medium tabular-nums">{{ $this->money($b['banked']) }}</dd>
                     </div>
-                    <div class="flex items-center justify-between py-2">
-                        <dt class="text-ink-muted dark:text-slate-400">{{ __('Caja chica') }}</dt>
-                        <dd class="font-medium tabular-nums">{{ $this->money($b['petty_cash']) }}</dd>
+                    <div class="py-2">
+                        <div class="flex items-center justify-between">
+                            <dt class="text-ink-muted dark:text-slate-400">{{ __('Caja chica') }}</dt>
+                            <dd class="font-medium tabular-nums">{{ $this->money($b['petty_cash']) }}</dd>
+                        </div>
+                        @include('livewire.counter.partials.petty-cash-items', ['items' => $b['petty_cash_items']])
                     </div>
                 </dl>
 
@@ -468,7 +482,7 @@
             {{-- Gasto de caja (petty cash) — only staff who may record expenses.
                  Rendered only in the open-session branch, so it never appears during the
                  blind count (which keeps the expected figure hidden). --}}
-            @can('expenses.record')
+            @if ($this->userCan('expenses.record'))
                 <section class="rounded-2xl border border-line bg-surface p-5 dark:border-slate-800 dark:bg-slate-900 sm:p-6">
                     <h3 class="text-base font-semibold">{{ __('Registrar gasto de caja') }}</h3>
                     <p class="mt-0.5 text-sm text-ink-muted dark:text-slate-400">{{ __('Sale del efectivo del cajón (caja chica).') }}</p>
@@ -523,7 +537,7 @@
                         </fieldset>
                     </form>
                 </section>
-            @endcan
+            @endif
             {{-- Fee collection LEFT this screen (prompt 201). It was the only panel on the caja that began
                  by asking you to find a person — its own member lookup, on a screen otherwise about the
                  drawer — and Socios does that job better, showing the socio's record, what they owe and
@@ -537,11 +551,11 @@
                  The drawer invariant is unchanged: a CASH fee still needs an open till, and Socios resolves
                  the same one through SelectTillSession, so it still lands in this drawer and still shows in
                  the arqueo as «Cuotas en efectivo». That is asserted, not assumed. --}}
-            @can('membership.fee.collect')
+            @if ($this->userCan('membership.fee.collect'))
                 <p data-fee-moved class="rounded-2xl border border-dashed border-line px-4 py-3 text-sm text-ink-muted dark:border-slate-700 dark:text-slate-400">
                     {{ __('Las cuotas se cobran en Socios, donde ves la ficha del socio y lo que debe. El efectivo sigue entrando en esta caja.') }}
                 </p>
-            @endcan
+            @endif
             </div>
 
             @endif
@@ -557,7 +571,7 @@
                  handover be counted to fit. `till.open`, not `till.close` — closing ends the day and is
                  manager-gated for that reason; a handover does neither, and requiring a manager for every
                  shift change would push clubs straight back to sharing a session. --}}
-            @can('till.open')
+            @if ($this->userCan('till.open'))
                 <div data-handover class="mt-4 rounded-2xl border border-line bg-surface p-4 dark:border-slate-800 dark:bg-slate-900">
                     <div class="flex items-center justify-between gap-3">
                         <h3 class="text-base font-semibold">{{ __('Cambio de turno') }}</h3>
@@ -637,13 +651,13 @@
                         </ul>
                     @endif
                 </div>
-            @endcan
+            @endif
 
             {{-- Close (arqueo) — DEMOTED (prompt 91): a once-a-day, irreversible action must not be the
                  loudest control on a tablet being scrolled mid-shift. A quiet, outlined button (the routine
                  movement/expense/fee actions carry the brand fill instead), and it opens a deliberate
                  multi-step close (reweigh → blind count) rather than committing anything on tap. --}}
-            @can('till.close')
+            @if ($this->userCan('till.close'))
                 <button
                     type="button"
                     wire:click="startClose"
@@ -654,9 +668,9 @@
                 </button>
             @else
                 <p class="rounded-xl border border-dashed border-line px-4 py-3 text-center text-sm text-ink-muted dark:border-slate-700 dark:text-slate-400">
-                    {{ __('Solo un responsable con permiso (till.close) puede cerrar la caja.') }}
+                    {{ __('Cerrar la caja lo hace alguien con permiso: que se identifique con su PIN.') }}
                 </p>
-            @endcan
+            @endif
         @endif
     @endif
 @endif

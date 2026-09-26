@@ -78,6 +78,24 @@ class RolesPermissions extends Page
         }
     }
 
+    /**
+     * "Conceder también" — grant the permission a held one needs (prompt 265), in one click from the warning. The same
+     * audited writer as a tick; only ever a GRANT of a listed dependency.
+     */
+    public function grantDependency(string $role, string $permission): void
+    {
+        abort_unless(static::canAccess(), 403);
+
+        $roleEnum = Role::tryFrom($role);
+        abort_if($roleEnum === null || $roleEnum === Role::OWNER, 403);
+        abort_unless(in_array($permission, array_merge(...array_values(Permissions::DEPENDENCIES)), true), 403);
+
+        $actor = Auth::user();
+        abort_unless($actor instanceof User, 403);
+
+        (new SetRolePermission)->handle($roleEnum, $permission, true, $actor);
+    }
+
     public function restoreDefaults(string $role): void
     {
         abort_unless(static::canAccess(), 403);
@@ -106,6 +124,8 @@ class RolesPermissions extends Page
             'held' => collect($editable)->mapWithKeys(fn (Role $r): array => [$r->value => Permissions::for($r)])->all(),
             'defaults' => collect($editable)->mapWithKeys(fn (Role $r): array => [$r->value => Permissions::defaultsFor($r)])->all(),
             'sensitive' => Permissions::SENSITIVE,
+            // Prompt 265 — held grants that need another the role lacks, per role.
+            'dependencies' => collect($editable)->mapWithKeys(fn (Role $r): array => [$r->value => Permissions::missingDependencies(Permissions::for($r))])->all(),
         ];
     }
 }

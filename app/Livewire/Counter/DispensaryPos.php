@@ -838,7 +838,36 @@ class DispensaryPos extends Component
         $this->attemptCommit(override: true);
     }
 
-    private function attemptCommit(bool $override): void
+    /** The PIN of whoever authorises a limit breach for the staff member serving (prompt 265). Never persisted. */
+    public string $authoriserPin = '';
+
+    /**
+     * "Autorizar con PIN" (prompt 265): a manager standing beside the staff member authorises THIS breach with their
+     * own PIN and a reason — the dispensation commits with the manager as the override's authoriser while the staff
+     * member stays the operator of record and stays identified. Audited as the manager's override
+     * (`dispensation.limit.override`, authorised_by). A PIN without `limits.override` is refused.
+     */
+    public function commitWithAuthoriserPin(): void
+    {
+        $pin = $this->authoriserPin;
+        $this->authoriserPin = ''; // never keep a PIN in component state
+
+        if (trim($this->overrideReason) === '') {
+            $this->flash(__('Indica el motivo de la excepción (queda registrado).'), 'error');
+
+            return;
+        }
+
+        $authoriser = $this->authoriserFromPin($pin, 'limits.override');
+
+        if ($authoriser === null) {
+            return;
+        }
+
+        $this->attemptCommit(override: true, authoriser: $authoriser);
+    }
+
+    private function attemptCommit(bool $override, ?User $authoriser = null): void
     {
         $member = $this->resolveMember();
         $location = $this->resolveLocation();
@@ -997,7 +1026,8 @@ class DispensaryPos extends Component
         }
 
         if ($override) {
-            $user = $this->counterActor();
+            // The authoriser: the operator, or — "Autorizar con PIN" (prompt 265) — whoever's PIN authorised it.
+            $user = $authoriser ?? $this->counterActor();
 
             if ($user === null || ! $user->can('limits.override')) {
                 $this->flash(__('No tienes permiso para autorizar una excepción.'), 'error');

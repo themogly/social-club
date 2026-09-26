@@ -122,6 +122,30 @@ class CheckInScreen extends Component
         $this->attemptCheckIn(override: true);
     }
 
+    /** The PIN of whoever authorises a blocked entry for the staff member at the door (prompt 265). Never persisted. */
+    public string $authoriserPin = '';
+
+    /**
+     * "Autorizar con PIN" at the door (prompt 265): someone who holds `checkin.override` authorises THIS entry with
+     * their own PIN; the staff member stays the operator of record and stays identified, and the override is audited
+     * as the authoriser's (`checkin.override`, authorised_by).
+     */
+    public function confirmOverrideWithPin(): void
+    {
+        $pin = $this->authoriserPin;
+        $this->authoriserPin = '';
+
+        if (! $this->requireOperator()) {
+            return;
+        }
+
+        $authoriser = $this->authoriserFromPin($pin, 'checkin.override');
+
+        if ($authoriser !== null) {
+            $this->attemptCheckIn(override: true, authoriser: $authoriser);
+        }
+    }
+
     public function checkOut(): void
     {
         // A write like every other door action (prompt 255): someone must be identified.
@@ -147,7 +171,7 @@ class CheckInScreen extends Component
         $this->dispatch('checkins-updated');
     }
 
-    private function attemptCheckIn(bool $override): void
+    private function attemptCheckIn(bool $override, ?User $authoriser = null): void
     {
         $member = $this->resolveMember();
         $location = $this->resolveLocation();
@@ -174,7 +198,7 @@ class CheckInScreen extends Component
         $options = ['method' => $this->scanned ? CheckInMethod::QR : CheckInMethod::MANUAL];
 
         if ($override) {
-            $user = $this->counterActor();
+            $user = $authoriser ?? $this->counterActor(); // "Autorizar con PIN" (prompt 265) names the authoriser
 
             if ($user === null || ! $user->can('checkin.override')) {
                 $this->flash(__('No tienes permiso para autorizar una excepción.'), 'error');

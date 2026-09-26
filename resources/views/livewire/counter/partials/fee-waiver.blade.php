@@ -27,7 +27,7 @@
      it opens, which needs the full width. Default `both` keeps every existing caller working unchanged. --}}
 @php($part = $part ?? 'both')
 
-@can('membership.fee.waive')
+@if ($this->userCan('membership.fee.waive'))
     @php($waiveOptions = $this->waiveReasonOptions())
     <div @class(['contents' => $part !== 'both', 'mt-2' => $part === 'both']) data-fee-waiver>
         @if ($part !== 'form')
@@ -92,4 +92,4 @@
             </div>
         @endif
     </div>
-@endcan
+@endif
