@@ -13289,3 +13289,98 @@ unreachable; narrowing the fields for the ordinary counter is a separate pass (t
 
 Merged to `main` on Ben's explicit instruction for this session. `composer check` green in `es` (pinned) and
 `en`; MySQL left to CI. No new copy (a refused call has no UI).
+
+## Prompt 255 — the person at the counter is the PIN operator, not the tablet's login
+
+### Ben's answer, and the choice it sets
+
+**"Varies per tablet."** Some tablets are logged in as the owner, so finding 1 (a staff PIN inheriting the
+device's rights) is live on at least some devices — the full fix applies. And because the device account is
+not a known low-privilege floor, **the `currentUser()` fallback is removed**: with nobody identified, the
+counter authorises NOTHING. A fallback would hand whichever account a tablet happens to be logged in as to
+whoever is standing at it.
+
+### Before (the new suite on `main`'s app code — all 12 red)
+
+- `test_a_staff_pin_cannot_close_the_till_on_an_owner_tablet` — *Expected 'error', Actual 'success'* (the till
+  closed).
+- `test_a_staff_pin_cannot_authorise_a_door_override_on_an_owner_tablet` — *'error' vs 'success'*.
+- `…the_recorded_closer` / `…door_override_is_authorised_by_the_operator…` / `…price_override_is_by_the_operator…`
+  / `…stock_take_is_opened_by_the_operator…` — each *"Failed asserting that two strings are identical"*: the
+  column held the OWNER tablet's id, not the manager's.
+- The four no-operator writes (`submitCount`, `submitReweigh`, `checkOut`, `emailReceipt`) — *"Failed asserting
+  that false matches expected true"* (`operatorPanelOpen`): each ran with nobody identified.
+- `…receipt_email_cannot_reach_another_sedes_dispensation` — *"DispensationReceiptMail queued unexpectedly"* (F5).
+- `test_the_view_flags_follow_the_operator` — *"staff inherited cash.bank from the owner tablet"*.
+
+### The seam
+
+`IdentifiesOperator` (composed by every counter screen) now owns the ONE implementation:
+
+- `userCan($permission)` → `CounterOperator::current()?->can()` — every screen's `userCan()`, every view flag
+  (`canOverride`, `canVoid`, `canBankCash`, …) and every inline `$user->can()` at an action site.
+- `counterActor()` → the operator — passed as the actor / `*_by` everywhere the counter writes one: `CloseTill`
+  (`closed_by`), `CheckInMember` (`override_by` → `authorised_by`), `CommitDispensation` (`price_override_by`,
+  limit `override_by`), `StockTake.opened_by`, `RecordTillExpense` (`recorded_by`), `VoidDispensation` /
+  `VoidOrder`, fee collect/waive, `OpensMemberships`, and `SignsUpMembers::requireOperatorForAlta()` (the
+  issuer AND `ApproveApplication`'s `reviewed_by`). The same source that already set `operator_id` on the money
+  — one answer to "who did this". The `CounterOperator::id() ?? currentUser()->id` fallbacks on `operator_id`
+  are gone (every one sits behind `requireOperator()`).
+- The per-screen private `userCan()` / `currentUser()` copies (six of them) are deleted, so a new site has to
+  choose between the two helpers below rather than inherit the device by default.
+
+### What deliberately stays the DEVICE's (stated, not inherited)
+
+`deviceUser()` / `deviceCan()`: **which sedes** the terminal can adopt (`LocationSwitcher`, in
+`ResolvesCounterLocation` and the home's sede list), **which screens** it can open (the five `mount()` gates,
+`CounterScreens::reachableFor/landingRouteFor`), and the home's Administración link (the panel IS the device
+session). These must resolve before anyone has typed a PIN, or the PIN pad itself could never render; none of
+them authorises an action. Signed vault URLs (member photos) also stay bound to the device user, because the
+URL carries `u=<viewer>` and is checked against the session that fetches it — passing the operator would break
+every photo.
+
+### The four unguarded writes, and one more
+
+`TillSession::submitCount()` and `submitReweigh()`, `CheckInScreen::checkOut()`, `DispensaryPos::emailReceipt()`
+now call `requireOperator()` first (mirroring `voidLast()`). The same gap existed in `WhosInside::checkOut()` /
+`checkOutAll()` (a child component with no pad of its own): its writes now ask the operator (`403` with nobody
+identified — the host's pad is the one pad, 173) while its mount stays a device gate.
+
+### F5 folded in
+
+`emailReceipt()` and `voidLast()` both looked up `lastDispensationId` (client-settable) with
+`withoutGlobalScopes()->find()` — any organisation's dispensation. Both now go through `lastDispensation()`,
+scoped to the counter's `#[Locked]` sede. Locking `lastDispensationId` itself was tried and dropped: three
+existing suites legitimately set it, and the sede scope is the boundary F5 asked for.
+
+### Counter home
+
+The panels (inside now, takings, shift) are the operator's — `Dashboard::for(counterActor())` — so a staff PIN
+on an owner tablet no longer sees the owner's takings. The panels render only once someone is identified
+(nothing under the surface before that).
+
+### Role matrix
+
+Unchanged — `git diff main -- app/Support/Permissions.php database/seeders/ app/Enums/Role.php` is empty. This is
+who is ASKED, not what is granted. No legitimate staff action turned out to be refused by the change beyond what
+the matrix already says staff may not do (close the till, override, void, bank).
+
+### Tests
+
+`tests/Feature/Counter/CounterOperatorIsTheActorTest` (14): the owner-tablet install throughout. Existing tests
+that relied on the device doing the operator's job were moved to the model — `BarPosScreenTest` /
+`DispensaryPosScreenTest` void-as-manager (the manager now identifies with a PIN instead of re-logging the
+tablet), `TillUiTest` close (identifies), `OneCounterLinkTest` (reads `deviceUser()`).
+
+### Open (not in this prompt)
+
+- `audit_logs.actor_id` is still `Auth::id()` inside `RecordAuditLog`, so audit rows written by counter actions
+  (e.g. `counter.handover.started`, `dispensation.void`) name the device account in `actor_id`, while their
+  payloads and the domain `*_by` columns now name the operator. Fixing it needs an explicit actor on
+  `RecordAuditLog` (the panel must not read a stale counter operator from a shared session), so it is its own
+  change.
+- The counter photo-capture route (`counter/members/{member}/photo`) records `$request->user()` — the device.
+
+### Merge
+
+Merged to `main` on Ben's explicit instruction for this session. No new copy (existing refusal strings reused).

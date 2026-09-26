@@ -86,7 +86,7 @@ class CheckInScreen extends Component
 
     public function mount(): void
     {
-        abort_unless($this->userCan('checkin.manage'), 403);
+        abort_unless($this->deviceCan('checkin.manage'), 403);
 
         // Resolve the counter's OWN working sede (session key counter.location_id) — never the panel
         // scope, never a silent guess. One assigned sede is adopted; several ⇒ ask (mustChooseLocation).
@@ -123,6 +123,11 @@ class CheckInScreen extends Component
 
     public function checkOut(): void
     {
+        // A write like every other door action (prompt 255): someone must be identified.
+        if (! $this->requireOperator()) {
+            return;
+        }
+
         $member = $this->resolveMember();
         $location = $this->resolveLocation();
 
@@ -168,7 +173,7 @@ class CheckInScreen extends Component
         $options = ['method' => $this->scanned ? CheckInMethod::QR : CheckInMethod::MANUAL];
 
         if ($override) {
-            $user = $this->currentUser();
+            $user = $this->counterActor();
 
             if ($user === null || ! $user->can('checkin.override')) {
                 $this->flash(__('No tienes permiso para autorizar una excepción.'), 'error');
@@ -213,7 +218,7 @@ class CheckInScreen extends Component
             return;
         }
 
-        $user = $this->currentUser();
+        $user = $this->counterActor();
         if ($user === null || ! $user->can('membership.fee.collect')) {
             $this->flash(__('No tienes permiso para cobrar cuotas.'), 'error');
 
@@ -346,18 +351,6 @@ class CheckInScreen extends Component
         return $actor instanceof User ? VaultUrl::photo($member, $actor) : null;
     }
 
-    private function userCan(string $permission): bool
-    {
-        return $this->currentUser()?->can($permission) ?? false;
-    }
-
-    private function currentUser(): ?User
-    {
-        $user = Auth::user();
-
-        return $user instanceof User ? $user : null;
-    }
-
     private function holdMember(string $memberId, bool $scanned): void
     {
         $this->memberId = $memberId;
@@ -407,7 +400,7 @@ class CheckInScreen extends Component
         }
 
         $location = $this->resolveLocation();
-        $user = $this->currentUser();
+        $user = $this->counterActor();
 
         if ($location === null || $user === null) {
             $this->flash(__('Sin sede activa.'), 'error');

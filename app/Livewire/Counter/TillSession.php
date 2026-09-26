@@ -36,7 +36,6 @@ use App\Support\Weight;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Collection;
-use Illuminate\Support\Facades\Auth;
 use InvalidArgumentException;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Locked;
@@ -139,7 +138,7 @@ class TillSession extends Component
 
     public function mount(): void
     {
-        abort_unless($this->userCan('till.open') || $this->userCan('till.close'), 403);
+        abort_unless($this->deviceCan('till.open') || $this->deviceCan('till.close'), 403);
 
         // Resolve the counter's OWN working sede (session key counter.location_id) — never the panel
         // scope, never a silent guess. One assigned sede is adopted; several ⇒ ask (mustChooseLocation).
@@ -400,7 +399,7 @@ class TillSession extends Component
      */
     private function landingUrl(): string
     {
-        $route = CounterScreens::landingRouteFor($this->currentUser()) ?? 'counter.home';
+        $route = CounterScreens::landingRouteFor($this->deviceUser()) ?? 'counter.home';
 
         return route($route);
     }
@@ -485,7 +484,7 @@ class TillSession extends Component
             return;
         }
 
-        $user = $this->currentUser();
+        $user = $this->counterActor();
 
         if ($user === null || ! $user->can('expenses.record')) {
             $this->flash(__('No tienes permiso para registrar un gasto.'), 'error');
@@ -619,7 +618,12 @@ class TillSession extends Component
             return;
         }
 
-        $user = $this->currentUser();
+        // A stock take is a write attributed to a person (prompt 255) — never run with nobody identified.
+        if (! $this->requireOperator()) {
+            return;
+        }
+
+        $user = $this->counterActor();
         if ($user === null || ! $user->can('stock.take')) {
             $this->flash(__('No tienes permiso para recontar el inventario.'), 'error');
 
@@ -761,7 +765,13 @@ class TillSession extends Component
             return;
         }
 
-        $user = $this->currentUser();
+        // Closing the till is the operator's act, and it is attributed (`closed_by`) — prompt 255 found it ran
+        // with nobody identified, e.g. straight after an idle lock.
+        if (! $this->requireOperator()) {
+            return;
+        }
+
+        $user = $this->counterActor();
 
         if ($user === null || ! $user->can('till.close')) {
             $this->flash(__('No tienes permiso para cerrar la caja.'), 'error');
@@ -930,22 +940,10 @@ class TillSession extends Component
         $this->reweighResult = null;
     }
 
-    private function userCan(string $permission): bool
-    {
-        return $this->currentUser()?->can($permission) ?? false;
-    }
-
     /** Whether this operator may bank cash (cash.bank) — the view hides the BANK option otherwise (prompt 81). */
     public function canBankCash(): bool
     {
         return $this->userCan('cash.bank');
-    }
-
-    private function currentUser(): ?User
-    {
-        $user = Auth::user();
-
-        return $user instanceof User ? $user : null;
     }
 
     private function flash(string $message, string $type): void

@@ -153,7 +153,7 @@ class OneCounterLinkTest extends TestCase
         $hub = (string) file_get_contents(base_path('app/Livewire/Counter/CounterHome.php'));
         $bar = (string) file_get_contents(base_path('resources/views/components/counter/top-bar.blade.php'));
 
-        $this->assertStringContainsString('CounterScreens::reachableFor($this->currentUser())', $hub);
+        $this->assertStringContainsString('CounterScreens::reachableFor($this->deviceUser())', $hub);
         foreach ([$hub, $bar] as $consumer) {
             $this->assertStringNotContainsString("'route' => 'counter.checkin'", $consumer,
                 'A consumer has re-declared the screen list — there must be exactly one.');

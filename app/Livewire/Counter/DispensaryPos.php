@@ -258,7 +258,7 @@ class DispensaryPos extends Component
 
     public function mount(): void
     {
-        abort_unless($this->userCan('pos.use'), 403);
+        abort_unless($this->deviceCan('pos.use'), 403);
 
         // Resolve the counter's OWN working sede (session key counter.location_id) — never the panel
         // scope, never a silent guess. One assigned sede is adopted; several ⇒ ask (mustChooseLocation).
@@ -320,7 +320,7 @@ class DispensaryPos extends Component
             return;
         }
 
-        $user = $this->currentUser();
+        $user = $this->counterActor();
         if ($user === null || ! $user->can('membership.fee.collect')) {
             $this->flash(__('No tienes permiso para cobrar cuotas.'), 'error');
 
@@ -764,7 +764,7 @@ class DispensaryPos extends Component
         // interaction as the limit override.
         $priceOverrideCents = null;
         if (trim($this->priceOverrideEuros) !== '') {
-            $user = $this->currentUser();
+            $user = $this->counterActor();
 
             if ($user === null || ! $user->can('dispensation.price.override')) {
                 $this->flash(__('No tienes permiso para ajustar el precio.'), 'error');
@@ -805,7 +805,7 @@ class DispensaryPos extends Component
         }
 
         $options = [
-            'operator_id' => CounterOperator::id() ?? $this->currentUser()?->id,
+            'operator_id' => CounterOperator::id(),
             'till_session_id' => $till->id,
             'cash_cents' => $cashCents,
             'wallet_cents' => $walletCents,
@@ -819,11 +819,11 @@ class DispensaryPos extends Component
         if ($priceOverrideCents !== null) {
             $options['price_override_cents'] = $priceOverrideCents;
             $options['price_override_reason'] = trim($this->priceOverrideReason);
-            $options['price_override_by'] = $this->currentUser();
+            $options['price_override_by'] = $this->counterActor();
         }
 
         if ($override) {
-            $user = $this->currentUser();
+            $user = $this->counterActor();
 
             if ($user === null || ! $user->can('limits.override')) {
                 $this->flash(__('No tienes permiso para autorizar una excepción.'), 'error');
@@ -1032,7 +1032,7 @@ class DispensaryPos extends Component
         ], $this->basket);
         $orderLines = array_map(fn (array $l): array => ['article_id' => (string) $l['article_id'], 'qty' => (int) $l['qty']], $this->barBasket);
 
-        $operatorId = CounterOperator::id() ?? $this->currentUser()?->id;
+        $operatorId = CounterOperator::id();
         $dispOptions = ['cash_cents' => $dispTotal - $dispWallet, 'wallet_cents' => $dispWallet, 'idempotency_key' => $this->idempotencyKey];
         if ($this->signaturePath !== null) {
             $dispOptions['signature_path'] = $this->signaturePath;
@@ -1115,7 +1115,7 @@ class DispensaryPos extends Component
             $order = (new CommitOrder)->handle($location, $orderLines, [
                 'member_id' => $member->id,
                 'till_session_id' => $till->id,
-                'operator_id' => CounterOperator::id() ?? $this->currentUser()?->id,
+                'operator_id' => CounterOperator::id(),
                 'cash_cents' => $cashApplied,
                 'wallet_cents' => $walletApplied,
                 'idempotency_key' => $this->idempotencyKey !== null ? $this->idempotencyKey.'-bar' : null,
@@ -1179,7 +1179,7 @@ class DispensaryPos extends Component
             return;
         }
 
-        $user = $this->currentUser();
+        $user = $this->counterActor();
 
         if ($user === null || ! $user->can('dispensation.void')) {
             $this->flash(__('No tienes permiso para anular una dispensación.'), 'error');
@@ -1195,7 +1195,7 @@ class DispensaryPos extends Component
             return;
         }
 
-        $dispensation = Dispensation::query()->withoutGlobalScopes()->find($this->lastDispensationId);
+        $dispensation = $this->lastDispensation();
 
         if ($dispensation === null) {
             $this->flash(__('Dispensación no encontrada.'), 'error');
@@ -1227,7 +1227,13 @@ class DispensaryPos extends Component
             return;
         }
 
-        $dispensation = Dispensation::query()->withoutGlobalScopes()->with(['member', 'lines'])->find($this->lastDispensationId);
+        // Sending a member's receipt is counter work like any other (prompt 255): someone must be identified —
+        // after an idle lock, whoever is standing at the tablet cannot mail a member's contribution out.
+        if (! $this->requireOperator()) {
+            return;
+        }
+
+        $dispensation = $this->lastDispensation()?->load(['member', 'lines']);
         $email = $dispensation?->member?->email;
 
         if ($dispensation === null || $email === null) {
@@ -1246,6 +1252,20 @@ class DispensaryPos extends Component
         } catch (\Throwable) {
             $this->flash(__('No se pudo enviar el comprobante. Inténtalo de nuevo.'), 'error');
         }
+    }
+
+    /**
+     * The contribution this counter just committed — scoped to THIS sede (prompt 255, audit F5). The id is a
+     * public property the client can set, so `withoutGlobalScopes()->find()` alone found ANY organisation's
+     * dispensation for a void or a receipt e-mail. Scoped to the counter's #[Locked] sede, the reach is what the
+     * operator could already do here; the void keeps its own permission check on top.
+     */
+    private function lastDispensation(): ?Dispensation
+    {
+        // The sede is the tighter bound (a location belongs to one organisation, and `$locationId` is #[Locked]).
+        return Dispensation::query()->withoutGlobalScopes()
+            ->where('location_id', $this->locationId)
+            ->find($this->lastDispensationId);
     }
 
     // --- View data (assembled here; the view stays declarative) -----------------
@@ -2145,18 +2165,6 @@ class DispensaryPos extends Component
         $this->idempotencyKey = (string) Str::ulid();
     }
 
-    private function userCan(string $permission): bool
-    {
-        return $this->currentUser()?->can($permission) ?? false;
-    }
-
-    private function currentUser(): ?User
-    {
-        $user = Auth::user();
-
-        return $user instanceof User ? $user : null;
-    }
-
     private function flash(string $message, string $type): void
     {
         // Any message other than a settled one means the previous outcome is no longer what is on screen
@@ -2200,7 +2208,7 @@ class DispensaryPos extends Component
         }
 
         $location = $this->resolveLocation();
-        $user = $this->currentUser();
+        $user = $this->counterActor();
 
         if ($location === null || $user === null) {
             $this->flash(__('Sin sede activa.'), 'error');

@@ -29,7 +29,6 @@ use App\Support\Wallet;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
-use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Str;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Locked;
@@ -146,7 +145,7 @@ class BarPos extends Component
 
     public function mount(): void
     {
-        abort_unless($this->userCan('pos.bar'), 403);
+        abort_unless($this->deviceCan('pos.bar'), 403);
 
         // Resolve the counter's OWN working sede (session key counter.location_id) — never the panel
         // scope, never a silent guess. One assigned sede is adopted; several ⇒ ask (mustChooseLocation).
@@ -441,7 +440,7 @@ class BarPos extends Component
         $reference = trim($this->reference);
 
         $options = [
-            'operator_id' => CounterOperator::id() ?? $this->currentUser()?->id,
+            'operator_id' => CounterOperator::id(),
             'till_session_id' => $till->id,
             'member_id' => $this->memberId,
             'cash_cents' => $cashCents,
@@ -496,7 +495,7 @@ class BarPos extends Component
             return;
         }
 
-        $user = $this->currentUser();
+        $user = $this->counterActor();
 
         if ($user === null || ! $user->can('order.void')) {
             $this->flash(__('No tienes permiso para anular un pedido.'), 'error');
@@ -835,18 +834,6 @@ class BarPos extends Component
         ]);
 
         $this->idempotencyKey = (string) Str::ulid();
-    }
-
-    private function userCan(string $permission): bool
-    {
-        return $this->currentUser()?->can($permission) ?? false;
-    }
-
-    private function currentUser(): ?User
-    {
-        $user = Auth::user();
-
-        return $user instanceof User ? $user : null;
     }
 
     private function flash(string $message, string $type): void

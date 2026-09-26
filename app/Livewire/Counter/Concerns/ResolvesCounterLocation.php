@@ -30,7 +30,7 @@ trait ResolvesCounterLocation
     /** Resolve the counter's working sede from its OWN state; never reads or writes the panel scope. */
     protected function resolveCounterLocation(): void
     {
-        $user = $this->currentUser();
+        $user = $this->deviceUser();
         $available = $user !== null
             ? app(LocationSwitcher::class)->available($user)
             : collect();

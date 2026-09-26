@@ -21,7 +21,6 @@ use App\Support\AvaladorResolver;
 use App\Support\Mrz\MrzParser;
 use App\Support\Settings;
 use Illuminate\Support\Collection;
-use Illuminate\Support\Facades\Auth;
 use RuntimeException;
 
 /**
@@ -830,8 +829,8 @@ trait SignsUpMembers
             return null;
         }
 
-        $user = Auth::user();
-
-        return $user instanceof User ? $user : null;
+        // The PIN operator, never the tablet's login (prompt 255) — this user is the application's issuer and,
+        // on the review, its reviewer.
+        return $this->counterActor();
     }
 }

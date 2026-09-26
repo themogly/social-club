@@ -128,7 +128,7 @@ class MembershipCounter extends Component
 
     public function mount(): void
     {
-        abort_unless($this->userCan('membership.fee.collect'), 403);
+        abort_unless($this->deviceCan('membership.fee.collect'), 403);
         $this->resolveCounterLocation();
 
         // Pending applications already had a home on this screen — the Alta panel and its
@@ -261,7 +261,7 @@ class MembershipCounter extends Component
             return;
         }
 
-        $user = $this->currentUser();
+        $user = $this->counterActor();
         if ($user === null || ! $user->can('membership.fee.collect')) {
             $this->flash(__('No tienes permiso para cobrar cuotas.'), 'error');
 
@@ -397,18 +397,6 @@ class MembershipCounter extends Component
         return $this->locationId !== null ? Location::query()->find($this->locationId) : null;
     }
 
-    private function currentUser(): ?User
-    {
-        $user = Auth::user();
-
-        return $user instanceof User ? $user : null;
-    }
-
-    public function userCan(string $permission): bool
-    {
-        return $this->currentUser()?->can($permission) ?? false;
-    }
-
     /** Weight for display (integer centigrams), via the shared value object — same formatter as the POS. */
     public function grams(int $centigrams): string
     {
@@ -440,7 +428,7 @@ class MembershipCounter extends Component
         }
 
         $location = $this->resolveLocation();
-        $user = $this->currentUser();
+        $user = $this->counterActor();
 
         if ($location === null || $user === null) {
             $this->flash(__('Sin sede activa.'), 'error');
