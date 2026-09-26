@@ -13384,3 +13384,61 @@ tablet), `TillUiTest` close (identifies), `OneCounterLinkTest` (reads `deviceUse
 ### Merge
 
 Merged to `main` on Ben's explicit instruction for this session. No new copy (existing refusal strings reused).
+
+## Prompt 256 — a dispensation line is validated where it is committed, not only where the basket is built
+
+### Before (new tests on the untouched writer)
+
+- Forged basket through the real screen, `grams_cg: -500` on a manual lote — *Expected 'error', Actual
+  'success'*: the negative contribution committed (the audit measured total −€36.15, the lote's
+  `remaining_cg` RISING, negative cash movements, the member's daily used going negative).
+- Writer, −500 / 0 cg on a manual lote — the line committed (*"A -500 cg line committed."*).
+- Automatic, −500 cg with ample stock — *"Failed asserting that exception with message 'Cada línea necesita una
+  cantidad positiva.' is thrown"*: the refusal, when it came, was `AllocateFromBatches` falling through to
+  "Stock insuficiente" — luck, not a guard.
+- Manual lote of another genetic / of another sede — both committed and drew from the wrong lote.
+- `CommitCombinedSettle` with a −500 cg line — committed through the same writer.
+
+### The two invariants, both inside `CommitDispensation` (the single writer)
+
+1. **Quantity is positive** — in `normalise()`, beside the existing unit guard, for WEIGHT lines
+   (`grams_cg <= 0` refused) before any allocation or pricing. The unit guard's message moved to the same
+   translated sentence so the two are symmetric. This makes the automatic path's refusal explicit and shared
+   instead of an accident of the allocator.
+2. **A manual lote matches its line** — in the per-line loop's manual branch: `batch.genetic_id` must equal the
+   line's genetic AND `batch.location_id` the commit's location, checked BEFORE `isDispensable` (in addition to
+   it, not instead).
+
+Both are `RuntimeException`s, so the POS shows its existing readable "No se pudo registrar la dispensación.
+Revisa la cesta y el stock." and the transaction rolls back — nothing partial. `DispensaryPos::addLine()` is
+untouched (it is the UI guard the forged basket bypasses). `CommitCombinedSettle` inherits both (proven: the
+bar half of a refused combined settle is not written either).
+
+### The bar's misc line — reproduced, and guarded
+
+The prompt's exact case (a negative misc line driving an order total NEGATIVE) did **not** reproduce through the
+screen: `BarPos::commitOrder()`'s tender check refuses a negative cash figure first. That test is kept, labelled
+as the tender check holding. What **did** reproduce: a forged −€3.00 misc line beside a €5.00 article — the total
+stays positive, the tender check passes, and `CommitOrder` wrote the negative line (an off-book discount
+`addMiscLine()` can never produce). So `CommitOrder` now refuses a misc line with `unit_price_cents <= 0`. The
+combined settle's order lines are article-only (mapped to `article_id` + `qty`), so it cannot carry a misc line.
+
+### Copy
+
+Three new strings in `lang/es.json` + `lang/en.json` ("Cada línea necesita una cantidad positiva.", "El lote
+:batch no corresponde a este producto en esta sede.", "Cada línea necesita un importe positivo."). They surface
+in exception messages (logs, the admin), not on the POS, which keeps its generic refusal.
+
+### Not a question for Ben (yet)
+
+No legitimate meaning of a negative weight was found — a reversal is `VoidDispensation`, a correction is void +
+fresh row. If one is ever wanted, it is a decision, not a reason to accept a negative from the client.
+
+### Verification
+
+`tests/Feature/Dispensing/CommitValidatesItsLinesTest` (9). `composer check` green in `es` and `en`. MySQL left
+to CI (the audit already raced the lock on MySQL; this prompt changes a single forged line, not a race).
+
+### Merge
+
+Merged to `main` on Ben's explicit instruction for this session.

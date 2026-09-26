@@ -318,7 +318,7 @@ class CommitDispensation
             if ($genetic->isUnitType()) {
                 $units = (int) ($line['units'] ?? 0);
                 if ($units <= 0) {
-                    throw new RuntimeException('A unit dispensation line needs a positive unit count.');
+                    throw new RuntimeException(__('Cada línea necesita una cantidad positiva.'));
                 }
 
                 return [
@@ -329,10 +329,20 @@ class CommitDispensation
                 ];
             }
 
+            // Prompt 256 — the weight twin of the unit guard above. `addLine()` refuses a non-positive weight, but
+            // the basket is a public Livewire property: a forged `grams_cg: -500` on a manual lote reached the
+            // locked decrement (whose guard only stops the RESULT going below zero), so the lote's stock ROSE,
+            // cash was recorded leaving the till and the member's daily allowance went up. The writer holds the
+            // invariant, before any allocation or pricing, for every caller (POS, combined settle, seeds).
+            $grams = (int) ($line['grams_cg'] ?? 0);
+            if ($grams <= 0) {
+                throw new RuntimeException(__('Cada línea necesita una cantidad positiva.'));
+            }
+
             return [
                 'genetic_id' => $genetic->id,
                 'batch_id' => isset($line['batch_id']) ? (string) $line['batch_id'] : null,
-                'grams_cg' => (int) ($line['grams_cg'] ?? 0),
+                'grams_cg' => $grams,
                 'units' => null,
             ];
         }, $lines);
@@ -361,6 +371,12 @@ class CommitDispensation
             if ($line['batch_id'] !== null) {
                 // MANUAL: the operator's chosen lote. Must be dispensable and must fit — refused, as before.
                 $batch = Batch::withoutGlobalScopes()->whereKey($line['batch_id'])->firstOrFail();
+                // Prompt 256 — the chosen lote must be THIS line's product at THIS sede. `isDispensable` only asks
+                // open/unexpired/non-empty, so a forged `batch_id` drew a Centro sale from another genetic's lote
+                // or from a Norte lote, and the register showed grams from a lote that did not match what was sold.
+                if ($batch->genetic_id !== $genetic->id || $batch->location_id !== $location->id) {
+                    throw new RuntimeException(__('El lote :batch no corresponde a este producto en esta sede.', ['batch' => $batch->batch_no]));
+                }
                 if (! (new SelectBatch)->isDispensable($batch)) {
                     throw new RuntimeException("Batch {$batch->batch_no} is not dispensable (closed, expired or empty).");
                 }
