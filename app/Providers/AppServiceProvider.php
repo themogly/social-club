@@ -4,6 +4,7 @@ namespace App\Providers;
 
 use App\Support\ActiveScope;
 use App\Support\CounterHandoverConfinement;
+use App\Support\CounterRequest;
 use App\Support\Help;
 use Filament\Schemas\Components\Form;
 use Filament\Tables\Table;
@@ -27,6 +28,9 @@ class AppServiceProvider extends ServiceProvider
     {
         // Prompt 254 — while an applicant holds the counter tablet, Livewire answers only the handover surface.
         CounterHandoverConfinement::register();
+
+        // Prompt 261 — mark counter Livewire requests, so the audit actor is the PIN operator there and only there.
+        CounterRequest::register();
 
         // A click on the primary button must ALWAYS produce a visible answer (prompt 168).
         //

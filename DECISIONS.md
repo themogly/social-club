@@ -13661,3 +13661,65 @@ handover confinement suite is green.
 ### Merge
 
 Merged to `main` on Ben's instruction. `composer check` green in `es` and `en`; no new copy.
+
+## Prompt 261 — the audit trail names the person at the PIN, and a member's photo needs one
+
+### Before (new tests on `main`'s app code)
+
+- `POST counter/members/{id}/photo` with NOBODY at the PIN on an owner tablet — *"Expected 403 but received
+  200"*: the member's identity photo was replaced, audited as the tablet's owner account. The photo is what
+  staff verify a face against (157); anyone at an unattended or locked tablet could swap in their own.
+- A staff operator stripped of both counter permissions still captured a photo (*200*): the policy asked the
+  tablet's login.
+- A till closed by the manager on the owner tablet — the `till.closed` audit row's `actor_id` was the OWNER
+  (while `closed_by` on the record, since 255, was the manager).
+- A counter photo view was access-logged against the tablet's login.
+- The no-bleed and pre-PIN route tests were already green (they guard the fix, not the bug).
+
+### The photo route
+
+`MemberPhotoController` now refuses with **403** and the standard "Identifícate con tu PIN antes de continuar."
+when no operator is identified; asks `capturePhoto` of the OPERATOR (`Gate::forUser($operator)`); and passes the
+operator to `CaptureMemberPhoto` as the actor (`captured_by`). It is a plain controller route, which is why 255's
+`requireOperator()` sweep of the Livewire screens never reached it. The camera component already treats a
+non-2xx as "upload failed", and the camera is only on screen with an operator identified.
+
+### The audit actor — how a counter request is detected
+
+`App\Support\CounterRequest`, asked by `RecordAuditLog`: on a counter request the actor is the PIN operator
+(falling back to the tablet login only when nobody is identified — the pre-PIN routes below); elsewhere
+`Auth::id()` exactly as before. A request is a counter request when it is a `counter`/`counter/*` route, OR a
+Livewire update in which a component under `App\Livewire\Counter\*` hydrated — set as a **request attribute** by a
+Livewire `before('hydrate')` hook, so it dies with the request. **Not "an operator is in the session"**: the session
+is shared with the admin panel, so an owner opening the panel on a tablet after a staff PIN would have had their
+panel actions attributed to the staff member — test 4 pins that this does not happen. Queued jobs and console
+commands have neither marker, so they keep a null actor. (No middleware: the path check is one line in the
+classifier and the Livewire case needs the hook anyway.)
+
+### Other audit writers reachable from the counter
+
+`VaultStream`'s `DocumentAccessLog` (member photo / signature / document views) used `$request->user()`. The member
+photo is viewed FROM the counter card, via a separate signed GET that carries no counter context — so counter
+screens now sign the operator into the photo URL (`op`, via `VaultUrl::photo(..., CounterOperator::id())`), and
+`VaultStream` logs that operator only while it is still the session's operator; a stale or foreign `op` falls back
+to the logged-in user, never to someone else. The URL stays bound to the session (`u`). Document and signature views
+are panel-side and unchanged.
+
+### Reviewed and deliberately left pre-operator
+
+- `POST counter/location` — choosing the sede is the step BEFORE the PIN pad can resolve anyone (a PIN is checked
+  against the sede's staff). Its audit rows name the tablet login when nobody is identified — correct.
+- `POST counter/panic` — the lockdown must fire discreetly in a robbery without anyone typing a PIN; it stays
+  gated on the tablet login's `lockdown.initiate`. Test 5 proves both work with no PIN.
+
+### Tests
+
+`tests/Feature/Security/AuditActorIsTheOperatorTest` (7), HTTP-kernel requests (the till close is two round trips on
+the returned snapshot, as the browser makes it). `MemberPhotoCaptureTest` now identifies its actor as the operator.
+One full-suite run showed `TemporaryMemberTest` failing and it passed alone and in every later full run — noted as a
+possible order-dependent flake, not caused here.
+
+### Merge
+
+Merged to `main` on Ben's explicit instruction for this session. `composer check` green in `es` and `en`; no new
+copy (the refusal reuses the standard identify-first sentence).

@@ -21,6 +21,7 @@ use App\Models\MemberSanction;
 use App\Models\Membership;
 use App\Models\TillSession;
 use App\Models\User;
+use App\Support\CounterOperator;
 use App\Support\Money;
 use App\Support\Settings;
 use App\Support\VaultUrl;
@@ -348,7 +349,7 @@ class CheckInScreen extends Component
         // never a bare disk temporaryUrl to the raw file. Null → initials when there is no photo or no user.
         $actor = Auth::user();
 
-        return $actor instanceof User ? VaultUrl::photo($member, $actor) : null;
+        return $actor instanceof User ? VaultUrl::photo($member, $actor, CounterOperator::id()) : null; // op: prompt 261
     }
 
     private function holdMember(string $memberId, bool $scanned): void

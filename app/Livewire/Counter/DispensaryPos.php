@@ -2245,7 +2245,7 @@ class DispensaryPos extends Component
         // Encrypted photo → authorised, access-logged endpoint only (prompt 113). Null → initials fallback.
         $actor = Auth::user();
 
-        return $actor instanceof User ? VaultUrl::photo($member, $actor) : null;
+        return $actor instanceof User ? VaultUrl::photo($member, $actor, CounterOperator::id()) : null; // op: prompt 261
     }
 
     private function isCheckedIn(Member $member, Location $location): bool
