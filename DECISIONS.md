@@ -13723,3 +13723,62 @@ possible order-dependent flake, not caused here.
 
 Merged to `main` on Ben's explicit instruction for this session. `composer check` green in `es` and `en`; no new
 copy (the refusal reuses the standard identify-first sentence).
+
+## Prompt 263 — one visit, one total, one pay button (a live money bug; done before 262)
+
+### Before
+
+`tests/Feature/Counter/OneVisitOnePayButtonTest` on the untouched tree: pressing the big "Registrar aportación"
+with bar items in the visit recorded the dispensation and **no order** (*"the drinks were left unpaid and
+unrecorded — Failed asserting that 0 is identical to 1"*); bar stock never moved; "Cerrar" then discarded the drinks
+without asking. The screen showed two pay buttons with two totals ("Liquidar visita · €23" in the bar block,
+"Registrar aportación · €20" at the foot) under a tender reading €23. With a price override set, the combined path
+ignored it entirely (a full-price charge), and a dispensation needing a limit override could not be settled with bar
+items at all ("liquídala por separado") — with the bar button gone there would have been no path.
+
+### The fix — one commit path
+
+`DispensaryPos::attemptCommit()` is now the ONLY commit path and decides by what the visit holds:
+- **dispensation only** → `CommitDispensation`, as before — button "Registrar aportación · €X";
+- **dispensation + bar** → `CommitCombinedSettle` (new private `commitVisit()`), atomic, two ledgers — button
+  **"Cobrar visita · €X+Y"**;
+- **bar only** → the bar-only settle (`settleBarOnly`) — button "Cobrar visita · €Y".
+Every dispensation gate runs once for both: eligibility, check-in (258A), the limit override (now carried into the
+combined settle's dispensation options instead of refused), the price override (applied to the aportación; the
+tender covers the overridden aportación + the bar), the signature, the tab (259). The wallet pays the aportación
+first, then the bar — the split the combined settle always used. `settleWithBar()` stays as a thin alias (older
+callers, `commitOnTab`) of the same path. So a stale page, a keyboard shortcut or a crafted
+`commitDispensation()` cannot take the dispensation and leave the drinks: the method itself routes.
+
+### The screen
+
+The bar block's own pay button is **removed** (it stays the list of bar lines with its subtotal). The header reads
+**"Total de la visita"** when bar lines are present ("Total aportación" otherwise) and shows the same figure as the
+tender's "a cobrar" and the button (`data-visit-total`, `data-cash-due`). The unsaved-work flag (`$store.counter.dirty`)
+now counts bar lines too.
+
+### Dropping a member with anything unpaid asks first
+
+- **"Cerrar"** (`clearMember`) with a non-empty basket or bar basket shows "Hay productos sin cobrar. ¿Descartarlos?"
+  — *Seguir cobrando* / *Descartar*; only *Descartar* (`clearMember(true)`) discards, and it records nothing.
+- **Selecting another member** used to reset the flower basket and KEEP the bar basket — one member's drinks moved
+  onto the next member's visit. It now asks the same question and does not switch; once confirmed, both baskets go.
+- **The idle lock** keeps the basket by design (198's "work survives a lock") — left alone.
+- **Leaving the screen** (Administración / Log out / Home) already confirms via the dirty flag, now including bar lines.
+
+### Verification
+
+8 new tests; `CartSectionsGateOnTheirOwnLinesTest` updated to the one-button contract (no pay button in the bar block;
+the one button pays the visit whenever bar lines exist; the header label follows). Real browser
+(`tests/Browser/shoot-one-pay-button.mjs`) at 820×1180 and 1180×820, light and dark: all 12 checks pass — exactly one
+pay button, none in the bar block, button = header = tender to the cent, and the button in view without scrolling the
+column (`storage/app/screenshots/263/`).
+
+### For Ben
+
+Whether real bar items were already lost this way on the live tablet: a bar article whose shelf count is LOWER than
+the system says is the signature — worth a quick count at the club.
+
+### Merge
+
+Merged to `main` on Ben's instruction ("merge all to main"). `composer check` green in `es` and `en`.

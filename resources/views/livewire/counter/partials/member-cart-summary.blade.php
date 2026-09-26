@@ -44,6 +44,18 @@
             >{{ __('Cerrar') }}</button>
         </div>
 
+        {{-- Prompt 263 — closing (or switching to another member) with anything unpaid ASKS first. "Cerrar" used to
+             discard both baskets outright, which is how drinks left the counter unpaid and unrecorded. --}}
+        @if ($confirmDiscard)
+            <div data-confirm-discard role="alertdialog" class="mt-2.5 rounded-xl border border-warning/40 bg-warning/5 p-3 text-sm">
+                <p class="font-semibold text-warning">{{ __('Hay productos sin cobrar. ¿Descartarlos?') }}</p>
+                <div class="mt-2 grid grid-cols-2 gap-2">
+                    <x-button type="button" variant="secondary" size="md" wire:click="keepUnpaid">{{ __('Seguir cobrando') }}</x-button>
+                    <x-button type="button" variant="danger" size="md" wire:click="clearMember(true)" data-confirm-discard-yes>{{ __('Descartar') }}</x-button>
+                </div>
+            </div>
+        @endif
+
         {{-- The allowance. Colour AND numbers, never colour alone. --}}
         @if ($limits)
             @php
