@@ -160,7 +160,10 @@ class CartSectionsGateOnTheirOwnLinesTest extends TestCase
         $this->assertStringContainsString('data-cart-bar-section', $html, 'the bar section is still not rendered');
         $this->assertStringContainsString('Cerveza', $html, 'the line the operator tapped is not on screen');
         $this->assertStringContainsString(e(Money::fromCents(250)->formatted()), $html, 'the amount added to the visit is not on screen');
-        $this->assertStringContainsString('data-settle-visit', $html, 'there is no way to take the money');
+        // Prompt 263 — the money is taken by the ONE pay button at the foot of the cart (no second button in the
+        // bar block), and for a bar line it pays the visit.
+        $this->assertStringNotContainsString('data-settle-visit', $html, 'the bar block grew its own pay button again');
+        $this->assertStringContainsString(e(__('Cobrar visita · :total', ['total' => Money::fromCents(250)->formatted()])), $html, 'there is no way to take the money');
     }
 
     /**
@@ -334,13 +337,18 @@ class CartSectionsGateOnTheirOwnLinesTest extends TestCase
 
             // The dispensation section is always the cart's frame; its TOTAL follows its own lines.
             $this->assertTrue($has('data-cart-dispensation-section'), "{$name}: the cart frame vanished");
-            $this->assertSame($state['flower'], $has(e(__('Total aportación'))), "{$name}: the aportación total is wrong");
+            // Prompt 263 — one visit total: labelled the aportación when it is flower only, the visit when bar lines join.
+            $this->assertSame($state['flower'] && ! $state['bar'], $has(e(__('Total aportación'))), "{$name}: the aportación total is wrong");
+            $this->assertSame($state['bar'], $has(e(__('Total de la visita'))), "{$name}: the visit total is wrong");
 
             // The bar section follows its own lines (the source is dispensario in every state here, and a
             // flower basket keeps the signpost — the one designed empty state).
             $this->assertSame($state['flower'] || $state['bar'], $has('data-cart-bar-section'), "{$name}: the bar section is wrong");
             $this->assertSame($state['bar'], $has(e(__('Total barra y tienda'))), "{$name}: the bar total is wrong");
-            $this->assertSame($state['bar'], $has('data-settle-visit'), "{$name}: the settle control is wrong");
+            // Prompt 263 — no pay button in the bar block; the ONE button at the foot pays the visit whenever there
+            // are bar lines (a bar-only visit included — 224's point, kept).
+            $this->assertFalse($has('data-settle-visit'), "{$name}: the bar block grew its own pay button again");
+            $this->assertSame($state['bar'], $has(e(__('Cobrar visita · :total', ['total' => '']))), "{$name}: the pay button does not pay the visit");
 
             // The tender follows EITHER — there is money to take whenever either side has lines.
             $this->assertSame($state['flower'] || $state['bar'], $has(e(__('Efectivo entregado'))), "{$name}: the tender is wrong");

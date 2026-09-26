@@ -728,12 +728,13 @@
 
                          On the DISPENSATION basket, not on "the cart has something in it": a bar-only visit
                          has no aportación and must not be shown a total for one. --}}
-                    @if ($hasDispensationLines)
-                        <div class="mt-3 flex items-center justify-between rounded-xl bg-surface-alt px-4 py-3 dark:bg-slate-800">
-                            <span class="font-semibold">{{ __('Total aportación') }}</span>
-                            <span class="text-lg font-bold tabular-nums">{{ $this->money($basketTotalCents) }}</span>
-                        </div>
-                    @endif
+                    {{-- Prompt 263 — ONE figure for the visit: this header, the tender's "a cobrar" and the pay button
+                         all show the same total. With bar lines it is the visit's total (aportación + barra, two
+                         ledgers, one payment); with flower only it is still labelled the aportación it is. --}}
+                    <div class="mt-3 flex items-center justify-between rounded-xl bg-surface-alt px-4 py-3 dark:bg-slate-800">
+                        <span class="font-semibold">{{ $hasBarLines ? __('Total de la visita') : __('Total aportación') }}</span>
+                        <span data-visit-total class="text-lg font-bold tabular-nums">{{ $this->money($visitTotalCents) }}</span>
+                    </div>
 
                     {{-- Bar/merch side of the SAME visit (prompt 118): add articles, then settle the whole visit
                          once — one payment, but a dispensation AND a bar order on their separate ledgers. Only
@@ -781,11 +782,9 @@
                                     <span class="font-bold tabular-nums">{{ $this->money($barTotalCents) }}</span>
                                 </div>
 
-                                <button type="button" wire:click="settleWithBar" data-settle-visit wire:loading.attr="disabled" wire:target="settleWithBar" x-bind:disabled="! online" class="mt-3 h-12 w-full rounded-xl bg-brand text-base font-semibold text-white transition hover:bg-brand-dark focus:outline-none focus:ring-2 focus:ring-brand/40 disabled:opacity-60">
-                                    {{ $hasDispensationLines
-                                        ? __('Liquidar visita · :total', ['total' => $this->money($basketTotalCents + $barTotalCents)])
-                                        : __('Cobrar barra · :total', ['total' => $this->money($barTotalCents)]) }}
-                                </button>
+                                {{-- Prompt 263 — no pay button of its own here any more. It sat beside the big
+                                     "Registrar aportación" with a DIFFERENT total, and the big one recorded the
+                                     dispensation only: drinks left unpaid. The one button at the foot pays the visit. --}}
                             @endif
                         </div>
                     @endif
@@ -864,7 +863,7 @@
                         <dl class="space-y-1 rounded-xl bg-surface-alt px-4 py-3 text-sm dark:bg-slate-800">
                             <div class="flex items-center justify-between">
                                 <dt class="text-ink-muted dark:text-slate-400">{{ __('A cobrar en efectivo') }}</dt>
-                                <dd class="font-semibold tabular-nums">{{ $this->money($cashPreviewCents) }}</dd>
+                                <dd data-cash-due class="font-semibold tabular-nums">{{ $this->money($cashPreviewCents) }}</dd>
                             </div>
                             <div class="flex items-center justify-between">
                                 <dt class="text-ink-muted dark:text-slate-400">{{ __('Monedero') }}</dt>
@@ -996,9 +995,13 @@
                              moment of pressing it, and the operator reads the total last — from the button
                              they are already looking at, not from a panel above it that may have scrolled. --}}
                         <span wire:loading.remove wire:target="commitDispensation">
-                            {{ $basketTotalCents > 0
-                                ? __('Registrar aportación · :total', ['total' => $this->money($basketTotalCents)])
-                                : __('Registrar aportación') }}
+                            {{-- Three states, one button (prompt 263): the aportación alone; or the whole visit
+                                 (aportación + barra, or barra only), settled together. --}}
+                            {{ $hasBarLines
+                                ? __('Cobrar visita · :total', ['total' => $this->money($visitTotalCents)])
+                                : ($basketTotalCents > 0
+                                    ? __('Registrar aportación · :total', ['total' => $this->money($visitTotalCents)])
+                                    : __('Registrar aportación')) }}
                         </span>
                         <span wire:loading wire:target="commitDispensation">{{ __('Registrando…') }}</span>
                     </button>
@@ -1032,8 +1035,9 @@
      it survives the trip to the hub and back, and Home must not warn about a loss that cannot happen. --}}
 @script
 <script>
-    const sync = () => { if (window.Alpine?.store('counter')) window.Alpine.store('counter').dirty = (($wire.basket?.length ?? 0) > 0); };
+    const sync = () => { if (window.Alpine?.store('counter')) window.Alpine.store('counter').dirty = ((($wire.basket?.length ?? 0) + ($wire.barBasket?.length ?? 0)) > 0); };
     $wire.$watch('basket', sync);
+    $wire.$watch('barBasket', sync); // prompt 263 — unpaid drinks are unsaved work too
     sync();
 </script>
 @endscript

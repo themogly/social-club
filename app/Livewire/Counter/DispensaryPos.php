@@ -339,8 +339,23 @@ class DispensaryPos extends Component
         $this->flashResult($result);
     }
 
-    public function clearMember(): void
+    /** Set when dropping the member would discard unpaid lines — the view asks before anything is lost (prompt 263). */
+    public bool $confirmDiscard = false;
+
+    /**
+     * Close the held member. With anything unpaid in either basket this ASKS first (prompt 263): "Cerrar" used to
+     * discard both baskets outright, so the ordinary sequence "commit the aportación, tap Cerrar, next member"
+     * handed the drinks over unpaid and unrecorded. `$confirmed` is the operator's answer to that question.
+     */
+    public function clearMember(bool $confirmed = false): void
     {
+        if (! $confirmed && $this->hasUnpaidLines()) {
+            $this->confirmDiscard = true;
+
+            return;
+        }
+
+        $this->confirmDiscard = false;
         $this->reset([
             'memberId', 'scanned', 'lookup', 'lookupSearched', 'basket', 'activeGeneticId', 'activeBatchId',
             'weightInput', 'calculatorMode', 'unitQty', 'cashTendered', 'walletInput', 'requireOverride',
@@ -350,6 +365,18 @@ class DispensaryPos extends Component
 
         // A new socio always starts a fresh basket → a fresh idempotency key.
         $this->idempotencyKey = (string) Str::ulid();
+    }
+
+    /** Keep the member and the baskets — the answer "no" to {@see clearMember()}'s question. */
+    public function keepUnpaid(): void
+    {
+        $this->confirmDiscard = false;
+    }
+
+    /** Is anything in either basket that has not been paid for? */
+    private function hasUnpaidLines(): bool
+    {
+        return $this->basket !== [] || $this->barBasket !== [];
     }
 
     // --- Genetic → weight → basket ----------------------------------------------
@@ -729,7 +756,7 @@ class DispensaryPos extends Component
         $this->onTab = true;
         $this->walletInput = $this->eurosString($tab['remainder']);
 
-        $this->barBasket !== [] ? $this->settleWithBar() : $this->attemptCommit(override: false);
+        $this->attemptCommit(override: false); // one path for the whole visit (prompt 263)
     }
 
     /**
@@ -839,8 +866,16 @@ class DispensaryPos extends Component
             return;
         }
 
-        if ($this->basket === []) {
+        if ($this->basket === [] && $this->barBasket === []) {
             $this->flash(__('La cesta está vacía.'), 'error');
+
+            return;
+        }
+
+        // Prompt 263 — ONE pay button settles the whole visit. A visit with only bar lines is a bar order on its
+        // own ledger; no dispensation, so none of the dispensation's gates below apply to it.
+        if ($this->basket === []) {
+            $this->settleBarOnly($member, $location);
 
             return;
         }
@@ -922,17 +957,25 @@ class DispensaryPos extends Component
             $total = $priceOverrideCents;
         }
 
-        [$cashCents, $walletCents] = $this->tenderSplit($total);
+        // Prompt 263 — the tender covers the WHOLE visit: the (possibly overridden) aportación plus the bar lines,
+        // one payment. The wallet pays the aportación first, then the bar — the same split the combined settle
+        // always used — and each ledger records its own share.
+        $barTotal = $this->barBasket !== [] ? $this->barBasketTotalCents($member, $location) : 0;
+        [$cashApplied, $walletApplied] = $this->tenderSplit($total + $barTotal);
 
         // The split is DERIVED (cash = total − wallet) so it always reconciles — the fix for prompt 74: the
         // Cash field is what the member HANDED, not the charge. The only tender error is an UNDER-tender
         // (handed less cash than owed); over-tender is fine and produces change. Tender is measured against
         // $total, which is already the OVERRIDDEN total when a price override is applied (prompt 64).
-        if ($this->isUnderTendered($cashCents)) {
+        if ($this->isUnderTendered($cashApplied)) {
             $this->flash(__('El efectivo entregado no cubre el total.'), 'error');
 
             return;
         }
+
+        $walletCents = min($walletApplied, $total);
+        $cashCents = $total - $walletCents;
+        $barWallet = $walletApplied - $walletCents;
 
         $options = [
             'operator_id' => CounterOperator::id(),
@@ -984,6 +1027,14 @@ class DispensaryPos extends Component
             'grams_cg' => (int) $line['grams_cg'],
             'units' => $line['units'] !== null ? (int) $line['units'] : null,
         ], $this->basket);
+
+        // Prompt 263 — with bar lines waiting, the dispensation and the bar order are written TOGETHER (atomic,
+        // two ledgers) — never the dispensation alone with the drinks left behind unpaid.
+        if ($this->barBasket !== []) {
+            $this->commitVisit($member, $location, $lines, $options, $barTotal, $barWallet);
+
+            return;
+        }
 
         try {
             $dispensation = (new CommitDispensation)->handle($member, $location, $lines, $options);
@@ -1075,112 +1126,31 @@ class DispensaryPos extends Component
     }
 
     /**
-     * Settle the whole visit in one payment: a Dispensation AND a bar Order, atomically, on separate ledgers
-     * (prompt 118). Reuses the SAME dispensation guards as a plain commit (eligibility, signature, open till),
-     * then hands both baskets to CommitCombinedSettle. The quick combined path stays for the clean case: a
-     * dispensation that needs a limit/price override uses the ordinary dispensation flow.
+     * Kept as the name the older callers use (prompt 263): settling the visit IS the one commit now — dispensation
+     * only, bar only, or both — through {@see attemptCommit()}, so every gate, the price override, the limit
+     * override, the signature and the tab apply the same way whichever it is.
      */
     public function settleWithBar(): void
     {
-        $member = $this->resolveMember();
-        $location = $this->resolveLocation();
+        $this->attemptCommit(override: false);
+    }
 
-        if ($member === null || $location === null) {
-            $this->flash(__('Identifica a un socio antes de registrar una dispensación.'), 'error');
-
-            return;
-        }
-        if (! $this->requireOperator()) {
-            return;
-        }
-        if (! $this->checkInSatisfied($member, $location)) {
-            return;
-        }
-        if ($this->offline) {
-            $this->flash(__('Sin conexión: no se puede registrar. La cesta se conserva hasta reconectar.'), 'error');
-
-            return;
-        }
-        if ($this->barBasket === []) {
-            $this->flash(__('Añade algún artículo de barra para liquidar la visita.'), 'error');
-
-            return;
-        }
-
-        // BAR ONLY (prompt 224). `CommitCombinedSettle` refuses a one-sided settle in terms — *"an empty side
-        // means the caller wants a plain dispensation or a plain order, which have their own single-writer
-        // entry points"* — so this takes that named entry point rather than bending the combined one. No new
-        // writer, and the combined path below is untouched.
-        //
-        // It skips the DISPENSATION guards deliberately: nothing is dispensed, so eligibility, the gram
-        // limits, the carencia and the signature have nothing to be about. That is the same reasoning the
-        // Barra screen is built on — a blocked socio can still be sold a coffee — and the settle it produces
-        // is a SALE on the bar ledger, exactly as if it had been rung up there.
-        if ($this->basket === []) {
-            $this->settleBarOnly($member, $location);
-
-            return;
-        }
-
-        $verdict = (new ResolveMemberEligibility)->handle($member, $location, 'counter');
-        if ($this->hardBlockRules($verdict) !== []) {
-            $this->flash(__('Dispensación bloqueada: :reasons', ['reasons' => implode(' · ', $verdict->blockingMessages())]), 'error');
-
-            return;
-        }
-        // An override-needed dispensation is not quick-settled with the bar — use the ordinary flow for it.
-        if ($this->overridableRules($verdict) !== [] || $this->limitBreach) {
-            $this->flash(__('Esta dispensación requiere autorización: liquídala por separado.'), 'warning');
-
-            return;
-        }
-        if ($this->signatureRequired() && $this->signaturePath === null) {
-            $this->flash(__('Falta la firma del socio.'), 'warning');
-
-            return;
-        }
-
-        $till = $this->openTillSession($location);
-        if ($till === null) {
-            $this->flash(__('No hay caja abierta en este terminal.'), 'error');
-
-            return;
-        }
-
-        $dispTotal = $this->basketTotalCents($member, $location);
-        $barTotal = $this->barBasketTotalCents($member, $location);
-        [$cashApplied, $walletApplied] = $this->tenderSplit($dispTotal + $barTotal);
-
-        if ($this->isUnderTendered($cashApplied)) {
-            $this->flash(__('El efectivo entregado no cubre el total.'), 'error');
-
-            return;
-        }
-
-        // Allocate the one payment across the two records: wallet to the dispensation first, then the bar; the
-        // cash remainder fills each. The split reconciles by construction (Σwallet + Σcash = combined total).
-        $dispWallet = min($walletApplied, $dispTotal);
-        $barWallet = $walletApplied - $dispWallet;
-
-        $dispLines = array_map(fn (array $l): array => [
-            'genetic_id' => (string) $l['genetic_id'],
-            // Null in automatic mode (prompt 250) — CommitDispensation allocates the lote(s) at commit.
-            'batch_id' => $l['batch_id'] !== null ? (string) $l['batch_id'] : null,
-            'grams_cg' => (int) $l['grams_cg'],
-            'units' => $l['units'] !== null ? (int) $l['units'] : null,
-        ], $this->basket);
+    /**
+     * Write a dispensation AND its bar order in one atomic settle (prompt 118's `CommitCombinedSettle`, two
+     * ledgers), reached from {@see attemptCommit()} after every dispensation gate has passed — the price override
+     * and the limit override ride in the dispensation's own options.
+     *
+     * @param  list<array<string, mixed>>  $lines
+     * @param  array<string, mixed>  $dispOptions
+     */
+    private function commitVisit(Member $member, Location $location, array $lines, array $dispOptions, int $barTotal, int $barWallet): void
+    {
         $orderLines = array_map(fn (array $l): array => ['article_id' => (string) $l['article_id'], 'qty' => (int) $l['qty']], $this->barBasket);
 
-        $operatorId = CounterOperator::id();
-        $dispOptions = ['cash_cents' => $dispTotal - $dispWallet, 'wallet_cents' => $dispWallet, 'idempotency_key' => $this->idempotencyKey];
-        if ($this->signaturePath !== null) {
-            $dispOptions['signature_path'] = $this->signaturePath;
-        }
-
         try {
-            $result = (new CommitCombinedSettle)->handle($member, $location, $dispLines, $orderLines, [
-                'till_session_id' => $till->id,
-                'operator_id' => $operatorId,
+            $result = (new CommitCombinedSettle)->handle($member, $location, $lines, $orderLines, [
+                'till_session_id' => $dispOptions['till_session_id'],
+                'operator_id' => $dispOptions['operator_id'],
                 'on_tab' => $this->onTab,
                 'dispensation' => $dispOptions,
                 'order' => [
@@ -1189,8 +1159,8 @@ class DispensaryPos extends Component
                     'idempotency_key' => $this->idempotencyKey !== null ? $this->idempotencyKey.'-bar' : null,
                 ],
             ]);
-        } catch (DebtLimitExceededException) {
-            $this->flash(__('El pago combinado con monedero superaría el saldo disponible del socio.'), 'error');
+        } catch (DebtLimitExceededException $e) {
+            $this->flash($e->getMessage(), 'error');
 
             return;
         } catch (DispensationBlockedException $e) {
@@ -1205,6 +1175,10 @@ class DispensaryPos extends Component
             return;
         } catch (TillClosedException) {
             $this->flash(__('La caja no está abierta.'), 'error');
+
+            return;
+        } catch (AuthorizationException) {
+            $this->flash(__('No tienes permiso para autorizar una excepción.'), 'error');
 
             return;
         } catch (RuntimeException) {
@@ -1224,7 +1198,7 @@ class DispensaryPos extends Component
      * A visit with nothing but bar lines: one Order, on the bar ledger, through `CommitOrder` — the same
      * single writer the Barra screen calls (prompt 224).
      *
-     * Reached only from {@see self::settleWithBar()}, after its operator/offline/till guards. Before 224 this
+     * Reached only from {@see self::attemptCommit()} (prompt 263), after its operator/check-in/offline guards. Before 224 this
      * case could not be settled at all: the combined settle required both baskets, so an operator who had
      * added three soft drinks to a member's visit had to add a flower line to take the money.
      */
@@ -1464,6 +1438,7 @@ class DispensaryPos extends Component
             'activeEntryGramsCg' => $this->activeEntryGramsCg(),
             'basketLines' => $basketLines,
             'basketTotalCents' => $total,
+            'visitTotalCents' => $total + $barTotal, // prompt 263 — the ONE figure on the header, the tender and the button
             'cashPreviewCents' => $cashPreview,
             'walletPreviewCents' => $walletPreview,
             'changeDueCents' => $this->changeDueCents($cashPreview),
@@ -2306,15 +2281,24 @@ class DispensaryPos extends Component
             return;
         }
 
+        // Prompt 263 — switching to ANOTHER member with unpaid lines asks first, exactly like "Cerrar". It used to
+        // reset the flower basket and KEEP the bar basket, so one member's drinks moved onto the next member's visit.
+        if ($this->memberId !== null && $this->memberId !== $member->id && $this->hasUnpaidLines()) {
+            $this->confirmDiscard = true;
+            $this->clearLookup();
+
+            return;
+        }
+
         $this->memberId = $member->id;
         $this->scanned = $scanned;
         $this->clearLookup();
 
-        // A new socio always starts a fresh basket → a fresh idempotency key.
+        // A new socio always starts a fresh basket → a fresh idempotency key (both baskets: prompt 263).
         $this->reset([
             'basket', 'activeGeneticId', 'activeBatchId', 'weightInput', 'calculatorMode', 'unitQty',
             'cashTendered', 'walletInput', 'requireOverride', 'limitBreach', 'overrideReason',
-            'signaturePath', 'lastDispensationId', 'voidReason', 'flashMessage',
+            'signaturePath', 'lastDispensationId', 'voidReason', 'flashMessage', 'barBasket', 'confirmDiscard',
         ]);
         $this->idempotencyKey = (string) Str::ulid();
     }
