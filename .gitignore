@@ -34,3 +34,6 @@ Thumbs.db
 
 # Prompt 179 — the in-browser MRZ reader, copied from node_modules by npm run build (see scripts/vendor-ocr.mjs)
 /public/ocr
+
+# Claude Code agent worktrees (isolated copies of this repo) — never tracked
+/.claude/worktrees/
