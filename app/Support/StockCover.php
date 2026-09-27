@@ -2,9 +2,13 @@
 
 namespace App\Support;
 
+use App\Enums\BatchStatus;
 use App\Enums\DispensationStatus;
+use App\Models\Batch;
 use App\Models\DispensationLine;
 use App\Models\Genetic;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Collection;
 
 /**
  * How long this genetic lasts at this sede **at the rate it is actually going** (prompt 216).
@@ -109,6 +113,62 @@ class StockCover
             ->pluck('first_at', 'genetic_id')
             ->map(fn ($at): string => (string) $at)
             ->all();
+    }
+
+    /**
+     * On-hand gram-equivalent per genetic at a sede, in ONE grouped query — {@see Genetic::onHandCgAt()} for a
+     * whole list (prompt 269). Open, in-date batches only (what `SelectBatch` would serve); a UNIT genetic
+     * reports units × grams-per-unit so one figure serves both kinds.
+     *
+     * @param  list<Genetic>  $genetics
+     * @return array<string, int>
+     */
+    public static function onHandCgFor(array $genetics, string $locationId): array
+    {
+        if ($genetics === []) {
+            return [];
+        }
+
+        $sums = Batch::query()->withoutGlobalScopes()
+            ->whereIn('genetic_id', array_map(fn (Genetic $genetic): string => $genetic->id, $genetics))
+            ->where('location_id', $locationId)
+            ->where('status', BatchStatus::OPEN->value)
+            ->where(fn (Builder $q) => $q->whereNull('expires_on')->orWhereDate('expires_on', '>=', now()->toDateString()))
+            ->groupBy('genetic_id')
+            ->selectRaw('genetic_id, COALESCE(SUM(remaining_cg), 0) AS cg, COALESCE(SUM(remaining_units), 0) AS units')
+            ->toBase()->get()->keyBy('genetic_id');
+
+        $onHand = [];
+
+        foreach ($genetics as $genetic) {
+            $row = $sums->get($genetic->id);
+            $onHand[$genetic->id] = $genetic->isUnitType()
+                ? (int) ($row->units ?? 0) * (int) $genetic->grams_per_unit_cg
+                : (int) ($row->cg ?? 0);
+        }
+
+        return $onHand;
+    }
+
+    /**
+     * How many of these genetics are low at a sede — `verdict()` over a whole list in a fixed number of
+     * queries (prompt 269). The counter hub renders this on every navigation, so a per-genetic query here
+     * would grow with the catalogue on the page that renders most.
+     *
+     * @param  Collection<int, Genetic>  $genetics  with `prices` eager-loaded for this sede
+     */
+    public static function lowCountAt(Collection $genetics, string $locationId): int
+    {
+        $ids = $genetics->modelKeys();
+        $onHand = self::onHandCgFor($genetics->values()->all(), $locationId);
+        $trailing = self::trailingCgFor($ids, $locationId);
+        $firstDispensed = self::firstDispensedAtFor($ids, $locationId);
+
+        return $genetics->filter(fn (Genetic $genetic): bool => self::verdict(
+            $genetic, $locationId, $onHand[$genetic->id] ?? 0,
+            $trailing[$genetic->id] ?? 0,
+            $firstDispensed[$genetic->id] ?? null,
+        )['low'])->count();
     }
 
     /**

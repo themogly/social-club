@@ -315,7 +315,10 @@ class DemoDataSeeder extends Seeder
                     // strains exercises the cross-strain split immediately. €23 < 3.5 × €7 (the lowest
                     // per-gram), so it is always a genuine break, never overriding the floor.
                     'price_per_eighth_cents' => 2300,
-                    'low_stock_threshold_cg' => 5000, 'active' => true,
+                    // No fixed threshold (prompt 269): a 50 g floor over 12–33 g of seeded stock badged EVERY
+                    // variety permanently, so on a demo install lowering stock visibly changed nothing. Left
+                    // null, the cover rule (216) decides — the same thing a real club gets until it sets one.
+                    'low_stock_threshold_cg' => null, 'active' => true,
                 ]);
 
                 // Opening stock sized to sit WITHIN this sede's ceiling (prompt 106): total intake per sede is

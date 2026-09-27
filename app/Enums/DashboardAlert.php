@@ -2,6 +2,7 @@
 
 namespace App\Enums;
 
+use App\Filament\Resources\Articles\ArticleResource;
 use App\Filament\Resources\Batches\BatchResource;
 use App\Filament\Resources\MemberApplications\MemberApplicationResource;
 use App\Filament\Resources\Members\MemberResource;
@@ -36,6 +37,8 @@ enum DashboardAlert: string
     case STOCK_CEILING_EXCEEDED = 'stock_ceiling_exceeded';
     case MEMBERSHIPS_EXPIRING = 'memberships_expiring';
     case PENDING_APPLICATIONS = 'pending_applications';
+    case GENETICS_LOW_STOCK = 'genetics_low_stock';
+    case ARTICLES_LOW_STOCK = 'articles_low_stock';
 
     /** error | warning | info — how loudly the rail says it. */
     public function severity(): string
@@ -43,7 +46,8 @@ enum DashboardAlert: string
         return match ($this) {
             self::STOCK_CEILING_EXCEEDED => 'error',
             self::MEMBERS_OVER_LIMIT, self::ACTIVE_MEMBER_CAP,
-            self::UNRECONCILED_TILL, self::BATCHES_EXPIRING => 'warning',
+            self::UNRECONCILED_TILL, self::BATCHES_EXPIRING,
+            self::GENETICS_LOW_STOCK, self::ARTICLES_LOW_STOCK => 'warning',
             self::MEMBERSHIPS_EXPIRING, self::PENDING_APPLICATIONS => 'info',
         };
     }
@@ -64,6 +68,8 @@ enum DashboardAlert: string
             self::STOCK_CEILING_EXCEEDED => __('Stock por encima del techo legal en esta sede'),
             self::MEMBERSHIPS_EXPIRING => trans_choice(':count membresía vence pronto|:count membresías vencen pronto', $count, ['count' => $count]),
             self::PENDING_APPLICATIONS => trans_choice(':count solicitud pendiente|:count solicitudes pendientes', $count, ['count' => $count]),
+            self::GENETICS_LOW_STOCK => trans_choice(':count variedad con stock bajo|:count variedades con stock bajo', $count, ['count' => $count]),
+            self::ARTICLES_LOW_STOCK => trans_choice(':count artículo de barra y tienda con stock bajo|:count artículos de barra y tienda con stock bajo', $count, ['count' => $count]),
         };
     }
 
@@ -86,7 +92,10 @@ enum DashboardAlert: string
             // Caja already resumes the sede's single open session on arrival, and makes the operator pick
             // when several are open — so this destination was the one that was already right.
             self::UNRECONCILED_TILL => 'counter.till',
-            self::BATCHES_EXPIRING, self::STOCK_CEILING_EXCEEDED, self::ACTIVE_MEMBER_CAP => null,
+            // Low stock (prompt 269) is the same decision as expiring batches: the remedy is a purchase, which the
+            // counter does not make. The dispensary picker already badges the variety itself.
+            self::BATCHES_EXPIRING, self::STOCK_CEILING_EXCEEDED, self::ACTIVE_MEMBER_CAP,
+            self::GENETICS_LOW_STOCK, self::ARTICLES_LOW_STOCK => null,
         };
     }
 
@@ -104,13 +113,19 @@ enum DashboardAlert: string
         return match ($this) {
             self::MEMBERS_OVER_LIMIT, self::ACTIVE_MEMBER_CAP, self::MEMBERSHIPS_EXPIRING => MemberResource::class,
             self::UNRECONCILED_TILL => TillSessionResource::class,
-            self::BATCHES_EXPIRING, self::STOCK_CEILING_EXCEEDED => BatchResource::class,
+            self::BATCHES_EXPIRING, self::STOCK_CEILING_EXCEEDED, self::GENETICS_LOW_STOCK => BatchResource::class,
             self::PENDING_APPLICATIONS => MemberApplicationResource::class,
+            self::ARTICLES_LOW_STOCK => ArticleResource::class,
         };
     }
 
     public function panelUrl(): string
     {
+        // The articles table already has a "Stock bajo" filter — arrive with it on, not on the whole catalogue.
+        if ($this === self::ARTICLES_LOW_STOCK) {
+            return ArticleResource::getUrl('index', ['filters' => ['low_stock' => ['isActive' => true]]]);
+        }
+
         return $this->panelResource()::getUrl();
     }
 

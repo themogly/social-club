@@ -10,15 +10,19 @@ use App\Enums\MembershipStatus;
 use App\Enums\OrderStatus;
 use App\Enums\Role;
 use App\Enums\TillSessionStatus;
+use App\Models\Article;
 use App\Models\Batch;
 use App\Models\CheckIn;
 use App\Models\Dispensation;
 use App\Models\DispensationLine;
+use App\Models\Genetic;
 use App\Models\Location;
 use App\Models\Member;
 use App\Models\MemberApplication;
 use App\Models\Membership;
 use App\Models\Order;
+use App\Models\Scopes\LocationScope;
+use App\Models\Scopes\OrganisationScope;
 use App\Models\TillSession;
 use App\Models\User;
 use App\Support\ActiveScope;
@@ -26,6 +30,7 @@ use App\Support\BusinessDay;
 use App\Support\Period;
 use App\Support\Settings;
 use App\Support\StockCeiling;
+use App\Support\StockCover;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -267,6 +272,8 @@ class Dashboard
         $add(DashboardAlert::STOCK_CEILING_EXCEEDED, count($this->ceilingBreaches()));
         $add(DashboardAlert::MEMBERSHIPS_EXPIRING, $this->expiringMemberships());
         $add(DashboardAlert::PENDING_APPLICATIONS, $this->pendingApplications());
+        $add(DashboardAlert::GENETICS_LOW_STOCK, $this->lowStockGenetics());
+        $add(DashboardAlert::ARTICLES_LOW_STOCK, $this->lowStockArticles());
 
         return $alerts;
     }
@@ -398,6 +405,33 @@ class Dashboard
     {
         return $this->scopeByLocation(MemberApplication::query()->withoutGlobalScopes())
             ->awaitingReview()->count();
+    }
+
+    /**
+     * Varieties running low, counted per sede (prompt 269) — the SAME `StockCover` verdict the dispensary picker
+     * badges, so the alert and the dot can never disagree. The "Aviso de stock bajo" figure on a price row
+     * used to reach nothing but that dot, and only once a socio was held at the counter.
+     *
+     * Queried live, never cached (stock is transactional). An empty variety is not "low" — it is gone, and
+     * the picker drops it — so this counts only what is still on hand.
+     */
+    public function lowStockGenetics(): int
+    {
+        return $this->scopeLocations()->sum(fn (Location $location): int => StockCover::lowCountAt(
+            Genetic::query()->withoutGlobalScope(OrganisationScope::class)
+                ->where('organisation_id', $location->organisation_id)
+                ->sellableAt($location->id)
+                ->with(['prices' => fn ($q) => $q->withoutGlobalScopes()->where('location_id', $location->id)])
+                ->get(),
+            $location->id,
+        ));
+    }
+
+    /** Barra y tienda articles at or under their own threshold — the rule the bar card's "Quedan pocas" uses. */
+    public function lowStockArticles(): int
+    {
+        return $this->scopeByLocation(Article::query()->withoutGlobalScopes([OrganisationScope::class, LocationScope::class]))
+            ->active()->lowStock()->count();
     }
 
     // --- Payload for role/location tests --------------------------------------------

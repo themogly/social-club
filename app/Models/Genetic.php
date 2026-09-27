@@ -171,7 +171,7 @@ class Genetic extends Model
 
     /**
      * The low-stock threshold (gram-equivalent centigrams) for this genetic at a location (prompt 54):
-     * the base GeneticPrice row's `low_stock_threshold_cg` at that sede, else the org-wide
+     * the GeneticPrice `low_stock_threshold_cg` at that sede (base row first), else the org-wide
      * `low_stock_threshold_cg` setting. The consumer of the threshold + fallback that had none before.
      */
     public function lowStockThresholdCg(?string $locationId): int
@@ -188,10 +188,23 @@ class Genetic extends Model
      */
     public function explicitLowStockThresholdCg(?string $locationId): ?int
     {
-        $perLocation = $this->prices()->withoutGlobalScopes()
+        // Stock is per variety per sede, not per tier — but the price form offers the field on EVERY row, and a
+        // figure typed on a tier's row used to be silently ignored (prompt 269). The base row still wins when it
+        // states one; otherwise the highest figure on any row at the sede (warn early rather than late).
+        // Reads an eager-loaded `prices` when the caller bulk-loaded it (StockCover::lowCountAt), so a list
+        // costs one query rather than one per genetic.
+        $prices = $this->relationLoaded('prices')
+            ? $this->prices
+            : $this->prices()->withoutGlobalScopes()->where('location_id', $locationId)->get(['location_id', 'tier_id', 'low_stock_threshold_cg']);
+
+        $perLocation = $prices
             ->where('location_id', $locationId)
-            ->whereNull('tier_id')
-            ->value('low_stock_threshold_cg');
+            ->whereNotNull('low_stock_threshold_cg')
+            ->sortBy([
+                fn (GeneticPrice $a, GeneticPrice $b): int => ($a->tier_id !== null) <=> ($b->tier_id !== null),
+                fn (GeneticPrice $a, GeneticPrice $b): int => $b->low_stock_threshold_cg <=> $a->low_stock_threshold_cg,
+            ])
+            ->first()?->low_stock_threshold_cg;
 
         if ($perLocation !== null) {
             return (int) $perLocation;
@@ -269,19 +282,7 @@ class Genetic extends Model
      */
     public function onHandCgAt(string $locationId): int
     {
-        $batches = $this->batches()->withoutGlobalScopes()
-            ->where('location_id', $locationId)
-            ->where('status', BatchStatus::OPEN->value)
-            ->where(fn (Builder $q) => $q->whereNull('expires_on')->orWhereDate('expires_on', '>=', now()->toDateString()))
-            ->get(['remaining_cg', 'remaining_units']);
-
-        if ($this->isUnitType()) {
-            $units = (int) $batches->sum(fn ($b): int => (int) $b->getRawOriginal('remaining_units'));
-
-            return $units * (int) $this->grams_per_unit_cg;
-        }
-
-        return (int) $batches->sum(fn ($b): int => (int) $b->getRawOriginal('remaining_cg'));
+        return StockCover::onHandCgFor([$this], $locationId)[$this->id] ?? 0;
     }
 
     /**

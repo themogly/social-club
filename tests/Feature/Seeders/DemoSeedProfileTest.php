@@ -10,6 +10,8 @@ use App\Enums\MemberStatus;
 use App\Models\Article;
 use App\Models\Batch;
 use App\Models\ExpenseCategory;
+use App\Models\Genetic;
+use App\Models\GeneticPrice;
 use App\Models\Location;
 use App\Models\Member;
 use App\Models\MemberSanction;
@@ -20,6 +22,7 @@ use App\Support\ActiveScope;
 use App\Support\Period;
 use App\Support\Settings;
 use App\Support\StockCeiling;
+use App\Support\StockCover;
 use App\Support\Wallet;
 use App\ViewModels\Reports\BarSalesReport;
 use App\ViewModels\Reports\FinancialReport;
@@ -101,6 +104,23 @@ class DemoSeedProfileTest extends TestCase
                 $ceiling['exceeded'],
                 "The demo seed must sit within {$location->name}'s ceiling ({$ceiling['on_site_cg']}cg on site vs {$ceiling['ceiling_cg']}cg)."
             );
+        }
+    }
+
+    /**
+     * Prompt 269 — a 50 g threshold on every seeded price, over 12–33 g of seeded stock, badged EVERY variety as
+     * low for ever: on a demo install the low-stock warning could not be seen to work, because lowering stock
+     * changed nothing. The seed now states no figure, and not every variety at a sede reads low.
+     */
+    public function test_the_seed_does_not_badge_every_variety_low(): void
+    {
+        $this->seedDemo('es');
+
+        $this->assertSame(0, GeneticPrice::query()->withoutGlobalScopes()->whereNotNull('low_stock_threshold_cg')->count());
+
+        foreach (Location::query()->get() as $location) {
+            $genetics = Genetic::query()->sellableAt($location->id)->with(['prices' => fn ($q) => $q->withoutGlobalScopes()->where('location_id', $location->id)])->get();
+            $this->assertLessThan($genetics->count(), StockCover::lowCountAt($genetics, $location->id), "every variety at {$location->name} reads low");
         }
     }
 
