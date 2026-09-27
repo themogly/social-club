@@ -4,9 +4,8 @@ namespace App\Filament\Resources\Genetics\Pages;
 
 use App\Actions\Pricing\SaveGeneticPrice;
 use App\Actions\Stock\IntakeBatch;
-use App\Enums\ConcentrateSubtype;
 use App\Enums\CultivationType;
-use App\Enums\ProductType;
+use App\Enums\ProductTypeChoice;
 use App\Enums\StrainType;
 use App\Enums\UnitType;
 use App\Filament\Resources\Genetics\GeneticResource;
@@ -68,15 +67,16 @@ class CreateGenetic extends CreateRecord
             Step::make(__('Tipo'))
                 ->description(__('Cómo se dispensa'))
                 ->schema([
+                    // Hachís is a first-level choice (prompt 276) — stored as CONCENTRATE + HASH at the finish.
                     Select::make('product_type')->label(__('Tipo de producto'))
-                        ->options(collect(ProductType::cases())->mapWithKeys(fn (ProductType $case): array => [$case->value => $case->label()])->all())
-                        ->default(ProductType::FLOWER->value)->required()->live()
+                        ->options(ProductTypeChoice::options())
+                        ->default(ProductTypeChoice::FLOWER->value)->required()->live()
                         ->helperText(fn (Get $get): string => __('Se dispensa: :modo', [
-                            'modo' => (ProductType::tryFrom((string) $get('product_type')) ?? ProductType::FLOWER)->unitType()->label(),
+                            'modo' => (ProductTypeChoice::tryFrom((string) $get('product_type')) ?? ProductTypeChoice::FLOWER)->unitType()->label(),
                         ])),
                     Select::make('concentrate_subtype')->label(__('Subtipo de extracto'))
-                        ->options(collect(ConcentrateSubtype::cases())->mapWithKeys(fn (ConcentrateSubtype $case): array => [$case->value => $case->label()])->all())
-                        ->visible(fn (Get $get): bool => $get('product_type') === ProductType::CONCENTRATE->value),
+                        ->options(ProductTypeChoice::extractSubtypeOptions())
+                        ->visible(fn (Get $get): bool => $get('product_type') === ProductTypeChoice::CONCENTRATE->value),
                     TextInput::make('grams_per_unit_g')->label(__('Gramos por unidad (g)'))
                         ->numeric()->rule(new GramAmount)->minValue(0)->step(0.01)->suffix('g')
                         ->visible(fn (Get $get): bool => self::isUnit($get('product_type')))
@@ -145,9 +145,8 @@ class CreateGenetic extends CreateRecord
         return DB::transaction(function () use ($data): Genetic {
             $genetic = Genetic::create([
                 'name' => $data['name'],
-                'product_type' => $data['product_type'],
+                ...ProductTypeChoice::from($data['product_type'])->attributes($data['concentrate_subtype'] ?? null),
                 'strain_type' => $data['strain_type'] ?? null,
-                'concentrate_subtype' => $data['concentrate_subtype'] ?? null,
                 'cultivation_type' => $data['cultivation_type'] ?? null,
                 'thc_bp' => filled($data['thc_pct'] ?? null) ? (int) round_half_up(((float) $data['thc_pct']) * 100) : null,
                 'cbd_bp' => filled($data['cbd_pct'] ?? null) ? (int) round_half_up(((float) $data['cbd_pct']) * 100) : null,
@@ -227,8 +226,6 @@ class CreateGenetic extends CreateRecord
 
     private static function isUnit(mixed $productType): bool
     {
-        $type = ProductType::tryFrom((string) $productType);
-
-        return $type !== null && $type->unitType() === UnitType::UNIT;
+        return ProductTypeChoice::tryFrom((string) $productType)?->unitType() === UnitType::UNIT;
     }
 }
