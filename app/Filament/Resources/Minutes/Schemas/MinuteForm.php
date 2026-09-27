@@ -55,7 +55,7 @@ class MinuteForm
                         Select::make('location_id')
                             ->label(__('Sede'))
                             ->placeholder(__('General (organización)'))
-                            ->options(fn (): array => Location::query()->orderBy('name')->pluck('name', 'id')->all()),
+                            ->options(fn (): array => Location::assignableOptions()),
 
                         Select::make('convocatoria_id')
                             ->label(__('Convocatoria'))

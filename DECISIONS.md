@@ -14368,3 +14368,57 @@ flex wrap), `CounterStaffDayTest` / `SignalsThatNeverVaryTest` (label ids). New:
 Nothing was blocked by the scope limit. `CLAUDE.md`'s "Motion One" line (design Discussion) is doc drift for the owner
 to reconcile, not a defect, and was not changed here. `TemporaryMemberTest`'s known intermittent (prompt 197) showed
 once in a full run and passed on rerun.
+
+## Prompt 273 — the pre-live admin and code-style refinements (Phase 2 and 3)
+
+The remaining admin-audit and code-style-audit items after 270–272 (security, compliance/money and the design/a11y
+branch took the rest). Ben: "go with your recommendations and fix all". Behaviour changes pinned in `PreLiveRefinementsTest` (9).
+
+### Owner-facing
+- **Roles y permisos names a grant that does nothing.** The ten panel-only permissions (`genetics.manage`, `prices.manage`,
+  `members.edit`, `comms.manage`, `minutes.manage`, `expenses.approve`, `purchases.manage`, `stock.merma`, `wallet.adjust`,
+  `reports.export`) now depend on `panel.access` in `Permissions::DEPENDENCIES`, so 265's warning and "Conceder también"
+  appear when one is given to a role without the panel. `reports.view` is deliberately NOT one — it also shows the day's
+  takings on the counter hub. Default roles raise no new warning (checked).
+- **Ajustes**: help text on every field an owner could not guess; the daily/monthly limit help now says it is the DEFAULT a
+  tier or personal limit replaces; the signed-URL field is named for what it means to an owner; the two counter choices
+  moved into a "Mostrador" section; a Guardar at the top of the ~4,000 px page; `avalador_max_sponsees` ≥ 1 (0 blocked all
+  sponsorship). The org-wide `low_stock_threshold_cg` — read by every variety's rule, editable nowhere — is now a field under
+  Existencias (grams, empty = automatic). The settings-coverage allowlist lost four keys that ARE on the form.
+- **Sede form**: grouped into Datos / Horario / Barra / Dispensario / Monedero / Cajas / Seguridad del mostrador; help on the
+  signature, check-in restriction and camera toggles; "ring-fence" dropped from the Spanish label; idle lock 0–60 (100,000
+  was accepted, silently turning it off); a stored timezone outside the two offered (the demo's UTC sede) is still offered.
+- **Sede dropdowns follow who works where.** `Location::assignableTo()` / `assignableOptions()` / `limitToAssignable()` — every
+  sede on a panel form (prices, batches, memberships, wallet ×3, expenses, purchases, announcements, events, applications,
+  minutes, convocatorias, add-a-strain) lists an owner's all and anyone else's own; Filament refuses a submitted sede outside
+  the options (tested). The price table shows only the viewer's sedes. This closes 238's deferral, paired with 270's policy.
+- **The low-stock alert lands on the answer**: Genéticas has a "Stock bajo" filter on the same `StockCover` verdict, and
+  `GENETICS_LOW_STOCK` links to it (269 had pointed it at the unfiltered Lotes list).
+- Price-row "Aviso de stock bajo" help says it is per sede, base row wins, empty = automatic; the price modal says "Guardar
+  precio" (not "Enviar"); "Artículos (bar)" → "Artículos" (it sits under Barra y tienda); the manager is "Gerente" wherever
+  the ROLE is meant ("responsable" stays where it means "whoever holds the permission"); Roles y permisos scrolls inside its
+  card at phone width instead of overlapping.
+
+### Code
+- **The dispensary grid no longer queries per variety**: stock and "has a lote" from one grouped query
+  (`StockCover::stockFor`, on `Batch::scopeDispensable`), the sede's prices eager-loaded (threshold and price read from them),
+  and `ResolvePrice` memoises the member's tier and discounts per instance. A test asserts 1 variety and 11 cost the same.
+- **`CounterOperator::current()`** is resolved once per request (held on the request, never a static; `set`/`clear` drop it).
+- **FEFO in one place**: `Batch::scopeFefo()` used by `SelectBatch::fefo` and `AllocateFromBatches`.
+- **Dead `settleWithBar`** removed (its three tests call `commitDispensation`, the same code path).
+- **Sponsor lookup** moved out of `App\Support`: `Member::scopeEligibleAvalador` / `scopeMatchingNameOrNumber` /
+  `avaladorLabel()` and the `ResolveAvalador` action; the name match is narrowed in SQL by the first word (it loaded every
+  active member per keystroke), and a match carries only id/names/number. (SQLite's LIKE is case-sensitive for non-ASCII
+  capitals — a dev-only nuance; MySQL's collation is not.)
+- The tab's "fits" asks `Wallet::maxDebitCents()` instead of re-deriving it; `StockCover::verdict()` / `verdictWith()` replace
+  a `func_num_args()` check; stock refusals throw `StockUnavailableException` and the counter SHOWS their translated message
+  (it said "No se pudo registrar…"); the bar-only settle shows the wallet writer's own debt message; the Seguridad drift lines
+  show the role's label, not `MANAGER`; float edge conversions replaced by `Money`/`Weight`/integer maths; a docblock moved
+  back to its property; a completeness test ties the roles page to `Permissions::ALL`.
+
+### Left for the owner (the reports' Discussion)
+Whether `Money::fromEuros` itself should become strict (every TYPED field already is, 271); `role_permission_overrides` has
+no `organisation_id` (single-organisation today — it matters when a second club arrives); stored Spanish reason strings
+(`'Compra en barra'`…) render raw in the English panel.
+
+`composer check` green in `es` and `en`. Merged to `main` on Ben's instruction.

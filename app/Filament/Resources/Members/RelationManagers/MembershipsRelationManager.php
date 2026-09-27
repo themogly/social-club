@@ -85,7 +85,7 @@ class MembershipsRelationManager extends RelationManager
             ->schema([
                 Select::make('location_id')
                     ->label(__('Sede'))
-                    ->options(fn () => Location::query()->orderBy('name')->pluck('name', 'id'))
+                    ->options(fn (): array => Location::assignableOptions())
                     ->required(),
                 Select::make('tier_id')
                     ->label(__('Tarifa'))
@@ -192,7 +192,7 @@ class MembershipsRelationManager extends RelationManager
             ->schema([
                 Select::make('location_id')
                     ->label(__('Sede destino'))
-                    ->options(fn () => Location::query()->orderBy('name')->pluck('name', 'id'))
+                    ->options(fn (): array => Location::assignableOptions())
                     ->required(),
             ])
             ->action(function (Membership $record, array $data): void {

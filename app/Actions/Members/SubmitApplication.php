@@ -7,7 +7,6 @@ use App\Models\Member;
 use App\Models\MemberApplication;
 use App\Models\MrzFieldStat;
 use App\Support\ApplicationShape;
-use App\Support\AvaladorResolver;
 use App\Support\DocumentVault;
 use App\Support\MrzPrefill;
 use App\Support\Settings;
@@ -234,7 +233,7 @@ class SubmitApplication
         // Prompt 244 — ONE resolver for the rule, now shared with the counter wizard's live feedback. Behaviour
         // is unchanged: an unambiguous match (by number or by exact full name) stores the id, anything else
         // stores null. The extraction is pinned by the existing avalador tests.
-        $result = AvaladorResolver::resolve($application->organisation_id, $ref);
+        $result = (new ResolveAvalador)->handle($application->organisation_id, $ref);
 
         return $result['status'] === 'found' ? (string) $result['member']?->id : null;
     }

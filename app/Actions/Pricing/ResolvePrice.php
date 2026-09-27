@@ -11,8 +11,10 @@ use App\Models\Genetic;
 use App\Models\GeneticPrice;
 use App\Models\Location;
 use App\Models\Member;
+use App\Models\MemberDiscount;
 use App\Support\PriceResult;
 use App\Support\Settings;
+use Illuminate\Database\Eloquent\Collection;
 use RuntimeException;
 
 /**
@@ -29,6 +31,15 @@ class ResolvePrice
 {
     /** One eighth = 3.5 g = 350 cg. Never a float comparison. */
     public const EIGHTH_CG = 350;
+
+    /**
+     * Per-INSTANCE memo of the member-side lookups (prompt 273). The dispensary resolves a price for every card with one
+     * resolver per render; the member's tier and discounts are the same for every card, and re-reading them per card
+     * was most of the grid's 119 queries. A new instance (every render, every commit) reads them afresh.
+     *
+     * @var array<string, mixed>
+     */
+    private array $memo = [];
 
     public function forGenetic(Genetic $genetic, Location $location, ?Member $member = null): PriceResult
     {
@@ -52,20 +63,14 @@ class ResolvePrice
         $tierId = $member !== null ? $this->activeTierId($member, $location) : null;
 
         if ($tierId !== null) {
-            $tierPrice = GeneticPrice::query()->withoutGlobalScopes()
-                ->where('genetic_id', $genetic->id)->where('location_id', $location->id)
-                ->where('tier_id', $tierId)->where('active', true)
-                ->orderByDesc('updated_at')->orderByDesc('id')->first(); // deterministic even with a legacy duplicate (271)
+            $tierPrice = $this->priceRow($genetic, $location, $tierId);
 
             if ($tierPrice !== null) {
                 return [(int) $tierPrice->{$column}, __('Tarifa'), $isUnit ? null : $tierPrice->price_per_eighth_cents];
             }
         }
 
-        $base = GeneticPrice::query()->withoutGlobalScopes()
-            ->where('genetic_id', $genetic->id)->where('location_id', $location->id)
-            ->whereNull('tier_id')->where('active', true)
-            ->orderByDesc('updated_at')->orderByDesc('id')->first(); // deterministic even with a legacy duplicate (271)
+        $base = $this->priceRow($genetic, $location, null);
 
         if ($base === null) {
             throw new RuntimeException('No active base price for this genetic at this location.');
@@ -173,12 +178,40 @@ class ResolvePrice
         return array_values($floors);
     }
 
+    /**
+     * The active price row for this variety, sede and tarifa (null = base) — newest first, so even a legacy duplicate
+     * resolves deterministically (271). Reads the caller's eager-loaded `prices` when present (the dispensary grid loads
+     * them for the sede), else one query.
+     */
+    private function priceRow(Genetic $genetic, Location $location, ?string $tierId): ?GeneticPrice
+    {
+        if ($genetic->relationLoaded('prices')) {
+            return $genetic->prices
+                ->filter(fn (GeneticPrice $p): bool => $p->location_id === $location->id && $p->tier_id === $tierId && $p->active)
+                ->sortByDesc(fn (GeneticPrice $p): string => ($p->updated_at?->format('YmdHisu') ?? '').'|'.$p->id)
+                ->first();
+        }
+
+        return GeneticPrice::query()->withoutGlobalScopes()
+            ->where('genetic_id', $genetic->id)->where('location_id', $location->id)
+            ->when($tierId === null, fn ($q) => $q->whereNull('tier_id'), fn ($q) => $q->where('tier_id', $tierId))
+            ->where('active', true)
+            ->orderByDesc('updated_at')->orderByDesc('id')->first();
+    }
+
     private function activeTierId(Member $member, Location $location): ?string
     {
-        return $member->memberships()->withoutGlobalScopes()
-            ->where('location_id', $location->id)
-            ->where('status', MembershipStatus::ACTIVE->value)
-            ->latest('id')->value('tier_id');
+        $key = 'tier|'.$member->id.'|'.$location->id;
+
+        if (! array_key_exists($key, $this->memo)) {
+            $this->memo[$key] = $member->memberships()->withoutGlobalScopes()
+                ->where('location_id', $location->id)
+                ->where('status', MembershipStatus::ACTIVE->value)
+                ->latest('id')->value('tier_id');
+        }
+
+        /** @var ?string */
+        return $this->memo[$key];
     }
 
     /**
@@ -194,13 +227,16 @@ class ResolvePrice
 
         // Therapeutic members get the therapeutic discount automatically.
         if ($member->is_therapeutic) {
-            $therapeutic = Discount::query()->withoutGlobalScopes()
+            $key = 'therapeutic|'.$member->organisation_id.'|'.$location->id;
+            $this->memo[$key] ??= Discount::query()->withoutGlobalScopes()
                 ->where('organisation_id', $member->organisation_id)
                 ->where('kind', DiscountKind::THERAPEUTIC->value)
                 ->where('active', true)
                 ->whereHas('locations', fn ($q) => $q->whereKey($location->id))
-                ->get()
-                ->filter(fn (Discount $d) => $this->appliesToGenetic($d, $genetic));
+                ->get();
+            /** @var Collection<int, Discount> $all */
+            $all = $this->memo[$key];
+            $therapeutic = $all->filter(fn (Discount $d) => $this->appliesToGenetic($d, $genetic));
 
             foreach ($therapeutic as $discount) {
                 $candidates[] = $this->fromDiscount($discount);
@@ -208,7 +244,12 @@ class ResolvePrice
         }
 
         // Assigned discounts (standard or per-member custom), not expired.
-        foreach ($member->memberDiscounts()->with('discount')->get() as $memberDiscount) {
+        $key = 'assigned|'.$member->id;
+        $this->memo[$key] ??= $member->memberDiscounts()->with('discount')->get();
+        /** @var Collection<int, MemberDiscount> $assigned */
+        $assigned = $this->memo[$key];
+
+        foreach ($assigned as $memberDiscount) {
             if ($memberDiscount->expires_at !== null && $memberDiscount->expires_at->isPast()) {
                 continue;
             }

@@ -258,7 +258,7 @@ class CommitCombinedSettleTest extends TestCase
             ->call('addLine')
             ->call('addBarItem', $this->article->id)
             ->set('cashTendered', '20')
-            ->call('settleWithBar')
+            ->call('commitDispensation')
             ->assertSet('lastDispensationId', fn ($v): bool => $v !== null)
             ->assertSet('lastOrderId', fn ($v): bool => $v !== null)
             ->assertSet('barBasket', []); // cleared after a clean settle

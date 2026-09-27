@@ -1,5 +1,8 @@
 # Admin / back-office audit — pre-live, 2026-09
 
+> **Status update:** Phase 2 and Phase 3 FIXED in prompt 273 (see DECISIONS.md).
+
+
 > **Status (2026-09-27):** Phase 1 all FIXED — items 1–2 (owner role, sede policy) in prompt 270; items 3–8 (retention, thresholds, debt rule, duplicate prices, Publicada/Imágenes, sede timezone/aforo) in prompt 271. Phase 2/3 → prompt 273.
 
 

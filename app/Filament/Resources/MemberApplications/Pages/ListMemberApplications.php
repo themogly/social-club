@@ -6,6 +6,7 @@ use App\Actions\Members\IssueApplicationInvite;
 use App\Actions\ResolveLocale;
 use App\Filament\Resources\MemberApplications\MemberApplicationResource;
 use App\Mail\ApplicationInviteMail;
+use App\Models\Location;
 use App\Models\User;
 use Filament\Actions\Action;
 use Filament\Forms\Components\Radio;
@@ -15,6 +16,7 @@ use Filament\Notifications\Notification;
 use Filament\Resources\Pages\ListRecords;
 use Filament\Schemas\Components\Utilities\Get;
 use Filament\Support\Icons\Heroicon;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Mail;
 use Throwable;
@@ -58,7 +60,7 @@ class ListMemberApplications extends ListRecords
                     ->live(),
                 Select::make('location_id')
                     ->label(__('Sede'))
-                    ->relationship('location', 'name')
+                    ->relationship('location', 'name', modifyQueryUsing: fn (Builder $query): Builder => Location::limitToAssignable($query))
                     ->searchable()
                     ->preload()
                     ->placeholder(__('Sin sede asignada')),

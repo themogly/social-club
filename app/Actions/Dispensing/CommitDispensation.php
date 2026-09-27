@@ -15,6 +15,7 @@ use App\Enums\TillSessionStatus;
 use App\Enums\WalletTransactionType;
 use App\Exceptions\DispensationBlockedException;
 use App\Exceptions\LimitExceededException;
+use App\Exceptions\StockUnavailableException;
 use App\Exceptions\TillClosedException;
 use App\Models\Batch;
 use App\Models\Dispensation;
@@ -375,7 +376,7 @@ class CommitDispensation
                 // open/unexpired/non-empty, so a forged `batch_id` drew a Centro sale from another genetic's lote
                 // or from a Norte lote, and the register showed grams from a lote that did not match what was sold.
                 if ($batch->genetic_id !== $genetic->id || $batch->location_id !== $location->id) {
-                    throw new RuntimeException(__('El lote :batch no corresponde a este producto en esta sede.', ['batch' => $batch->batch_no]));
+                    throw new StockUnavailableException(__('El lote :batch no corresponde a este producto en esta sede.', ['batch' => $batch->batch_no]));
                 }
                 if (! (new SelectBatch)->isDispensable($batch)) {
                     throw new RuntimeException("Batch {$batch->batch_no} is not dispensable (closed, expired or empty).");

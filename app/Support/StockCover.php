@@ -2,12 +2,12 @@
 
 namespace App\Support;
 
-use App\Enums\BatchStatus;
 use App\Enums\DispensationStatus;
 use App\Models\Batch;
 use App\Models\DispensationLine;
 use App\Models\Genetic;
-use Illuminate\Database\Eloquent\Builder;
+use App\Models\Location;
+use App\Models\Scopes\OrganisationScope;
 use Illuminate\Database\Eloquent\Collection;
 
 /**
@@ -116,14 +116,13 @@ class StockCover
     }
 
     /**
-     * On-hand gram-equivalent per genetic at a sede, in ONE grouped query — {@see Genetic::onHandCgAt()} for a
-     * whole list (prompt 269). Open, in-date batches only (what `SelectBatch` would serve); a UNIT genetic
-     * reports units × grams-per-unit so one figure serves both kinds.
+     * Dispensable stock per genetic at a sede, in ONE grouped query (prompts 269/273): centigrams and units, over the
+     * batches `Batch::scopeDispensable` admits — the same rule `SelectBatch` serves from.
      *
      * @param  list<Genetic>  $genetics
-     * @return array<string, int>
+     * @return array<string, array{cg: int, units: int}>
      */
-    public static function onHandCgFor(array $genetics, string $locationId): array
+    public static function stockFor(array $genetics, string $locationId): array
     {
         if ($genetics === []) {
             return [];
@@ -132,19 +131,36 @@ class StockCover
         $sums = Batch::query()->withoutGlobalScopes()
             ->whereIn('genetic_id', array_map(fn (Genetic $genetic): string => $genetic->id, $genetics))
             ->where('location_id', $locationId)
-            ->where('status', BatchStatus::OPEN->value)
-            ->where(fn (Builder $q) => $q->whereNull('expires_on')->orWhereDate('expires_on', '>=', now()->toDateString()))
+            ->dispensable()
             ->groupBy('genetic_id')
             ->selectRaw('genetic_id, COALESCE(SUM(remaining_cg), 0) AS cg, COALESCE(SUM(remaining_units), 0) AS units')
             ->toBase()->get()->keyBy('genetic_id');
 
+        $stock = [];
+        foreach ($genetics as $genetic) {
+            $row = $sums->get($genetic->id);
+            $stock[$genetic->id] = ['cg' => (int) ($row->cg ?? 0), 'units' => (int) ($row->units ?? 0)];
+        }
+
+        return $stock;
+    }
+
+    /**
+     * On-hand gram-equivalent per genetic — {@see Genetic::onHandCgAt()} for a whole list. A UNIT genetic reports units ×
+     * grams-per-unit so one figure serves both kinds.
+     *
+     * @param  list<Genetic>  $genetics
+     * @return array<string, int>
+     */
+    public static function onHandCgFor(array $genetics, string $locationId): array
+    {
+        $stock = self::stockFor($genetics, $locationId);
         $onHand = [];
 
         foreach ($genetics as $genetic) {
-            $row = $sums->get($genetic->id);
             $onHand[$genetic->id] = $genetic->isUnitType()
-                ? (int) ($row->units ?? 0) * (int) $genetic->grams_per_unit_cg
-                : (int) ($row->cg ?? 0);
+                ? $stock[$genetic->id]['units'] * (int) $genetic->grams_per_unit_cg
+                : $stock[$genetic->id]['cg'];
         }
 
         return $onHand;
@@ -159,16 +175,54 @@ class StockCover
      */
     public static function lowCountAt(Collection $genetics, string $locationId): int
     {
+        return count(self::lowIdsAt($genetics, $locationId));
+    }
+
+    /**
+     * WHICH of these genetics are low at a sede — the ids behind {@see self::lowCountAt()}, for the Genéticas "Stock bajo"
+     * filter the dashboard alert lands on (prompt 273: an alert whose destination cannot say which ones is a dead end).
+     *
+     * @param  Collection<int, Genetic>  $genetics  with `prices` eager-loaded for this sede
+     * @return list<string>
+     */
+    public static function lowIdsAt(Collection $genetics, string $locationId): array
+    {
         $ids = $genetics->modelKeys();
         $onHand = self::onHandCgFor($genetics->values()->all(), $locationId);
         $trailing = self::trailingCgFor($ids, $locationId);
         $firstDispensed = self::firstDispensedAtFor($ids, $locationId);
 
-        return $genetics->filter(fn (Genetic $genetic): bool => self::verdict(
+        return $genetics->filter(fn (Genetic $genetic): bool => self::verdictWith(
             $genetic, $locationId, $onHand[$genetic->id] ?? 0,
             $trailing[$genetic->id] ?? 0,
             $firstDispensed[$genetic->id] ?? null,
-        )['low'])->count();
+        )['low'])->map(fn (Genetic $genetic): string => $genetic->id)->values()->all();
+    }
+
+    /**
+     * The genetics low at any of these sedes (the active sede, or every sede of an owner's rollup).
+     *
+     * @param  iterable<Location>  $locations
+     * @return list<string>
+     */
+    public static function lowGeneticIds(iterable $locations): array
+    {
+        $ids = [];
+        foreach ($locations as $location) {
+            $ids = array_merge($ids, self::lowIdsAt(self::sellableWithPricesAt($location), $location->id));
+        }
+
+        return array_values(array_unique($ids));
+    }
+
+    /** @return Collection<int, Genetic> the genetics sellable at a sede, with that sede's prices eager-loaded */
+    public static function sellableWithPricesAt(Location $location): Collection
+    {
+        return Genetic::query()->withoutGlobalScope(OrganisationScope::class)
+            ->where('organisation_id', $location->organisation_id)
+            ->sellableAt($location->id)
+            ->with(['prices' => fn ($query) => $query->withoutGlobalScopes()->where('location_id', $location->id)])
+            ->get();
     }
 
     /**
@@ -203,7 +257,34 @@ class StockCover
      *
      * @return array{low: bool, days: ?float, basis: string}
      */
-    public static function verdict(Genetic $genetic, string $locationId, int $onHandCg, ?int $trailingCg = null, ?string $firstDispensedAt = null): array
+    public static function verdict(Genetic $genetic, string $locationId, int $onHandCg): array
+    {
+        return self::decide($genetic, $locationId, $onHandCg, function () use ($genetic, $locationId): array {
+            return [
+                self::trailingCgFor([$genetic->id], $locationId, self::windowDays($locationId))[$genetic->id] ?? 0,
+                self::firstDispensedAtFor([$genetic->id], $locationId)[$genetic->id] ?? null,
+            ];
+        });
+    }
+
+    /**
+     * {@see self::verdict()} with the history already in hand — for the bulk callers (the counter grid, the alert) that
+     * read trailing consumption and first-sale dates for the whole list in two grouped queries. Explicit rather than
+     * the old `func_num_args()` check that told "not passed" from "passed null" (prompt 273).
+     *
+     * @return array{low: bool, days: ?float, basis: string}
+     */
+    public static function verdictWith(Genetic $genetic, string $locationId, int $onHandCg, int $trailingCg, ?string $firstDispensedAt): array
+    {
+        return self::decide($genetic, $locationId, $onHandCg, fn (): array => [$trailingCg, $firstDispensedAt]);
+    }
+
+    /**
+     * @param  \Closure(): array{0: int, 1: ?string}  $history  trailing grams and first-sale date — only asked for once
+     *                                                          the cheaper rules have not decided
+     * @return array{low: bool, days: ?float, basis: string}
+     */
+    private static function decide(Genetic $genetic, string $locationId, int $onHandCg, \Closure $history): array
     {
         if ($onHandCg <= 0) {
             return ['low' => false, 'days' => null, 'basis' => 'empty'];
@@ -216,11 +297,7 @@ class StockCover
         }
 
         $window = self::windowDays($locationId);
-        $trailingCg ??= self::trailingCgFor([$genetic->id], $locationId, $window)[$genetic->id] ?? 0;
-
-        if (func_num_args() < 5) {
-            $firstDispensedAt = self::firstDispensedAtFor([$genetic->id], $locationId)[$genetic->id] ?? null;
-        }
+        [$trailingCg, $firstDispensedAt] = $history();
 
         $thin = $firstDispensedAt === null || strtotime($firstDispensedAt) >= now()->subDays($window)->timestamp;
 

@@ -6,7 +6,9 @@ use App\Actions\RecordAuditLog;
 use App\Enums\SettingType;
 use App\Support\CounterScreens;
 use App\Support\Settings;
+use App\Support\Weight;
 use BackedEnum;
+use Filament\Actions\Action;
 use Filament\Forms\Components\CheckboxList;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
@@ -155,9 +157,9 @@ class ManageSettings extends Page
                         TextInput::make('carencia_days')->label(__('Días de carencia'))->integer()->minValue(0)->maxValue(365)->required()
                             ->helperText(__('Espera obligatoria desde el alta antes de la primera dispensación.')),
                         TextInput::make('daily_limit_g')->label(__('Límite diario (g)'))->numeric()->minValue(0.01)->maxValue(1000)->required()
-                            ->helperText(__('Máximo por socio y día. Se bloquea en el mostrador al superarlo.')),
+                            ->helperText(__('Límite por defecto por socio y día; una tarifa o un límite personal lo sustituye (y puede ser mayor). Se bloquea en el mostrador al superarlo.')),
                         TextInput::make('monthly_limit_g')->label(__('Techo mensual (g)'))->numeric()->minValue(0.01)->maxValue(10000)->gte('daily_limit_g')->required()
-                            ->helperText(__('Máximo por socio y mes.')),
+                            ->helperText(__('Límite por defecto por socio y mes; una tarifa o un límite personal lo sustituye.')),
                         Select::make('monthly_window')->label(__('Ventana mensual'))
                             ->options(['calendar' => __('Mes natural'), 'rolling30' => __('30 días móviles')])->required(),
                         TextInput::make('active_member_cap')->label(__('Tope de socios activos'))->integer()->minValue(1)->required()
@@ -168,8 +170,10 @@ class ManageSettings extends Page
 
                 Section::make(__('Indicador de consumo'))
                     ->schema([
-                        TextInput::make('gauge_warning_pct')->label(__('% aviso'))->integer()->minValue(1)->maxValue(100)->required(),
-                        TextInput::make('gauge_alert_pct')->label(__('% alerta'))->integer()->minValue(1)->maxValue(100)->gt('gauge_warning_pct')->required(),
+                        TextInput::make('gauge_warning_pct')->label(__('% aviso'))->integer()->minValue(1)->maxValue(100)->required()
+                            ->helperText(__('Porcentaje del límite del socio consumido a partir del cual el indicador se pone en aviso (ámbar).')),
+                        TextInput::make('gauge_alert_pct')->label(__('% alerta'))->integer()->minValue(1)->maxValue(100)->gt('gauge_warning_pct')->required()
+                            ->helperText(__('Porcentaje del límite a partir del cual el indicador se pone en alerta (rojo). Debe ser mayor que el de aviso.')),
                     ])->columns(2),
 
                 Section::make(__('Avalador'))
@@ -180,7 +184,8 @@ class ManageSettings extends Page
                                 'waivable' => __('Exonerable por gerente'),
                                 'not_required' => __('No requerido'),
                             ])->required(),
-                        TextInput::make('avalador_max_sponsees')->label(__('Máx. avalados por socio'))->integer()->minValue(0)->required(),
+                        TextInput::make('avalador_max_sponsees')->label(__('Máx. avalados por socio'))->integer()->minValue(1)->required()
+                            ->helperText(__('Cuántos socios puede avalar una misma persona.')),
                         Toggle::make('avalador_therapeutic_exempt')->label(__('Socios terapéuticos exentos de aval'))
                             ->helperText(__('Los socios terapéuticos pueden sustituir el aval por un certificado médico.')),
                     ])->columns(2),
@@ -199,8 +204,10 @@ class ManageSettings extends Page
 
                 Section::make(__('Membresía'))
                     ->schema([
-                        TextInput::make('expiring_soon_days')->label(__('Días "caduca pronto"'))->integer()->minValue(0)->maxValue(365)->required(),
-                        TextInput::make('renewal_reminder_lead_days')->label(__('Días de aviso de renovación'))->integer()->minValue(0)->maxValue(365)->required(),
+                        TextInput::make('expiring_soon_days')->label(__('Días "caduca pronto"'))->integer()->minValue(0)->maxValue(365)->required()
+                            ->helperText(__('Con cuántos días de antelación una membresía aparece como «caduca pronto».')),
+                        TextInput::make('renewal_reminder_lead_days')->label(__('Días de aviso de renovación'))->integer()->minValue(0)->maxValue(365)->required()
+                            ->helperText(__('Cuántos días antes del vencimiento se avisa al socio para renovar.')),
                         TextInput::make('invite_expiry_days')->label(__('Caducidad de invitación (días)'))->numeric()->minValue(1)->required()
                             ->helperText(__('Una invitación de alta sin usar caduca tras estos días.')),
                         TextInput::make('refund_window_days')->label(__('Ventana de reembolso (días)'))->numeric()->minValue(0)->required()
@@ -228,20 +235,27 @@ class ManageSettings extends Page
 
                 Section::make(__('Existencias'))
                     ->schema([
-                        TextInput::make('batch_expiry_window_days')->label(__('Ventana de caducidad de lote (días)'))->integer()->minValue(0)->maxValue(365)->required(),
+                        TextInput::make('batch_expiry_window_days')->label(__('Ventana de caducidad de lote (días)'))->integer()->minValue(0)->maxValue(365)->required()
+                            ->helperText(__('Un lote que caduca dentro de estos días aparece en «Requiere atención».')),
                         TextInput::make('stock_cover_window_days')->label(__('Ventana de consumo (días)'))->numeric()->minValue(1)->required()
                             ->helperText(__('Sobre cuántos días de dispensaciones reales se calcula el ritmo de cada genética.')),
                         TextInput::make('stock_cover_low_days')->label(__('Avisar por debajo de (días de stock)'))->numeric()->minValue(1)->required()
                             ->helperText(__('«Stock bajo» se mide contra la demanda: cuántos días duraría al ritmo actual. Un aviso que llega el día que te quedas sin existencias no es un aviso.')),
-                        Toggle::make('discounts_stack')->label(__('Los descuentos se acumulan')),
+                        // Prompt 273 — read by every variety's low-stock rule and editable nowhere; empty = the automatic rule.
+                        TextInput::make('low_stock_threshold_g')->label(__('Aviso fijo de stock bajo para todas las variedades (g)'))->numeric()->minValue(0)
+                            ->helperText(__('Opcional. Vacío = aviso automático por días de cobertura. Una cifra puesta en el precio de una variedad en su sede manda sobre esta.')),
+                        Toggle::make('discounts_stack')->label(__('Los descuentos se acumulan'))
+                            ->helperText(__('Si se desactiva, se aplica solo el mejor descuento de cada socio; si se activa, se suman.')),
                     ])->columns(2),
 
                 Section::make(__('Caja'))
                     ->schema([
                         TextInput::make('till_default_float_eur')->label(__('Fondo de caja por defecto (€)'))->numeric()->minValue(0)->required()
                             ->helperText(__('Se propone al abrir la caja cada mañana. El operador siempre puede cambiarlo. 0 = sin fondo por defecto.')),
-                        TextInput::make('arqueo_variance_tolerance_eur')->label(__('Tolerancia de descuadre (€)'))->numeric()->minValue(0)->required(),
-                        TextInput::make('expense_approval_threshold_eur')->label(__('Umbral de aprobación de gasto (€)'))->numeric()->minValue(0)->required(),
+                        TextInput::make('arqueo_variance_tolerance_eur')->label(__('Tolerancia de descuadre (€)'))->numeric()->minValue(0)->required()
+                            ->helperText(__('Un arqueo que se desvía más de esta cifra exige una nota al cerrar la caja.')),
+                        TextInput::make('expense_approval_threshold_eur')->label(__('Umbral de aprobación de gasto (€)'))->numeric()->minValue(0)->required()
+                            ->helperText(__('Los gastos por encima de esta cifra quedan pendientes hasta que alguien con permiso para aprobar gastos los apruebe.')),
                     ])->columns(2),
 
                 Section::make(__('Privacidad y datos'))
@@ -254,9 +268,15 @@ class ManageSettings extends Page
                             ->helperText(__('El texto de los mensajes con socios se redacta pasado este plazo; queda el hilo como evidencia del contacto.')),
                         TextInput::make('application_retention_days')->label(__('Retención de solicitudes (días)'))->numeric()->minValue(1)->required()
                             ->helperText(__('Una solicitud rechazada o abandonada se anonimiza y su foto de identidad se borra pasado este plazo. Las aprobadas no se tocan (la foto pasa a ser del socio).')),
-                        TextInput::make('signed_url_ttl_seconds')->label(__('Caducidad de URLs firmadas (seg.)'))->integer()->minValue(60)->maxValue(3600)->required(),
+                        TextInput::make('signed_url_ttl_seconds')->label(__('Tiempo abierto de un enlace a un documento (seg.)'))->integer()->minValue(60)->maxValue(3600)->required()
+                            ->helperText(__('Cuánto tiempo sigue abierto el enlace a un DNI o documento de un socio antes de caducar (60–3600 s).')),
                         TextInput::make('qr_scan_max_failures_per_minute')->label(__('Máx. escaneos fallidos por minuto'))->numeric()->minValue(1)->required()
                             ->helperText(__('Tras tantos escaneos de tarjeta fallidos por operador en un minuto, se bloquea temporalmente (anti fuerza bruta).')),
+                    ])->columns(3),
+
+                // Prompt 273 — the two counter choices used to sit under "Privacidad y datos".
+                Section::make(__('Mostrador'))
+                    ->schema([
                         Select::make('counter_landing')->label(__('Pantalla de inicio del mostrador'))
                             ->options([
                                 'home' => __('Inicio del mostrador (iconos)'),
@@ -268,8 +288,16 @@ class ManageSettings extends Page
                                 ->mapWithKeys(fn (array $s): array => [$s['route'] => $s['label']])->all())
                             ->required()
                             ->helperText(__('Qué destino ocupa el botón grande del inicio del mostrador. Quien no tenga permiso para abrirlo verá como principal el primero que sí pueda abrir.')),
-                    ])->columns(3),
+                    ])->columns(2),
             ]);
+    }
+
+    /** Prompt 273 — the page is ~4,000 px tall; the save is also at the top, not only after the last section. */
+    protected function getHeaderActions(): array
+    {
+        return [
+            Action::make('saveTop')->label(__('Guardar'))->action(fn () => $this->save()),
+        ];
     }
 
     public function save(): void
@@ -294,6 +322,7 @@ class ManageSettings extends Page
         // The door threshold is a SEPARATE figure from the hard limit — never derived from it.
         Settings::set('wallet_door_debt_threshold_cents', (int) round_half_up(((float) ($state['wallet_door_debt_threshold_eur'] ?? 0)) * 100), SettingType::CENTS);
         Settings::set('low_balance_threshold_cents', (int) round_half_up(((float) ($state['low_balance_threshold_eur'] ?? 0)) * 100), SettingType::CENTS);
+        Settings::set('low_stock_threshold_cg', filled($state['low_stock_threshold_g'] ?? null) ? Weight::fromGrams((string) $state['low_stock_threshold_g'])->centigrams : 0, SettingType::CG);
         Settings::set('till_default_float_cents', (int) round_half_up(((float) ($state['till_default_float_eur'] ?? 0)) * 100), SettingType::CENTS);
         Settings::set('arqueo_variance_tolerance_cents', (int) round_half_up(((float) ($state['arqueo_variance_tolerance_eur'] ?? 0)) * 100), SettingType::CENTS);
         Settings::set('expense_approval_threshold_cents', (int) round_half_up(((float) ($state['expense_approval_threshold_eur'] ?? 0)) * 100), SettingType::CENTS);
@@ -321,6 +350,8 @@ class ManageSettings extends Page
         $values['wallet_debt_limit_eur'] = ((int) Settings::get('wallet_debt_limit_cents')) / 100;
         $values['wallet_door_debt_threshold_eur'] = ((int) Settings::get('wallet_door_debt_threshold_cents')) / 100;
         $values['low_balance_threshold_eur'] = ((int) Settings::get('low_balance_threshold_cents')) / 100;
+        $lowStockCg = (int) Settings::get('low_stock_threshold_cg', 0);
+        $values['low_stock_threshold_g'] = $lowStockCg > 0 ? $lowStockCg / 100 : null;
         $values['till_default_float_eur'] = ((int) Settings::get('till_default_float_cents')) / 100;
         $values['arqueo_variance_tolerance_eur'] = ((int) Settings::get('arqueo_variance_tolerance_cents')) / 100;
         $values['expense_approval_threshold_eur'] = ((int) Settings::get('expense_approval_threshold_cents')) / 100;

@@ -9,7 +9,6 @@ use App\Models\Member;
 use App\Models\User;
 use App\Rules\AvaladorWithinSponseeCap;
 use App\Support\ActiveScope;
-use App\Support\AvaladorResolver;
 use App\Support\DocumentUpload;
 use App\Support\DocumentVault;
 use App\Support\Email;
@@ -123,17 +122,20 @@ class MemberForm
 
                         // Prompt 264 — found BY NAME: it listed and searched member numbers only, so typing the
                         // sponsor's surname found nobody. Now name or number in one box, labelled "Nombre
-                        // Apellidos · M-00028", drawn from AvaladorResolver's pool (active members of this
+                        // Apellidos · M-00028", drawn from Member::eligibleAvalador (active members of this
                         // organisation) — the same definition of a valid sponsor as the counter's sign-up. No
                         // preload: that would put every member into the page.
                         Select::make('avalador_member_id')
                             ->label(__('Avalador'))
                             ->searchable()
-                            ->getSearchResultsUsing(fn (string $search, ?Member $record): array => AvaladorResolver::candidates(
-                                (string) app(ActiveScope::class)->organisationId(), $search, $record?->id,
-                            )->mapWithKeys(fn (Member $m): array => [$m->id => AvaladorResolver::label($m)])->all())
-                            ->getOptionLabelUsing(fn ($value): ?string => ($m = Member::query()->withoutGlobalScopes()->find($value)) instanceof Member
-                                ? AvaladorResolver::label($m) : null)
+                            ->getSearchResultsUsing(fn (string $search, ?Member $record): array => blank(trim($search)) ? [] : Member::query()->withoutGlobalScopes()
+                                ->eligibleAvalador((string) app(ActiveScope::class)->organisationId())
+                                ->when($record !== null, fn ($q) => $q->whereKeyNot($record?->id)) // nobody sponsors themself
+                                ->matchingNameOrNumber(trim($search))
+                                ->orderBy('last_name')->orderBy('first_name')->limit(20)
+                                ->get(['id', 'first_name', 'last_name', 'member_no'])
+                                ->mapWithKeys(fn (Member $m): array => [$m->id => $m->avaladorLabel()])->all())
+                            ->getOptionLabelUsing(fn ($value): ?string => Member::query()->withoutGlobalScopes()->find($value)?->avaladorLabel())
                             ->placeholder(__('Busca por nombre o nº de socio'))
                             // Enforce avalador_max_sponsees (prompt 34): an avalador cannot back more than
                             // the configured maximum. No cap was enforced before — it was unlimited.

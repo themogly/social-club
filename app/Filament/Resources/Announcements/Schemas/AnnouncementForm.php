@@ -2,11 +2,13 @@
 
 namespace App\Filament\Resources\Announcements\Schemas;
 
+use App\Models\Location;
 use Filament\Forms\Components\DateTimePicker;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
 use Filament\Schemas\Schema;
+use Illuminate\Database\Eloquent\Builder;
 
 class AnnouncementForm
 {
@@ -26,7 +28,7 @@ class AnnouncementForm
 
             Select::make('location_id')
                 ->label(__('Sede'))
-                ->relationship('location', 'name')
+                ->relationship('location', 'name', modifyQueryUsing: fn (Builder $query): Builder => Location::limitToAssignable($query))
                 ->searchable()
                 ->preload()
                 ->placeholder(__('Todas las sedes'))

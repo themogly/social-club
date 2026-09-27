@@ -20,6 +20,7 @@ use App\Enums\WalletTransactionType;
 use App\Exceptions\DebtLimitExceededException;
 use App\Exceptions\DispensationBlockedException;
 use App\Exceptions\LimitExceededException;
+use App\Exceptions\StockUnavailableException;
 use App\Exceptions\TillClosedException;
 use App\Livewire\Counter\Concerns\CollectsMembershipFees;
 use App\Livewire\Counter\Concerns\FindsMembers;
@@ -826,15 +827,14 @@ class DispensaryPos extends Component
     {
         $tendered = trim($this->cashTendered) === '' ? 0 : max(0, $this->parseCents($this->cashTendered) ?? 0);
         $remainder = max(0, $total - $tendered);
-        $headroom = Wallet::tabHeadroomCents($member, $location->id);
-        $credit = max(0, Wallet::balance($member->id, $location->id));
 
         return [
             'limit' => (int) ($member->debt_limit_cents ?? 0),
             'owed' => Wallet::totalDebtCents($member->id),
-            'headroom' => $headroom,
+            'headroom' => Wallet::tabHeadroomCents($member, $location->id),
             'remainder' => $remainder,
-            'fits' => $remainder > 0 && $remainder - $credit <= $headroom,
+            // The wallet writer's own question (prompt 273) — credit here plus the tab's headroom — not a hand copy of it.
+            'fits' => $remainder > 0 && $remainder <= Wallet::maxDebitCents($member, $location->id),
         ];
     }
 
@@ -1112,6 +1112,10 @@ class DispensaryPos extends Component
             $this->flash($e->getMessage(), 'error');
 
             return;
+        } catch (StockUnavailableException $e) {
+            $this->flash($e->getMessage(), 'error'); // names the product and what is left (273)
+
+            return;
         } catch (RuntimeException) {
             $this->flash(__('No se pudo registrar la dispensación. Revisa la cesta y el stock.'), 'error');
 
@@ -1183,16 +1187,6 @@ class DispensaryPos extends Component
     }
 
     /**
-     * Kept as the name the older callers use (prompt 263): settling the visit IS the one commit now — dispensation
-     * only, bar only, or both — through {@see attemptCommit()}, so every gate, the price override, the limit
-     * override, the signature and the tab apply the same way whichever it is.
-     */
-    public function settleWithBar(): void
-    {
-        $this->attemptCommit(override: false);
-    }
-
-    /**
      * Write a dispensation AND its bar order in one atomic settle (prompt 118's `CommitCombinedSettle`, two
      * ledgers), reached from {@see attemptCommit()} after every dispensation gate has passed — the price override
      * and the limit override ride in the dispensation's own options.
@@ -1236,6 +1230,10 @@ class DispensaryPos extends Component
             return;
         } catch (AuthorizationException) {
             $this->flash(__('No tienes permiso para autorizar una excepción.'), 'error');
+
+            return;
+        } catch (StockUnavailableException $e) {
+            $this->flash($e->getMessage(), 'error');
 
             return;
         } catch (RuntimeException) {
@@ -1292,8 +1290,9 @@ class DispensaryPos extends Component
                 'idempotency_key' => $this->idempotencyKey !== null ? $this->idempotencyKey.'-bar' : null,
                 'on_tab' => $this->onTab,
             ]);
-        } catch (DebtLimitExceededException) {
-            $this->flash(__('El pago con monedero superaría el saldo disponible del socio.'), 'error');
+        } catch (DebtLimitExceededException $e) {
+            // The writer's own words (259: "solo se puede añadir a la cuenta…"), as the other two paths show (273).
+            $this->flash($e->getMessage(), 'error');
 
             return;
         } catch (TillClosedException) {
@@ -1464,7 +1463,7 @@ class DispensaryPos extends Component
         $total = $this->chargeableCents((int) array_sum(array_map(fn (array $l): int => (int) $l['total_cents'], $basketLines)));
 
         // The tender preview is split over the COMBINED total (prompt 224). It used to split the dispensation
-        // total alone while `settleWithBar()` split dispensation + bar, so with a bar line present the
+        // total alone while the combined settle split dispensation + bar, so with a bar line present the
         // breakdown above the settle button disagreed with the settle button itself — and a bar-only visit had
         // a breakdown reading €0,00 against real money. One figure, one split, one place.
         $barTotal = $this->barBasketTotalCents($member, $location);
@@ -1759,7 +1758,7 @@ class DispensaryPos extends Component
         }
 
         // BOTH baskets (prompt 224): "Justo" fills in the cash owed, and what is owed on a visit with a bar
-        // line is the combined amount — the same figure `settleWithBar()` splits.
+        // line is the combined amount — the same figure the one commit (`attemptCommit()`) splits.
         $member = $this->resolveMember();
 
         return $this->chargeableCents($this->basketTotalCents($member, $location)) + $this->barBasketTotalCents($member, $location);
@@ -1910,16 +1909,20 @@ class DispensaryPos extends Component
 
         $presets = [];
         foreach ((array) Settings::get('pos_weight_presets_g', [1, 2, 3.5, 5]) as $g) {
-            $grams = (float) str_replace(',', '.', (string) $g);
-            if ($grams <= 0) {
+            // Through the one weight rule, integer from here on (prompt 273 — it was a float and round_half_up).
+            try {
+                $cg = Weight::fromGrams(str_replace(',', '.', (string) $g))->centigrams;
+            } catch (InvalidArgumentException) {
                 continue;
             }
-            $cg = (int) round_half_up($grams * 100);
+            if ($cg <= 0) {
+                continue;
+            }
             [$priceCents, $eighthApplied] = $this->presetPrice($price, $cg);
 
             $presets[] = [
                 'grams_cg' => $cg,
-                'label' => rtrim(rtrim(number_format($grams, 2, ',', ''), '0'), ','),
+                'label' => rtrim(rtrim(sprintf('%d,%02d', intdiv($cg, 100), $cg % 100), '0'), ','),
                 'price_cents' => $priceCents,
                 'eighth_applied' => $eighthApplied,
                 'available' => $cg <= $remaining,
@@ -1995,7 +1998,8 @@ class DispensaryPos extends Component
         /** @var Collection<int, Genetic> $genetics */
         $genetics = Genetic::query()
             ->sellableAt($location->id)
-            ->with('category')
+            // The sede's prices ride along so the low-stock verdict reads its threshold without a query per card (273).
+            ->with(['category', 'prices' => fn ($query) => $query->withoutGlobalScopes()->where('location_id', $location->id)])
             ->orderBy('name')
             ->get();
 
@@ -2006,6 +2010,9 @@ class DispensaryPos extends Component
         $geneticIds = $genetics->pluck('id')->all();
         $trailingCg = StockCover::trailingCgFor($geneticIds, $location->id);
         $firstDispensed = StockCover::firstDispensedAtFor($geneticIds, $location->id);
+        // Prompt 273 — the stock for the whole grid in ONE grouped query too; it was two or three per card (remaining,
+        // and a FEFO lookup just to answer "has a lote"). 11 varieties cost 119 queries per render, on every key press.
+        $stock = StockCover::stockFor($genetics->values()->all(), $location->id);
 
         $rows = [];
 
@@ -2017,8 +2024,8 @@ class DispensaryPos extends Component
             }
 
             $isUnit = $genetic->isUnitType();
-            $remainingUnits = $isUnit ? $this->remainingUnits($genetic, $location) : null;
-            $remainingCg = $isUnit ? ($remainingUnits ?? 0) * (int) $genetic->grams_per_unit_cg : $this->remainingCg($genetic, $location);
+            $remainingUnits = $isUnit ? $stock[$genetic->id]['units'] : null;
+            $remainingCg = $isUnit ? ($remainingUnits ?? 0) * (int) $genetic->grams_per_unit_cg : $stock[$genetic->id]['cg'];
 
             $rows[] = [
                 'id' => $genetic->id,
@@ -2041,7 +2048,7 @@ class DispensaryPos extends Component
                 'remaining_cg' => $remainingCg,
                 'remaining_units' => $remainingUnits,
                 // The one resolver, handed the bulk figures — never a second calculation on the screen.
-                'cover' => $cover = StockCover::verdict(
+                'cover' => $cover = StockCover::verdictWith(
                     $genetic, $location->id, $remainingCg,
                     $trailingCg[$genetic->id] ?? 0,
                     $firstDispensed[$genetic->id] ?? null,
@@ -2050,7 +2057,8 @@ class DispensaryPos extends Component
                 // Staff screens may carry quantities; the member menu may not (185). "Runs out in about two
                 // days at the current rate" is information — the word "low" is not.
                 'cover_label' => StockCover::label($cover['days']),
-                'has_batch' => (new SelectBatch)->fefo($genetic, $location) !== null,
+                // A dispensable lote exists exactly when there is dispensable stock — the rule SelectBatch::fefo serves by.
+                'has_batch' => ($isUnit ? (int) $remainingUnits : $remainingCg) > 0,
                 // Prompt 271 — the first photo from "Añadir variedad", which nothing used to show.
                 'image_url' => filled($genetic->images[0] ?? null) ? Storage::disk('public')->url((string) $genetic->images[0]) : null,
             ];

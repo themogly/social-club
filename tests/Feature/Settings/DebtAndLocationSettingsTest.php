@@ -162,12 +162,15 @@ class DebtAndLocationSettingsTest extends TestCase
 
         // Money/weight/percent values edited via *_eur / *_g / *_pct virtual fields → cover their stored keys.
         // minute_quorum_fraction_bp is entered as a percentage (prompt 44).
-        $edgeCovered = ['daily_limit_cg', 'monthly_limit_cg', 'wallet_debt_limit_cents', 'wallet_door_debt_threshold_cents', 'low_balance_threshold_cents', 'till_default_float_cents', 'arqueo_variance_tolerance_cents', 'expense_approval_threshold_cents', 'minute_quorum_fraction_bp', 'assembly_second_call_quorum_bp'];
+        $edgeCovered = ['daily_limit_cg', 'monthly_limit_cg', 'wallet_debt_limit_cents', 'wallet_door_debt_threshold_cents', 'low_balance_threshold_cents', 'till_default_float_cents', 'arqueo_variance_tolerance_cents', 'expense_approval_threshold_cents', 'minute_quorum_fraction_bp', 'assembly_second_call_quorum_bp',
+            // Prompt 273 — edited as grams (empty = automatic) under Existencias.
+            'low_stock_threshold_cg'];
 
         // Deliberately NOT on the org settings form (documented in DECISIONS): the enforcement
         // matrix (its own editor), per-location settings, and system/compliance constants.
         // (default_locale + enabled_locales are now ON the form — prompt 44 — so they left this list.)
-        $excluded = ['enforcement', 'aforo_default', 'data_retention_days', 'audit_retention_days', 'signed_url_ttl_seconds', 'consent_text_version', 'consent_privacy_text', 'consent_statutes_text', 'heartbeat_stale_seconds', 'monthly_window',
+        // (data/audit retention, signed-URL lifetime and the monthly window ARE on the form — prompt 273 took them off this list.)
+        $excluded = ['enforcement', 'aforo_default', 'consent_text_version', 'consent_privacy_text', 'consent_statutes_text', 'heartbeat_stale_seconds',
             // System constant, not a front-of-house threshold: how many hours abandoned member-import scratch
             // CSVs live before the imports:prune-staging sweep deletes them (prompt 142).
             'import_staging_retention_hours',
@@ -200,9 +203,8 @@ class DebtAndLocationSettingsTest extends TestCase
             // Per-location numeric-LIST setting, edited on LocationForm (prompt 133): POS weight presets.
             'pos_weight_presets_g',
             // Documented in DECISIONS: forecast_options_g is a preset ARRAY (a tags/repeater
-            // input is a later enhancement); low_stock_threshold_cg is a fallback — the operative
-            // low-stock threshold is set per-article on the Article resource.
-            'forecast_options_g', 'low_stock_threshold_cg'];
+            // input is a later enhancement).
+            'forecast_options_g'];
 
         $covered = array_merge($editable, $edgeCovered, $excluded);
 

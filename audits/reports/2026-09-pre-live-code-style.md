@@ -1,5 +1,8 @@
 # Code-style audit — pre-live (Laravel idiom & consistency)
 
+> **Status update:** Phase 2 and Phase 3 FIXED in prompt 273, except the stored Spanish reason strings (left for the owner — Discussion).
+
+
 > **Status (2026-09-27):** Phase 1 all FIXED — strict typed money, tab after override, strain confirmation (prompt 271); `avaladorFeedback` (prompt 270). Phase 2/3 → prompt 273.
 
 

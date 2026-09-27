@@ -154,4 +154,17 @@ class Batch extends Model
             ->where(fn (Builder $q): Builder => $q->where('remaining_cg', '>', 0)->orWhere('remaining_units', '>', 0))
             ->where(fn (Builder $q): Builder => $q->whereNull('expires_on')->orWhereDate('expires_on', '>=', today()));
     }
+
+    /**
+     * "Dispensable, oldest first" — FEFO, in ONE place (prompt 273). The lote the counter offers (`SelectBatch::fefo`)
+     * and the lotes the allocator draws (`AllocateFromBatches`) used to type the ordering separately; if they drifted,
+     * "oldest first" would mean two things in manual and automatic mode.
+     *
+     * @param  Builder<static>  $query
+     * @return Builder<static>
+     */
+    public function scopeFefo(Builder $query): Builder
+    {
+        return $query->dispensable()->orderBy('acquired_or_harvested_on')->orderBy('id');
+    }
 }

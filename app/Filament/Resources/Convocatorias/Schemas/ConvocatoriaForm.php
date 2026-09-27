@@ -54,7 +54,7 @@ class ConvocatoriaForm
                     Select::make('location_id')
                         ->label(__('Sede'))
                         ->placeholder(__('General (organización)'))
-                        ->options(fn (): array => Location::query()->orderBy('name')->pluck('name', 'id')->all())
+                        ->options(fn (): array => Location::assignableOptions())
                         ->helperText(__('Solo el lugar de celebración. La asamblea es de la asociación: se convoca a todos los socios.')),
                 ])
                 ->columns(2),
