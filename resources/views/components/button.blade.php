@@ -2,6 +2,7 @@
     'variant' => 'primary',   // primary | secondary | danger | danger-soft | warning
     'size' => 'md',           // sm | md | lg | xl  (height/padding — counter screens use lg/xl)
     'href' => null,           // when set, renders an <a> instead of a <button>
+    'as' => null,             // 'label' — a button-looking <label> wrapping a visually hidden file input (prompt 272)
 ])
 
 {{--
@@ -41,6 +42,9 @@
 
 @if ($href !== null)
     <a href="{{ $href }}" {{ $attributes->class($classes) }}>{{ $slot }}</a>
+@elseif ($as === 'label')
+    {{-- A label is not focusable itself; the hidden input inside it is, so the ring follows focus-within. --}}
+    <label {{ $attributes->class([$classes, 'cursor-pointer focus-within:ring-2 focus-within:ring-brand focus-within:ring-offset-2 focus-within:ring-offset-surface dark:focus-within:ring-offset-slate-950']) }}>{{ $slot }}</label>
 @else
     <button {{ $attributes->merge(['type' => 'button'])->class($classes) }}>{{ $slot }}</button>
 @endif

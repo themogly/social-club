@@ -19,6 +19,19 @@ import './mrz-reader.js';
 // (`$wire.submitCameraScan` → ResolveMemberByToken). Translated copy is passed in from Blade.
 // A pure-JS fallback (jsQR) for Safari/Firefox is a documented follow-up (needs a browser to
 // add + verify). Camera access requires a secure context (HTTPS or localhost).
+// Prompt 272 — the Android back gesture closes a counter overlay before it leaves the page (CLAUDE.md: pushState
+// on open, popstate closes). The receipt and document sheets did this; the camera and photo overlays did not, so
+// Back left the screen with the camera still live. `overlayHistory` is the one shared pair of moves.
+const overlayHistory = {
+    push(name) {
+        history.pushState({ counterOverlay: name }, '');
+    },
+    // Take back our own entry when the overlay closes by any route OTHER than Back.
+    pop(name) {
+        if (history.state?.counterOverlay === name) history.back();
+    },
+};
+
 document.addEventListener('alpine:init', () => {
     window.Alpine.data('cameraScan', (config = {}) => ({
         messages: config.messages || {},
@@ -33,10 +46,21 @@ document.addEventListener('alpine:init', () => {
         timer: null,
         busy: false,
 
+        init() {
+            this.onPopState = () => {
+                if (this.active) {
+                    this.teardown();
+                    this.active = false;
+                }
+            };
+            window.addEventListener('popstate', this.onPopState);
+        },
+
         async openScanner() {
             if (!this.supported) return;
             this.error = null;
             this.active = true;
+            overlayHistory.push('camera');
 
             try {
                 this.stream = await navigator.mediaDevices.getUserMedia({
@@ -89,12 +113,14 @@ document.addEventListener('alpine:init', () => {
         onDecoded(token) {
             this.teardown();
             this.active = false;
+            overlayHistory.pop('camera');
             this.$wire.submitCameraScan(token);
         },
 
         closeScanner() {
             this.teardown();
             this.active = false;
+            overlayHistory.pop('camera');
         },
 
         // Release the camera and stop the scan loop — always call before leaving the screen.
@@ -113,6 +139,7 @@ document.addEventListener('alpine:init', () => {
 
         destroy() {
             this.teardown();
+            window.removeEventListener('popstate', this.onPopState);
         },
     }));
 
@@ -136,11 +163,22 @@ document.addEventListener('alpine:init', () => {
         preview: null, // dataURL of the captured still, awaiting confirm
         stream: null,
 
+        init() {
+            this.onPopState = () => {
+                if (this.active) {
+                    this.teardown();
+                    this.active = false;
+                }
+            };
+            window.addEventListener('popstate', this.onPopState);
+        },
+
         async open() {
             if (!this.supported) return;
             this.error = null;
             this.preview = null;
             this.active = true;
+            overlayHistory.push('photo');
 
             try {
                 this.stream = await navigator.mediaDevices.getUserMedia({
@@ -225,6 +263,7 @@ document.addEventListener('alpine:init', () => {
             this.teardown();
             this.active = false;
             this.busy = false;
+            overlayHistory.pop('photo');
             if (this.$wire) {
                 this.$wire.$refresh();
             } else {
@@ -235,6 +274,7 @@ document.addEventListener('alpine:init', () => {
         close() {
             this.teardown();
             this.active = false;
+            overlayHistory.pop('photo');
         },
 
         teardown() {
@@ -247,6 +287,7 @@ document.addEventListener('alpine:init', () => {
 
         destroy() {
             this.teardown();
+            window.removeEventListener('popstate', this.onPopState);
         },
     }));
 });
