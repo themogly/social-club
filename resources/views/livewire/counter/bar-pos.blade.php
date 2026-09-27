@@ -39,7 +39,7 @@
     @if (! $noLocation)
         {{-- Offline banner — unmistakable, fail closed. --}}
         <div x-show="! online" x-cloak role="alert" aria-live="assertive" class="mb-4 flex items-center gap-3 rounded-xl border border-error/40 bg-error/10 px-4 py-3 text-sm font-semibold text-error">
-            <span class="text-lg">⚠️</span>
+            <x-counter.icon name="alert" class="h-5 w-5" />
             <span>{{ __('Sin conexión. No se puede registrar ninguna venta; la cesta se conserva y se reactivará al reconectar.') }}</span>
         </div>
 
@@ -60,7 +60,7 @@
     @if ($blocker === \App\Support\CounterBlocker::SEDE)
         <x-counter.blocking-state
             data-blocker="sede"
-            icon="📍"
+            icon="map-pin"
             :heading="$mustChooseLocation ? __('Elige tu sede') : __('Sin sede asignada')"
             :body="$mustChooseLocation ? __('Trabajas en varias sedes. Selecciona en la barra superior en cuál estás.') : __('No tienes ninguna sede activa. Pide a un responsable que te asigne una para vender en barra.')"
         />
@@ -70,7 +70,7 @@
              language, but it stays out of CounterBlocker — that chain is preconditions, not settings. --}}
         <x-counter.blocking-state
             data-blocker="bar-disabled"
-            icon="🚫"
+            icon="ban"
             :heading="__('Barra desactivada en esta sede')"
             :body="__('Un responsable puede activarla desde la ficha de la sede.')"
         />
@@ -94,7 +94,28 @@
                 data-selection-pane
                 class="flex min-h-0 flex-1 flex-col gap-4 md:overflow-y-auto md:pr-1"
             >
-            <div class="flex flex-col gap-4" x-data="{ showMisc: false }" x-on:misc-added.window="showMisc = false">
+            {{-- Prompt 272 — "Importe manual" behaves like the canon overlays: focus moves INTO it (it was left on
+                 the trigger, behind an aria-modal dialog), goes back to the trigger on close, and the back
+                 gesture closes it instead of leaving the Bar (pushState on open, popstate closes). No trap. --}}
+            <div class="flex flex-col gap-4"
+                 x-data="{
+                     showMisc: false,
+                     miscTrigger: null,
+                     openMisc() {
+                         this.miscTrigger = document.activeElement
+                         this.showMisc = true
+                         history.pushState({ barMisc: true }, '')
+                         this.$nextTick(() => document.getElementById('misc-desc')?.focus())
+                     },
+                     closeMisc() {
+                         if (! this.showMisc) return
+                         this.showMisc = false
+                         if (history.state?.barMisc) history.back()
+                         this.miscTrigger?.focus?.()
+                     },
+                 }"
+                 x-on:misc-added.window="closeMisc()"
+                 x-on:popstate.window="if (showMisc) { showMisc = false; miscTrigger?.focus?.() }">
                 <section class="rounded-2xl border border-line bg-surface p-4 dark:border-slate-800 dark:bg-slate-900">
                     {{-- Prompt 176: wraps rather than clips. At 820 portrait the selection pane is ~470px
                          and title + view toggle + search + manual-line did not fit on one row. --}}
@@ -103,7 +124,7 @@
                         {{-- List / grid. GRID is the default for articles — a name and a price fit a tile,
                              which is the case Loyverse describes; the dispensary defaults the other way. --}}
                         <div role="group" aria-label="{{ __('Vista') }}" class="flex w-fit shrink-0 gap-1 self-start rounded-xl border border-line p-1 dark:border-slate-700">
-                            @foreach ([['list', __('Lista'), '☰'], ['grid', __('Cuadrícula'), '▦'], ['large', __('Grande'), '⬜']] as [$mode, $label, $glyph])
+                            @foreach ([['list', __('Lista'), 'list'], ['grid', __('Cuadrícula'), 'grid'], ['large', __('Grande'), 'large']] as [$mode, $label, $glyph])
                                 <button
                                     type="button"
                                     wire:click="setArticleLayout('{{ $mode }}')"
@@ -115,7 +136,7 @@
                                         'bg-brand text-white' => $articleLayout === $mode,
                                         'text-ink-muted hover:bg-surface-alt dark:text-slate-400 dark:hover:bg-slate-800' => $articleLayout !== $mode,
                                     ])
-                                >{{ $glyph }}</button>
+                                ><x-counter.icon :name="$glyph" class="h-5 w-5" /></button>
                             @endforeach
                         </div>
 
@@ -127,7 +148,7 @@
                                 placeholder="{{ __('Buscar artículo…') }}"
                                 class="h-11 w-full min-w-0 rounded-xl border border-line bg-surface px-4 text-sm text-ink placeholder:text-ink-muted focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/40 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 sm:w-48"
                             >
-                            <button type="button" @click="showMisc = true" class="inline-flex h-11 shrink-0 items-center gap-1 rounded-xl border border-brand/40 bg-brand-tint/40 px-3 text-sm font-semibold text-brand transition hover:bg-brand-tint dark:border-brand/40 dark:bg-slate-800 dark:text-slate-100 dark:hover:bg-slate-700">
+                            <button type="button" @click="openMisc()" data-misc-open class="inline-flex h-11 shrink-0 items-center gap-1 rounded-xl border border-brand/40 bg-brand-tint/40 px-3 text-sm font-semibold text-brand transition hover:bg-brand-tint dark:border-brand/40 dark:bg-slate-800 dark:text-slate-100 dark:hover:bg-slate-700">
                                 <span aria-hidden="true">＋</span>{{ __('Importe manual') }}
                             </button>
                         </div>
@@ -138,9 +159,9 @@
                          filter semantics are the chips' exactly (filterCategory), only rendered as tiles. --}}
                     @if ($articleLayout === 'large' && ! empty($categories))
                         <div data-category-tiles class="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3">
-                            <button type="button" wire:click="filterCategory(null)" data-category-tile @class(['flex min-h-[112px] items-center justify-center rounded-xl border p-4 text-center text-lg font-semibold transition', 'border-brand bg-brand text-white' => $categoryId === null, 'border-line bg-surface text-ink hover:border-brand hover:bg-brand-tint/40 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:hover:bg-slate-800' => $categoryId !== null])>{{ __('Todo') }}</button>
+                            <button type="button" wire:click="filterCategory(null)" data-category-tile aria-pressed="{{ $categoryId === null ? 'true' : 'false' }}" @class(['flex min-h-[112px] items-center justify-center rounded-xl border p-4 text-center text-lg font-semibold transition', 'border-brand bg-brand text-white' => $categoryId === null, 'border-line bg-surface text-ink hover:border-brand hover:bg-brand-tint/40 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:hover:bg-slate-800' => $categoryId !== null])>{{ __('Todo') }}</button>
                             @foreach ($categories as $category)
-                                <button type="button" wire:click="filterCategory('{{ $category['id'] }}')" data-category-tile @class(['flex min-h-[112px] items-center justify-center rounded-xl border p-4 text-center text-lg font-semibold transition', 'border-brand bg-brand text-white' => $categoryId === $category['id'], 'border-line bg-surface text-ink hover:border-brand hover:bg-brand-tint/40 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:hover:bg-slate-800' => $categoryId !== $category['id']])>{{ $category['name'] }}</button>
+                                <button type="button" wire:click="filterCategory('{{ $category['id'] }}')" data-category-tile aria-pressed="{{ $categoryId === $category['id'] ? 'true' : 'false' }}" @class(['flex min-h-[112px] items-center justify-center rounded-xl border p-4 text-center text-lg font-semibold transition', 'border-brand bg-brand text-white' => $categoryId === $category['id'], 'border-line bg-surface text-ink hover:border-brand hover:bg-brand-tint/40 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:hover:bg-slate-800' => $categoryId !== $category['id']])>{{ $category['name'] }}</button>
                             @endforeach
                         </div>
                     @endif
@@ -149,9 +170,9 @@
                          control; the markup here is BYTE-IDENTICAL to before (prompt 248: a toggle, not a change). --}}
                     @if (! empty($categories) && $articleLayout !== 'large')
                         <div class="mt-3 flex flex-wrap gap-2">
-                            <button type="button" wire:click="filterCategory(null)" @class(['inline-flex items-center rounded-full border min-h-11 px-4 text-sm', 'border-brand bg-brand text-white' => $categoryId === null, 'border-line text-ink-muted dark:border-slate-700 dark:text-slate-400' => $categoryId !== null])>{{ __('Todas') }}</button>
+                            <button type="button" wire:click="filterCategory(null)" aria-pressed="{{ ($categoryId === null) ? 'true' : 'false' }}" @class(['inline-flex items-center rounded-full border min-h-11 px-4 text-sm', 'border-brand bg-brand text-white' => $categoryId === null, 'border-line text-ink-muted dark:border-slate-700 dark:text-slate-400' => $categoryId !== null])>{{ __('Todas') }}</button>
                             @foreach ($categories as $category)
-                                <button type="button" wire:click="filterCategory('{{ $category['id'] }}')" @class(['inline-flex items-center rounded-full border min-h-11 px-4 text-sm', 'border-brand bg-brand text-white' => $categoryId === $category['id'], 'border-line text-ink-muted dark:border-slate-700 dark:text-slate-400' => $categoryId !== $category['id']])>{{ $category['name'] }}</button>
+                                <button type="button" wire:click="filterCategory('{{ $category['id'] }}')" aria-pressed="{{ ($categoryId === $category['id']) ? 'true' : 'false' }}" @class(['inline-flex items-center rounded-full border min-h-11 px-4 text-sm', 'border-brand bg-brand text-white' => $categoryId === $category['id'], 'border-line text-ink-muted dark:border-slate-700 dark:text-slate-400' => $categoryId !== $category['id']])>{{ $category['name'] }}</button>
                             @endforeach
                         </div>
                     @endif
@@ -206,12 +227,12 @@
                 {{-- Manual-line entry as an on-demand modal (prompt 126) — opened from the header button, so it is
                      reachable at 1024×768 without scrolling past the catalogue. The reason is ONE TAP for the
                      common cases (categorised + fast) with free text as the fallback. --}}
-                <div x-show="showMisc" x-cloak @keydown.escape.window="showMisc = false"
+                <div x-show="showMisc" x-cloak @keydown.escape.window="closeMisc()"
                      class="fixed inset-0 z-40 flex items-center justify-center bg-black/40 p-4" role="dialog" aria-modal="true" aria-label="{{ __('Importe manual') }}">
-                    <div @click.outside="showMisc = false" class="w-full max-w-md rounded-2xl border border-line bg-surface p-5 shadow-xl dark:border-slate-800 dark:bg-slate-900">
+                    <div @click.outside="closeMisc()" class="w-full max-w-md rounded-2xl border border-line bg-surface p-5 shadow-xl dark:border-slate-800 dark:bg-slate-900">
                         <div class="flex items-center justify-between">
                             <h2 class="text-base font-semibold">{{ __('Importe manual') }}</h2>
-                            <button type="button" @click="showMisc = false" aria-label="{{ __('Cerrar') }}" class="flex h-11 w-11 items-center justify-center rounded-lg text-ink-muted hover:bg-black/5 dark:text-slate-400 dark:hover:bg-white/5">✕</button>
+                            <button type="button" @click="closeMisc()" aria-label="{{ __('Cerrar') }}" class="flex h-11 w-11 items-center justify-center rounded-lg text-ink-muted hover:bg-black/5 dark:text-slate-400 dark:hover:bg-white/5">✕</button>
                         </div>
                         <p class="mt-1 text-xs text-ink-muted dark:text-slate-400">{{ __('Un concepto fuera de catálogo (no mueve stock). El motivo queda registrado para poder revisarlo después.') }}</p>
 
@@ -228,7 +249,7 @@
                                 <label for="misc-ref" class="block text-xs font-medium text-ink-muted dark:text-slate-400">{{ __('Motivo') }}</label>
                                 <div class="mt-1 flex flex-wrap gap-1.5">
                                     @foreach ([__('Artículo sin dar de alta'), __('Precio especial'), __('Evento')] as $reason)
-                                        <button type="button" @click="$wire.set('miscReference', @js($reason))" class="rounded-full border border-line px-3 py-1.5 text-sm text-ink transition hover:bg-surface-alt dark:border-slate-700 dark:text-slate-100 dark:hover:bg-slate-800">{{ $reason }}</button>
+                                        <button type="button" @click="$wire.set('miscReference', @js($reason))" class="min-h-11 rounded-full border border-line px-3 py-1.5 text-sm text-ink transition hover:bg-surface-alt dark:border-slate-700 dark:text-slate-100 dark:hover:bg-slate-800">{{ $reason }}</button>
                                     @endforeach
                                 </div>
                                 <input id="misc-ref" type="text" wire:model="miscReference" autocomplete="off" placeholder="{{ __('… o escribe un motivo') }}" class="mt-2 h-11 w-full rounded-xl border border-line bg-surface px-3 text-base text-ink placeholder:text-ink-muted focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/40 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100">
@@ -251,7 +272,7 @@
                      fade says "there is more above", the stable gutter keeps a real scrollbar on the
                      platforms that hide it, and `overscroll-contain` stops a flick at the end of the basket
                      scrolling the page behind it. --}}
-                <div data-cart-scroll class="counter-scroll-region flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto overscroll-contain pr-1">
+                <div data-cart-scroll x-data="{ atTop: true }" x-on:scroll.passive="atTop = $el.scrollTop <= 0" x-bind:class="atTop && 'at-top'" class="counter-scroll-region flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto overscroll-contain">
                 {{-- Prompt 193 — per-sede, and NOT rendered when off (not collapsed, not disabled): most bar
                      sales are a coffee for cash, and with this off the cart column opens on the Basket, which
                      is where the operator's attention belongs. The flag governs INPUT only — a socio recorded
@@ -475,7 +496,7 @@
                         wire:loading.attr="disabled"
                         wire:target="commitOrder"
                         x-bind:disabled="! online"
-                        class="mt-4 h-16 w-full rounded-xl bg-brand text-lg font-bold text-white transition hover:bg-brand-dark focus:outline-none focus:ring-2 focus:ring-brand/40 disabled:cursor-not-allowed disabled:opacity-50"
+                        class="mt-4 h-16 w-full rounded-xl bg-brand text-lg font-bold text-white transition hover:bg-brand-dark focus:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 focus-visible:ring-offset-surface dark:focus-visible:ring-offset-slate-950 disabled:cursor-not-allowed disabled:opacity-50"
                     >
                         {{-- The total ON the button (prompt 230, completing 224/225's convention): the figure
                              and the act are one thing at the moment of pressing, and the operator reads it

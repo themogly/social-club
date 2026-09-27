@@ -39,7 +39,7 @@
     @if (! $noLocation)
         {{-- Offline banner — unmistakable, fail closed. --}}
         <div x-show="! online" x-cloak role="alert" aria-live="assertive" class="mb-4 flex items-center gap-3 rounded-xl border border-error/40 bg-error/10 px-4 py-3 text-sm font-semibold text-error">
-            <span class="text-lg">⚠️</span>
+            <x-counter.icon name="alert" class="h-5 w-5" />
             <span>{{ __('Sin conexión. No se puede registrar ninguna dispensación; la cesta se conserva y se reactivará al reconectar.') }}</span>
         </div>
 
@@ -60,7 +60,7 @@
                  sede is assigned at all only a responsable can fix it, and saying so is the honest state. --}}
             <x-counter.blocking-state
                 data-blocker="sede"
-                icon="📍"
+                icon="map-pin"
                 :heading="$mustChooseLocation ? __('Elige tu sede') : __('Sin sede asignada')"
                 :body="$mustChooseLocation ? __('Trabajas en varias sedes. Selecciona en la barra superior en cuál estás.') : __('No tienes ninguna sede activa. Pide a un responsable que te asigne una para dispensar.')"
             />
@@ -73,7 +73,7 @@
                  name box (partials/member-identify), each already accepting what the other asked for. --}}
             <x-counter.blocking-state
                 data-blocker="member"
-                icon="🪪"
+                icon="id-card"
                 :heading="__('Identifica a un socio')"
                 :body="__('Sin socio no se puede registrar ninguna dispensación.')"
             >
@@ -109,12 +109,6 @@
              the OPERATOR step renders this branch with the 173 surface over it and no socio resolved. --}}
         @php
             $inCarencia = $member !== null && $member->carencia_ends_at !== null && $member->carencia_ends_at->isFuture();
-            $statusColour = $member === null ? '' : match ($member->status) {
-                \App\Enums\MemberStatus::ACTIVE => 'border-success/30 bg-success/10 text-success',
-                \App\Enums\MemberStatus::APPLICANT => 'border-warning/30 bg-warning/10 text-warning',
-                \App\Enums\MemberStatus::SUSPENDED, \App\Enums\MemberStatus::EXPELLED => 'border-error/30 bg-error/10 text-error',
-                default => 'border-line bg-surface-alt text-ink-muted dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300',
-            };
         @endphp
 
         @php
@@ -166,14 +160,14 @@
                                     <p class="text-sm text-ink-muted dark:text-slate-400">{{ $this->money($activeGeneticPriceCents) }} / {{ $activeGenetic->isUnitType() ? __('ud') : 'g' }}</p>
                                 @endif
                             </div>
-                            <button type="button" wire:click="cancelWeightEntry" class="rounded-lg px-2 py-1 text-sm text-ink-muted hover:bg-black/5 dark:text-slate-400 dark:hover:bg-white/5">{{ __('Cancelar') }}</button>
+                            <button type="button" wire:click="cancelWeightEntry" class="inline-flex min-h-11 items-center rounded-lg px-3 text-sm text-ink-muted hover:bg-black/5 dark:text-slate-400 dark:hover:bg-white/5">{{ __('Cancelar') }}</button>
                         </div>
 
                         @if (! $activeGenetic->isUnitType())
                         {{-- grams vs calculator (€) toggle --}}
                         <div class="mt-3 inline-flex rounded-xl border border-line bg-surface p-0.5 text-sm dark:border-slate-700 dark:bg-slate-950">
-                            <button type="button" wire:click="$set('calculatorMode', false)" @class(['rounded-lg px-3 py-1.5 font-medium', 'bg-brand text-white' => ! $calculatorMode, 'text-ink-muted dark:text-slate-400' => $calculatorMode])>{{ __('Gramos') }}</button>
-                            <button type="button" wire:click="toggleCalculator" @class(['rounded-lg px-3 py-1.5 font-medium', 'bg-brand text-white' => $calculatorMode, 'text-ink-muted dark:text-slate-400' => ! $calculatorMode])>{{ __('Calculadora €') }}</button>
+                            <button type="button" wire:click="$set('calculatorMode', false)" aria-pressed="{{ $calculatorMode ? 'false' : 'true' }}" @class(['inline-flex min-h-11 items-center rounded-lg px-3 font-medium', 'bg-brand text-white' => ! $calculatorMode, 'text-ink-muted dark:text-slate-400' => $calculatorMode])>{{ __('Gramos') }}</button>
+                            <button type="button" wire:click="toggleCalculator" aria-pressed="{{ $calculatorMode ? 'true' : 'false' }}" @class(['inline-flex min-h-11 items-center rounded-lg px-3 font-medium', 'bg-brand text-white' => $calculatorMode, 'text-ink-muted dark:text-slate-400' => ! $calculatorMode])>{{ __('Calculadora €') }}</button>
                         </div>
 
                         {{-- display --}}
@@ -216,7 +210,7 @@
                             @endforeach
                             <button type="button" wire:click="pad(',')" class="h-14 rounded-xl border border-line bg-surface text-xl font-semibold text-ink transition hover:bg-surface-alt dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:hover:bg-slate-800">,</button>
                             <button type="button" wire:click="pad('0')" class="h-14 rounded-xl border border-line bg-surface text-xl font-semibold text-ink transition hover:bg-surface-alt dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:hover:bg-slate-800">0</button>
-                            <button type="button" wire:click="pad('back')" class="h-14 rounded-xl border border-line bg-surface text-xl font-semibold text-ink-muted transition hover:bg-surface-alt dark:border-slate-700 dark:bg-slate-950 dark:text-slate-400 dark:hover:bg-slate-800">⌫</button>
+                            <button type="button" wire:click="pad('back')" aria-label="{{ __('Retroceso') }}" class="h-14 rounded-xl border border-line bg-surface text-xl font-semibold text-ink-muted transition hover:bg-surface-alt dark:border-slate-700 dark:bg-slate-950 dark:text-slate-400 dark:hover:bg-slate-800">⌫</button>
                         </div>
                         @else
                             {{-- Unit stepper for a UNIT genetic (preroll/edible). The gauge feedback below
@@ -264,8 +258,8 @@
                                 @else
                                     <div class="mt-1 flex flex-wrap gap-2">
                                         @foreach ($activeGeneticBatches as $i => $batch)
-                                            <button type="button" wire:click="selectBatch('{{ $batch->id }}')" @class([
-                                                'rounded-lg border px-3 py-1.5 text-sm transition',
+                                            <button type="button" wire:click="selectBatch('{{ $batch->id }}')" aria-pressed="{{ ($activeBatchId === $batch->id) ? 'true' : 'false' }}" @class([
+                                                'inline-flex min-h-11 items-center rounded-lg border px-3 py-1.5 text-sm transition',
                                                 'border-brand bg-brand text-white' => $activeBatchId === $batch->id,
                                                 'border-line bg-surface text-ink hover:bg-surface-alt dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100' => $activeBatchId !== $batch->id,
                                             ])>
@@ -331,7 +325,7 @@
                              Applies to BOTH sources (prompt 212): it is a density preference about cards, not
                              a fact about cannabis, and an operator who prefers a grid prefers it for both. --}}
                         <div role="group" aria-label="{{ __('Vista') }}" class="flex w-fit shrink-0 gap-1 self-start rounded-xl border border-line p-1 dark:border-slate-700">
-                            @foreach ([['list', __('Lista'), '☰'], ['grid', __('Cuadrícula'), '▦']] as [$mode, $label, $glyph])
+                            @foreach ([['list', __('Lista'), 'list'], ['grid', __('Cuadrícula'), 'grid']] as [$mode, $label, $glyph])
                                 <button
                                     type="button"
                                     wire:click="setGeneticLayout('{{ $mode }}')"
@@ -343,7 +337,7 @@
                                         'bg-brand text-white' => $this->catalogueLayout() === $mode,
                                         'text-ink-muted hover:bg-surface-alt dark:text-slate-400 dark:hover:bg-slate-800' => $this->catalogueLayout() !== $mode,
                                     ])
-                                >{{ $glyph }}</button>
+                                ><x-counter.icon :name="$glyph" class="h-5 w-5" /></button>
                             @endforeach
                         </div>
 
@@ -435,9 +429,9 @@
                         <div class="mt-3">
                             <p class="mb-1 text-xs font-medium text-ink-muted dark:text-slate-400">{{ __('Categoría') }}</p>
                             <div role="group" aria-label="{{ __('Categoría') }}" class="flex flex-wrap gap-2">
-                                <button type="button" wire:click="{{ $categoryAction }}(null)" @class(['inline-flex items-center rounded-full border min-h-11 px-4 text-sm', 'border-brand bg-brand text-white' => $activeCategoryId === null, 'border-line text-ink-muted dark:border-slate-700 dark:text-slate-400' => $activeCategoryId !== null])>{{ __('Todas') }}</button>
+                                <button type="button" wire:click="{{ $categoryAction }}(null)" aria-pressed="{{ ($activeCategoryId === null) ? 'true' : 'false' }}" @class(['inline-flex items-center rounded-full border min-h-11 px-4 text-sm', 'border-brand bg-brand text-white' => $activeCategoryId === null, 'border-line text-ink-muted dark:border-slate-700 dark:text-slate-400' => $activeCategoryId !== null])>{{ __('Todas') }}</button>
                                 @foreach ($paneCategories as $category)
-                                    <button type="button" wire:click="{{ $categoryAction }}('{{ $category['id'] }}')" @class(['inline-flex items-center rounded-full border min-h-11 px-4 text-sm', 'border-brand bg-brand text-white' => $activeCategoryId === $category['id'], 'border-line text-ink-muted dark:border-slate-700 dark:text-slate-400' => $activeCategoryId !== $category['id']])>{{ $category['name'] }}</button>
+                                    <button type="button" wire:click="{{ $categoryAction }}('{{ $category['id'] }}')" aria-pressed="{{ ($activeCategoryId === $category['id']) ? 'true' : 'false' }}" @class(['inline-flex items-center rounded-full border min-h-11 px-4 text-sm', 'border-brand bg-brand text-white' => $activeCategoryId === $category['id'], 'border-line text-ink-muted dark:border-slate-700 dark:text-slate-400' => $activeCategoryId !== $category['id']])>{{ $category['name'] }}</button>
                                 @endforeach
                             </div>
                         </div>
@@ -447,9 +441,9 @@
                         <div class="mt-2">
                             <p class="mb-1 text-xs font-medium text-ink-muted dark:text-slate-400">{{ __('Tipo') }}</p>
                             <div role="group" aria-label="{{ __('Tipo') }}" class="flex flex-wrap gap-2">
-                                <button type="button" wire:click="filterProductType(null)" @class(['inline-flex items-center rounded-full border min-h-11 px-4 text-sm', 'border-brand bg-brand text-white' => $productType === null, 'border-line text-ink-muted dark:border-slate-700 dark:text-slate-400' => $productType !== null])>{{ __('Todos los tipos') }}</button>
+                                <button type="button" wire:click="filterProductType(null)" aria-pressed="{{ ($productType === null) ? 'true' : 'false' }}" @class(['inline-flex items-center rounded-full border min-h-11 px-4 text-sm', 'border-brand bg-brand text-white' => $productType === null, 'border-line text-ink-muted dark:border-slate-700 dark:text-slate-400' => $productType !== null])>{{ __('Todos los tipos') }}</button>
                                 @foreach ($productTypes as $type)
-                                    <button type="button" wire:click="filterProductType('{{ $type['value'] }}')" @class(['inline-flex items-center rounded-full border min-h-11 px-4 text-sm', 'border-brand bg-brand text-white' => $productType === $type['value'], 'border-line text-ink-muted dark:border-slate-700 dark:text-slate-400' => $productType !== $type['value']])>{{ $type['label'] }}</button>
+                                    <button type="button" wire:click="filterProductType('{{ $type['value'] }}')" aria-pressed="{{ ($productType === $type['value']) ? 'true' : 'false' }}" @class(['inline-flex items-center rounded-full border min-h-11 px-4 text-sm', 'border-brand bg-brand text-white' => $productType === $type['value'], 'border-line text-ink-muted dark:border-slate-700 dark:text-slate-400' => $productType !== $type['value']])>{{ $type['label'] }}</button>
                                 @endforeach
                             </div>
                         </div>
@@ -459,9 +453,9 @@
                         <div class="mt-2">
                             <p class="mb-1 text-xs font-medium text-ink-muted dark:text-slate-400">{{ __('Variedad') }}</p>
                             <div role="group" aria-label="{{ __('Variedad') }}" class="flex flex-wrap gap-2">
-                                <button type="button" wire:click="filterStrainType(null)" @class(['inline-flex items-center rounded-full border min-h-11 px-4 text-sm', 'border-brand bg-brand text-white' => $strainType === null, 'border-line text-ink-muted dark:border-slate-700 dark:text-slate-400' => $strainType !== null])>{{ __('Todas') }}</button>
+                                <button type="button" wire:click="filterStrainType(null)" aria-pressed="{{ ($strainType === null) ? 'true' : 'false' }}" @class(['inline-flex items-center rounded-full border min-h-11 px-4 text-sm', 'border-brand bg-brand text-white' => $strainType === null, 'border-line text-ink-muted dark:border-slate-700 dark:text-slate-400' => $strainType !== null])>{{ __('Todas') }}</button>
                                 @foreach ($strainTypes as $variety)
-                                    <button type="button" wire:click="filterStrainType('{{ $variety['value'] }}')" @class(['inline-flex items-center rounded-full border min-h-11 px-4 text-sm', 'border-brand bg-brand text-white' => $strainType === $variety['value'], 'border-line text-ink-muted dark:border-slate-700 dark:text-slate-400' => $strainType !== $variety['value']])>{{ $variety['label'] }}</button>
+                                    <button type="button" wire:click="filterStrainType('{{ $variety['value'] }}')" aria-pressed="{{ ($strainType === $variety['value']) ? 'true' : 'false' }}" @class(['inline-flex items-center rounded-full border min-h-11 px-4 text-sm', 'border-brand bg-brand text-white' => $strainType === $variety['value'], 'border-line text-ink-muted dark:border-slate-700 dark:text-slate-400' => $strainType !== $variety['value']])>{{ $variety['label'] }}</button>
                                 @endforeach
                             </div>
                         </div>
@@ -589,7 +583,7 @@
                      the foot with a flash — and without a floor the basket is what pays for both. The owner:
                      *"not cover the basket like this."* A flash now costs the region nothing below its
                      minimum; it scrolls instead. Measured at both orientations, with and without a flash. --}}
-                <div data-cart-scroll class="counter-scroll-region flex min-h-[9rem] flex-1 flex-col gap-4 overflow-y-auto overscroll-contain pr-1">
+                <div data-cart-scroll x-data="{ atTop: true }" x-on:scroll.passive="atTop = $el.scrollTop <= 0" x-bind:class="atTop && 'at-top'" class="counter-scroll-region flex min-h-[9rem] flex-1 flex-col gap-4 overflow-y-auto overscroll-contain">
                     {{-- The card renders ONLY when the verdict has something an operator must act on. A clean
                          socio's column is now identity (pinned) → basket, with nothing between them. --}}
                     @if ($showMemberDetail)
@@ -717,7 +711,11 @@
                                 </div>
                             </li>
                         @empty
-                            <li class="py-6 text-center text-sm text-ink-muted dark:text-slate-400">{{ __('Cesta vacía. Elige una genética e introduce el peso.') }}</li>
+                            {{-- Prompt 272 — ONE empty state. With both baskets empty the hint below speaks, so this line
+                                 only says something while the bar basket holds lines and the flower basket does not. --}}
+                            @if ($hasBarLines)
+                                <li class="py-6 text-center text-sm text-ink-muted dark:text-slate-400">{{ __('Cesta vacía. Elige una genética e introduce el peso.') }}</li>
+                            @endif
                         @endforelse
                     </ul>
 
@@ -981,8 +979,9 @@
                         {{-- BOTH baskets empty: no heavy payment apparatus (tender, signature, breakdown), just
                              the next step. The commit stays below (prompt 60), it simply has nothing to charge
                              yet. --}}
-                        <p data-empty-basket-hint class="mt-3 rounded-xl border border-dashed border-line px-4 py-6 text-center text-sm text-ink-muted dark:border-slate-700 dark:text-slate-400">
-                            {{ __('Identifica a un socio y añade una genética para empezar.') }}
+                        {{-- The next step for THIS state (prompt 272): it said "identify a socio" while one was held. --}}
+                        <p data-empty-basket-hint class="rounded-xl border border-dashed border-line px-4 py-6 text-center text-sm text-ink-muted dark:border-slate-700 dark:text-slate-400">
+                            {{ $member ? __('Cesta vacía. Elige una genética e introduce el peso.') : __('Identifica a un socio y añade una genética para empezar.') }}
                         </p>
                     @endif
                 </section>
@@ -1029,7 +1028,7 @@
                         wire:loading.attr="disabled"
                         wire:target="commitDispensation"
                         x-bind:disabled="! online"
-                        class="mt-4 h-16 w-full rounded-xl bg-brand text-lg font-bold text-white transition hover:bg-brand-dark focus:outline-none focus:ring-2 focus:ring-brand/40 disabled:cursor-not-allowed disabled:opacity-50"
+                        class="mt-4 h-16 w-full rounded-xl bg-brand text-lg font-bold text-white transition hover:bg-brand-dark focus:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 focus-visible:ring-offset-surface dark:focus-visible:ring-offset-slate-950 disabled:cursor-not-allowed disabled:opacity-50"
                     >
                         {{-- THE TOTAL ON THE BUTTON (prompt 225). The figure and the act are one thing at the
                              moment of pressing it, and the operator reads the total last — from the button
