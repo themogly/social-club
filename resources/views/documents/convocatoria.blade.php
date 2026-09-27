@@ -27,12 +27,12 @@
     <table class="kv">
         <tr>
             <td class="k">{{ __('Fecha y hora') }}</td>
-            <td>{{ $convocatoria->held_at->format('d/m/Y H:i') }}</td>
+            <td>{{ local_datetime($convocatoria->held_at, 'd/m/Y H:i') }}</td>
         </tr>
         @if ($convocatoria->second_call_at)
             <tr>
                 <td class="k">{{ __('Segunda convocatoria') }}</td>
-                <td>{{ $convocatoria->second_call_at->format('d/m/Y H:i') }}</td>
+                <td>{{ local_datetime($convocatoria->second_call_at, 'd/m/Y H:i') }}</td>
             </tr>
         @endif
         @if ($convocatoria->venue)
@@ -49,7 +49,7 @@
         @endif
         <tr>
             <td class="k">{{ __('Estado') }}</td>
-            <td>{{ $convocatoria->isIssued() ? __('Emitida el :date', ['date' => $convocatoria->issued_at->format('d/m/Y H:i')]) : __('Borrador') }}</td>
+            <td>{{ $convocatoria->isIssued() ? __('Emitida el :date', ['date' => local_datetime($convocatoria->issued_at, 'd/m/Y H:i')]) : __('Borrador') }}</td>
         </tr>
     </table>
 

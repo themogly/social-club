@@ -150,7 +150,14 @@ class GeneticPricesRelationManager extends RelationManager
                 ->label(__('Sede'))
                 ->options(fn () => Location::query()->orderBy('name')->pluck('name', 'id'))
                 ->required()
-                ->disabled($edit),
+                ->disabled($edit)
+                // Prompt 271 — one price per sede and tarifa; a second base price left the charge to chance. On the sede
+                // (always filled) rather than the tarifa, whose empty value — the base price — would skip the rule.
+                ->rule(fn (Get $get): \Closure => function (string $attribute, mixed $value, \Closure $fail) use ($get, $edit): void {
+                    if (! $edit && SaveGeneticPrice::rowExists($this->genetic(), (string) $value, filled($get('tier_id')) ? (string) $get('tier_id') : null)) {
+                        $fail(__('Ya hay un precio para esta sede y tarifa. Edítalo en lugar de añadir otro.'));
+                    }
+                }),
             Select::make('tier_id')
                 ->label(__('Tarifa'))
                 ->options(fn () => MembershipTier::query()->orderBy('name')->pluck('name', 'id'))

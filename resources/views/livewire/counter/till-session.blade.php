@@ -346,7 +346,7 @@
                             {{ __('Terminal') }}: <span class="font-medium text-ink dark:text-slate-100">{{ $session->terminal }}</span>
                         </p>
                         <p class="text-sm text-ink-muted dark:text-slate-400">
-                            {{ __('Abierta') }}: {{ $session->opened_at?->format('d/m/Y H:i') }}@if ($session->openedBy) · {{ $session->openedBy->name }} @endif
+                            {{ __('Abierta') }}: {{ local_datetime($session->opened_at, 'd/m/Y H:i') }}@if ($session->openedBy) · {{ $session->openedBy->name }} @endif
                         </p>
                     </div>
                     <span class="shrink-0 rounded-full border border-warning/30 bg-warning/10 px-2.5 py-0.5 text-xs font-semibold uppercase tracking-wide text-warning">{{ __('Abierta') }}</span>
@@ -642,7 +642,7 @@
                                     <span class="min-w-0">
                                         <span class="block truncate font-medium">{{ $shift->openedBy?->name ?? '—' }}</span>
                                         <span class="block text-xs text-ink-muted dark:text-slate-400">
-                                            {{ $shift->opened_at?->format('H:i') }}–{{ $shift->closed_at?->format('H:i') ?? __('ahora') }}
+                                            {{ local_datetime($shift->opened_at, 'H:i') }}–{{ $shift->closed_at ? local_datetime($shift->closed_at, 'H:i') : __('ahora') }}
                                         </span>
                                     </span>
                                     <span class="shrink-0 text-xs font-medium">{{ $shift->status->label() }}</span>

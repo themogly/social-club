@@ -246,7 +246,8 @@ class CounterHome extends Component
         // practice; it is asserted rather than assumed, because a null here would silently widen the gate.
         abort_if($user === null, 403);
 
-        return $this->dashboard ??= Dashboard::for($user, Period::today());
+        // The counter sede's BUSINESS day (prompt 271) — it used to be the UTC calendar day, so the takings reset at 02:00.
+        return $this->dashboard ??= Dashboard::for($user, Period::today($this->resolveLocation()));
     }
 
     /**

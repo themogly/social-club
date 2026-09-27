@@ -141,8 +141,9 @@ class Dashboard
      */
     public function operatorsOnShift(): array
     {
-        $ids = $this->dispensations(Period::today())->distinct()->pluck('operator_id')
-            ->merge($this->orders(Period::today())->distinct()->pluck('operator_id'))
+        $today = Period::today($this->period->location);
+        $ids = $this->dispensations($today)->distinct()->pluck('operator_id')
+            ->merge($this->orders($today)->distinct()->pluck('operator_id'))
             ->filter()->unique()->values();
 
         if ($ids->isEmpty()) {
@@ -175,7 +176,7 @@ class Dashboard
 
     public function newMembersThisMonth(): int
     {
-        [$start, $end] = Period::thisMonth()->bounds();
+        [$start, $end] = Period::thisMonth($this->period->location)->bounds();
 
         return (int) Member::query()->withoutGlobalScopes()
             ->where('organisation_id', $this->organisationId)
@@ -212,7 +213,7 @@ class Dashboard
         }
 
         // Average daily grams dispensed over the trailing 30 days.
-        $today = Period::today();
+        $today = Period::today($this->period->location);
         $trailing = new Period($today->start->subDays(30), $today->end, 'custom');
         $perDay = intdiv($this->gramsDispensedCg($trailing), 30);
 
@@ -302,7 +303,8 @@ class Dashboard
 
     public function membersOverLimit(): int
     {
-        [$start, $end] = Period::thisMonth()->bounds();
+        // The BUSINESS month (271) — the same window the monthly cap enforces, so the alert and the block agree.
+        [$start, $end] = Period::thisMonth($this->period->location)->bounds();
 
         // The members carrying a per-member monthly override (the only limit this alert measures).
         $limits = Member::query()->withoutGlobalScopes()

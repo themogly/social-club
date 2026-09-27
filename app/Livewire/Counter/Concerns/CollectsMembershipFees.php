@@ -367,12 +367,6 @@ trait CollectsMembershipFees
     /** Parse the euro amount field to integer cents (edge conversion), or null when blank/invalid. */
     protected function parseFeeCents(): ?int
     {
-        $raw = str_replace(',', '.', trim($this->feeAmount));
-
-        if ($raw === '' || ! is_numeric($raw)) {
-            return null;
-        }
-
-        return (int) round_half_up(((float) $raw) * 100);
+        return Money::parseTyped($this->feeAmount); // the strict typed-money rule (271) — "1.000" is refused, not €1
     }
 }

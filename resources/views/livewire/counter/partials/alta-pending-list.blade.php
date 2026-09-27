@@ -11,7 +11,7 @@
                 <li>
                     <button type="button" wire:click="reviewAltaApplication('{{ $application->id }}')" class="flex min-h-11 w-full items-center justify-between gap-3 bg-surface px-4 py-3 text-left text-sm transition hover:bg-surface-alt dark:bg-slate-900 dark:hover:bg-slate-800">
                         <span class="min-w-0 truncate">{{ trim(($p['first_name'] ?? '').' '.($p['last_name'] ?? '')) ?: ($application->applicant_email ?? __('Solicitud')) }}</span>
-                        <span class="shrink-0 text-xs text-ink-muted dark:text-slate-400">{{ $application->submitted_at?->format('d/m/Y') }}</span>
+                        <span class="shrink-0 text-xs text-ink-muted dark:text-slate-400">{{ local_datetime($application->submitted_at, 'd/m/Y') }}</span>
                     </button>
                 </li>
             @endforeach

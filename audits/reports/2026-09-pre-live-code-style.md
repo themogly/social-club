@@ -1,5 +1,8 @@
 # Code-style audit — pre-live (Laravel idiom & consistency)
 
+> **Status (2026-09-27):** Phase 1 all FIXED — strict typed money, tab after override, strain confirmation (prompt 271); `avaladorFeedback` (prompt 270). Phase 2/3 → prompt 273.
+
+
 **Commit** `2d98aed` (branch `audit/pre-live`, same as main, after prompt 269) · **date** 2026-09-27 ·
 **mode** REPORT ONLY: no production code changed, nothing committed.
 

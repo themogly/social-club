@@ -187,7 +187,7 @@
                         @if ($openCheckIn)
                             <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                                 <p class="text-sm text-ink-muted dark:text-slate-400">
-                                    {{ __('Dentro desde') }} <span class="font-semibold text-ink dark:text-slate-100">{{ $openCheckIn->checked_in_at->format('H:i') }}</span>
+                                    {{ __('Dentro desde') }} <span class="font-semibold text-ink dark:text-slate-100">{{ local_datetime($openCheckIn->checked_in_at, 'H:i') }}</span>
                                 </p>
                                 <button
                                     wire:click="checkOut"

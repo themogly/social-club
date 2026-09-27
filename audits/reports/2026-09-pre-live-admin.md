@@ -1,5 +1,8 @@
 # Admin / back-office audit — pre-live, 2026-09
 
+> **Status (2026-09-27):** Phase 1 all FIXED — items 1–2 (owner role, sede policy) in prompt 270; items 3–8 (retention, thresholds, debt rule, duplicate prices, Publicada/Imágenes, sede timezone/aforo) in prompt 271. Phase 2/3 → prompt 273.
+
+
 - **Commit:** `2d98aed` (branch `audit/pre-live`, identical to `main`). **Date:** 2026-09-27.
 - **This run only reports.** It changed no production code. Following `audits/admin-audit.md` Step 1 only: no branch was made, nothing was fixed or committed.
 - **Method:**

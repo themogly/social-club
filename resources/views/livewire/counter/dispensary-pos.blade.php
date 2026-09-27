@@ -493,6 +493,9 @@
                         'flex flex-col gap-2' => $this->catalogueLayout() === 'list',
                         'grid gap-3 sm:grid-cols-2' => $this->catalogueLayout() === 'grid',
                     ])>
+                        {{-- Prompt 271 — the variety's photo (taken at "Añadir variedad"), 193's rule: the column only when
+                             some variety has one; a variety without gets its initial, never an invented picture. --}}
+                        @php $geneticThumbs = collect($genetics)->contains(fn (array $row): bool => $row['image_url'] !== null); @endphp
                         @forelse ($genetics as $g)
                             @php $disabledCard = $member === null || ! $g['has_batch']; @endphp
                             <button
@@ -513,6 +516,15 @@
                                      view) — the owner asked for "compact, maybe not as much as this design",
                                      so the density comes from padding and type scale and NOT from dropping
                                      facts: every figure the 90px card carried is still here. --}}
+                                @if ($geneticThumbs)
+                                    <span data-genetic-thumb class="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-surface-alt dark:bg-slate-800">
+                                        @if ($g['image_url'])
+                                            <img src="{{ $g['image_url'] }}" alt="" class="h-full w-full object-cover">
+                                        @else
+                                            <span class="text-sm font-semibold text-ink-muted dark:text-slate-400">{{ mb_strtoupper(mb_substr($g['name'], 0, 1)) }}</span>
+                                        @endif
+                                    </span>
+                                @endif
                                 <span class="min-w-0 flex-1">
                                     <span class="block truncate font-semibold leading-tight">{{ $g['name'] }}</span>
                                     <span class="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px] leading-tight text-ink-muted dark:text-slate-400">

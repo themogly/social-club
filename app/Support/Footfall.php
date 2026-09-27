@@ -20,8 +20,9 @@ class Footfall
             ->where('location_id', $location->id)
             ->whereBetween('checked_in_at', [$from, $to])
             ->get(['checked_in_at'])
-            ->each(function (CheckIn $checkIn) use (&$matrix): void {
-                $matrix[(int) $checkIn->checked_in_at->dayOfWeek][(int) $checkIn->checked_in_at->hour]++;
+            ->each(function (CheckIn $checkIn) use (&$matrix, $location): void {
+                $local = $checkIn->checked_in_at->copy()->setTimezone($location->timezone ?: 'Europe/Madrid'); // the sede's hours (271)
+                $matrix[(int) $local->dayOfWeek][(int) $local->hour]++;
             });
 
         return $matrix;

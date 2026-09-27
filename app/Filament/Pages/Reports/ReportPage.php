@@ -169,6 +169,7 @@ abstract class ReportPage extends Page
             return Period::custom(
                 CarbonImmutable::parse($this->customStart),
                 CarbonImmutable::parse($this->customEnd),
+                $this->periodLocation(),
             );
         }
 
@@ -184,10 +185,7 @@ abstract class ReportPage extends Page
      */
     protected function periodLocation(): ?Location
     {
-        $id = app(ActiveScope::class)->locationId() ?? Location::query()->withoutGlobalScopes()
-            ->where('organisation_id', $this->organisationId())->orderBy('name')->value('id');
-
-        return $id !== null ? Location::query()->withoutGlobalScopes()->find($id) : null;
+        return Period::sedeInScope(); // one rule (prompt 271): the active sede, else the organisation's canonical one
     }
 
     /**

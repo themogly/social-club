@@ -30,7 +30,7 @@ class RedactExpiredAuditLogs extends Command
 
     public function handle(): int
     {
-        $cutoff = now()->subDays((int) Settings::get('audit_retention_days', 3650));
+        $cutoff = now()->subDays(max(Settings::MIN_RETENTION_DAYS, (int) Settings::get('audit_retention_days', 3650)));
 
         // Past retention AND still holding detail; the register's own pruning summaries are exempt.
         $due = fn () => AuditLog::query()

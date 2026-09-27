@@ -16,8 +16,8 @@ use Illuminate\Support\Facades\DB;
  * they appear ONCE, with both amounts, and the two totals never merge into a misleading "owes" figure.
  *
  * Every figure is the SAME source of truth the counter enforces: wallet debt is SUM(wallet_transactions),
- * the over-threshold flag is `balance < -wallet_debt_limit_cents` (i.e. the negation of
- * ResolveMemberEligibility::debtWithinThreshold), and unpaid cuota is fee_cents − SUM(fee payments) (the
+ * the over-threshold flag is "owes more than their approved tab allows" (prompt 271 — the rule of
+ * Wallet::debtIsWithinApprovedTab, which the counter blocks on; summed across the scoped sedes), and unpaid cuota is fee_cents − SUM(fee payments) (the
  * negation of feesPaid). Those quantities are AGGREGATED IN SQL (grouped, not per-member) so the query
  * count does not scale with the membership — a per-member resolver loop is exactly the N+1 the dashboard
  * audit flagged. A test pins the aggregate against the resolver so the definition cannot drift.
@@ -61,7 +61,8 @@ class DebtorReport extends AbstractReport
     private function debtors(): ReportTable
     {
         $locationIds = $this->resolvedLocationIds();
-        $threshold = (int) Settings::get('wallet_debt_limit_cents', 0); // the counter block threshold
+        $debtAllowed = (bool) Settings::get('wallet_debt_allowed', false);
+        $clubLimit = (int) Settings::get('wallet_debt_limit_cents', 0); // 0 = no club cap (259/271)
 
         // 1) Wallet debt, grouped — one row per member with a negative balance across the scoped sedes.
         $wallet = DB::table('wallet_transactions')
@@ -97,7 +98,7 @@ class DebtorReport extends AbstractReport
         $memberIds = array_values(array_unique(array_merge($wallet->keys()->all(), array_keys($cuota))));
         $members = Member::query()->withoutGlobalScopes()
             ->whereIn('id', $memberIds)
-            ->get(['id', 'member_no', 'first_name', 'last_name', 'email', 'phone'])
+            ->get(['id', 'member_no', 'first_name', 'last_name', 'email', 'phone', 'debt_limit_cents'])
             ->keyBy('id');
 
         $rows = [];
@@ -109,7 +110,12 @@ class DebtorReport extends AbstractReport
 
             $walletDebt = $wallet->has($id) ? -(int) $wallet->get($id)->balance : 0; // owed = positive
             $cuotaDebt = (int) ($cuota[$id]['outstanding'] ?? 0);
-            $overThreshold = $walletDebt > $threshold; // matches !debtWithinThreshold at the counter
+            // What this member may owe: their approved tab, capped by the club cap when one is set; nothing if debt is off.
+            $approved = $debtAllowed ? max(0, (int) $member->debt_limit_cents) : 0;
+            if ($clubLimit > 0) {
+                $approved = min($approved, $clubLimit);
+            }
+            $overThreshold = $walletDebt > $approved; // matches the counter's block (Wallet::debtIsWithinApprovedTab)
 
             $this->totalWalletDebtCents += $walletDebt;
             $this->totalCuotaCents += $cuotaDebt;

@@ -3,6 +3,7 @@
 namespace App\ViewModels\Reports;
 
 use App\Support\Money;
+use App\Support\Period;
 use App\Support\Weight;
 use Carbon\CarbonImmutable;
 
@@ -93,7 +94,7 @@ class ReportColumn
             self::NUMBER => number_format((int) $raw, 0, ',', app()->getLocale() === 'es' ? '.' : ','),
             self::PERCENT => number_format((int) $raw, 0, ',', '').' %',
             self::DATE => $this->carbon($raw)->translatedFormat('d/m/Y'),
-            self::DATETIME => $this->carbon($raw)->translatedFormat('d/m/Y H:i'),
+            self::DATETIME => $this->local($raw)->translatedFormat('d/m/Y H:i'),
             default => (string) $raw,
         };
     }
@@ -114,7 +115,7 @@ class ReportColumn
             self::WEIGHT => number_format((int) $raw / 100, 2, $decimal, ''),
             self::NUMBER, self::PERCENT => (string) (int) $raw,
             self::DATE => $this->carbon($raw)->format('Y-m-d'),
-            self::DATETIME => $this->carbon($raw)->format('Y-m-d H:i'),
+            self::DATETIME => $this->local($raw)->format('Y-m-d H:i'),
             default => str_replace(["\r", "\n"], ' ', (string) $raw),
         };
     }
@@ -136,5 +137,11 @@ class ReportColumn
     private function carbon(mixed $raw): CarbonImmutable
     {
         return $raw instanceof CarbonImmutable ? $raw : CarbonImmutable::parse((string) $raw);
+    }
+
+    /** A stored (UTC) instant as the sede's wall-clock time — what a report shows and exports (prompt 271). */
+    private function local(mixed $raw): CarbonImmutable
+    {
+        return $this->carbon($raw)->setTimezone(Period::displayTimezone());
     }
 }

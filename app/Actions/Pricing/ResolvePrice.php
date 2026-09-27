@@ -54,7 +54,8 @@ class ResolvePrice
         if ($tierId !== null) {
             $tierPrice = GeneticPrice::query()->withoutGlobalScopes()
                 ->where('genetic_id', $genetic->id)->where('location_id', $location->id)
-                ->where('tier_id', $tierId)->where('active', true)->first();
+                ->where('tier_id', $tierId)->where('active', true)
+                ->orderByDesc('updated_at')->orderByDesc('id')->first(); // deterministic even with a legacy duplicate (271)
 
             if ($tierPrice !== null) {
                 return [(int) $tierPrice->{$column}, __('Tarifa'), $isUnit ? null : $tierPrice->price_per_eighth_cents];
@@ -63,7 +64,8 @@ class ResolvePrice
 
         $base = GeneticPrice::query()->withoutGlobalScopes()
             ->where('genetic_id', $genetic->id)->where('location_id', $location->id)
-            ->whereNull('tier_id')->where('active', true)->first();
+            ->whereNull('tier_id')->where('active', true)
+            ->orderByDesc('updated_at')->orderByDesc('id')->first(); // deterministic even with a legacy duplicate (271)
 
         if ($base === null) {
             throw new RuntimeException('No active base price for this genetic at this location.');

@@ -13,7 +13,7 @@
                     {{ $active->is_drill ? __('Simulacro en curso') : __('Bloqueo de seguridad ACTIVO') }}
                 </p>
                 <p class="mt-1 text-sm text-gray-600 dark:text-gray-300">
-                    {{ __('Desde :when', ['when' => $active->locked_at->format('d/m/Y H:i')]) }}
+                    {{ __('Desde :when', ['when' => local_datetime($active->locked_at, 'd/m/Y H:i')]) }}
                     @if ($active->lockedBy)· {{ $active->lockedBy->name }}@endif
                 </p>
                 @unless ($active->is_drill)
@@ -102,9 +102,9 @@
                     <tbody class="divide-y divide-gray-100 dark:divide-white/5">
                         @forelse ($history as $row)
                             <tr>
-                                <td class="px-3 py-2">{{ $row->locked_at->format('d/m/Y H:i') }}</td>
+                                <td class="px-3 py-2">{{ local_datetime($row->locked_at, 'd/m/Y H:i') }}</td>
                                 <td class="px-3 py-2">{{ $row->is_drill ? __('Simulacro') : __('Real') }}</td>
-                                <td class="px-3 py-2">{{ $row->reactivated_at?->format('d/m/Y H:i') ?? '—' }}</td>
+                                <td class="px-3 py-2">{{ (local_datetime($row->reactivated_at, 'd/m/Y H:i') ?: '—') }}</td>
                                 <td class="px-3 py-2">{{ $row->reactivation_method ?? '—' }}</td>
                             </tr>
                         @empty

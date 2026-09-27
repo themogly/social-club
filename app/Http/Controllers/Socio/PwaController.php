@@ -88,6 +88,9 @@ class PwaController extends Controller
             $genetics = Genetic::query()->withoutGlobalScope(OrganisationScope::class)
                 ->where('organisation_id', $member->organisation_id)
                 ->sellableAt($location->id)
+                // Prompt 271 — "Publicada" is what puts a variety on the members' menu (it used to be read by nothing).
+                // The counter still sees unpublished varieties: it is the staff's catalogue, not the menu.
+                ->published()
                 ->orderBy('name')
                 ->get()
                 ->map(fn (Genetic $g): array => [

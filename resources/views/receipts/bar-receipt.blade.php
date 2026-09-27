@@ -81,7 +81,7 @@
             <div class="row"><span class="muted">{{ __('Socio') }}</span><span>{{ $order->member->fullName() }}</span></div>
             <div class="row"><span class="muted">{{ __('Nº de socio') }}</span><span>{{ $order->member->member_no }}</span></div>
         @endif
-        <div class="row"><span class="muted">{{ __('Fecha') }}</span><span>{{ $order->created_at?->format('d/m/Y H:i') }}</span></div>
+        <div class="row"><span class="muted">{{ __('Fecha') }}</span><span>{{ local_datetime($order->created_at, 'd/m/Y H:i') }}</span></div>
         <div class="row"><span class="muted">{{ __('Ticket nº') }}</span><span>{{ $order->id }}</span></div>
         @if ($order->reference)
             <div class="row"><span class="muted">{{ __('Referencia') }}</span><span>{{ $order->reference }}</span></div>

@@ -91,7 +91,7 @@
                         <tbody>
                             @foreach ($rows as $row)
                                 <tr>
-                                    <td>{{ \Illuminate\Support\Carbon::parse($row['fecha'])->format('d/m/Y H:i') }}</td>
+                                    <td>{{ local_datetime($row['fecha']) }}</td>
                                     <td>{{ $row['member_no'] }}</td>
                                     <td>{{ $row['genetica'] }}</td>
                                     <td>{{ $row['lote'] }}</td>

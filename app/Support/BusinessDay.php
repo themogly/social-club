@@ -63,6 +63,56 @@ class BusinessDay
     }
 
     /**
+     * The business day / week / month containing $at — THE definition of every window a report, a dashboard or the
+     * monthly gram cap uses (prompt 271). Computed in the sede's own timezone, starting at its cutoff (a month starts on
+     * the 1st at 06:00, not at midnight), then expressed as storage-tz instants like {@see self::window()}.
+     *
+     * The monthly cap used to start its month at local MIDNIGHT: a 01:30 dispensation on the 1st counted against the new
+     * month for the cap and the old month for every report, and between midnight and the cutoff the cap ignored grams
+     * dispensed earlier in that same gap.
+     *
+     * @return array{0: CarbonImmutable, 1: CarbonImmutable}
+     */
+    public static function periodWindow(Location $location, string $type, DateTimeInterface|string|null $at = null): array
+    {
+        [$hour, $minute] = self::cutoff($location);
+        $businessDate = self::date($location, $at);
+
+        $startLocal = (match ($type) {
+            'week' => $businessDate->startOfWeek(),
+            'month' => $businessDate->startOfMonth(),
+            default => $businessDate,
+        })->setTime($hour, $minute, 0);
+
+        $endLocal = match ($type) {
+            'week' => $startLocal->addWeek(),
+            'month' => $startLocal->addMonth(),
+            default => $startLocal->addDay(),
+        };
+
+        $storageTz = config('app.timezone') ?: 'UTC';
+
+        return [$startLocal->setTimezone($storageTz), $endLocal->setTimezone($storageTz)];
+    }
+
+    /**
+     * The trailing 30 BUSINESS days ending with the one containing $at (the `rolling30` monthly-cap window).
+     *
+     * @return array{0: CarbonImmutable, 1: CarbonImmutable}
+     */
+    public static function rolling30Window(Location $location, DateTimeInterface|string|null $at = null): array
+    {
+        [$hour, $minute] = self::cutoff($location);
+        $businessDate = self::date($location, $at);
+        $storageTz = config('app.timezone') ?: 'UTC';
+
+        return [
+            $businessDate->subDays(29)->setTime($hour, $minute, 0)->setTimezone($storageTz),
+            $businessDate->addDay()->setTime($hour, $minute, 0)->setTimezone($storageTz),
+        ];
+    }
+
+    /**
      * @return array{0: int, 1: int}
      */
     private static function cutoff(Location $location): array

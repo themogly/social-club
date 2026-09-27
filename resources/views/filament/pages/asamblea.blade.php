@@ -17,7 +17,7 @@
                     class="block w-full rounded-lg border-gray-300 bg-white text-sm text-gray-900 shadow-sm focus:border-primary-500 focus:ring-primary-500 dark:border-white/10 dark:bg-white/5 dark:text-white"
                 >
                     @foreach ($open as $c)
-                        <option value="{{ $c->id }}">{{ $c->title }} — {{ $c->held_at->format('d/m/Y H:i') }}</option>
+                        <option value="{{ $c->id }}">{{ $c->title }} — {{ local_datetime($c->held_at, 'd/m/Y H:i') }}</option>
                     @endforeach
                 </select>
             @endif

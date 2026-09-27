@@ -1,5 +1,8 @@
 # Pre-live audit: which day is "today"? (Madrid, 06:00 cutoff)
 
+> **Status (2026-09-27):** FIXED in prompt 271 — BusinessDay owns every window (the monthly cap included), naive `Period` callers resolve the sede, half-open queries, display times in the sede's timezone, harness check corrected, a Madrid/06:00 demo sede. See DECISIONS.md, prompt 271.
+
+
 Date: 2026-09-27 · Branch `audit/pre-live` @ 2d98aed · Report only, no code changed.
 
 ## Verdict: both a stale check and a real bug

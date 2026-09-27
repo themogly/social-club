@@ -77,13 +77,20 @@ class ResolveMemberEligibility
             ->exists();
     }
 
+    /**
+     * Prompt 271 — at the COUNTER a member within their approved tab is not over any threshold ({@see
+     * Wallet::debtIsWithinApprovedTab()}, the rule the wallet writer applies); the club cap at 0 means "no cap", as it
+     * does there. It used to compare against the club cap as a block threshold, so at the default 0 an approved tab
+     * worked once and then blocked. The DOOR keeps its own, independent threshold (default mode WARN): a reminder at
+     * the door that somebody owes money is a club's legitimate choice even within an approved tab.
+     */
     private function debtWithinThreshold(Member $member, Location $location, string $surface): bool
     {
-        $threshold = $surface === 'door'
-            ? (int) Settings::get('wallet_door_debt_threshold_cents', 0)
-            : (int) Settings::get('wallet_debt_limit_cents', 0);
+        if ($surface === 'door') {
+            return Wallet::balance($member->id, $location->id) >= -(int) Settings::get('wallet_door_debt_threshold_cents', 0);
+        }
 
-        return Wallet::balance($member->id, $location->id) >= -$threshold;
+        return Wallet::debtIsWithinApprovedTab($member, $location->id);
     }
 
     private function feesPaid(Member $member, Location $location): bool

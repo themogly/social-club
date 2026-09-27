@@ -31,93 +31,113 @@ class Period
         return config('app.timezone') ?: 'UTC';
     }
 
-    public static function today(): self
+    /**
+     * The sede whose business day a period is measured in when the caller names none (prompt 271): the active sede, or
+     * — for the organisation rollup — its canonical (first by name) sede, the rule the dashboard and reports already
+     * used. Null only when there is no organisation or it has no sede; the window is then the naive calendar one.
+     */
+    public static function sedeInScope(): ?Location
     {
-        $start = CarbonImmutable::now(self::tz())->startOfDay();
+        $scope = app(ActiveScope::class);
+        $id = $scope->locationId();
 
-        return new self($start, $start->addDay(), 'day');
+        if ($id === null && $scope->organisationId() !== null) {
+            $id = Location::query()->withoutGlobalScopes()
+                ->where('organisation_id', $scope->organisationId())->orderBy('name')->value('id');
+        }
+
+        return $id !== null ? Location::query()->withoutGlobalScopes()->find($id) : null;
     }
 
-    public static function thisWeek(): self
+    /** The timezone a person reads times in: the sede's (prompt 271), else the app's. */
+    public static function displayTimezone(?Location $location = null): string
     {
-        $start = CarbonImmutable::now(self::tz())->startOfWeek();
-
-        return new self($start, $start->addWeek(), 'week');
-    }
-
-    public static function thisMonth(): self
-    {
-        $start = CarbonImmutable::now(self::tz())->startOfMonth();
-
-        return new self($start, $start->addMonth(), 'month');
-    }
-
-    public static function custom(CarbonImmutable $start, CarbonImmutable $end): self
-    {
-        return new self($start->startOfDay(), $end->startOfDay()->addDay(), 'custom');
+        return ($location ?? self::sedeInScope())?->timezone ?: self::tz();
     }
 
     /**
-     * Resolve one of the toggle keys (today | week | month), defaulting to today. When a $location is given
-     * the window is its BUSINESS day/week/month (prompt 105) — the same definition the gram cap and the
-     * Z-report use — so a report and the cap never disagree by the cutoff offset. Without a location it is the
-     * legacy naive app-tz calendar window (kept for callers with no location in scope).
+     * Today, this week, this month — always the BUSINESS window of a sede (prompt 271). These used to be naive UTC
+     * calendar windows: the counter hub's takings reset at 02:00 Madrid time and the dashboard's charts disagreed with
+     * its own cards. The sede defaults to {@see self::sedeInScope()}.
+     */
+    public static function today(?Location $location = null): self
+    {
+        return self::window('day', $location);
+    }
+
+    public static function thisWeek(?Location $location = null): self
+    {
+        return self::window('week', $location);
+    }
+
+    public static function thisMonth(?Location $location = null): self
+    {
+        return self::window('month', $location);
+    }
+
+    private static function window(string $type, ?Location $location): self
+    {
+        $location ??= self::sedeInScope();
+
+        if ($location !== null) {
+            return self::businessWindow($location, $type);
+        }
+
+        $now = CarbonImmutable::now(self::tz());
+        $start = match ($type) {
+            'week' => $now->startOfWeek(),
+            'month' => $now->startOfMonth(),
+            default => $now->startOfDay(),
+        };
+
+        return new self($start, match ($type) {
+            'week' => $start->addWeek(),
+            'month' => $start->addMonth(),
+            default => $start->addDay(),
+        }, $type);
+    }
+
+    /**
+     * A custom date range, as BUSINESS days (prompt 271): "27/09 – 28/09" runs from the 27th at the sede's cutoff to the
+     * 29th at its cutoff, the same days the "today" key would give — not a UTC calendar span.
+     */
+    public static function custom(CarbonImmutable $start, CarbonImmutable $end, ?Location $location = null): self
+    {
+        $location ??= self::sedeInScope();
+
+        if ($location === null) {
+            return new self($start->startOfDay(), $end->startOfDay()->addDay(), 'custom');
+        }
+
+        $tz = $location->timezone ?: 'Europe/Madrid';
+        [$from] = BusinessDay::periodWindow($location, 'day', CarbonImmutable::parse($start->toDateString().' 12:00:00', $tz));
+        [, $to] = BusinessDay::periodWindow($location, 'day', CarbonImmutable::parse($end->toDateString().' 12:00:00', $tz));
+
+        return new self($from, $to, 'custom', $location);
+    }
+
+    /**
+     * Resolve one of the toggle keys (today | week | month), defaulting to today, as the BUSINESS window of $location
+     * (prompt 105), or of the sede in scope when none is given (prompt 271).
      */
     public static function fromKey(?string $key, ?Location $location = null): self
     {
-        $type = match ($key) {
+        return self::window(match ($key) {
             'week' => 'week',
             'month' => 'month',
             default => 'day',
-        };
-
-        if ($location === null) {
-            return match ($type) {
-                'week' => self::thisWeek(),
-                'month' => self::thisMonth(),
-                default => self::today(),
-            };
-        }
-
-        return self::businessWindow($location, $type);
+        }, $location);
     }
 
     /**
-     * The BUSINESS day/week/month window for a location containing the instant $at (default now), returned as
-     * half-open [start, end) in the STORAGE timezone. Computed in the location's own timezone so addWeek/
-     * addMonth cross a DST boundary correctly (the window is then a genuinely different absolute length),
-     * then converted to storage-tz instants so a whereBetween string-compares like-for-like — the same
-     * normalisation BusinessDay::window applies.
+     * The BUSINESS day/week/month window for a location containing the instant $at (default now), half-open
+     * [start, end) in the STORAGE timezone — {@see BusinessDay::periodWindow()}, the one definition.
      */
     public static function businessWindow(Location $location, string $type, DateTimeInterface|string|null $at = null): self
     {
-        [$hour, $minute] = self::cutoffOf($location);
-        $businessDate = BusinessDay::date($location, $at); // local midnight of the business day containing $at
+        [$start, $end] = BusinessDay::periodWindow($location, $type, $at);
 
-        $startLocal = (match ($type) {
-            'week' => $businessDate->startOfWeek(),
-            'month' => $businessDate->startOfMonth(),
-            default => $businessDate,
-        })->setTime($hour, $minute, 0);
-
-        $endLocal = match ($type) {
-            'week' => $startLocal->addWeek(),
-            'month' => $startLocal->addMonth(),
-            default => $startLocal->addDay(),
-        };
-
-        $storageTz = self::tz();
-
-        return new self($startLocal->setTimezone($storageTz), $endLocal->setTimezone($storageTz), $type, $location);
-    }
-
-    /** @return array{0: int, 1: int} the location's business-day cutoff as [hour, minute]. */
-    private static function cutoffOf(Location $location): array
-    {
-        $cutoff = substr((string) ($location->business_day_cutoff ?: '06:00'), 0, 5);
-        [$hour, $minute] = array_pad(array_map('intval', explode(':', $cutoff)), 2, 0);
-
-        return [$hour, $minute];
+        return new self($start, $end, $type, $location);
     }
 
     /** The previous equivalent window (yesterday / last week / last month / shifted custom). */

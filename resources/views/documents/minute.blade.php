@@ -48,7 +48,7 @@
         </tr>
         <tr>
             <td class="k">{{ __('Estado') }}</td>
-            <td>{{ $minute->signed_at === null ? __('Borrador') : __('Firmada el :date', ['date' => $minute->signed_at->format('d/m/Y H:i')]) }}</td>
+            <td>{{ $minute->signed_at === null ? __('Borrador') : __('Firmada el :date', ['date' => local_datetime($minute->signed_at, 'd/m/Y H:i')]) }}</td>
         </tr>
         @if ($minute->signed_at !== null)
             <tr>
@@ -100,7 +100,7 @@
     @endif
 
     @if ($minute->signed_at !== null)
-        <p class="signedby">{{ __('Cerrada y firmada en el sistema por :name el :date', ['name' => $minute->signedBy?->name ?? __('No consta'), 'date' => $minute->signed_at->format('d/m/Y H:i')]) }}</p>
+        <p class="signedby">{{ __('Cerrada y firmada en el sistema por :name el :date', ['name' => $minute->signedBy?->name ?? __('No consta'), 'date' => local_datetime($minute->signed_at, 'd/m/Y H:i')]) }}</p>
     @endif
 
     <table class="sign">
