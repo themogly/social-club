@@ -131,7 +131,7 @@ class StockCover
         $sums = Batch::query()->withoutGlobalScopes()
             ->whereIn('genetic_id', array_map(fn (Genetic $genetic): string => $genetic->id, $genetics))
             ->where('location_id', $locationId)
-            ->dispensable()
+            ->dispensable($locationId)
             ->groupBy('genetic_id')
             ->selectRaw('genetic_id, COALESCE(SUM(remaining_cg), 0) AS cg, COALESCE(SUM(remaining_units), 0) AS units')
             ->toBase()->get()->keyBy('genetic_id');

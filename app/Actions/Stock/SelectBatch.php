@@ -6,6 +6,7 @@ use App\Enums\BatchStatus;
 use App\Models\Batch;
 use App\Models\Genetic;
 use App\Models\Location;
+use App\Support\BusinessDay;
 
 /**
  * Batch selection at the counter — FEFO (oldest open, non-expired, in-stock batch).
@@ -20,7 +21,7 @@ class SelectBatch
         return Batch::query()->withoutGlobalScopes()
             ->where('genetic_id', $genetic->id)
             ->where('location_id', $location->id)
-            ->fefo()
+            ->fefo($location->id)
             ->first();
     }
 
@@ -33,6 +34,6 @@ class SelectBatch
 
         return $batch->status === BatchStatus::OPEN
             && $hasStock
-            && ($batch->expires_on === null || $batch->expires_on->greaterThanOrEqualTo(today()));
+            && ($batch->expires_on === null || $batch->expires_on->toDateString() >= BusinessDay::today((string) $batch->location_id));
     }
 }

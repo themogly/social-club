@@ -32,6 +32,7 @@ use App\Models\Organisation;
 use App\Models\TillSession;
 use App\Models\User;
 use App\Support\ActiveScope;
+use App\Support\BusinessDay;
 use App\Support\CounterOperator;
 use App\Support\Money;
 use App\Support\Period;
@@ -175,6 +176,27 @@ class PreLiveComplianceMoneyTest extends TestCase
         DB::disableQueryLog();
 
         $this->assertLessThanOrEqual(1, $locationQueries);
+    }
+
+    /** Prompt 275 — a date-only field compares against the sede's BUSINESS date, not the UTC calendar date. */
+    public function test_a_batch_that_expired_yesterday_is_still_dispensable_until_the_cutoff(): void
+    {
+        $batch = Batch::factory()->create([
+            'organisation_id' => $this->org->id, 'genetic_id' => $this->genetic->id, 'location_id' => $this->madrid->id,
+            'initial_cg' => 1000, 'remaining_cg' => 1000, 'status' => BatchStatus::OPEN, 'expires_on' => '2026-09-27',
+        ]);
+        $dispensable = fn (): bool => Batch::query()->withoutGlobalScopes()->whereKey($batch->id)->dispensable($this->madrid->id)->exists();
+
+        // 28 Sep 03:00 Madrid is still business day 27 Sep (06:00 cutoff): the lote that expires on the 27th is in date.
+        $this->travelTo(CarbonImmutable::parse('2026-09-28 03:00', 'Europe/Madrid'));
+        request()->attributes->replace([]);
+        $this->assertSame('2026-09-27', BusinessDay::today($this->madrid));
+        $this->assertTrue($dispensable());
+
+        // After the cutoff it is the 28th, and the lote is expired.
+        $this->travelTo(CarbonImmutable::parse('2026-09-28 07:00', 'Europe/Madrid'));
+        request()->attributes->replace([]);
+        $this->assertFalse($dispensable());
     }
 
     // --- Typed money: one strict rule ------------------------------------------------------------------------------

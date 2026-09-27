@@ -41,7 +41,7 @@ class AllocateFromBatches
         $batches = Batch::query()->withoutGlobalScopes()
             ->where('genetic_id', $genetic->id)
             ->where('location_id', $location->id)
-            ->fefo()
+            ->fefo($location->id)
             ->lockForUpdate()
             ->get();
 

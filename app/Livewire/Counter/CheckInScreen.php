@@ -21,6 +21,7 @@ use App\Models\MemberSanction;
 use App\Models\Membership;
 use App\Models\TillSession;
 use App\Models\User;
+use App\Support\BusinessDay;
 use App\Support\CounterOperator;
 use App\Support\Money;
 use App\Support\Settings;
@@ -367,7 +368,9 @@ class CheckInScreen extends Component
 
     private function activeSanction(Member $member): ?MemberSanction
     {
-        $today = now()->toDateString();
+        // The sede's business date (prompt 275) — a sanction ending "yesterday" still binds until the cutoff.
+        $location = $this->resolveLocation();
+        $today = $location !== null ? BusinessDay::today($location) : now()->toDateString();
 
         return $member->sanctions()
             ->whereDate('from_date', '<=', $today)

@@ -7,6 +7,7 @@ use App\Enums\BatchStatus;
 use App\Enums\UnitType;
 use App\Models\Concerns\BelongsToOrganisation;
 use App\Models\Concerns\ScopedToLocation;
+use App\Support\BusinessDay;
 use Database\Factories\BatchFactory;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
@@ -148,11 +149,14 @@ class Batch extends Model
      * @param  Builder<static>  $query
      * @return Builder<static>
      */
-    public function scopeDispensable(Builder $query): Builder
+    public function scopeDispensable(Builder $query, ?string $locationId = null): Builder
     {
+        // Expiry against the SEDE's business date when the caller names the sede (prompt 275), not the UTC calendar.
+        $today = $locationId !== null ? BusinessDay::today($locationId) : today()->toDateString();
+
         return $query->where('status', BatchStatus::OPEN)
             ->where(fn (Builder $q): Builder => $q->where('remaining_cg', '>', 0)->orWhere('remaining_units', '>', 0))
-            ->where(fn (Builder $q): Builder => $q->whereNull('expires_on')->orWhereDate('expires_on', '>=', today()));
+            ->where(fn (Builder $q): Builder => $q->whereNull('expires_on')->orWhereDate('expires_on', '>=', $today));
     }
 
     /**
@@ -163,8 +167,8 @@ class Batch extends Model
      * @param  Builder<static>  $query
      * @return Builder<static>
      */
-    public function scopeFefo(Builder $query): Builder
+    public function scopeFefo(Builder $query, ?string $locationId = null): Builder
     {
-        return $query->dispensable()->orderBy('acquired_or_harvested_on')->orderBy('id');
+        return $query->dispensable($locationId)->orderBy('acquired_or_harvested_on')->orderBy('id');
     }
 }
