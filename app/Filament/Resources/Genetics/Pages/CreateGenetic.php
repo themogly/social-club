@@ -105,9 +105,9 @@ class CreateGenetic extends CreateRecord
                 ->schema([
                     // 238's rule exactly: default to the scope, required, blank in the rollup, locked single-sede.
                     Select::make('location_id')->label(__('Sede'))
-                        ->options(fn (): array => Location::query()->orderBy('name')->pluck('name', 'id')->all())
+                        ->options(fn (): array => Location::assignableOptions())
                         ->default(fn (): ?string => app(ActiveScope::class)->locationId())
-                        ->disabled(fn (): bool => Location::query()->count() === 1)
+                        ->disabled(fn (): bool => count(Location::assignableOptions()) === 1)
                         ->dehydrated()
                         ->required(),
                 ]),
@@ -161,7 +161,7 @@ class CreateGenetic extends CreateRecord
             $location = Location::query()->findOrFail($data['location_id']);
 
             $intake = [
-                'cost_per_gram_cents' => (int) round_half_up(((float) ($data['cost_per_gram_eur'] ?? 0)) * 100),
+                'cost_per_gram_cents' => Money::fromEuros((string) ($data['cost_per_gram_eur'] ?? 0))->cents, // the one conversion (273)
                 'lab_report_path' => $data['lab_report_path'] ?? null,
             ];
             $genetic->isUnitType()

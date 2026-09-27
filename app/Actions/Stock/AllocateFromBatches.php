@@ -2,6 +2,7 @@
 
 namespace App\Actions\Stock;
 
+use App\Exceptions\StockUnavailableException;
 use App\Models\Batch;
 use App\Models\Genetic;
 use App\Models\Location;
@@ -31,7 +32,7 @@ class AllocateFromBatches
     /**
      * @return list<array{batch: Batch, qty: int}> FEFO parts summing to exactly $quantity
      *
-     * @throws RuntimeException when the sede's dispensable batches of this genetic cannot cover $quantity
+     * @throws StockUnavailableException when the sede's dispensable batches of this genetic cannot cover $quantity
      */
     public function handle(Genetic $genetic, Location $location, int $quantity): array
     {
@@ -40,9 +41,7 @@ class AllocateFromBatches
         $batches = Batch::query()->withoutGlobalScopes()
             ->where('genetic_id', $genetic->id)
             ->where('location_id', $location->id)
-            ->dispensable()
-            ->orderBy('acquired_or_harvested_on')
-            ->orderBy('id')
+            ->fefo()
             ->lockForUpdate()
             ->get();
 
@@ -67,7 +66,7 @@ class AllocateFromBatches
         }
 
         if ($remaining > 0) {
-            throw new RuntimeException(__('Stock insuficiente de :genetic en :sede (disponible: :available).', [
+            throw new StockUnavailableException(__('Stock insuficiente de :genetic en :sede (disponible: :available).', [
                 'genetic' => $genetic->name,
                 'sede' => $location->name,
                 'available' => $isUnit

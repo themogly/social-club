@@ -3,6 +3,7 @@
 namespace App\Filament\Resources\Expenses\Schemas;
 
 use App\Enums\ExpensePaidFrom;
+use App\Models\Location;
 use App\Support\DocumentUpload;
 use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\FileUpload;
@@ -70,7 +71,7 @@ class ExpenseForm
 
                         Select::make('location_id')
                             ->label(__('Sede'))
-                            ->relationship('location', 'name')
+                            ->relationship('location', 'name', modifyQueryUsing: fn (Builder $query): Builder => Location::limitToAssignable($query))
                             ->searchable()
                             ->preload()
                             ->helperText(__('Opcional. Un gasto general puede no estar ligado a una sede.')),

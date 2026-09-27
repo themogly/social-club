@@ -2,8 +2,11 @@
 
 namespace App\Filament\Resources\MemberApplications\Schemas;
 
+use App\Models\Location;
+use App\Models\User;
 use Filament\Forms\Components\Select;
 use Filament\Schemas\Schema;
+use Illuminate\Database\Eloquent\Builder;
 
 /**
  * What may be EDITED on an application, which is very little (admin audit, Phase C).
@@ -33,7 +36,7 @@ class MemberApplicationForm
             ->components([
                 Select::make('location_id')
                     ->label(__('Sede'))
-                    ->relationship('location', 'name')
+                    ->relationship('location', 'name', modifyQueryUsing: fn (Builder $query): Builder => Location::limitToAssignable($query))
                     ->searchable()
                     ->preload()
                     ->placeholder(__('Sin sede asignada')),

@@ -207,7 +207,7 @@ class CartSectionsGateOnTheirOwnLinesTest extends TestCase
     /**
      * The tender preview is split over the COMBINED total.
      *
-     * It used to split the dispensation total alone while `settleWithBar()` splits dispensation + bar, so a
+     * It used to split the dispensation total alone while the one commit (`commitDispensation()`) splits dispensation + bar, so a
      * mixed visit showed a cash figure that understated what the settle would take, and a bar-only visit
      * showed €0,00 against real money.
      */
@@ -250,7 +250,7 @@ class CartSectionsGateOnTheirOwnLinesTest extends TestCase
      *
      * This needed a server change and the prompt asked for none — see DECISIONS. `CommitCombinedSettle`
      * refuses a one-sided settle in terms (*"an empty side means the caller wants a plain dispensation or a
-     * plain order, which have their own single-writer entry points"*), so `settleWithBar()` now takes that
+     * plain order, which have their own single-writer entry points"*), so the one commit (`commitDispensation()`) now takes that
      * named entry point — `CommitOrder`, the same writer the Barra screen calls — for the bar-only case. The
      * combined path is untouched. Without it the fix would be half a fix: the operator can see the line and
      * cannot take the money without adding a flower line they do not want.
@@ -267,7 +267,7 @@ class CartSectionsGateOnTheirOwnLinesTest extends TestCase
             ->call('setCatalogueSource', 'bar')
             ->call('addBarItem', $article->id)
             ->call('addBarItem', $article->id)
-            ->call('settleWithBar')
+            ->call('commitDispensation')
             ->assertSet('barBasket', []);
 
         $order = Order::query()->withoutGlobalScopes()->latest('id')->firstOrFail();
@@ -291,7 +291,7 @@ class CartSectionsGateOnTheirOwnLinesTest extends TestCase
             ->set('weightInput', '2')
             ->call('addLine')
             ->call('addBarItem', $article->id)
-            ->call('settleWithBar');
+            ->call('commitDispensation');
 
         $this->assertSame(1, Dispensation::query()->withoutGlobalScopes()->count(), 'the dispensation half is missing');
         $this->assertSame(1, Order::query()->withoutGlobalScopes()->count(), 'the bar half is missing');

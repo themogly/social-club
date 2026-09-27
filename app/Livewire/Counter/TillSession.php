@@ -78,11 +78,11 @@ class TillSession extends Component
 
     public string $movementReason = '';
 
-    /** Petty-cash (gasto de caja) form — records a PETTY_CASH movement out of the open drawer. */
     /** The session just closed, for the revealed arqueo's itemised petty cash (prompt 265). Server-set only. */
     #[Locked]
     public ?string $closedSessionId = null;
 
+    /** Petty-cash (gasto de caja) form — records a PETTY_CASH movement out of the open drawer. */
     public string $expenseAmount = '';
 
     public ?string $expenseCategoryId = null;

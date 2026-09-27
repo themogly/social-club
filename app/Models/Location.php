@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Enums\Role;
 use App\Models\Concerns\BelongsToOrganisation;
 use Database\Factories\LocationFactory;
 use Illuminate\Database\Eloquent\Builder;
@@ -11,6 +12,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Support\Facades\Auth;
 
 /**
  * A premises — the operational scope. Its timezone + business_day_cutoff drive
@@ -56,6 +58,54 @@ class Location extends Model
     public function memberships(): HasMany
     {
         return $this->hasMany(Membership::class);
+    }
+
+    /**
+     * The sedes a person may WRITE to from the panel (prompt 273): every sede for an owner, otherwise the ones they are
+     * assigned to. Every sede dropdown on a panel form reads this, so a manager cannot record prices, batches, wallet
+     * movements or expenses at a sede they do not work at — the object-ownership rule `LocationPolicy` applies (270).
+     *
+     * @param  Builder<static>  $query
+     * @return Builder<static>
+     */
+    public function scopeAssignableTo(Builder $query, ?User $user): Builder
+    {
+        if ($user !== null && $user->hasRole(Role::OWNER->value)) {
+            return $query;
+        }
+
+        return $query->whereIn('locations.id', $user !== null ? $user->locations()->pluck('locations.id')->all() : []);
+    }
+
+    /**
+     * {@see self::scopeAssignableTo()} for the signed-in user, applied to a relationship Select's query.
+     *
+     * @template TModel of \Illuminate\Database\Eloquent\Model
+     *
+     * @param  Builder<TModel>  $query
+     * @return Builder<TModel>
+     */
+    public static function limitToAssignable(Builder $query): Builder
+    {
+        $user = Auth::user();
+
+        if ($user instanceof User && $user->hasRole(Role::OWNER->value)) {
+            return $query;
+        }
+
+        return $query->whereIn('locations.id', $user instanceof User ? $user->locations()->pluck('locations.id')->all() : []);
+    }
+
+    /**
+     * {@see self::scopeAssignableTo()} for the signed-in user, as select options.
+     *
+     * @return array<string, string>
+     */
+    public static function assignableOptions(): array
+    {
+        $user = Auth::user();
+
+        return static::query()->assignableTo($user instanceof User ? $user : null)->orderBy('name')->pluck('name', 'id')->all();
     }
 
     /**

@@ -291,7 +291,7 @@ class MemberResource extends Resource
                 'money' => Money::fromCents(Wallet::totalDebtCents($record->id))->formatted(),
             ]))
             ->fillForm(fn (Member $record): array => [
-                'debt_limit_eur' => $record->debt_limit_cents !== null ? number_format($record->debt_limit_cents / 100, 2, '.', '') : null,
+                'debt_limit_eur' => $record->debt_limit_cents !== null ? sprintf('%d.%02d', intdiv((int) $record->debt_limit_cents, 100), (int) $record->debt_limit_cents % 100) : null, // integer-only (273)
             ])
             ->schema([
                 TextInput::make('debt_limit_eur')

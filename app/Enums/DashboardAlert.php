@@ -4,6 +4,7 @@ namespace App\Enums;
 
 use App\Filament\Resources\Articles\ArticleResource;
 use App\Filament\Resources\Batches\BatchResource;
+use App\Filament\Resources\Genetics\GeneticResource;
 use App\Filament\Resources\MemberApplications\MemberApplicationResource;
 use App\Filament\Resources\Members\MemberResource;
 use App\Filament\Resources\TillSessions\TillSessionResource;
@@ -113,7 +114,8 @@ enum DashboardAlert: string
         return match ($this) {
             self::MEMBERS_OVER_LIMIT, self::ACTIVE_MEMBER_CAP, self::MEMBERSHIPS_EXPIRING => MemberResource::class,
             self::UNRECONCILED_TILL => TillSessionResource::class,
-            self::BATCHES_EXPIRING, self::STOCK_CEILING_EXCEEDED, self::GENETICS_LOW_STOCK => BatchResource::class,
+            self::BATCHES_EXPIRING, self::STOCK_CEILING_EXCEEDED => BatchResource::class,
+            self::GENETICS_LOW_STOCK => GeneticResource::class,
             self::PENDING_APPLICATIONS => MemberApplicationResource::class,
             self::ARTICLES_LOW_STOCK => ArticleResource::class,
         };
@@ -122,8 +124,9 @@ enum DashboardAlert: string
     public function panelUrl(): string
     {
         // The articles table already has a "Stock bajo" filter — arrive with it on, not on the whole catalogue.
-        if ($this === self::ARTICLES_LOW_STOCK) {
-            return ArticleResource::getUrl('index', ['filters' => ['low_stock' => ['isActive' => true]]]);
+        // Both low-stock tables have a "Stock bajo" filter — arrive with it on, not on the whole catalogue (269/273).
+        if ($this === self::ARTICLES_LOW_STOCK || $this === self::GENETICS_LOW_STOCK) {
+            return $this->panelResource()::getUrl('index', ['filters' => ['low_stock' => ['isActive' => true]]]);
         }
 
         return $this->panelResource()::getUrl();

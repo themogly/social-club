@@ -15,7 +15,6 @@ use App\Models\Batch;
 use App\Models\CheckIn;
 use App\Models\Dispensation;
 use App\Models\DispensationLine;
-use App\Models\Genetic;
 use App\Models\Location;
 use App\Models\Member;
 use App\Models\MemberApplication;
@@ -420,11 +419,7 @@ class Dashboard
     public function lowStockGenetics(): int
     {
         return $this->scopeLocations()->sum(fn (Location $location): int => StockCover::lowCountAt(
-            Genetic::query()->withoutGlobalScope(OrganisationScope::class)
-                ->where('organisation_id', $location->organisation_id)
-                ->sellableAt($location->id)
-                ->with(['prices' => fn ($q) => $q->withoutGlobalScopes()->where('location_id', $location->id)])
-                ->get(),
+            StockCover::sellableWithPricesAt($location),
             $location->id,
         ));
     }

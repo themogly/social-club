@@ -179,11 +179,11 @@ class WalletTransactionsRelationManager extends RelationManager
             ->schema([
                 Select::make('from_location_id')
                     ->label(__('Desde la sede'))
-                    ->options(fn () => Location::query()->orderBy('name')->pluck('name', 'id'))
+                    ->options(fn (): array => Location::assignableOptions())
                     ->required(),
                 Select::make('to_location_id')
                     ->label(__('Hacia la sede'))
-                    ->options(fn () => Location::query()->orderBy('name')->pluck('name', 'id'))
+                    ->options(fn (): array => Location::assignableOptions())
                     ->different('from_location_id')
                     ->required(),
                 TextInput::make('amount_eur')
@@ -219,7 +219,7 @@ class WalletTransactionsRelationManager extends RelationManager
     {
         return Select::make('location_id')
             ->label(__('Sede'))
-            ->options(fn () => Location::query()->orderBy('name')->pluck('name', 'id'))
+            ->options(fn (): array => Location::assignableOptions())
             ->required();
     }
 

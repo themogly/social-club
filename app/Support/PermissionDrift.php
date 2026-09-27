@@ -100,8 +100,9 @@ class PermissionDrift
         }
 
         return RolePermissionOverride::query()->orderBy('role')->orderBy('permission')->get()
-            ->map(fn ($o): string => ($o->granted ? __(':role: añadido «:permission»', ['role' => $o->role, 'permission' => Permissions::label($o->permission)])
-                : __(':role: retirado «:permission»', ['role' => $o->role, 'permission' => Permissions::label($o->permission)])))
+            // The role's translated label, never its raw enum key (prompt 273 — the English panel showed "MANAGER").
+            ->map(fn ($o): string => ($o->granted ? __(':role: añadido «:permission»', ['role' => RoleEnum::tryFrom((string) $o->role)?->label() ?? $o->role, 'permission' => Permissions::label($o->permission)])
+                : __(':role: retirado «:permission»', ['role' => RoleEnum::tryFrom((string) $o->role)?->label() ?? $o->role, 'permission' => Permissions::label($o->permission)])))
             ->all();
     }
 

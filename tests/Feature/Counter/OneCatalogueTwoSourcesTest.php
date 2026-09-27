@@ -204,7 +204,7 @@ class OneCatalogueTwoSourcesTest extends TestCase
         $this->assertCount(1, $pos->get('basket'), 'the genetic did not land on the dispensation basket');
         $this->assertCount(1, $pos->get('barBasket'), 'the article did not land on the bar basket');
 
-        $pos->set('cashTendered', '100,00')->call('settleWithBar');
+        $pos->set('cashTendered', '100,00')->call('commitDispensation');
 
         $this->assertSame(1, Dispensation::query()->withoutGlobalScopes()->where('member_id', $member->id)->count());
         $this->assertSame(1, Order::query()->withoutGlobalScopes()->where('member_id', $member->id)->count());

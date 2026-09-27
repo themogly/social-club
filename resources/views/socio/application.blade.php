@@ -43,7 +43,7 @@
             </div>
         @else
             @php($input = \App\Support\SocioForm::FIELD)
-            @php($declaredG = data_get($payload, 'declared_monthly_cg') !== null ? (float) data_get($payload, 'declared_monthly_cg') / 100 : null)
+            @php($declaredG = data_get($payload, 'declared_monthly_cg') !== null ? intdiv((int) data_get($payload, 'declared_monthly_cg'), 100) : null)
             {{-- The summary stays (it is the fastest way to see everything at once) but it is now announced:
                  role="alert" fires it on return from a failed submit, and each message is ALSO on its own
                  field via <x-socio.field-error> (a11y audit). --}}

@@ -56,8 +56,10 @@ class GeneticPricesRelationManager extends RelationManager
         $perUnit = $this->genetic()->isUnitType();
 
         return $table
-            // A genetic is org-wide, so show its prices across EVERY location, not just the active one.
-            ->modifyQueryUsing(fn (Builder $query): Builder => $query->withoutGlobalScope(LocationScope::class))
+            // A genetic is org-wide, so show its prices across every sede the viewer works at (an owner: all of them) —
+            // prompt 273: a manager used to see and edit every sede's rows.
+            ->modifyQueryUsing(fn (Builder $query): Builder => $query->withoutGlobalScope(LocationScope::class)
+                ->whereIn('location_id', array_keys(Location::assignableOptions())))
             ->columns([
                 TextColumn::make('location.name')->label(__('Sede'))->sortable(),
                 TextColumn::make('tier.name')->label(__('Tarifa'))->placeholder(__('Base')),
@@ -89,6 +91,7 @@ class GeneticPricesRelationManager extends RelationManager
             ->icon(Heroicon::OutlinedPlus)
             ->visible(fn (): bool => Auth::user()?->can('prices.manage') ?? false)
             ->schema($this->formSchema())
+            ->modalSubmitActionLabel(__('Guardar precio')) // prompt 273 — it said "Enviar"
             ->action(function (array $data): void {
                 $location = Location::query()->whereKey($data['location_id'])->firstOrFail();
 
@@ -121,6 +124,7 @@ class GeneticPricesRelationManager extends RelationManager
                 'active' => $record->active,
             ])
             ->schema($this->formSchema(edit: true))
+            ->modalSubmitActionLabel(__('Guardar precio')) // prompt 273 — it said "Enviar"
             ->action(function (GeneticPrice $record, array $data): void {
                 // location + tier identify the row — fixed on edit; only price/threshold/active change.
                 (new SaveGeneticPrice)->handle(
@@ -148,7 +152,7 @@ class GeneticPricesRelationManager extends RelationManager
         return [
             Select::make('location_id')
                 ->label(__('Sede'))
-                ->options(fn () => Location::query()->orderBy('name')->pluck('name', 'id'))
+                ->options(fn (): array => Location::assignableOptions())
                 ->required()
                 ->disabled($edit)
                 // Prompt 271 — one price per sede and tarifa; a second base price left the charge to chance. On the sede
@@ -193,9 +197,10 @@ class GeneticPricesRelationManager extends RelationManager
                 }),
             TextInput::make('low_stock_threshold_g')
                 ->label(__('Aviso de stock bajo (g)'))
+                // Prompt 273 — say how it actually works (269): one figure per variety and SEDE, not per tarifa.
                 ->helperText($perUnit
-                    ? __('Opcional. Equivalente en gramos (unidades × g/unidad) por debajo del cual avisar.')
-                    : __('Opcional. Nivel por debajo del cual avisar de stock bajo.'))
+                    ? __('Opcional, para toda la sede (no por tarifa). Equivalente en gramos (unidades × g/unidad). Vacío = aviso automático por días de cobertura.')
+                    : __('Opcional, para toda la sede (no por tarifa): si lo pones en la fila base, manda esa. Vacío = aviso automático por días de cobertura (Ajustes ▸ Existencias).'))
                 ->numeric()
                 ->minValue(0), // prompt 54 consumes this as a gram-equivalent threshold for BOTH types
             Toggle::make('active')

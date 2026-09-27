@@ -140,6 +140,9 @@ class Permissions
      *     (`TillSession::reweighRequired()`), which is gated on stock.take — without it the close cannot finish.
      *   · pos.use / pos.bar / checkin.manage → till.open: the counter sends a till-less sede to open a till first
      *     (236); without till.open this role can only work once somebody else has opened one.
+     *   · the PANEL-ONLY grants → panel.access (prompt 273): nothing on the counter checks them, so given to a role
+     *     without the panel (STAFF, by default since 262) the tick does nothing at all — the failure 265 exists to
+     *     name. (`reports.view` is NOT here: it also shows the day's takings on the counter hub.)
      *
      * @var array<string, list<string>>
      */
@@ -148,6 +151,16 @@ class Permissions
         'pos.use' => ['till.open'],
         'pos.bar' => ['till.open'],
         'checkin.manage' => ['till.open'],
+        'reports.export' => ['panel.access'],
+        'genetics.manage' => ['panel.access'],
+        'prices.manage' => ['panel.access'],
+        'members.edit' => ['panel.access'],
+        'comms.manage' => ['panel.access'],
+        'minutes.manage' => ['panel.access'],
+        'expenses.approve' => ['panel.access'],
+        'purchases.manage' => ['panel.access'],
+        'stock.merma' => ['panel.access'],
+        'wallet.adjust' => ['panel.access'],
     ];
 
     /** Why `$permission` needs `$needs`, in the words the roles page shows the owner (prompt 265). */
@@ -155,7 +168,9 @@ class Permissions
     {
         return match ($permission) {
             'till.close' => __('Para cerrar la caja al final del día también hace falta «:needs».', ['needs' => self::label($needs)]),
-            default => __('Sin «:needs», solo podrá trabajar cuando otra persona haya abierto la caja.', ['needs' => self::label($needs)]),
+            default => $needs === 'panel.access'
+                ? __('Este permiso solo se usa en el panel de administración: sin «:needs» no hace nada.', ['needs' => self::label($needs)])
+                : __('Sin «:needs», solo podrá trabajar cuando otra persona haya abierto la caja.', ['needs' => self::label($needs)]),
         };
     }
 

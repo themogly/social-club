@@ -26,7 +26,7 @@ class ArticleResource extends Resource
 
     public static function getNavigationLabel(): string
     {
-        return __('Artículos (bar)');
+        return __('Artículos'); // under "Barra y tienda" — "(bar)" hid the shop (prompt 273)
     }
 
     public static function getNavigationGroup(): ?string

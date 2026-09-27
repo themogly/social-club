@@ -20,9 +20,7 @@ class SelectBatch
         return Batch::query()->withoutGlobalScopes()
             ->where('genetic_id', $genetic->id)
             ->where('location_id', $location->id)
-            ->dispensable()
-            ->orderBy('acquired_or_harvested_on')
-            ->orderBy('id')
+            ->fefo()
             ->first();
     }
 

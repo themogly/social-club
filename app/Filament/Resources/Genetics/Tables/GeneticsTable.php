@@ -6,6 +6,9 @@ use App\Enums\BatchStatus;
 use App\Enums\ProductType;
 use App\Enums\StrainType;
 use App\Models\Genetic;
+use App\Models\Location;
+use App\Support\ActiveScope;
+use App\Support\StockCover;
 use Filament\Actions\ActionGroup;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteBulkAction;
@@ -14,9 +17,12 @@ use Filament\Actions\RestoreBulkAction;
 use Filament\Actions\ViewAction;
 use Filament\Tables\Columns\IconColumn;
 use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Filters\Filter;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Filters\TrashedFilter;
 use Filament\Tables\Table;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Collection;
 
 class GeneticsTable
 {
@@ -72,6 +78,11 @@ class GeneticsTable
                 IconColumn::make('active')->label(__('Activa'))->boolean(),
             ])
             ->filters([
+                // Prompt 273 — where the "variedades con stock bajo" alert lands: the SAME verdict as the counter's dot and
+                // the alert (StockCover), at the active sede or — for the owner's rollup — at any sede.
+                Filter::make('low_stock')
+                    ->label(__('Stock bajo'))
+                    ->query(fn (Builder $query): Builder => $query->whereIn('id', StockCover::lowGeneticIds(self::sedesInScope()))),
                 SelectFilter::make('product_type')
                     ->label(__('Tipo de producto'))
                     ->options(collect(ProductType::cases())
@@ -103,5 +114,16 @@ class GeneticsTable
             // what to do first.
             ->emptyStateHeading(__('Sin genéticas'))
             ->emptyStateDescription(__('Una genética es una variedad con su precio por gramo en cada sede. Crea la primera y después registra un lote con su stock.'));
+    }
+
+    /** @return Collection<int, Location> the active sede, or every sede of the organisation for the rollup */
+    private static function sedesInScope(): Collection
+    {
+        $scope = app(ActiveScope::class);
+
+        return Location::query()->withoutGlobalScopes()
+            ->where('organisation_id', $scope->organisationId())
+            ->when($scope->locationId() !== null, fn (Builder $query): Builder => $query->whereKey($scope->locationId()))
+            ->get();
     }
 }

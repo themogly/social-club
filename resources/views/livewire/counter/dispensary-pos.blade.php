@@ -955,7 +955,7 @@
                          a component now because it has a second consumer (the application form).
 
                          With the dispensation basket, not the bar's: it is the signature for the aportación,
-                         and `settleWithBar` asks for it only when a dispensation is being written. --}}
+                         and the one commit (`attemptCommit`) asks for it only when a dispensation is being written. --}}
                     @if ($requireSignature && $hasDispensationLines)
                         <div class="mt-4 border-t border-line pt-4 dark:border-slate-800">
                             <x-counter.signature-pad

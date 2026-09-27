@@ -32,7 +32,7 @@ class BatchForm
                         // nothing to choose. Fixed at intake, like the genetic — disabled once the batch exists.
                         Select::make('location_id')
                             ->label(__('Sede'))
-                            ->options(fn (): array => Location::query()->orderBy('name')->pluck('name', 'id')->all())
+                            ->options(fn (): array => Location::assignableOptions())
                             ->default(fn (): ?string => app(ActiveScope::class)->locationId())
                             ->required()
                             ->searchable()

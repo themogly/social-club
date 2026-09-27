@@ -1,4 +1,4 @@
-{{-- Prompt 262 — Sistema ▸ Roles y permisos. The owner decides what Personal and Encargado may do; Propietario is always
+{{-- Prompt 262 — Sistema ▸ Roles y permisos. The owner decides what Personal and Gerente may do; Propietario is always
      everything (ticked, locked). Each row shows the code's default beside the club's choice, so a change is visible
      against it. Sensitive grants are marked — warned, not blocked: it is the owner's club. --}}
 <x-filament-panels::page>
@@ -34,8 +34,10 @@
 
     @foreach ($groups as $group => $permissions)
         <x-filament::section :heading="$group">
+            {{-- Prompt 273 — a minimum width, so at phone width the grid scrolls inside its card instead of the headers
+                 overlapping and each label wrapping one word per line. --}}
             <div class="overflow-x-auto">
-                <table class="w-full table-fixed text-sm" data-roles-group>
+                <table class="w-full min-w-[34rem] table-fixed text-sm" data-roles-group>
                     <thead>
                         <tr class="text-left text-xs text-gray-500 dark:text-gray-400">
                             <th class="py-2 pe-4 font-medium">{{ __('Permiso') }}</th>

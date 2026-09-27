@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\Purchases\Schemas;
 
+use App\Models\Location;
 use App\Support\DocumentUpload;
 use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\FileUpload;
@@ -10,6 +11,7 @@ use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Schema;
+use Illuminate\Database\Eloquent\Builder;
 
 /**
  * Amount and paid are edited in euros and converted to integer cents on the Create
@@ -34,7 +36,7 @@ class PurchaseForm
 
                         Select::make('location_id')
                             ->label(__('Sede'))
-                            ->relationship('location', 'name')
+                            ->relationship('location', 'name', modifyQueryUsing: fn (Builder $query): Builder => Location::limitToAssignable($query))
                             ->searchable()
                             ->preload(),
 

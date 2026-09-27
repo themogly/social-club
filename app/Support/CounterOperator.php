@@ -14,9 +14,13 @@ class CounterOperator
 {
     private const KEY = 'counter.operator_id';
 
+    /** Request attribute holding the resolved operator (prompt 273). */
+    private const MEMO = 'counter.operator';
+
     public static function set(User $operator): void
     {
         session([self::KEY => $operator->id]);
+        request()->attributes->remove(self::MEMO);
     }
 
     public static function id(): ?string
@@ -24,15 +28,33 @@ class CounterOperator
         return session(self::KEY);
     }
 
+    /**
+     * The operator, resolved ONCE per request (prompt 273). Every `userCan()` / `counterActor()` asks this, and each
+     * `User::find()` also reloaded the person's roles and permissions — 15 of the 49 queries in one POS render. Held on
+     * the request (not a static), so it can never outlive the request that resolved it; `set()`/`clear()` drop it.
+     */
     public static function current(): ?User
     {
         $id = self::id();
 
-        return $id !== null ? User::find($id) : null;
+        if ($id === null) {
+            return null;
+        }
+
+        $memo = request()->attributes->get(self::MEMO);
+        if ($memo instanceof User && $memo->getKey() === $id) {
+            return $memo;
+        }
+
+        $user = User::find($id);
+        request()->attributes->set(self::MEMO, $user);
+
+        return $user;
     }
 
     public static function clear(): void
     {
         session()->forget(self::KEY);
+        request()->attributes->remove(self::MEMO);
     }
 }

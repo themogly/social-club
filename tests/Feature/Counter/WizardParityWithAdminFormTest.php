@@ -3,6 +3,7 @@
 namespace Tests\Feature\Counter;
 
 use App\Actions\Members\AnonymiseMember;
+use App\Actions\Members\ResolveAvalador;
 use App\Actions\Till\OpenTill;
 use App\Enums\MemberStatus;
 use App\Enums\Role;
@@ -15,7 +16,6 @@ use App\Models\Organisation;
 use App\Models\TillSession;
 use App\Models\User;
 use App\Support\ActiveScope;
-use App\Support\AvaladorResolver;
 use App\Support\CounterOperator;
 use Database\Seeders\RolePermissionSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -141,17 +141,18 @@ class WizardParityWithAdminFormTest extends TestCase
         Member::factory()->create(['organisation_id' => $this->org->id, 'status' => MemberStatus::ACTIVE, 'first_name' => 'Juan', 'last_name' => 'Pérez']);
         Member::factory()->create(['organisation_id' => $this->org->id, 'status' => MemberStatus::ACTIVE, 'first_name' => 'Juan', 'last_name' => 'Pérez']);
 
-        $found = AvaladorResolver::resolve($this->org->id, 'María García');
+        $found = (new ResolveAvalador)->handle($this->org->id, 'María García');
         $this->assertSame('found', $found['status']);
         $this->assertSame($maria->id, $found['member']->id);
+        $this->assertNull($found['member']->getAttribute('document_number'), 'a sponsor match carries a label, not the whole row (273)');
 
-        $byNumber = AvaladorResolver::resolve($this->org->id, 'M-00042');
+        $byNumber = (new ResolveAvalador)->handle($this->org->id, 'M-00042');
         $this->assertSame('found', $byNumber['status']);
         $this->assertSame($maria->id, $byNumber['member']->id);
 
-        $this->assertSame('none', AvaladorResolver::resolve($this->org->id, 'Nadie Existe')['status']);
-        $this->assertSame('multiple', AvaladorResolver::resolve($this->org->id, 'Juan Pérez')['status']);
-        $this->assertSame('empty', AvaladorResolver::resolve($this->org->id, '  ')['status']);
+        $this->assertSame('none', (new ResolveAvalador)->handle($this->org->id, 'Nadie Existe')['status']);
+        $this->assertSame('multiple', (new ResolveAvalador)->handle($this->org->id, 'Juan Pérez')['status']);
+        $this->assertSame('empty', (new ResolveAvalador)->handle($this->org->id, '  ')['status']);
     }
 
     public function test_the_wizard_renders_the_sponsor_feedback(): void

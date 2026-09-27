@@ -13,7 +13,6 @@ use App\Models\MemberApplication;
 use App\Models\Organisation;
 use App\Models\User;
 use App\Support\ActiveScope;
-use App\Support\AvaladorResolver;
 use App\Support\CounterOperator;
 use Database\Seeders\RolePermissionSeeder;
 use Filament\Facades\Filament;
@@ -157,7 +156,8 @@ class PendingAlertAndSponsorSearchTest extends TestCase
         $this->sponsor('Beto', 'Alba', 'M-00002', MemberStatus::SUSPENDED);
         $this->sponsor('Carla', 'Alba', 'M-00003', MemberStatus::ACTIVE, Organisation::factory()->create());
 
-        $labels = array_values(AvaladorResolver::candidates($this->org->id, 'alba')->map(fn (Member $m) => AvaladorResolver::label($m))->all());
+        $labels = Member::query()->withoutGlobalScopes()->eligibleAvalador($this->org->id)->matchingNameOrNumber('alba')
+            ->get()->map(fn (Member $m) => $m->avaladorLabel())->values()->all();
 
         $this->assertSame(['Ana Alba · M-00001'], $labels);
     }

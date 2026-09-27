@@ -5,6 +5,7 @@ namespace App\Livewire\Counter\Concerns;
 use App\Actions\Members\ApproveApplication;
 use App\Actions\Members\FindDuplicateMembers;
 use App\Actions\Members\IssueApplicationInvite;
+use App\Actions\Members\ResolveAvalador;
 use App\Actions\Members\SubmitApplication;
 use App\Actions\Memberships\EnrolMembership;
 use App\Actions\RecordAuditLog;
@@ -17,7 +18,6 @@ use App\Models\MemberApplication;
 use App\Models\MembershipTier;
 use App\Models\User;
 use App\Support\ApplicationShape;
-use App\Support\AvaladorResolver;
 use App\Support\Mrz\MrzParser;
 use App\Support\Settings;
 use Illuminate\Support\Collection;
@@ -763,7 +763,7 @@ trait SignsUpMembers
             return ['status' => 'empty', 'member' => null];
         }
 
-        return AvaladorResolver::resolve($this->altaLocation()?->organisation_id, $this->altaForm['avalador_ref'] ?? null);
+        return (new ResolveAvalador)->handle($this->altaLocation()?->organisation_id, $this->altaForm['avalador_ref'] ?? null);
     }
 
     /** @return Collection<int, MembershipTier> */

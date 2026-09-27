@@ -319,6 +319,38 @@ class Member extends Model implements Authenticatable, HasLocalePreference
     }
 
     /**
+     * WHO may be an avalador (sponsor) at all — active members of this organisation (prompt 264). The ONE definition the
+     * counter's sign-up and the admin form's picker share. (A Member scope since prompt 273; it lived in App\Support.)
+     *
+     * @param  Builder<static>  $query
+     * @return Builder<static>
+     */
+    public function scopeEligibleAvalador(Builder $query, string $organisationId): Builder
+    {
+        return $query->where('organisation_id', $organisationId)->where('status', MemberStatus::ACTIVE->value);
+    }
+
+    /**
+     * First name, last name OR member number, in one box (prompt 264) — a sponsor is known by name, not by number.
+     *
+     * @param  Builder<static>  $query
+     * @return Builder<static>
+     */
+    public function scopeMatchingNameOrNumber(Builder $query, string $term): Builder
+    {
+        return $query->where(fn (Builder $q) => $q
+            ->where('first_name', 'like', '%'.$term.'%')
+            ->orWhere('last_name', 'like', '%'.$term.'%')
+            ->orWhere('member_no', 'like', '%'.$term.'%'));
+    }
+
+    /** "Nombre Apellidos · M-00028" — the person, and the number that tells two namesakes apart. Never DNI or birth date. */
+    public function avaladorLabel(): string
+    {
+        return trim($this->first_name.' '.$this->last_name).' · '.$this->member_no;
+    }
+
+    /**
      * Derived (prompt 93) — a member with NO active membership looks fine on their record but cannot be
      * dispensed to at the counter. Never stored; queried live.
      */
