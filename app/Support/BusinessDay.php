@@ -40,6 +40,30 @@ class BusinessDay
     }
 
     /**
+     * The business DATE (Y-m-d) at a sede right now — what "today" means for a date-only field there: a sanction's
+     * dates, a batch's expiry (prompt 275). They compared against the UTC calendar date, so for 1–2 h around Madrid
+     * midnight a batch that expired "yesterday" or a sanction that starts "today" disagreed with the business day
+     * every other rule uses. Accepts the sede or its id (the id is resolved once per request).
+     */
+    public static function today(Location|string $location): string
+    {
+        if (is_string($location)) {
+            $key = 'business-day.location|'.$location;
+            $resolved = request()->attributes->get($key);
+            if (! $resolved instanceof Location) {
+                $resolved = Location::query()->withoutGlobalScopes()->find($location);
+                if ($resolved === null) {
+                    return now()->toDateString();
+                }
+                request()->attributes->set($key, $resolved);
+            }
+            $location = $resolved;
+        }
+
+        return self::date($location)->toDateString();
+    }
+
+    /**
      * The [start, end) instants of the business day containing $at, returned in the
      * app (storage) timezone so a `whereBetween` string-compares like-for-like
      * against timestamps stored in that timezone. The boundary is an INSTANT — a

@@ -27,6 +27,7 @@ use App\Models\StockTake;
 use App\Models\StockTakeLine;
 use App\Models\TillSession as TillSessionModel;
 use App\Models\User;
+use App\Support\BusinessDay;
 use App\Support\CounterOperator;
 use App\Support\CounterScreens;
 use App\Support\Money;
@@ -607,10 +608,13 @@ class TillSession extends Component
             return false;
         }
 
+        // "Today" is the sede's business day (prompt 275), not the UTC calendar date.
+        $location = Location::query()->withoutGlobalScopes()->find($this->locationId);
+        [$dayStart, $dayEnd] = $location !== null ? BusinessDay::window($location) : [now()->startOfDay(), now()->startOfDay()->addDay()];
         $countedToday = StockTake::query()->withoutGlobalScopes()
             ->where('location_id', $this->locationId)
             ->where('status', StockTakeStatus::COMMITTED->value)
-            ->whereDate('committed_at', now())->exists();
+            ->where('committed_at', '>=', $dayStart)->where('committed_at', '<', $dayEnd)->exists();
         if ($countedToday) {
             return false;
         }

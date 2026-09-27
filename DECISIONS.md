@@ -14438,3 +14438,24 @@ A real-browser and integrity-harness pass over `main` after 270–273, on a fres
   with no page-level sideways scroll, avatar on screen at 390 light/dark and 1440. Screenshots: `storage/app/screenshots/273/`.
 
 `composer check` green in `es` and `en`. Merged to `main` on Ben's instruction.
+
+## Prompt 275 — the pre-live audit leftovers: date-only fields on the business date
+
+The remaining "do these" items after 270–274 (memory note `pre-live-audit-leftovers`). Ben: "continue… then merge".
+
+- **Date-only fields use the sede's business date** (`BusinessDay::today($location)`, the sede resolved once per request):
+  batch expiry in `Batch::scopeDispensable($locationId)` / `scopeFefo($locationId)` (every caller names its sede) and
+  `SelectBatch::isDispensable()`, sanctions at the dispensary and the door (`activeSanction`), and the till's "flower
+  already counted today" check (now the business-day window). They compared against the UTC calendar date, so for 1–2 h
+  around Madrid midnight a lote that expired "yesterday" or a sanction that started "today" disagreed with the business day
+  every other rule uses (271). Chosen as the BUSINESS date, not the local calendar date: at 03:00 the club is still trading
+  the previous day, so a lote expiring that day is still in date until the 06:00 cutoff. Pinned in
+  `PreLiveComplianceMoneyTest` (expiry either side of the cutoff).
+- **Not done, and why:**
+  - *Unique DB index on prices* — superseded: Ben's prompt "271 — the price is set on the batch" (run here as 278) moves the
+    sale price onto the batch, so an index on `genetic_prices` would be work thrown away. The form and writer guards (271) stand
+    meanwhile.
+  - *Android Back after the server closes the sign-up modal* — left as 272 left it (a race with Livewire's redirect); listed
+    in the owner report as a known gap.
+  - *Event/convocatoria times typed before 271* — stored as wall-clock values, displayed shifted by the UTC offset. Whether
+    any exist is a data question for the owner (report).

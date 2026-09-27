@@ -44,6 +44,7 @@ use App\Models\Membership;
 use App\Models\TillSession;
 use App\Models\User;
 use App\Support\ArticleImage;
+use App\Support\BusinessDay;
 use App\Support\CounterOperator;
 use App\Support\DocumentVault;
 use App\Support\EligibilityVerdict;
@@ -2175,7 +2176,7 @@ class DispensaryPos extends Component
         return (int) Batch::query()->withoutGlobalScopes()
             ->where('genetic_id', $genetic->id)
             ->where('location_id', $location->id)
-            ->dispensable()
+            ->dispensable($location->id)
             ->sum('remaining_cg');
     }
 
@@ -2185,7 +2186,7 @@ class DispensaryPos extends Component
         return (int) Batch::query()->withoutGlobalScopes()
             ->where('genetic_id', $genetic->id)
             ->where('location_id', $location->id)
-            ->dispensable()
+            ->dispensable($location->id)
             ->sum('remaining_units');
     }
 
@@ -2207,7 +2208,7 @@ class DispensaryPos extends Component
         return Batch::query()->withoutGlobalScopes()
             ->where('genetic_id', $this->activeGeneticId)
             ->where('location_id', $location->id)
-            ->dispensable()
+            ->dispensable($location->id)
             ->orderBy('acquired_or_harvested_on')
             ->orderBy('id')
             ->get();
@@ -2291,7 +2292,9 @@ class DispensaryPos extends Component
 
     private function activeSanction(Member $member): ?MemberSanction
     {
-        $today = now()->toDateString();
+        // The sede's business date (prompt 275) — a sanction ending "yesterday" still binds until the cutoff.
+        $location = $this->resolveLocation();
+        $today = $location !== null ? BusinessDay::today($location) : now()->toDateString();
 
         return $member->sanctions()
             ->whereDate('from_date', '<=', $today)
