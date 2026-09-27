@@ -32,7 +32,7 @@
 <div data-blocked-member class="flex min-h-0 flex-1 flex-col gap-4">
     <section class="rounded-2xl border border-warning/40 bg-warning/10 p-5">
         <div class="flex items-start gap-3">
-            <span aria-hidden="true" class="text-3xl leading-none">⛔</span>
+            <span aria-hidden="true" class="text-warning"><x-counter.icon name="ban" class="h-8 w-8" /></span>
             <div class="min-w-0">
                 <h2 class="text-lg font-bold text-warning">{{ __('No se puede dispensar a :name', ['name' => $member->fullName()]) }}</h2>
                 <p class="mt-0.5 text-sm text-ink dark:text-slate-200">

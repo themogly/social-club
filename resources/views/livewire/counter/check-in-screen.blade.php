@@ -17,7 +17,7 @@
         @if (\App\Support\CounterBlocker::rendersInPage($blocker))
             <x-counter.blocking-state
                 data-blocker="sede"
-                icon="📍"
+                icon="map-pin"
                 :heading="$mustChooseLocation ? __('Elige tu sede') : __('Sin sede asignada')"
                 :body="$mustChooseLocation ? __('Trabajas en varias sedes. Selecciona en la barra superior en cuál estás.') : __('No tienes ninguna sede activa. Pide a un responsable que te asigne una para usar la recepción.')"
             />
@@ -36,12 +36,6 @@
             @if ($member)
                 @php
                     $inCarencia = $member->carencia_ends_at !== null && $member->carencia_ends_at->isFuture();
-                    $statusColour = match ($member->status) {
-                        \App\Enums\MemberStatus::ACTIVE => 'border-success/30 bg-success/10 text-success',
-                        \App\Enums\MemberStatus::APPLICANT => 'border-warning/30 bg-warning/10 text-warning',
-                        \App\Enums\MemberStatus::SUSPENDED, \App\Enums\MemberStatus::EXPELLED => 'border-error/30 bg-error/10 text-error',
-                        default => 'border-line bg-surface-alt text-ink-muted dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300',
-                    };
                 @endphp
 
                 <section class="rounded-2xl border border-line bg-surface p-4 dark:border-slate-800 dark:bg-slate-900 sm:p-6">
@@ -58,20 +52,23 @@
                         <div class="min-w-0 flex-1">
                             <div class="flex flex-wrap items-center gap-2">
                                 <h2 class="truncate text-2xl font-bold">{{ $member->fullName() }}</h2>
-                                <span class="rounded-full border px-2.5 py-0.5 text-xs font-semibold uppercase tracking-wide {{ $statusColour }}">{{ $member->status->label() }}</span>
+                                @include('livewire.counter.partials.member-status-badge', ['status' => $member->status, 'size' => 'md'])
                             </div>
                             <p class="mt-0.5 text-sm text-ink-muted dark:text-slate-400">{{ $member->member_no }}</p>
 
                             {{-- No photo on file (prompt 157): the door is the moment to take it — the member is
                                  here, with their document, and staff can see both. Never blocks entry. --}}
                             @unless ($photoUrl)
-                                <div class="mt-3 rounded-xl border border-warning/30 bg-warning/5 p-3">
+                                <div class="mt-2 rounded-xl border border-warning/30 bg-warning/5 p-2.5">
                                     <p class="text-xs font-medium text-warning">{{ __('Este socio no tiene foto. Hazla ahora, con el documento delante — se comparará en el mostrador.') }}</p>
-                                    <x-counter.photo-capture :member="$member" source="door" class="mt-2" />
+                                    <x-counter.photo-capture :member="$member" source="door" class="mt-1.5" />
                                 </div>
                             @endunless
 
-                            <dl class="mt-3 grid grid-cols-2 gap-x-4 gap-y-1.5 text-sm">
+                            {{-- Prompt 272 — four facts in ONE row from lg (they were a 2×2 grid), and a tighter nag above: with
+                                 the photo nag showing, the door's only commit (Registrar entrada) sat past the fold at
+                                 1180×820, the primary device. The commit must be on screen. --}}
+                            <dl class="mt-2 grid grid-cols-2 gap-x-4 gap-y-1.5 text-sm lg:grid-cols-4">
                                 <div>
                                     <dt class="text-ink-muted dark:text-slate-400">{{ __('Cuota / tier') }}</dt>
                                     <dd class="font-medium">{{ $membership?->tier?->name ?? '—' }}</dd>
@@ -97,7 +94,7 @@
                             </dl>
                         </div>
 
-                        <button type="button" wire:click="clearMember" class="shrink-0 rounded-lg px-3 py-2 text-sm text-ink-muted transition hover:bg-black/5 dark:text-slate-400 dark:hover:bg-white/5">
+                        <button type="button" wire:click="clearMember" class="inline-flex h-11 shrink-0 items-center rounded-lg px-3 text-sm text-ink-muted transition hover:bg-black/5 dark:text-slate-400 dark:hover:bg-white/5">
                             {{ __('Cerrar') }}
                         </button>
                     </div>
@@ -110,7 +107,7 @@
                             $gaugeBar = match ($gaugeState) { 'alert' => 'bg-error', 'warning' => 'bg-warning', default => 'bg-success' };
                             $gaugeText = match ($gaugeState) { 'alert' => 'text-error', 'warning' => 'text-warning', default => 'text-success' };
                         @endphp
-                        <div class="mt-5">
+                        <div class="mt-4">
                             <div class="flex items-baseline justify-between text-sm">
                                 <span class="font-medium">{{ __('Consumo del mes') }}</span>
                                 <span class="font-semibold {{ $gaugeText }}">{{ $this->grams($limits->monthlyUsedCg) }} / {{ $this->grams($limits->monthlyLimitCg) }} · {{ $pct }}%</span>
@@ -137,7 +134,7 @@
 
                     {{-- Door verdict --}}
                     @if ($verdict)
-                        <div class="mt-5 border-t border-line pt-4 dark:border-slate-800">
+                        <div class="mt-4 border-t border-line pt-3 dark:border-slate-800">
                             @if ($verdict->isClear())
                                 <div class="flex items-center gap-2 rounded-xl border border-success/30 bg-success/10 px-4 py-3 text-sm font-semibold text-success">
                                     <span>✓</span><span>{{ __('Sin incidencias. Listo para entrar.') }}</span>
@@ -183,7 +180,7 @@
                     @endif
 
                     {{-- Actions --}}
-                    <div class="mt-5">
+                    <div class="mt-4">
                         @if ($openCheckIn)
                             <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                                 <p class="text-sm text-ink-muted dark:text-slate-400">
@@ -201,7 +198,7 @@
                             <button
                                 wire:click="checkIn"
                                 wire:loading.attr="disabled"
-                                class="h-16 w-full rounded-xl bg-brand text-lg font-bold text-white transition hover:bg-brand-dark focus:outline-none focus:ring-2 focus:ring-brand/40 disabled:opacity-60"
+                                class="h-16 w-full rounded-xl bg-brand text-lg font-bold text-white transition hover:bg-brand-dark focus:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 focus-visible:ring-offset-surface dark:focus-visible:ring-offset-slate-950 disabled:opacity-60"
                             >
                                 {{ __('Registrar entrada') }}
                             </button>
@@ -238,7 +235,7 @@
             @else
                 {{-- Intentional empty state before a member is held --}}
                 <div class="rounded-2xl border border-dashed border-line bg-surface p-10 text-center dark:border-slate-700 dark:bg-slate-900">
-                    <div class="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-surface-alt text-2xl dark:bg-slate-800">🪪</div>
+                    <div class="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-surface-alt text-ink-muted dark:bg-slate-800 dark:text-slate-300" aria-hidden="true"><x-counter.icon name="id-card" class="h-7 w-7" /></div>
                     <p class="mt-4 font-medium">{{ __('Escanea una tarjeta o busca un socio') }}</p>
                     <p class="mt-1 text-sm text-ink-muted dark:text-slate-400">{{ __('Sus datos y el veredicto de acceso aparecerán aquí.') }}</p>
                 </div>

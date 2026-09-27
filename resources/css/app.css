@@ -20,6 +20,17 @@
         'Noto Color Emoji';
 }
 
+/* Native widgets follow the scheme (prompt 272). The counter never declared `color-scheme`, so in dark the date
+   input's calendar glyph painted black on near-black and native <select> popups and file inputs painted for a light
+   page (only the socio layout had the meta). Same guard tokens.css uses: an explicit light theme stays light. */
+:root {
+    color-scheme: light dark;
+}
+:root.light,
+:root[data-theme='light'] {
+    color-scheme: light;
+}
+
 /* `x-cloak` — hide a thing until Alpine has decided whether it should be visible.
    Found inert in prompt 220: eighteen uses across eight templates and no rule behind any of them, so every
    `x-cloak` element painted on load and disappeared once Alpine booted. That is a flash of the WRONG state,
@@ -56,6 +67,14 @@
     scrollbar-width: thin;
     -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 12px);
     mask-image: linear-gradient(to bottom, transparent 0, #000 12px);
+}
+
+/* …but only when there IS something above (prompt 272). At rest the fade clipped the first card's top border
+   and corners, so the basket looked unfinished beside every other card. The cart regions mark `.at-top` from
+   their own scroll position; a region without that hook (the alta modal's padded body) keeps the fade. */
+.counter-scroll-region.at-top {
+    -webkit-mask-image: none;
+    mask-image: none;
 }
 
 .counter-scroll-region::-webkit-scrollbar {

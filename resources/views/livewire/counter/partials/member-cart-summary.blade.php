@@ -31,7 +31,7 @@
                 <h2 class="truncate text-sm font-bold leading-tight">{{ $member->fullName() }}</h2>
                 <p class="mt-0.5 truncate text-xs text-ink-muted dark:text-slate-400">
                     {{ $member->member_no }}
-                    <span class="rounded-full border px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide {{ $statusColour }}">{{ $member->status->label() }}</span>
+                    @include('livewire.counter.partials.member-status-badge', ['status' => $member->status])
                 </p>
             </div>
 

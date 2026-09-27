@@ -84,7 +84,7 @@
         </label>
         <div class="relative">
             @if ($large ?? false)
-                <span aria-hidden="true" class="pointer-events-none absolute inset-y-0 left-4 flex items-center text-lg text-ink-muted dark:text-slate-400">🔍</span>
+                <span aria-hidden="true" class="pointer-events-none absolute inset-y-0 left-4 flex items-center text-ink-muted dark:text-slate-400"><x-counter.icon name="search" class="h-5 w-5" /></span>
             @endif
         <input
             id="member-lookup"

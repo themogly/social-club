@@ -69,6 +69,10 @@ class AdminPanelProvider extends PanelProvider
                 // whose 50/700 are exactly this product's --brand-tint / --brand-dark. So the ramp now
                 // agrees with resources/css/tokens.css step for step instead of approximating it.
                 'primary' => Color::Blue,
+                // Prompt 272 — the neutral ramp is SLATE, like the palette's neutrals (#0f172a / #475569 /
+                // #e2e8f0 / #f8fafc), the counter and the dashboard's own cards. Filament's default zinc met
+                // slate on the same dark screen: blue-grey cards on a neutral-black page.
+                'gray' => Color::Slate,
             ])
             // Local initials avatar (prompt 61) — replaces Filament's default UiAvatarsProvider, which
             // sent every staff name to https://ui-avatars.com on each page load (undeclared outbound

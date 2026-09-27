@@ -34,7 +34,7 @@
     @if (\App\Support\CounterBlocker::rendersInPage($blocker))
         <x-counter.blocking-state
             data-blocker="sede"
-            icon="📍"
+            icon="map-pin"
             :heading="$mustChooseLocation ? __('Elige tu sede') : __('Sin sede asignada')"
             :body="$mustChooseLocation ? __('Trabajas en varias sedes. Selecciona en la barra superior en cuál estás.') : __('No tienes ninguna sede activa. Pide a un responsable que te asigne una.')"
         />
@@ -146,16 +146,20 @@
                     @forelse ($panels['alerts'] as $alert)
                         @php($href = $this->alertHref($alert['key']))
                         @php($dot = match ($alert['severity']) { 'error' => 'bg-error', 'warning' => 'bg-warning', default => 'bg-brand' })
+                        {{-- Prompt 272 — severity is not colour alone (WCAG 1.4.1): the dot stays decorative and the word
+                             is read out. --}}
+                        @php($severityWord = match ($alert['severity']) { 'error' => __('Urgente'), 'warning' => __('Aviso'), default => __('Información') })
                         <{{ $href ? 'a' : 'p' }}
                             @if ($href) href="{{ $href }}" wire:navigate.ignore @endif
                             data-alert="{{ $alert['key'] }}"
                             @class([
-                                'mt-2 flex items-start gap-2 rounded-lg px-2 py-1.5 text-sm',
+                                // min-h-11 (prompt 272): these rows are finger targets — 32px was under the counter's floor.
+                                'mt-2 flex min-h-11 items-center gap-2 rounded-lg px-2 py-1.5 text-sm',
                                 'transition hover:bg-surface-alt dark:hover:bg-slate-800' => (bool) $href,
                             ])
                         >
-                            <span class="mt-1.5 inline-block h-2 w-2 shrink-0 rounded-full {{ $dot }}" aria-hidden="true"></span>
-                            <span>{{ $this->alertLabel($alert['key'], $alert['count']) }}</span>
+                            <span class="inline-block h-2 w-2 shrink-0 rounded-full {{ $dot }}" aria-hidden="true"></span>
+                            <span><span class="sr-only">{{ $severityWord }}: </span>{{ $this->alertLabel($alert['key'], $alert['count']) }}</span>
                         </{{ $href ? 'a' : 'p' }}>
                     @empty
                         {{-- An intentional empty state: "nothing needs you" is information, not a blank box. --}}
@@ -173,8 +177,13 @@
                 {{-- AYUDA (prompt 92) — the same answers, moved here from the top bar's overflow. It is
                      reference content rather than a terminal operation, and the hub is where somebody has a
                      moment to read it. Static; nothing loads. Rules are NAMED, never a hard-coded value. --}}
-                <details data-counter-help class="rounded-2xl border border-line bg-surface p-5 dark:border-slate-800 dark:bg-slate-900">
-                    <summary class="flex min-h-11 cursor-pointer items-center text-sm font-semibold">{{ __('¿Por qué no puedo dispensar a un socio?') }}</summary>
+                <details data-counter-help class="group rounded-2xl border border-line bg-surface p-5 dark:border-slate-800 dark:bg-slate-900">
+                    {{-- A trailing chevron that turns on [open] (prompt 272): `display:flex` on <summary> suppresses the
+                         native marker, so the disclosure read as a bold static line. --}}
+                    <summary class="flex min-h-11 cursor-pointer items-center justify-between gap-2 text-sm font-semibold [&::-webkit-details-marker]:hidden">
+                        <span>{{ __('¿Por qué no puedo dispensar a un socio?') }}</span>
+                        <x-counter.icon name="chevron-down" class="h-4 w-4 text-ink-muted transition-transform group-open:rotate-180 motion-reduce:transition-none dark:text-slate-400" />
+                    </summary>
                     <div data-counter-help-content class="mt-2">
                         <ul class="space-y-1 text-sm text-ink-muted dark:text-slate-400">
                             <li>· {{ __('No tiene una membresía activa, o no está al corriente de la cuota.') }}</li>

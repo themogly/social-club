@@ -18,7 +18,7 @@
     @if (\App\Support\CounterBlocker::rendersInPage($blocker))
         <x-counter.blocking-state
             data-blocker="sede"
-            icon="📍"
+            icon="map-pin"
             :heading="$mustChooseLocation ? __('Elige tu sede') : __('Sin sede asignada')"
             :body="$mustChooseLocation ? __('Trabajas en varias sedes. Selecciona en la barra superior en cuál estás.') : __('No tienes ninguna sede activa. Pide a un responsable que te asigne una.')"
         />
@@ -133,7 +133,7 @@
                             <p class="truncate font-semibold">{{ $feeMember->fullName() }}</p>
                             <p class="text-sm text-ink-muted dark:text-slate-400">
                                 {{ $feeMember->member_no }}
-                                <span class="rounded-full border px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide">{{ $feeMember->status->label() }}</span>
+                                @include('livewire.counter.partials.member-status-badge', ['status' => $feeMember->status])
                             </p>
 
                             {{-- Prompt 203 — who this is, which the record did not say.
@@ -184,7 +184,7 @@
                                 @endif
                             @endif
                         </div>
-                        <button type="button" wire:click="clearFeeMember" class="flex h-11 shrink-0 items-center rounded-lg px-3 text-sm text-ink-muted transition hover:bg-black/5 dark:text-slate-400 dark:hover:bg-white/5">{{ __('Cambiar') }}</button>
+                        <button type="button" wire:click="clearFeeMember" class="flex h-11 shrink-0 items-center rounded-lg px-3 text-sm text-ink-muted transition hover:bg-black/5 dark:text-slate-400 dark:hover:bg-white/5" aria-label="{{ __('Cerrar ficha del socio') }}">{{ __('Cerrar') }}</button>
                     </div>
 
                     {{-- ============ Prompt 177 — the member RECORD. Reading only. ============
@@ -368,7 +368,7 @@
                  appear in the space. Hidden the moment a socio is held — the space is theirs then. --}}
             @unless ($feeMember)
                 <div class="mt-4 rounded-2xl border border-dashed border-line bg-surface p-10 text-center dark:border-slate-700 dark:bg-slate-900">
-                    <div class="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-surface-alt text-2xl dark:bg-slate-800">🪪</div>
+                    <div class="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-surface-alt text-ink-muted dark:bg-slate-800 dark:text-slate-300" aria-hidden="true"><x-counter.icon name="id-card" class="h-7 w-7" /></div>
                     <p class="mt-4 font-medium">{{ __('Escanea una tarjeta o busca un socio') }}</p>
                     <p class="mt-1 text-sm text-ink-muted dark:text-slate-400">{{ __('Su cuota, su tarifa y lo que lleva este mes aparecerán aquí.') }}</p>
                 </div>

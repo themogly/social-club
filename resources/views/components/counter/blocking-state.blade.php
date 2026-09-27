@@ -3,7 +3,7 @@
     'body',
     'actionLabel' => null,
     'actionHref' => null,
-    'icon' => '📍',
+    'icon' => 'map-pin', // a name from x-counter.icon (prompt 272 — the OS emoji are gone)
 ])
 
 {{--
@@ -30,7 +30,7 @@
     data-blocker="{{ $attributes->get('data-blocker') }}"
     {{ $attributes->except('data-blocker')->class(['flex min-h-[60svh] flex-col items-center justify-center px-6 text-center']) }}
 >
-    <div class="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-surface-alt text-3xl dark:bg-slate-800" aria-hidden="true">{{ $icon }}</div>
+    <div class="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-surface-alt text-ink-muted dark:bg-slate-800 dark:text-slate-300" aria-hidden="true"><x-counter.icon :name="$icon" class="h-8 w-8" /></div>
 
     <h2 class="mt-5 text-xl font-semibold">{{ $heading }}</h2>
     <p class="mt-2 max-w-sm text-sm text-ink-muted dark:text-slate-400">{{ $body }}</p>

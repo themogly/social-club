@@ -16,7 +16,7 @@
     @if (\App\Support\CounterBlocker::rendersInPage($blocker))
         <x-counter.blocking-state
             data-blocker="sede"
-            icon="📍"
+            icon="map-pin"
             :heading="$mustChooseLocation ? __('Elige tu sede') : __('Sin sede asignada')"
             :body="$mustChooseLocation ? __('Trabajas en varias sedes. Selecciona en la barra superior en cuál estás.') : __('No tienes ninguna sede activa. Pide a un responsable que te asigne una para gestionar la caja.')"
         />
@@ -96,7 +96,7 @@
                 data-till-open-screen
                 class="mx-auto flex min-h-[60svh] w-full max-w-md flex-col justify-center rounded-2xl border border-line bg-surface p-6 text-center dark:border-slate-800 dark:bg-slate-900"
             >
-                <div class="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-surface-alt text-3xl dark:bg-slate-800" aria-hidden="true">💶</div>
+                <div class="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-surface-alt text-ink-muted dark:bg-slate-800 dark:text-slate-300" aria-hidden="true"><x-counter.icon name="cash" class="h-8 w-8" /></div>
 
                 <h2 class="mt-5 text-xl font-semibold">{{ __('Abrir caja') }}</h2>
                 <p class="mt-2 text-sm text-ink-muted dark:text-slate-400">{{ __('No hay ninguna caja abierta en este terminal.') }}</p>
