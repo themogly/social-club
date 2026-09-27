@@ -14422,3 +14422,19 @@ no `organisation_id` (single-organisation today — it matters when a second clu
 (`'Compra en barra'`…) render raw in the English panel.
 
 `composer check` green in `es` and `en`. Merged to `main` on Ben's instruction.
+
+## Prompt 274 — the final end-to-end pass: one query regression, one clipped avatar
+
+A real-browser and integrity-harness pass over `main` after 270–273, on a freshly seeded demo.
+
+- **The till report's query count grew with its sessions again** (harness: 34 queries for 4 sessions, 70 for 28). Cause: 271's
+  `local_datetime()` resolves the sede in scope for every timestamp it prints, and `Period::sedeInScope()` queried each time.
+  It is now memoised per request per scope (on the request, like `CounterOperator`, never a static). Harness flat again at 26;
+  `PreLiveComplianceMoneyTest` pins that twenty printed times cost at most one sede lookup. The suite had not caught it — the
+  harness did, which is what it is for.
+- **The panel topbar clipped the avatar at 390** (admin report, Phase 3): the sede picker is narrower below `sm`.
+- Browser checks on the real app, all PASS: PIN sign-in (267/270), tender panel (268), low-stock alert on the dashboard and
+  the counter hub (269) landing on the filtered Genéticas list (273), sede form sections, settings top save, roles grid at 390
+  with no page-level sideways scroll, avatar on screen at 390 light/dark and 1440. Screenshots: `storage/app/screenshots/273/`.
+
+`composer check` green in `es` and `en`. Merged to `main` on Ben's instruction.

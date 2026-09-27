@@ -39,6 +39,15 @@ class Period
     public static function sedeInScope(): ?Location
     {
         $scope = app(ActiveScope::class);
+        $memoKey = 'period.sede|'.$scope->organisationId().'|'.$scope->locationId();
+
+        // Resolved once per request per scope (prompt 274): `local_datetime()` asks this for every timestamp it prints,
+        // and a till report prints one per row — it made the till report's query count grow with its sessions.
+        if (request()->attributes->has($memoKey)) {
+            /** @var ?Location */
+            return request()->attributes->get($memoKey);
+        }
+
         $id = $scope->locationId();
 
         if ($id === null && $scope->organisationId() !== null) {
@@ -46,7 +55,10 @@ class Period
                 ->where('organisation_id', $scope->organisationId())->orderBy('name')->value('id');
         }
 
-        return $id !== null ? Location::query()->withoutGlobalScopes()->find($id) : null;
+        $location = $id !== null ? Location::query()->withoutGlobalScopes()->find($id) : null;
+        request()->attributes->set($memoKey, $location);
+
+        return $location;
     }
 
     /** The timezone a person reads times in: the sede's (prompt 271), else the app's. */

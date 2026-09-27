@@ -41,6 +41,7 @@ use App\ViewModels\Dashboard;
 use Carbon\CarbonImmutable;
 use Database\Seeders\RolePermissionSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
 use Livewire\Livewire;
 use Tests\TestCase;
@@ -160,6 +161,20 @@ class PreLiveComplianceMoneyTest extends TestCase
     {
         $this->assertSame('27/09/2026 01:30', local_datetime(CarbonImmutable::parse('2026-09-26 23:30:00', 'UTC'), 'd/m/Y H:i', $this->madrid));
         $this->assertSame('', local_datetime(null));
+    }
+
+    /** Prompt 274 — printing a time resolves the sede once per request, not once per row (the till report grew with it). */
+    public function test_printing_many_times_resolves_the_sede_once(): void
+    {
+        DB::flushQueryLog();
+        DB::enableQueryLog();
+        foreach (range(1, 20) as $i) {
+            local_datetime(now()->subMinutes($i));
+        }
+        $locationQueries = collect(DB::getQueryLog())->filter(fn (array $q): bool => str_contains($q['query'], 'from "locations"'))->count();
+        DB::disableQueryLog();
+
+        $this->assertLessThanOrEqual(1, $locationQueries);
     }
 
     // --- Typed money: one strict rule ------------------------------------------------------------------------------
