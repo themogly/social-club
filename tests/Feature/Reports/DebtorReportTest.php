@@ -143,12 +143,14 @@ class DebtorReportTest extends TestCase
         // request). Otherwise the first render pays a one-time setting query the second gets for free (prompt
         // 109), and the two would differ by that constant — which is not the member-count scaling this guards.
         Settings::flush();
+        request()->attributes->replace([]); // and the per-request sede memo (prompt 274), for the same reason
         $small = $this->countQueries(fn () => $this->report()->tables());
 
         for ($i = 0; $i < 12; $i++) {
             $this->wallet($this->member(0), -100);
         }
         Settings::flush();
+        request()->attributes->replace([]);
         $large = $this->countQueries(fn () => $this->report()->tables());
 
         $this->assertSame($small, $large, 'The debtor report must aggregate in SQL, not per member.');
