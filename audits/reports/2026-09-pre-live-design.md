@@ -52,6 +52,8 @@ scrolls sideways. The admin dashboard's tables clip their money columns at 1440 
   the measurement says"*. It no longer fits at `xl`, because prompt 267 widened the operator chip. ·
   `pos/3-line-1440-light.png`, `hub/1440-light.png`, `members/1440-light.png`, `pos/4-tender-short-light.png`
 
+  **Fixed in 272:** the bar is capped at 1152px, so the labelled row fits at no width: Lock / Log out are icon controls everywhere (aria-label + title), "Trabajando:" is gone, Administración keeps its word. Home link measures 154px at every width.
+
 - **[Counter top bar, every counter screen @ 390×844 / light+dark]: the bar scrolls sideways and loses its way
   home.** Measured: `scrollWidth` 451 in a 390 viewport, on all six counter screens, so the whole page scrolls
   horizontally. The home link (brand plus screen title) is crushed to **16px** and shows nothing. The operator
@@ -63,6 +65,8 @@ scrolls sideways. The admin dashboard's tables clip their money columns at 1440 
   that way back. A panic control that you have to scroll sideways to find is a safety control in the wrong
   place. See Discussion for the constraint any fix must respect. · `hub/390-light.png`,
   `checkin/390-light.png`, `pos/0-empty-390-light.png`, `pos/1-member-390-dark.png`
+
+  **Fixed in 272:** the row flex-wraps (controls to a second row, and at 390 the leave-group + panic to a third) — every control one tap and on screen, no overflow; `scrollWidth` = 390. Administración stays labelled (246).
 
 - **[Solid amber/red buttons @ all counter viewports / DARK]: white text on `bg-warning` / `bg-error` fails AA in
   dark mode, and seven of these buttons bypass `<x-button>`.** Dark mode swaps the tokens to `#d97706` and
@@ -79,6 +83,8 @@ scrolls sideways. The admin dashboard's tables clip their money columns at 1440 
   button is one that a palette fix cannot reach. · `till/close2-land-dark.png` (Confirmar recuento, dark)
   against `till/close-land-light.png` (same button, light, passes)
 
+  **Fixed in 272:** fill tokens split from text tokens; `x-button` warning/danger use them; all seven hand-rolled buttons converted.
+
 - **[Admin dashboard @ 1440×900, 1280×800, 1024×768 / light+dark]: the tables clip the money columns they exist
   to show.** Measured scroll containers:
   - *Últimas transacciones*: 301 of 344px visible at 1440, 245 at 1280, 117 at 1024. *IMPORTE* is cut
@@ -93,6 +99,8 @@ scrolls sideways. The admin dashboard's tables clip their money columns at 1440 
   admin means 1280 and 1024 are in scope. · `adm-dashboard/tx-1280-light.png`,
   `adm-dashboard/tx-1024-light.png`, `adm-dashboard/scroll2-1440-dark.png`
 
+  **Fixed in 272:** tables side by side only from 2xl; the rail joins the main column from 1280; Techo legal cards size to the section. No table scrolls at 1440/1280/1024.
+
 - **[Dispensario, member blocked @ 1180×820, 820×1180 / light+dark]: an empty card sits between the identity card
   and the basket.** It is a 32px rounded box with nothing in it. The cause is `dispensary-pos.blade.php:585`:
   `data-member-detail` renders whenever the verdict is not clear. While the blocked surface is up, every blocking
@@ -102,6 +110,8 @@ scrolls sideways. The admin dashboard's tables clip their money columns at 1440 
   (the same rule the loop applies). → `CLAUDE.md`: empty states are *"INTENTIONAL (designed), never a broken/blank
   box"*. This one sits on the screen staff use most, in the state where they most need to read it calmly. ·
   `pos/1-member-blocked-port-dark.png`, `pos/1-member-blocked-land-dark.png`
+
+  **Fixed in 272:** the section renders only when it has a row (the loop's own rule, computed once).
 
 **Review:** Two of these are the same component, the counter top bar. Both are regressions: the bar was widened
 without re-measuring either end of the range, and the fix belongs in one file. The dark-mode button contrast is
@@ -122,6 +132,8 @@ breakage rather than taste.
   wizard is where a new member's date of birth is typed. · `alta/date-dark-zoom.png`,
   `alta/wizard1-port-dark.png`
 
+  **Fixed in 272:** `color-scheme: light dark` on `:root` with the explicit-light guard.
+
 - **[Counter iconography @ all viewports / both]: OS emoji stand in for icons beside an outline-SVG set.** There
   are 12 emoji or glyph icons in counter views:
   - 🪪 on the POS, Recepción and Socios empty states
@@ -140,6 +152,8 @@ breakage rather than taste.
   `alta/modal-land-light.png`, `bar/land-light.png`, `bar/port-dark.png`,
   `pos/1-member-blocked-port-dark.png`
 
+  **Fixed in 272:** new `x-counter.icon` outline set replaces all twelve; a test fails any drawn emoji.
+
 - **[Counter touch targets @ 1180×820, 820×1180 / both]: three controls fall under the counter's own 44px
   floor.** The floor is recorded in `DECISIONS.md` l.4489 and l.4705.
   - The hub's *Requiere atención* rows, including 269's new low-stock alert, are links **32px** tall.
@@ -149,6 +163,8 @@ breakage rather than taste.
   → Use `min-h-11` on the alert links (they are already full width), `min-h-11 px-3` on the chips, and `h-11` on
   Cerrar. → These are finger targets on a tablet in a dim room. The alert rail is the entry point 269 just
   added. · `hub/land-light.png`, `till/close-land-light.png`, `checkin/held-land-dark.png`
+
+  **Fixed in 272:** all three at 44px.
 
 - **[Admin panel @ desktop / DARK]: two neutral families on one screen.** Filament's default gray ramp is zinc:
   the page is `#09090b` (zinc-950) and sections are `#18181b`. The dashboard's own cards (`csc-card`,
@@ -160,6 +176,8 @@ breakage rather than taste.
   light, but in dark the two ramps now meet on the same screen. · `adm-dashboard/1440-dark.png`,
   `adm-roles/1440-dark.png`, `login/port-dark.png`
 
+  **Fixed in 272:** `'gray' => Color::Slate`.
+
 - **[Dispensario, member held, basket empty @ all viewports / both]: the basket shows two empty states, and the
   second one is wrong.** It reads *"Cesta vacía. Elige una genética e introduce el peso."* and then, in a dashed
   box, *"Identifica a un socio y añade una genética para empezar."*, while the socio is identified and pinned
@@ -168,12 +186,16 @@ breakage rather than taste.
   This one gives two, and one of them is already done. · `pos/1-member-land-light.png`,
   `pos/1-member-blocked-port-dark.png`
 
+  **Fixed in 272:** one state-dependent message.
+
 - **[Alta staff wizard, step 1 @ all viewports / both]: browser-native file inputs, in the browser's language.**
   *Foto* and *Documento de identidad* show Chrome's **"Choose File / No file chosen"** in English inside a
   Spanish UI, as an unbranded control. → Use a visually hidden input behind an `x-button variant="secondary"`
   label, with a translated *"Ningún archivo"* / file-name line, as the counter's `photo-capture` component
   already does. → This is the one piece of copy that i18n parity cannot catch, because it is not the app's
   string. · `alta/wizard1-land-light.png`, `alta/wizard1-port-dark.png`, `alta/wizard1-390-light.png`
+
+  **Fixed in 272:** new `x-counter.file-field` (hidden input in an `<x-button as="label">`, translated "Ningún archivo").
 
 - **[Roles y permisos @ 1440, 1280, 1024 / both]: a 30-row permission matrix built from raw 13px browser
   checkboxes.** `roles-permissions.blade.php:58,67` uses `<input type="checkbox" class="rounded border-gray-300
@@ -185,6 +207,8 @@ breakage rather than taste.
   its targets should not be 13px. · `adm-roles/1440-light.png`, `adm-roles/scroll1-1440-light.png`,
   `adm-roles/1440-dark.png`
 
+  **Fixed in 272:** `x-filament::input.checkbox`, a visible "siempre", 44px targets, AA state text.
+
 - **[Member card across counter screens @ 1180×820 / both]: the same socio renders three ways.** The *ACTIVO*
   status badge is an outlined neutral pill on Socios and a green tinted pill on Recepción and the POS. The
   dismiss control reads *Cambiar* on Socios and *Cerrar* on Recepción and the POS. The photo nag is a compact
@@ -193,17 +217,23 @@ breakage rather than taste.
   An operator moving between screens should not have to re-read a familiar card. ·
   `members/held-land-light.png`, `checkin/held-land-dark.png`, `pos/3-line-land-light.png`
 
+  **Fixed in 272:** one `member-status-badge` partial and one dismiss word (Cerrar). The photo nag's two shapes were left (no change recommended; different contexts).
+
 - **[Recepción, member held @ 1180×820 / both]: *Registrar entrada* sits ~10px past the fold on the primary
   device.** The page is 876px in an 820 viewport once the photo nag shows, so the door's only commit is clipped at
   the bottom edge. → Tighten the vertical rhythm of the held-member card (the nag and the 2×2 facts grid), or pin
   the commit as the POS does. → The counter UX audit's first principle is that the commit is on screen. At the
   door it now depends on whether the member has a photo. · `checkin/held-land-dark.png`
 
+  **Fixed in 272:** facts grid in one row from lg and a tighter rhythm; on screen at 1180×820 even with the nag and a warning.
+
 - **[Admin dashboard KPI grid @ 1440, 1280 / both]: eight tiles in a three-column grid leave a stranded hole.**
   Row three is *Saldo de socios*, *Caja*, then empty. → Either let the row's last tile span (`col-span-2` on the
   eighth tile when `n % 3 == 2`), or move to a four-column grid at `2xl`. → The design audit rubric names
   stranded grid tiles specifically. The hole reads as a missing widget. · `adm-dashboard/1440-light.png`,
   `adm-dashboard/1440-dark.png`
+
+  **Fixed in 272:** a wrapping flex row (12rem basis) — the last row's tiles share it, no hole.
 
 **Review:** These are cluster-level issues, not taste. Four of them come from bypassing a shared primitive: native
 controls, emoji instead of the icon set, raw checkboxes, three badge renderings. Each has an existing in-product
@@ -221,19 +251,27 @@ pattern to copy. Two are dark-mode specific, which is the scheme staff actually 
   it to say "there is more above", and at rest there is not. · `bar/cart-top-zoom-light.png`,
   `bar/cart-top-zoom-dark.png`
 
+  **Fixed in 272:** the fade shows only once the region is scrolled (`.at-top`).
+
 - **[Cart column @ all two-pane viewports / both]: the cards in the scroll region are 4px narrower than the
   pinned identity card and the commit button.** `scrollbar-gutter: stable` plus `pr-1` means their right edges
   do not line up. → Offset the gutter with a matching negative margin, or apply the same right inset to the pinned
   head and foot. · `pos/3-line-land-light.png`, `pos/3-line-port-light.png`
 
+  **Fixed in 272:** the extra `pr-1` is gone; the cards line up with the pinned card and the commit.
+
 - **[Hub @ all viewports / both]: the *¿Por qué no puedo dispensar a un socio?* disclosure has no affordance.**
   `summary` is `display:flex`, which suppresses the disclosure marker, so it reads as a bold static line in an
   86px card. → Add a trailing chevron that rotates on `[open]`. · `hub/land-light.png`, `hub/port-light.png`
+
+  **Fixed in 272:** a rotating chevron (reduced-motion safe).
 
 - **[Dispensario pinned identity card @ 1180×820, 820×1180, 1440 / both]: *Hacer foto* wraps onto two lines**
   inside the photo nag while *Subir archivo* does not, so the pair are uneven. → Use `whitespace-nowrap`, or let
   the pair go full width below `lg`, as Recepción's nag does. · `pos/2-genetic-land-light.png`,
   `pos/3-line-port-light.png`
+
+  **Fixed in 272:** `whitespace-nowrap`.
 
 **Review:** None of these gets in the way of a task. The first is the only one a user is likely to notice
 unprompted.

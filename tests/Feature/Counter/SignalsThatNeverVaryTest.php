@@ -226,7 +226,10 @@ class SignalsThatNeverVaryTest extends TestCase
         $at = strpos($html, 'data-price-override-toggle');
         $this->assertNotFalse($at);
         $this->assertMatchesRegularExpression('/data-price-override\s+x-show="open"/', substr($html, $at, 1100), 'the fields are not behind an x-show disclosure');
-        $this->assertStringNotContainsString('placeholder="'.e(__('Nuevo total (€)')).'"', substr($html, 0, $at));
+        $this->assertStringNotContainsString('id="price-override-amount"', substr($html, 0, $at));
+        // Prompt 272 — the amount and the reason are LABELLED (a placeholder is not a label).
+        $this->assertStringContainsString('<label for="price-override-amount"', substr($html, $at));
+        $this->assertStringContainsString('<label for="price-override-reason"', substr($html, $at));
     }
 
     /**

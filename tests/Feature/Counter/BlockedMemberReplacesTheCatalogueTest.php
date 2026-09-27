@@ -291,7 +291,10 @@ class BlockedMemberReplacesTheCatalogueTest extends TestCase
 
         $this->assertSame(1, substr_count($html, 'data-blocked-reasons'), 'the reasons are listed twice');
         $this->assertSame(1, substr_count($html, 'data-commit-blocked-reason'), 'the commit reminder renders twice');
-        $this->assertSame(1, substr_count($html, 'aria-live="polite"'), 'the block is announced more than once');
+        // Prompt 272 added two polite regions that announce OTHER things — the tender totals and the PIN pad's
+        // digit count — so they are set aside; what this pins is that the BLOCK is announced once.
+        $outcomeRegions = (string) preg_replace('/data-(tender-summary|pin-count)[^>]*aria-live="polite"/', '', $html);
+        $this->assertSame(1, substr_count($outcomeRegions, 'aria-live="polite"'), 'the block is announced more than once');
         // …and the fee panel is not ALSO in the cart column beside it.
         $this->assertSame(1, substr_count($html, 'data-fee-waive-toggle'), 'the fee panel renders twice');
     }

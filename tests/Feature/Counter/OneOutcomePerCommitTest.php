@@ -238,6 +238,8 @@ class OneOutcomePerCommitTest extends TestCase
             ->call('commitOrder')
             ->html();
 
-        $this->assertSame(1, $this->rendered($ok, 'aria-live="polite"'), 'a success announces politely, once');
+        // Prompt 272's tender-totals and PIN-count regions announce other things; the OUTCOME is announced once.
+        $outcomeRegions = (string) preg_replace('/data-(tender-summary|pin-count)[^>]*aria-live="polite"/', '', $ok);
+        $this->assertSame(1, $this->rendered($outcomeRegions, 'aria-live="polite"'), 'a success announces politely, once');
     }
 }

@@ -269,9 +269,11 @@ class DashboardScreenTest extends TestCase
         $this->assertMatchesRegularExpression('/\.csc-card-headmain\s*\{[^}]*flex-direction:\s*column/', $styles);
         $this->assertMatchesRegularExpression('/csc-card-headmain[\s\S]{0,400}?csc-card-label[\s\S]{0,400}?csc-delta/', $markup);
 
-        // (3) auto-fit with a readable min-width instead of a fixed four-up — a four-up row in the
-        //     content column made each card too narrow even with the chip below.
-        $this->assertMatchesRegularExpression('/grid-template-columns:\s*repeat\(auto-fit,\s*minmax\(12rem/', $styles);
+        // (3) a readable ~12rem floor instead of a fixed four-up — a four-up row in the content column made
+        //     each card too narrow even with the chip below. Prompt 272 made the row a wrapping flex with a
+        //     12rem basis (so the last row never strands a hole); the floor is the same.
+        $this->assertMatchesRegularExpression('/\.csc-cards > \*\s*\{[^}]*flex-basis:\s*12rem/', $styles);
+        $this->assertMatchesRegularExpression('/\.csc-cards\s*\{[^}]*flex-wrap:\s*wrap/', $styles);
         $this->assertDoesNotMatchRegularExpression('/\.csc-cards\s*\{[^}]*repeat\(4,/', $styles);
     }
 

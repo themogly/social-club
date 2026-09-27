@@ -33,6 +33,13 @@
      1180×820 in ES — a fit of ZERO — and 42px clipped at 1180×760, with the reader below the fold. Nothing
      was dropped; the gaps, the label offsets and the reader block's padding gave the pixels back. --}}
 <div data-alta-staff-fields class="space-y-3">
+    {{-- Prompt 272 — a failed Siguiente moves focus to the first invalid field (WCAG 3.3.1); it stayed on
+         Siguiente, with five unassociated messages. Keyed and rendered only while errors exist, so it fires when
+         they APPEAR and not on every later render (the avalador field is live, and typing must not be yanked). --}}
+    @if ($errors->any())
+        <span hidden data-alta-error-focus wire:key="alta-error-focus"
+              x-init="$nextTick(() => $el.closest('[data-alta-staff-fields]')?.querySelector('[aria-invalid=true]')?.focus())"></span>
+    @endif
 
     {{-- ============ 1 · IDENTIDAD ============
          The two uploads and 179's reader live here because the reader READS the document file chosen here and
@@ -42,38 +49,38 @@
         <div class="grid gap-2.5 sm:grid-cols-2">
             <div>
                 <label for="alta-first-name" class="block text-sm font-medium text-ink-muted dark:text-slate-400">{{ __('Nombre') }}</label>
-                <input id="alta-first-name" type="text" wire:model="altaForm.first_name" autocomplete="new-first-name" data-no-autofill
+                <input id="alta-first-name" type="text" wire:model="altaForm.first_name" aria-required="true" @error('altaForm.first_name') aria-invalid="true" aria-describedby="altaForm.first_name-error" @enderror autocomplete="new-first-name" data-no-autofill
                        class="mt-1 h-12 w-full rounded-xl border border-line bg-surface px-4 text-base dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100">
-                @error('altaForm.first_name') <p class="mt-1 text-xs text-error">{{ $message }}</p> @enderror
+                <x-socio.field-error name="altaForm.first_name" />
             </div>
             <div>
                 <label for="alta-last-name" class="block text-sm font-medium text-ink-muted dark:text-slate-400">{{ __('Apellidos') }}</label>
-                <input id="alta-last-name" type="text" wire:model="altaForm.last_name" autocomplete="new-last-name" data-no-autofill
+                <input id="alta-last-name" type="text" wire:model="altaForm.last_name" aria-required="true" @error('altaForm.last_name') aria-invalid="true" aria-describedby="altaForm.last_name-error" @enderror autocomplete="new-last-name" data-no-autofill
                        class="mt-1 h-12 w-full rounded-xl border border-line bg-surface px-4 text-base dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100">
-                @error('altaForm.last_name') <p class="mt-1 text-xs text-error">{{ $message }}</p> @enderror
+                <x-socio.field-error name="altaForm.last_name" />
             </div>
             <div>
                 <label for="alta-dob" class="block text-sm font-medium text-ink-muted dark:text-slate-400">{{ __('Fecha de nacimiento') }}</label>
-                <input id="alta-dob" type="date" wire:model="altaForm.date_of_birth" autocomplete="new-date-of-birth" data-no-autofill
+                <input id="alta-dob" type="date" wire:model="altaForm.date_of_birth" aria-required="true" @error('altaForm.date_of_birth') aria-invalid="true" aria-describedby="altaForm.date_of_birth-error" @enderror autocomplete="new-date-of-birth" data-no-autofill
                        class="mt-1 h-12 w-full rounded-xl border border-line bg-surface px-4 text-base dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100">
-                @error('altaForm.date_of_birth') <p class="mt-1 text-xs text-error">{{ $message }}</p> @enderror
+                <x-socio.field-error name="altaForm.date_of_birth" />
             </div>
             <div>
                 <label for="alta-doc-type" class="block text-sm font-medium text-ink-muted dark:text-slate-400">{{ __('Tipo de documento') }}</label>
-                <select id="alta-doc-type" wire:model="altaForm.document_type" autocomplete="off" data-no-autofill
+                <select id="alta-doc-type" wire:model="altaForm.document_type" aria-required="true" @error('altaForm.document_type') aria-invalid="true" aria-describedby="altaForm.document_type-error" @enderror autocomplete="off" data-no-autofill
                         class="mt-1 h-12 w-full rounded-xl border border-line bg-surface px-4 text-base dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100">
                     <option value="">{{ __('Elige…') }}</option>
                     @foreach (\App\Enums\IdDocumentType::cases() as $type)
                         <option value="{{ $type->value }}">{{ $type->label() }}</option>
                     @endforeach
                 </select>
-                @error('altaForm.document_type') <p class="mt-1 text-xs text-error">{{ $message }}</p> @enderror
+                <x-socio.field-error name="altaForm.document_type" />
             </div>
             <div class="sm:col-span-2">
                 <label for="alta-doc-number" class="block text-sm font-medium text-ink-muted dark:text-slate-400">{{ __('Número de documento') }}</label>
-                <input id="alta-doc-number" type="text" wire:model="altaForm.document_number" autocomplete="new-document-number" data-no-autofill
+                <input id="alta-doc-number" type="text" wire:model="altaForm.document_number" aria-required="true" @error('altaForm.document_number') aria-invalid="true" aria-describedby="altaForm.document_number-error" @enderror autocomplete="new-document-number" data-no-autofill
                        class="mt-1 h-12 w-full rounded-xl border border-line bg-surface px-4 text-base dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100">
-                @error('altaForm.document_number') <p class="mt-1 text-xs text-error">{{ $message }}</p> @enderror
+                <x-socio.field-error name="altaForm.document_number" />
             </div>
         </div>
 
@@ -87,19 +94,11 @@
              access-logged URL — whichever form uploaded them. --}}
         <div class="grid gap-2.5 sm:grid-cols-2">
             <div>
-                <label for="alta-photo" class="block text-sm font-medium text-ink-muted dark:text-slate-400">{{ __('Foto (opcional)') }}</label>
-                <input id="alta-photo" type="file" accept="image/*" capture="user" wire:model="altaPhoto" data-alta-photo
-                       class="mt-1 block min-h-11 w-full text-sm text-ink file:mr-3 file:min-h-11 file:rounded-lg file:border-0 file:bg-brand-tint file:px-3 file:text-sm file:font-medium file:text-brand dark:text-slate-200 dark:file:bg-slate-800 dark:file:text-slate-100">
-                <p class="mt-0.5 text-[11px] leading-tight text-ink-muted dark:text-slate-400">{{ __('Se compara con la persona en el mostrador. Puedes omitirla.') }}</p>
-                @error('altaPhoto') <p class="mt-1 text-xs text-error">{{ $message }}</p> @enderror
+                <x-counter.file-field id="alta-photo" :label="__('Foto (opcional)')" wire:model="altaPhoto" accept="image/*" capture="user" data-alta-photo="" :hint="__('Se compara con la persona en el mostrador. Puedes omitirla.')" />
             </div>
 
             <div>
-                <label for="alta-scan" class="block text-sm font-medium text-ink-muted dark:text-slate-400">{{ __('Documento de identidad (opcional)') }}</label>
-                <input id="alta-scan" type="file" accept="image/*,application/pdf" capture="environment" wire:model="altaDocumentScan" data-alta-scan
-                       class="mt-1 block min-h-11 w-full text-sm text-ink file:mr-3 file:min-h-11 file:rounded-lg file:border-0 file:bg-brand-tint file:px-3 file:text-sm file:font-medium file:text-brand dark:text-slate-200 dark:file:bg-slate-800 dark:file:text-slate-100">
-                <p class="mt-0.5 text-[11px] leading-tight text-ink-muted dark:text-slate-400">{{ __('Se guarda cifrado y cada consulta queda registrada.') }}</p>
-                @error('altaDocumentScan') <p class="mt-1 text-xs text-error">{{ $message }}</p> @enderror
+                <x-counter.file-field id="alta-scan" :label="__('Documento de identidad (opcional)')" wire:model="altaDocumentScan" accept="image/*,application/pdf" capture="environment" data-alta-scan="" :hint="__('Se guarda cifrado y cada consulta queda registrada.')" />
             </div>
         </div>
 
@@ -113,7 +112,7 @@
                 hidden
                 data-reading="{{ __('Leyendo el documento…') }}"
                 data-needs-file="{{ __('Elige primero una foto del documento.') }}"
-                class="inline-flex min-h-11 items-center rounded-xl border border-brand/40 bg-brand-tint px-4 text-sm font-semibold text-brand transition hover:bg-brand-tint/70 disabled:opacity-60 dark:bg-slate-900 dark:text-slate-100"
+                class="inline-flex min-h-11 items-center rounded-xl border border-brand/40 bg-brand-tint px-4 text-sm font-semibold text-brand transition hover:bg-brand-tint/70 disabled:opacity-60 dark:bg-slate-900 dark:text-slate-100 dark:hover:bg-slate-800"
             >{{ __('Rellenar desde el documento') }}</button>
             <p data-alta-mrz-status role="status" aria-live="polite" class="text-[11px] leading-tight text-ink-muted empty:hidden dark:text-slate-400"></p>
             <p class="mt-0.5 text-[11px] leading-tight text-ink-muted dark:text-slate-400">{{ __('Del DNI o NIE, fotografía el REVERSO. Del pasaporte, la página de la foto.') }}</p>
@@ -131,30 +130,30 @@
         <div class="grid gap-2.5 sm:grid-cols-2">
             <div>
                 <label for="alta-email-staff" class="block text-sm font-medium text-ink-muted dark:text-slate-400">{{ __('Email') }}</label>
-                <input id="alta-email-staff" type="email" inputmode="email" wire:model="altaForm.email" autocomplete="new-email" data-no-autofill
+                <input id="alta-email-staff" type="email" inputmode="email" wire:model="altaForm.email" aria-required="true" @error('altaForm.email') aria-invalid="true" aria-describedby="altaForm.email-error" @enderror autocomplete="new-email" data-no-autofill
                        class="mt-1 h-12 w-full rounded-xl border border-line bg-surface px-4 text-base dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100">
-                @error('altaForm.email') <p class="mt-1 text-xs text-error">{{ $message }}</p> @enderror
+                <x-socio.field-error name="altaForm.email" />
             </div>
             <div>
                 <label for="alta-phone" class="block text-sm font-medium text-ink-muted dark:text-slate-400">{{ __('Teléfono') }}</label>
-                <input id="alta-phone" type="tel" inputmode="tel" wire:model="altaForm.phone" autocomplete="new-phone" data-no-autofill
+                <input id="alta-phone" type="tel" inputmode="tel" wire:model="altaForm.phone" @error('altaForm.phone') aria-invalid="true" aria-describedby="altaForm.phone-error" @enderror autocomplete="new-phone" data-no-autofill
                        class="mt-1 h-12 w-full rounded-xl border border-line bg-surface px-4 text-base dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100">
-                @error('altaForm.phone') <p class="mt-1 text-xs text-error">{{ $message }}</p> @enderror
+                <x-socio.field-error name="altaForm.phone" />
             </div>
             <div class="sm:col-span-2">
                 <label for="alta-address" class="block text-sm font-medium text-ink-muted dark:text-slate-400">{{ __('Dirección') }}</label>
-                <input id="alta-address" type="text" wire:model="altaForm.address" autocomplete="new-address" data-no-autofill
+                <input id="alta-address" type="text" wire:model="altaForm.address" @error('altaForm.address') aria-invalid="true" aria-describedby="altaForm.address-error" @enderror autocomplete="new-address" data-no-autofill
                        class="mt-1 h-12 w-full rounded-xl border border-line bg-surface px-4 text-base dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100">
-                @error('altaForm.address') <p class="mt-1 text-xs text-error">{{ $message }}</p> @enderror
+                <x-socio.field-error name="altaForm.address" />
             </div>
             <div class="sm:col-span-2">
                 <label for="alta-avalador" class="block text-sm font-medium text-ink-muted dark:text-slate-400">{{ __('Avalador (nombre o nº)') }}</label>
                 {{-- Prompt 244 — `.live` (debounced) so the field says what it FOUND before the form is submitted:
                      a name that matched nobody, or two people, was accepted as free text with nobody told
                      (prompt 60 for a lookup). Same resolver SubmitApplication stores through — see avaladorFeedback(). --}}
-                <input id="alta-avalador" type="text" wire:model.live.debounce.400ms="altaForm.avalador_ref" autocomplete="new-avalador-ref" data-no-autofill
+                <input id="alta-avalador" type="text" wire:model.live.debounce.400ms="altaForm.avalador_ref" @error('altaForm.avalador_ref') aria-invalid="true" aria-describedby="altaForm.avalador_ref-error" @enderror autocomplete="new-avalador-ref" data-no-autofill
                        class="mt-1 h-12 w-full rounded-xl border border-line bg-surface px-4 text-base dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100">
-                @error('altaForm.avalador_ref') <p class="mt-1 text-xs text-error">{{ $message }}</p> @enderror
+                <x-socio.field-error name="altaForm.avalador_ref" />
                 @php $avalador = $this->avaladorFeedback(); @endphp
                 @if ($avalador['status'] === 'found')
                     <p data-avalador-feedback="found" class="mt-1 text-xs font-medium text-success">{{ __('Avalador: :name (:no)', ['name' => $avalador['member']->fullName(), 'no' => $avalador['member']->member_no]) }}</p>
@@ -175,7 +174,7 @@
              `altaTiers()` list; optional to advance (the review re-asks only when it was skipped). --}}
         <div>
             <label for="alta-wizard-tier" class="block text-sm font-medium text-ink-muted dark:text-slate-400">{{ __('Cuota / tier') }}</label>
-            <select id="alta-wizard-tier" wire:model="altaTierId" data-alta-wizard-tier
+            <select id="alta-wizard-tier" wire:model="altaTierId" @error('altaTierId') aria-invalid="true" aria-describedby="altaTierId-error" @enderror data-alta-wizard-tier
                     class="mt-1 h-12 w-full rounded-xl border border-line bg-surface px-4 text-base dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100">
                 <option value="">{{ __('Elige una cuota…') }}</option>
                 @foreach ($this->altaTiers() as $tier)
@@ -194,21 +193,17 @@
              data still goes through `wire:model`. --}}
         <div x-data="{ therapeutic: @js((bool) ($altaForm['is_therapeutic'] ?? false)) }">
             <label class="flex min-h-11 items-center gap-3 rounded-xl border border-line bg-surface p-4 text-base dark:border-slate-700 dark:bg-slate-900">
-                <input type="checkbox" wire:model="altaForm.is_therapeutic" @change="therapeutic = $event.target.checked" data-alta-therapeutic
+                <input type="checkbox" wire:model="altaForm.is_therapeutic" @error('altaForm.is_therapeutic') aria-invalid="true" aria-describedby="altaForm.is_therapeutic-error" @enderror @change="therapeutic = $event.target.checked" data-alta-therapeutic
                        class="h-5 w-5 shrink-0 rounded border-line text-brand focus:ring-brand">
                 <span>
                     <span class="block font-medium">{{ __('Uso terapéutico') }}</span>
                     <span class="block text-xs text-ink-muted dark:text-slate-400">{{ __('Dato de salud: márcalo solo si la persona lo declara.') }}</span>
                 </span>
             </label>
-            @error('altaForm.is_therapeutic') <p class="mt-1 text-xs text-error">{{ $message }}</p> @enderror
+            <x-socio.field-error name="altaForm.is_therapeutic" />
 
             <div x-show="therapeutic" x-cloak class="mt-3">
-                <label for="alta-medical-cert" class="block text-sm font-medium text-ink-muted dark:text-slate-400">{{ __('Certificado médico (opcional)') }}</label>
-                <input id="alta-medical-cert" type="file" accept="image/*,application/pdf" capture="environment" wire:model="altaMedicalCert" data-alta-medical-cert
-                       class="mt-1 block w-full text-sm file:mr-3 file:rounded-lg file:border-0 file:bg-brand-tint file:px-4 file:py-2 file:text-sm file:font-semibold file:text-brand dark:file:bg-slate-800 dark:file:text-slate-200">
-                <p class="mt-1 text-xs text-ink-muted dark:text-slate-400">{{ __('La prueba del uso terapéutico. Se guarda cifrada, como el documento de identidad.') }}</p>
-                @error('altaMedicalCert') <p class="mt-1 text-xs text-error">{{ $message }}</p> @enderror
+                <x-counter.file-field id="alta-medical-cert" :label="__('Certificado médico (opcional)')" wire:model="altaMedicalCert" accept="image/*,application/pdf" capture="environment" data-alta-medical-cert="" :hint="__('La prueba del uso terapéutico. Se guarda cifrada, como el documento de identidad.')" />
             </div>
         </div>
 
@@ -221,7 +216,7 @@
                 $forecastOptions = array_values(array_filter((array) \App\Support\Settings::get('forecast_options_g', [30, 50, 60, 90]), 'is_numeric'));
             @endphp
             <label for="alta-declared" class="block text-sm font-medium text-ink-muted dark:text-slate-400">{{ __('Consumo mensual estimado') }}</label>
-            <select id="alta-declared" wire:model="altaForm.declared_monthly_g" data-alta-declared
+            <select id="alta-declared" wire:model="altaForm.declared_monthly_g" @error('altaForm.declared_monthly_g') aria-invalid="true" aria-describedby="altaForm.declared_monthly_g-error" @enderror data-alta-declared
                     class="mt-1 h-12 w-full rounded-xl border border-line bg-surface px-4 text-base dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100">
                 <option value="">{{ __('Prefiero no indicarlo ahora') }}</option>
                 @foreach ($forecastOptions as $opt)
@@ -229,7 +224,7 @@
                 @endforeach
             </select>
             <p class="mt-1 text-xs text-ink-muted dark:text-slate-400">{{ __('Alimenta la previsión de cultivo del club. Se puede cambiar después.') }}</p>
-            @error('altaForm.declared_monthly_g') <p class="mt-1 text-xs text-error">{{ $message }}</p> @enderror
+            <x-socio.field-error name="altaForm.declared_monthly_g" />
         </div>
     @endif
 
@@ -248,8 +243,8 @@
                     :hint="__('Pásale la tablet: firma quien se da de alta, no tú.')"
                     class="mt-0"
                 />
-                @error(\App\Support\ApplicationShape::SIGNATURE_FIELD) <p class="mt-1 text-xs text-error">{{ $message }}</p> @enderror
-                @error('altaSignaturePath') <p class="mt-1 text-xs text-error">{{ $message }}</p> @enderror
+                <x-socio.field-error :name="\App\Support\ApplicationShape::SIGNATURE_FIELD" />
+                <x-socio.field-error name="altaSignaturePath" />
             </div>
         @endif
 
@@ -267,14 +262,14 @@
         @unless (\App\Support\Settings::get('signature_on_application', true))
             <div class="rounded-xl border border-warning/40 bg-warning/10 p-4">
                 <label class="flex min-h-11 items-start gap-3 text-sm">
-                    <input type="checkbox" wire:model="altaConsentHeld" data-alta-consent-held
+                    <input type="checkbox" wire:model="altaConsentHeld" @error('altaConsentHeld') aria-invalid="true" aria-describedby="altaConsentHeld-error" @enderror data-alta-consent-held
                            class="mt-0.5 h-5 w-5 shrink-0 rounded border-line text-brand focus:ring-brand">
                     <span>
                         <span class="block font-semibold">{{ __('El club conserva su consentimiento firmado') }}</span>
                         <span class="block text-xs text-ink-muted dark:text-slate-400">{{ __('Se registrará como consentimiento en papel, a tu nombre. No equivale a que el socio lo acepte en pantalla: si puede hacerlo, entrégale la tablet.') }}</span>
                     </span>
                 </label>
-                @error('altaConsentHeld') <p class="mt-1 text-xs text-error">{{ $message }}</p> @enderror
+                <x-socio.field-error name="altaConsentHeld" />
             </div>
         @endunless
     @endif

@@ -196,7 +196,7 @@ class CounterStaffDayTest extends TestCase
 
         // Empty basket → the next-step hint, not the tender/signature apparatus.
         $this->assertStringContainsString('data-empty-basket-hint', $html);
-        $this->assertStringNotContainsString('Efectivo entregado (€)', $html);
+        $this->assertStringNotContainsString('id="pos-cash-tendered"', $html);
         // …but the charge button stays observable (prompt 60).
         $this->assertStringContainsString('x-bind:disabled="! online"', $html);
     }

@@ -16,7 +16,7 @@
     @if (\App\Support\CounterBlocker::rendersInPage($blocker))
         <x-counter.blocking-state
             data-blocker="sede"
-            icon="📍"
+            icon="map-pin"
             :heading="$mustChooseLocation ? __('Elige tu sede') : __('Sin sede asignada')"
             :body="$mustChooseLocation ? __('Trabajas en varias sedes. Selecciona en la barra superior en cuál estás.') : __('No tienes ninguna sede activa. Pide a un responsable que te asigne una para gestionar la caja.')"
         />
@@ -96,7 +96,7 @@
                 data-till-open-screen
                 class="mx-auto flex min-h-[60svh] w-full max-w-md flex-col justify-center rounded-2xl border border-line bg-surface p-6 text-center dark:border-slate-800 dark:bg-slate-900"
             >
-                <div class="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-surface-alt text-3xl dark:bg-slate-800" aria-hidden="true">💶</div>
+                <div class="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-surface-alt text-ink-muted dark:bg-slate-800 dark:text-slate-300" aria-hidden="true"><x-counter.icon name="cash" class="h-8 w-8" /></div>
 
                 <h2 class="mt-5 text-xl font-semibold">{{ __('Abrir caja') }}</h2>
                 <p class="mt-2 text-sm text-ink-muted dark:text-slate-400">{{ __('No hay ninguna caja abierta en este terminal.') }}</p>
@@ -182,8 +182,8 @@
                                     wire:click="toggleNotCounted('{{ $batch->id }}')"
                                     data-reweigh-not-counted-toggle="{{ $batch->id }}"
                                     @class([
-                                        'shrink-0 rounded-lg px-2.5 py-1 text-xs font-semibold transition',
-                                        'bg-warning text-white' => $notCounted,
+                                        'inline-flex min-h-11 shrink-0 items-center rounded-lg px-3 text-xs font-semibold transition',
+                                        'bg-warning-fill text-white hover:brightness-90' => $notCounted,
                                         'bg-surface-alt text-ink-muted hover:bg-warning/10 hover:text-warning dark:bg-slate-800 dark:text-slate-400' => ! $notCounted,
                                     ])
                                 >
@@ -197,6 +197,7 @@
                                     wire:model="reweighReasons.{{ $batch->id }}"
                                     data-reweigh-reason="{{ $batch->id }}"
                                     autocomplete="off"
+                                    aria-label="{{ __('Motivo por el que no se puede contar') }}"
                                     placeholder="{{ __('Motivo (p. ej. bote no localizado)') }}"
                                     class="mt-2 h-14 w-full rounded-xl border border-warning/50 bg-warning/5 px-4 text-base text-ink placeholder:text-ink-muted focus:border-warning focus:outline-none focus:ring-2 focus:ring-warning/40 dark:text-slate-100"
                                 >
@@ -219,19 +220,8 @@
                     @endforeach
 
                     <div class="flex gap-2">
-                        <button
-                            type="button"
-                            wire:click="cancelClose"
-                            class="h-14 flex-1 rounded-xl border border-line bg-surface-alt px-6 text-base font-semibold text-ink transition hover:bg-slate-200 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:hover:bg-slate-700"
-                        >
-                            {{ __('Cancelar') }}
-                        </button>
-                        <button
-                            type="submit"
-                            class="h-14 flex-1 rounded-xl bg-warning px-6 text-base font-semibold text-white transition hover:opacity-90"
-                        >
-                            {{ __('Confirmar recuento') }}
-                        </button>
+                        <x-button variant="secondary" size="lg" wire:click="cancelClose" class="flex-1">{{ __('Cancelar') }}</x-button>
+                        <x-button type="submit" variant="warning" size="lg" class="flex-1">{{ __('Confirmar recuento') }}</x-button>
                     </div>
                 </form>
             </section>

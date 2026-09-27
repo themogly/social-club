@@ -25,7 +25,7 @@
         class="absolute right-0 z-40 mt-1 w-72 rounded-xl border border-gray-200 bg-white p-2 shadow-lg dark:border-white/10 dark:bg-gray-900"
     >
         @if (count($helpGuides) > 0)
-            <p class="px-3 py-2 text-xs font-semibold uppercase tracking-wide text-gray-400">{{ __('Guías de tareas') }}</p>
+            <p class="px-3 py-2 text-xs font-semibold uppercase tracking-wide text-gray-600 dark:text-gray-400">{{ __('Guías de tareas') }}</p>
             @foreach ($helpGuides as $key => $guide)
                 <a href="{{ \App\Filament\Pages\Manual::getUrl().'#guia-'.$key }}" class="flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-gray-700 transition hover:bg-gray-100 dark:text-gray-200 dark:hover:bg-white/5">
                     <span aria-hidden="true">→</span> {{ __($guide['title']) }}

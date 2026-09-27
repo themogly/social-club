@@ -47,19 +47,29 @@
 
     /* Layout */
     .csc-grid { display: grid; grid-template-columns: 1fr; gap: 1.5rem; align-items: start; }
-    @media (min-width: 1024px) { .csc-grid { grid-template-columns: minmax(0, 2.15fr) minmax(280px, 1fr); } }
+    /* Prompt 272 — the rail joins the main column from 1280, not 1024: at 1024 the 320px Filament sidebar plus a
+       280px rail left the main column 336px, so its tables clipped whatever the table layout did. */
+    @media (min-width: 1280px) { .csc-grid { grid-template-columns: minmax(0, 2.15fr) minmax(280px, 1fr); } }
     .csc-main { display: flex; flex-direction: column; gap: 1.5rem; min-width: 0; }
     .csc-rail { display: flex; flex-direction: column; gap: 1.25rem; min-width: 0; }
-    @media (min-width: 1024px) { .csc-rail { position: sticky; top: 1rem; } }
+    @media (min-width: 1280px) { .csc-rail { position: sticky; top: 1rem; } }
     /* Prompt 144: auto-fit with a readable min-width instead of a fixed four-up. A four-up row inside the
        Filament content column made each card too narrow for its label + delta chip, forcing a mid-word break;
        auto-fit keeps every card >= ~13rem, so labels wrap on whole words (three-up where four won't fit). */
-    .csc-cards { display: grid; grid-template-columns: repeat(1, 1fr); gap: 1rem; }
-    @media (min-width: 640px) { .csc-cards { grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr)); } }
+    /* Prompt 272 — a wrapping FLEX row, not an auto-fit grid: eight tiles in a three-column grid left a stranded
+       hole in row three (the design audit names stranded tiles; it read as a missing widget). With flex-grow the
+       last row's tiles share the row, so there is never a hole whatever the count (it varies by role) or width.
+       Same ~12rem floor, so 144's "labels wrap on whole words" still holds. */
+    .csc-cards { display: flex; flex-wrap: wrap; gap: 1rem; }
+    .csc-cards > * { flex: 1 1 100%; min-width: 0; }
+    @media (min-width: 640px) { .csc-cards > * { flex-basis: 12rem; } }
     .csc-chart-grid { display: grid; grid-template-columns: 1fr; gap: 1.5rem; }
     @media (min-width: 768px) { .csc-chart-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+    /* Prompt 272 — the two tables sit side by side only from 2xl. Beside the Filament sidebar and the right rail,
+       two-up clipped the very columns they exist to show: IMPORTE cut to "18" at 1440, TOTAL to "61,(" at 1280,
+       and at 1024 Top dispensado showed its first column only. A clipped euro figure reads as a wrong number. */
     .csc-two { display: grid; grid-template-columns: 1fr; gap: 1.5rem; }
-    @media (min-width: 768px) { .csc-two { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+    @media (min-width: 1536px) { .csc-two { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 
     /* Card */
     .csc-card { display: flex; flex-direction: column; gap: 0.75rem; background: var(--s); border: 1px solid var(--bd); border-radius: var(--radius); padding: 1rem 1.1rem; box-shadow: var(--shadow); position: relative; overflow: hidden; text-decoration: none; color: inherit; }

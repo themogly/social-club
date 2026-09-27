@@ -31,7 +31,7 @@
                 <h2 class="truncate text-sm font-bold leading-tight">{{ $member->fullName() }}</h2>
                 <p class="mt-0.5 truncate text-xs text-ink-muted dark:text-slate-400">
                     {{ $member->member_no }}
-                    <span class="rounded-full border px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide {{ $statusColour }}">{{ $member->status->label() }}</span>
+                    @include('livewire.counter.partials.member-status-badge', ['status' => $member->status])
                 </p>
             </div>
 
@@ -47,10 +47,14 @@
         {{-- Prompt 263 — closing (or switching to another member) with anything unpaid ASKS first. "Cerrar" used to
              discard both baskets outright, which is how drinks left the counter unpaid and unrecorded. --}}
         @if ($confirmDiscard)
-            <div data-confirm-discard role="alertdialog" class="mt-2.5 rounded-xl border border-warning/40 bg-warning/5 p-3 text-sm">
-                <p class="font-semibold text-warning">{{ __('Hay productos sin cobrar. ¿Descartarlos?') }}</p>
+            {{-- Prompt 272 — a NAMED alertdialog that takes focus when it appears (WCAG 2.4.3): it was unnamed
+                 and left focus on "Cerrar", behind it. Focus lands on the safe answer, never on Descartar. --}}
+            <div data-confirm-discard role="alertdialog" aria-labelledby="confirm-discard-title" aria-modal="false"
+                 x-data x-init="$nextTick(() => $refs.keepUnpaid?.focus())"
+                 class="mt-2.5 rounded-xl border border-warning/40 bg-warning/5 p-3 text-sm">
+                <p id="confirm-discard-title" class="font-semibold text-warning">{{ __('Hay productos sin cobrar. ¿Descartarlos?') }}</p>
                 <div class="mt-2 grid grid-cols-2 gap-2">
-                    <x-button type="button" variant="secondary" size="md" wire:click="keepUnpaid">{{ __('Seguir cobrando') }}</x-button>
+                    <x-button type="button" variant="secondary" size="md" wire:click="keepUnpaid" x-ref="keepUnpaid">{{ __('Seguir cobrando') }}</x-button>
                     <x-button type="button" variant="danger" size="md" wire:click="clearMember(true)" data-confirm-discard-yes>{{ __('Descartar') }}</x-button>
                 </div>
             </div>

@@ -60,11 +60,11 @@
     @endif
 
     @if ($stored)
-        <div data-signature-captured class="mt-2 flex items-center justify-between rounded-xl border border-success/30 bg-success/10 px-3 py-2 text-sm text-success">
+        <div data-signature-captured role="status" class="mt-2 flex items-center justify-between rounded-xl border border-success/30 bg-success/10 px-3 py-2 text-sm text-success">
             <span>✓ {{ __('Firma capturada') }}</span>
             @if ($mode === 'livewire')
                 <button type="button" wire:click="{{ $clear }}" data-signature-redo
-                        class="inline-flex min-h-11 items-center rounded-md px-3 text-success/80 hover:text-success">{{ __('Rehacer') }}</button>
+                        class="inline-flex min-h-11 items-center rounded-md px-3 font-semibold text-success underline-offset-2 hover:underline">{{ __('Rehacer') }}</button>
             @endif
         </div>
     @else
@@ -100,6 +100,10 @@
             <canvas
                 x-ref="pad"
                 data-signature-canvas
+                {{-- Prompt 272 — a name and the instructions (WCAG 1.1.1). The pointer requirement itself is exempt
+                     as path-dependent input; being unlabelled is not. --}}
+                role="img"
+                aria-label="{{ ($label ?? __('Firma')).'. '.__('Firma con el dedo o el ratón dentro del recuadro y pulsa «Guardar firma».') }}"
                 class="w-full touch-none rounded-xl border border-line bg-white dark:border-slate-700"
                 @mousedown="start($event)" @mousemove="move($event)" @mouseup="stop()" @mouseleave="stop()"
                 @touchstart.prevent="start($event)" @touchmove.prevent="move($event)" @touchend="stop()"
@@ -108,14 +112,14 @@
                 {{-- The drawing travels with the form. Empty until the applicant presses Guardar, which is
                      what makes "signed" a deliberate act rather than a stray stroke. --}}
                 <input type="hidden" name="{{ $name }}" x-ref="field" value="" data-signature-field>
-                <p x-show="signed" x-cloak data-signature-form-ok class="mt-2 text-xs font-medium text-success">✓ {{ __('Firma capturada') }}</p>
+                {{-- The live region is always in the DOM and its CONTENT appears, so the save is announced (a region
+                     that is itself shown/hidden is not reliably read). --}}
+                <p role="status" class="mt-2 text-xs font-medium text-success"><span x-show="signed" x-cloak data-signature-form-ok>✓ {{ __('Firma capturada') }}</span></p>
             @endif
 
             <div class="mt-2 flex gap-2">
-                <button type="button" @click="wipe()" data-signature-clear
-                        class="min-h-11 flex-1 rounded-lg border border-line bg-surface-alt text-sm font-medium text-ink-muted dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300">{{ __('Borrar') }}</button>
-                <button type="button" @click="save()" data-signature-save
-                        class="min-h-11 flex-1 rounded-lg bg-brand text-sm font-semibold text-white hover:bg-brand-dark">{{ __('Guardar firma') }}</button>
+                <x-button variant="secondary" size="sm" @click="wipe()" data-signature-clear class="min-h-11 flex-1">{{ __('Borrar') }}</x-button>
+                <x-button size="sm" @click="save()" data-signature-save class="min-h-11 flex-1">{{ __('Guardar firma') }}</x-button>
             </div>
         </div>
     @endif

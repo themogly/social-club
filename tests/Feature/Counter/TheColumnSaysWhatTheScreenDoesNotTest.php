@@ -242,6 +242,27 @@ class TheColumnSaysWhatTheScreenDoesNotTest extends TestCase
         $this->assertStringContainsString('data-product', $html, 'a WARN took the catalogue away');
     }
 
+    /**
+     * Prompt 272 — a BLOCKED socio with no warnings and nothing owed gets no member-detail card at all.
+     *
+     * The card used to render whenever the verdict was not clear; with the blocked surface up every blocking row
+     * is skipped and the remedies are withheld, so all that was left was an empty 32px box between the identity
+     * and the basket (design audit, Phase 1). The rule: the card renders only when it has a row to show.
+     */
+    public function test_a_blocked_member_with_nothing_else_to_say_gets_no_empty_card(): void
+    {
+        $this->operator();
+        $this->genetic();
+
+        $member = $this->member();
+        $member->forceFill(['status' => MemberStatus::SUSPENDED])->save();
+
+        $html = $this->pos($member->fresh())->html();
+
+        $this->assertStringContainsString(e(__('Socio/a suspendido/a o expulsado/a.')), $html, 'the block is not stated at all');
+        $this->assertStringNotContainsString('data-member-detail', $html, 'an empty member-detail card renders beside the blocked surface');
+    }
+
     /** A sanctioned socio's sanction is stated exactly once, wherever its severity puts it. */
     public function test_a_sanction_is_stated_exactly_once(): void
     {

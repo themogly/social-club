@@ -54,8 +54,13 @@
                                         <x-filament::badge color="warning" size="sm" class="ms-1 inline-flex">{{ __('Sensible') }}</x-filament::badge>
                                     @endif
                                 </td>
+                                {{-- Prompt 272 — Filament's own checkbox (the panel ships no forms plugin, so a raw input painted as a
+                                     13px native box), and the owner's locked column SAYS "siempre" instead of just being greyed. --}}
                                 <td class="px-3 py-2 text-center">
-                                    <input type="checkbox" checked disabled aria-label="{{ __('Propietario: siempre') }}" class="rounded border-gray-300 opacity-60">
+                                    <span class="inline-flex flex-col items-center gap-0.5">
+                                        <x-filament::input.checkbox checked disabled aria-label="{{ __('Propietario: siempre') }}" />
+                                        <span class="text-xs text-gray-600 dark:text-gray-400" aria-hidden="true">{{ __('siempre') }}</span>
+                                    </span>
                                 </td>
                                 @foreach ($roles as $role)
                                     @php
@@ -63,14 +68,17 @@
                                         $isDefault = in_array($permission, $defaults[$role->value], true);
                                     @endphp
                                     <td class="px-3 py-2 text-center">
-                                        <label class="inline-flex flex-col items-center gap-0.5">
-                                            <input type="checkbox" @checked($isHeld)
+                                        {{-- Prompt 272 — AA-legible state text (it was 10px gray-400 at 2.62:1, and the divergence
+                                             line warning-600 at ~3.2:1), a 44px label target around the box, and the state is
+                                             the checkbox's DESCRIPTION, because its aria-label overrides the wrapping label. --}}
+                                        <label class="inline-flex min-h-11 min-w-11 cursor-pointer flex-col items-center justify-center gap-0.5">
+                                            <x-filament::input.checkbox :checked="$isHeld"
                                                    wire:click="toggle('{{ $role->value }}', '{{ $permission }}')"
-                                                   @if (! $isHeld && in_array($permission, $sensitive, true)) wire:confirm="{{ __('Este permiso llega al núcleo de cumplimiento y privacidad. ¿Concederlo a :role?', ['role' => $role->label()]) }}" @endif
+                                                   :wire:confirm="(! $isHeld && in_array($permission, $sensitive, true)) ? __('Este permiso llega al núcleo de cumplimiento y privacidad. ¿Concederlo a :role?', ['role' => $role->label()]) : null"
                                                    data-toggle="{{ $role->value }}:{{ $permission }}"
                                                    aria-label="{{ $role->label() }}: {{ \App\Support\Permissions::label($permission) }}"
-                                                   class="rounded border-gray-300 text-primary-600">
-                                            <span @class(['text-[10px]', 'text-gray-400' => $isHeld === $isDefault, 'font-semibold text-warning-600' => $isHeld !== $isDefault])>
+                                                   aria-describedby="default-{{ $role->value }}-{{ $permission }}" />
+                                            <span id="default-{{ $role->value }}-{{ $permission }}" @class(['text-xs', 'text-gray-600 dark:text-gray-400' => $isHeld === $isDefault, 'font-semibold text-warning-700 dark:text-warning-400' => $isHeld !== $isDefault])>
                                                 {{ $isHeld === $isDefault ? __('por defecto') : ($isDefault ? __('por defecto: sí') : __('por defecto: no')) }}
                                             </span>
                                         </label>

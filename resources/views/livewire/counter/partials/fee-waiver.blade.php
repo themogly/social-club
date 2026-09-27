@@ -76,8 +76,9 @@
                 </div>
 
                 @if ($waiveReason === 'OTHER')
-                    <input type="text" wire:model="waiveReasonText" data-waive-reason-text
-                           placeholder="{{ __('Motivo de la condonación') }}" autocomplete="off"
+                    <label for="{{ $waiveGroup }}-reason-text" class="mt-1 block text-xs font-medium text-ink-muted dark:text-slate-400">{{ __('Motivo de la condonación') }}</label>
+                    <input type="text" id="{{ $waiveGroup }}-reason-text" wire:model="waiveReasonText" data-waive-reason-text
+                           autocomplete="off"
                            class="mt-1 h-12 w-full rounded-xl border border-line bg-surface px-4 text-base dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100">
                 @endif
 
@@ -85,10 +86,9 @@
                     {{ __('Deja el importe vacío para condonar todo lo pendiente. No mueve caja ni monedero.') }}
                 </p>
 
-                <button type="button" wire:click="waiveFee" data-fee-waive-submit
-                        class="mt-2 inline-flex min-h-11 w-full items-center justify-center rounded-xl bg-warning px-4 text-sm font-semibold text-white transition hover:opacity-90">
+                <x-button variant="warning" size="md" wire:click="waiveFee" data-fee-waive-submit class="mt-2 w-full">
                     {{ __('Condonar cuota') }}
-                </button>
+                </x-button>
             </div>
         @endif
     </div>

@@ -57,6 +57,35 @@
         back() { this.pin = this.pin.slice(0, -1) },
         clear() { this.pin = '' },
         submit() { if (this.pin === '') return; $wire.operatorPin = this.pin; this.pin = ''; $wire.unlockOperator() },
+        {{-- Prompt 272 — the keyboard. Enter used to be bound on window as "submit": but Enter is how a focused
+             <button> is activated, and keydown reaches window before the button's click — so Enter on the
+             second digit key submitted the ONE digit typed so far ("PIN no reconocido"), each key after the
+             first costing an attempt against the lockout throttle (235). Enter now submits only when focus is
+             NOT on one of this surface's own buttons (those activate themselves, the confirm included), and a
+             physical keyboard or keypad types digits and Backspace straight into the pad. --}}
+        onKey(e) {
+            if (! this.open || ! this.padVisible || e.ctrlKey || e.metaKey || e.altKey) return
+            if (e.key === 'Enter') {
+                if (e.target?.closest?.('[data-counter-surface] button')) return
+                e.preventDefault(); this.submit(); return
+            }
+            if (/^[0-9]$/.test(e.key)) { e.preventDefault(); this.push(e.key); return }
+            if (e.key === 'Backspace') { e.preventDefault(); this.back() }
+        },
+        {{-- Initial focus in, focus back out (WCAG 2.4.3). NOT a focus trap — the recorded no-trap decision
+             stands (DECISIONS: the audit's deferred trap); this only stops focus being left behind an
+             aria-modal surface, where a screen reader treats the focused element as hidden. --}}
+        returnFocusTo: null,
+        focusChanged(isOpen) {
+            if (isOpen) {
+                this.returnFocusTo = document.activeElement
+                setTimeout(() => this.$refs.surface?.focus({ preventScroll: true }), 0)
+            } else if (this.returnFocusTo?.isConnected) {
+                this.returnFocusTo.focus({ preventScroll: true })
+                this.returnFocusTo = null
+            }
+        },
+        digitsLabel(n) { return n === 0 ? '' : (n === 1 ? @js(__('1 dígito introducido')) : @js(__(':count dígitos introducidos')).replace(':count', n)) },
         {{-- Handed over outranks everything: the applicant must not be shown a lock screen mid-form.
              Otherwise a client-side idle lock outranks the server's 'no operator yet'. --}}
         get mode() {
@@ -69,10 +98,13 @@
         get padVisible() { return this.mode === 'locked' || this.mode === 'unidentified' || (this.mode === 'handover' && this.staffPad) },
     }"
     x-effect="if (mode !== 'handover') staffPad = false"
+    x-init="$watch('open', (v) => focusChanged(v)); if (open) focusChanged(true)"
     x-show="open"
+    x-ref="surface"
+    tabindex="-1"
     x-on:counter-unlocked.window="$store.counter.unlocked()"
-    @keydown.window.enter="open && padVisible && submit()"
-    class="fixed inset-0 z-50 flex items-center justify-center bg-surface-alt p-4 dark:bg-slate-950"
+    @keydown.window="onKey($event)"
+    class="fixed inset-0 z-50 flex items-center justify-center bg-surface-alt p-4 focus:outline-none dark:bg-slate-950"
     role="dialog"
     aria-modal="true"
     x-bind:aria-label="padVisible
@@ -149,9 +181,11 @@
                 </template>
                 <span x-show="pin.length === 0" class="text-sm text-ink-muted dark:text-slate-400">••••</span>
             </div>
+            {{-- The dots are aria-hidden, so the COUNT is announced instead (never the digits). --}}
+            <p data-pin-count class="sr-only" aria-live="polite" x-text="digitsLabel(pin.length)"></p>
 
             @if ($operatorFeedback !== null)
-                <p data-counter-surface-feedback class="mt-3 rounded-lg bg-error/10 px-3 py-2 text-center text-sm font-medium text-error">{{ $operatorFeedback }}</p>
+                <p data-counter-surface-feedback role="alert" class="mt-3 rounded-lg bg-error/10 px-3 py-2 text-center text-sm font-medium text-error">{{ $operatorFeedback }}</p>
             @endif
 
             @if ($this->operatorLockedOut())

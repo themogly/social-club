@@ -21,6 +21,14 @@
     --color-success: #166534; /* green-800 · min 5.86:1 on light incl tint */
     --color-warning: #92400e; /* amber-800 · min 5.80:1 on light incl tint */
     --color-error: #b91c1c;   /* red-700 · min 5.24:1 on light incl tint */
+
+    /* FILL tokens (prompt 272) — the colour a solid button/pill is painted in, under WHITE text. Prompt 98
+       tuned the tokens above for text ON a surface; nobody measured the inverse, text on the token, and in
+       dark the text values (#d97706 / #f87171) take white at only 3.19:1 / 2.77:1. So fills are split from
+       text, as the dashboard's --br / --brfill split did. Light: the same ramp steps as the light text set
+       (white 7.09:1 / 6.47:1 — light mode is visually unchanged). Dark values below. */
+    --color-warning-fill: #92400e; /* amber-800 · white 7.09:1 */
+    --color-error-fill: #b91c1c;   /* red-700 · white 6.47:1 */
 }
 
 /* Dark surfaces (#0f172a): warning/success keep their original (already passed dark ≥5:1); error goes LIGHTER
@@ -32,6 +40,8 @@
         --color-warning: #d97706; /* min 5.01:1 on dark incl tint */
         --color-error: #f87171;   /* red-400 · min 5.69:1 on dark incl tint */
         --color-ink-muted: #94a3b8;
+        --color-warning-fill: #b45309; /* amber-700 · white 5.02:1 (the lightest amber that takes white) */
+        --color-error-fill: #dc2626;   /* the palette's own --error · white 4.83:1 */
     }
 }
 :root.dark,
@@ -40,6 +50,8 @@
     --color-success: #16a34a;
     --color-warning: #d97706;
     --color-error: #f87171;
+    --color-warning-fill: #b45309;
+    --color-error-fill: #dc2626;
     /* The a11y audit's finding: ink-muted had NO dark value, so #475569 stayed put on a slate-950 counter
        at 2.35:1 — and it only shows where a usage forgot its own `dark:text-…`, which is exactly where
        nobody looks. Two real controls relied on it (Cerrar sesión on the counter home, Borrar on the PIN

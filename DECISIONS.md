@@ -14245,3 +14245,126 @@ the code-style audit's Phase 1. Ben: "go with your recommendations and fix all".
   variety has one). Removing the photo step would have undone the add-a-strain design; wiring it was smaller.
 
 `composer check` green in `es` and `en`. Merged to `main` on Ben's instruction.
+---
+
+## Prompt 272 — the pre-live design and accessibility audits, fixed
+
+Both reports (`audits/reports/2026-09-pre-live-design.md`, `…-accessibility.md`) worked through Phase 1 → 3,
+de-duplicated where they overlap (both flagged the dark amber/red button contrast; both flagged the hub alert rows and
+Recepción's Cerrar as under 44px). Presentation only: Blade, CSS, components, lang, `resources/js/app.js` overlay
+history, and one presentation line in `AdminPanelProvider`. Nothing in `app/Actions`, the settings validation, the
+middleware, the policies or the tender/till logic was touched. Screens LOOKED at through
+`tests/Browser/shoot-pre-live-design-fixes.mjs` (1440 / 1280 / 1280×700 / 1024 / 1180×820 / 820×1180 / 390, light and
+dark, reduced motion); captures in `storage/app/screenshots/272/`.
+
+### Phase 1
+
+- **Top bar truncated to "C." / "D.." at ≥1280 and overflowed at 390.** Measured: the counter shell caps the bar at
+  1152px, so above 1152 it is ONE width — `xl` vs `2xl` is irrelevant — and the labelled row needed all 1104px of it
+  even without *"Trabajando:"*. 130's rule (labelling is all-or-nothing, only where it fits) therefore answers
+  "nowhere": Lock and device Log out are icon controls at every width with `aria-label` + `title`, the "Trabajando:"
+  prefix is gone (the green dot + name + sr-only "· Cambiar de persona" remain), **Administración keeps its word at
+  every width (246, respected)**. The row now `flex-wrap`s: below ~820 the terminal controls drop to a second row, and
+  at 390 the leave-group + panic to a third. The Discussion's alternative (Lock / Log out / panic into an overflow) was
+  NOT taken: 198 made Lock and 121 made panic one tap, and wrapping keeps every control one tap and on screen. Measured
+  after: home link 154px at every width, `scrollWidth` = viewport at 390, panic inside the viewport.
+- **White on warning/error fills failed AA in dark (3.19 / 2.77:1).** New `--color-warning-fill` / `--color-error-fill`
+  tokens beside the text tokens (the dashboard's `--br`/`--brfill` move). Light values = the light text set (visually
+  unchanged); dark = amber-700 `#b45309` (5.02:1, the lightest amber that takes white) and the palette's own `--error`
+  `#dc2626` (4.83:1). No new hex outside the existing ramps. `x-button` warning/danger paint the fill and darken on hover
+  (`brightness-90`; `opacity-90` faded the label too). The hand-rolled amber/red buttons are now `<x-button>` (override
+  ×2, authorise-with-PIN, Condonar cuota, Identificarme, Confirmar recuento + its Cancelar, the door's override); the
+  "Marcar para contar" chip and the camera/photo/sede error pills paint the fill token. Guarded: `ColourContrastTest`
+  measures white on every fill value and fails any view with `bg-warning|error … text-white`.
+- **Dark tapped tiles / presets kept the light hover (1.9–2.4:1).** `dark:hover:bg-slate-800` (and `dark:hover:text-white`
+  where the light hover turned the text brand) on article/genetic tiles, weight presets, bar category tiles, the Importe
+  manual trigger, the wizard's reader button, the hub tiles and the top-bar controls; the ⅛ label is
+  `dark:text-slate-100` + semibold (the "· ⅛" glyph carries the meaning, not colour). **Corrects the August report**,
+  which dismissed the tile finding as a transitional background.
+- **Admin dashboard tables clipped euro columns.** The two tables are side by side only from 2xl (1536); the right rail
+  joins the main column from 1280 (at 1024 the 320px sidebar + 280px rail left the main column 336px). Measured after:
+  every table `scrollWidth == clientWidth` at 1440/1280/1024. The Techo legal cards size to their section
+  (`auto-fit minmax(14rem)`), not the viewport.
+- **Blocked member's empty card.** `data-member-detail` renders only when it has a row: an unsatisfied rule the loop
+  does not skip, or something owed — the loop's own rule, computed once in the view's `@php`.
+- **PIN pad Enter on a focused key submitted a partial PIN.** One `@keydown.window` handler: Enter submits only when
+  focus is NOT on one of the surface's own buttons (they activate themselves, the confirm included); `0–9` and
+  Backspace type into the pad while it is up. Proven in a browser: three Enter presses on focused keys = three dots, no
+  "PIN no reconocido"; the fourth digit from the keyboard; unlock succeeds.
+- **Placeholder-only fields.** Real `<label for>` on the POS "Efectivo entregado", the price-override amount and reason,
+  the limit-override reason (POS, door, authorise-with-PIN), the waiver's "Otro" reason, both void boxes; an
+  `aria-label` on the reweigh "no se puede contar" reason.
+- **"Cambio" 4.43:1 and "Rehacer" /80.** The tender summary is an inset `dark:bg-slate-950` well (the report offered
+  slate-900, which is the card's own colour, so the box would have vanished); Socios' "Pendiente" box likewise.
+  "Rehacer" drops the `/80` (semibold, underline on hover).
+- **Roles y permisos "por defecto" 2.62:1 / ~3.2:1.** `text-gray-600 dark:text-gray-400` and `text-warning-700
+  dark:text-warning-400` at `text-xs`; the help menu heading gray-600.
+
+### Phase 2
+
+- `color-scheme: light dark` on `:root` in `app.css`, with the explicit-light guard `tokens.css` uses (native date
+  glyph, selects, file inputs).
+- **Emoji → one outline icon set.** New `x-counter.icon` (stroke-1.8, `currentColor`, aria-hidden): map-pin, id-card,
+  alert, ban, cash, pencil, tablet, search, list/grid/large, chevron-down. `blocking-state`'s `icon` prop is now a name.
+  Guard: `PreLiveA11yFixesTest` fails any counter view that DRAWS an emoji outside a Blade comment.
+- **Touch targets** → 44px: hub alert rows, the reweigh chips, Recepción's Cerrar, the POS weight-panel Cancelar,
+  Gramos / Calculadora, the batch picker, the Importe manual reason chips.
+- **Filament neutral ramp is Slate** (`'gray' => Color::Slate`) — matches the palette's neutrals, the counter and the
+  dashboard cards.
+- **One basket empty state**, and it says the next step for the state (identify a socio / choose a genetic).
+- **Wizard file inputs** → new `x-counter.file-field`: a visually hidden input inside an `<x-button as="label">` (new
+  `as="label"` on the shared button, with a focus-within ring) + a translated "Ningún archivo" line. The caller spells
+  `wire:model` in its own bytes (the field-parity guard reads them) and it passes through to the input.
+- **Roles matrix**: `x-filament::input.checkbox`, a visible "siempre" under the owner column, 44px label targets, and the
+  state line is the checkbox's `aria-describedby` (its `aria-label` overrode the wrapping label — the Phase 3 item too).
+- **One status badge** (`partials/member-status-badge`) on Socios, Recepción and the POS, and one dismiss word
+  ("Cerrar"; Socios said "Cambiar"). The photo nag's compact-vs-full difference was left: the report recommended no
+  change for it and the contexts differ (the pinned cart card vs. the door, where the photo is taken).
+- **Recepción's commit past the fold.** Facts grid 2×2 → one row from `lg`, a tighter nag and section rhythm. Measured
+  at 1180×820 with the nag AND a debt warning: on screen.
+- KPI grid: a wrapping flex row with a 12rem basis, so the last row never strands a hole whatever the role's tile count.
+- **Focus ring** on `<x-button>` and the hand-rolled commit buttons: `focus-visible:ring-2 ring-brand ring-offset-2`,
+  offset colour per scheme.
+- **Overlays: focus in, focus back, Back closes.** Sign-up modal: pushState on open; popstate runs the SAME dirty guard
+  as ✕/Escape (a declined confirm re-pushes); focus on the title on open, on the "+ Nuevo socio/a" trigger when it
+  leaves the DOM, and back on the title when entering the wizard replaces the focused card. Importe manual: the same
+  moves. Camera/photo overlays: pushState/popstate through a shared `overlayHistory` in `app.js`. The discard confirm is
+  a NAMED alertdialog that focuses "Seguir cobrando" (never Descartar). **No focus trap — the recorded decision
+  (l.11012 / l.12980) stands**; this is initial focus only, which has no "inert left on" failure mode. Known edge,
+  accepted: when the SERVER closes the modal (a successful alta) the pushed entry stays, so the next Back is a no-op on
+  the same page — calling `history.back()` there could race a Livewire redirect off the new page.
+- **Wizard errors** use the PWA's `<x-socio.field-error>` (id + `role="alert"`); every bound control carries
+  `aria-invalid` + `aria-describedby` while invalid and `aria-required` where `ApplicationShape` requires it; a failed
+  step focuses the first invalid field (fires when errors APPEAR, not on later renders — the avalador field is live).
+- PIN pad: "PIN no reconocido" is `role="alert"`; an sr-only polite count ("3 dígitos introducidos"), never the digits;
+  focus moves into the surface on open and back on close.
+- The tender `<dl>` is `aria-live="polite"`; toggles carry `aria-pressed` (Gramos/Calculadora, fee Efectivo/Monedero,
+  category/type/strain chips and tiles, the batch picker); keypad ⌫ is "Retroceso"; the signature canvas is
+  `role="img"` with instructions and the captured message a `role="status"` region; the pad's Borrar / Guardar firma are
+  `<x-button>`.
+
+### Phase 3
+
+- The cart scroll-region fade shows only once scrolled (`.at-top` from the region's own scroll position); the extra
+  `pr-1` inside the stable gutter is gone, so the basket lines up with the pinned card and the commit (it measured 4px
+  narrower).
+- The hub disclosure has a rotating chevron (`group-open`, `motion-reduce:transition-none`).
+- "Hacer foto" is `whitespace-nowrap`.
+- Hub alert severity has an sr-only word (Urgente / Aviso / Información).
+- The flash ✕ drops `opacity-70`.
+- Tender names: "Borrar efectivo entregado", "Añadir 5,00 €" etc.
+
+### Tests updated (to the new rule, none deleted)
+
+`CounterScreenSwitcherTest` / `TopbarHarnessTest` (no breakpoint labels; the row wraps), `ButtonComponentTest` (fill
+tokens, focus-visible ring), `BlockedMemberReplacesTheCatalogueTest` / `OneOutcomePerCommitTest` (the tender and
+PIN-count regions announce other things; the OUTCOME is still announced once), `DashboardScreenTest` (12rem basis,
+flex wrap), `CounterStaffDayTest` / `SignalsThatNeverVaryTest` (label ids). New: `PinPadKeyboardTest`,
+`PreLiveA11yFixesTest`, a blocked-member case in `TheColumnSaysWhatTheScreenDoesNotTest`, fill-token cases in
+`ColourContrastTest`.
+
+### Skipped
+
+Nothing was blocked by the scope limit. `CLAUDE.md`'s "Motion One" line (design Discussion) is doc drift for the owner
+to reconcile, not a defect, and was not changed here. `TemporaryMemberTest`'s known intermittent (prompt 197) showed
+once in a full run and passed on rerun.

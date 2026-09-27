@@ -70,7 +70,7 @@ every icon-only button has a name, and reduced motion is respected.
   → Why: WCAG 2.1.1. Since prompt 267 this PIN is how anyone signs in, everywhere, including the admin panel. A
   keyboard-only operator locks themselves out by working the pad the standard way.
 
-  Review:
+  Review: **Fixed in 272** — Enter submits only when focus is not on a surface button; 0–9 and Backspace type into the pad (`PinPadKeyboardTest`, proven in a browser).
 
 - **[counter · dark] Dark-scheme `warning` and `error` tokens are used as solid fills under white text, and fail
   AA.**
@@ -96,7 +96,7 @@ every icon-only button has a name, and reduced motion is respected.
   → Why: these are the consequential buttons (override, waive, discard, close-out), in the scheme staff work in
   all evening.
 
-  Review:
+  Review: **Fixed in 272** — `--color-warning-fill` / `--color-error-fill` tokens (dark: amber-700 5.02:1, `#dc2626` 4.83:1); `x-button` uses them and every listed hand-rolled button/pill is converted or repainted (`ColourContrastTest`).
 
 - **[counter · dark] A tapped tile or weight preset is left with a light hover background, and the text on it
   falls to 1.9–2.4:1.**
@@ -114,7 +114,7 @@ every icon-only button has a name, and reduced motion is respected.
   the August report**, which dismissed the tile finding as axe misreading "a transitional background". It was
   this hover.
 
-  Review:
+  Review: **Fixed in 272** — `dark:hover:bg-slate-800` on tiles/presets (and every sibling light hover found); the ⅛ label is `dark:text-slate-100`.
 
 - **[counter · tender panel, prompt 268] "Cambio" in success green is 4.43:1 in dark, and "Rehacer" fails in both
   themes.**
@@ -131,7 +131,7 @@ every icon-only button has a name, and reduced motion is respected.
   → Why: "Cambio" is the figure the operator reads to count change into a hand. 16px bold is not "large text"
   for AA.
 
-  Review:
+  Review: **Fixed in 272** — Tender summary is a `dark:bg-slate-950` well on both screens (slate-900 is the card's own colour); Socios' Pendiente box likewise; Rehacer drops `/80`.
 
 - **[counter · forms] Fields with no real label: the POS cash field (placeholder only) and the reason boxes.**
   - The POS **"Efectivo entregado"** input is named only by its placeholder. The visible "Efectivo entregado"
@@ -150,7 +150,7 @@ every icon-only button has a name, and reduced motion is respected.
   was overridden. (August put a placeholder-only field in Phase 2. It is filed here to follow the spec; see
   Discussion.)
 
-  Review:
+  Review: **Fixed in 272** — Real `<label for>` on the POS cash field, price-override amount/reason, limit-override reasons, waiver Otro, both void boxes.
 
 - **[panel · Roles y permisos, prompt 262] The "por defecto" state text is below AA in light mode.**
   - The line under each checkbox is `text-[10px] text-gray-400`, measured **2.62:1** on white
@@ -165,7 +165,7 @@ every icon-only button has a name, and reduced motion is respected.
   → Why: this page is the owner's record of every departure from the defaults. The one signal on it should be
   readable.
 
-  Review:
+  Review: **Fixed in 272** — `text-gray-600 dark:text-gray-400` / `text-warning-700 dark:text-warning-400` at text-xs; help-menu heading gray-600.
 
 ---
 
@@ -183,7 +183,7 @@ every icon-only button has a name, and reduced motion is respected.
   → Why: WCAG 2.4.7 / 1.4.11 (3:1 for a state indicator). August checked that every `outline-none` had a
   replacement ring, but never measured whether the ring could be seen.
 
-  Review:
+  Review: **Fixed in 272** — `focus-visible:ring-2 ring-brand ring-offset-2` with a per-scheme offset on `x-button` and the commit buttons.
 
 - **[counter · overlays] The new modals do not move focus into themselves, and one uses `alertdialog` without a
   name.**
@@ -203,7 +203,7 @@ every icon-only button has a name, and reduced motion is respected.
   → Why: WCAG 2.4.3. This is initial focus, **not** a focus trap, so it keeps the recorded no-trap decision
   (see Discussion).
 
-  Review:
+  Review: **Fixed in 272** — Sign-up modal, staff wizard, PIN surface and Importe manual move focus in and back; the discard confirm is a named alertdialog that focuses Seguir cobrando. No trap — the recorded decision stands.
 
 - **[counter · overlays] The back gesture leaves the page instead of closing the sign-up modal or "Importe
   manual".**
@@ -218,7 +218,7 @@ every icon-only button has a name, and reduced motion is respected.
   → Why: CLAUDE.md names this rule, and names the sign-up modal as part of the canon. Keyboard and
   switch-access users on Android rely on Back to dismiss things.
 
-  Review:
+  Review: **Fixed in 272** — pushState/popstate on the sign-up modal (through the same dirty guard), Importe manual, and the camera/photo overlays.
 
 - **[counter · staff sign-up wizard, 221] Validation errors are not tied to their fields.**
   - After a failed "Siguiente" there are five `<p class="text-error">` messages, with no `id`, no
@@ -231,7 +231,7 @@ every icon-only button has a name, and reduced motion is respected.
 
   → Why: WCAG 3.3.1 / 1.3.1. This is the longest staff form on the counter.
 
-  Review:
+  Review: **Fixed in 272** — `<x-socio.field-error>` + `aria-invalid`/`aria-describedby`/`aria-required`; a failed step focuses the first invalid field.
 
 - **[counter · PIN surface] Nothing on the PIN pad reaches a screen reader.**
   - "PIN no reconocido." (`counter-surface.blade.php:154`) is a plain `<p>`.
@@ -241,7 +241,7 @@ every icon-only button has a name, and reduced motion is respected.
 
   → Why: WCAG 4.1.3 / 3.3.1.
 
-  Review:
+  Review: **Fixed in 272** — `role="alert"` on the feedback; an sr-only polite digit count.
 
 - **[counter · tender] The totals change without an announcement.**
   - Quick-cash taps now add (prompt 268) and flip "Falta" ↔ "Cambio", and the commit button's total changes.
@@ -251,7 +251,7 @@ every icon-only button has a name, and reduced motion is respected.
 
   → Why: WCAG 4.1.3. The result of a tap should not be visual-only.
 
-  Review:
+  Review: **Fixed in 272** — `aria-live="polite"` on both tender `<dl>`s.
 
 - **[counter · toggles] Some toggles show which option is selected only by colour.**
   - Affected: Gramos / Calculadora € (`dispensary-pos.blade.php:165–166`), the fee's Efectivo / Monedero
@@ -263,14 +263,14 @@ every icon-only button has a name, and reduced motion is respected.
 
   → Why: WCAG 4.1.2 / 1.4.1.
 
-  Review:
+  Review: **Fixed in 272** — `aria-pressed` on Gramos/Calculadora, fee Efectivo/Monedero, the category/type/strain chips and tiles, and the batch picker.
 
 - **[counter · POS weight keypad] "⌫" has no name** (`dispensary-pos.blade.php:209`), while the PIN pad's
   backspace is `aria-label="Retroceso"`.
 
   → Same label. → Why: WCAG 4.1.2. Screen readers read the glyph inconsistently, or not at all.
 
-  Review:
+  Review: **Fixed in 272** — `aria-label="Retroceso"`.
 
 - **[counter + PWA · signature pad] The canvas has no name or instructions, and saving is not announced.**
   - `signature-pad.blade.php:100` has no `role` or `aria-label`. The form-mode "✓ Firma capturada" is not live.
@@ -282,7 +282,7 @@ every icon-only button has a name, and reduced motion is respected.
   → Why: WCAG 1.1.1 / 4.1.3. The pointer requirement itself is exempt as path-dependent input; being unlabelled
   is not.
 
-  Review:
+  Review: **Fixed in 272** — Canvas `role="img"` with instructions; the captured message is a `role="status"` region (form and Livewire modes).
 
 ---
 
@@ -296,7 +296,7 @@ every icon-only button has a name, and reduced motion is respected.
 
   → `min-h-11`. → Why: tablet-first. The rail is the hub's newest control.
 
-  Review:
+  Review: **Fixed in 272** — All four at `min-h-11` / `h-11` (plus the batch picker and the Importe manual chips).
 
 - **[counter · hub] Alert severity is shown only by the dot's colour** (`counter-home.blade.php:157`, where the
   dot is `aria-hidden`).
@@ -304,21 +304,21 @@ every icon-only button has a name, and reduced motion is respected.
   → An sr-only severity word, or a shape difference. → Why: WCAG 1.4.1. Low impact, since the label itself says
   what is wrong.
 
-  Review:
+  Review: **Fixed in 272** — An sr-only severity word (Urgente / Aviso / Información).
 
 - **[panel · Roles y permisos] The divergence from default is not announced.** The checkbox's `aria-label`
   overrides its wrapping label, so "por defecto: no" never reaches a screen reader.
 
   → `aria-describedby` pointing at that span. → Why: this is the page's main information.
 
-  Review:
+  Review: **Fixed in 272** — `aria-describedby` points at the state line.
 
 - **[counter · flash] The ✕ dismiss has `opacity-70`.** It measures 3.18:1 light and 3.32:1 dark, which passes
   3:1 for a glyph but repeats the opacity-on-token pattern (`counter-flash.blade.php:57`).
 
   → Drop the opacity. → Why: cheap, and it closes a pattern that has already caused one failure.
 
-  Review:
+  Review: **Fixed in 272** — Opacity dropped; a hover background instead.
 
 - **[counter · tender] Names that need their context.** "Borrar" beside "Efectivo entregado" clears only the
   cash, and "€5 / €10 / €20" now *add* money.
@@ -326,7 +326,7 @@ every icon-only button has a name, and reduced motion is respected.
   → `aria-label="Borrar efectivo entregado"` / "Añadir 5 €". → Why: WCAG 2.4.6. Prompt 268 changed what these
   buttons do, and the names no longer say it.
 
-  Review:
+  Review: **Fixed in 272** — `aria-label` "Borrar efectivo entregado" / "Añadir 5,00 €" on both screens.
 
 ---
 
@@ -388,7 +388,7 @@ every icon-only button has a name, and reduced motion is respected.
      close**. That has no "inert left on" failure mode, and the sheets already do it.
    - Whether a real trap is ever wanted is the owner's call. With `aria-modal="true"` and focus left behind the
      dialog, what a screen reader announces and what is focused disagree today.
-2. **August's dismissal of the tile contrast was wrong.** It was the dark hover state (Phase 1, third item), not
+2. **August's dismissal of the tile contrast was wrong.** (Corrected and fixed in 272.) It was the dark hover state (Phase 1, third item), not
    a rendering artefact. It is worth correcting in that report's record so the next pass does not dismiss it
    again.
 3. **How to rank placeholder-only fields.** The audit spec ranks them as Phase 1. August ranked the bar's as

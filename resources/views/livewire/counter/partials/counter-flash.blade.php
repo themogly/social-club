@@ -53,6 +53,6 @@
         {{-- 44×44 (prompt 234). Measured at 27×28 the first time a harness state carried a flash at all — the
              one control on this block, on a tablet, under the floor since 192. Nothing had a flash on screen
              to measure until the column's own geometry harness gained one. --}}
-        <button type="button" wire:click="$set('flashMessage', null)" aria-label="{{ __('Descartar aviso') }}" class="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-md opacity-70 hover:opacity-100">✕</button>
+        <button type="button" wire:click="$set('flashMessage', null)" aria-label="{{ __('Descartar aviso') }}" class="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-md transition hover:bg-black/5 dark:hover:bg-white/5">✕</button>
     </div>
 @endif

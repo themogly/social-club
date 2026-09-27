@@ -57,7 +57,9 @@
         // Prompt 248 — the LARGE size (standalone Bar only): a big tile, name and price large, stock small.
         // `!` overrides the base min-h/padding; list/grid never see these (the condition is false there).
         'flex-col justify-between gap-2 !min-h-[120px] !px-4 !py-3' => $layout === 'large',
-        'border-line bg-surface hover:border-brand hover:bg-brand-tint/40 dark:border-slate-700 dark:bg-slate-950 dark:hover:border-brand' => ! $soldOut,
+        // Prompt 272 — a DARK hover: on a tablet `:hover` sticks to the last tile tapped, and the light tint left
+        // the tile's secondary text at 1.91:1 in dark.
+        'border-line bg-surface hover:border-brand hover:bg-brand-tint/40 dark:border-slate-700 dark:bg-slate-950 dark:hover:border-brand dark:hover:bg-slate-800' => ! $soldOut,
         'cursor-not-allowed border-dashed border-line bg-surface-alt opacity-60 dark:border-slate-800 dark:bg-slate-900' => $soldOut,
     ])
 >

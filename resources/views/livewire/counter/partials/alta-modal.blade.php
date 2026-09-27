@@ -89,7 +89,38 @@
                 return
             }
 
+            this.closing = true
+            {{-- Take back the history entry this modal pushed, so the NEXT back gesture leaves the page as expected. --}}
+            if (history.state?.altaModal) history.back()
             $wire.closeAlta()
+        },
+
+        {{-- Prompt 272 — the back gesture closes the modal, THROUGH the guard (CLAUDE.md names this modal as the
+             canon for it, and it was the one overlay that did not do it: Back left /counter/members and lost a
+             typed application without the confirm). pushState on open; popstate runs the same guard, and a
+             declined confirm puts the entry back so the modal is still covered by it. --}}
+        closing: false,
+        onPopState() {
+            if (this.closing) return
+            if ((this.serverSaysDirty() || this.domSaysDirty()) && ! window.confirm(@js(__('¿Descartar esta alta? Se perderá lo que has escrito.')))) {
+                history.pushState({ altaModal: true }, '')
+                return
+            }
+            this.closing = true
+            $wire.closeAlta()
+        },
+
+        {{-- Initial focus IN, focus back to the trigger on close (WCAG 2.4.3). Not a trap — see the header. --}}
+        focusTitle() { $refs.altaTitle?.focus({ preventScroll: true }) },
+        init() {
+            history.pushState({ altaModal: true }, '')
+            this.popHandler = () => this.onPopState()
+            window.addEventListener('popstate', this.popHandler)
+            this.$nextTick(() => this.focusTitle())
+        },
+        destroy() {
+            window.removeEventListener('popstate', this.popHandler)
+            document.querySelector('[data-alta-toggle]')?.focus({ preventScroll: true })
         },
     }"
     @keydown.escape.window="attemptClose()"
@@ -117,7 +148,7 @@
         {{-- Header — the title is fixed, the subtitle says where you are. --}}
         <div class="flex items-start justify-between gap-4 border-b border-line px-5 py-4 dark:border-slate-800">
             <div class="min-w-0">
-                <h2 id="alta-modal-title" class="text-lg font-semibold">{{ __('Alta de socio/a') }}</h2>
+                <h2 id="alta-modal-title" x-ref="altaTitle" tabindex="-1" class="text-lg font-semibold focus:outline-none">{{ __('Alta de socio/a') }}</h2>
                 <p data-alta-modal-subtitle class="mt-0.5 text-sm text-ink-muted dark:text-slate-400">{{ $altaSubtitle }}</p>
             </div>
             <button
@@ -134,7 +165,9 @@
             {{-- The stepper. Numbered circles joined by progress bars, each circle a real 44px control: you
                  may tap back to a step you have filled in, and forward stays behind Siguiente, where the
                  step's own rules run. A stepper that jumped forward would be a way around validation. --}}
-            <ol data-alta-stepper class="flex items-center gap-1 border-b border-line px-5 py-3 dark:border-slate-800">
+            {{-- Entering the wizard REPLACES the card that had focus, which dropped focus to <body> (prompt 272):
+                 the stepper arriving puts it back on the modal's title. --}}
+            <ol data-alta-stepper x-init="$nextTick(() => { if (! $el.closest('[data-alta-modal]')?.contains(document.activeElement)) $el.closest('[data-alta-modal]')?.querySelector('#alta-modal-title')?.focus({ preventScroll: true }) })" class="flex items-center gap-1 border-b border-line px-5 py-3 dark:border-slate-800">
                 @foreach ($altaSteps as $n => $name)
                     <li @class(['flex items-center gap-1', 'flex-1' => $n < count($altaSteps)])>
                         <button
@@ -262,7 +295,7 @@
                 @endif
                 <button type="button" wire:click="toggleStaffAltaForm" data-alta-staff-form
                         class="flex w-full items-center gap-4 rounded-2xl border border-line bg-surface p-4 text-left transition hover:border-brand hover:bg-brand-tint dark:border-slate-700 dark:bg-slate-900 dark:hover:bg-slate-800">
-                    <span aria-hidden="true" class="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-brand-tint text-2xl dark:bg-slate-800">📝</span>
+                    <span aria-hidden="true" class="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-brand-tint text-brand dark:bg-slate-800 dark:text-slate-200"><x-counter.icon name="pencil" class="h-6 w-6" /></span>
                     <span class="min-w-0 flex-1">
                         <span class="block text-base font-semibold">{{ __('Rellenar sus datos aquí') }}</span>
                         <span class="block text-sm text-ink-muted dark:text-slate-400">{{ __('Tú lo escribes y firma en pantalla al final.') }}</span>
@@ -275,7 +308,7 @@
                      back. Building a lookalike here would have been a second sign-up path to keep in step. --}}
                 <button type="button" wire:click="handOverForAlta" data-alta-handover
                         class="flex w-full items-center gap-4 rounded-2xl border border-line bg-surface p-4 text-left transition hover:border-brand hover:bg-brand-tint dark:border-slate-700 dark:bg-slate-900 dark:hover:bg-slate-800">
-                    <span aria-hidden="true" class="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-brand-tint text-2xl dark:bg-slate-800">🤝</span>
+                    <span aria-hidden="true" class="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-brand-tint text-brand dark:bg-slate-800 dark:text-slate-200"><x-counter.icon name="tablet" class="h-6 w-6" /></span>
                     <span class="min-w-0 flex-1">
                         <span class="block text-base font-semibold">{{ __('Entregar la tablet') }}</span>
                         <span class="block text-sm text-ink-muted dark:text-slate-400">{{ __('Lo rellena la persona, acepta el consentimiento y firma.') }}</span>
