@@ -117,7 +117,8 @@
             <section aria-labelledby="fee-collection-heading" class="rounded-2xl border border-line bg-surface p-4 dark:border-slate-800 dark:bg-slate-900">
 
                 @if ($feeMember)
-                    <div class="mt-3 flex items-start justify-between gap-3 rounded-xl bg-surface-alt p-3 dark:bg-slate-800">
+                    {{-- Prompt 272 — slate-950 in dark: "Pendiente" in success/warning ink was 4.43:1 on slate-800. --}}
+                    <div class="mt-3 flex items-start justify-between gap-3 rounded-xl bg-surface-alt p-3 dark:bg-slate-950">
                         {{-- The photo is already at the counter (prompt 157) and stays. Served through the
                              authorised, access-logged endpoint — never a raw path. --}}
                         @if ($photoUrl)

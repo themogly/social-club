@@ -113,7 +113,7 @@
                 hidden
                 data-reading="{{ __('Leyendo el documento…') }}"
                 data-needs-file="{{ __('Elige primero una foto del documento.') }}"
-                class="inline-flex min-h-11 items-center rounded-xl border border-brand/40 bg-brand-tint px-4 text-sm font-semibold text-brand transition hover:bg-brand-tint/70 disabled:opacity-60 dark:bg-slate-900 dark:text-slate-100"
+                class="inline-flex min-h-11 items-center rounded-xl border border-brand/40 bg-brand-tint px-4 text-sm font-semibold text-brand transition hover:bg-brand-tint/70 disabled:opacity-60 dark:bg-slate-900 dark:text-slate-100 dark:hover:bg-slate-800"
             >{{ __('Rellenar desde el documento') }}</button>
             <p data-alta-mrz-status role="status" aria-live="polite" class="text-[11px] leading-tight text-ink-muted empty:hidden dark:text-slate-400"></p>
             <p class="mt-0.5 text-[11px] leading-tight text-ink-muted dark:text-slate-400">{{ __('Del DNI o NIE, fotografía el REVERSO. Del pasaporte, la página de la foto.') }}</p>

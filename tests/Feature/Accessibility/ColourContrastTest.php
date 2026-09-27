@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\Accessibility;
 
+use Symfony\Component\Finder\Finder;
 use Tests\TestCase;
 
 /**
@@ -85,6 +86,39 @@ class ColourContrastTest extends TestCase
             // DARK value on the dark surface + its /10 tint.
             $this->assertGreaterThanOrEqual(self::AA, $this->ratio($v['dark'], self::DARK), "{$name} dark {$v['dark']} on dark");
             $this->assertGreaterThanOrEqual(self::AA, $this->ratio($v['dark'], $this->over($v['dark'], self::DARK, 0.1)), "{$name} dark on its /10 tint");
+        }
+    }
+
+    /**
+     * Prompt 272 — text ON the token, the inverse case prompt 98 never measured. Solid warning/danger buttons
+     * and error pills carry a WHITE label; the dark text values took it at 3.19:1 / 2.77:1. The fill tokens
+     * must clear AA under white in BOTH schemes (light value first, then the dark overrides).
+     */
+    public function test_the_fill_tokens_take_a_white_label_at_aa_in_both_schemes(): void
+    {
+        $css = (string) file_get_contents(base_path('resources/css/tokens.css'));
+
+        foreach (['warning', 'error'] as $token) {
+            preg_match_all('/--color-'.$token.'-fill:\s*(#[0-9a-fA-F]{6})/', $css, $m);
+            // @theme (light) + the prefers-color-scheme dark block + the explicit .dark block.
+            $this->assertCount(3, $m[1], "Expected a light and two dark values for --color-{$token}-fill.");
+
+            foreach ($m[1] as $fill) {
+                $this->assertGreaterThanOrEqual(self::AA, $this->ratio('#ffffff', strtolower($fill)), "white on {$token}-fill {$fill}");
+            }
+        }
+    }
+
+    public function test_no_counter_view_paints_white_text_on_a_text_token(): void
+    {
+        // The regression this closes: `bg-warning text-white` / `bg-error text-white` hand-rolled in partials,
+        // where a palette fix could not reach them. A solid fill under white text uses the *-fill token.
+        foreach ((new Finder)->files()->in(resource_path('views'))->name('*.blade.php') as $file) {
+            $this->assertDoesNotMatchRegularExpression(
+                '/\bbg-(warning|error)\b(?![\/-])[^"\']*\btext-white\b/',
+                $file->getContents(),
+                $file->getRelativePathname().' paints white text on a text token — use bg-*-fill or <x-button variant>',
+            );
         }
     }
 

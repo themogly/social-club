@@ -212,26 +212,23 @@
                     @if ($blocked)
                         <div class="mt-4 rounded-xl border border-error/30 bg-error/5 p-4">
                             <p class="text-sm font-semibold text-error">{{ __('Entrada bloqueada') }}</p>
-                            <ul class="mt-1 list-disc space-y-0.5 pl-5 text-sm text-error/90">
+                            <ul class="mt-1 list-disc space-y-0.5 pl-5 text-sm text-error">
                                 @foreach ($blockedReasons as $reason)
                                     <li>{{ $reason }}</li>
                                 @endforeach
                             </ul>
 
                             @if ($canOverride)
+                                <label for="checkin-override-reason" class="mt-3 block text-xs font-medium text-ink-muted dark:text-slate-400">{{ __('Motivo de la excepción (queda registrado)') }}</label>
                                 <textarea
+                                    id="checkin-override-reason"
                                     wire:model="overrideReason"
                                     rows="2"
-                                    placeholder="{{ __('Motivo de la excepción (queda registrado)') }}"
-                                    class="mt-3 w-full rounded-xl border border-line bg-surface px-3 py-2 text-sm focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/40 dark:border-slate-700 dark:bg-slate-950"
+                                    class="mt-1 w-full rounded-xl border border-line bg-surface px-3 py-2 text-sm focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/40 dark:border-slate-700 dark:bg-slate-950"
                                 ></textarea>
-                                <button
-                                    wire:click="confirmOverride"
-                                    wire:loading.attr="disabled"
-                                    class="mt-2 h-12 w-full rounded-xl bg-error px-6 text-base font-semibold text-white transition hover:opacity-90 disabled:opacity-60"
-                                >
+                                <x-button variant="danger" size="md" wire:click="confirmOverride" wire:loading.attr="disabled" class="mt-2 w-full">
                                     {{ __('Autorizar y registrar entrada') }}
-                                </button>
+                                </x-button>
                             @else
                                 @include('livewire.counter.partials.authorise-with-pin', ['action' => 'confirmOverrideWithPin', 'reasonModel' => 'overrideReason'])
                             @endif

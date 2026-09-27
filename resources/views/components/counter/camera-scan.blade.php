@@ -48,7 +48,7 @@
             </div>
         </div>
 
-        <p x-show="error" x-cloak x-text="error" role="alert" class="max-w-md rounded-lg bg-error px-4 py-2 text-center text-sm font-semibold text-white"></p>
+        <p x-show="error" x-cloak x-text="error" role="alert" class="max-w-md rounded-lg bg-error-fill px-4 py-2 text-center text-sm font-semibold text-white"></p>
         <p x-show="! error" class="text-sm font-medium text-white/90">{{ __('Apunta la cámara al código QR de la tarjeta del socio.') }}</p>
 
         <x-button variant="secondary" size="md" x-on:click="closeScanner()">{{ __('Cerrar') }}</x-button>

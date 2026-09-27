@@ -127,7 +127,7 @@
                                 placeholder="{{ __('Buscar artículo…') }}"
                                 class="h-11 w-full min-w-0 rounded-xl border border-line bg-surface px-4 text-sm text-ink placeholder:text-ink-muted focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/40 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 sm:w-48"
                             >
-                            <button type="button" @click="showMisc = true" class="inline-flex h-11 shrink-0 items-center gap-1 rounded-xl border border-brand/40 bg-brand-tint/40 px-3 text-sm font-semibold text-brand transition hover:bg-brand-tint dark:border-brand/40 dark:bg-slate-800 dark:text-slate-100">
+                            <button type="button" @click="showMisc = true" class="inline-flex h-11 shrink-0 items-center gap-1 rounded-xl border border-brand/40 bg-brand-tint/40 px-3 text-sm font-semibold text-brand transition hover:bg-brand-tint dark:border-brand/40 dark:bg-slate-800 dark:text-slate-100 dark:hover:bg-slate-700">
                                 <span aria-hidden="true">＋</span>{{ __('Importe manual') }}
                             </button>
                         </div>
@@ -138,9 +138,9 @@
                          filter semantics are the chips' exactly (filterCategory), only rendered as tiles. --}}
                     @if ($articleLayout === 'large' && ! empty($categories))
                         <div data-category-tiles class="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3">
-                            <button type="button" wire:click="filterCategory(null)" data-category-tile @class(['flex min-h-[112px] items-center justify-center rounded-xl border p-4 text-center text-lg font-semibold transition', 'border-brand bg-brand text-white' => $categoryId === null, 'border-line bg-surface text-ink hover:border-brand hover:bg-brand-tint/40 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100' => $categoryId !== null])>{{ __('Todo') }}</button>
+                            <button type="button" wire:click="filterCategory(null)" data-category-tile @class(['flex min-h-[112px] items-center justify-center rounded-xl border p-4 text-center text-lg font-semibold transition', 'border-brand bg-brand text-white' => $categoryId === null, 'border-line bg-surface text-ink hover:border-brand hover:bg-brand-tint/40 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:hover:bg-slate-800' => $categoryId !== null])>{{ __('Todo') }}</button>
                             @foreach ($categories as $category)
-                                <button type="button" wire:click="filterCategory('{{ $category['id'] }}')" data-category-tile @class(['flex min-h-[112px] items-center justify-center rounded-xl border p-4 text-center text-lg font-semibold transition', 'border-brand bg-brand text-white' => $categoryId === $category['id'], 'border-line bg-surface text-ink hover:border-brand hover:bg-brand-tint/40 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100' => $categoryId !== $category['id']])>{{ $category['name'] }}</button>
+                                <button type="button" wire:click="filterCategory('{{ $category['id'] }}')" data-category-tile @class(['flex min-h-[112px] items-center justify-center rounded-xl border p-4 text-center text-lg font-semibold transition', 'border-brand bg-brand text-white' => $categoryId === $category['id'], 'border-line bg-surface text-ink hover:border-brand hover:bg-brand-tint/40 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:hover:bg-slate-800' => $categoryId !== $category['id']])>{{ $category['name'] }}</button>
                             @endforeach
                         </div>
                     @endif
@@ -373,13 +373,13 @@
                                  not a label (a11y audit), and this is the field that decides what goes in the drawer. --}}
                             <div class="flex items-center justify-between">
                                 <label for="bar-cash-tendered" class="block text-xs font-medium text-ink-muted dark:text-slate-400">{{ __('Efectivo entregado') }}</label>
-                                <button type="button" wire:click="clearTendered" data-clear-tendered class="min-h-11 px-2 text-xs font-semibold text-ink-muted hover:text-brand dark:text-slate-400">{{ __('Borrar') }}</button>
+                                <button type="button" wire:click="clearTendered" data-clear-tendered aria-label="{{ __('Borrar efectivo entregado') }}" class="min-h-11 px-2 text-xs font-semibold text-ink-muted hover:text-brand dark:text-slate-400">{{ __('Borrar') }}</button>
                             </div>
                             <div class="mt-1 grid grid-cols-4 gap-2">
                                 <button type="button" wire:click="quickCash" class="h-11 rounded-xl border border-line bg-surface text-sm font-semibold text-ink transition hover:bg-surface-alt dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:hover:bg-slate-800">{{ __('Justo') }}</button>
-                                <button type="button" wire:click="quickCash(500)" class="h-11 rounded-xl border border-line bg-surface text-sm font-semibold text-ink transition hover:bg-surface-alt dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:hover:bg-slate-800">€5</button>
-                                <button type="button" wire:click="quickCash(1000)" class="h-11 rounded-xl border border-line bg-surface text-sm font-semibold text-ink transition hover:bg-surface-alt dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:hover:bg-slate-800">€10</button>
-                                <button type="button" wire:click="quickCash(2000)" class="h-11 rounded-xl border border-line bg-surface text-sm font-semibold text-ink transition hover:bg-surface-alt dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:hover:bg-slate-800">€20</button>
+                                <button type="button" wire:click="quickCash(500)" aria-label="{{ __('Añadir :money', ['money' => $this->money(500)]) }}" class="h-11 rounded-xl border border-line bg-surface text-sm font-semibold text-ink transition hover:bg-surface-alt dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:hover:bg-slate-800">€5</button>
+                                <button type="button" wire:click="quickCash(1000)" aria-label="{{ __('Añadir :money', ['money' => $this->money(1000)]) }}" class="h-11 rounded-xl border border-line bg-surface text-sm font-semibold text-ink transition hover:bg-surface-alt dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:hover:bg-slate-800">€10</button>
+                                <button type="button" wire:click="quickCash(2000)" aria-label="{{ __('Añadir :money', ['money' => $this->money(2000)]) }}" class="h-11 rounded-xl border border-line bg-surface text-sm font-semibold text-ink transition hover:bg-surface-alt dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:hover:bg-slate-800">€20</button>
                             </div>
                             <input
                                 id="bar-cash-tendered"
@@ -387,12 +387,13 @@
                                 inputmode="decimal"
                                 wire:model.live.debounce.400ms="cashTendered"
                                 autocomplete="off"
-                                placeholder="{{ __('Efectivo entregado (€)') }}"
+                                placeholder="0,00"
                                 class="mt-2 h-11 w-full rounded-xl border border-line bg-surface px-3 text-base text-ink placeholder:text-ink-muted focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/40 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
                             >
                         </div>
 
-                        <dl class="space-y-1 rounded-xl bg-surface-alt px-4 py-3 text-sm dark:bg-slate-800">
+                        {{-- Prompt 272 — slate-950 in dark (Cambio's green was 4.43:1 on 800) and a polite live region. --}}
+                        <dl data-tender-summary aria-live="polite" class="space-y-1 rounded-xl bg-surface-alt px-4 py-3 text-sm dark:bg-slate-950">
                             <div class="flex items-center justify-between">
                                 <dt class="text-ink-muted dark:text-slate-400">{{ __('A cobrar en efectivo') }}</dt>
                                 <dd class="font-semibold tabular-nums">{{ $this->money($cashPostedCents) }}</dd>
@@ -448,8 +449,8 @@
 
                             @if ($canVoid)
                                 <div class="rounded-xl border border-line bg-surface p-3 dark:border-slate-700 dark:bg-slate-900">
-                                    <label class="block text-xs font-medium text-ink-muted dark:text-slate-400">{{ __('Anular esta venta') }}</label>
-                                    <textarea wire:model="voidReason" rows="2" placeholder="{{ __('Motivo de la anulación (queda registrado)') }}" class="mt-1 w-full rounded-lg border border-line bg-surface px-3 py-2 text-sm focus:border-error focus:outline-none focus:ring-2 focus:ring-error/30 dark:border-slate-700 dark:bg-slate-950"></textarea>
+                                    <label for="bar-void-reason" class="block text-xs font-medium text-ink-muted dark:text-slate-400">{{ __('Anular esta venta') }}</label>
+                                    <textarea id="bar-void-reason" wire:model="voidReason" rows="2" placeholder="{{ __('Motivo de la anulación (queda registrado)') }}" class="mt-1 w-full rounded-lg border border-line bg-surface px-3 py-2 text-sm focus:border-error focus:outline-none focus:ring-2 focus:ring-error/30 dark:border-slate-700 dark:bg-slate-950"></textarea>
                                     <button type="button" wire:click="voidLast" wire:confirm="{{ __('¿Anular la venta? Se revertirán stock y monedero.') }}" class="mt-2 h-11 w-full rounded-lg border border-error/40 bg-error/10 text-sm font-semibold text-error transition hover:bg-error/20">{{ __('Anular') }}</button>
                                 </div>
                             @endif

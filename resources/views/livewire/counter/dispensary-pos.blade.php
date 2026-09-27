@@ -123,6 +123,16 @@
             // selection pane, the cart's verdict list (which drops its duplicate copy) and the commit's
             // reason line.
             $blockedSurface = $member !== null && ! empty($hardBlockRules);
+
+            // Prompt 272 — the member-detail card renders only when it has a ROW to show. It used to render
+            // whenever the verdict was not clear; while the blocked surface is up every blocking rule is skipped
+            // below and the remedies are withheld, so a blocked socio with no warnings and nothing owed got an
+            // empty 32px box between the identity and the basket. Same rule the loop applies, computed once.
+            $memberDetailRules = ($member && $verdict && ! $verdict->isClear())
+                ? collect($verdict->rules)->reject(fn (array $rule): bool => $rule['satisfied'] || ($blockedSurface && in_array($rule['mode'], ['BLOCK', 'OVERRIDE'], true)))
+                : collect();
+            $showMemberDetail = $member && $verdict && ! $verdict->isClear()
+                && ($memberDetailRules->isNotEmpty() || ($owesCents ?? 0) > 0);
         @endphp
 
         <div class="flex h-full min-h-0 flex-col gap-4 md:flex-row">
@@ -184,13 +194,13 @@
                                         data-weight-preset="{{ $preset['grams_cg'] }}"
                                         @class([
                                             'flex min-h-11 flex-col items-center justify-center rounded-xl border px-1 py-1 text-sm font-semibold transition',
-                                            'border-line bg-surface text-ink hover:bg-brand-tint hover:text-brand dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100' => $preset['available'],
+                                            'border-line bg-surface text-ink hover:bg-brand-tint hover:text-brand dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:hover:bg-slate-800 dark:hover:text-white' => $preset['available'],
                                             'cursor-not-allowed border-line/60 text-ink-muted opacity-40 dark:border-slate-800' => ! $preset['available'],
                                         ])
                                     >
                                         <span>{{ $preset['label'] }} g</span>
                                         @if ($preset['price_cents'] !== null)
-                                            <span @class(['text-[11px] font-medium', 'text-brand' => $preset['eighth_applied'], 'text-ink-muted dark:text-slate-400' => ! $preset['eighth_applied']])>
+                                            <span @class(['text-[11px] font-medium', 'font-semibold text-brand dark:text-slate-100' => $preset['eighth_applied'], 'text-ink-muted dark:text-slate-400' => ! $preset['eighth_applied']])>
                                                 {{ $this->money($preset['price_cents']) }}@if ($preset['eighth_applied']) · ⅛@endif
                                             </span>
                                         @endif
@@ -504,7 +514,7 @@
                                     'flex w-full min-h-11 rounded-xl border px-3 py-1.5 text-left transition',
                                     'flex-col gap-1' => $this->catalogueLayout() === 'grid',
                                     'flex-col gap-1 sm:flex-row sm:items-center sm:justify-between sm:gap-4' => $this->catalogueLayout() === 'list',
-                                    'border-line bg-surface hover:border-brand hover:bg-brand-tint/40 dark:border-slate-700 dark:bg-slate-950 dark:hover:border-brand' => ! $disabledCard,
+                                    'border-line bg-surface hover:border-brand hover:bg-brand-tint/40 dark:border-slate-700 dark:bg-slate-950 dark:hover:border-brand dark:hover:bg-slate-800' => ! $disabledCard,
                                     'cursor-not-allowed border-dashed border-line bg-surface-alt opacity-60 dark:border-slate-800 dark:bg-slate-900' => $disabledCard,
                                 ])
                             >
@@ -582,7 +592,7 @@
                 <div data-cart-scroll class="counter-scroll-region flex min-h-[9rem] flex-1 flex-col gap-4 overflow-y-auto overscroll-contain pr-1">
                     {{-- The card renders ONLY when the verdict has something an operator must act on. A clean
                          socio's column is now identity (pinned) → basket, with nothing between them. --}}
-                    @if ($member && $verdict && ! $verdict->isClear())
+                    @if ($showMemberDetail)
                         <section data-member-detail class="rounded-2xl border border-line bg-surface p-4 dark:border-slate-800 dark:bg-slate-900">
                         {{-- WHAT THIS SECTION NO LONGER SAYS (prompt 234). The owner: *"the waiting period
                              Completed I don't think is needed, along with Cleared to dispense — if there's an
@@ -826,8 +836,14 @@
                         <div data-price-override x-show="open" x-cloak class="mt-2 rounded-xl border border-warning/30 bg-warning/5 p-3">
                             <p class="block text-xs font-medium text-warning">{{ __('Ajustar precio (queda registrado)') }}</p>
                             <div class="mt-1 grid gap-2 sm:grid-cols-2">
-                                <input type="text" inputmode="decimal" wire:model.blur="priceOverrideEuros" autocomplete="off" placeholder="{{ __('Nuevo total (€)') }}" class="h-11 w-full rounded-xl border border-line bg-surface px-3 text-base text-ink placeholder:text-ink-muted focus:border-warning focus:outline-none focus:ring-2 focus:ring-warning/40 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100">
-                                <input type="text" wire:model.blur="priceOverrideReason" autocomplete="off" placeholder="{{ __('Motivo (p. ej. producto defectuoso)') }}" class="h-11 w-full rounded-xl border border-line bg-surface px-3 text-base text-ink placeholder:text-ink-muted focus:border-warning focus:outline-none focus:ring-2 focus:ring-warning/40 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100">
+                                <div>
+                                <label for="price-override-amount" class="block text-xs font-medium text-ink-muted dark:text-slate-400">{{ __('Nuevo total (€)') }}</label>
+                                <input id="price-override-amount" type="text" inputmode="decimal" wire:model.blur="priceOverrideEuros" autocomplete="off" class="mt-1 h-11 w-full rounded-xl border border-line bg-surface px-3 text-base text-ink placeholder:text-ink-muted focus:border-warning focus:outline-none focus:ring-2 focus:ring-warning/40 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100">
+                                </div>
+                                <div>
+                                <label for="price-override-reason" class="block text-xs font-medium text-ink-muted dark:text-slate-400">{{ __('Motivo del ajuste') }}</label>
+                                <input id="price-override-reason" type="text" wire:model.blur="priceOverrideReason" autocomplete="off" placeholder="{{ __('Motivo (p. ej. producto defectuoso)') }}" class="mt-1 h-11 w-full rounded-xl border border-line bg-surface px-3 text-base text-ink placeholder:text-ink-muted focus:border-warning focus:outline-none focus:ring-2 focus:ring-warning/40 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100">
+                                </div>
                             </div>
                             <p class="mt-1 text-[11px] text-ink-muted dark:text-slate-400">{{ __('Deja el importe vacío para cobrar el precio normal. 0 € = gratis.') }}</p>
                         </div>
@@ -852,20 +868,25 @@
                         {{-- Quick cash --}}
                         <div>
                             <div class="flex items-center justify-between">
-                                <p class="text-xs font-medium text-ink-muted dark:text-slate-400">{{ __('Efectivo entregado') }}</p>
+                                {{-- Prompt 272 — a real <label for>, as the bar's cash field has had since August: a placeholder
+                                     is not a label, and it vanished on the first keystroke of the field that decides the drawer. --}}
+                                <label for="pos-cash-tendered" class="text-xs font-medium text-ink-muted dark:text-slate-400">{{ __('Efectivo entregado') }}</label>
                                 {{-- Prompt 268 — the notes ADD now, so a mistaken tap needs an undo. --}}
-                                <button type="button" wire:click="clearTendered" data-clear-tendered class="min-h-11 px-2 text-xs font-semibold text-ink-muted hover:text-brand dark:text-slate-400">{{ __('Borrar') }}</button>
+                                <button type="button" wire:click="clearTendered" data-clear-tendered aria-label="{{ __('Borrar efectivo entregado') }}" class="min-h-11 px-2 text-xs font-semibold text-ink-muted hover:text-brand dark:text-slate-400">{{ __('Borrar') }}</button>
                             </div>
                             <div class="mt-1 grid grid-cols-4 gap-2">
                                 <button type="button" wire:click="quickCash" class="h-11 rounded-xl border border-line bg-surface text-sm font-semibold text-ink transition hover:bg-surface-alt dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:hover:bg-slate-800">{{ __('Justo') }}</button>
-                                <button type="button" wire:click="quickCash(500)" class="h-11 rounded-xl border border-line bg-surface text-sm font-semibold text-ink transition hover:bg-surface-alt dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:hover:bg-slate-800">€5</button>
-                                <button type="button" wire:click="quickCash(1000)" class="h-11 rounded-xl border border-line bg-surface text-sm font-semibold text-ink transition hover:bg-surface-alt dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:hover:bg-slate-800">€10</button>
-                                <button type="button" wire:click="quickCash(2000)" class="h-11 rounded-xl border border-line bg-surface text-sm font-semibold text-ink transition hover:bg-surface-alt dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:hover:bg-slate-800">€20</button>
+                                <button type="button" wire:click="quickCash(500)" aria-label="{{ __('Añadir :money', ['money' => $this->money(500)]) }}" class="h-11 rounded-xl border border-line bg-surface text-sm font-semibold text-ink transition hover:bg-surface-alt dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:hover:bg-slate-800">€5</button>
+                                <button type="button" wire:click="quickCash(1000)" aria-label="{{ __('Añadir :money', ['money' => $this->money(1000)]) }}" class="h-11 rounded-xl border border-line bg-surface text-sm font-semibold text-ink transition hover:bg-surface-alt dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:hover:bg-slate-800">€10</button>
+                                <button type="button" wire:click="quickCash(2000)" aria-label="{{ __('Añadir :money', ['money' => $this->money(2000)]) }}" class="h-11 rounded-xl border border-line bg-surface text-sm font-semibold text-ink transition hover:bg-surface-alt dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:hover:bg-slate-800">€20</button>
                             </div>
-                            <input type="text" inputmode="decimal" wire:model.live.debounce.400ms="cashTendered" autocomplete="off" placeholder="{{ __('Efectivo entregado (€)') }}" class="mt-2 h-11 w-full rounded-xl border border-line bg-surface px-3 text-base text-ink placeholder:text-ink-muted focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/40 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100">
+                            <input id="pos-cash-tendered" type="text" inputmode="decimal" wire:model.live.debounce.400ms="cashTendered" autocomplete="off" placeholder="0,00" class="mt-2 h-11 w-full rounded-xl border border-line bg-surface px-3 text-base text-ink placeholder:text-ink-muted focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/40 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100">
                         </div>
 
-                        <dl class="space-y-1 rounded-xl bg-surface-alt px-4 py-3 text-sm dark:bg-slate-800">
+                        {{-- Prompt 272 — slate-950, not 800, in dark (an inset well inside the slate-900 card): the dark success token
+                             was only ever checked against the darkest surfaces, and "Cambio" (the figure counted into a hand) was 4.43:1 on 800. Polite live
+                             region, so a quick-cash tap that flips Falta / Cambio is announced, not visual-only. --}}
+                        <dl data-tender-summary aria-live="polite" class="space-y-1 rounded-xl bg-surface-alt px-4 py-3 text-sm dark:bg-slate-950">
                             <div class="flex items-center justify-between">
                                 <dt class="text-ink-muted dark:text-slate-400">{{ __('A cobrar en efectivo') }}</dt>
                                 <dd data-cash-due class="font-semibold tabular-nums">{{ $this->money($cashPreviewCents) }}</dd>
@@ -942,8 +963,9 @@
                         <div class="mt-4 rounded-xl border border-warning/40 bg-warning/5 p-3">
                             <p class="text-sm font-semibold text-warning">{{ $limitBreach ? __('Supera el límite de consumo') : __('Requiere autorización') }}</p>
                             @if ($canOverride)
-                                <textarea wire:model="overrideReason" rows="2" placeholder="{{ __('Motivo de la excepción (queda registrado)') }}" class="mt-2 w-full rounded-xl border border-warning/40 bg-surface px-3 py-2 text-sm focus:border-warning focus:outline-none focus:ring-2 focus:ring-warning/40 dark:bg-slate-950"></textarea>
-                                <button type="button" wire:click="commitWithOverride" wire:loading.attr="disabled" wire:target="commitWithOverride" x-bind:disabled="! online" class="mt-2 h-12 w-full rounded-xl bg-warning px-4 text-base font-semibold text-white transition hover:opacity-90 disabled:opacity-60">{{ __('Autorizar y registrar') }}</button>
+                                <label for="override-reason" class="mt-2 block text-xs font-medium text-ink-muted dark:text-slate-400">{{ __('Motivo de la excepción (queda registrado)') }}</label>
+                                <textarea id="override-reason" wire:model="overrideReason" rows="2" class="mt-1 w-full rounded-xl border border-warning/40 bg-surface px-3 py-2 text-sm focus:border-warning focus:outline-none focus:ring-2 focus:ring-warning/40 dark:bg-slate-950"></textarea>
+                                <x-button variant="warning" size="md" wire:click="commitWithOverride" wire:loading.attr="disabled" wire:target="commitWithOverride" x-bind:disabled="! online" class="mt-2 w-full">{{ __('Autorizar y registrar') }}</x-button>
                             @else
                                 @include('livewire.counter.partials.authorise-with-pin', ['action' => 'commitWithAuthoriserPin', 'reasonModel' => 'overrideReason'])
                             @endif
@@ -979,8 +1001,8 @@
 
                             @if ($canVoid)
                                 <div class="rounded-xl border border-line bg-surface p-3 dark:border-slate-700 dark:bg-slate-900">
-                                    <label class="block text-xs font-medium text-ink-muted dark:text-slate-400">{{ __('Anular esta dispensación') }}</label>
-                                    <textarea wire:model="voidReason" rows="2" placeholder="{{ __('Motivo de la anulación (queda registrado)') }}" class="mt-1 w-full rounded-lg border border-line bg-surface px-3 py-2 text-sm focus:border-error focus:outline-none focus:ring-2 focus:ring-error/30 dark:border-slate-700 dark:bg-slate-950"></textarea>
+                                    <label for="pos-void-reason" class="block text-xs font-medium text-ink-muted dark:text-slate-400">{{ __('Anular esta dispensación') }}</label>
+                                    <textarea id="pos-void-reason" wire:model="voidReason" rows="2" placeholder="{{ __('Motivo de la anulación (queda registrado)') }}" class="mt-1 w-full rounded-lg border border-line bg-surface px-3 py-2 text-sm focus:border-error focus:outline-none focus:ring-2 focus:ring-error/30 dark:border-slate-700 dark:bg-slate-950"></textarea>
                                     <button type="button" wire:click="voidLast" wire:confirm="{{ __('¿Anular la dispensación? Se revertirán stock y monedero.') }}" class="mt-2 h-11 w-full rounded-lg border border-error/40 bg-error/10 text-sm font-semibold text-error transition hover:bg-error/20">{{ __('Anular') }}</button>
                                 </div>
                             @endif

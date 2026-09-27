@@ -64,7 +64,7 @@
             <span>✓ {{ __('Firma capturada') }}</span>
             @if ($mode === 'livewire')
                 <button type="button" wire:click="{{ $clear }}" data-signature-redo
-                        class="inline-flex min-h-11 items-center rounded-md px-3 text-success/80 hover:text-success">{{ __('Rehacer') }}</button>
+                        class="inline-flex min-h-11 items-center rounded-md px-3 font-semibold text-success underline-offset-2 hover:underline">{{ __('Rehacer') }}</button>
             @endif
         </div>
     @else

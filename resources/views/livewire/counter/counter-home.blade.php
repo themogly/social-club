@@ -86,7 +86,7 @@
                             href="{{ route($tile['route']) }}"
                             data-counter-home-tile="{{ $tile['route'] }}"
                             wire:navigate.ignore
-                            class="flex min-h-[8rem] flex-col justify-between rounded-2xl border border-line bg-surface p-5 shadow-sm transition hover:border-brand hover:bg-brand-tint hover:text-brand focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand dark:border-slate-800 dark:bg-slate-900 dark:hover:border-brand dark:hover:bg-slate-800"
+                            class="flex min-h-[8rem] flex-col justify-between rounded-2xl border border-line bg-surface p-5 shadow-sm transition hover:border-brand hover:bg-brand-tint hover:text-brand focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand dark:border-slate-800 dark:bg-slate-900 dark:hover:border-brand dark:hover:bg-slate-800 dark:hover:text-white"
                         >
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" class="h-8 w-8" aria-hidden="true">
                                 <path stroke-linecap="round" stroke-linejoin="round" d="{{ $tile['icon'] }}"/>

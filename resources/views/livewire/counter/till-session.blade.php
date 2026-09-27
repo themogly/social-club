@@ -182,8 +182,8 @@
                                     wire:click="toggleNotCounted('{{ $batch->id }}')"
                                     data-reweigh-not-counted-toggle="{{ $batch->id }}"
                                     @class([
-                                        'shrink-0 rounded-lg px-2.5 py-1 text-xs font-semibold transition',
-                                        'bg-warning text-white' => $notCounted,
+                                        'inline-flex min-h-11 shrink-0 items-center rounded-lg px-3 text-xs font-semibold transition',
+                                        'bg-warning-fill text-white hover:brightness-90' => $notCounted,
                                         'bg-surface-alt text-ink-muted hover:bg-warning/10 hover:text-warning dark:bg-slate-800 dark:text-slate-400' => ! $notCounted,
                                     ])
                                 >
@@ -197,6 +197,7 @@
                                     wire:model="reweighReasons.{{ $batch->id }}"
                                     data-reweigh-reason="{{ $batch->id }}"
                                     autocomplete="off"
+                                    aria-label="{{ __('Motivo por el que no se puede contar') }}"
                                     placeholder="{{ __('Motivo (p. ej. bote no localizado)') }}"
                                     class="mt-2 h-14 w-full rounded-xl border border-warning/50 bg-warning/5 px-4 text-base text-ink placeholder:text-ink-muted focus:border-warning focus:outline-none focus:ring-2 focus:ring-warning/40 dark:text-slate-100"
                                 >
@@ -219,19 +220,8 @@
                     @endforeach
 
                     <div class="flex gap-2">
-                        <button
-                            type="button"
-                            wire:click="cancelClose"
-                            class="h-14 flex-1 rounded-xl border border-line bg-surface-alt px-6 text-base font-semibold text-ink transition hover:bg-slate-200 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:hover:bg-slate-700"
-                        >
-                            {{ __('Cancelar') }}
-                        </button>
-                        <button
-                            type="submit"
-                            class="h-14 flex-1 rounded-xl bg-warning px-6 text-base font-semibold text-white transition hover:opacity-90"
-                        >
-                            {{ __('Confirmar recuento') }}
-                        </button>
+                        <x-button variant="secondary" size="lg" wire:click="cancelClose" class="flex-1">{{ __('Cancelar') }}</x-button>
+                        <x-button type="submit" variant="warning" size="lg" class="flex-1">{{ __('Confirmar recuento') }}</x-button>
                     </div>
                 </form>
             </section>
