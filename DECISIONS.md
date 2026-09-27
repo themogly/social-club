@@ -14149,3 +14149,43 @@ crossing" marker so it does not fire on every render; say the word if the club w
 `LowStockAlertTest` (8): threshold crossed → alert, restock → cleared (through `RecordStockMovement`); empty is not low; tier-row
 figure counts; base row wins; articles (active, not deleted, filtered panel URL); the panel dashboard and the counter hub both say it;
 another sede's / another organisation's stock never reaches this sede's alert; no per-variety queries. `DemoSeedProfileTest` +1.
+
+## Prompt 270 — pre-live security: the PIN is a sign-in everywhere, and only an owner makes an owner
+
+From the pre-live security audit (`audits/reports/2026-09-pre-live-security.md`) plus the two access findings the admin
+and code-style audits raised. Ben: "go with your recommendations and fix all". Each item is proven over the request that
+exploited it in `PreLiveSignInHardeningTest` (11).
+
+- **Till handover signs in.** `TillSession::handOver()` named the incoming person without signing them in, so after
+  owner → staff the staff member held the owner's panel. `SignInOperator` now sets `CounterOperator` itself and is the
+  ONLY production caller of `CounterOperator::set()` (a test scans `app/` for a second one).
+- **A correct PIN no longer clears the throttle — supersedes prompt 120.** An insider could interleave their own PIN
+  between guesses at the owner's (24 wrong guesses against a limit of 5). Failures now decay only with time (300 s for
+  attempts, an hour for strikes); a responsable can still clear a bucket from Seguridad. Owner's decision via Ben, on my
+  recommendation. The two tests that pinned 120's rule now pin this one.
+- **A PIN names exactly one person.** The Personal form refuses a PIN another account already uses (checked against every
+  stored hash, inactive and deleted accounts included — `User::pinIsTaken()`); `UnlockOperator` refuses a PIN that still
+  matches two people (set before this rule) and audits `counter.pin.ambiguous` with the user ids, never the PIN. Owner task:
+  have everyone set a fresh PIN, since existing duplicates cannot be found from the hashes.
+- **Only an owner makes an owner.** `staff.manage` (owner-editable since 262) let a manager set their own roles to OWNER or
+  reset the owner's password. Now: an owner's row is touchable only by an owner (`UserPolicy`); the role list hides OWNER
+  from non-owners; a non-owner cannot change their own roles (field locked); and `EnsureRoleChangeIsAllowed` refuses a
+  forged submission on create and edit.
+- **Locked means locked for Livewire too.** `CounterLockConfinement` — a global `before('hydrate')` hook, the shape of 254's
+  handover confinement — refuses (403 + `counter.lock.refused_call`) any non-counter component while the counter session
+  is locked. Page loads were already redirected (267); a replayed panel snapshot was not.
+- **Sponsor lookup** (`avaladorFeedback()`, public) answers nothing with nobody at the PIN — it returned a full member row.
+- **Sedes are managed by those who work there.** `LocationPolicy` checked only the permission; now view/update/restore/
+  delete need the sede to be one of the user's (an owner works everywhere, inactive sedes included), creating one takes
+  `locations.manage`, and the Sedes list shows a non-owner only their own.
+- **Phase 2/3:** vault responses send `Cache-Control: no-store, private`; a deactivated account is signed out on its next
+  web request (`EndInactiveSessions`, before the counter guards) and an operator id naming an inactive account is dropped;
+  the CSP gains `report-uri /csp-report`, a throttled, CSRF-exempt, 8 KB-bounded endpoint that logs `csp.violation` with
+  URLs reduced to scheme/host/path (a signed URL's query is never logged). The policy stays report-only until that log is
+  clean — flipping `CSP_ENFORCE` is the owner's call after watching it.
+- Two tests faked a counter-only account with an INACTIVE user; since the inactive sign-out they use a real one (STAFF
+  hold no `panel.access` by default, 262).
+- Not changed: prompt 124's fail-open throttle on a cache outage (never 503 the counter). Moving the throttle keys to the
+  database store is noted in the report's Discussion as an option, not done.
+
+`composer check` green in `es` and `en`. Merged to `main` on Ben's instruction.

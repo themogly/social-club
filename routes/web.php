@@ -5,6 +5,7 @@ use App\Http\Controllers\BarReceiptController;
 use App\Http\Controllers\Counter\MemberPhotoController;
 use App\Http\Controllers\CounterLocationController;
 use App\Http\Controllers\CounterPanicController;
+use App\Http\Controllers\CspReportController;
 use App\Http\Controllers\DispensationReceiptController;
 use App\Http\Controllers\LockdownReactivationController;
 use App\Http\Controllers\Member\AnnouncementController;
@@ -21,7 +22,14 @@ use App\Livewire\Counter\CounterHome;
 use App\Livewire\Counter\DispensaryPos;
 use App\Livewire\Counter\MembershipCounter;
 use App\Livewire\Counter\TillSession;
+use Illuminate\Foundation\Http\Middleware\PreventRequestForgery;
 use Illuminate\Support\Facades\Route;
+
+// Prompt 270 — the Content-Security-Policy's report stream (browsers post without a CSRF token or a session).
+Route::post('csp-report', CspReportController::class)
+    ->withoutMiddleware([PreventRequestForgery::class])
+    ->middleware('throttle:60,1')
+    ->name('csp.report');
 
 // Authenticated, signed, short-lived access to a member document on the private
 // disk (issued by App\Actions\Members\IssueDocumentUrl). The `signed` middleware

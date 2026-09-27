@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Middleware\EndInactiveSessions;
 use App\Http\Middleware\EnforceCounterHandover;
 use App\Http\Middleware\EnforceOrgLockdown;
 use App\Http\Middleware\RequireOpenTill;
@@ -55,6 +56,8 @@ return Application::configure(basePath: dirname(__DIR__))
         // too, after that stack's StartSession — see AdminPanelProvider. One boundary, both surfaces, each with
         // a started session behind it.
         $middleware->web(append: [
+            // Prompt 270 — a deactivated account is signed out on its next request, before any counter guard runs.
+            EndInactiveSessions::class,
             EnforceCounterHandover::class,
             RequireOpenTill::class,
             SetLocale::class,

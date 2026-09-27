@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Counter;
 
+use App\Actions\Counter\SignInOperator;
 use App\Actions\Expenses\RecordTillExpense;
 use App\Actions\Stock\CommitStockTake;
 use App\Actions\Till\CloseTill;
@@ -311,8 +312,9 @@ class TillSession extends Component
             return;
         }
 
-        // The drawer now belongs to the person who took it, so the counter works as them from here.
-        CounterOperator::set($incoming);
+        // The drawer now belongs to the person who took it, so the counter works as them from here — and so does the
+        // session (prompt 270): a handover is a PIN sign-in like any other, never a person switch under the old login.
+        (new SignInOperator)->handle($incoming, $location);
         $this->reset(['handoverOpen', 'handoverCounted', 'handoverPin', 'handoverNote']);
 
         // Deliberately says nothing about the variance: the count was blind and stays blind until the

@@ -83,23 +83,31 @@ class CounterPinTest extends TestCase
         $this->assertGreaterThan($firstWindow, $action->lockoutSecondsRemaining($key)); // escalated
     }
 
-    public function test_a_correct_pin_clears_the_escalating_throttle(): void
+    /**
+     * Prompt 270 supersedes 120's "a correct PIN clears the throttle": since 267 a PIN is a sign-in, and a success that
+     * wiped the tally let an insider interleave their own PIN between guesses. Failures now decay only with time.
+     */
+    public function test_a_correct_pin_does_not_clear_the_throttle_failures_decay_with_time(): void
     {
         $action = new UnlockOperator;
         $key = 'pin:test:clear';
 
-        // Four wrong attempts (one shy of a lockout), then the correct PIN — the tally resets.
+        // Four wrong attempts (one shy of a lockout), then the correct PIN — it still signs in…
         for ($i = 0; $i < UnlockOperator::MAX_ATTEMPTS - 1; $i++) {
             $action->handle($this->location, '0000', $key);
         }
         $this->assertNotNull($action->handle($this->location, '4321', $key));
         $this->assertFalse($action->isLockedOut($key));
 
-        // A fresh run of wrong attempts starts from zero (no residual count carried over).
-        for ($i = 0; $i < UnlockOperator::MAX_ATTEMPTS - 1; $i++) {
-            $action->handle($this->location, '0000', $key);
-        }
-        $this->assertFalse($action->isLockedOut($key)); // still one short — the earlier attempts did not persist
+        // …but the tally stands: the next wrong attempt is the fifth, and locks.
+        $action->handle($this->location, '0000', $key);
+        $this->assertTrue($action->isLockedOut($key));
+
+        // Time is what clears it: past the lockout window and the attempt window, a fresh run starts from zero.
+        $this->travel(UnlockOperator::LOCKOUT_WINDOWS[0] + 301)->seconds();
+        $this->assertFalse($action->isLockedOut($key));
+        $action->handle($this->location, '0000', $key);
+        $this->assertFalse($action->isLockedOut($key));
     }
 
     public function test_transaction_records_the_unlocked_operator_not_the_device_user(): void

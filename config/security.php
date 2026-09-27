@@ -7,10 +7,11 @@ return [
     | Content-Security-Policy
     |--------------------------------------------------------------------------
     |
-    | Shipped REPORT-ONLY by default so a too-tight policy surfaces violations in
-    | the browser console without breaking the Filament panel / Livewire / Alpine
-    | (Alpine needs 'unsafe-eval' + 'unsafe-inline'). Once the report stream is
-    | clean, flip CSP_ENFORCE=true to switch the header to the enforcing variant.
+    | Shipped REPORT-ONLY by default so a too-tight policy surfaces violations
+    | without breaking the Filament panel / Livewire / Alpine (Alpine needs
+    | 'unsafe-eval' + 'unsafe-inline'). Violations are posted to /csp-report and
+    | logged as `csp.violation` (prompt 270). Once that log is clean, flip
+    | CSP_ENFORCE=true to switch the header to the enforcing variant.
     | Even permissive, this still blocks external/injected scripts, framing, and
     | base-uri / form-action hijacking.
     |
@@ -29,6 +30,7 @@ return [
         "base-uri 'self'",
         "form-action 'self'",
         "object-src 'none'",
+        'report-uri /csp-report',
     ],
 
     /*

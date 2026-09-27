@@ -44,6 +44,9 @@ class VaultStream
             'Content-Type' => DocumentVault::mimeFor($path),
             'Content-Disposition' => 'inline; filename="'.basename($path).'"',
             'X-Content-Type-Options' => 'nosniff',
+            // Prompt 270 — never let a decrypted ID scan sit in a shared tablet's disk cache after the link expires.
+            'Cache-Control' => 'no-store, private, max-age=0',
+            'Pragma' => 'no-cache',
         ]);
     }
 }

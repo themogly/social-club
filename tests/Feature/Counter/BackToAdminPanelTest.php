@@ -74,10 +74,10 @@ class BackToAdminPanelTest extends TestCase
 
     public function test_a_counter_only_user_without_panel_access_sees_no_administration_link(): void
     {
-        // Has the counter permission (via STAFF) but canAccessPanel() is false (inactive) —
-        // the deliberate lockdown for a fixed till tablet. The shared header still renders;
-        // the Administración link does not.
-        $counterOnly = $this->user(Role::STAFF, active: false);
+        // Has the counter permission (via STAFF) but canAccessPanel() is false — STAFF hold no `panel.access` by
+        // default (262), the deliberate lockdown for a fixed till tablet. (It used to be faked with an INACTIVE account,
+        // which since 270 is signed out on its next request.) The shared header still renders; the link does not.
+        $counterOnly = $this->user(Role::STAFF);
         $this->assertFalse($counterOnly->canAccessPanel(Filament::getPanel('admin')));
 
         foreach ($this->routes as $route) {

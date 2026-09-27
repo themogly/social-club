@@ -18,7 +18,16 @@ use Illuminate\Support\Facades\Hash;
  * Throttled (prompt 120): the bucket is LOCATION-WIDE (see IdentifiesOperator::operatorThrottleKey — a shared
  * counter, so rotating the browser session must not reset the count), and the lockout ESCALATES — each
  * successive lockout at the same sede is longer, so a brute-forcer faces exponential cost while a fat-fingered
- * operator only waits a minute. A correct PIN clears the whole throttle.
+ * operator only waits a minute.
+ *
+ * **A correct PIN no longer clears the throttle (prompt 270, superseding 120's "a correct PIN clears everything").**
+ * Since 267 a PIN is a full sign-in, and clearing on success let an insider interleave their OWN PIN between guesses at
+ * someone else's — unbounded guessing (the audit made 24 wrong guesses against a limit of 5, then signed in as the
+ * owner). Failures now decay only with time (the 300 s attempt window, the hour for strikes); a fat finger still costs
+ * at most that window. A responsable can still clear a bucket from Seguridad ({@see self::clearLockout()}).
+ *
+ * **A PIN that matches two people signs in neither** (prompt 270). PINs are unique per organisation on save, but a PIN
+ * set before that rule existed may still be shared; first-match used to sign a staff member in as the owner.
  */
 class UnlockOperator
 {
@@ -68,12 +77,17 @@ class UnlockOperator
         /** @var Collection<int, User> $candidates */
         $candidates = $location->users()->where('active', true)->get();
 
-        foreach ($candidates as $candidate) {
-            if ($candidate->pin !== null && Hash::check($pin, $candidate->pin)) {
-                $this->clear($throttleKey);
+        $matches = $candidates->filter(fn (User $candidate): bool => $candidate->pin !== null && Hash::check($pin, $candidate->pin));
 
-                return $candidate;
-            }
+        if ($matches->count() === 1) {
+            return $matches->first();
+        }
+
+        if ($matches->count() > 1) {
+            // Ambiguous: refuse rather than guess who typed it, and say so in the trail (ids only — never the PIN).
+            (new RecordAuditLog)->handle('counter.pin.ambiguous', $location, null, [
+                'user_ids' => $matches->pluck('id')->values()->all(),
+            ]);
         }
 
         $this->registerFailure($throttleKey, $this->maxAttemptsAt($location));

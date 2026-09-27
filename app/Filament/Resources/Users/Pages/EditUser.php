@@ -3,11 +3,13 @@
 namespace App\Filament\Resources\Users\Pages;
 
 use App\Actions\RecordAuditLog;
+use App\Actions\Users\EnsureRoleChangeIsAllowed;
 use App\Filament\Resources\Users\UserResource;
 use App\Models\User;
 use Filament\Actions\DeleteAction;
 use Filament\Actions\RestoreAction;
 use Filament\Resources\Pages\EditRecord;
+use Illuminate\Support\Facades\Auth;
 
 class EditUser extends EditRecord
 {
@@ -35,6 +37,9 @@ class EditUser extends EditRecord
     {
         /** @var User $user */
         $user = $this->getRecord();
+        $actor = Auth::user();
+        abort_unless($actor instanceof User, 403);
+        (new EnsureRoleChangeIsAllowed)->handle($actor, $user, (array) ($this->data['roles'] ?? []));
         $this->rolesBefore = $user->getRoleNames()->sort()->values()->all();
         $this->passwordBefore = $user->getRawOriginal('password');
         $this->pinBefore = $user->getRawOriginal('pin');
