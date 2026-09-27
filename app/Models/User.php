@@ -19,6 +19,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use Illuminate\Support\Facades\Hash;
 use SensitiveParameter;
 use Spatie\Permission\Traits\HasRoles;
 
@@ -53,6 +54,30 @@ class User extends Authenticatable implements FilamentUser, HasAppAuthentication
     public function canUseTheApp(): bool
     {
         return $this->active && $this->hasAnyRole(array_column(Role::cases(), 'value'));
+    }
+
+    /**
+     * Is this PIN already someone else's? (prompt 270)
+     *
+     * Since 267 a PIN is a sign-in, and `UnlockOperator` cannot tell two people with the same PIN apart — first-match
+     * signed a staff member in as the owner. PINs are hashed, so this checks the candidate against every other stored
+     * hash (a club has tens of staff, not thousands). Inactive accounts count too: reactivating one must not collide.
+     */
+    public static function pinIsTaken(#[SensitiveParameter] string $pin, ?string $exceptUserId = null): bool
+    {
+        $query = static::query()->withTrashed()->whereNotNull('pin');
+
+        if ($exceptUserId !== null) {
+            $query->whereKeyNot($exceptUserId);
+        }
+
+        foreach ($query->pluck('pin') as $hash) {
+            if (Hash::check($pin, (string) $hash)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /** @return BelongsToMany<Location, $this> */

@@ -100,8 +100,8 @@ class PinLockoutAdminTest extends TestCase
         $this->assertTrue($unlock->isLockedOut('counter-pin:'.$this->sedeB->id), 'sede B did not lock on the fifth failure');
     }
 
-    /** A correct PIN still clears the count — the throttle's shape is unchanged. */
-    public function test_a_correct_pin_still_clears_the_throttle(): void
+    /** Prompt 270 — a correct PIN no longer clears the count (a PIN is a sign-in since 267); the configured limit holds. */
+    public function test_a_correct_pin_no_longer_clears_the_throttle(): void
     {
         Settings::set('counter_pin_max_attempts', 3, SettingType::INT, $this->sedeA->id);
         $this->staffAt($this->sedeA, '4321');
@@ -112,8 +112,8 @@ class PinLockoutAdminTest extends TestCase
         $matched = $unlock->handle($this->sedeA, '4321', 'counter-pin:'.$this->sedeA->id);
 
         $this->assertNotNull($matched);
-        $this->failTimes($this->sedeA, 2);
-        $this->assertFalse($unlock->isLockedOut('counter-pin:'.$this->sedeA->id), 'the correct PIN did not reset the tally');
+        $this->failTimes($this->sedeA, 1);
+        $this->assertTrue($unlock->isLockedOut('counter-pin:'.$this->sedeA->id), 'the correct PIN reset the tally');
     }
 
     /** A nonsense stored value is clamped to the 3–10 window, and a broken read falls back to 5. */

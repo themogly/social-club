@@ -306,7 +306,6 @@ trait IdentifiesOperator
             CounterHandover::end();
         }
 
-        CounterOperator::set($operator);
         // Prompt 267 — the PIN IS a sign-in: the session becomes this person everywhere (counter, panel, audit).
         (new SignInOperator)->handle($operator, $location);
         $this->operatorPanelOpen = false;

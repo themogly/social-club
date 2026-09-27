@@ -5,6 +5,7 @@ namespace App\Actions\Counter;
 use App\Actions\RecordAuditLog;
 use App\Models\Location;
 use App\Models\User;
+use App\Support\CounterOperator;
 use Illuminate\Auth\SessionGuard;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cookie;
@@ -27,6 +28,11 @@ use Illuminate\Support\Facades\Cookie;
  *     is already the operator's (255/261).
  *
  * The PIN check itself — `UnlockOperator`, its per-sede staff list and its throttle — is unchanged and runs before this.
+ *
+ * **Naming the operator and signing in are ONE step (prompt 270).** The till handover set the counter's operator
+ * without signing in, so after owner → staff the staff member worked under the owner's login and `/users` answered 200.
+ * This action now sets `CounterOperator` itself, and it is the only production caller of `CounterOperator::set()`, so
+ * a third path cannot split the two again (`CounterOperatorIsASignInTest` pins that).
  */
 class SignInOperator
 {
@@ -35,6 +41,7 @@ class SignInOperator
         $from = Auth::id();
         $guard = Auth::guard('web');
 
+        CounterOperator::set($operator);
         $guard->login($operator);
         if ($guard instanceof SessionGuard) {
             Cookie::queue(Cookie::forget($guard->getRecallerName()));

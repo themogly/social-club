@@ -757,6 +757,12 @@ trait SignsUpMembers
      */
     public function avaladorFeedback(): array
     {
+        // Prompt 270 — a PUBLIC method is a wire action, and this one returns a whole member row (DNI, address,
+        // therapeutic flag). With nobody identified at the PIN it answers nothing, like its neighbours (260/255).
+        if (! $this->hasOperator()) {
+            return ['status' => 'empty', 'member' => null];
+        }
+
         return AvaladorResolver::resolve($this->altaLocation()?->organisation_id, $this->altaForm['avalador_ref'] ?? null);
     }
 

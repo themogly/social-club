@@ -451,7 +451,8 @@ class TopBarNamesItsDestinationsTest extends TestCase
     /** A counter-only login with no panel access still sees no way into admin — the rename changes nothing. */
     public function test_a_user_without_panel_access_sees_no_administration_control(): void
     {
-        $user = User::factory()->create(['active' => false]);
+        // STAFF hold no `panel.access` by default (262). Not faked with an inactive account: since 270 that is signed out.
+        $user = User::factory()->create();
         $user->assignRole(Role::STAFF->value);
         $user->locations()->sync([$this->location->id]);
         $this->actingAs($user);

@@ -2,12 +2,16 @@
 
 namespace App\Filament\Resources\Users\Schemas;
 
+use App\Enums\Role;
+use App\Models\User;
 use App\Support\Email;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
 use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Schema;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Facades\Auth;
 
 class UserForm
 {
@@ -87,16 +91,31 @@ class UserForm
                     ->minLength(4)
                     ->maxLength(8)
                     ->helperText(__('4–8 dígitos. Identifica al operador en el mostrador.'))
+                    // Prompt 270 — a PIN is a sign-in, so it must name exactly one person.
+                    ->rule(fn (?User $record): \Closure => function (string $attribute, mixed $value, \Closure $fail) use ($record): void {
+                        if (filled($value) && User::pinIsTaken((string) $value, $record?->id)) {
+                            $fail(__('Ese PIN ya lo usa otra persona. Elige otro.'));
+                        }
+                    })
                     ->visible(fn (string $operation, Get $get): bool => $operation === 'create' || (bool) $get('set_pin'))
                     ->required(fn (string $operation, Get $get): bool => $operation === 'edit' && (bool) $get('set_pin'))
                     ->dehydrated(fn (?string $state, string $operation, Get $get): bool => filled($state)
                         && ($operation === 'create' || (bool) $get('set_pin'))),
 
+                // Prompt 270 — only an owner hands out (or takes away) the owner role, and nobody but an owner edits their
+                // own roles: `staff.manage` granted to a manager used to let them promote themselves to OWNER. The
+                // options are filtered here; `UserPolicy` and `EnsureRoleChangeIsAllowed` hold the line server-side.
                 Select::make('roles')
                     ->label(__('Roles'))
-                    ->relationship('roles', 'name')
+                    ->relationship('roles', 'name', modifyQueryUsing: fn (Builder $query): Builder => self::actorIsOwner()
+                        ? $query
+                        : $query->where('name', '!=', Role::OWNER->value))
                     ->multiple()
                     ->preload()
+                    ->disabled(fn (?User $record): bool => ! self::actorIsOwner() && $record !== null && $record->is(Auth::user()))
+                    ->helperText(fn (?User $record): ?string => ! self::actorIsOwner() && $record !== null && $record->is(Auth::user())
+                        ? __('Tus propios roles solo los puede cambiar el propietario.')
+                        : null)
                     ->required(),
 
                 Select::make('locations')
@@ -110,5 +129,12 @@ class UserForm
                     ->label(__('Activo'))
                     ->default(true),
             ]);
+    }
+
+    private static function actorIsOwner(): bool
+    {
+        $actor = Auth::user();
+
+        return $actor instanceof User && $actor->hasRole(Role::OWNER->value);
     }
 }

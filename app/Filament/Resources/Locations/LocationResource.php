@@ -2,12 +2,14 @@
 
 namespace App\Filament\Resources\Locations;
 
+use App\Enums\Role;
 use App\Filament\Resources\Locations\Pages\CreateLocation;
 use App\Filament\Resources\Locations\Pages\EditLocation;
 use App\Filament\Resources\Locations\Pages\ListLocations;
 use App\Filament\Resources\Locations\Schemas\LocationForm;
 use App\Filament\Resources\Locations\Tables\LocationsTable;
 use App\Models\Location;
+use App\Models\User;
 use BackedEnum;
 use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
@@ -15,6 +17,7 @@ use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
+use Illuminate\Support\Facades\Auth;
 
 class LocationResource extends Resource
 {
@@ -68,6 +71,19 @@ class LocationResource extends Resource
             'create' => CreateLocation::route('/create'),
             'edit' => EditLocation::route('/{record}/edit'),
         ];
+    }
+
+    /** Prompt 270 — a non-owner lists only the sedes they work at; the policy refuses the rest record by record. */
+    public static function getEloquentQuery(): Builder
+    {
+        $query = parent::getEloquentQuery();
+        $user = Auth::user();
+
+        if ($user instanceof User && $user->hasRole(Role::OWNER->value)) {
+            return $query;
+        }
+
+        return $query->whereIn('id', $user instanceof User ? $user->locations()->pluck('locations.id')->all() : []);
     }
 
     public static function getRecordRouteBindingEloquentQuery(): Builder

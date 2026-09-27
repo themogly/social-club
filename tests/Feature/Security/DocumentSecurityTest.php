@@ -97,6 +97,16 @@ class DocumentSecurityTest extends TestCase
         $this->assertSame(2, DocumentAccessLog::query()->where('member_document_id', $document->id)->count());
     }
 
+    /** Prompt 270 — a decrypted scan must not stay in a shared tablet's browser cache after its link expires. */
+    public function test_a_stream_is_never_stored_by_the_browser(): void
+    {
+        $owner = $this->user(Role::OWNER);
+        $response = $this->stream($owner, (new IssueDocumentUrl)->handle($this->document(), $owner))->assertOk();
+
+        $this->assertStringContainsString('no-store', (string) $response->headers->get('Cache-Control'));
+        $this->assertStringContainsString('private', (string) $response->headers->get('Cache-Control'));
+    }
+
     public function test_a_url_bound_to_one_user_is_refused_for_another_session(): void
     {
         $owner = $this->user(Role::OWNER);

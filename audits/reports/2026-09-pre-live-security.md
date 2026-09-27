@@ -108,7 +108,7 @@ Counts: **Phase 1 — 5**, **Phase 2 — 1**, **Phase 3 — 2**.
   likelihood. But it is exactly the "walk up to a locked counter" case 267 claims to close, and the code can close it
   (unlike plain bfcache repaint, which remains a kiosk task).
 
-**Review:** not fixed — report-only run. Suggested order: handover sign-in and PIN uniqueness first (one-line and
+**Review:** all five FIXED in prompt 270 (`PreLiveSignInHardeningTest`). Original note — suggested order: handover sign-in and PIN uniqueness first (one-line and
 small fixes, high impact), then the throttle, then the owner-role guard, then the Livewire lock hook. Each needs a
 denial test over HTTP.
 
@@ -131,7 +131,7 @@ What I checked and found holding: erasure coverage (`RgpdCompletenessTest` green
 the two migrations add `members.debt_limit_cents` and `role_permission_overrides`. `debt_limit_cents` is not fillable
 and has a single audited writer. The RAT's "Acceso interno" line follows the live roles (262).
 
-**Review:** not fixed — report-only run.
+**Review:** FIXED in prompt 270.
 
 ---
 
@@ -157,7 +157,7 @@ and has a single audited writer. The RAT's "Acceso interno" line follows the liv
   enough for Alpine and Livewire.
   → **Why it matters:** the CSP is the second wall behind output escaping. It is cheap here, and it is off.
 
-**Review:** not fixed — report-only run.
+**Review:** both FIXED in prompt 270 (inactive sign-out; CSP report stream — enforcing stays the owner's call).
 
 ---
 

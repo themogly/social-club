@@ -5,6 +5,7 @@ namespace App\Providers;
 use App\Http\Responses\CounterAwareLoginResponse;
 use App\Support\ActiveScope;
 use App\Support\CounterHandoverConfinement;
+use App\Support\CounterLockConfinement;
 use App\Support\CounterRequest;
 use App\Support\Help;
 use Filament\Auth\Http\Responses\Contracts\LoginResponse;
@@ -33,6 +34,7 @@ class AppServiceProvider extends ServiceProvider
     {
         // Prompt 254 — while an applicant holds the counter tablet, Livewire answers only the handover surface.
         CounterHandoverConfinement::register();
+        CounterLockConfinement::register();
 
         // Prompt 261 — mark counter Livewire requests, so the audit actor is the PIN operator there and only there.
         CounterRequest::register();
