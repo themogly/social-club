@@ -80,7 +80,9 @@
                     @if (! empty($ceilingHeadroom))
                         @php $gr = fn (int $cg): string => \App\Support\Weight::fromCentigrams($cg)->formatted(); @endphp
                         <x-dashboard.section :title="__('Techo legal de existencias')">
-                            <div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-3" data-ceiling-headroom>
+                            {{-- Prompt 272 — columns by the space the SECTION has, not the viewport: at 1024 beside the
+                                 sidebar and the rail, `sm:grid-cols-2` squeezed each card to one word per line. --}}
+                            <div class="grid grid-cols-[repeat(auto-fit,minmax(14rem,1fr))] gap-3" data-ceiling-headroom>
                                 @foreach ($ceilingHeadroom as $h)
                                     <div @class([
                                         'rounded-xl border p-4',
