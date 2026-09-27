@@ -203,7 +203,7 @@ class CreateGenetic extends CreateRecord
     {
         $stock = $genetic->isUnitType()
             ? trans_choice(':count unidad|:count unidades', (int) ($data['units'] ?? 0), ['count' => (int) ($data['units'] ?? 0)])
-            : rtrim(rtrim((string) ($data['grams'] ?? '0'), '0'), '.').' g';
+            : Weight::fromGrams((string) ($data['grams'] ?? '0'))->formatted(); // the one formatter (271) — rtrim read 250 as "25 g"
         $priceEur = $genetic->isUnitType() ? ($data['price_per_unit_eur'] ?? 0) : ($data['price_per_gram_eur'] ?? 0);
         $unit = $genetic->isUnitType() ? __('/ud') : __('/g');
 

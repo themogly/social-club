@@ -36,6 +36,23 @@ final class Money
         return new self((int) round_half_up((float) $euros * 100));
     }
 
+    /**
+     * Integer cents from a euro amount a PERSON typed, or null when it is blank or ambiguous (prompt 271, 268's rule).
+     *
+     * ONE reading: digits, optionally one separator (`,` or `.`) followed by one or two decimals — "1.250,00" and "1.250"
+     * are refused, never read as €1,25 (`fromEuros("1.250")` gives 125 cents). The twin of `Weight`'s grams rule (257).
+     * Pure integer arithmetic — no float on the way. Every typed money field at the counter parses through here: the
+     * tender, the till's float / count / movements / handover, and the membership fee.
+     */
+    public static function parseTyped(string $typed): ?int
+    {
+        if (preg_match('/^(\d{1,9})(?:[.,](\d{1,2}))?$/', trim($typed), $m) !== 1) {
+            return null;
+        }
+
+        return (int) $m[1] * 100 + (int) str_pad($m[2] ?? '0', 2, '0');
+    }
+
     public function euros(): float
     {
         return $this->cents / 100;

@@ -14,6 +14,7 @@ use App\Models\StockMovement;
 use App\Models\User;
 use App\Support\ActiveScope;
 use App\Support\Settings;
+use App\Support\Weight;
 use Database\Seeders\RolePermissionSeeder;
 use Filament\Facades\Filament;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -59,6 +60,9 @@ class AddAStrainFlowTest extends TestCase
             ])
             ->call('create')
             ->assertHasNoFormErrors();
+
+        // Prompt 271 — the confirmation said "25 g" for 250 g (an rtrim that also stripped integer zeros).
+        $this->assertStringContainsString(Weight::fromCentigrams(25000)->formatted(), (string) collect(session('filament.notifications'))->pluck('body')->implode(' '));
 
         $genetic = Genetic::query()->withoutGlobalScopes()->where('name', 'Amnesia Haze')->sole();
         $this->assertTrue($genetic->active);

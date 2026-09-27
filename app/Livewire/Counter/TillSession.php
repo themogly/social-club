@@ -37,7 +37,6 @@ use App\Support\Weight;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Collection;
-use InvalidArgumentException;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Locked;
 use Livewire\Component;
@@ -948,20 +947,13 @@ class TillSession extends Component
             ->first();
     }
 
-    /** Parse a euros string from the edge to integer cents, or null when invalid. */
+    /**
+     * Parse a typed euros string to integer cents, or null when blank/ambiguous — the strict rule (prompt 271). The
+     * blind count used to go through `Money::fromEuros`, so a drawer counted as "1.250" closed at €1,25, immutably.
+     */
     private function toCents(string $euros): ?int
     {
-        $euros = trim($euros);
-
-        if ($euros === '') {
-            return null;
-        }
-
-        try {
-            return Money::fromEuros($euros)->cents;
-        } catch (InvalidArgumentException) {
-            return null;
-        }
+        return Money::parseTyped($euros);
     }
 
     private function resetCloseState(): void

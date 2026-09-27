@@ -7,6 +7,7 @@ use App\Models\Genetic;
 use App\Models\GeneticPrice;
 use App\Models\Location;
 use Illuminate\Support\Facades\DB;
+use InvalidArgumentException;
 
 /**
  * THE single writer for GeneticPrice rows (prompt 63) — the counterpart to ResolvePrice, which stays
@@ -28,6 +29,12 @@ class SaveGeneticPrice
         ?GeneticPrice $existing = null,
         ?int $eighthCents = null,
     ): GeneticPrice {
+        // Prompt 271 — ONE row per (variety, sede, tarifa). A second one left the charged price to the database's row
+        // order. The form refuses it first; this is the writer's own guard.
+        if ($existing === null && self::rowExists($genetic, $location->id, $tierId)) {
+            throw new InvalidArgumentException(__('Ya hay un precio para esta sede y tarifa. Edítalo en lugar de añadir otro.'));
+        }
+
         return DB::transaction(function () use ($genetic, $location, $tierId, $priceCents, $lowStockThresholdCg, $active, $existing, $eighthCents): GeneticPrice {
             $column = $genetic->isUnitType() ? 'price_per_unit_cents' : 'price_per_gram_cents';
             $otherColumn = $genetic->isUnitType() ? 'price_per_gram_cents' : 'price_per_unit_cents';
@@ -67,5 +74,15 @@ class SaveGeneticPrice
 
             return $price;
         });
+    }
+
+    /** Does this variety already have a price row for this sede and tarifa (null = the base price)? */
+    public static function rowExists(Genetic $genetic, ?string $locationId, ?string $tierId): bool
+    {
+        return GeneticPrice::query()->withoutGlobalScopes()
+            ->where('genetic_id', $genetic->id)
+            ->where('location_id', $locationId)
+            ->when($tierId === null, fn ($q) => $q->whereNull('tier_id'), fn ($q) => $q->where('tier_id', $tierId))
+            ->exists();
     }
 }

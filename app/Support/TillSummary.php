@@ -52,7 +52,7 @@ class TillSummary
                 'note' => $expense->note,
                 'amount_cents' => $expense->amount_cents->cents,
                 'recorded_by' => (string) ($expense->recorder->name ?? '—'),
-                'at' => $expense->created_at?->format('H:i') ?? '',
+                'at' => local_datetime($expense->created_at, 'H:i'), // the sede's wall clock (271)
             ];
         }
 

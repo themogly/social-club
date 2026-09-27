@@ -76,23 +76,11 @@ class ResolveMemberLimits
      */
     private function monthWindow(Location $location, DateTimeInterface|string|null $at): array
     {
-        $businessDate = BusinessDay::date($location, $at);
-        // Boundaries computed in the location tz, then expressed in the app (storage)
-        // timezone so the whereBetween below matches app-tz-stored dispensed_at values
-        // (same instant-preserving normalisation as BusinessDay::window()).
-        $storageTz = config('app.timezone') ?: 'UTC';
-
-        if (Settings::get('monthly_window', 'calendar') === 'rolling30') {
-            return [
-                $businessDate->copy()->subDays(29)->startOfDay()->setTimezone($storageTz),
-                $businessDate->copy()->addDay()->startOfDay()->setTimezone($storageTz),
-            ];
-        }
-
-        return [
-            $businessDate->copy()->startOfMonth()->setTimezone($storageTz),
-            $businessDate->copy()->startOfMonth()->addMonth()->setTimezone($storageTz),
-        ];
+        // Prompt 271 — the BUSINESS month (starting at the cutoff on the 1st), the same window every report uses. It
+        // used to start at local midnight, so the cap and the Registro disagreed about a 01:30 dispensation on the 1st.
+        return Settings::get('monthly_window', 'calendar') === 'rolling30'
+            ? BusinessDay::rolling30Window($location, $at)
+            : BusinessDay::periodWindow($location, 'month', $at);
     }
 
     private function usedBetween(Member $member, CarbonInterface $start, CarbonInterface $end): int
@@ -101,7 +89,9 @@ class ResolveMemberLimits
             ->whereHas('dispensation', fn ($q) => $q
                 ->where('member_id', $member->id)
                 ->where('status', DispensationStatus::COMPLETED->value)
-                ->whereBetween('dispensed_at', [$start, $end]))
+                // Half-open (prompt 271): a row stamped exactly on a boundary belongs to one window, not both.
+                ->where('dispensed_at', '>=', $start)
+                ->where('dispensed_at', '<', $end))
             ->sum('grams_cg');
     }
 }

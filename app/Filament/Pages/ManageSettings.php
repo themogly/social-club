@@ -150,26 +150,26 @@ class ManageSettings extends Page
                 Section::make(__('Cumplimiento'))
                     ->description(__('Límites legales. Cambiarlos afecta solo a comprobaciones futuras, nunca a lo ya registrado.'))
                     ->schema([
-                        TextInput::make('min_age')->label(__('Edad mínima'))->numeric()->required()
+                        TextInput::make('min_age')->label(__('Edad mínima'))->integer()->minValue(18)->maxValue(99)->required()
                             ->helperText(__('Edad mínima para ser socio. Se bloquea la dispensación por debajo.')),
-                        TextInput::make('carencia_days')->label(__('Días de carencia'))->numeric()->required()
+                        TextInput::make('carencia_days')->label(__('Días de carencia'))->integer()->minValue(0)->maxValue(365)->required()
                             ->helperText(__('Espera obligatoria desde el alta antes de la primera dispensación.')),
-                        TextInput::make('daily_limit_g')->label(__('Límite diario (g)'))->numeric()->required()
+                        TextInput::make('daily_limit_g')->label(__('Límite diario (g)'))->numeric()->minValue(0.01)->maxValue(1000)->required()
                             ->helperText(__('Máximo por socio y día. Se bloquea en el mostrador al superarlo.')),
-                        TextInput::make('monthly_limit_g')->label(__('Techo mensual (g)'))->numeric()->required()
+                        TextInput::make('monthly_limit_g')->label(__('Techo mensual (g)'))->numeric()->minValue(0.01)->maxValue(10000)->gte('daily_limit_g')->required()
                             ->helperText(__('Máximo por socio y mes.')),
                         Select::make('monthly_window')->label(__('Ventana mensual'))
                             ->options(['calendar' => __('Mes natural'), 'rolling30' => __('30 días móviles')])->required(),
-                        TextInput::make('active_member_cap')->label(__('Tope de socios activos'))->numeric()->required()
+                        TextInput::make('active_member_cap')->label(__('Tope de socios activos'))->integer()->minValue(1)->required()
                             ->helperText(__('Aviso en el panel al acercarse a este número.')),
-                        TextInput::make('stock_ceiling_days')->label(__('Días para techo de stock'))->numeric()->required()
+                        TextInput::make('stock_ceiling_days')->label(__('Días para techo de stock'))->integer()->minValue(1)->maxValue(365)->required()
                             ->helperText(__('socios × límite diario × estos días = stock máximo recomendado en sede.')),
                     ])->columns(3),
 
                 Section::make(__('Indicador de consumo'))
                     ->schema([
-                        TextInput::make('gauge_warning_pct')->label(__('% aviso'))->numeric()->required(),
-                        TextInput::make('gauge_alert_pct')->label(__('% alerta'))->numeric()->required(),
+                        TextInput::make('gauge_warning_pct')->label(__('% aviso'))->integer()->minValue(1)->maxValue(100)->required(),
+                        TextInput::make('gauge_alert_pct')->label(__('% alerta'))->integer()->minValue(1)->maxValue(100)->gt('gauge_warning_pct')->required(),
                     ])->columns(2),
 
                 Section::make(__('Avalador'))
@@ -180,7 +180,7 @@ class ManageSettings extends Page
                                 'waivable' => __('Exonerable por gerente'),
                                 'not_required' => __('No requerido'),
                             ])->required(),
-                        TextInput::make('avalador_max_sponsees')->label(__('Máx. avalados por socio'))->numeric()->required(),
+                        TextInput::make('avalador_max_sponsees')->label(__('Máx. avalados por socio'))->integer()->minValue(0)->required(),
                         Toggle::make('avalador_therapeutic_exempt')->label(__('Socios terapéuticos exentos de aval'))
                             ->helperText(__('Los socios terapéuticos pueden sustituir el aval por un certificado médico.')),
                     ])->columns(2),
@@ -188,19 +188,19 @@ class ManageSettings extends Page
                 Section::make(__('Cartera y deuda'))
                     ->schema([
                         Toggle::make('wallet_debt_allowed')->label(__('Permitir deuda'))
-                            ->helperText(__('Si se desactiva, ninguna aportación puede dejar el monedero en negativo.')),
+                            ->helperText(__('Si se desactiva, ninguna aportación puede dejar el monedero en negativo. Si se activa, solo pueden deber los socios con una «Cuenta del socio» aprobada, hasta su límite.')),
                         TextInput::make('wallet_debt_limit_eur')->label(__('Límite de deuda (€)'))->numeric()->minValue(0)->required()
-                            ->helperText(__('Tope duro: el mostrador BLOQUEA una aportación que dejaría la deuda por encima de esta cifra.')),
+                            ->helperText(__('Tope del club (0 = sin tope): ningún socio puede deber más de esta cifra en esta sede, aunque su cuenta aprobada sea mayor.')),
                         TextInput::make('wallet_door_debt_threshold_eur')->label(__('Umbral de deuda en la puerta (€)'))->numeric()->minValue(0)->required()
-                            ->helperText(__('Cifra DISTINTA del tope duro: la puerta reacciona (avisa/bloquea según la matriz) al llegar a esta deuda en el check-in.')),
+                            ->helperText(__('Independiente del tope: la puerta reacciona (avisa/bloquea según la matriz) cuando la deuda supera esta cifra (0 = cualquier deuda), aunque esté dentro de su cuenta aprobada.')),
                         TextInput::make('low_balance_threshold_eur')->label(__('Aviso de saldo bajo (€)'))->numeric()->minValue(0)->required()
                             ->helperText(__('Cuando una aportación deja el saldo por debajo de esta cifra, se envía un aviso push al socio.')),
                     ])->columns(3),
 
                 Section::make(__('Membresía'))
                     ->schema([
-                        TextInput::make('expiring_soon_days')->label(__('Días "caduca pronto"'))->numeric()->required(),
-                        TextInput::make('renewal_reminder_lead_days')->label(__('Días de aviso de renovación'))->numeric()->required(),
+                        TextInput::make('expiring_soon_days')->label(__('Días "caduca pronto"'))->integer()->minValue(0)->maxValue(365)->required(),
+                        TextInput::make('renewal_reminder_lead_days')->label(__('Días de aviso de renovación'))->integer()->minValue(0)->maxValue(365)->required(),
                         TextInput::make('invite_expiry_days')->label(__('Caducidad de invitación (días)'))->numeric()->minValue(1)->required()
                             ->helperText(__('Una invitación de alta sin usar caduca tras estos días.')),
                         TextInput::make('refund_window_days')->label(__('Ventana de reembolso (días)'))->numeric()->minValue(0)->required()
@@ -228,7 +228,7 @@ class ManageSettings extends Page
 
                 Section::make(__('Existencias'))
                     ->schema([
-                        TextInput::make('batch_expiry_window_days')->label(__('Ventana de caducidad de lote (días)'))->numeric()->required(),
+                        TextInput::make('batch_expiry_window_days')->label(__('Ventana de caducidad de lote (días)'))->integer()->minValue(0)->maxValue(365)->required(),
                         TextInput::make('stock_cover_window_days')->label(__('Ventana de consumo (días)'))->numeric()->minValue(1)->required()
                             ->helperText(__('Sobre cuántos días de dispensaciones reales se calcula el ritmo de cada genética.')),
                         TextInput::make('stock_cover_low_days')->label(__('Avisar por debajo de (días de stock)'))->numeric()->minValue(1)->required()
@@ -246,14 +246,15 @@ class ManageSettings extends Page
 
                 Section::make(__('Privacidad y datos'))
                     ->schema([
-                        TextInput::make('data_retention_days')->label(__('Retención de datos de socio (días)'))->numeric()->required(),
-                        TextInput::make('audit_retention_days')->label(__('Retención del registro de auditoría (días)'))->numeric()->required()
-                            ->helperText(__('Retención MÍNIMA. El registro de auditoría es inalterable y no se purga automáticamente; esta cifra se comunica (panel, RAT), no borra nada.')),
+                        TextInput::make('data_retention_days')->label(__('Retención de datos de socio (días)'))->integer()->minValue(Settings::MIN_RETENTION_DAYS)->maxValue(36500)->required()
+                            ->helperText(__('Cada noche se anonimizan automáticamente los socios que causaron baja hace más de este plazo. No se puede deshacer.')),
+                        TextInput::make('audit_retention_days')->label(__('Retención del registro de auditoría (días)'))->integer()->minValue(Settings::MIN_RETENTION_DAYS)->maxValue(36500)->required()
+                            ->helperText(__('Pasado este plazo se borra cada noche el detalle (antes/después) de cada entrada; la entrada queda. No se puede deshacer.')),
                         TextInput::make('message_retention_days')->label(__('Retención de mensajes (días)'))->numeric()->minValue(1)->required()
                             ->helperText(__('El texto de los mensajes con socios se redacta pasado este plazo; queda el hilo como evidencia del contacto.')),
                         TextInput::make('application_retention_days')->label(__('Retención de solicitudes (días)'))->numeric()->minValue(1)->required()
                             ->helperText(__('Una solicitud rechazada o abandonada se anonimiza y su foto de identidad se borra pasado este plazo. Las aprobadas no se tocan (la foto pasa a ser del socio).')),
-                        TextInput::make('signed_url_ttl_seconds')->label(__('Caducidad de URLs firmadas (seg.)'))->numeric()->required(),
+                        TextInput::make('signed_url_ttl_seconds')->label(__('Caducidad de URLs firmadas (seg.)'))->integer()->minValue(60)->maxValue(3600)->required(),
                         TextInput::make('qr_scan_max_failures_per_minute')->label(__('Máx. escaneos fallidos por minuto'))->numeric()->minValue(1)->required()
                             ->helperText(__('Tras tantos escaneos de tarjeta fallidos por operador en un minuto, se bloquea temporalmente (anti fuerza bruta).')),
                         Select::make('counter_landing')->label(__('Pantalla de inicio del mostrador'))

@@ -3,7 +3,6 @@
 namespace App\Livewire\Counter\Concerns;
 
 use App\Support\Money;
-use InvalidArgumentException;
 
 /**
  * The ONE tender model shared by both counter screens (prompt 74). Cash entered is what the member
@@ -119,17 +118,7 @@ trait HandlesTender
      */
     protected function parseCents(string $euros): ?int
     {
-        $euros = trim($euros);
-
-        if ($euros === '' || preg_match('/^(\d+)(?:[.,](\d{1,2}))?$/', $euros, $m) !== 1) {
-            return null;
-        }
-
-        try {
-            return Money::fromEuros(isset($m[2]) ? $m[1].'.'.$m[2] : $m[1])->cents;
-        } catch (InvalidArgumentException) {
-            return null;
-        }
+        return Money::parseTyped($euros); // the one typed-money rule (271)
     }
 
     /** Integer cents → a euros string for an input ("50,00") — Spanish format like the panel around it (prompt 268). */

@@ -6,6 +6,7 @@ use App\Filament\Pages\Auth\Login;
 use App\Filament\Pages\Auth\RequestPasswordReset;
 use App\Http\Middleware\EnforceCounterHandover;
 use App\Http\Middleware\RedirectCounterOnlyAccounts;
+use App\Http\Middleware\SetDisplayTimezone;
 use App\Http\Middleware\SetLocale;
 use App\Livewire\LocaleSwitcher;
 use App\Livewire\LocationSwitcher;
@@ -194,6 +195,8 @@ class AdminPanelProvider extends PanelProvider
                 DisableBladeIconComponents::class,
                 DispatchServingFilamentEvent::class,
             ])
+            // Prompt 271 — times in the sede's timezone, for page loads AND Livewire updates (persistent).
+            ->middleware([SetDisplayTimezone::class], isPersistent: true)
             ->authMiddleware([
                 Authenticate::class,
             ]);

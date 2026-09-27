@@ -113,10 +113,10 @@ class DemoDataSeeder extends Seeder
         $this->seedSettings($org->id);
         $this->seedDemoProfile();
 
-        // The DEMO runs timezone-neutral (UTC, midnight cutoff) so its business day equals the storage
-        // calendar day — reproducible regardless of the deployer's locale, and no 00:00–06:00 gap to confuse
-        // a demo (prompt 105). A real club sets its own timezone + business_day_cutoff (fallback Madrid/06:00)
-        // and every report now honours it through BusinessDay — proven by tests using a Madrid location.
+        // The first demo sede runs timezone-neutral (UTC, midnight cutoff) so its business day equals the storage
+        // calendar day (prompt 105). The SECOND is a real one — Europe/Madrid with a 06:00 cutoff (prompt 271) —
+        // because an all-UTC demo hid every place that measured "today" in UTC: the counter hub's takings reset at
+        // 02:00 and the monthly cap disagreed with the reports, and nobody could see it.
         $centro = Location::create([
             'organisation_id' => $org->id, 'name' => $strings['locations'][0], 'address' => 'Calle de Ejemplo 1, 28001 Madrid',
             'capacity' => 50, 'timezone' => 'UTC', 'business_day_cutoff' => '00:00',
@@ -124,7 +124,7 @@ class DemoDataSeeder extends Seeder
         ]);
         $norte = Location::create([
             'organisation_id' => $org->id, 'name' => $strings['locations'][1], 'address' => 'Avenida del Norte 42, 08001 Barcelona',
-            'capacity' => 40, 'timezone' => 'UTC', 'business_day_cutoff' => '00:00',
+            'capacity' => 40, 'timezone' => 'Europe/Madrid', 'business_day_cutoff' => '06:00',
             'opening_time' => '17:00', 'closing_time' => '02:00', 'accent' => '#16a34a', 'active' => true,
         ]);
         $locations = [$centro, $norte];

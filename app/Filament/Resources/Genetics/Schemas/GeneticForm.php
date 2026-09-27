@@ -156,7 +156,9 @@ class GeneticForm
                                 ->where('applies_to', CategoryAppliesTo::GENETIC->value)->exists()),
 
                         Toggle::make('published')
-                            ->label(__('Publicada')),
+                            ->label(__('Publicada'))
+                            ->helperText(__('Visible en el menú de la app de socios. El mostrador la ve igualmente.'))
+                            ->default(true),
 
                         Toggle::make('active')
                             ->label(__('Activa'))

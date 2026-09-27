@@ -78,7 +78,7 @@
                 <div class="min-w-0 flex-1">
                     <p class="truncate text-sm font-medium">{{ $checkIn->member?->fullName() ?? __('Socio') }}</p>
                     <p class="text-xs text-ink-muted dark:text-slate-400">
-                        {{ $checkIn->checked_in_at->format('H:i') }} · {{ $checkIn->checked_in_at->shortAbsoluteDiffForHumans() }}
+                        {{ local_datetime($checkIn->checked_in_at, 'H:i') }} · {{ $checkIn->checked_in_at->shortAbsoluteDiffForHumans() }}
                     </p>
                 </div>
                 <button

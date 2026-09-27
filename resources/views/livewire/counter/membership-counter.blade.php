@@ -224,7 +224,7 @@
                                 <span class="text-xs font-medium text-ink-muted dark:text-slate-400">{{ __('Documento de identidad') }}</span>
                                 @foreach ($idDocuments as $document)
                                     <x-button type="button" variant="secondary" size="sm" wire:click="viewDocument('{{ $document->id }}')" data-view-document>
-                                        {{ $loop->first ? __('Ver documento') : __('Ver documento del :date', ['date' => $document->created_at?->format('d/m/Y')]) }}
+                                        {{ $loop->first ? __('Ver documento') : __('Ver documento del :date', ['date' => local_datetime($document->created_at, 'd/m/Y')]) }}
                                     </x-button>
                                 @endforeach
                             </div>
@@ -318,7 +318,7 @@
                                             <span class="min-w-0">
                                                 {{-- Prompt 250 — unique() so an automatic split (one genetic across lotes) never names the product twice. --}}
                                                 <span class="block truncate">{{ $dispensation->lines->pluck('genetic_name_snapshot')->filter()->unique()->implode(', ') ?: __('Dispensación') }}</span>
-                                                <span class="block text-xs text-ink-muted dark:text-slate-400">{{ $dispensation->created_at->format('d/m/Y H:i') }}</span>
+                                                <span class="block text-xs text-ink-muted dark:text-slate-400">{{ local_datetime($dispensation->created_at, 'd/m/Y H:i') }}</span>
                                             </span>
                                             <span class="shrink-0 font-medium tabular-nums">{{ $this->grams((int) $dispensation->lines->sum(fn ($line) => (int) $line->getRawOriginal('grams_cg'))) }}</span>
                                         </li>

@@ -43,14 +43,25 @@ class AuditRetentionTest extends TestCase
 
     public function test_changing_the_setting_moves_the_boundary(): void
     {
-        $entry = $this->entry(now()->subDays(100));
+        $entry = $this->entry(now()->subDays(400));
 
         $this->artisan('audit:redact-retention')->assertSuccessful();
         $this->assertNotNull($entry->fresh()->before); // default 3650 days → not yet due
 
-        Settings::set('audit_retention_days', 30);
+        Settings::set('audit_retention_days', 380);
         $this->artisan('audit:redact-retention')->assertSuccessful();
         $this->assertNull($entry->fresh()->before);     // now past the shortened boundary — the key IS read
+    }
+
+    /** Prompt 271 — a retention stored below the floor (before the form had bounds) cannot strip recent history. */
+    public function test_a_retention_below_the_floor_is_clamped(): void
+    {
+        $entry = $this->entry(now()->subDays(100));
+
+        Settings::set('audit_retention_days', 30);
+        $this->artisan('audit:redact-retention')->assertSuccessful();
+
+        $this->assertNotNull($entry->fresh()->before);
     }
 
     public function test_it_is_idempotent_and_records_one_summary_entry(): void

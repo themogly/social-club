@@ -20,7 +20,7 @@ class PurgeExpiredMembers extends Command
 
     public function handle(AnonymiseMember $anonymise): int
     {
-        $cutoff = now()->subDays((int) Settings::get('data_retention_days', 1825));
+        $cutoff = now()->subDays(max(Settings::MIN_RETENTION_DAYS, (int) Settings::get('data_retention_days', 1825)));
 
         $due = Member::withoutGlobalScopes()
             ->whereNotNull('left_at')

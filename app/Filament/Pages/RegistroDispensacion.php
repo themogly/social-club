@@ -15,7 +15,6 @@ use App\ViewModels\Reports\ConsumptionReport;
 use BackedEnum;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Filament\Support\Icons\Heroicon;
-use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use League\Csv\Writer;
 use Symfony\Component\HttpFoundation\StreamedResponse;
@@ -121,7 +120,7 @@ class RegistroDispensacion extends ReportPage
         $writer->insertOne([__('Fecha'), __('Nº socio'), __('Genética'), __('Lote'), __('Gramos'), __('Aportación'), __('Operador')]);
         foreach ($this->controlRows() as $row) {
             $writer->insertOne([
-                Carbon::parse((string) $row['fecha'])->format('d/m/Y H:i'),
+                local_datetime($row['fecha']), // the sede's wall clock on the legal register (271)
                 (string) $row['member_no'],
                 (string) $row['genetica'],
                 (string) $row['lote'],
@@ -153,7 +152,8 @@ class RegistroDispensacion extends ReportPage
             ->leftJoin('users', 'dispensations.operator_id', '=', 'users.id')
             ->whereIn('dispensations.location_id', $this->scopeLocationIds())
             ->where('dispensations.status', DispensationStatus::COMPLETED->value)
-            ->whereBetween('dispensations.dispensed_at', [$start, $end])
+            ->where('dispensations.dispensed_at', '>=', $start)   // half-open (prompt 271): a boundary row prints once
+            ->where('dispensations.dispensed_at', '<', $end)
             ->orderBy('dispensations.dispensed_at')
             ->get([
                 'dispensations.dispensed_at as fecha',

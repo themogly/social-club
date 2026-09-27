@@ -120,9 +120,13 @@ class LocationForm
                     ->label(__('Dirección'))
                     ->maxLength(255),
 
+                // Prompt 271 — required and at least 1: an empty aforo silently switched the capacity check off (the
+                // matrix calls it "Siempre BLOQUEAR"), and −1 blocked every entry (or 500'd on MySQL's unsigned column).
                 TextInput::make('capacity')
                     ->label(__('Aforo'))
-                    ->numeric()
+                    ->integer()
+                    ->minValue(1)
+                    ->required()
                     // A new sede pre-fills from the org-wide aforo_default (prompt 44 — previously a
                     // dead setting nothing read); editable per location, so it's only a starting point.
                     ->default(fn (): int => (int) Settings::get('aforo_default', 50))
@@ -134,7 +138,10 @@ class LocationForm
                         'Europe/Madrid' => 'Europe/Madrid',
                         'Atlantic/Canary' => 'Atlantic/Canary',
                     ])
-                    ->default('Europe/Madrid'),
+                    ->default('Europe/Madrid')
+                    // Prompt 271 — the column is NOT NULL: an emptied zone was a 500 on save.
+                    ->required()
+                    ->selectablePlaceholder(false),
 
                 // TimePicker, not free-text (prompt 147): a `time` column rejects '' on MySQL (and SQLite
                 // silently stores it), so three plain TextInputs 500'd the whole sede-create. 24-hour, no

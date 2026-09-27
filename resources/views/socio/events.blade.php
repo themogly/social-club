@@ -28,7 +28,7 @@
             </div>
 
             @if ($event->starts_at)
-                <p class="mt-1 text-sm font-medium text-brand dark:text-slate-200">{{ $event->starts_at->format('d/m/Y · H:i') }}</p>
+                <p class="mt-1 text-sm font-medium text-brand dark:text-slate-200">{{ local_datetime($event->starts_at, 'd/m/Y · H:i') }}</p>
             @endif
             @if ($event->description)
                 <p class="mt-1.5 whitespace-pre-line text-sm text-ink-muted dark:text-slate-300">{{ $event->description }}</p>

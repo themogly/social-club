@@ -279,7 +279,7 @@ class DashboardCharts
             return ['labels' => $labels, 'counts' => $counts];
         }
 
-        [$start, $end] = Period::thisMonth()->bounds();
+        [$start, $end] = Period::thisMonth($this->period->location)->bounds();
         $used = DB::table('dispensation_lines')
             ->join('dispensations', 'dispensation_lines.dispensation_id', '=', 'dispensations.id')
             ->whereIn('dispensations.location_id', $this->resolvedLocationIds())
@@ -522,8 +522,7 @@ class DashboardCharts
      */
     private function trailingDays(int $days): array
     {
-        $tz = config('app.timezone') ?: 'UTC';
-        $end = CarbonImmutable::now($tz)->startOfDay()->addDay();
+        $end = Period::today($this->period->location)->end; // through the end of today's BUSINESS day (271)
         $start = $end->subDays($days);
 
         $bounds = [];
@@ -548,12 +547,13 @@ class DashboardCharts
         [$start, $end] = $period->bounds();
         $labels = [];
         $bounds = [];
+        $tz = Period::displayTimezone($period->location); // labels in the sede's wall-clock time (271)
 
         if ($period->type === 'day') {
             $cursor = $start;
             while ($cursor < $end) {
                 $bounds[] = [$cursor, $cursor->addHour()];
-                $labels[] = $cursor->format('H:00');
+                $labels[] = $cursor->setTimezone($tz)->format('H:00');
                 $cursor = $cursor->addHour();
             }
 
@@ -564,7 +564,7 @@ class DashboardCharts
         while ($cursor < $end) {
             $next = $cursor->addDay();
             $bounds[] = [$cursor, $next];
-            $labels[] = $cursor->format('j M');
+            $labels[] = $cursor->setTimezone($tz)->format('j M');
             $cursor = $next;
         }
 

@@ -76,6 +76,36 @@ class Wallet
         return max(0, $room);
     }
 
+    /**
+     * May this member owe what they owe at this sede right now? (prompt 271) — the ONE debt rule the counter's eligibility
+     * check and the Deudores report read, so neither can disagree with the tab the wallet writer allows. (The door keeps
+     * its own, independent warning threshold.)
+     *
+     * `wallet_debt_limit_cents` used to mean two things: "no club cap" at 0 here (259), and "block ANY debt" at 0 in the
+     * eligibility check — so an approved tab worked once and then blocked the member ("Deuda por encima del umbral").
+     * Now owing is allowed exactly within the layers {@see self::tabHeadroomCents()} applies: the sede switch, the member's
+     * approved tab (their total debt across sedes within it) and, when set above 0, the club cap on this sede's balance.
+     */
+    public static function debtIsWithinApprovedTab(Member $member, string $locationId): bool
+    {
+        $owedHere = max(0, -self::balance($member->id, $locationId));
+
+        if ($owedHere === 0) {
+            return true;
+        }
+
+        $memberLimit = (int) ($member->debt_limit_cents ?? 0);
+
+        if (! (bool) Settings::get('wallet_debt_allowed', false, $locationId)
+            || $memberLimit <= 0 || self::totalDebtCents($member->id) > $memberLimit) {
+            return false;
+        }
+
+        $clubLimit = (int) Settings::get('wallet_debt_limit_cents', 0, $locationId);
+
+        return $clubLimit <= 0 || $owedHere <= $clubLimit;
+    }
+
     /** The largest DEBIT this sede's wallet may take for the member now: their credit here plus the tab's headroom. */
     public static function maxDebitCents(Member $member, string $locationId): int
     {

@@ -60,6 +60,7 @@ use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use InvalidArgumentException;
 use Livewire\Attributes\Layout;
@@ -1001,7 +1002,7 @@ class DispensaryPos extends Component
                 return;
             }
 
-            $priceOverrideCents = max(0, min($entered, $resolvedTotal)); // reduce only: 0 (free) .. resolved
+            $priceOverrideCents = $this->chargeableCents($resolvedTotal); // reduce only: 0 (free) .. resolved
             $total = $priceOverrideCents;
         }
 
@@ -1460,7 +1461,7 @@ class DispensaryPos extends Component
         }
 
         $basketLines = $this->basketView($member, $location);
-        $total = (int) array_sum(array_map(fn (array $l): int => (int) $l['total_cents'], $basketLines));
+        $total = $this->chargeableCents((int) array_sum(array_map(fn (array $l): int => (int) $l['total_cents'], $basketLines)));
 
         // The tender preview is split over the COMBINED total (prompt 224). It used to split the dispensation
         // total alone while `settleWithBar()` split dispensation + bar, so with a bar line present the
@@ -1731,7 +1732,24 @@ class DispensaryPos extends Component
         }
     }
 
-    /** The live basket total the shared HandlesTender model splits/tenders against (pre price-override). */
+    /**
+     * What the aportación will actually be charged: the resolved total, or a valid price override clamped to 0..resolved
+     * (prompt 64's rule). ONE figure for the header, "Justo", "Añadir a la cuenta" and the commit (prompt 271) — the tab
+     * used to be filled from the PRE-override total, so an €8,37 basket overridden to €5 with €3 handed put all €5 on
+     * the member's tab and showed the €3 as change. The permission and the reason are still checked at commit.
+     */
+    private function chargeableCents(int $resolvedTotal): int
+    {
+        if (trim($this->priceOverrideEuros) === '' || ! $this->userCan('dispensation.price.override')) {
+            return $resolvedTotal;
+        }
+
+        $entered = $this->parseCents($this->priceOverrideEuros);
+
+        return $entered === null ? $resolvedTotal : max(0, min($entered, $resolvedTotal));
+    }
+
+    /** The live visit total the shared HandlesTender model splits/tenders against — price-override-aware (271). */
     protected function tenderableTotalCents(): int
     {
         $location = $this->resolveLocation();
@@ -1744,7 +1762,7 @@ class DispensaryPos extends Component
         // line is the combined amount — the same figure `settleWithBar()` splits.
         $member = $this->resolveMember();
 
-        return $this->basketTotalCents($member, $location) + $this->barBasketTotalCents($member, $location);
+        return $this->chargeableCents($this->basketTotalCents($member, $location)) + $this->barBasketTotalCents($member, $location);
     }
 
     // --- Live view assembly (nothing cached) ------------------------------------
@@ -2033,6 +2051,8 @@ class DispensaryPos extends Component
                 // days at the current rate" is information — the word "low" is not.
                 'cover_label' => StockCover::label($cover['days']),
                 'has_batch' => (new SelectBatch)->fefo($genetic, $location) !== null,
+                // Prompt 271 — the first photo from "Añadir variedad", which nothing used to show.
+                'image_url' => filled($genetic->images[0] ?? null) ? Storage::disk('public')->url((string) $genetic->images[0]) : null,
             ];
         }
 

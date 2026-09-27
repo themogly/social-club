@@ -14189,3 +14189,59 @@ exploited it in `PreLiveSignInHardeningTest` (11).
   database store is noted in the report's Discussion as an option, not done.
 
 `composer check` green in `es` and `en`. Merged to `main` on Ben's instruction.
+
+## Prompt 271 — one business day, one money rule, one debt rule: the pre-live compliance and money findings
+
+From the pre-live timezone investigation (`audits/reports/2026-09-pre-live-timezone.md`), the admin audit's Phase 1 and
+the code-style audit's Phase 1. Ben: "go with your recommendations and fix all". Pinned in `PreLiveComplianceMoneyTest` (13).
+
+### The business day is the only day
+- **`BusinessDay::periodWindow()` / `rolling30Window()`** are the one definition of a day, week, month and trailing-30
+  window: computed in the sede's timezone, starting at its cutoff. `Period::businessWindow()` delegates to it.
+- **The monthly gram cap uses it.** `ResolveMemberLimits` started the month at local MIDNIGHT: a 01:30 dispensation on the
+  1st counted against the new month for the cap and the old month for every report, and between midnight and the cutoff
+  on the 1st the cap ignored grams dispensed earlier in that gap. Now the cap, the reports and the over-limit alert agree.
+- **`Period::today()` / `thisWeek()` / `thisMonth()` / `fromKey()` / `custom()` are business windows**, of the sede passed
+  or of `Period::sedeInScope()` (the active sede, else the organisation's canonical one — the rule the dashboard and
+  reports already used, now in one place). Only with no sede at all do they fall back to the naive calendar. This fixed the
+  counter hub (its takings reset at 02:00 Madrid), the dashboard charts (they disagreed with the cards on the same page),
+  "Este mes", new members, the over-limit alert and table, and custom ranges (whole business days now).
+- **Half-open** everywhere the cap and the Registro query (`>= start AND < end`), so a boundary row counts once.
+- **Times people read are the sede's local time.** Storage stays UTC. The panel sets Filament's global display timezone per
+  request (`SetDisplayTimezone`, persistent so Livewire updates match — pickers convert typed times back to UTC); Blade uses
+  `local_datetime()` — receipts, the Registro (screen and CSV), report DATETIME columns, the till, check-in, the member
+  PWA's messages/events, Seguridad, and the assembly documents; the heatmap and hourly chart labels use local hours.
+  **Data note:** event/convocatoria times typed before this were stored as wall-clock values and will now display shifted
+  by the UTC offset — re-save them (pre-live, so there should be none that matter).
+- **The integrity harness check was wrong** (it asserted the business day starts at UTC midnight — only true for a UTC/00:00
+  sede). It now checks that report day/month equal `BusinessDay`'s and that no naive `now()->startOfDay/Month()` window is
+  back in `app/`. The **demo's second sede is Europe/Madrid with a 06:00 cutoff**, so the demo can show this class of bug.
+
+### Money and the counter
+- **`Money::parseTyped()`** — 268's strict rule, integer-only — is now how every typed euro field at the counter parses: the
+  tender, the till's float / blind count / cash movements / petty cash / handover, and the membership fee. "1.250" was read
+  as €1,25 on an immutable close. `Money::fromEuros` is unchanged for non-typed callers. One existing test pinned rounding a
+  three-decimal entry ("12,345" → €12,35); it now pins the refusal.
+- **The tab reads the charged total.** `DispensaryPos::chargeableCents()` applies a valid price override (clamped, as at
+  commit) for the header, "Justo", "Añadir a la cuenta" and the commit alike; €50 overridden to €30 with €10 handed now owes €20.
+- **One debt rule** (`Wallet::debtIsWithinApprovedTab`): at the counter, owing is fine within the member's approved tab, with
+  the club cap at 0 meaning "no cap" — as the wallet writer already treated it (259). The eligibility check used 0 as "block
+  any debt", so an approved tab worked once. The Deudores report flags the same. The DOOR keeps its own, independent
+  threshold (default WARN) — a reminder at the door is a club's choice even within a tab. Help texts rewritten.
+- **One price per variety, sede and tarifa**: the price form (rule on the sede, since an empty tarifa — the base price — would
+  skip a rule on the tarifa field) and `SaveGeneticPrice` refuse a second row; `ResolvePrice` orders deterministically in
+  case a legacy duplicate exists. No unique index (the nullable `tier_id` makes it driver-dependent; noted in the report).
+
+### Settings, sedes and varieties
+- **Legal thresholds and retention have bounds**: minimum age 18–99, carencia 0–365, daily limit > 0, monthly ≥ daily, alert %
+  > warning %, signed-URL lifetime 60–3600 s, retention ≥ `Settings::MIN_RETENTION_DAYS` (365). The two nightly irreversible
+  jobs (member anonymisation, audit redaction) clamp to that floor too, so a value stored before the bounds cannot fire them.
+  The audit-retention help text said "no borra nada"; it now says what the job does.
+- **A sede needs a timezone and an aforo of at least 1** — an emptied timezone was a 500; an empty aforo silently disabled
+  the capacity check the matrix calls fixed.
+- **Add-strain confirmation** uses `Weight::formatted()`; it said "25 g" for 250 g.
+- **"Publicada" decides the members' menu** (the counter still sees unpublished varieties; new ones default to published),
+  and **the variety photo** from "Añadir variedad" shows as a thumbnail on the counter's list (193's rule: only when some
+  variety has one). Removing the photo step would have undone the add-a-strain design; wiring it was smaller.
+
+`composer check` green in `es` and `en`. Merged to `main` on Ben's instruction.

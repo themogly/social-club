@@ -13,7 +13,7 @@
                         ? 'bg-brand text-white'
                         : 'border border-line bg-surface text-ink dark:border-slate-800 dark:bg-slate-900 dark:text-slate-100' }}">
                     <p class="mb-1 text-[11px] font-medium {{ $mine ? 'text-white/80' : 'text-ink-muted dark:text-slate-400' }}">
-                        {{ $message->author->label() }} · {{ $message->created_at->format('d/m/Y H:i') }}
+                        {{ $message->author->label() }} · {{ local_datetime($message->created_at, 'd/m/Y H:i') }}
                     </p>
                     <p class="whitespace-pre-line">{{ $message->body }}</p>
                 </div>

@@ -16,6 +16,13 @@ use Throwable;
  */
 class Settings
 {
+    /**
+     * The shortest retention an irreversible nightly job will act on (prompt 271) — member anonymisation and audit-log
+     * redaction. The form refuses less; the jobs clamp to it too, so a value stored before the form had bounds (0, −30)
+     * can never anonymise every departed member or strip the whole audit trail overnight.
+     */
+    public const MIN_RETENTION_DAYS = 365;
+
     /** Final-fallback code defaults (seeded into the settings table too). NOTES §A reference table. */
     public const DEFAULTS = [
         // Identity / display

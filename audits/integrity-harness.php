@@ -310,16 +310,38 @@ $sections['dashboard'] = function (Result $R) use ($org, $money): void {
 /**
  * Reports must define "a day" the way the gram cap and the Z-report do. A club open past
  * midnight puts real trade in the gap. (Prompt 105.)
+ *
+ * Prompt 271 corrected this check: it used to assert that the business day starts at UTC
+ * midnight, which only a UTC sede with a 00:00 cutoff can satisfy — it tested configuration,
+ * not code, and a real Madrid/06:00 sede failed it for being set up correctly. The contract is
+ * ONE definition: the report's day and month, the naive "today"/"this month" callers, and the
+ * monthly gram cap all equal BusinessDay's windows for the sede.
  */
 $sections['dayboundary'] = function (Result $R): void {
     foreach (Location::withoutGlobalScopes()->get() as $loc) {
         $probe = CarbonImmutable::now()->setTime(12, 0);
-        [$bdStart] = BusinessDay::window($loc, $probe);
-        $calendarStart = $probe->setTimezone(config('app.timezone') ?: 'UTC')->startOfDay();
-        $hours = (int) round(abs($bdStart->getTimestamp() - $calendarStart->getTimestamp()) / 3600);
-        $R->check("'today' agrees for {$loc->name}", $hours === 0,
-            $hours === 0 ? '' : "business day and report day are {$hours} h apart");
+        $day = BusinessDay::window($loc, $probe);
+        $month = BusinessDay::periodWindow($loc, 'month', $probe);
+
+        $sameDay = Period::businessWindow($loc, 'day', $probe)->bounds() == $day
+            && Period::today($loc)->bounds() == BusinessDay::window($loc);
+        $R->check("'today' is the business day for {$loc->name}", $sameDay, $sameDay ? '' : 'a report day differs from BusinessDay::window');
+
+        $sameMonth = Period::businessWindow($loc, 'month', $probe)->bounds() == $month
+            && Period::thisMonth($loc)->bounds() == BusinessDay::periodWindow($loc, 'month');
+        $R->check("'this month' is the business month for {$loc->name}", $sameMonth, $sameMonth ? '' : 'a report month differs from the monthly cap\'s');
     }
+
+    // No naive calendar window may creep back into domain code: every "today"/"this month" names a sede or resolves one.
+    $naive = [];
+    foreach (new RecursiveIteratorIterator(new RecursiveDirectoryIterator(app_path())) as $file) {
+        if ($file->isFile() && str_ends_with($file->getFilename(), '.php')
+            && preg_match('/CarbonImmutable::now\([^)]*\)->startOf(Day|Month)\(\)/', (string) file_get_contents($file->getPathname())) === 1
+            && ! str_ends_with($file->getPathname(), 'Support/Period.php')) {
+            $naive[] = str_replace(app_path().'/', '', $file->getPathname());
+        }
+    }
+    $R->check('no naive UTC day/month window in app/', $naive === [], implode(', ', $naive));
 
     // Half-open bounds compared inclusively double-count a boundary-instant row.
     $p = Period::thisMonth();

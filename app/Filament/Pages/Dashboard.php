@@ -14,7 +14,6 @@ use App\Models\Batch;
 use App\Models\Genetic;
 use App\Models\Location;
 use App\Models\User;
-use App\Support\ActiveScope;
 use App\Support\Money;
 use App\Support\Period;
 use App\Support\Weight;
@@ -114,6 +113,7 @@ class Dashboard extends BaseDashboard
             return Period::custom(
                 CarbonImmutable::parse($this->customStart),
                 CarbonImmutable::parse($this->customEnd),
+                $this->periodLocation(),
             );
         }
 
@@ -124,13 +124,7 @@ class Dashboard extends BaseDashboard
     /** The sede whose business-day config resolves the period — active sede, else the org's canonical (first) sede. */
     protected function periodLocation(): ?Location
     {
-        $scope = app(ActiveScope::class);
-        $orgId = $scope->organisationId();
-        $id = $scope->locationId() ?? ($orgId !== null
-            ? Location::query()->withoutGlobalScopes()->where('organisation_id', $orgId)->orderBy('name')->value('id')
-            : null);
-
-        return $id !== null ? Location::query()->withoutGlobalScopes()->find($id) : null;
+        return Period::sedeInScope(); // one rule (prompt 271): the active sede, else the organisation's canonical one
     }
 
     /**

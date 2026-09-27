@@ -134,16 +134,19 @@ class TillOpenScreenTest extends TestCase
         $this->assertSame(8050, $this->storedFloatCents());
     }
 
-    public function test_a_decimal_entry_rounds_the_way_the_rest_of_the_product_rounds(): void
+    /**
+     * Prompt 271 — the till's typed money uses the ONE strict rule (268's): at most two decimals, one separator. "12,345"
+     * is ambiguous (twelve thousand three hundred and forty-five, to a Spanish eye) and is refused, never rounded.
+     */
+    public function test_an_ambiguous_entry_is_refused_not_rounded(): void
     {
         $this->operator();
 
         Livewire::test(TillSession::class)->set('floatInput', '12,345')->call('open');
+        $this->assertNull($this->storedFloatCents());
 
-        // round_half_up at the euro edge — 12,345 → 1235 cents, never a float in the column.
-        $stored = $this->storedFloatCents();
-        $this->assertIsInt($stored);
-        $this->assertSame(1235, $stored);
+        Livewire::test(TillSession::class)->set('floatInput', '12,35')->call('open');
+        $this->assertSame(1235, $this->storedFloatCents());
     }
 
     // --- the first-ever open ---------------------------------------------------------------------------

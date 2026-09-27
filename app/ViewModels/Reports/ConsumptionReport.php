@@ -204,7 +204,7 @@ class ConsumptionReport extends AbstractReport
 
     private function overLimit(): ReportTable
     {
-        [$start, $end] = Period::thisMonth()->bounds();
+        [$start, $end] = Period::thisMonth($this->period->location)->bounds(); // the cap's business month (271)
 
         // One grouped query of this month's grams per member across the scope.
         $used = DB::table('dispensation_lines')

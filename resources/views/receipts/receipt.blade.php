@@ -79,7 +79,7 @@
 
         <div class="row"><span class="muted">{{ __('Socio') }}</span><span>{{ $dispensation->member?->fullName() }}</span></div>
         <div class="row"><span class="muted">{{ __('Nº de socio') }}</span><span>{{ $dispensation->member?->member_no }}</span></div>
-        <div class="row"><span class="muted">{{ __('Fecha') }}</span><span>{{ $dispensation->dispensed_at?->format('d/m/Y H:i') }}</span></div>
+        <div class="row"><span class="muted">{{ __('Fecha') }}</span><span>{{ local_datetime($dispensation->dispensed_at, 'd/m/Y H:i') }}</span></div>
         <div class="row"><span class="muted">{{ __('Referencia') }}</span><span>{{ $dispensation->id }}</span></div>
 
         <h2>{{ __('Dispensación') }}</h2>
