@@ -462,8 +462,10 @@ class CounterHubTest extends TestCase
 
         // Measured at 32 on this branch. The bound is deliberately close to it: the dashboard's own entry
         // records ~85 bounded queries for a screen opened a few times a day, and this one renders on every
-        // navigation, all shift. Room to breathe, not room to drift.
-        $this->assertLessThanOrEqual(40, $count, "the hub ran {$count} queries");
+        // navigation, all shift. Room to breathe, not room to drift. Prompt 269 added the low-stock alerts: a
+        // FIXED six per sede (varieties, their prices, on-hand, trailing, first sale, articles), never per variety
+        // — `LowStockAlertTest` pins that half.
+        $this->assertLessThanOrEqual(46, $count, "the hub ran {$count} queries");
     }
 
     /**

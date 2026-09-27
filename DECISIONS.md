@@ -14104,3 +14104,48 @@ with "Cambio" beneath (`storage/app/screenshots/268/`).
 ### Merge
 
 Merged to `main` on Ben's instruction. `composer check` green in `es` and `en`.
+
+## Prompt 269 — the low-stock warning is an alert, and it can be seen to work
+
+A tester reported *"low stock alert doesn't work"*. The counter badge's arithmetic was correct (pinned already by
+`GeneticLowStockTest` / `LowStockIsDaysOfCoverTest`); what was broken was everything around it:
+
+- **Nothing alerted.** The admin field is literally "Aviso de stock bajo (g)", and the figure reached one place: a small dot in the
+  dispensary picker, visible only once a socio is held. The "Requiere atención" list on the panel dashboard and the counter hub had
+  no low-stock entry at all.
+- **A figure typed on a tier's price row was silently ignored.** The form offers the field on every row; the reader only looked at
+  the base (no-tier) row.
+- **The demo seed made it impossible to see working.** Every seeded price carried a 50 g threshold over 12–33 g of stock, so every
+  variety read "Stock bajo" permanently and lowering stock visibly changed nothing. (213 diagnosed exactly this for the old 50 g
+  default; the seed's explicit figure kept it alive, because an explicit figure wins.)
+
+### Decisions
+
+- **Two new `DashboardAlert` cases**, `GENETICS_LOW_STOCK` (varieties) and `ARTICLES_LOW_STOCK` (Barra y tienda), both `warning`.
+  Two rather than one because the subjects live in different tables: varieties → Lotes (the remedy is a batch/purchase), articles →
+  Artículos **with the existing "Stock bajo" filter on**. Counter destination `null` for both — the same decision as expiring
+  batches: restocking is a purchase, which the counter does not make; the picker already badges the variety itself. Staff with no
+  `viewAny` on the resource see plain text, never a 403 (207's rule, unchanged).
+- **One verdict.** The variety count is `StockCover::verdict()` — the SAME rule the picker badges — so the alert and the dot cannot
+  disagree. An empty variety is *gone*, not low (the picker drops it), so it is not counted. Articles use `Article::scopeLowStock()`,
+  the rule behind the bar's "Quedan pocas"; inactive and deleted articles are excluded.
+- **Bounded, because the hub renders on every navigation.** `StockCover::lowCountAt()` runs a fixed six queries per sede (varieties,
+  their prices, on-hand, trailing, first sale, articles) regardless of catalogue size — `StockCover::onHandCgFor()` is the grouped
+  on-hand, `Genetic::onHandCgAt()` now delegates to it, and `explicitLowStockThresholdCg()` reads an eager-loaded `prices` when
+  present. The hub budget moved 40 → 46 for those six; `LowStockAlertTest` pins that the count does not grow per variety. Live
+  queries, never cached (stock is transactional).
+- **Tier-row thresholds count.** Stock is per variety per sede, not per tier. The base row's figure still wins when it states one;
+  otherwise the **highest** figure on any row at that sede (warn early rather than late); then the org setting; then the cover rule.
+- **The demo seed states no threshold**, so the cover rule (216) decides — what a real club gets until it sets a figure.
+  `DemoSeedProfileTest` asserts no seeded threshold and that not every variety at a sede reads low.
+
+### Not done (deliberately)
+
+No push/email notification — the alert is a dashboard/hub entry like the other seven. A notification would need a "once per
+crossing" marker so it does not fire on every render; say the word if the club wants one.
+
+### Tests
+
+`LowStockAlertTest` (8): threshold crossed → alert, restock → cleared (through `RecordStockMovement`); empty is not low; tier-row
+figure counts; base row wins; articles (active, not deleted, filtered panel URL); the panel dashboard and the counter hub both say it;
+another sede's / another organisation's stock never reaches this sede's alert; no per-variety queries. `DemoSeedProfileTest` +1.
