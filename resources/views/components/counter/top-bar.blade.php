@@ -92,9 +92,15 @@
 --}}
 <header
     data-counter-topbar
-    class="flex items-center justify-between border-b border-line px-4 py-3 dark:border-slate-800 sm:px-6"
+    class="flex flex-wrap items-center justify-between gap-y-2 border-b border-line px-4 py-3 dark:border-slate-800 sm:px-6"
 >
-    <div class="flex min-w-0 items-center gap-3">
+    {{-- Prompt 272 — the row WRAPS rather than crushing or overflowing. At 390 the fixed right-hand group
+         was wider than the phone, so the page scrolled sideways (scrollWidth 451), the home link was crushed
+         to 16px and the panic control sat off screen. Wrapping moves the terminal controls to a second row
+         (and, at phone width, the leave-group to a third) — every control stays ONE tap and ON screen, and
+         nothing is hidden behind an overflow: Lock (198) and panic (121) are one-tap by decision, and the
+         Administración word is visible at every width (246). --}}
+    <div class="flex min-w-0 max-w-full items-center gap-3">
         {{-- HOME — a labelled link, not a logo (205), and now named by where it goes (206).
 
              205's fix was that the route home must not BE a logo: it was a 44×44 brand square with one letter
@@ -117,7 +123,7 @@
            @class([
                'flex min-w-0 min-h-11 items-center gap-2 rounded-xl px-2 text-left transition sm:px-3',
                'bg-brand-tint text-brand dark:bg-slate-800 dark:text-white' => request()->routeIs('counter.home'),
-               'text-ink hover:bg-brand-tint hover:text-brand dark:text-slate-100 dark:hover:bg-slate-800' => ! request()->routeIs('counter.home'),
+               'text-ink hover:bg-brand-tint hover:text-brand dark:text-slate-100 dark:hover:bg-slate-800 dark:hover:text-white' => ! request()->routeIs('counter.home'),
            ])
            @if (request()->routeIs('counter.home')) aria-current="page" @endif>
             {{-- The house, taken back off the admin link where 205 left it. --}}
@@ -175,7 +181,7 @@
                             @class([
                                 'inline-flex items-center gap-1.5 rounded-lg min-h-11 px-3 text-sm font-medium transition',
                                 'bg-warning/10 text-warning ring-1 ring-warning/50' => $mustChooseSede,
-                                'bg-surface-alt text-ink hover:bg-brand-tint hover:text-brand dark:bg-slate-800 dark:text-slate-100' => ! $mustChooseSede,
+                                'bg-surface-alt text-ink hover:bg-brand-tint hover:text-brand dark:bg-slate-800 dark:text-slate-100 dark:hover:bg-slate-700 dark:hover:text-white' => ! $mustChooseSede,
                             ])>
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" class="h-4 w-4" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M15 10.5a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z"/><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1 1 15 0Z"/></svg>
                         <span>{{ $mustChooseSede ? __('Elige tu sede') : $currentSede?->name }}</span>
@@ -197,7 +203,7 @@
                                         @class([
                                             'flex w-full items-center justify-between gap-2 rounded-lg px-3 py-2 text-left text-sm transition',
                                             'bg-brand-tint font-semibold text-brand dark:bg-slate-800 dark:text-white' => $isCurrent,
-                                            'font-medium text-ink hover:bg-brand-tint hover:text-brand dark:text-slate-200 dark:hover:bg-slate-800' => ! $isCurrent,
+                                            'font-medium text-ink hover:bg-brand-tint hover:text-brand dark:text-slate-200 dark:hover:bg-slate-800 dark:hover:text-white' => ! $isCurrent,
                                         ])
                                         @if ($isCurrent) aria-current="true" @endif>
                                     <span>{{ $sede->name }}</span>
@@ -213,7 +219,7 @@
 
             @if ($sedeSwitchError)
                 <p role="alert" data-counter-sede-error
-                   class="absolute left-0 top-full z-30 mt-1 w-max max-w-xs rounded-lg bg-error px-2.5 py-1.5 text-xs font-medium text-white shadow">
+                   class="absolute left-0 top-full z-30 mt-1 w-max max-w-xs rounded-lg bg-error-fill px-2.5 py-1.5 text-xs font-medium text-white shadow">
                     {{ $sedeSwitchError }}
                 </p>
             @endif
@@ -224,21 +230,22 @@
          destinations were in this bar AND on the hub after 189, which is the "duplicate data" the owner
          reported, and a strip that took prompts 116, 130 and 132 to fit on a portrait tablet was the more
          expensive of the two copies to keep. `CounterScreens` is unchanged and is read by the tiles. --}}
-    <div class="min-w-0 flex-1"></div>
 
     {{-- ============ THE TERMINAL CONTROLS ============
          Every one of these was in TWO places after 189 — here and on the hub's "Terminal" panel. They live
          here now and only here (prompt 205), because they are facts about this terminal rather than about
          whichever screen happens to be open.
 
-         **Labels collapse below `xl`, raised from `lg` by prompt 206**, and 130's rule that labelling is
-         all-or-nothing is why it had to move rather than half-collapse: this row grew — the club's name went
-         back into the home link and *Panel* became the longer, correct *Administración* — and a labelled row
-         no longer fits the 1024px landscape tablet. Measured, not guessed: at 1024 the labelled row overlapped
-         the sede badge by 68px. Every target stays at the 44px floor either way, and every control carries an
-         `aria-label`, because `hidden` takes a label out of the accessibility tree as well as off the screen —
-         the Lock button was relying on a span that vanished from both below `lg`. --}}
-    <div class="flex shrink-0 items-center gap-1">
+         **No breakpoint labels any more (prompt 272).** 130's rule is that labelling is all-or-nothing and only
+         where it fits; 206 moved the flip to `xl`. But the counter shell is capped at `max-w-6xl` (1152px), so
+         from 1152 up the bar is ONE width — and after 267 widened the operator chip the labelled row
+         (*"Trabajando:"*, *"Bloquear pantalla"*, *"Cerrar sesión del dispositivo"*) no longer fit it: the home
+         link took the loss and the club name and the screen's h1 read "C." / "D..". Measured, the labelled
+         row needed every pixel of 1104 even without the prefix, so there is no width at which it fits — the
+         rule's answer is "nowhere". Lock and Log out are icon controls at every width, each with an
+         `aria-label` and a `title` (the pointer tooltip); Administración keeps its WORD (246); the chip shows
+         the name alone (the green dot and the sr-only "· Cambiar de persona" carry the rest). --}}
+    <div class="ml-auto flex max-w-full flex-wrap items-center justify-end gap-1">
         {{-- WHO IS WORKING, and Switch — one control (prompt 173's rule: exactly ONE route to the pad, which
              is 173's own full-screen surface; this dispatches to it and does not draw a second one). --}}
         @if ($user !== null && \App\Support\CounterOperator::current() !== null)
@@ -248,10 +255,9 @@
                 data-counter-switch-operator
                 @click="window.Livewire.dispatch('counter-switch-operator')"
                 title="{{ __('Cambiar de persona') }}"
-                class="inline-flex min-h-11 items-center gap-2 rounded-lg bg-surface-alt px-3 text-sm transition hover:bg-brand-tint hover:text-brand dark:bg-slate-800 dark:hover:bg-slate-700"
+                class="inline-flex min-h-11 items-center gap-2 rounded-lg bg-surface-alt px-3 text-sm transition hover:bg-brand-tint hover:text-brand dark:bg-slate-800 dark:hover:bg-slate-700 dark:hover:text-white"
             >
                 <span class="inline-block h-2.5 w-2.5 shrink-0 rounded-full bg-success" aria-hidden="true"></span>
-                <span class="hidden text-ink-muted xl:inline dark:text-slate-400">{{ __('Trabajando') }}:</span>
                 <span data-operator-name class="max-w-[9rem] truncate font-semibold">{{ \App\Support\CounterOperator::current()?->name }}</span>
                 {{-- Prompt 239 — the operator's shift-end IS this: hand over to the next person, who enters their
                      own PIN. It replaced "Cerrar sesión" as the thing an operator reaches for at the end of a
@@ -270,12 +276,12 @@
             data-counter-lock
             @click="$store.counter.lockNow()"
             aria-label="{{ __('Bloquear pantalla') }}"
+            title="{{ __('Bloquear pantalla') }}"
             class="inline-flex min-h-11 items-center gap-2 rounded-lg px-3 text-sm font-medium text-ink-muted transition hover:bg-brand-tint hover:text-brand dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-white"
         >
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" class="h-5 w-5 shrink-0" aria-hidden="true">
                 <path stroke-linecap="round" stroke-linejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 1 0-9 0v3.75m-.75 0h10.5a2.25 2.25 0 0 1 2.25 2.25v6.75a2.25 2.25 0 0 1-2.25 2.25H6.75a2.25 2.25 0 0 1-2.25-2.25v-6.75a2.25 2.25 0 0 1 2.25-2.25Z"/>
             </svg>
-            <span class="hidden xl:inline" aria-hidden="true">{{ __('Bloquear pantalla') }}</span>
         </button>
 
         {{-- ======== THE CONTROLS THAT LEAVE THE COUNTER (prompt 206) ========
@@ -330,12 +336,12 @@
                         type="submit"
                         data-counter-logout
                         aria-label="{{ __('Cerrar sesión del dispositivo') }}"
+                        title="{{ __('Cerrar sesión del dispositivo') }}"
                         class="inline-flex min-h-11 items-center gap-2 rounded-lg px-3 text-sm font-medium text-ink-muted transition hover:bg-black/5 dark:text-slate-400 dark:hover:bg-white/5"
                     >
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" class="h-5 w-5 shrink-0" aria-hidden="true">
                             <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0 0 13.5 3h-6a2.25 2.25 0 0 0-2.25 2.25v13.5A2.25 2.25 0 0 0 7.5 21h6a2.25 2.25 0 0 0 2.25-2.25V15M12 9l-3 3m0 0 3 3m-3-3h12.75"/>
                         </svg>
-                        <span class="hidden xl:inline" aria-hidden="true">{{ __('Cerrar sesión del dispositivo') }}</span>
                     </button>
                 </form>
             @endif

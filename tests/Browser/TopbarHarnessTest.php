@@ -70,7 +70,10 @@ class TopbarHarnessTest extends TestCase
         // name went back into the home link, and *Panel* became the longer, correct *Administración*), and at
         // 1024 the labelled row overlapped the sede badge by 68px. 130's rule is that labelling is
         // all-or-nothing and only where it fits, so the threshold moves rather than the labels half-collapsing.
-        $this->assertStringContainsString('hidden xl:inline', $html);
+        // **Prompt 272: nowhere.** The counter shell caps the bar at 1152px, so above that it is one width,
+        // and after 267 the labelled row no longer fit it — the home link lost, reading "C." / "D..". The rule's
+        // answer is that the labels fit at no width, so there are none; every icon control keeps its aria-label.
+        $this->assertStringNotContainsString('hidden xl:inline', $html);
         $this->assertStringNotContainsString('hidden md:inline', $html);
         $this->assertStringNotContainsString('hidden lg:inline', $html);
         $this->assertStringContainsString('h-11 w-11', $html);                     // 44px panic control

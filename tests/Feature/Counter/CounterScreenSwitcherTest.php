@@ -151,8 +151,10 @@ class CounterScreenSwitcherTest extends TestCase
         $this->assertMatchesRegularExpression('/data-counter-home-tile="counter\.\w+"[^>]*\n?[^>]*min-h-\[8rem\]/s', $html);
         $this->assertStringContainsString('min-h-[11rem]', $html);
 
-        // The bar's controls: uniform labelling gated at xl, 116's md:inline still gone.
-        $this->assertStringContainsString('hidden xl:inline', $html);
+        // The bar's controls: no breakpoint-gated labels at all since prompt 272 (the capped bar never fits the
+        // labelled row, so it is labelled nowhere — all-or-nothing), and 116's md:inline still gone.
+        $this->assertStringNotContainsString('hidden xl:inline', $html);
+        $this->assertStringContainsString('flex-wrap', $html); // the row wraps rather than overflowing at 390
         $this->assertStringNotContainsString('hidden md:inline', $html);
         $this->assertStringNotContainsString('hidden lg:inline', $html);
         $this->assertStringContainsString('min-h-11', $html);
