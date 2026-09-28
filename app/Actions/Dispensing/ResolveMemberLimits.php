@@ -25,10 +25,16 @@ use DateTimeInterface;
  */
 class ResolveMemberLimits
 {
-    public function handle(Member $member, Location $location, DateTimeInterface|string|null $at = null): LimitSnapshot
+    /**
+     * `$defaults` stands in for the org/sede default limits (`daily_limit_cg`, `monthly_limit_cg`) — how the switch-on
+     * modal counts, with THIS resolver, who a proposed default would put over the month (prompt 296).
+     *
+     * @param  array{daily_limit_cg?: int, monthly_limit_cg?: int}  $defaults
+     */
+    public function handle(Member $member, Location $location, DateTimeInterface|string|null $at = null, array $defaults = []): LimitSnapshot
     {
-        $daily = $this->resolveLimit($member, $location, 'daily_limit_cg', fn (MembershipTier $t) => $t->daily_limit_cg);
-        $monthly = $this->resolveLimit($member, $location, 'monthly_limit_cg', fn (MembershipTier $t) => $t->monthly_limit_cg);
+        $daily = $this->resolveLimit($member, $location, 'daily_limit_cg', fn (MembershipTier $t) => $t->daily_limit_cg, $defaults);
+        $monthly = $this->resolveLimit($member, $location, 'monthly_limit_cg', fn (MembershipTier $t) => $t->monthly_limit_cg, $defaults);
 
         [$dayStart, $dayEnd] = BusinessDay::window($location, $at);
         [$monthStart, $monthEnd] = $this->monthWindow($location, $at);
@@ -44,7 +50,17 @@ class ResolveMemberLimits
     /**
      * @param  callable(MembershipTier): ?int  $tierValue
      */
-    private function resolveLimit(Member $member, Location $location, string $memberField, callable $tierValue): int
+    /**
+     * The limits to SHOW — none at all while the owner has switched limits off (prompt 296): the counter's allowance, the
+     * month bar and the limit-greyed presets all read this, so they disappear together.
+     */
+    public function shown(Member $member, Location $location): ?LimitSnapshot
+    {
+        return Settings::limitsEnabled() ? $this->handle($member, $location) : null;
+    }
+
+    /** @param  array{daily_limit_cg?: int, monthly_limit_cg?: int}  $defaults */
+    private function resolveLimit(Member $member, Location $location, string $memberField, callable $tierValue, array $defaults = []): int
     {
         if ($member->{$memberField} !== null) {
             return (int) $member->{$memberField};
@@ -53,6 +69,10 @@ class ResolveMemberLimits
         $tier = $this->activeTier($member, $location);
         if ($tier !== null && $tierValue($tier) !== null) {
             return (int) $tierValue($tier);
+        }
+
+        if (isset($defaults[$memberField])) {
+            return (int) $defaults[$memberField];
         }
 
         // location → org default (Settings resolves precedence when scoped to the location).

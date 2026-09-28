@@ -270,10 +270,12 @@
                                     <span class="text-ink-muted dark:text-slate-400">{{ __('Equivale a') }}</span>
                                     <span data-entry-preview-grams class="font-semibold tabular-nums" x-text="enteredCg !== null ? grams(enteredCg) : ''"></span>
                                 </div>
+                                @if ($limits) {{-- none at all while limits are switched off (296) --}}
                                 <div class="mt-1 flex items-center justify-between text-xs" x-show="remainingAfter !== null">
                                     <span class="text-ink-muted dark:text-slate-400">{{ __('Restante hoy tras esta entrada') }}</span>
                                     <span data-entry-preview-remaining class="font-medium" x-bind:class="remainingAfter < 0 ? 'text-error' : 'text-success'" x-text="remainingAfter !== null ? grams(remainingAfter) : ''"></span>
                                 </div>
+                                @endif
                             </div>
                         @endif
 

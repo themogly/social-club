@@ -27,8 +27,15 @@
         </div>
     </section>
 
-    @if ($snapshot)
-        <section class="mt-4 rounded-2xl border border-line bg-surface p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+    @if ($snapshot && ! $limitsOn)
+        {{-- Prompt 296 — limits switched off by the club: what was taken, never an allowance or a percentage. --}}
+        <section data-consumption-taken class="mt-4 rounded-2xl border border-line bg-surface p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+            <h2 class="text-sm font-semibold text-ink-muted dark:text-slate-300">{{ __('Consumo del mes') }}</h2>
+            <p class="mt-1 text-2xl font-semibold">{{ $grams($snapshot->monthlyUsedCg) }}</p>
+            <p class="mt-2 text-xs text-ink-muted dark:text-slate-400">{{ __('Hoy: :used', ['used' => $grams($snapshot->dailyUsedCg)]) }}</p>
+        </section>
+    @elseif ($snapshot)
+        <section data-consumption-allowance class="mt-4 rounded-2xl border border-line bg-surface p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
             <div class="flex items-baseline justify-between">
                 <h2 class="text-sm font-semibold text-ink-muted dark:text-slate-300">{{ __('Consumo del mes') }}</h2>
                 <span class="text-xs text-ink-muted dark:text-slate-400">{{ min(100, $snapshot->monthlyPercent()) }}%</span>

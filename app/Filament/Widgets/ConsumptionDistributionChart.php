@@ -2,6 +2,8 @@
 
 namespace App\Filament\Widgets;
 
+use App\Support\Settings;
+
 /**
  * How the active membership sits against its monthly limit — a histogram of members by
  * the share of their cap used this month. The bands are coloured by risk (green low,
@@ -9,6 +11,12 @@ namespace App\Filament\Widgets;
  */
 class ConsumptionDistributionChart extends DashboardChart
 {
+    /** Prompt 296 — a chart of shares of a limit has nothing to show while the owner has switched limits off. */
+    public static function canView(): bool
+    {
+        return Settings::limitsEnabled() && parent::canView();
+    }
+
     protected function getType(): string
     {
         return 'bar';

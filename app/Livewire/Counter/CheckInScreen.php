@@ -290,7 +290,7 @@ class CheckInScreen extends Component
 
         if ($member !== null && $location !== null) {
             $verdict = (new ResolveMemberEligibility)->handle($member, $location, 'door');
-            $limits = (new ResolveMemberLimits)->handle($member, $location);
+            $limits = (new ResolveMemberLimits)->shown($member, $location); // none while limits are off (296)
             $openCheckIn = $this->openCheckIn($member, $location);
             $membership = $this->activeMembership($member, $location);
             $walletCents = Wallet::balance($member->id, $location->id);

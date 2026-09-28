@@ -37,6 +37,9 @@ class Settings
         // Compliance (NOTES §A) — all editable
         'min_age' => 18,
         'carencia_days' => 15,
+        // Prompt 296 — the org-wide switch for consumption limits. ON by default, so a new club and every existing
+        // install are unchanged until the owner switches it off in Ajustes → Cumplimiento.
+        'consumption_limits_enabled' => true,
         'daily_limit_cg' => 350,            // 3.5 g
         'monthly_limit_cg' => 10000,        // 100 g
         'monthly_window' => 'calendar',     // calendar | rolling30
@@ -336,11 +339,26 @@ class Settings
     }
 
     /**
-     * Enforcement mode (BLOCK | WARN | OVERRIDE) for a check at a surface, from the
+     * Prompt 296 — are consumption limits applied at all? Org-wide (per-sede on/off is out of scope). Off, nothing
+     * checks a limit (`enforcement()` reads OFF for them) and nothing shows one; every gram is still recorded, and the
+     * stock ceiling still reads `daily_limit_cg`.
+     */
+    public static function limitsEnabled(): bool
+    {
+        return (bool) self::get('consumption_limits_enabled', true);
+    }
+
+    /**
+     * Enforcement mode (BLOCK | WARN | OVERRIDE, or OFF for limits switched off) for a check at a surface, from the
      * enforcement matrix. Unknown combinations default to BLOCK (fail safe).
      */
     public static function enforcement(string $surface, string $rule): string
     {
+        // Prompt 296 — limits switched off are a check whose mode is OFF, read here so every consumer of the mode follows.
+        if (($rule === 'daily_limit' || $rule === 'monthly_limit') && ! self::limitsEnabled()) {
+            return 'OFF';
+        }
+
         $matrix = self::get('enforcement', self::DEFAULTS['enforcement']);
         $value = data_get($matrix, "{$surface}.{$rule}");
 

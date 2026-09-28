@@ -115,15 +115,22 @@ class ManageEnforcement extends Page
         $fields = [];
         foreach (self::RULES[$surface] as $rule) {
             $locked = in_array($rule, self::LOCKED, true);
+            $limitsOff = self::switchedOff($rule);
             $fields[] = Select::make("{$surface}.{$rule}")
                 ->label(self::ruleLabel($rule))
                 ->options(self::modeOptionsFor($rule))
-                ->disabled($locked)
-                ->helperText($this->fieldHelp($rule, $locked))
+                ->disabled($locked || $limitsOff)
+                ->helperText($limitsOff ? __('Desactivado — ver Ajustes') : $this->fieldHelp($rule, $locked))
                 ->selectablePlaceholder(false);
         }
 
         return $fields;
+    }
+
+    /** Prompt 296 — the daily and monthly limit rows, while the owner has switched consumption limits off in Ajustes. */
+    private static function switchedOff(string $rule): bool
+    {
+        return in_array($rule, ['daily_limit', 'monthly_limit'], true) && ! Settings::limitsEnabled();
     }
 
     public function save(): void
@@ -135,12 +142,16 @@ class ManageEnforcement extends Page
 
         // Reassemble the matrix from the form, FORCING the locked cells to BLOCK server-side (a disabled
         // field isn't submitted, and even a tampered submit is ignored). Unknown modes fail safe to BLOCK.
+        // A limit row switched off in Ajustes (296) is read-only here, so it keeps its stored mode for when limits return.
+        $stored = $this->currentValues();
         $matrix = [];
         foreach (self::RULES as $surface => $rules) {
             foreach ($rules as $rule) {
-                $mode = in_array($rule, self::LOCKED, true)
-                    ? 'BLOCK'
-                    : ($state[$surface][$rule] ?? self::defaultMode($rule));
+                $mode = match (true) {
+                    in_array($rule, self::LOCKED, true) => 'BLOCK',
+                    self::switchedOff($rule) => $stored[$surface][$rule],
+                    default => $state[$surface][$rule] ?? self::defaultMode($rule),
+                };
                 $matrix[$surface][$rule] = in_array($mode, self::validModes($rule), true) ? $mode : self::defaultMode($rule);
             }
         }

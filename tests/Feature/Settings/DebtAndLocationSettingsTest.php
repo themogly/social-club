@@ -174,6 +174,9 @@ class DebtAndLocationSettingsTest extends TestCase
             // System constant, not a front-of-house threshold: how many hours abandoned member-import scratch
             // CSVs live before the imports:prune-staging sweep deletes them (prompt 142).
             'import_staging_retention_hours',
+            // On the form (Cumplimiento) as a switch, but written only by its own modal through SetConsumptionLimits
+            // (prompt 296) — switching limits on asks for the defaults first — never by the page's "Guardar".
+            'consumption_limits_enabled',
             // Scheduler constant, not a front-of-house threshold: how many hours before an event to push
             // its reminder (prompt 56 — the events:remind command reads it).
             'event_reminder_lead_hours',

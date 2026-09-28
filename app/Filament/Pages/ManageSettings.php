@@ -3,7 +3,9 @@
 namespace App\Filament\Pages;
 
 use App\Actions\RecordAuditLog;
+use App\Actions\Settings\SetConsumptionLimits;
 use App\Enums\SettingType;
+use App\Models\User;
 use App\Support\CounterScreens;
 use App\Support\Settings;
 use App\Support\Weight;
@@ -153,12 +155,26 @@ class ManageSettings extends Page
                 Section::make(__('Cumplimiento'))
                     ->description(__('Límites legales. Cambiarlos afecta solo a comprobaciones futuras, nunca a lo ya registrado.'))
                     ->schema([
+                        // Prompt 296 (Shane) — a switch, not a deletion. Flipping it saves NOTHING by itself: it snaps back and
+                        // opens a modal (on: the defaults, and what they will mean; off: are you sure?), and only that
+                        // modal's button writes — the flag and the defaults together, audited. Never saved by "Guardar".
+                        Toggle::make('consumption_limits_enabled')->label(__('Aplicar límites de consumo'))
+                            ->helperText(__('Si lo desactivas, el mostrador no comprueba ni muestra límites. Las dispensaciones se siguen registrando igual.'))
+                            ->live()
+                            ->afterStateUpdated(function (bool $state): void {
+                                $this->data['consumption_limits_enabled'] = ! $state;
+                                $this->mountAction($state ? 'enableLimits' : 'disableLimits');
+                            })
+                            ->dehydrated(false)
+                            ->columnSpanFull(),
                         TextInput::make('min_age')->label(__('Edad mínima'))->integer()->minValue(18)->maxValue(99)->required()
                             ->helperText(__('Edad mínima para ser socio. Se bloquea la dispensación por debajo.')),
                         TextInput::make('carencia_days')->label(__('Días de carencia'))->integer()->minValue(0)->maxValue(365)->required()
                             ->helperText(__('Espera obligatoria desde el alta antes de la primera dispensación.')),
                         TextInput::make('daily_limit_g')->label(__('Límite diario (g)'))->numeric()->minValue(0.01)->maxValue(1000)->required()
-                            ->helperText(__('Límite por defecto por socio y día; una tarifa o un límite personal lo sustituye (y puede ser mayor). Se bloquea en el mostrador al superarlo.')),
+                            ->helperText(fn (): string => Settings::limitsEnabled()
+                                ? __('Límite por defecto por socio y día; una tarifa o un límite personal lo sustituye (y puede ser mayor). Se bloquea en el mostrador al superarlo.')
+                                : __('Se sigue usando para calcular el techo legal de existencias.')),
                         TextInput::make('monthly_limit_g')->label(__('Techo mensual (g)'))->numeric()->minValue(0.01)->maxValue(10000)->gte('daily_limit_g')->required()
                             ->helperText(__('Límite por defecto por socio y mes; una tarifa o un límite personal lo sustituye.')),
                         Select::make('monthly_window')->label(__('Ventana mensual'))
@@ -301,6 +317,58 @@ class ManageSettings extends Page
             ]);
     }
 
+    /** Prompt 296 — switching limits ON asks for the defaults, and says what they will mean on the next shift. */
+    public function enableLimitsAction(): Action
+    {
+        return Action::make('enableLimits')
+            ->modalHeading(__('Activar límites de consumo'))
+            ->modalDescription(function (): string {
+                $impact = SetConsumptionLimits::impact((int) Settings::get('daily_limit_cg'), (int) Settings::get('monthly_limit_cg'));
+
+                return trans_choice(':count socio sin límite propio usará estos valores.|:count socios sin límite propio usarán estos valores.', $impact['without_own'], ['count' => $impact['without_own']])
+                    .' '.trans_choice(':count socio ya superaría el límite mensual este mes.|:count socios ya superarían el límite mensual este mes.', $impact['over_monthly'], ['count' => $impact['over_monthly']])
+                    .' '.__('Los socios con un límite propio lo conservan: solo cambia el valor por defecto.');
+            })
+            ->fillForm(fn (): array => [
+                'daily_limit_g' => Weight::fromCentigrams((int) Settings::get('daily_limit_cg'))->grams(),
+                'monthly_limit_g' => Weight::fromCentigrams((int) Settings::get('monthly_limit_cg'))->grams(),
+            ])
+            ->schema([
+                // Validated exactly as the Cumplimiento fields are.
+                TextInput::make('daily_limit_g')->label(__('Límite diario por defecto (g)'))->numeric()->minValue(0.01)->maxValue(1000)->required(),
+                TextInput::make('monthly_limit_g')->label(__('Límite mensual por defecto (g)'))->numeric()->minValue(0.01)->maxValue(10000)->gte('daily_limit_g')->required(),
+            ])
+            ->modalSubmitActionLabel(__('Activar'))
+            ->action(function (array $data): void {
+                $actor = Auth::user();
+                abort_unless($actor instanceof User, 403);
+                (new SetConsumptionLimits)->enable($actor, Weight::fromGrams((string) $data['daily_limit_g'])->centigrams, Weight::fromGrams((string) $data['monthly_limit_g'])->centigrams);
+
+                $this->data['consumption_limits_enabled'] = true;
+                $this->data['daily_limit_g'] = (float) $data['daily_limit_g'];
+                $this->data['monthly_limit_g'] = (float) $data['monthly_limit_g'];
+                Notification::make()->title(__('Límites de consumo activados'))->success()->send();
+            });
+    }
+
+    /** Prompt 296 — switching limits OFF asks once. */
+    public function disableLimitsAction(): Action
+    {
+        return Action::make('disableLimits')
+            ->requiresConfirmation()
+            ->modalHeading(__('Desactivar límites de consumo'))
+            ->modalDescription(__('El mostrador dejará de comprobar límites. ¿Continuar?'))
+            ->modalSubmitActionLabel(__('Desactivar'))
+            ->action(function (): void {
+                $actor = Auth::user();
+                abort_unless($actor instanceof User, 403);
+                (new SetConsumptionLimits)->disable($actor);
+
+                $this->data['consumption_limits_enabled'] = false;
+                Notification::make()->title(__('Límites de consumo desactivados'))->success()->send();
+            });
+    }
+
     /** Prompt 273 — the page is ~4,000 px tall; the save is also at the top, not only after the last section. */
     protected function getHeaderActions(): array
     {
@@ -354,6 +422,7 @@ class ManageSettings extends Page
         foreach (array_keys(self::SCALARS) as $key) {
             $values[$key] = Settings::get($key);
         }
+        $values['consumption_limits_enabled'] = Settings::limitsEnabled();
         $values['daily_limit_g'] = ((int) Settings::get('daily_limit_cg')) / 100;
         $values['monthly_limit_g'] = ((int) Settings::get('monthly_limit_cg')) / 100;
         $values['wallet_debt_limit_eur'] = ((int) Settings::get('wallet_debt_limit_cents')) / 100;

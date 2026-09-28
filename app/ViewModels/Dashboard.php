@@ -304,6 +304,7 @@ class Dashboard
 
     public function membersOverLimit(): int
     {
+
         // The BUSINESS month (271) — the same window the monthly cap enforces, so the alert and the block agree.
         [$start, $end] = Period::thisMonth($this->period->location)->bounds();
 
@@ -313,7 +314,8 @@ class Dashboard
             ->whereNotNull('monthly_limit_cg')->where('monthly_limit_cg', '>', 0)
             ->pluck('monthly_limit_cg', 'id');
 
-        if ($limits->isEmpty()) {
+        // Prompt 296 — nobody is "over a limit" while the owner has switched limits off (asked after the one cheap query).
+        if ($limits->isEmpty() || ! Settings::limitsEnabled()) {
             return 0;
         }
 

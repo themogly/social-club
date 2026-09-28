@@ -3,6 +3,7 @@
 namespace App\Filament\Resources\MembershipTiers\Schemas;
 
 use App\Enums\MembershipPeriod;
+use App\Support\Settings;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
@@ -40,6 +41,7 @@ class MembershipTierForm
                 // daily_limit_cg / monthly_limit_cg (nullable per-tier overrides of the
                 // organisation limits). The Create/Edit pages convert grams ↔ centigrams.
                 TextInput::make('daily_limit_g')
+                    ->hint(fn (): ?string => Settings::limitsEnabled() ? null : __('Límites desactivados en Ajustes')) // kept, not cleared (296)
                     ->label(__('Límite diario (g)'))
                     ->helperText(__('Opcional. Sustituye el límite diario de la organización.'))
                     ->numeric()
@@ -47,6 +49,7 @@ class MembershipTierForm
                     ->step(0.01),
 
                 TextInput::make('monthly_limit_g')
+                    ->hint(fn (): ?string => Settings::limitsEnabled() ? null : __('Límites desactivados en Ajustes')) // kept, not cleared (296)
                     ->label(__('Techo mensual (g)'))
                     ->helperText(__('Opcional. Sustituye el techo mensual de la organización.'))
                     ->numeric()

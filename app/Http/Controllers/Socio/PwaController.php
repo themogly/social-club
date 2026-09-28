@@ -68,6 +68,8 @@ class PwaController extends Controller
             'location' => $location,
             'qrPng' => Qr::png($token),
             'snapshot' => $snapshot,
+            // Prompt 296 — limits switched off: the member sees what they have taken, with no allowance or percentage.
+            'limitsOn' => Settings::limitsEnabled(),
             'walletCents' => $location !== null ? Wallet::balance($member->id, $location->id) : 0,
         ]);
     }

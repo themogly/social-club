@@ -271,7 +271,8 @@ class CommitDispensation
                 continue;
             }
 
-            if (Settings::enforcement('counter', "{$rule}_limit") === 'WARN') {
+            // WARN records the breach and carries on; OFF (limits switched off, prompt 296) never checked it at all.
+            if (in_array(Settings::enforcement('counter', "{$rule}_limit"), ['WARN', 'OFF'], true)) {
                 continue;
             }
 
