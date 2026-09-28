@@ -14,6 +14,7 @@ use App\Filament\Pages\ManageOrganisationIdentity;
 use App\Filament\Pages\ManageSettings;
 use App\Filament\Pages\Rat;
 use App\Filament\Pages\RegistroDispensacion;
+use App\Filament\Pages\RegistroJornada;
 use App\Filament\Pages\Reports\AgmPackReportPage;
 use App\Filament\Pages\Reports\AttendanceReportPage;
 use App\Filament\Pages\Reports\BarSalesReportPage;
@@ -234,6 +235,13 @@ class Help
             'La foto del día de tu sede (aforo, caja, dispensaciones) o, si eres propietario/a, la consolidación de toda la organización.',
             'Todas las cifras se consultan en vivo, nunca se guardan en caché.',
         ]],
+        // Prompt 281 (Ben's 280) — the registro de jornada.
+        RegistroJornada::class => ['permission' => 'staff.hours.view', 'title' => 'Registro de jornada', 'body' => [
+            'Cada persona ficha su entrada en el mostrador con su PIN (al identificarse, «Fichar entrada») y su salida con «Fichar salida» en la barra superior, que vuelve a pedir su PIN. Al cerrar la caja se le ofrece fichar la salida.',
+            'Si alguien se olvida de fichar la salida, la próxima vez que fiche la entrada se le pregunta a qué hora terminó (con un motivo): queda como «Hora declarada». Nada cierra una jornada solo.',
+            'Avisos: «Sin fichar salida» (jornada abierta de un día anterior), «Hora declarada», «Corregido por…», «Anulado» (tachado, nunca oculto) y «Actividad sin fichar» (se identificó en el mostrador ese día sin fichar).',
+            'Corregir no edita nada: «Añadir jornada», «Añadir salida» o «Anular» escriben un fichaje nuevo con su motivo y quién lo hizo, y el original se conserva. La hoja mensual en PDF es la que pedirá la gestoría.',
+        ]],
         Seguridad::class => ['permission' => 'lockdown.manage', 'title' => 'Seguridad', 'body' => [
             'Desde aquí se activa el bloqueo de seguridad ante una amenaza, se ensaya con un simulacro y se consulta el historial de activaciones.',
             // Prompt 235: the PIN lockout's key lives here too, and the Manual page says so.
@@ -349,6 +357,17 @@ class Help
      * @var array<string, array{title: string, permission: string|null, intro: string, example?: string, steps: list<array{title: string, body: list<string>}>}>
      */
     public const GUIDES = [
+        // Prompt 281 — the one line every member of staff needs about the registro de jornada.
+        'fichar' => [
+            'permission' => null,
+            'title' => 'Fichar la jornada',
+            'intro' => 'Ficha entrada al empezar y salida al terminar. Si te olvidas, te lo preguntará la próxima vez.',
+            'steps' => [
+                ['title' => 'Entrada', 'body' => ['Al identificarte con tu PIN al empezar, elige «Fichar entrada». Si solo pasas a mirar algo, «Solo identificarme».']],
+                ['title' => 'Salida', 'body' => ['«Fichar salida» en la barra superior; te pedirá tu PIN otra vez. Si cierras la caja, también se te ofrece allí.']],
+                ['title' => 'Mis horas', 'body' => ['El reloj de la barra superior muestra tus horas de esta semana y de este mes. Solo las tuyas.']],
+            ],
+        ],
         'lockdown-runbook' => [
             'permission' => 'lockdown.manage',
             'title' => 'Bloqueo de seguridad (atraco): qué hacer',

@@ -29,6 +29,17 @@
             @include('livewire.counter.partials.counter-flash', ['anchor' => 'data-commit-feedback', 'spacing' => '', 'nonce' => $flashSeq])
         @endif
 
+        @if ($countSubmitted && $clockOutOffer)
+            {{-- Prompt 281 — the closer is still clocked in: offer the clock-out right here (no second PIN — the close was theirs). --}}
+            <section data-clock-out-offer class="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-brand/30 bg-brand-tint p-4 dark:border-slate-700 dark:bg-slate-900">
+                <p class="text-sm font-semibold">{{ __('¿Fichar salida ahora?') }}</p>
+                <div class="flex flex-wrap gap-2">
+                    <x-button type="button" wire:click="clockOutAfterClose" data-clock-out-yes class="min-h-[2.75rem]">{{ __('Sí, fichar salida') }}</x-button>
+                    <x-button type="button" variant="secondary" wire:click="dismissClockOutOffer" data-clock-out-no class="min-h-[2.75rem]">{{ __('No, sigo trabajando') }}</x-button>
+                </div>
+            </section>
+        @endif
+
         @if ($countSubmitted)
             {{-- ============ Blind close REVEALED: the arqueo result ============ --}}
             @php $varianceOff = ($variance ?? 0) !== 0; @endphp

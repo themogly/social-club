@@ -4,6 +4,7 @@ namespace App\Livewire\Counter;
 
 use App\Actions\Counter\SignInOperator;
 use App\Actions\Expenses\RecordTillExpense;
+use App\Actions\Staff\ClockOut;
 use App\Actions\Stock\CommitStockTake;
 use App\Actions\Till\CloseTill;
 use App\Actions\Till\HandOverTill;
@@ -12,6 +13,7 @@ use App\Actions\Till\RecordCashMovement;
 use App\Actions\UnlockOperator;
 use App\Enums\BatchStatus;
 use App\Enums\CashMovementType;
+use App\Enums\StaffClockSource;
 use App\Enums\StockTakeStatus;
 use App\Enums\TillSessionStatus;
 use App\Enums\UnitType;
@@ -35,9 +37,12 @@ use App\Support\Settings;
 use App\Support\TerminalName;
 use App\Support\TillSummary;
 use App\Support\Weight;
+use App\Support\WorkedHours;
+use DomainException;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Collection;
+use InvalidArgumentException;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Locked;
 use Livewire\Component;
@@ -101,6 +106,9 @@ class TillSession extends Component
 
     /** True only after a SUCCESSFUL close — gates the reveal of expected/variance. */
     public bool $countSubmitted = false;
+
+    /** Prompt 281 — after closing the till, offer the closer "¿Fichar salida ahora?" when they have an open period. */
+    public bool $clockOutOffer = false;
 
     /** The close required a note (variance beyond tolerance) — re-prompt without revealing. */
     public bool $needsNote = false;
@@ -878,6 +886,8 @@ class TillSession extends Component
         $this->expected = $closed->expected_cents?->cents;
         $this->variance = $closed->variance_cents?->cents;
         $this->flash(__('Caja cerrada.'), 'success');
+        // The close was just authorised by this person, so the offer needs no second PIN (Fichar salida from the menu does).
+        $this->clockOutOffer = WorkedHours::openPeriodFor($user) !== null;
     }
 
     /**
@@ -900,6 +910,31 @@ class TillSession extends Component
     }
 
     /** Clear the reveal and start fresh (ready to open a new session). */
+    /** "Sí" — clock out at now, source TILL_CLOSE, no second PIN: the close itself was just authorised by them. */
+    public function clockOutAfterClose(): void
+    {
+        $operator = CounterOperator::current();
+        $this->clockOutOffer = false;
+
+        if ($operator === null) {
+            return;
+        }
+
+        try {
+            (new ClockOut)->handle($operator, $operator, StaffClockSource::TILL_CLOSE);
+            $this->dispatch('counter-clock-state', open: false);
+            $this->flash(__('Salida fichada.'), 'success');
+        } catch (DomainException|InvalidArgumentException $e) {
+            $this->flash($e->getMessage(), 'warning');
+        }
+    }
+
+    /** "No, sigo trabajando." */
+    public function dismissClockOutOffer(): void
+    {
+        $this->clockOutOffer = false;
+    }
+
     public function finishClose(): void
     {
         $this->closedSessionId = null;
