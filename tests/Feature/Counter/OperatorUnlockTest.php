@@ -101,7 +101,7 @@ class OperatorUnlockTest extends TestCase
         Livewire::actingAs($this->device)->test(CheckInScreen::class)
             ->set('operatorPin', '0000')
             ->call('unlockOperator')
-            ->assertSet('operatorFeedback', __('PIN no reconocido.'))
+            ->assertSet('operatorFeedback', trans_choice('PIN incorrecto. Te queda :count intento.|PIN incorrecto. Te quedan :count intentos.', 4, ['count' => 4])) // prompt 286: says what is left
             ->assertSet('operatorPin', '');   // the PIN is never held in component state
 
         $this->assertNull(CounterOperator::id());
@@ -307,8 +307,10 @@ class OperatorUnlockTest extends TestCase
             ->call('save')
             ->assertHasNoFormErrors();
 
-        $this->assertNotNull($fresh->fresh()->pin);           // stored (hashed)
-        $this->assertNotSame('5678', $fresh->fresh()->pin);   // never in plain text
+        // Prompt 286 — stored as its keyed lookup only: no bcrypt hash beside it, never the plain PIN.
+        $this->assertTrue($fresh->fresh()->hasPin());
+        $this->assertNull($fresh->fresh()->getRawOriginal('pin'));
+        $this->assertNotSame('5678', $fresh->fresh()->getRawOriginal('pin_lookup'));
 
         // …and it unlocks that operator at the counter.
         Livewire::actingAs($this->device)->test(TillSession::class)

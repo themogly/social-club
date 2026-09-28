@@ -38,7 +38,7 @@ class DevAdminSeeder extends Seeder
                 [
                     'name' => $account['name'],
                     'password' => Hash::make('password'),
-                    'pin' => Hash::make($account['pin']),
+                    'pin' => $account['pin'], // stored as its keyed lookup by the model (prompt 286)
                     'active' => true,
                     'email_verified_at' => now(),
                 ],

@@ -14871,3 +14871,80 @@ the rollup: every choice ended `LocationSwitcher::switchTo()` with `redirect('/'
   - Lotes with "B-" typed in, then the rollup, then North: stays on `/batches?search=B-` with the box still filled.
   - A Central batch's edit page: the rollup stays on it; North lands on `/batches`.
   - Registro de dispensación and the RAT stay put.
+
+## Prompt 286 — The PIN answers straight away, and you can't type over it while it's checking
+
+- **An HMAC lookup instead of an N-way bcrypt scan.** `UnlockOperator` bcrypt-checked the PIN against every active person
+  at the sede, all of them on purpose since 270 so a shared PIN is refused. One bcrypt-12 check measured **241 ms** here,
+  so 8 people meant **1.9 s** per attempt, paid again for "Fichar salida" and the supervisor PIN. `User::pinIsTaken()`
+  checked every user in the organisation. For a 4–8 digit PIN bcrypt buys little: the keyspace is 10⁴–10⁸, so a leaked
+  table falls in hours whatever the cost. **The online throttle is the protection, and it is unchanged** (same buckets,
+  windows and escalation; a wrong PIN still counts).
+- **`users.pin_lookup`** = `HMAC-SHA256(pin, HKDF(APP_KEY, 'csc-pin-lookup'))` (`App\Support\PinLookup`), unique. Users
+  carry no `organisation_id` (one club per install), so the index is on the lookup alone. A PIN is found by one indexed
+  query of active people at the sede. Writing a PIN goes through a `User::pin` mutator: a plain PIN is stored as its
+  lookup only. A value that is already a password hash (older fixtures and data) is kept as a legacy PIN. The `'hashed'`
+  cast is gone.
+- **Lazy upgrade.**
+  - When the lookup finds nobody, the old bcrypt scan runs over people at the sede **without** a lookup only.
+  - A single match writes their lookup and **nulls the bcrypt hash** in one transaction. Leaving it beside the HMAC would
+    keep the offline route open without the key.
+  - Two legacy matches are still the 270 ambiguity: refused and audited.
+  - The legacy scan runs only on a lookup miss, as the prompt specifies. A legacy PIN identical to an upgraded person's
+    PIN could only date from before 270's uniqueness rule, and the go-live list already has everyone set a fresh,
+    distinct PIN.
+  - A lookup collision on upgrade signs the person in (they matched exactly one person here) and audits
+    `counter.pin.upgrade_collision`.
+- **"Has a PIN"** now means a lookup **or** a legacy hash (`User::hasPin()`, used by `setupIncompleteReasons()`). The users
+  edit page audits a PIN change across either column. `DevAdminSeeder` stores plain PINs (lookups). `UserFactory` gives
+  every person their own random 8-digit PIN, since the shared `1234` would now break the unique index.
+- **`APP_KEY` rotation invalidates every PIN.** Accepted: PINs are re-settable, and the runbook already says never to
+  rotate it. There is a line in `SETUP.md`. **`php artisan csc:pin-upgrade-status`** (read-only) counts who is still on
+  the legacy hash.
+- **`WorkedHours::openPeriodFor()`** read every clock event the person ever had, on every sign-in. It is now two small
+  queries: the latest non-annulled IN (with its sede), and whether a non-annulled OUT follows it in the reader's order.
+  The test loads ≤ 3 events whatever the history.
+- **The pads.** One shared behaviour, `window.counterPinCheck()` in `resources/js/app.js`, is used by:
+  - the surface pad (identify, idle unlock, handover recovery, "Fichar salida");
+  - the supervisor PIN (`authorise-with-pin`);
+  - the till-handover PIN.
+
+  How it behaves:
+  - While checking there is one request in flight at most. A second submit is impossible: it returns before calling
+    the server. Keys, Borrar, backspace, the confirm and the keyboard do nothing, the dots stay filled, and the confirm
+    shows a spinner and reads "Comprobando…".
+  - The state clears in `finally`.
+  - `unlockOperator()` and `confirmClockOut()` return `{ok, name}` to the promise. On a correct PIN the pad turns green
+    with a check and "Hola, Marta" ("Salida fichada. Hasta luego, …" for clock-out) for 600 ms. The surface is held open
+    through it even though the server has already closed it.
+  - On a wrong PIN it shakes once (only with motion allowed), clears, and the server's `role="alert"` line says **how
+    many attempts are left** (`UnlockOperator::attemptsRemaining`), every place a PIN is entered.
+  - A lockout disables the same keys through a live `pinLocked` property (a `dehydrateIdentifiesOperator` hook). The pad
+    refreshes itself once when the countdown ends.
+  - Success and checking are announced with `role="status"`.
+  - The supervisor and till-handover fields keep only the checking state: their outcome is the act itself, which the
+    screen already reports.
+- **Measured** (server, bcrypt-12, 8 legacy people at the sede):
+  - a legacy person's first PIN: 1.9 s;
+  - the same PIN after the upgrade: **7 ms**;
+  - an upgraded person with 7 legacy people still at the sede: 7 ms, since the scan no longer runs on a lookup hit;
+  - a wrong PIN while legacy hashes remain: ~1.4 s, falling to a single query as they upgrade.
+
+  Browser round trip with 150 ms latency and 9/1.5 Mb/s ("Fast 4G"-style):
+  - legacy first PIN 1.3–1.5 s;
+  - upgraded **0.33 s**;
+  - wrong PIN 1.2–1.4 s (legacy scan).
+
+  Beyond hashing, nothing in the unlock round trip measured over ~150 ms.
+- **Not measured:** "Cobrar visita" (the dispensary commit). It isn't the PIN path, so it's left for a follow-up prompt
+  with its own profiling. The PIN path the owner described ("Fichar salida" re-running the unlock) is fixed here.
+- Tests: `PinLookupTest` (10) and `PinPadStatesTest` (3), seen red first. Existing assertions moved to the new storage
+  and markup:
+  - `OperatorUnlockTest` (lookup, and the attempts-left line);
+  - `UserCredentialAutofillTest` (lookup);
+  - `CounterSurfaceTest` (the one-pad marker).
+- Browser check: `tests/Browser/prove-286-pin-pad.mjs`, at 1180×820 and 820×1180, throttled, on a throwaway database
+  with BCRYPT_ROUNDS=12. It covers one request while hammering the pad, the greeting, the near-instant second PIN, the
+  wrong-PIN attempts line with the dots cleared, and the lockout disabling all 13 keys. Screenshots are in
+  `storage/app/screenshots/286/`.
+- **For Ben, after deploy:** run `php artisan csc:pin-upgrade-status` after the first busy evening.

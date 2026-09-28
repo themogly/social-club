@@ -32,6 +32,50 @@ const overlayHistory = {
     },
 };
 
+// Prompt 286 — every PIN entry behaves the same while its answer is on the way. The owner: "if the PIN is correct, say
+// so straight away and don't let them keep retrying". The pad used to empty its dots and look idle for the whole
+// round trip, so people retyped — each retype that landed wrong cost an attempt against the lockout. Now:
+//   checking — one request in flight at most (a second submit is impossible, not ignored); keys, Borrar, backspace,
+//              the confirm and the keyboard do nothing; the dots stay filled; the confirm reads "Comprobando…".
+//   holding  — a correct PIN shows "Hola, Marta" (~600 ms) before the counter continues; nothing can be typed.
+//   shaking  — a wrong PIN shakes once and clears; the server's line says how many attempts are left.
+// `call` is the `$wire` action; its promise carries the server's outcome ({ok, name}). The state always clears in
+// `finally`, so a network error can never leave a pad stuck. `feedback: false` (the supervisor and till-handover PIN
+// fields) keeps only the checking state: their outcome is the act itself, reported by the screen.
+window.counterPinCheck = () => ({
+    checking: false,
+    holding: false,
+    shaking: false,
+    greeting: '',
+    pinBusy() {
+        return this.checking || this.holding;
+    },
+    async checkPin(call, { feedback = true } = {}) {
+        if (this.checking || this.holding) return null;
+        this.checking = true;
+        let outcome = null;
+        try {
+            outcome = await call();
+        } catch (e) {
+            outcome = null;
+        } finally {
+            this.checking = false;
+        }
+        if (! feedback) return outcome;
+        if (outcome && outcome.ok) {
+            this.greeting = outcome.name || '';
+            this.holding = true;
+            await new Promise((resolve) => setTimeout(resolve, 600));
+            this.holding = false;
+            this.greeting = '';
+        } else {
+            this.shaking = true;
+            setTimeout(() => { this.shaking = false; }, 400);
+        }
+        return outcome;
+    },
+});
+
 document.addEventListener('alpine:init', () => {
     window.Alpine.data('cameraScan', (config = {}) => ({
         messages: config.messages || {},

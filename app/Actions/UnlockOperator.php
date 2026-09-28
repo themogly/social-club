@@ -4,16 +4,20 @@ namespace App\Actions;
 
 use App\Models\Location;
 use App\Models\User;
+use App\Support\PinLookup;
 use App\Support\Settings;
+use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use SensitiveParameter;
 
 /**
  * Identify the counter operator by PIN. Counter apps (dispensary/bar POS, check-in)
  * run under one authenticated device session; a PIN unlock names the operator
  * recorded on each transaction — so the till can switch operator without a full
- * re-login. PINs are hashed, never logged or shown.
+ * re-login. PINs are stored as a keyed lookup (prompt 286), never logged or shown.
  *
  * Throttled (prompt 120): the bucket is LOCATION-WIDE (see IdentifiesOperator::operatorThrottleKey — a shared
  * counter, so rotating the browser session must not reset the count), and the lockout ESCALATES — each
@@ -67,32 +71,78 @@ class UnlockOperator
     /**
      * Verify a PIN against the active staff assigned to the location. Returns the matched operator, or null on
      * a wrong PIN or while locked out.
+     *
+     * Prompt 286 — ONE indexed lookup of the PIN's keyed HMAC ({@see PinLookup}), never a bcrypt check per person. The
+     * only bcrypt left is the LEGACY scan, over people at this sede still holding a pre-286 hash, and only when the
+     * lookup found nobody (it empties as each enters their PIN once). Two legacy matches are still the 270 ambiguity —
+     * refused, never first-match. A single legacy match upgrades that person: lookup written, bcrypt hash nulled, in one
+     * transaction. (A legacy PIN equal to an upgraded person's could only date from before 270's uniqueness rule; the
+     * go-live list already has everyone set a fresh, distinct PIN.)
      */
-    public function handle(Location $location, string $pin, string $throttleKey): ?User
+    public function handle(Location $location, #[SensitiveParameter] string $pin, string $throttleKey): ?User
     {
         if ($this->isLockedOut($throttleKey)) {
             return null;
         }
 
-        /** @var Collection<int, User> $candidates */
-        $candidates = $location->users()->where('active', true)->get();
+        $lookup = PinLookup::for($pin);
 
-        $matches = $candidates->filter(fn (User $candidate): bool => $candidate->pin !== null && Hash::check($pin, $candidate->pin));
+        /** @var Collection<int, User> $matches */
+        $matches = $location->users()->where('active', true)->where('pin_lookup', $lookup)->get();
 
-        if ($matches->count() === 1) {
-            return $matches->first();
+        // The legacy scan runs ONLY when the lookup found nobody (prompt 286), so an upgraded person's PIN is one query
+        // however many legacy hashes remain at the sede.
+        /** @var Collection<int, User> $legacy */
+        $legacy = $matches->isNotEmpty() ? collect() : $location->users()->where('active', true)->whereNull('pin_lookup')->whereNotNull('pin')->get()
+            ->filter(fn (User $candidate): bool => Hash::check($pin, (string) $candidate->getRawOriginal('pin')));
+
+        $all = $matches->concat($legacy);
+
+        if ($all->count() === 1) {
+            $operator = $all->first();
+
+            return $legacy->isNotEmpty() ? $this->upgrade($operator, $lookup) : $operator;
         }
 
-        if ($matches->count() > 1) {
+        if ($all->count() > 1) {
             // Ambiguous: refuse rather than guess who typed it, and say so in the trail (ids only — never the PIN).
             (new RecordAuditLog)->handle('counter.pin.ambiguous', $location, null, [
-                'user_ids' => $matches->pluck('id')->values()->all(),
+                'user_ids' => $all->pluck('id')->values()->all(),
             ]);
         }
 
         $this->registerFailure($throttleKey, $this->maxAttemptsAt($location));
 
         return null;
+    }
+
+    /**
+     * How many wrong PINs are left before this bucket locks out — shown on the pad ("Te quedan 2 intentos") so a
+     * wrong attempt visibly costs something. Degrades to the sede maximum if the cache is unreachable.
+     */
+    public function attemptsRemaining(?Location $location, string $throttleKey): int
+    {
+        $attempts = (int) $this->safely(fn (): int => (int) Cache::get($this->key($throttleKey, 'attempts'), 0), 0);
+
+        return max(0, $this->maxAttemptsAt($location) - $attempts);
+    }
+
+    /**
+     * A legacy PIN's first correct use: store the lookup and null the bcrypt hash, together. If the lookup is already
+     * someone else's (a person at another sede set the same PIN since), the sign-in still succeeds — it matched exactly
+     * one person HERE — and the row is left for a responsable to reset (audited, ids only).
+     */
+    private function upgrade(User $user, string $lookup): User
+    {
+        try {
+            DB::transaction(fn () => User::query()->withTrashed()->whereKey($user->id)
+                ->update(['pin_lookup' => $lookup, 'pin' => null]));
+            $user->setRawAttributes(array_merge($user->getAttributes(), ['pin_lookup' => $lookup, 'pin' => null]), true);
+        } catch (UniqueConstraintViolationException) {
+            (new RecordAuditLog)->handle('counter.pin.upgrade_collision', $user);
+        }
+
+        return $user;
     }
 
     /**

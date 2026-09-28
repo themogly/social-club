@@ -77,8 +77,8 @@ class CounterSurfaceTest extends TestCase
             if (! $file->isFile() || ! str_ends_with($file->getFilename(), '.blade.php')) {
                 continue;
             }
-            if (str_contains((string) file_get_contents($file->getPathname()), 'push(d) { if (this.pin.length < 8)')
-                || str_contains((string) file_get_contents($file->getPathname()), 'push(d){ if (this.pin.length < 8)')) {
+            // The pad's digit push — its guard grew a "keys locked" check in prompt 286, the append is the marker.
+            if (str_contains((string) file_get_contents($file->getPathname()), 'this.pin.length < 8) this.pin += d')) {
                 $pads[] = str_replace(resource_path('views').'/', '', $file->getPathname());
             }
         }
