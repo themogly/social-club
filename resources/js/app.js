@@ -42,6 +42,20 @@ const overlayHistory = {
 // `call` is the `$wire` action; its promise carries the server's outcome ({ok, name}). The state always clears in
 // `finally`, so a network error can never leave a pad stuck. `feedback: false` (the supervisor and till-handover PIN
 // fields) keeps only the checking state: their outcome is the act itself, reported by the screen.
+// Prompt 290 — "Instalar como app". Chrome offers installation by firing `beforeinstallprompt`; keep it, and tell the top
+// bar's button it may show. A browser that never fires it never shows the button (no dead control); once running as the
+// installed app (`display-mode: standalone`) it hides. Installing grants nothing — the PIN still gates everything.
+window.cscInstallPrompt = null;
+window.addEventListener('beforeinstallprompt', (event) => {
+    event.preventDefault();
+    window.cscInstallPrompt = event;
+    window.dispatchEvent(new CustomEvent('csc-installable'));
+});
+window.addEventListener('appinstalled', () => {
+    window.cscInstallPrompt = null;
+    window.dispatchEvent(new CustomEvent('csc-installed'));
+});
+
 window.counterPinCheck = () => ({
     checking: false,
     holding: false,

@@ -35,6 +35,19 @@
         {{-- No public/indexable surface anywhere in this app (NOTES §A / §B). --}}
         <meta name="robots" content="noindex, nofollow">
 
+        {{-- Prompt 290 — the counter installs as its OWN app ("Mostrador"), with no browser bar. The manifest is behind the
+             counter's gate, so it is fetched with credentials. No service worker is registered here, ever: the counter
+             shows member data and must never be served from a cache. Only this layout links it. --}}
+        <link rel="manifest" href="/counter.webmanifest" crossorigin="use-credentials">
+        <meta name="theme-color" content="#2563eb" media="(prefers-color-scheme: light)">
+        <meta name="theme-color" content="#0f172a" media="(prefers-color-scheme: dark)">
+        <meta name="mobile-web-app-capable" content="yes">
+        <meta name="apple-mobile-web-app-capable" content="yes">
+        {{-- `default`, not `black-translucent`: the app never draws under the status bar, so the top bar needs no inset. --}}
+        <meta name="apple-mobile-web-app-status-bar-style" content="default">
+        <meta name="apple-mobile-web-app-title" content="{{ __('Mostrador') }}">
+        <link rel="apple-touch-icon" href="/counter-icons/apple-touch-icon-180.png">
+
         {{-- The screen's own name, from the ONE list the tab strip uses (App\Support\CounterScreens), so the
              tab, the heading and the strip can never disagree. All six screens used to fall through to
              "Mostrador" — six identical titles and six identical h1s (a11y audit, WCAG 2.4.2). --}}
