@@ -14727,3 +14727,46 @@ check` green in `es` and `en`. Merged to `main` on Ben's instruction.
 Tests: `tests/Feature/Staff/RegistroDeJornadaTest` (22) cover append-only, own-PIN-only, the declared end, the till-close
 offer, wrong-sede and wrong-role denials, the store refusal, UTC storage, bounded report queries, the PDF and the force-delete
 guard.
+
+## Prompt 283 — An Almacén / cultivo doesn't ask for opening hours
+
+The owner: *"If it's storage it doesn't need operating hours."* 277 hid the counter sections for a store, but two parts
+were missed: Horario's opening and closing times, and the accent colour (counter theming, prompt 03). The first section
+also said "Datos de la sede" on a location that isn't a sede.
+
+- **Form (`LocationForm`)**: for `kind = ALMACEN`, `opening_time`, `closing_time` and `accent` are hidden with the same
+  `visible()` closure pattern `capacity` uses. The first section's heading follows the type selector live: "Datos de la
+  ubicación" for a store, "Datos de la sede" for a sede. (In English "Store details" versus "Location details", since the
+  glossary already renders *sede* as "Location".) **`business_day_cutoff` stays visible and required** (default
+  06:00), because it decides which business day a stock movement or transfer at the store belongs to. At a store its
+  helper reads "Decide a qué día se asignan los movimientos de stock del almacén. Normalmente 06:00.". `timezone` stays
+  for the same reason. For a store, Horario keeps a section of its own containing only the cutoff. Nothing changes for a sede.
+- **What a hidden field dehydrates to (checked, not assumed):** a hidden Filament field is **left out** of the form
+  state, not saved as null.
+  - On **create**, that means a value typed before switching to Almacén never reaches the insert, so the column keeps its
+    null default. A test covers filling all three and then switching.
+  - On **edit**, a hidden field is simply left out of the update, so a stale value on an existing store row would survive
+    a save.
+  - So the rule lives on the model: `Location::booted()` `saving` nulls the three for a store, on every write path. The
+    edit test starts from a store row that carries all three and asserts they are cleared by a save.
+- **Wider check.**
+  - `LocationForm`: every other counter-only field is already inside the sections 277 hides (Barra, Dispensario,
+    Monedero, Cajas, Seguridad del mostrador) or is `capacity`. `name`, `kind`, `address`, `timezone`, `active` and the
+    cutoff mean something for a store and stay. Nothing else found. The hidden sections' settings still get their
+    defaults written as location Setting rows on create (Create/EditLocation). That's inert for a store, since nothing
+    reads them there, and left as is.
+  - `LocationsTable`: the **Precios** badge warned a store "Sin precios, esta sede no puede dispensar nada". A store never
+    dispenses, so the badge and its tooltip are now blank for a store. **Aforo** is already blank (the column is null for
+    a store). Tipo, Dirección, Zona horaria and Activo are fine. Nothing that affects stock, traceability or the ceiling
+    was touched.
+  - Noticed, not changed: the resource's own label is "Sede", so the page title reads "Crear Sede" / "Editar Sede" and
+    the sidebar says "Sedes" for a store too. Renaming the resource (e.g. "Ubicaciones") is resource-wide and out of this
+    prompt's scope.
+- `opening_time` and `closing_time` are read by nothing in the app (only `$fillable`, the factory and the demo seeder),
+  so blanking them for a store has no downstream effect.
+
+Tests: `tests/Feature/Locations/AlmacenHasNoOpeningHoursTest` (7). Tests 1–5 of the prompt were each seen red first,
+plus the list badge and a sede regression pin. Test 3's cutoff-required and default parts already passed; its
+store-helper assertion is what made it red. Browser (`tests/Browser/prove-283-almacen-form.mjs`, screenshots
+`storage/app/screenshots/283/`), as the owner: switching Sede ↔ Almacén makes the fields and the heading follow; a saved
+store reopens without hours or accent; the list shows no price warning on it; 390 dark checked.

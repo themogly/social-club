@@ -111,13 +111,22 @@ class LocationForm
         return $numbers;
     }
 
+    /** Is the form describing an Almacén / cultivo (277)? The type is a live select on create, fixed on edit. */
+    private static function isStore(Get $get): bool
+    {
+        $kind = $get('kind');
+
+        return ($kind instanceof LocationKind ? $kind->value : $kind) === LocationKind::ALMACEN->value;
+    }
+
     public static function configure(Schema $schema): Schema
     {
         return $schema
             ->components([
                 // Prompt 273 — ~25 fields in one flat grid; now grouped so a manager can find the security settings.
 
-                Section::make(__('Datos de la sede'))
+                // Prompt 283 — the heading follows the type selector: a store is a location, not a sede.
+                Section::make(fn (Get $get): string => self::isStore($get) ? __('Datos de la ubicación') : __('Datos de la sede'))
                     ->schema([
                         TextInput::make('name')
                             ->label(__('Nombre'))
@@ -164,8 +173,10 @@ class LocationForm
                             ->required()
                             ->selectablePlaceholder(false),
 
+                        // Counter theming (the per-location accent, prompt 03) — a store has no counter (283).
                         ColorPicker::make('accent')
-                            ->label(__('Color de acento')),
+                            ->label(__('Color de acento'))
+                            ->visible(fn (Get $get): bool => ! self::isStore($get)),
 
                         Toggle::make('active')
                             ->label(__('Activo'))
@@ -187,11 +198,17 @@ class LocationForm
                             ->format('H:i')
                             ->required()
                             ->default('06:00')
-                            ->helperText(__('Hora en la que se reinicia el día operativo, p. ej. 06:00.')),
+                            // Prompt 283 — kept for a store: it decides which business day a stock movement or transfer
+                            // there belongs to. Only the explanation changes.
+                            ->helperText(fn (Get $get): string => self::isStore($get)
+                                ? __('Decide a qué día se asignan los movimientos de stock del almacén. Normalmente 06:00.')
+                                : __('Hora en la que se reinicia el día operativo, p. ej. 06:00.')),
 
                         // Optional. Blank must dehydrate to NULL, not '' (a TimePicker does; a TextInput did not).
+                        // Hidden for a store (283): nothing reads them, and it has no opening hours.
                         TimePicker::make('opening_time')
                             ->label(__('Hora de apertura'))
+                            ->visible(fn (Get $get): bool => ! self::isStore($get))
                             ->native(false)
                             ->seconds(false)
                             ->displayFormat('H:i')
@@ -199,6 +216,7 @@ class LocationForm
 
                         TimePicker::make('closing_time')
                             ->label(__('Hora de cierre'))
+                            ->visible(fn (Get $get): bool => ! self::isStore($get))
                             ->native(false)
                             ->seconds(false)
                             ->displayFormat('H:i')

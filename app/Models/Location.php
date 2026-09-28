@@ -30,6 +30,22 @@ class Location extends Model
         'terminals',
     ];
 
+    /**
+     * Prompt 283 — a store has no opening hours and no counter to theme, so those three are always null on one. The
+     * form hides them; a hidden Filament field is left out of the save (not blanked), so an edit alone would keep a stale
+     * value — the rule lives here, where every write passes.
+     */
+    protected static function booted(): void
+    {
+        static::saving(function (Location $location): void {
+            if ($location->isStore()) {
+                $location->opening_time = null;
+                $location->closing_time = null;
+                $location->accent = null;
+            }
+        });
+    }
+
     protected function casts(): array
     {
         return [
