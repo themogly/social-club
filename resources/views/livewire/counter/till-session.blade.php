@@ -192,7 +192,7 @@
                         <div wire:key="reweigh-{{ $batch->id }}" data-reweigh-batch="{{ $batch->id }}" class="rounded-xl border border-line bg-surface p-3 dark:border-slate-700 dark:bg-slate-900">
                             <div class="flex items-center justify-between gap-2">
                                 <label for="reweigh-{{ $batch->id }}" class="block text-sm font-medium text-ink dark:text-slate-100">
-                                    {{ $batch->genetic?->name ?? __('Sin nombre') }} · {{ $batch->batch_no }}
+                                    {{ $batch->displayName(withGenetic: true) }}
                                 </label>
                                 <button
                                     type="button"

@@ -123,10 +123,12 @@ class PreLiveA11yFixesTest extends TestCase
         $pos = (string) file_get_contents(resource_path('views/livewire/counter/dispensary-pos.blade.php'));
         $fee = (string) file_get_contents(resource_path('views/livewire/counter/partials/inline-fee.blade.php'));
         $bar = (string) file_get_contents(resource_path('views/livewire/counter/bar-pos.blade.php'));
+        // Prompt 282 moved the manual-lote chip into its own component.
+        $chip = (string) file_get_contents(resource_path('views/components/counter/batch-chip.blade.php'));
 
         $this->assertStringContainsString('wire:click="toggleCalculator" aria-pressed=', $pos);
         $this->assertStringContainsString("wire:click=\"\$set('calculatorMode', false)\" aria-pressed=", $pos);
-        $this->assertStringContainsString("wire:click=\"selectBatch('{{ \$batch->id }}')\" aria-pressed=", $pos);
+        $this->assertStringContainsString("wire:click=\"selectBatch('{{ \$batch->id }}')\" aria-pressed=", $chip);
         $this->assertStringContainsString('wire:click="filterStrainType(null)" aria-pressed=', $pos);
         $this->assertStringContainsString("wire:click=\"\$set('feeMethod', 'CASH')\" aria-pressed=", $fee);
         $this->assertStringContainsString('wire:click="filterCategory(null)" aria-pressed=', $bar);

@@ -258,15 +258,8 @@
                                 @else
                                     <div class="mt-1 flex flex-wrap gap-2">
                                         @foreach ($activeGeneticBatches as $i => $batch)
-                                            <button type="button" wire:click="selectBatch('{{ $batch->id }}')" aria-pressed="{{ ($activeBatchId === $batch->id) ? 'true' : 'false' }}" @class([
-                                                'inline-flex min-h-11 items-center rounded-lg border px-3 py-1.5 text-sm transition',
-                                                'border-brand bg-brand text-white' => $activeBatchId === $batch->id,
-                                                'border-line bg-surface text-ink hover:bg-surface-alt dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100' => $activeBatchId !== $batch->id,
-                                            ])>
-                                                {{ $batch->batch_no }}
-                                                <span class="opacity-70">· {{ $activeGenetic->isUnitType() ? $batch->remaining_units.' '.__('uds') : $this->grams($batch->remaining_cg?->centigrams ?? 0) }}</span>
-                                                @if ($i === 0)<span class="ml-1 rounded-full bg-white/20 px-1.5 py-0.5 text-[10px] font-semibold uppercase">FEFO</span>@endif
-                                            </button>
+                                            <x-counter.batch-chip :batch="$batch" :selected="$activeBatchId === $batch->id" :fefo="$i === 0"
+                                                :quantity="$activeGenetic->isUnitType() ? $batch->remaining_units.' '.__('uds') : $this->grams($batch->remaining_cg?->centigrams ?? 0)" />
                                         @endforeach
                                     </div>
                                 @endif

@@ -43,6 +43,9 @@ class BatchesTable
     {
         return $table
             ->columns([
+                // Prompt 282 — the club's own name first; the search box matches it, the lote number and the strain.
+                TextColumn::make('label')->label(__('Nombre'))->searchable()->sortable()->placeholder('—')->limit(40)
+                    ->tooltip(fn (Batch $record): ?string => $record->label),
                 TextColumn::make('batch_no')->label(__('Nº lote'))->searchable()->sortable(),
                 TextColumn::make('genetic.name')->label(__('Genética'))->searchable()->sortable(),
                 TextColumn::make('genetic.product_type')->label(__('Tipo'))->badge()->toggleable(),
@@ -131,7 +134,7 @@ class BatchesTable
             ->icon(Heroicon::OutlinedExclamationTriangle)
             ->color('danger')
             ->visible(fn (): bool => Auth::user()?->can('reports.view') ?? false)
-            ->modalHeading(fn (Batch $record): string => __('Retirada de lote :batch', ['batch' => $record->batch_no]))
+            ->modalHeading(fn (Batch $record): string => __('Retirada de lote :batch', ['batch' => $record->displayName()]))
             ->modalDescription(fn (Batch $record): string => self::recallSummary($record))
             ->modalContent(fn (Batch $record) => view('filament.batch-recall', ['recall' => new BatchRecall($record)]))
             ->modalSubmitActionLabel(__('Descargar CSV'))
@@ -169,6 +172,7 @@ class BatchesTable
             ->label(fn (Batch $record): string => $record->location?->isStore() ? __('Asignar a sede') : __('Trasladar'))
             ->icon(Heroicon::OutlinedArrowsRightLeft)
             ->visible(fn (): bool => Auth::user()?->can('stock.transfer') ?? false)
+            ->modalHeading(fn (Batch $record): string => __('Trasladar :batch', ['batch' => $record->displayName(withGenetic: true)]))
             ->schema([
                 Select::make('to_location_id')
                     ->label(__('Destino'))

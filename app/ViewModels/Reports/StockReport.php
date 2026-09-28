@@ -66,7 +66,7 @@ class StockReport extends AbstractReport
             ->whereIn('location_id', $this->resolvedLocationIds())
             ->where('status', BatchStatus::OPEN->value)
             ->whereNull('deleted_at')
-            ->get(['id', 'batch_no', 'genetic_id', 'remaining_cg', 'remaining_units', 'cost_per_gram_cents', 'expires_on']);
+            ->get(['id', 'batch_no', 'label', 'genetic_id', 'remaining_cg', 'remaining_units', 'cost_per_gram_cents', 'expires_on']);
 
         $genetics = DB::table('genetics')
             ->whereIn('id', $batches->pluck('genetic_id')->unique()->all())
@@ -90,6 +90,7 @@ class StockReport extends AbstractReport
 
             return [
                 'lote' => (string) $b->batch_no,
+                'nombre' => $b->label !== null ? (string) $b->label : '—', // the club's own name (prompt 282)
                 'genetica' => (string) ($g->name ?? __('Sin genética')),
                 'tipo' => $g !== null ? (ProductType::tryFrom((string) $g->product_type)?->label() ?? '—') : '—',
                 'restante' => $remaining,
@@ -105,6 +106,7 @@ class StockReport extends AbstractReport
             title: __('Existencias por lote'),
             columns: [
                 ReportColumn::text('lote', __('Lote')),
+                ReportColumn::text('nombre', __('Nombre')),
                 ReportColumn::text('genetica', __('Genética')),
                 ReportColumn::text('tipo', __('Tipo')),
                 ReportColumn::weight('restante', __('Restante')),
@@ -204,10 +206,12 @@ class StockReport extends AbstractReport
                 'stock_take_lines.variance_cg as variance_cg',
             ]);
 
-        $batchNos = DB::table('batches')->whereIn('id', $lines->pluck('batch_id')->all())->pluck('batch_no', 'id');
+        // Shown by display name (prompt 282): the club's name, then the lote number.
+        $batchNames = Batch::query()->withoutGlobalScopes()->whereIn('id', $lines->pluck('batch_id')->all())->get(['id', 'batch_no', 'label'])
+            ->mapWithKeys(fn (Batch $b): array => [$b->id => $b->displayName()]);
 
         $rows = $lines->map(fn (\stdClass $r): array => [
-            'lote' => (string) ($batchNos[$r->batch_id] ?? '—'),
+            'lote' => (string) ($batchNames[$r->batch_id] ?? '—'),
             'esperado' => (int) $r->expected_cg,
             'contado' => (int) $r->counted_cg,
             'variacion' => (int) $r->variance_cg,

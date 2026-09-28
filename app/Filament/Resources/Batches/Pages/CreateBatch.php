@@ -57,6 +57,7 @@ class CreateBatch extends CreateRecord
 
         $salePriceCents = Money::fromEuros((string) ($data['sale_price_eur'] ?? 0))->cents;
         $intake = [
+            'label' => $data['label'] ?? null,
             'cost_per_gram_cents' => Money::fromEuros((string) ($data['cost_per_gram_eur'] ?? 0))->cents,
             // The batch's own sale price and photos (prompt 278).
             'price_per_gram_cents' => $genetic->isUnitType() ? null : $salePriceCents,

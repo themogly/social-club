@@ -82,6 +82,7 @@ class TransferBatch
                     'parent_batch_id' => $source->id,
                     'location_id' => $to->id,
                     'batch_no' => $source->batch_no,
+                    'label' => $source->label, // the name belongs to the lote (prompt 282)
                     'acquired_or_harvested_on' => $source->acquired_or_harvested_on,
                     'expires_on' => $source->expires_on,
                     'initial_cg' => $isUnit ? null : $quantity,
