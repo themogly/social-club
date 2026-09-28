@@ -28,6 +28,7 @@ use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Support\Facades\Auth;
 use InvalidArgumentException;
 use League\Csv\Writer;
+use Livewire\Attributes\Url;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 /**
@@ -48,10 +49,14 @@ class RegistroJornada extends Page
 
     protected static ?string $slug = 'registro-de-jornada';
 
+    // The person and month ride in the URL (prompt 285) so the "Horas del personal" report can link a name straight to
+    // that person's month here. Visibility is still the page's own: a person outside the viewer's sedes shows nothing.
+    #[Url]
     public ?string $personId = null;
 
     public ?string $locationId = null;
 
+    #[Url]
     public string $month = '';
 
     public static function canAccess(): bool
@@ -78,7 +83,7 @@ class RegistroJornada extends Page
 
     public function mount(): void
     {
-        $this->month = now()->format('Y-m');
+        $this->month = preg_match('/^\d{4}-\d{2}$/', $this->month) === 1 ? $this->month : now()->format('Y-m');
     }
 
     protected function getHeaderActions(): array

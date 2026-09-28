@@ -70,8 +70,12 @@
                 </div>
             </div>
         @else
-            {{-- Summary strip --}}
-            @if (! empty($summary))
+            {{-- Summary strip — a report with its own cards and charts (prompt 285) shows those instead. --}}
+            @isset($chartsView)
+                @include($chartsView)
+            @endisset
+
+            @if (! empty($summary) && ! isset($chartsView))
                 <div class="csc-summary">
                     @foreach ($summary as $chip)
                         <div class="csc-chip csc-chip-{{ $chip['tone'] ?? 'default' }}">

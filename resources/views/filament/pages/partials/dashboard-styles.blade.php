@@ -160,6 +160,21 @@
     .csc-readout dd a { color: var(--tx); text-decoration: none; }
     .csc-readout dd a:hover { color: var(--brtx); text-decoration: underline; }
 
+    /* Personal ahora (prompt 285) — who is clocked in, same rhythm as the readouts */
+    .csc-staff-now { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+    .csc-staff-now-row { display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; padding: 0.5rem 0; border-bottom: 1px solid var(--bd); }
+    .csc-staff-now-row:last-child { border-bottom: 0; }
+    .csc-staff-now-who { display: flex; flex-direction: column; min-width: 0; }
+    .csc-staff-now-name { font-size: 0.88rem; font-weight: 700; color: var(--tx); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .csc-staff-now-sede, .csc-staff-now-time { font-size: 0.76rem; color: var(--mut); }
+    .csc-staff-now-time { display: flex; flex-direction: column; align-items: flex-end; flex: none; font-variant-numeric: tabular-nums; }
+    .csc-staff-now-dur { font-weight: 700; color: var(--tx); }
+    .csc-staff-now-link { display: inline-block; margin-top: 0.6rem; }
+
+    /* Two heatmaps side by side (prompt 285: staff coverage beside member footfall) — stacked below 1280 */
+    .csc-heat-pair { display: grid; grid-template-columns: 1fr; gap: 1.5rem; }
+    @media (min-width: 1280px) { .csc-heat-pair { grid-template-columns: 1fr 1fr; } }
+
     /* Alerts */
     .csc-alerts { display: flex; flex-direction: column; gap: 0.55rem; }
     .csc-alert { display: flex; align-items: flex-start; gap: 0.6rem; padding: 0.65rem 0.7rem; border-radius: 0.6rem; border: 1px solid var(--bd); text-decoration: none; }

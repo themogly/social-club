@@ -2,12 +2,14 @@
 
 namespace App\Enums;
 
+use App\Filament\Pages\RegistroJornada;
 use App\Filament\Resources\Articles\ArticleResource;
 use App\Filament\Resources\Batches\BatchResource;
 use App\Filament\Resources\Genetics\GeneticResource;
 use App\Filament\Resources\MemberApplications\MemberApplicationResource;
 use App\Filament\Resources\Members\MemberResource;
 use App\Filament\Resources\TillSessions\TillSessionResource;
+use Filament\Pages\Page;
 use Filament\Resources\Resource;
 
 /**
@@ -41,6 +43,10 @@ enum DashboardAlert: string
     case GENETICS_LOW_STOCK = 'genetics_low_stock';
     case ARTICLES_LOW_STOCK = 'articles_low_stock';
     case ASSOCIATION_STOCK_CEILING = 'association_stock_ceiling';
+    // Prompt 285 — the registro de jornada's two loose ends, over the last 31 days (never the dashboard period), on the
+    // panel dashboard only and only for holders of `staff.hours.view`.
+    case STAFF_OPEN_SHIFTS = 'staff_open_shifts';
+    case STAFF_UNCLOCKED_ACTIVITY = 'staff_unclocked_activity';
 
     /** error | warning | info — how loudly the rail says it. */
     public function severity(): string
@@ -49,8 +55,9 @@ enum DashboardAlert: string
             self::STOCK_CEILING_EXCEEDED => 'error',
             self::MEMBERS_OVER_LIMIT, self::ACTIVE_MEMBER_CAP,
             self::UNRECONCILED_TILL, self::BATCHES_EXPIRING,
-            self::GENETICS_LOW_STOCK, self::ARTICLES_LOW_STOCK, self::ASSOCIATION_STOCK_CEILING => 'warning',
-            self::MEMBERSHIPS_EXPIRING, self::PENDING_APPLICATIONS => 'info',
+            self::GENETICS_LOW_STOCK, self::ARTICLES_LOW_STOCK, self::ASSOCIATION_STOCK_CEILING,
+            self::STAFF_OPEN_SHIFTS => 'warning',
+            self::MEMBERSHIPS_EXPIRING, self::PENDING_APPLICATIONS, self::STAFF_UNCLOCKED_ACTIVITY => 'info',
         };
     }
 
@@ -73,6 +80,8 @@ enum DashboardAlert: string
             self::GENETICS_LOW_STOCK => trans_choice(':count variedad con stock bajo|:count variedades con stock bajo', $count, ['count' => $count]),
             self::ARTICLES_LOW_STOCK => trans_choice(':count artículo de barra y tienda con stock bajo|:count artículos de barra y tienda con stock bajo', $count, ['count' => $count]),
             self::ASSOCIATION_STOCK_CEILING => __('La asociación tiene más stock en total (sedes y almacén) que el techo orientativo'),
+            self::STAFF_OPEN_SHIFTS => trans_choice(':count jornada sin fichar salida|:count jornadas sin fichar salida', $count, ['count' => $count]),
+            self::STAFF_UNCLOCKED_ACTIVITY => trans_choice(':count día con actividad sin fichar|:count días con actividad sin fichar', $count, ['count' => $count]),
         };
     }
 
@@ -99,6 +108,8 @@ enum DashboardAlert: string
             // counter does not make. The dispensary picker already badges the variety itself.
             self::BATCHES_EXPIRING, self::STOCK_CEILING_EXCEEDED, self::ACTIVE_MEMBER_CAP,
             self::GENETICS_LOW_STOCK, self::ARTICLES_LOW_STOCK, self::ASSOCIATION_STOCK_CEILING => null,
+            // Hours are corrected in the panel's registro (staff.hours.manage), never at the counter.
+            self::STAFF_OPEN_SHIFTS, self::STAFF_UNCLOCKED_ACTIVITY => null,
         };
     }
 
@@ -109,7 +120,9 @@ enum DashboardAlert: string
      * hand-you-a-haystack move as landing on an empty search box. A resource index is at least the right
      * table.
      *
-     * @return class-string<\Filament\Resources\Resource>
+     * The two hours alerts land on a PAGE — the registro de jornada — not a resource (prompt 285).
+     *
+     * @return class-string<\Filament\Resources\Resource>|class-string<Page>
      */
     public function panelResource(): string
     {
@@ -120,6 +133,7 @@ enum DashboardAlert: string
             self::GENETICS_LOW_STOCK => GeneticResource::class,
             self::PENDING_APPLICATIONS => MemberApplicationResource::class,
             self::ARTICLES_LOW_STOCK => ArticleResource::class,
+            self::STAFF_OPEN_SHIFTS, self::STAFF_UNCLOCKED_ACTIVITY => RegistroJornada::class,
         };
     }
 
@@ -144,6 +158,8 @@ enum DashboardAlert: string
      */
     public function panelDestinationIsOpenToActor(): bool
     {
-        return $this->panelResource()::canViewAny();
+        $target = $this->panelResource();
+
+        return is_subclass_of($target, Page::class) ? $target::canAccess() : $target::canViewAny();
     }
 }

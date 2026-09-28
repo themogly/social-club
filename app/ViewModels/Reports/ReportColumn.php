@@ -2,6 +2,7 @@
 
 namespace App\ViewModels\Reports;
 
+use App\Support\Duration;
 use App\Support\Money;
 use App\Support\Period;
 use App\Support\Weight;
@@ -27,6 +28,10 @@ class ReportColumn
     public const NUMBER = 'number';     // plain integer count
 
     public const PERCENT = 'percent';   // integer percentage
+
+    public const HOURS = 'hours';       // worked minutes, shown as decimal hours ("152,5 h") — a total over days
+
+    public const DURATION = 'duration'; // worked minutes, shown as "7 h 30 min" — one shift
 
     public const DATE = 'date';
 
@@ -60,6 +65,16 @@ class ReportColumn
         return new self($key, $label, self::NUMBER, $sortable, $total);
     }
 
+    public static function hours(string $key, string $label, bool $total = true, bool $sortable = true): self
+    {
+        return new self($key, $label, self::HOURS, $sortable, $total);
+    }
+
+    public static function duration(string $key, string $label, bool $sortable = true): self
+    {
+        return new self($key, $label, self::DURATION, $sortable, false);
+    }
+
     public static function percent(string $key, string $label, bool $sortable = true): self
     {
         return new self($key, $label, self::PERCENT, $sortable, false);
@@ -78,7 +93,7 @@ class ReportColumn
     /** Money/weight/counts sit on the right, tabular; everything else on the left. */
     public function numeric(): bool
     {
-        return in_array($this->type, [self::MONEY, self::WEIGHT, self::NUMBER, self::PERCENT], true);
+        return in_array($this->type, [self::MONEY, self::WEIGHT, self::NUMBER, self::PERCENT, self::HOURS, self::DURATION], true);
     }
 
     /** Rich, locale-aware string for the screen and the PDF. */
@@ -93,6 +108,8 @@ class ReportColumn
             self::WEIGHT => Weight::fromCentigrams((int) $raw)->formatted(),
             self::NUMBER => number_format((int) $raw, 0, ',', app()->getLocale() === 'es' ? '.' : ','),
             self::PERCENT => number_format((int) $raw, 0, ',', '').' %',
+            self::HOURS => Duration::hours((int) $raw),
+            self::DURATION => Duration::format((int) $raw),
             self::DATE => $this->carbon($raw)->translatedFormat('d/m/Y'),
             self::DATETIME => $this->local($raw)->translatedFormat('d/m/Y H:i'),
             default => (string) $raw,
@@ -114,6 +131,8 @@ class ReportColumn
             self::MONEY => number_format((int) $raw / 100, 2, $decimal, ''),
             self::WEIGHT => number_format((int) $raw / 100, 2, $decimal, ''),
             self::NUMBER, self::PERCENT => (string) (int) $raw,
+            // Hours as a bare decimal a spreadsheet can sum (minutes / 60, two places).
+            self::HOURS, self::DURATION => number_format((int) $raw / 60, 2, $decimal, ''),
             self::DATE => $this->carbon($raw)->format('Y-m-d'),
             self::DATETIME => $this->local($raw)->format('Y-m-d H:i'),
             default => str_replace(["\r", "\n"], ' ', (string) $raw),

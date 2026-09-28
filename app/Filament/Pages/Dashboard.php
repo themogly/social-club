@@ -19,6 +19,7 @@ use App\Support\Period;
 use App\Support\Weight;
 use App\ViewModels\Dashboard as DashboardData;
 use App\ViewModels\DashboardCharts;
+use App\ViewModels\StaffHours;
 use Carbon\CarbonImmutable;
 use Filament\Actions\Action;
 use Filament\Pages\Dashboard as BaseDashboard;
@@ -139,6 +140,8 @@ class Dashboard extends BaseDashboard
         $charts = DashboardCharts::for($user, $period);
         $canSeeFinance = $data->canSeeFinance;
         $role = $this->roleFor($user);
+        // Prompt 285 — staff hours, for holders of staff.hours.view (never STAFF): absent, not empty, without it.
+        $staffHours = StaffHours::visibleOnDashboard($user) ? StaffHours::for($user, $period) : null;
 
         return [
             'period' => $period,
@@ -151,7 +154,9 @@ class Dashboard extends BaseDashboard
             'data' => $data,
             'occupancy' => $occ = $charts->occupancy(),
             'stats' => $this->statCards($data, $charts, $period, $canSeeFinance),
-            'alerts' => $this->decorateAlerts($data->alerts()),
+            'alerts' => $this->decorateAlerts(array_merge($data->alerts(), $this->staffAlerts($staffHours))),
+            'staffHours' => $staffHours,
+            'staffNow' => $staffHours?->now() ?? [],
             'ceilingHeadroom' => $data->ceilingHeadroom(),
             'readouts' => $this->readouts($data, $period, $occ, $canSeeFinance),
             'comparisonRows' => $this->comparisonRows($charts->perLocationComparison($period), $canSeeFinance),
@@ -217,11 +222,33 @@ class Dashboard extends BaseDashboard
     }
 
     /**
+     * The registro de jornada's loose ends (prompt 285), over the last 31 days whatever the period — an alert must not
+     * vanish because the owner switched to "Hoy". Panel only: the counter hub never carries staff hours.
+     *
+     * @return list<array{severity: string, key: string, count: int}>
+     */
+    private function staffAlerts(?StaffHours $hours): array
+    {
+        if ($hours === null) {
+            return [];
+        }
+
+        $alerts = [];
+        foreach ([DashboardAlert::STAFF_OPEN_SHIFTS->value => $hours->openShiftsCount(), DashboardAlert::STAFF_UNCLOCKED_ACTIVITY->value => $hours->unclockedDaysCount()] as $key => $count) {
+            if ($count > 0) {
+                $alerts[] = ['severity' => DashboardAlert::from($key)->severity(), 'key' => $key, 'count' => $count];
+            }
+        }
+
+        return $alerts;
+    }
+
+    /**
      * Turn the view-model's terse alert tuples into rendered rows — a plain-language
      * Spanish sentence, an icon and a click-through to where the operator fixes it.
      *
      * @param  list<array{severity: string, key: string, count: int}>  $alerts
-     * @return list<array{severity: string, count: int, message: string, href: string, icon: Heroicon}>
+     * @return list<array{severity: string, key: string, count: int, message: string, href: string, icon: Heroicon}>
      */
     private function decorateAlerts(array $alerts): array
     {
@@ -245,10 +272,11 @@ class Dashboard extends BaseDashboard
                 'genetics_low_stock' => [trans_choice(':count variedad con stock bajo|:count variedades con stock bajo', $count, ['count' => $count]), Heroicon::OutlinedArchiveBoxXMark],
                 'association_stock_ceiling' => [__('La asociación tiene más stock en total (sedes y almacén) que el techo orientativo'), Heroicon::OutlinedArchiveBox],
                 'articles_low_stock' => [trans_choice(':count artículo de barra y tienda con stock bajo|:count artículos de barra y tienda con stock bajo', $count, ['count' => $count]), Heroicon::OutlinedShoppingBag],
+                'staff_open_shifts', 'staff_unclocked_activity' => [(string) $case?->label($count), Heroicon::OutlinedClock],
                 default => [$case?->label($count) ?? __('Aviso'), Heroicon::OutlinedBell],
             };
 
-            return ['severity' => $alert['severity'], 'count' => $count, 'message' => $message, 'href' => $case?->panelUrl() ?? '#', 'icon' => $icon];
+            return ['severity' => $alert['severity'], 'key' => $alert['key'], 'count' => $count, 'message' => $message, 'href' => $case?->panelUrl() ?? '#', 'icon' => $icon];
         }, $alerts);
     }
 

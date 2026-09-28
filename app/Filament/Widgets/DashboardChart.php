@@ -91,6 +91,7 @@ abstract class DashboardChart extends ChartWidget
         return [
             'brand' => '#2563eb',
             'brand_soft' => 'rgba(37, 99, 235, 0.65)',
+            'brand_faint' => 'rgba(37, 99, 235, 0.35)', // the same blue, lighter — a declared/corrected share (285)
             'success' => '#16a34a',
             'success_soft' => 'rgba(22, 163, 74, 0.65)',
             'warning' => '#d97706',

@@ -76,10 +76,14 @@ class WorkedHours
             ->where('occurred_at', '<', $to->copy()->addDay())
             ->get();
 
+        // Annulments of these events, read ONCE for everyone (prompt 285): the dashboard asks for every person at once,
+        // and a lookup per person made its query count grow with the staff.
+        $annulled = self::annulledAmong($events);
+
         $periods = [];
         foreach ($events->groupBy('user_id') as $userEvents) {
             $open = null;
-            foreach (self::effectiveEvents($userEvents) as $event) {
+            foreach (self::effectiveEvents($userEvents, $annulled) as $event) {
                 if ($event->type === StaffClockType::IN) {
                     if ($open !== null) {
                         $periods[] = self::period($open, null);
@@ -193,17 +197,30 @@ class WorkedHours
      * IN/OUT events that are not annulled, in time order.
      *
      * @param  Collection<int, StaffClockEvent>  $events
+     * @param  Collection<string, int>|null  $annulled  ids already known to be annulled (keys), else looked up here
      * @return Collection<int, StaffClockEvent>
      */
-    private static function effectiveEvents(Collection $events): Collection
+    private static function effectiveEvents(Collection $events, ?Collection $annulled = null): Collection
     {
-        $annulled = $events->where('type', StaffClockType::ANNUL)->pluck('corrects_event_id')->filter()->flip();
-        // An annulment may target an event outside this slice; look those up too, in one query.
-        $outside = StaffClockEvent::query()->withoutGlobalScopes()->where('type', StaffClockType::ANNUL->value)
-            ->whereIn('corrects_event_id', $events->pluck('id'))->pluck('corrects_event_id')->flip();
+        $annulled ??= self::annulledAmong($events);
 
-        return $events->reject(fn (StaffClockEvent $e): bool => $e->type === StaffClockType::ANNUL
-            || $annulled->has($e->id) || $outside->has($e->id))->values();
+        return $events->reject(fn (StaffClockEvent $e): bool => $e->type === StaffClockType::ANNUL || $annulled->has($e->id))->values();
+    }
+
+    /**
+     * The ids (as keys) of these events that an ANNUL row points at — the ANNULs in the slice, plus those outside it (an
+     * annulment is written later than the event it corrects), in one query.
+     *
+     * @param  Collection<int, StaffClockEvent>  $events
+     * @return Collection<string, int>
+     */
+    private static function annulledAmong(Collection $events): Collection
+    {
+        $inside = $events->where('type', StaffClockType::ANNUL)->pluck('corrects_event_id')->filter();
+        $outside = StaffClockEvent::query()->withoutGlobalScopes()->where('type', StaffClockType::ANNUL->value)
+            ->whereIn('corrects_event_id', $events->pluck('id'))->pluck('corrects_event_id');
+
+        return $inside->concat($outside)->filter()->unique()->values()->flip();
     }
 
     /** @return WorkedPeriod */
