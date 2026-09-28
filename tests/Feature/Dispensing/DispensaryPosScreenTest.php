@@ -132,8 +132,8 @@ class DispensaryPosScreenTest extends TestCase
             ->call('selectMember', $this->eligibleMember()->id)
             ->assertOk()
             ->assertSet('noLocation', false)
-            // Prompt 194 — ONE field, labelled by the sede's card_readers_enabled wording (off here).
-            ->assertSee(__('Buscar socio por nombre o nº'))
+            // Prompt 299 — with a socio chosen the search is gone (194's one field comes back with *Cambiar socio*).
+            ->assertDontSee('data-member-lookup', false)
             ->assertSee($this->genetic->name); // the genetics grid lists the priced sede genetic
     }
 

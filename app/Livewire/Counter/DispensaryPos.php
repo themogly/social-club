@@ -1428,6 +1428,7 @@ class DispensaryPos extends Component
             'requireSignature' => $this->signatureRequired(),
             'requireCheckedIn' => $this->checkedInRequired(),
             'cameraScanEnabled' => (bool) Settings::get('camera_scan_enabled', false),
+            'cardReadersEnabled' => $this->cardReadersEnabled(), // prompt 299 — the wedge catcher, with the search hidden
             'hardBlockRules' => $verdict !== null ? $this->hardBlockRules($verdict) : [],
             'overridableRules' => $verdict !== null ? $this->overridableRules($verdict) : [],
             'canOverride' => $this->userCan('limits.override'),

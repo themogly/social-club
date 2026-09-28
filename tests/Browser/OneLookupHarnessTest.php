@@ -156,13 +156,10 @@ class OneLookupHarnessTest extends TestCase
         $blocker = $search(DispensaryPos::class)->html();
         $this->write('dispensary-blocker', $blocker, 'Dispensario', fullHeight: true);
 
-        // 3) The dispensary RESOLVED: a socio is held and the lookup has moved into the scrolling selection
-        //    pane, above the genetics. This is the hard fold case — the one 176 rebuilt the screen over.
-        $pane = Livewire::test(DispensaryPos::class)
-            ->call('selectMember', $member->id)
-            ->set('lookup', 'Gar')->call('submitLookup')
-            ->html();
-        $this->write('dispensary-pane', $pane, 'Dispensario', fullHeight: true);
+        // 3) The dispensary RESOLVED: since prompt 299 there is NO lookup once a socio is held (the card's scan button,
+        //    a card reader and *Cambiar socio* change who). Asserted absent rather than photographed.
+        $pane = Livewire::test(DispensaryPos::class)->call('selectMember', $member->id)->html();
+        $this->assertStringNotContainsString('id="member-lookup"', $pane, 'the dispensary still asks "find a member" with one chosen');
 
         // 4) Socios and 5) the bar — two of the three that had no scan affordance at all before 194.
         // The caja was the third; fee collection left it for Socios in prompt 201, so it now has no member
@@ -175,7 +172,7 @@ class OneLookupHarnessTest extends TestCase
 
         // --- now the assertions ---
 
-        foreach (['checkin' => $checkin, 'dispensary-blocker' => $blocker, 'dispensary-pane' => $pane,
+        foreach (['checkin' => $checkin, 'dispensary-blocker' => $blocker,
             'socios' => $socios, 'bar' => $bar] as $name => $html) {
             $this->assertSame(1, substr_count($html, 'id="member-lookup"'), $name.' renders ONE lookup field');
             $this->assertStringContainsString('data-member-lookup-results', $html, $name.' renders its results in place');
