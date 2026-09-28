@@ -14517,3 +14517,82 @@ Extracto, Preliado and Comestible, on the add-a-strain wizard and on the edit fo
   Hachís; a hash dispensation moves the same centigrams, the same daily/monthly used figures, the same block at the limit and
   the same stock-ceiling on-site figure as flower of the same grams; existing hash strains read Hachís on the list, the edit
   form, the counter and both reports; Extracto no longer offers Hachís. `lang/en.json` already carried "Hachís" → "Hash".
+## Prompt 279 (Ben's 275) — the till forms confirm where you tapped
+
+Reported from the club tablet as *"Record movement not working in counter."* It was working: `recordMovement` wrote the
+`cash_movements` row and flashed *"Movimiento registrado: 10,00 €."* — in the shared flash slot at the TOP of the Caja. At
+iPad landscape (1180×820) the operator has scrolled down to the form, so the answer landed above the viewport; the only visible
+change was the amount field emptying, and the second tap recorded it twice. *Registrar gasto de caja* had the same defect.
+
+### The rule (202's, applied to the till)
+An action's result renders **inside the card of the form that produced it, right above its button — and only there**. One
+mechanism, not a second message: `flash()` records WHERE as well as WHAT. Each form action opens by naming its card in a
+*private* `$feedbackIn` (`movement`, `expense`, `handover`, `reweigh`, `count`); `flash()` copies it into the locked public
+`$flashAt`. Private means Livewire never persists it, so every request starts at "the top" and any flash raised outside a form
+action (a PIN sign-in, the trait's own messages) goes to the top without anyone remembering to reset it.
+
+`render()` resolves the slot the flash actually renders in (`flashSlot()`): its card **when that card is on screen**, else the
+top. That fallback is what keeps the whole-screen outcomes honest — *"Caja cerrada."* (the count form is replaced by the arqueo),
+*"Recuento de flor registrado."* (the recount form is replaced by the count, the variances directly under the top slot), a
+till already closed, and a handover to someone without `till.open` (the handover card is gone) — none can render nowhere.
+
+### What happened to the top flash
+**Suppressed for these actions, not removed.** The top slot renders only when `flashSlot === null`, so a form's result appears
+exactly once (asserted by count, snapshot stripped). Nothing else relied on it for these actions: the one test that pinned
+the old message (`ConfirmationCarriesTheOutcomeTest::test_a_till_movement_confirms_once_and_names_the_amount`) was UPDATED to
+the new wording and still asserts one render. The top slot keeps the open screen, the whole-screen outcomes above and the
+trait's flashes.
+
+### The sweep
+- **Handover ("Entregar la caja")**: refusals (bad count, PIN, same person) render above its button; a settled handover's
+  *"Caja entregada a …"* renders under the card heading (the panel closes). Measured BEFORE it was already on screen at both
+  orientations — opening the panel withholds the breakdown (186), so the page shrinks — but it is the same class of action and
+  now follows the same rule; its button also gained `wire:target`.
+- **Flower recount**: refusals render above *Confirmar recuento*. BEFORE at 1180×820 with the page at its foot: **−238** (off);
+  AFTER **719..789** (on).
+- **Blind count (arqueo)**: refusals and the *"hace falta una nota"* warning render above its buttons, beside the note field
+  they ask for. *"Primero hay que recontar la flor."* goes to the recount card it bounces to.
+
+### Two things found on the way
+- **The same confirmation twice showed nothing the second time.** The shared partial keyed the message on `md5($message)`, so
+  a second identical *"10,00 € (Entrada)"* morphed onto the first one's element — already hidden by its 6s timer. Measured in
+  the browser: tap 1 visible, tap 2 `display:none`. On exactly this screen that is the double-record trap again. The partial
+  takes an optional `$nonce`; the till passes a locked `$flashSeq` bumped by every `flash()`. The other four counter screens use
+  the same partial without a nonce and are **not changed here** (one prompt, one task) — same latent issue, worth a follow-up.
+- **An inline message above the button can itself land below the fold** when the card was flush with the viewport bottom
+  (measured: expense at 783..853 in 820). The partial takes an optional `$reveal`: `scrollIntoView({ block: 'nearest' })`,
+  instant — a visible message never moves the page, and there is no animation to gate on reduced motion.
+
+### The rest
+- The success line names the type (`Movimiento registrado: :amount (:type).`) because the amount field it confirms has just been
+  cleared. The word comes from a new `CashMovementType::shortLabel()` — the same words the select offers (Entrada / Salida /
+  Ingreso en banco), now used by both. (Its English is the existing "Entry"/"Exit" key shared with the door and the till report
+  — pre-existing and out of scope; "Cash in/out" would read better in English, flagged for the owner.)
+- **Double-tap guard**: both buttons already had an UNTARGETED `wire:loading.attr="disabled"` and no busy label. They are now the
+  shared `<x-button>` with `wire:loading.attr="disabled" wire:target="<action>"` and a *Registrando…* label while in flight.
+- Measurements (`tests/Browser/shoot-till-forms-inline.mjs`, fresh demo seed), confirmation top..bottom in viewport px:
+
+  | viewport | form | page scrolled to | BEFORE | AFTER |
+  |---|---|---|---|---|
+  | 1180×820 | movimiento | form card on screen | **−306..−236** | 747..817 |
+  | 1180×820 | movimiento | page foot | **−624..−554** | 429..499 |
+  | 1180×820 | gasto | form card on screen | **−328..−258** | 750..820 |
+  | 1180×820 | gasto | page foot | **−660..−590** | 487..557 |
+  | 820×1180 | movimiento | form card on screen | 72..142 (the one case that was fine) | 1107..1177 |
+  | 820×1180 | gasto | form card on screen | **−374..−304** | 1110..1180 |
+
+  The report's ≈ −512 sits between the two landscape scroll positions; BEFORE figures grow with the day's petty-cash list
+  (the page gets longer), which is why a later re-run on the same database read −882. Screenshots: `storage/app/screenshots/279/`.
+- Tests: `tests/Feature/Counter/TillFormsConfirmInlineTest.php` (14 — position asserted via the DOM, not `assertSee`: success
+  with amount + type inside the movement card, each type named as the select names it, a fresh key for a repeated
+  confirmation, invalid amount / bank permission / no operator inside the movement card, expense success + refusal inside the
+  expense card, both buttons' targeted loading state, handover / blind count / recount refusals inside their cards, the
+  whole-screen outcome still at the top, the slot never outliving its action).
+
+`composer check` green in `es` and `en` on the branch as cut (2173 tests). After rebasing onto `87bd265` (Ben's prompt 275,
+business-date expiry) the suite shows **two failures that are not this branch's and depend on the clock**:
+`StockCatalogueTest::test_fefo_picks_the_oldest_open_batch_and_skips_expired` and
+`MenuAvailabilityTest::test_an_expired_batch_does_not_count_as_available`. Both build a batch with `expires_on = now()->subDay()`;
+run between midnight and the sede's 06:00 cutoff, `BusinessDay::today()` is still yesterday, so the batch is not yet expired.
+Neither test touches the till. Left for 275's owner rather than fixed here (one prompt, one task); they pass after 06:00.
+MySQL left to CI. Not merged.

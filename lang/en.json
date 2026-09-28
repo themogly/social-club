@@ -1649,7 +1649,7 @@
     "Motivo:": "Reason:",
     "Motivos que pueden impedir dispensar": "Reasons that may prevent dispensing",
     "Movida a lista de espera": "Moved to the waiting list",
-    "Movimiento registrado: :amount.": "Movement recorded: :amount.",
+    "Movimiento registrado: :amount (:type).": "Movement recorded: :amount (:type).",
     "Movimientos": "Movements",
     "Movimientos de efectivo": "Cash movements",
     "Movimientos económicos y saldo del monedero": "Financial movements and wallet balance",

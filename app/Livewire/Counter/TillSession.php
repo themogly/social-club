@@ -141,6 +141,32 @@ class TillSession extends Component
     /** success | warning | error */
     public string $flashType = 'success';
 
+    /**
+     * WHERE the flash renders (prompt 279): null is the shared slot at the top of the screen; otherwise the form
+     * card that produced it — `movement`, `expense`, `handover`, `reweigh`, `count` — right by its button.
+     *
+     * At iPad landscape the operator has scrolled down to a form before tapping, so a top-of-page answer landed
+     * 300–600px above the viewport and a working "Registrar movimiento" read as broken (and got tapped twice).
+     * Prompt 202's rule: the result shows where the action happened, and only there. Set ONLY by `flash()`, from
+     * the action's own `$feedbackIn`, so the slot can never outlive the action that chose it. Server-set only.
+     */
+    #[Locked]
+    public ?string $flashAt = null;
+
+    /**
+     * The card the running action answers in. Private, so Livewire does not persist it: each request starts at
+     * null (the top), and an action opts its own flashes into its card. Any flash raised outside such an action
+     * — a PIN sign-in, a whole-screen outcome — therefore goes to the top without anyone having to remember.
+     */
+    private ?string $feedbackIn = null;
+
+    /**
+     * Bumped by every `flash()` and joined to the message's key (prompt 279). Without it the same confirmation
+     * twice — two 10,00 € entradas — morphed onto the first one's already-faded element and showed nothing.
+     */
+    #[Locked]
+    public int $flashSeq = 0;
+
     public function mount(): void
     {
         abort_unless($this->deviceCan('till.open') || $this->deviceCan('till.close'), 403);
@@ -259,6 +285,8 @@ class TillSession extends Component
      */
     public function handOver(): void
     {
+        $this->feedbackIn = 'handover';
+
         if (! $this->requireOperator()) {
             return;
         }
@@ -421,6 +449,8 @@ class TillSession extends Component
 
     public function recordMovement(): void
     {
+        $this->feedbackIn = 'movement';
+
         $session = $this->resolveOpenSession();
 
         if ($session === null) {
@@ -473,8 +503,11 @@ class TillSession extends Component
         $this->movementAmount = '';
         $this->movementReason = '';
         // Named, not just acknowledged: the amount field is now blank, so "Movimiento registrado." left the
-        // operator with no way to check what they had posted (prompt 202).
-        $this->flash(__('Movimiento registrado: :amount.', ['amount' => Money::fromCents($cents)->formatted()]), 'success');
+        // operator with no way to check what they had posted (prompt 202) — and the type with it (prompt 279).
+        $this->flash(__('Movimiento registrado: :amount (:type).', [
+            'amount' => Money::fromCents($cents)->formatted(),
+            'type' => $type->shortLabel(),
+        ]), 'success');
     }
 
     // --- Petty cash (gasto de caja) --------------------------------------------
@@ -486,6 +519,8 @@ class TillSession extends Component
      */
     public function recordExpense(): void
     {
+        $this->feedbackIn = 'expense';
+
         $session = $this->resolveOpenSession();
 
         if ($session === null) {
@@ -629,6 +664,8 @@ class TillSession extends Component
      */
     public function submitReweigh(): void
     {
+        $this->feedbackIn = 'reweigh';
+
         $session = $this->resolveOpenSession();
         if ($session === null) {
             return;
@@ -768,6 +805,8 @@ class TillSession extends Component
 
     public function submitCount(): void
     {
+        $this->feedbackIn = 'count';
+
         $session = $this->resolveOpenSession();
 
         if ($session === null) {
@@ -778,6 +817,7 @@ class TillSession extends Component
         // recoverable — bounce back to the reweigh step with a clear reason, never a silent hang (mirror needsNote).
         if ($this->reweighRequired()) {
             $this->reweighing = true;
+            $this->feedbackIn = 'reweigh'; // the screen is now the recount — say why, inside it
             $this->flash(__('Primero hay que recontar la flor.'), 'warning');
 
             return;
@@ -887,6 +927,7 @@ class TillSession extends Component
                 'expenseCategories' => collect(),
                 // Prompt 265 — after the reveal only (never on the blind count): the closed session's petty cash, itemised.
                 'closedPetty' => $this->closedSessionId !== null ? $this->closedPettyCash($this->closedSessionId) : null,
+                'flashSlot' => null,
             ]);
         }
 
@@ -921,6 +962,8 @@ class TillSession extends Component
             'reweighBatches' => $this->reweighing ? $this->reweighBatches() : collect(),
             // Configured terminals for the open-form picker (prompt 84).
             'terminals' => $location?->terminalNames() ?? [],
+            // Prompt 279 — where the flash renders: beside the button that raised it, or the top.
+            'flashSlot' => $this->flashSlot($session),
         ]);
     }
 
@@ -981,9 +1024,36 @@ class TillSession extends Component
         return $this->userCan('cash.bank');
     }
 
+    /**
+     * The slot the flash actually renders in this cycle (prompt 279): its own card when that card is on screen,
+     * else the top. The fallback is what keeps a whole-screen outcome honest — "Caja cerrada." replaces the count
+     * form with the arqueo, the recount's success replaces the recount form, a handover to someone without
+     * `till.open` removes the handover card — and none of them can end up rendered nowhere.
+     */
+    private function flashSlot(?TillSessionModel $session): ?string
+    {
+        if ($this->flashAt === null || $this->countSubmitted || $session === null) {
+            return null;
+        }
+
+        // The same branches the view takes: recount, then blind count, then the open-session screen.
+        $onScreen = match (true) {
+            $this->reweighing => ['reweigh'],
+            $this->closing => ['count'],
+            default => array_merge(
+                $this->handoverOpen ? [] : ['movement', ...($this->userCan('expenses.record') ? ['expense'] : [])],
+                $this->userCan('till.open') ? ['handover'] : [],
+            ),
+        };
+
+        return in_array($this->flashAt, $onScreen, true) ? $this->flashAt : null;
+    }
+
     private function flash(string $message, string $type): void
     {
         $this->flashMessage = $message;
         $this->flashType = $type;
+        $this->flashAt = $this->feedbackIn;
+        $this->flashSeq++;
     }
 }

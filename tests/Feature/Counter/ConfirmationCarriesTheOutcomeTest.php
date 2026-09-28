@@ -5,6 +5,7 @@ namespace Tests\Feature\Counter;
 use App\Actions\Till\OpenTill;
 use App\Actions\Wallet\RecordWalletTransaction;
 use App\Enums\BatchStatus;
+use App\Enums\CashMovementType;
 use App\Enums\MembershipStatus;
 use App\Enums\MemberStatus;
 use App\Enums\Role;
@@ -400,7 +401,9 @@ class ConfirmationCarriesTheOutcomeTest extends TestCase
             ->call('recordMovement')
             ->assertOk();
 
-        $expected = __('Movimiento registrado: :amount.', ['amount' => Money::fromCents(5000)->formatted()]);
+        // Prompt 279: it names the type too, since the amount field beside it has been cleared, and it
+        // renders inside the movement card rather than the top slot — still exactly once.
+        $expected = __('Movimiento registrado: :amount (:type).', ['amount' => Money::fromCents(5000)->formatted(), 'type' => CashMovementType::IN->shortLabel()]);
         $this->assertSame($expected, $component->get('flashMessage'));
         $this->assertSame('', $component->get('movementAmount'), 'the field it names has already been cleared');
         $this->assertSame(1, $this->rendered($component->html(), $expected), 'one confirmation, one live region');

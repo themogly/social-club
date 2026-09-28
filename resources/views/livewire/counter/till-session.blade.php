@@ -21,7 +21,13 @@
             :body="$mustChooseLocation ? __('Trabajas en varias sedes. Selecciona en la barra superior en cuál estás.') : __('No tienes ninguna sede activa. Pide a un responsable que te asigne una para gestionar la caja.')"
         />
     @else
-        @include('livewire.counter.partials.counter-flash', ['anchor' => 'data-commit-feedback', 'spacing' => ''])
+        {{-- The shared slot at the top now answers only whole-screen outcomes (the arqueo revealed, the recount
+             committed, the drawer opened or already closed) and anything raised outside a form. A form's own
+             result renders INSIDE its card, beside its button (prompt 279) — at iPad landscape the operator has
+             scrolled down to the form, and an answer up here landed 300–600px above the viewport. --}}
+        @if ($flashSlot === null)
+            @include('livewire.counter.partials.counter-flash', ['anchor' => 'data-commit-feedback', 'spacing' => '', 'nonce' => $flashSeq])
+        @endif
 
         @if ($countSubmitted)
             {{-- ============ Blind close REVEALED: the arqueo result ============ --}}
@@ -219,6 +225,10 @@
                         </div>
                     @endforeach
 
+                    @if ($flashSlot === 'reweigh')
+                        @include('livewire.counter.partials.counter-flash', ['anchor' => 'data-till-feedback=reweigh', 'spacing' => '', 'nonce' => $flashSeq, 'reveal' => true])
+                    @endif
+
                     <div class="flex gap-2">
                         <x-button variant="secondary" size="lg" wire:click="cancelClose" class="flex-1">{{ __('Cancelar') }}</x-button>
                         <x-button type="submit" variant="warning" size="lg" class="flex-1">{{ __('Confirmar recuento') }}</x-button>
@@ -282,6 +292,10 @@
                                 class="mt-2 w-full rounded-xl border border-warning/40 bg-surface px-3 py-2 text-sm focus:border-warning focus:outline-none focus:ring-2 focus:ring-warning/40 dark:bg-slate-950"
                             ></textarea>
                         </div>
+                    @endif
+
+                    @if ($flashSlot === 'count')
+                        @include('livewire.counter.partials.counter-flash', ['anchor' => 'data-till-feedback=count', 'spacing' => '', 'nonce' => $flashSeq, 'reveal' => true])
                     @endif
 
                     <div class="flex gap-2">
@@ -425,11 +439,11 @@
                             wire:model="movementType"
                             class="mt-2 h-12 w-full rounded-xl border border-line bg-surface px-3 text-base text-ink focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/40 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
                         >
-                            <option value="IN">{{ __('Entrada') }}</option>
-                            <option value="OUT">{{ __('Salida') }}</option>
+                            <option value="IN">{{ \App\Enums\CashMovementType::IN->shortLabel() }}</option>
+                            <option value="OUT">{{ \App\Enums\CashMovementType::OUT->shortLabel() }}</option>
                             {{-- Banking cash out is gated on cash.bank (prompt 81); petty cash has its own audited form below. --}}
                             @if ($this->canBankCash())
-                                <option value="BANKED">{{ __('Ingreso en banco') }}</option>
+                                <option value="BANKED">{{ \App\Enums\CashMovementType::BANKED->shortLabel() }}</option>
                             @endif
                         </select>
                     </div>
@@ -457,13 +471,15 @@
                         >
                     </div>
                     <div class="sm:col-span-2">
-                        <button
-                            type="submit"
-                            wire:loading.attr="disabled"
-                            class="h-12 w-full rounded-xl bg-brand px-6 text-base font-semibold text-white transition hover:bg-brand-dark focus:outline-none focus:ring-2 focus:ring-brand/40 disabled:opacity-60"
-                        >
-                            {{ __('Registrar movimiento') }}
-                        </button>
+                        {{-- The answer, beside the button that asked (prompt 279) — never only at the top of the page. --}}
+                        @if ($flashSlot === 'movement')
+                            @include('livewire.counter.partials.counter-flash', ['anchor' => 'data-till-feedback=movement', 'spacing' => 'mb-3', 'nonce' => $flashSeq, 'reveal' => true])
+                        @endif
+                        {{-- Double-tap guard: disabled, and saying so, while THIS request is in flight. --}}
+                        <x-button type="submit" class="w-full" wire:loading.attr="disabled" wire:target="recordMovement">
+                            <span wire:loading.remove wire:target="recordMovement">{{ __('Registrar movimiento') }}</span>
+                            <span wire:loading wire:target="recordMovement">{{ __('Registrando…') }}</span>
+                        </x-button>
                     </div>
                     </fieldset>
                 </form>
@@ -516,13 +532,13 @@
                             >
                         </div>
                         <div class="sm:col-span-2">
-                            <button
-                                type="submit"
-                                wire:loading.attr="disabled"
-                                class="h-12 w-full rounded-xl bg-brand px-6 text-base font-semibold text-white transition hover:bg-brand-dark focus:outline-none focus:ring-2 focus:ring-brand/40 disabled:opacity-60"
-                            >
-                                {{ __('Registrar gasto') }}
-                            </button>
+                            @if ($flashSlot === 'expense')
+                                @include('livewire.counter.partials.counter-flash', ['anchor' => 'data-till-feedback=expense', 'spacing' => 'mb-3', 'nonce' => $flashSeq, 'reveal' => true])
+                            @endif
+                            <x-button type="submit" class="w-full" wire:loading.attr="disabled" wire:target="recordExpense">
+                                <span wire:loading.remove wire:target="recordExpense">{{ __('Registrar gasto') }}</span>
+                                <span wire:loading wire:target="recordExpense">{{ __('Registrando…') }}</span>
+                            </x-button>
                         </div>
                         </fieldset>
                     </form>
@@ -574,6 +590,11 @@
                         >{{ $handoverOpen ? __('Cancelar') : __('Entregar la caja') }}</button>
                     </div>
 
+                    {{-- A settled handover closes the panel, so its answer sits under the card's heading. --}}
+                    @if ($flashSlot === 'handover' && ! $handoverOpen)
+                        @include('livewire.counter.partials.counter-flash', ['anchor' => 'data-till-feedback=handover', 'spacing' => 'mt-3', 'nonce' => $flashSeq, 'reveal' => true])
+                    @endif
+
                     @if ($handoverOpen)
                         <p class="mt-2 text-sm text-ink-muted dark:text-slate-400">{{ __('Cuenta el efectivo del cajón y que entre la siguiente persona con su PIN. La caja no se cierra: el día sigue siendo uno.') }}</p>
 
@@ -613,11 +634,17 @@
                                 <input id="handover-note" type="text" wire:model="handoverNote" autocomplete="off" class="mt-2 h-12 w-full rounded-xl border border-line bg-surface px-4 text-base text-ink focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/40 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100">
                             </div>
 
+                            {{-- A refusal (bad count, wrong PIN) renders here, beside the button — prompt 279. --}}
+                            @if ($flashSlot === 'handover')
+                                @include('livewire.counter.partials.counter-flash', ['anchor' => 'data-till-feedback=handover', 'spacing' => '', 'nonce' => $flashSeq, 'reveal' => true])
+                            @endif
+
                             <button
                                 type="button"
                                 wire:click="handOver"
                                 data-handover-confirm
                                 wire:loading.attr="disabled"
+                                wire:target="handOver"
                                 class="h-14 w-full rounded-xl bg-brand text-base font-semibold text-white transition hover:bg-brand-dark focus:outline-none focus:ring-2 focus:ring-brand/40 disabled:opacity-60"
                             >{{ __('Entregar la caja') }}</button>
                         </div>
