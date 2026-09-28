@@ -47,6 +47,11 @@
     display: none !important;
 }
 
+/* Prompt 295 — no camera on this device (resources/js/photo-buttons.js): only *Elegir archivo* is offered. */
+:root[data-no-camera] [data-camera-button] {
+    display: none !important;
+}
+
 /* The sign-up modal's entrance (prompt 221). The design asks for a ~0.22s pop-in; CLAUDE.md requires every
    effect to be gated behind `prefers-reduced-motion`, and requires content to be visible without JS or
    animation. Both hold here: the rule exists only under `no-preference`, so a reduced-motion operator gets the

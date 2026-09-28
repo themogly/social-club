@@ -49,4 +49,10 @@ class CreateArticle extends CreateRecord
             throw ValidationException::withMessages(['data.location_id' => $e->getMessage()]);
         }
     }
+
+    /** Back to the list (prompt 295, Shane's note on the catalogue's create pages). */
+    protected function getRedirectUrl(): string
+    {
+        return $this->getResource()::getUrl('index');
+    }
 }

@@ -7,9 +7,11 @@ use App\Actions\Stock\RecordStockMovement;
 use App\Actions\Stock\TransferBatch;
 use App\Enums\BatchStatus;
 use App\Enums\StockMovementType;
+use App\Filament\Support\ReturnFocus;
 use App\Models\Batch;
 use App\Models\Location;
 use App\Models\User;
+use App\Support\BelowCost;
 use App\Support\Money;
 use App\Support\Spreadsheet\ReportExport;
 use App\Support\Weight;
@@ -33,6 +35,7 @@ use Filament\Tables\Filters\TrashedFilter;
 use Filament\Tables\Table;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\HtmlString;
 use InvalidArgumentException;
 use RuntimeException;
 use Symfony\Component\HttpFoundation\StreamedResponse;
@@ -233,17 +236,60 @@ class BatchesTable
             ])
             ->modalDescription(__('Cambia el precio de este lote. Solo afecta a las aportaciones a partir de ahora; queda en la auditoría.'))
             ->modalSubmitActionLabel(__('Guardar precio'))
-            ->action(function (Batch $record, array $data): void {
-                $actor = Auth::user();
-                abort_unless($actor instanceof User, 403);
-                (new SetBatchPrice)->handle(
-                    $record,
-                    Money::fromEuros((string) $data['rate_eur'])->cents,
-                    filled($data['eighth_eur'] ?? null) ? Money::fromEuros((string) $data['eighth_eur'])->cents : null,
-                    $actor,
+            // Prompt 295 — below the batch's cost, ask first: *Continuar* saves (and closes both), *Volver y corregir*
+            // returns to this form with nothing written. The same rule as the intake forms (`BelowCost`).
+            ->registerModalActions([self::belowCostAction()])
+            ->action(function (Batch $record, array $data, Action $action): void {
+                $rate = Money::fromEuros((string) $data['rate_eur'])->cents;
+                $eighth = filled($data['eighth_eur'] ?? null) ? Money::fromEuros((string) $data['eighth_eur'])->cents : null;
+                $unit = $record->isUnitType();
+                $offences = BelowCost::offences(
+                    $record->cost_per_gram_cents, $unit ? null : $rate, $unit ? $rate : null, $unit ? null : $eighth,
+                    $record->genetic?->grams_per_unit_cg !== null ? (int) $record->genetic->grams_per_unit_cg : null,
                 );
-                Notification::make()->title(__('Precio actualizado'))->success()->send();
+
+                if ($offences !== []) {
+                    $action->getLivewire()->mountAction('belowCost', [
+                        'batch' => $record->getKey(), 'rate' => $rate, 'eighth' => $eighth,
+                        'lines' => array_column($offences, 'line'),
+                        'field' => $offences[0]['field'] === 'per_eighth' ? 'eighth_eur' : 'rate_eur',
+                    ]);
+                    $action->halt();
+                }
+
+                self::savePrice($record, $rate, $eighth);
             });
+    }
+
+    private static function belowCostAction(): Action
+    {
+        return Action::make('belowCost')
+            ->requiresConfirmation()
+            ->color('warning')
+            ->modalHeading(__('El precio de venta es menor que el coste'))
+            ->modalDescription(function (array $arguments): HtmlString {
+                $lines = is_array($arguments['lines'] ?? null) ? array_filter($arguments['lines'], 'is_string') : [];
+
+                return new HtmlString(implode('', array_map(fn (string $line): string => '<span class="block">'.e($line).'</span>', $lines)));
+            })
+            ->modalSubmitActionLabel(__('Continuar'))
+            ->modalCancelAction(fn (Action $action): Action => $action
+                ->label(__('Volver y corregir'))
+                ->extraAttributes(fn (array $arguments): array => ReturnFocus::to($arguments['field'] ?? 'rate_eur')))
+            ->extraModalWindowAttributes(ReturnFocus::listener())
+            ->modalAutofocus(false)
+            ->cancelParentActions()
+            ->action(function (array $arguments): void {
+                self::savePrice(Batch::query()->findOrFail($arguments['batch']), (int) $arguments['rate'], $arguments['eighth'] !== null ? (int) $arguments['eighth'] : null);
+            });
+    }
+
+    private static function savePrice(Batch $batch, int $rate, ?int $eighth): void
+    {
+        $actor = Auth::user();
+        abort_unless($actor instanceof User, 403);
+        (new SetBatchPrice)->handle($batch, $rate, $eighth, $actor);
+        Notification::make()->title(__('Precio actualizado'))->success()->send();
     }
 
     protected static function adjustAction(): Action

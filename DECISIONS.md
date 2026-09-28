@@ -15516,3 +15516,102 @@ screenshots `storage/app/screenshots/285/`):
   - `prove-293-visit.mjs` now checks both, at 1180×820 and 820×1180. It runs a full visit (socio → flower → bar →
     cash → signature → commit), checks that the stock figure follows the sale, and requires zero console errors.
 - **Club tablet:** a check for Shane is in `verification/real-device-checks.md` (pending).
+
+## Prompt 295 — Shane's catalogue notes: *Productos*, no empty category, back to the list, camera or file, and a below-cost warning
+
+- **1. *Artículos* → *Productos*: Shane's decision, confirmed by him.** He chose it over *Carta* (clashes with the member
+  area's menu) and *Productos de barra* (hides the shop). The menu reads *Barra y tienda → Productos*, and the counter
+  reads *Buscar producto…*. **Words only:** the `Article` model, the `articles` table, the routes, `articles.manage` and
+  every class are unchanged.
+  - **Every changed key** (es → the English it now maps to):
+    - *Artículo / artículo / Artículos / artículos* → *Producto / producto / Productos / productos* (Product / product /
+      Products / products);
+    - *Artículos (bar)* → *Productos (bar)*;
+    - *Alta de artículo* → *Alta de producto*;
+    - *Artículo no disponible.* / *Algún artículo ya no está disponible.* → *Producto…* / *Algún producto…*;
+    - *Artículo sin dar de alta* → *Producto sin dar de alta* (English unchanged: *Item not yet in stock*);
+    - *Añade algún artículo de barra…* → *…producto de barra…*;
+    - *Barra y tienda por artículo* → *…por producto*;
+    - *Buscar artículo…* → *Buscar producto…*;
+    - *Cambia a Barra arriba para añadir artículos…* → *…productos…*;
+    - *Cesta vacía. Toca un artículo…* → *…un producto…*;
+    - *Cobra bebidas y artículos* → *…y productos*;
+    - *Cuando se registren ventas… por artículo.* → *…por producto.*;
+    - *Gestionar artículos de barra y tienda* → *…productos…* (the permission's label; the key stays `articles.manage`);
+    - *Hay artículos de barra en la visita…* → *…productos…*;
+    - the manual's entry, both empty states (*Sin artículos* → *Sin productos*, and the two *Los artículos son…*
+      descriptions);
+    - *Los proveedores son de quienes el club adquiere género o artículos…* → *…o productos…*;
+    - *Ningún artículo coincide…*, *No hay artículos activos / disponibles en esta sede.* → *producto(s)*;
+    - *Stock insuficiente para el artículo :name.* → *…el producto :name.*;
+    - *Toca un artículo para añadirlo a esta visita.* → *…un producto…*;
+    - the low-stock alert *:count artículo(s) de barra y tienda con stock bajo* → *producto(s)*.
+  - **Kept, because they are legal articles:** *Artículo 30 RGPD* (twice) and *Artículo 33 RGPD*.
+  - **The guard:** `ProductsNameTest` refuses any Spanish key or English value that says *artículo* or *article*
+    unless it is followed by a number (a legal article). It also checks that the rendered Barra screen never says
+    *artículo*.
+- **2. *Categoría* removed from the product form (create and edit)** because nothing can create a product category:
+  there is no Categories resource and only `DemoDataSeeder` made any, so on a live club the drop-down was always empty.
+  The `category_id` column and existing values stay; there is no migration. The bar's chips and 248's tiles already
+  render only when categories exist, and a test confirms none show when there are none. If the club wants to group
+  bar products later, that is a small resource of its own.
+- **3. After creating, back to the list:** *Añadir variedad* → Genéticas, *Añadir stock* → Lotes, and a new product →
+  Productos. The wizard's summary notification survives the redirect (asserted). The other create pages are
+  unchanged, deliberately:
+
+  | page | lands on |
+  |---|---|
+  | Gasto (Expense) | list, already |
+  | Acta (Minute) | the minute's view (you sign it there) |
+  | Socio (Member) | the socio's record (deliberate) |
+  | Anuncio, BreachLog, Convocatoria, DataRequest, Descuento, Plantilla, Evento, Categoría de gasto, Sede, Tarifa, Compra, Proveedor, Usuario | Filament's default: the record's view page where there is one, else its edit page |
+
+- **4. *Hacer foto* or *Elegir archivo*: one pattern, two buttons side by side, each at least 44 px.** *Hacer foto*
+  opens the camera: the **front** one (`capture="user"`) for a member's face, the **back** one (`environment`) for ID
+  scans, receipts, invoices, strain/batch/product photos and lab reports. *Elegir archivo* opens the files and gallery,
+  never with `capture`. Both feed the same field, so validation, limits, the private disk, encryption and the preview
+  are unchanged. A device with no camera (`enumerateDevices`, no `videoinput`) shows only *Elegir archivo*; if that
+  check is unavailable or fails, both show.
+  - **Panel:** `App\Filament\Forms\CameraOrFile::field(FileUpload…, camera:)` adds the two buttons **above** the drop
+    zone. They are not below it because Filament's `helperText()` is the field's below-content slot, and putting the
+    buttons there silently removed the size-limit and encryption notices; `UploadLimitsTest` caught it.
+    They hand the file to the field's own FilePond instance through its API (`addFile`, `browse`), so there is no
+    second upload path. The wizard's photo step no longer forces `capture` on the drop zone.
+  - **Counter and member area:** `x-counter.file-field` with `camera=`. The camera input has no name and hands its
+    file to the field's own input (`resources/js/photo-buttons.js`, loaded by the counter and the applicant form), so
+    `wire:model`, the form post, the MRZ reader and the close guard see one field. The applicant form's photo and ID
+    scan now use this field.
+  - `photo-capture` keeps its live camera (*Hacer foto*), with *Elegir archivo* beside it and no `capture` (it used to
+    force the front camera on its picker too).
+  - **The upload sites:**
+    - panel: strain photo (wizard and edit), batch photos, product photos, lab reports (wizard and batch), member photo
+      (front camera), ID scan, medical certificate, expense receipt and purchase invoice;
+    - counter: the staff alta's photo (front), ID scan and medical certificate, plus the photo nag's live camera;
+    - member area: photo (front) and ID scan.
+  - **File-only, by design:** the member CSV import and the club logo.
+  - **The guard:** `CameraOrFileTest` lists every upload site; a new one fails until it is classified.
+- **5. Below-cost warning — a warning, not a block** (a club may knowingly clear old stock at a loss).
+  - **One rule:** `App\Support\BelowCost`, in integer cents × centigrams:
+    - by weight, the price per gram against the cost per gram;
+    - per unit, the price per unit against the cost per gram × the genetic's grams per unit;
+    - the eighth, when set, against the cost per gram × 3,5.
+    A missing or zero cost, or a price **equal** to cost, never warns.
+  - **Where it asks:**
+    - the *Añadir variedad* wizard, on leaving *Precio* (the cost was entered two steps earlier) and again on *Crear*
+      if the figures changed since *Continuar*;
+    - *Añadir stock*;
+    - the batch's audited *Precio* action, as a stacked confirmation over its form.
+  - **The modal:** each affected price beside its cost. *Volver y corregir* (the default) writes nothing and puts
+    the cursor in the first affected field; *Continuar* saves as entered.
+  - **The audit:** the existing `batch.intake` / `batch.price.updated` entry records `below_cost: true`, and no
+    amounts beyond what is already stored.
+- **Verified in a browser** at 1180×820 as the owner, on a throwaway DB:
+  - `tests/Browser/prove-295-catalogue.mjs`:
+    - the wizard warns on leaving *Precio*, and *Volver y corregir* focuses the price;
+    - a fixed price moves on with no warning;
+    - *Hacer foto* puts a picture into FilePond, and *Elegir archivo* opens a picker with no `capture`;
+    - *Crear* lands on the list;
+    - the product form has no *Categoría* and lands on the list.
+  - `tests/Browser/prove-295-counter-photo.mjs`: the staff alta's front-camera picture reaches the field and uploads.
+- **The club tablet (Shane)** is in `verification/real-device-checks.md`: does each *Hacer foto* open the right
+  camera on the Android tablet, and does a desktop show only *Elegir archivo*? Pending.

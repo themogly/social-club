@@ -25,3 +25,25 @@ toggle and the search box once each.
   (so that the tab and the filters need nothing more from the server) — it is the one tap that got heavier.
 
 **Answer:** _(pending)_
+
+---
+
+## 295 — *Hacer foto* or *Elegir archivo* on every photo
+
+**Who:** Shane, on the club's Android tablet; and the owner, on a desktop.
+
+**On the tablet**, open each photo field once. Check that *Hacer foto* opens the camera and *Elegir archivo* opens
+the gallery or files:
+
+- Panel:
+  - Genéticas → *Añadir variedad* → Foto;
+  - Lotes → *Añadir stock* (photos and lab report);
+  - Productos → Nuevo;
+  - a socio's record (Foto should open the **front** camera; Documento and Certificado médico the back one);
+  - Gastos → receipt; Compras → invoice.
+- Counter: *Nuevo socio/a* → staff alta (the photo on the **front** camera, the document on the back one).
+- Member area: the applicant form's photo (front) and ID (back).
+
+**On a desktop with no camera:** only *Elegir archivo* shows.
+
+**Answer:** _(pending)_

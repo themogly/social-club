@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\Batches\Schemas;
 
+use App\Filament\Forms\CameraOrFile;
 use App\Models\Genetic;
 use App\Models\Location;
 use App\Rules\GramAmount;
@@ -109,17 +110,17 @@ class BatchForm
                         DatePicker::make('expires_on')
                             ->label(__('Caducidad')),
 
-                        FileUpload::make('lab_report_path')
+                        CameraOrFile::field(FileUpload::make('lab_report_path')
                             ->label(__('Informe de laboratorio'))
                             ->disk('documents')
                             ->getUploadedFileUsing(DocumentUpload::withoutDirectUrl())
                             ->visibility('private')
                             ->maxSize(DocumentUpload::maxKilobytes())
-                            ->helperText(DocumentUpload::helperText()),
+                            ->helperText(DocumentUpload::helperText()), camera: 'environment', accept: 'image/*,application/pdf'),
 
                         // Photos of THIS harvest (278) — shown on the members' menu and the counter; public disk (a product
                         // photo is not personal data), resized on upload so the menu stays light.
-                        FileUpload::make('images')
+                        CameraOrFile::field(FileUpload::make('images')
                             ->label(__('Fotos del lote'))
                             ->image()
                             ->imageEditor()
@@ -129,7 +130,7 @@ class BatchForm
                             ->disk('public')
                             ->directory('batches')
                             ->multiple()
-                            ->columnSpanFull(),
+                            ->columnSpanFull(), camera: 'environment'),
 
                         Textarea::make('notes')
                             ->label(__('Notas'))

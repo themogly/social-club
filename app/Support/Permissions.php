@@ -263,7 +263,7 @@ class Permissions
             'stock.merma' => __('Registrar mermas'),
             'stock.transfer' => __('Trasladar stock entre sedes'),
             'stock.take' => __('Hacer recuentos de inventario'),
-            'articles.manage' => __('Gestionar artículos de barra y tienda'),
+            'articles.manage' => __('Gestionar productos de barra y tienda'),
             'discounts.manage' => __('Gestionar descuentos'),
             'wallet.adjust' => __('Ajustar monederos'),
             'till.open' => __('Abrir caja'),

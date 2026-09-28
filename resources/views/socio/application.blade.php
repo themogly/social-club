@@ -152,12 +152,8 @@
                     {{-- Optional identity photo (prompt 157). Never required — helps staff recognise the applicant
                          on arrival and shortens the first visit. The copy is honest about what it is for. --}}
                     <div>
-                        <label class="mb-1 block text-sm font-medium" for="photo">{{ __('Foto (opcional)') }}</label>
-                        <input id="photo" name="photo" @error('photo') aria-invalid="true" aria-describedby="photo-error" @enderror type="file" accept="image/*" capture="user"
-                               {{-- Prompt 217: `min-h-11` + vertical padding on the INPUT, so the whole row is the target rather
-                                    than the styled `file:` pseudo-button alone. Measured 316×36 before. --}}
-                               class="block min-h-11 w-full py-2 text-sm text-ink file:mr-3 file:min-h-9 file:rounded-lg file:border-0 file:bg-brand-tint file:px-3 file:py-2 file:text-sm file:font-medium file:text-brand dark:text-slate-200 dark:file:bg-slate-800 dark:file:text-slate-100">
-                        <x-socio.field-error name="photo" />
+                        {{-- Prompt 295 — Hacer foto (the front camera) or Elegir archivo, the counter's shared field. --}}
+                        <x-counter.file-field id="photo" name="photo" :label="__('Foto (opcional)')" accept="image/*" camera="user" />
                         <p class="mt-1 text-xs text-ink-muted dark:text-slate-400">{{ \App\Support\DocumentUpload::helperText(__('Ayuda a que te reconozcan al llegar. Se comparará contigo en el mostrador. Puedes omitirla y hacerla en la sede.')) }}</p>
                     </div>
 
@@ -171,12 +167,9 @@
                          application is never approved), because for Article 9 material that is a transparency
                          obligation, not a courtesy. --}}
                     <div>
-                        <label class="mb-1 block text-sm font-medium" for="document_scan">{{ __('Documento de identidad (opcional)') }}</label>
-                        <input id="document_scan" name="document_scan" @error('document_scan') aria-invalid="true" aria-describedby="document_scan-error" @enderror type="file" accept="image/*,application/pdf"
-                               {{-- Prompt 217: `min-h-11` + vertical padding on the INPUT, so the whole row is the target rather
-                                    than the styled `file:` pseudo-button alone. Measured 316×36 before. --}}
-                               class="block min-h-11 w-full py-2 text-sm text-ink file:mr-3 file:min-h-9 file:rounded-lg file:border-0 file:bg-brand-tint file:px-3 file:py-2 file:text-sm file:font-medium file:text-brand dark:text-slate-200 dark:file:bg-slate-800 dark:file:text-slate-100">
-                        <x-socio.field-error name="document_scan" />
+                        {{-- Prompt 295 — Hacer foto (the back camera) or Elegir archivo; the MRZ reader below still reads
+                             `#document_scan`, which is the field's own input whichever button filled it. --}}
+                        <x-counter.file-field id="document_scan" name="document_scan" :label="__('Documento de identidad (opcional)')" accept="image/*,application/pdf" camera="environment" />
                         <p class="mt-1 text-xs text-ink-muted dark:text-slate-400">{{ \App\Support\DocumentUpload::helperText(__('Foto o PDF de tu DNI, NIE o pasaporte. Se guarda cifrado, solo se abre con un enlace firmado y cada consulta queda registrada. Si tu solicitud no se aprueba, se borra. Puedes omitirlo y enseñarlo en el mostrador.')) }}</p>
 
                         {{-- Prompt 179 — read it here, on this device. `hidden` until the script mounts, so a

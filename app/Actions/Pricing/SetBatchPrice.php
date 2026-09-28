@@ -5,6 +5,7 @@ namespace App\Actions\Pricing;
 use App\Actions\RecordAuditLog;
 use App\Models\Batch;
 use App\Models\User;
+use App\Support\BelowCost;
 use Illuminate\Auth\Access\AuthorizationException;
 use InvalidArgumentException;
 
@@ -36,7 +37,12 @@ class SetBatchPrice
             'price_per_eighth_cents' => $isUnit ? null : $eighthCents,
         ])->save();
 
-        (new RecordAuditLog)->handle('batch.price.updated', $batch, $before, $batch->only(['price_per_gram_cents', 'price_per_unit_cents', 'price_per_eighth_cents']));
+        $after = $batch->only(['price_per_gram_cents', 'price_per_unit_cents', 'price_per_eighth_cents']);
+        if (BelowCost::forBatch($batch) !== []) {
+            $after['below_cost'] = true; // prompt 295 — set below the batch's cost, knowingly (a warning, never a block)
+        }
+
+        (new RecordAuditLog)->handle('batch.price.updated', $batch, $before, $after);
 
         return $batch;
     }

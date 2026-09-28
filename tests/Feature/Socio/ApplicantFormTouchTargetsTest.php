@@ -139,14 +139,20 @@ class ApplicantFormTouchTargetsTest extends TestCase
     {
         $xpath = $this->xpath($this->form());
 
+        // Prompt 295 — each field is two buttons (Hacer foto, Elegir archivo), each a label wrapping its hidden input:
+        // the LABEL is what the thumb hits, so it is what must clear the floor.
         foreach (['photo', 'document_scan'] as $name) {
             $input = $xpath->query('//input[@type="file"][@name="'.$name.'"]')->item(0);
+            $camera = $xpath->query('//input[@type="file"][@data-camera-for="'.$name.'"]')->item(0);
 
-            $this->assertInstanceOf(DOMElement::class, $input, "{$name} is missing");
-            $this->assertTrue(
-                $this->clearsTheFloor($input),
-                "{$name} is under the touch floor — pad the input, not the file: pseudo-button alone",
-            );
+            foreach (['Elegir archivo' => $input, 'Hacer foto' => $camera] as $button => $field) {
+                $this->assertInstanceOf(DOMElement::class, $field, "{$name}: {$button} is missing");
+                $label = $field->parentNode;
+                $this->assertTrue(
+                    $label instanceof DOMElement && $label->nodeName === 'label' && $this->clearsTheFloor($label),
+                    "{$name}: {$button} is under the touch floor",
+                );
+            }
         }
     }
 

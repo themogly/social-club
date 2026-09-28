@@ -292,7 +292,7 @@ class Dashboard extends BaseDashboard
                 'pending_applications' => [trans_choice(':count solicitud pendiente de revisión|:count solicitudes pendientes de revisión', $count, ['count' => $count]), Heroicon::OutlinedInbox],
                 'genetics_low_stock' => [trans_choice(':count variedad con stock bajo|:count variedades con stock bajo', $count, ['count' => $count]), Heroicon::OutlinedArchiveBoxXMark],
                 'association_stock_ceiling' => [__('La asociación tiene más stock en total (sedes y almacén) que el techo orientativo'), Heroicon::OutlinedArchiveBox],
-                'articles_low_stock' => [trans_choice(':count artículo de barra y tienda con stock bajo|:count artículos de barra y tienda con stock bajo', $count, ['count' => $count]), Heroicon::OutlinedShoppingBag],
+                'articles_low_stock' => [trans_choice(':count producto de barra y tienda con stock bajo|:count productos de barra y tienda con stock bajo', $count, ['count' => $count]), Heroicon::OutlinedShoppingBag],
                 'staff_open_shifts', 'staff_unclocked_activity' => [(string) $case?->label($count), Heroicon::OutlinedClock],
                 default => [$case?->label($count) ?? __('Aviso'), Heroicon::OutlinedBell],
             };

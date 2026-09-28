@@ -172,6 +172,10 @@ glossary in `DECISIONS.md`; never let "translate" slip into commercial framing (
   `app/Livewire/Counter/TillSession.php` (till open + cash movements + BLIND close), and
   `app/Livewire/Counter/DispensaryPos.php` (member-first weight POS — a THIN shell that only resolves
   + calls the Actions; idempotency key per basket, fail-closed offline, no member ⇒ no commit).
+- Photo / scan uploads (prompt 295): two buttons, *Hacer foto* (`capture` = `user` for a face, `environment` otherwise)
+  and *Elegir archivo* (never `capture`), one field. Panel: `app/Filament/Forms/CameraOrFile.php`; counter and member
+  area: `x-counter.file-field camera="…"` + `resources/js/photo-buttons.js`. Every upload site is classified in
+  `CameraOrFileTest`. Below-cost prices: `app/Support/BelowCost.php` + `app/Filament/Concerns/WarnsBelowCost.php`.
 - Counter round-trip budget (prompt 293): a part of a counter screen that rarely changes is a Livewire island re-sent
   only when its data changes — `@island('…', always: $this->islandChanged('…'))` with
   `app/Livewire/Counter/Concerns/RendersIslandsOnChange.php` (not a targeted `renderIsland()`: 4.4.6 registers islands

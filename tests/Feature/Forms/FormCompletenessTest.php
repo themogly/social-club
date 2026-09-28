@@ -83,6 +83,7 @@ class FormCompletenessTest extends TestCase
         ArticleResource::class => [
             // location_id is now a required field on the form (prompt 294) — no longer scope-filled.
             'price_cents' => 'entered as euros via price_eur (MoneyCast at the edge).',
+            'category_id' => 'off the form (prompt 295): nothing in the app can create a product category, so it was always empty; the column and existing values stay.',
         ],
         BatchResource::class => [
             // location_id is now a required field on the form (prompt 238) — no longer scope-filled.

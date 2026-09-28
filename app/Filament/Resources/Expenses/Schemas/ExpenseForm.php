@@ -3,6 +3,7 @@
 namespace App\Filament\Resources\Expenses\Schemas;
 
 use App\Enums\ExpensePaidFrom;
+use App\Filament\Forms\CameraOrFile;
 use App\Models\Location;
 use App\Support\DocumentUpload;
 use Filament\Forms\Components\DatePicker;
@@ -91,14 +92,14 @@ class ExpenseForm
                             ->label(__('Nota'))
                             ->columnSpanFull(),
 
-                        FileUpload::make('receipt_path')
+                        CameraOrFile::field(FileUpload::make('receipt_path')
                             ->label(__('Justificante'))
                             ->disk('documents')
                             ->getUploadedFileUsing(DocumentUpload::withoutDirectUrl())
                             ->visibility('private')
                             ->maxSize(DocumentUpload::maxKilobytes())
                             ->helperText(DocumentUpload::helperText())
-                            ->columnSpanFull(),
+                            ->columnSpanFull(), camera: 'environment', accept: 'image/*,application/pdf'),
 
                         Placeholder::make('staff_payment_notice')
                             ->label(__('Aviso sobre pagos de personal'))

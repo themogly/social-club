@@ -83,7 +83,7 @@ enum DashboardAlert: string
             self::MEMBERSHIPS_EXPIRING => trans_choice(':count membresía vence pronto|:count membresías vencen pronto', $count, ['count' => $count]),
             self::PENDING_APPLICATIONS => trans_choice(':count solicitud pendiente|:count solicitudes pendientes', $count, ['count' => $count]),
             self::GENETICS_LOW_STOCK => trans_choice(':count variedad con stock bajo|:count variedades con stock bajo', $count, ['count' => $count]),
-            self::ARTICLES_LOW_STOCK => trans_choice(':count artículo de barra y tienda con stock bajo|:count artículos de barra y tienda con stock bajo', $count, ['count' => $count]),
+            self::ARTICLES_LOW_STOCK => trans_choice(':count producto de barra y tienda con stock bajo|:count productos de barra y tienda con stock bajo', $count, ['count' => $count]),
             self::ASSOCIATION_STOCK_CEILING => __('La asociación tiene más stock en total (sedes y almacén) que el techo orientativo'),
             self::STAFF_OPEN_SHIFTS => trans_choice(':count jornada sin fichar salida|:count jornadas sin fichar salida', $count, ['count' => $count]),
             self::STAFF_UNCLOCKED_ACTIVITY => trans_choice(':count día con actividad sin fichar|:count días con actividad sin fichar', $count, ['count' => $count]),

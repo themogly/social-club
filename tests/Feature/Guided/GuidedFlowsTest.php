@@ -199,8 +199,8 @@ class GuidedFlowsTest extends TestCase
 
         $genetic = Genetic::query()->where('name', 'Nueva Cepa')->firstOrFail();
 
-        // Redirected to the genetic's own page, and COMPLETE — no 'no_price'/'no_stock' gap left behind.
-        $component->assertRedirect(GeneticResource::getUrl('edit', ['record' => $genetic]));
+        // Back to the strains list (prompt 295, Shane), and COMPLETE — no 'no_price'/'no_stock' gap left behind.
+        $component->assertRedirect(GeneticResource::getUrl('index'));
         $this->assertNull($genetic->completenessReason());
 
         // And you can no longer create an incomplete one: a name-only submit is REFUSED, nothing is saved.

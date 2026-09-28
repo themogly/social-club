@@ -87,18 +87,18 @@
         {{-- THE TWO UPLOADS (prompt 215). The counter nags about a missing photo on three screens and the form
              staff use to create members could not capture one — the sharpest of the four omissions.
 
-             `capture="user"` / `capture="environment"` asks a device WITH a camera to open it and is ignored by
+             `capture="user"` / `camera="environment"` asks a device WITH a camera to open it and is ignored by
              one without, so this is the same progressive enhancement 157 and 179 built: the file input is
              always there and the form is usable with no camera at all. Both files go through
              `SubmitApplication` to `DocumentVault` — encrypted before write, private disk, signed
              access-logged URL — whichever form uploaded them. --}}
         <div class="grid gap-2.5 sm:grid-cols-2">
             <div>
-                <x-counter.file-field id="alta-photo" :label="__('Foto (opcional)')" wire:model="altaPhoto" accept="image/*" capture="user" data-alta-photo="" :hint="__('Se compara con la persona en el mostrador. Puedes omitirla.')" />
+                <x-counter.file-field id="alta-photo" :label="__('Foto (opcional)')" wire:model="altaPhoto" accept="image/*" camera="user" data-alta-photo="" :hint="__('Se compara con la persona en el mostrador. Puedes omitirla.')" />
             </div>
 
             <div>
-                <x-counter.file-field id="alta-scan" :label="__('Documento de identidad (opcional)')" wire:model="altaDocumentScan" accept="image/*,application/pdf" capture="environment" data-alta-scan="" :hint="__('Se guarda cifrado y cada consulta queda registrada.')" />
+                <x-counter.file-field id="alta-scan" :label="__('Documento de identidad (opcional)')" wire:model="altaDocumentScan" accept="image/*,application/pdf" camera="environment" data-alta-scan="" :hint="__('Se guarda cifrado y cada consulta queda registrada.')" />
             </div>
         </div>
 
@@ -203,7 +203,7 @@
             <x-socio.field-error name="altaForm.is_therapeutic" />
 
             <div x-show="therapeutic" x-cloak class="mt-3">
-                <x-counter.file-field id="alta-medical-cert" :label="__('Certificado médico (opcional)')" wire:model="altaMedicalCert" accept="image/*,application/pdf" capture="environment" data-alta-medical-cert="" :hint="__('La prueba del uso terapéutico. Se guarda cifrada, como el documento de identidad.')" />
+                <x-counter.file-field id="alta-medical-cert" :label="__('Certificado médico (opcional)')" wire:model="altaMedicalCert" accept="image/*,application/pdf" camera="environment" data-alta-medical-cert="" :hint="__('La prueba del uso terapéutico. Se guarda cifrada, como el documento de identidad.')" />
             </div>
         </div>
 

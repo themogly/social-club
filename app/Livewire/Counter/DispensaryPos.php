@@ -837,7 +837,7 @@ class DispensaryPos extends Component
         }
 
         if ($this->barBasket !== [] && ! $this->userCan('pos.bar')) {
-            $this->flash(__('Hay artículos de barra en la visita: los cobra alguien con permiso de barra.'), 'error');
+            $this->flash(__('Hay productos de barra en la visita: los cobra alguien con permiso de barra.'), 'error');
 
             return;
         }

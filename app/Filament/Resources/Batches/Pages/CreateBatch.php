@@ -3,10 +3,12 @@
 namespace App\Filament\Resources\Batches\Pages;
 
 use App\Actions\Stock\IntakeBatch;
+use App\Filament\Concerns\WarnsBelowCost;
 use App\Filament\Resources\Batches\BatchResource;
 use App\Models\Genetic;
 use App\Models\Location;
 use App\Support\ActiveScope;
+use App\Support\BelowCost;
 use App\Support\Money;
 use App\Support\Weight;
 use Filament\Notifications\Notification;
@@ -16,6 +18,8 @@ use Illuminate\Database\Eloquent\Model;
 
 class CreateBatch extends CreateRecord
 {
+    use WarnsBelowCost;
+
     protected static string $resource = BatchResource::class;
 
     private Genetic $intakeGenetic;
@@ -99,5 +103,32 @@ class CreateBatch extends CreateRecord
                 'genetic' => $this->intakeGenetic->name,
                 'sede' => $this->intakeLocation->name,
             ]));
+    }
+
+    /** @return list<array{field: string, price_cents: int, cost_cents: int, line: string}> */
+    protected function belowCostOffences(): array
+    {
+        $genetic = filled($this->data['genetic_id'] ?? null) ? Genetic::query()->find($this->data['genetic_id']) : null;
+        $unit = $genetic?->isUnitType() ?? false;
+        $sale = self::typedCents($this->data['sale_price_eur'] ?? null);
+
+        return BelowCost::offences(
+            self::typedCents($this->data['cost_per_gram_eur'] ?? null),
+            $unit ? null : $sale,
+            $unit ? $sale : null,
+            $unit ? null : self::typedCents($this->data['price_per_eighth_eur'] ?? null),
+            $genetic?->grams_per_unit_cg !== null ? (int) $genetic->grams_per_unit_cg : null,
+        );
+    }
+
+    protected function belowCostField(string $offence): string
+    {
+        return $offence === 'per_eighth' ? 'price_per_eighth_eur' : 'sale_price_eur';
+    }
+
+    /** Back to the list (prompt 295, Shane's note on the catalogue's create pages). */
+    protected function getRedirectUrl(): string
+    {
+        return $this->getResource()::getUrl('index');
     }
 }

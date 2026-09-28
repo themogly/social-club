@@ -13,7 +13,7 @@ enum CategoryAppliesTo: string implements HasLabel
     {
         return match ($this) {
             self::GENETIC => __('Genética'),
-            self::ARTICLE => __('Artículo'),
+            self::ARTICLE => __('Producto'),
         };
     }
 

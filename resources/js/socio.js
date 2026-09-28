@@ -23,6 +23,7 @@
 // NOT loaded on counter routes: Livewire starts its own bundled Alpine there, and two Alpines on one page is
 // a documented breakage.
 import Alpine from 'alpinejs';
+import './photo-buttons.js';
 
 window.Alpine = Alpine;
 Alpine.start();

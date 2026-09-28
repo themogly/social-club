@@ -65,7 +65,7 @@ class RecordStockMovement
             } else {
                 $new = $locked->stock + $delta;
                 if ($new < 0) {
-                    throw new RuntimeException(__('Stock insuficiente para el artículo :name.', ['name' => $locked->name]));
+                    throw new RuntimeException(__('Stock insuficiente para el producto :name.', ['name' => $locked->name]));
                 }
                 $locked->stock = $new;
             }

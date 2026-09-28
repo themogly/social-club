@@ -391,9 +391,9 @@
                                 x-model="search.bar"
                                 x-show="source === 'bar'"
                                 x-cloak
-                                aria-label="{{ __('Buscar artículo…') }}"
+                                aria-label="{{ __('Buscar producto…') }}"
                                 autocomplete="off"
-                                placeholder="{{ __('Buscar artículo…') }}"
+                                placeholder="{{ __('Buscar producto…') }}"
                                 class="h-11 w-full rounded-xl border border-line bg-surface px-4 text-sm text-ink placeholder:text-ink-muted focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/40 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 sm:w-56"
                             >
                         @endif
@@ -481,7 +481,7 @@
                                 @endforeach
                             </div>
                             <p x-show="! anyVisible('bar')" x-cloak class="mt-4 rounded-xl border border-dashed border-line px-4 py-6 text-center text-sm text-ink-muted dark:border-slate-700 dark:text-slate-400">
-                                {{ empty($bar['rows']) ? __('No hay artículos disponibles en esta sede.') : __('Ningún artículo coincide con la búsqueda.') }}
+                                {{ empty($bar['rows']) ? __('No hay productos disponibles en esta sede.') : __('Ningún producto coincide con la búsqueda.') }}
                             </p>
                         </div>
                     @endif
@@ -785,8 +785,8 @@
                                  dispensario source the operator has to be told WHERE the bar is, and on the
                                  barra source they are already there and need to know the tap will land. --}}
                             @unless ($hasBarLines)
-                                <p class="mt-2 text-xs text-ink-muted dark:text-slate-400" x-show="$store.counterCatalogue.source === 'bar'" x-cloak>{{ __('Toca un artículo para añadirlo a esta visita.') }}</p>
-                                <p class="mt-2 text-xs text-ink-muted dark:text-slate-400" x-show="$store.counterCatalogue.source !== 'bar'">{{ __('Cambia a Barra arriba para añadir artículos a esta visita.') }}</p>
+                                <p class="mt-2 text-xs text-ink-muted dark:text-slate-400" x-show="$store.counterCatalogue.source === 'bar'" x-cloak>{{ __('Toca un producto para añadirlo a esta visita.') }}</p>
+                                <p class="mt-2 text-xs text-ink-muted dark:text-slate-400" x-show="$store.counterCatalogue.source !== 'bar'">{{ __('Cambia a Barra arriba para añadir productos a esta visita.') }}</p>
                             @endunless
 
                             @if ($hasBarLines)
