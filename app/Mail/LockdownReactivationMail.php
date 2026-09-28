@@ -5,21 +5,16 @@ namespace App\Mail;
 use App\Models\OrganisationLockdown;
 use App\Models\User;
 use App\Support\Settings;
-use Illuminate\Bus\Queueable;
-use Illuminate\Mail\Mailable;
 use Illuminate\Mail\Mailables\Content;
 use Illuminate\Mail\Mailables\Envelope;
-use Illuminate\Queue\SerializesModels;
 
 /**
  * The owner "way back" (prompt 121): a single-use reactivation link sent to an owner's own inbox, so a lockdown
  * can be lifted OFF the terminal. The raw token lives only in this email (its hash is what the DB stores). A
  * drill says so in the subject and body so a rehearsal is never mistaken for the real thing.
  */
-class LockdownReactivationMail extends Mailable
+class LockdownReactivationMail extends ClubMail
 {
-    use Queueable, SerializesModels;
-
     public function __construct(
         public User $owner,
         public OrganisationLockdown $lockdown,

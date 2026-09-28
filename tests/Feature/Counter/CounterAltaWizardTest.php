@@ -9,7 +9,9 @@ use App\Enums\ApplicationStatus;
 use App\Enums\MemberStatus;
 use App\Enums\Role;
 use App\Livewire\Counter\MembershipCounter;
+use App\Mail\ApplicationApprovedMail;
 use App\Mail\ApplicationInviteMail;
+use App\Mail\MemberCardMail;
 use App\Models\Location;
 use App\Models\Member;
 use App\Models\MemberApplication;
@@ -115,6 +117,31 @@ class CounterAltaWizardTest extends TestCase
     }
 
     // --- the whole flow, by a STAFF member with no manager ---------------------------------------------
+
+    /** Prompt 288 — approving at the counter sends the SAME two emails as the panel: approved first, then the card. */
+    public function test_approving_at_the_counter_sends_the_approved_email_then_the_card(): void
+    {
+        Mail::fake();
+        $staff = $this->staff();
+        $tier = $this->tier();
+
+        Livewire::test(MembershipCounter::class)->call('toggleAlta')
+            ->set('altaInviteEmail', 'lucia@example.es')->call('sendAltaInvitation');
+        $application = $this->latestApplication();
+        $this->fillInTheForm($application);
+        CounterOperator::set($staff);
+
+        Livewire::test(MembershipCounter::class)->call('toggleAlta')
+            ->call('reviewAltaApplication', $application->id)
+            ->set('altaTierId', $tier->id)
+            ->call('approveAlta');
+
+        $order = collect((fn (): array => $this->queuedMailables)->call(Mail::getFacadeRoot()))
+            ->map(fn (object $mail): string => $mail::class)
+            ->reject(fn (string $class): bool => $class === ApplicationInviteMail::class)
+            ->values()->all();
+        $this->assertSame([ApplicationApprovedMail::class, MemberCardMail::class], $order);
+    }
 
     public function test_a_staff_member_completes_the_whole_flow(): void
     {

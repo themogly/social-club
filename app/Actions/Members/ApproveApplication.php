@@ -3,15 +3,18 @@
 namespace App\Actions\Members;
 
 use App\Actions\RecordAuditLog;
+use App\Actions\ResolveLocale;
 use App\Enums\ApplicationStatus;
 use App\Enums\ConsentChannel;
 use App\Exceptions\DuplicateMemberException;
+use App\Mail\ApplicationApprovedMail;
 use App\Models\Member;
 use App\Models\MemberApplication;
 use App\Support\ActiveScope;
 use App\Support\MemberEligibility;
 use App\Support\MemberEnrolment;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Mail;
 use RuntimeException;
 
 /**
@@ -89,6 +92,9 @@ class ApproveApplication
             // The medical certificate behind a therapeutic member (prompt 244), same vault object the applicant
             // uploaded — approval points at it, AnonymiseMember disposes of it. Null when not therapeutic / skipped.
             'medical_cert_path' => $payload['medical_cert_path'] ?? null,
+            // Prompt 288 — the language they applied in (stamped at submit) becomes the member's own: their emails,
+            // card and member app follow it. Null (the club default) when the payload predates it.
+            'locale' => in_array($payload['consent_locale'] ?? null, ['en', 'es'], true) ? $payload['consent_locale'] : null,
         ]);
         $member->organisation_id = $application->organisation_id;
         // Shared enrolment defaults — the SAME source the direct-create form fills, so the
@@ -134,6 +140,15 @@ class ApproveApplication
         ]);
 
         (new RecordAuditLog)->handle('application.approved', $member, null, ['application_id' => $application->id]);
+
+        // Prompt 288 — the "approved" email belongs HERE, beside the card, so every approval sends the same two emails:
+        // it used to be queued by the panel's approve action only, and a counter approval (174's path) never sent it.
+        // Approved FIRST, then the card, in the order its wording promises ("recibirás tu carné en un correo aparte").
+        if (filled($member->email)) {
+            Mail::to((string) $member->email)
+                ->locale((new ResolveLocale)->handle($member))
+                ->queue(new ApplicationApprovedMail($member->fullName(), (string) $member->member_no));
+        }
 
         // Send the QR card automatically (prompt 85). Called ONCE here — the member is fully created; the
         // admin CreateMember page's afterCreate does not run on this path, so there is no double-send.

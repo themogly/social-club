@@ -4,6 +4,7 @@ namespace App\Filament\Resources\MemberApplications;
 
 use App\Actions\Members\ApproveApplication;
 use App\Actions\Members\SendApplicationInvite;
+use App\Actions\ResolveLocale;
 use App\Enums\ApplicationStatus;
 use App\Filament\Resources\MemberApplications\Pages\EditMemberApplication;
 use App\Filament\Resources\MemberApplications\Pages\ListMemberApplications;
@@ -11,7 +12,6 @@ use App\Filament\Resources\MemberApplications\Pages\ViewMemberApplication;
 use App\Filament\Resources\MemberApplications\Schemas\MemberApplicationForm;
 use App\Filament\Resources\MemberApplications\Schemas\MemberApplicationInfolist;
 use App\Filament\Resources\MemberApplications\Tables\MemberApplicationsTable;
-use App\Mail\ApplicationApprovedMail;
 use App\Mail\ApplicationRejectedMail;
 use App\Models\MemberApplication;
 use BackedEnum;
@@ -118,11 +118,8 @@ class MemberApplicationResource extends Resource
             ->visible(fn (MemberApplication $record): bool => self::isDecidable($record))
             ->action(function (array $data, MemberApplication $record): void {
                 try {
-                    $member = (new ApproveApplication)->handle($record, allowDuplicate: (bool) ($data['allow_duplicate'] ?? false));
-
-                    if ($member->email !== null) {
-                        Mail::to($member->email)->queue(new ApplicationApprovedMail($member->fullName(), (string) $member->member_no));
-                    }
+                    // The approved email and the card are both sent by ApproveApplication (prompt 288) — never here too.
+                    (new ApproveApplication)->handle($record, allowDuplicate: (bool) ($data['allow_duplicate'] ?? false));
 
                     Notification::make()
                         ->title(__('Solicitud aprobada'))
@@ -163,7 +160,11 @@ class MemberApplicationResource extends Resource
                 $email = data_get($record->payload, 'email');
                 if (is_string($email) && $email !== '') {
                     $name = trim((string) data_get($record->payload, 'first_name').' '.(string) data_get($record->payload, 'last_name'));
-                    Mail::to($email)->queue(new ApplicationRejectedMail($name !== '' ? $name : $email, is_string($reason) ? $reason : null));
+                    // In the language they applied in (prompt 288), else the club default — never the worker's.
+                    $applied = data_get($record->payload, 'consent_locale');
+                    Mail::to($email)
+                        ->locale(in_array($applied, ['en', 'es'], true) ? $applied : (new ResolveLocale)->handle())
+                        ->queue(new ApplicationRejectedMail($name !== '' ? $name : $email, is_string($reason) ? $reason : null));
                 }
 
                 Notification::make()

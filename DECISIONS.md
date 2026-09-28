@@ -15068,3 +15068,70 @@ screenshots `storage/app/screenshots/285/`):
   Screenshots are in `storage/app/screenshots/287/`. The panel's Invitar is covered by the feature test (same sender).
 - **For Ben, before this ships:** invitations already sent from the counter have valid links, but nobody received an
   email. In the panel under Solicitudes, use **Reenviar** on the outstanding ones that have an address.
+
+## Prompt 288 — Every email the system promises, actually sent
+
+**The inventory, final state.** Web Push is not email and is out of scope.
+
+| Email | Sent from | Queued, retried, after-commit (`ClubMail`) | Recipient's language |
+|---|---|---|---|
+| `ApplicationInviteMail` | `SendApplicationInvite` ← panel Invitar/Reenviar, counter invite + Reenviar (287) | yes | actor → club default (as before) |
+| `ApplicationApprovedMail` | **`ApproveApplication`** (every approval, panel and counter) | yes | **member's** (new) |
+| `ApplicationRejectedMail` | panel Rechazar | yes | **the language they applied in**, else the club default (new) |
+| `MemberCardMail` | `SendMemberCard` ← `ApproveApplication`, `CreateMember`, Reenviar carné | yes | member's |
+| `MemberLoginLinkMail` | `IssueMemberLoginLink` | yes | **member's** (new) |
+| `DispensationReceiptMail` | counter "Enviar comprobante" | yes | member's |
+| `MembershipReminderMail` | `memberships:sweep` | yes | member's |
+| `ConvocatoriaMail` | `IssueConvocatoria` | yes | recipient's |
+| `LockdownReactivationMail` | `InitiateLockdown`, after its transaction | yes | **owner's** (new) |
+| Filament password reset | panel "¿Olvidaste tu contraseña?" | Filament's own queued notification | — |
+| `ExampleClubMail` | `/dev/mail` only | — (a preview) | — |
+
+- **A — the approved email moves into `ApproveApplication`**, beside `SendMemberCard`, approved first and then the card
+  (the order its wording promises). It was queued by the panel's approve action only, so a counter approval (174's
+  path) never sent it. The panel's inline send is gone, so there is exactly one of each per approval. Approval also now
+  copies the applicant's submission language (`consent_locale`, stamped at submit) onto the new member's `locale`, so
+  their emails, card and member app follow it (null → club default, as before).
+- **B — locales pinned** on the approved email, the login link, the rejection (payload `consent_locale`, else the club
+  default) and the lockdown mail (owner's). A queued mail renders in the worker, which has no session.
+- **C — retries live per mailable, not globally.** `App\Mail\ClubMail` (every mailable except `ExampleClubMail`) sets:
+  - `tries = 4`, `backoff() = [30, 120, 600]`, so a network hiccup or a Resend 429 recovers within ~12 minutes;
+  - `ShouldQueueAfterCommit`, so a mail never leaves before its rows commit (`MemberCardMail`/`MemberLoginLinkMail`
+    serialise a Member);
+  - `failed()`, which writes `mail.failed` with the class (never the address) so a lost email shows in the club's own
+    records.
+
+  Horizon's `supervisor-1` keeps `tries => 1` because other jobs may not be safe to retry; mail can decide for itself.
+  Because club mail now queues itself, `MailRenderTest` renders with `sendNow()`.
+- **D — the lockdown mail** was already queued after `InitiateLockdown`'s transaction. It now also has after-commit
+  (for an outer transaction), the owner's locale and the retries. A test runs it on the real `database` queue driver: a
+  rolled-back lockdown leaves no job, and a committed one leaves exactly one.
+- **E — password reset**, tested end to end: the notification goes to the normalised email, and its link is built on
+  `APP_URL`. It is a queued notification, so a transport failure happens in the worker. Failing to hand it to the queue
+  (Redis down) is now a readable message on the form ("No se pudo enviar el correo ahora mismo…"), never a 500.
+- **F — can mail work at all?**
+  - **`php artisan csc:mail-test {email}`** sends one plain message synchronously and prints "Enviado" or the
+    transport's own error (exit 1). It records no address.
+  - The *Salud del sistema* Correo row is graded: **red** for a `log`/`array` mailer in production or an API mailer
+    without its key; **amber** for an `example.com` sender; it also counts mail jobs failed in the last 7 days, by
+    mailable, from `failed_jobs`. It reads configuration only and never sends.
+  - The runbook's `RESEND_KEY` error was already corrected in `SETUP.md` and `.env.example` (see the earlier entry).
+    The only remaining mention is the original build brief (`prompts/00-bootstrap-brief.md`), a historical record left
+    as written.
+- **The guard, `tests/Feature/Mail/MailInventoryTest`:**
+  - every mailable has a production sender;
+  - every mailable extends `ClubMail` with the retry/after-commit settings;
+  - every `Mail::to()->queue()` in app code chains `->locale()` (comments are stripped first, so a docblock is not a
+    send);
+  - every UI string claiming an email went out is listed with the send that makes it true, and a new one fails the test
+    until it is added.
+- Tests: `EveryEmailSentTest` (10), `MailInventoryTest` (4) and a counter approval test in `CounterAltaWizardTest`, all
+  seen red first. The password-reset failure test was split from the link test because the broker throttles a repeat
+  request for the same user within a minute.
+- Verified on a throwaway database with the real `log` transport and a sync queue: an English applicant's approval wrote
+  "Your application has been approved", then "Your membership card", then "Your access link" for the login link. **Not
+  done:** stopping Redis mid-send to watch a retry. The retry settings are asserted on the class, and the queue driver
+  applies them. The health page's grading is covered by feature tests rather than a screenshot.
+- Found while checking, not fixed here: on a **demo-seeded** database the first real approval collides with a seeded
+  member number (`members.organisation_id + member_no` unique). The demo seeder writes member numbers without advancing
+  the sequence. It's a seeding bug only (production has no demo data); worth its own prompt.

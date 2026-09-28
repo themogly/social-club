@@ -3,11 +3,8 @@
 namespace App\Mail;
 
 use App\Support\OrganisationIdentity;
-use Illuminate\Bus\Queueable;
-use Illuminate\Mail\Mailable;
 use Illuminate\Mail\Mailables\Content;
 use Illuminate\Mail\Mailables\Envelope;
-use Illuminate\Queue\SerializesModels;
 
 /**
  * Prompt 45 — emails a prospect their tokenised pre-registration invite link (the ONE public member
@@ -15,10 +12,8 @@ use Illuminate\Queue\SerializesModels;
  * token hash. Carries scalars so the /dev/mail preview + render test need no database, and a resend
  * reuses the SAME token by rebuilding the URL.
  */
-class ApplicationInviteMail extends Mailable
+class ApplicationInviteMail extends ClubMail
 {
-    use Queueable, SerializesModels;
-
     public function __construct(public string $url, public string $expiresOn) {}
 
     public function envelope(): Envelope

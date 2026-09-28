@@ -3,20 +3,15 @@
 namespace App\Mail;
 
 use App\Support\OrganisationIdentity;
-use Illuminate\Bus\Queueable;
-use Illuminate\Mail\Mailable;
 use Illuminate\Mail\Mailables\Content;
 use Illuminate\Mail\Mailables\Envelope;
-use Illuminate\Queue\SerializesModels;
 
 /**
  * Sent when a pre-registration is REJECTED. A reason is included where one was
  * recorded; the tone is factual, never promotional.
  */
-class ApplicationRejectedMail extends Mailable
+class ApplicationRejectedMail extends ClubMail
 {
-    use Queueable, SerializesModels;
-
     public function __construct(public string $applicantName, public ?string $reason = null) {}
 
     public function envelope(): Envelope

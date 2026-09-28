@@ -47,7 +47,7 @@ class MailRenderTest extends TestCase
         $this->assertNotEmpty($previews, 'There should be at least one registered mailable.');
 
         foreach ($previews as $key => $mailable) {
-            $mailer->to('socia@example.test')->send($mailable);
+            $mailer->to('socia@example.test')->sendNow($mailable); // render now: club mail queues itself (prompt 288)
             $email = $transport->messages()->last()->getOriginalMessage();
             $html = (string) $email->getHtmlBody();
             $text = (string) $email->getTextBody();

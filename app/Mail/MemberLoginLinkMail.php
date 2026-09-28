@@ -5,20 +5,15 @@ namespace App\Mail;
 use App\Models\Member;
 use App\Support\OrganisationIdentity;
 use App\Support\Settings;
-use Illuminate\Bus\Queueable;
-use Illuminate\Mail\Mailable;
 use Illuminate\Mail\Mailables\Content;
 use Illuminate\Mail\Mailables\Envelope;
-use Illuminate\Queue\SerializesModels;
 
 /**
  * Passwordless access to the member PWA — a single-use, short-lived magic link. The
  * raw token lives only in this email (its hash is what the database stores).
  */
-class MemberLoginLinkMail extends Mailable
+class MemberLoginLinkMail extends ClubMail
 {
-    use Queueable, SerializesModels;
-
     public function __construct(public Member $member, public string $token) {}
 
     public function envelope(): Envelope
