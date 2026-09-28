@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\CspReportController;
 use App\Http\Middleware\EndInactiveSessions;
 use App\Http\Middleware\EnforceCounterHandover;
 use App\Http\Middleware\EnforceOrgLockdown;
@@ -24,6 +25,11 @@ return Application::configure(basePath: dirname(__DIR__))
         then: function (): void {
             // Developer-only routes (gated to local by middleware inside the file).
             Route::middleware('web')->group(__DIR__.'/../routes/dev.php');
+
+            // The Content-Security-Policy's report stream (prompt 270): browsers post without a CSRF token or a session,
+            // so it sits OUTSIDE the web group (post-296 audit A·7 — inside it every report started a session row).
+            // Throttled per IP; TRUSTED_PROXIES must not be '*' in production or that key is spoofable.
+            Route::post('csp-report', CspReportController::class)->middleware('throttle:60,1')->name('csp.report');
         },
     )
     ->withMiddleware(function (Middleware $middleware): void {

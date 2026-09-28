@@ -252,9 +252,10 @@ class MemberApplicationResource extends Resource
                 && $record->inviteUrl() !== null
                 && (Auth::user()?->can('applications.review') ?? false))
             ->action(function (MemberApplication $record): void {
-                (new SendApplicationInvite)->handle($record)
+                $sender = new SendApplicationInvite;
+                $sender->handle($record)
                     ? Notification::make()->title(__('Invitación reenviada (en cola)'))->success()->send()
-                    : Notification::make()->title(__('No se pudo reenviar'))->danger()->send();
+                    : Notification::make()->title($sender->refusal ?? __('No se pudo reenviar'))->danger()->send();
             });
     }
 

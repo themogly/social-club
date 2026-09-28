@@ -266,7 +266,7 @@ class BatchesTable
 
                 if ($offences !== []) {
                     $action->getLivewire()->mountAction('belowCost', [
-                        'batch' => $record->getKey(), 'rate' => $rate, 'eighth' => $eighth,
+                        'rate' => $rate, 'eighth' => $eighth,
                         'lines' => array_column($offences, 'line'),
                         'field' => $offences[0]['field'] === 'per_eighth' ? 'eighth_eur' : 'rate_eur',
                     ]);
@@ -295,8 +295,12 @@ class BatchesTable
             ->extraModalWindowAttributes(ReturnFocus::listener())
             ->modalAutofocus(false)
             ->cancelParentActions()
-            ->action(function (array $arguments): void {
-                self::savePrice(Batch::query()->findOrFail($arguments['batch']), (int) $arguments['rate'], $arguments['eighth'] !== null ? (int) $arguments['eighth'] : null);
+            ->action(function (Action $action, array $arguments): void {
+                // Post-296 audit (P3-1) — the batch is the record whose Precio was opened, never the client-editable
+                // argument (the rate is just a price the same person could have typed).
+                $batch = $action->getParentAction()?->getRecord();
+                abort_unless($batch instanceof Batch, 403);
+                self::savePrice($batch, (int) $arguments['rate'], $arguments['eighth'] !== null ? (int) $arguments['eighth'] : null);
             });
     }
 
