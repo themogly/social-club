@@ -1,4 +1,12 @@
-@props(['footfall' => ['matrix' => [], 'max' => 0]])
+{{-- Prompt 285 — the same grid also draws staff COVERAGE (minutes staffed per hour × weekday) beside member footfall.
+     The defaults are footfall's, unchanged; `unit="minutes"` formats cells as durations and the label/empty copy are
+     the caller's. --}}
+@props([
+    'footfall' => ['matrix' => [], 'max' => 0],
+    'unit' => 'count',
+    'label' => null,
+    'empty' => null,
+])
 
 @php
     $matrix = $footfall['matrix'] ?? [];
@@ -6,15 +14,16 @@
     // Footfall is keyed 0=Sun..6=Sat; present it Monday-first.
     $order = [1, 2, 3, 4, 5, 6, 0];
     $days = [__('Lun'), __('Mar'), __('Mié'), __('Jue'), __('Vie'), __('Sáb'), __('Dom')];
+    $show = fn (int $value): string => $unit === 'minutes' ? \App\Support\Duration::format($value) : (string) $value;
 @endphp
 
 @if (($footfall['max'] ?? 0) === 0)
-    <x-dashboard.empty :message="__('Sin entradas registradas en el período')" :icon="\Filament\Support\Icons\Heroicon::OutlinedClock" />
+    <x-dashboard.empty :message="$empty ?? __('Sin entradas registradas en el período')" :icon="\Filament\Support\Icons\Heroicon::OutlinedClock" />
 @else
     <div class="csc-heat-wrap">
         {{-- role=img + label give screen readers a text alternative for the colour grid;
              each cell still carries a title tooltip with its day/hour/count for pointer users. --}}
-        <div class="csc-heat" role="img" aria-label="{{ __('Mapa de calor de afluencia por día de la semana y franja horaria') }}">
+        <div class="csc-heat" role="img" aria-label="{{ $label ?? __('Mapa de calor de afluencia por día de la semana y franja horaria') }}">
             <div class="csc-heat-corner" aria-hidden="true"></div>
             @for ($h = 0; $h < 24; $h++)
                 <div class="csc-heat-hour">{{ $h % 3 === 0 ? $h : '' }}</div>
@@ -27,7 +36,7 @@
                         $value = (int) ($matrix[$weekday][$h] ?? 0);
                         $opacity = $value > 0 ? round(0.15 + 0.85 * ($value / $max), 3) : 0;
                     @endphp
-                    <div class="csc-heat-cell" style="--op: {{ $opacity }}" title="{{ $days[$index] }} · {{ $h }}:00 · {{ $value }}"></div>
+                    <div class="csc-heat-cell" style="--op: {{ $opacity }}" title="{{ $days[$index] }} · {{ $h }}:00 · {{ $show($value) }}"></div>
                 @endfor
             @endforeach
         </div>

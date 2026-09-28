@@ -22,6 +22,7 @@ use App\Filament\Pages\Reports\ConsumptionReportPage;
 use App\Filament\Pages\Reports\DebtorReportPage;
 use App\Filament\Pages\Reports\FinancialReportPage;
 use App\Filament\Pages\Reports\MembersReportPage;
+use App\Filament\Pages\Reports\StaffHoursReportPage;
 use App\Filament\Pages\Reports\StockReportPage;
 use App\Filament\Pages\Reports\TillReportPage;
 use App\Filament\Pages\RolesPermissions;
@@ -294,6 +295,12 @@ class Help
         Asamblea::class => ['permission' => 'minutes.manage', 'title' => 'Asamblea', 'body' => [
             'Celebra la asamblea de una convocatoria emitida: registra la asistencia (presente o representado) sobre la lista fijada y observa el quórum en vivo.',
             'Anota el resultado de cada punto del orden del día y luego redacta el acta a partir de lo registrado — no se reescribe a mano. Firmarla la archiva de forma inmutable.',
+        ]],
+        // Prompt 285 — staff hours at a glance.
+        StaffHoursReportPage::class => ['permission' => 'staff.hours.view', 'title' => 'Informe de horas del personal', 'body' => [
+            'Quién ha trabajado y cuántas horas, por persona, sede y día, con la cobertura de personal junto a la afluencia de socios del mismo período.',
+            'Una jornada abierta de un día anterior («Sin fichar salida») cuenta cero horas: no se inventa una salida. Las horas declaradas o corregidas se muestran aparte, para ver cuánto del mes descansa en horas escritas a mano.',
+            'Solo horas, nunca importes. Cada nombre lleva a su registro de jornada del mes, que es donde se corrige.',
         ]],
         AttendanceReportPage::class => ['permission' => 'reports.view', 'title' => 'Informe de asistencia', 'body' => [
             'Cuánta gente pasó por la sede y cuándo. Ayuda a dimensionar turnos y a respetar el aforo.',

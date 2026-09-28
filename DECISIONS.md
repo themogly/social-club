@@ -14727,3 +14727,73 @@ check` green in `es` and `en`. Merged to `main` on Ben's instruction.
 Tests: `tests/Feature/Staff/RegistroDeJornadaTest` (22) cover append-only, own-PIN-only, the declared end, the till-close
 offer, wrong-sede and wrong-role denials, the store refusal, UTC storage, bounded report queries, the PDF and the force-delete
 guard.
+
+## Prompt 285 — Staff hours at a glance: on the dashboard, and a report of their own
+
+Ben: *"some charts on the owner dashboard with what staff are working and what hours … some on the homepage and some on
+its own."* The dashboard shows what's happening; a new Informes page shows how it went.
+
+- **One reader, one pass.** `App\ViewModels\StaffHours` is built from ONE `WorkedHours::periods()` call covering
+  everything any figure needs: the selected period, the previous one for the delta, and the 31-day alert lookback. It is
+  memoised per request (keyed by viewer, sedes, period and minute), so the page, its alerts and "Personal ahora" are one
+  pass over the event log. Nothing else pairs events.
+  - The dashboard's charts are Filament widgets that load lazily in their own request, and get their own single pass.
+  - While measuring this I found and fixed an N+1 in `WorkedHours::periods()`: the annulment lookup ran once per person.
+    It is now one query for everyone (`annulledAmong()`).
+  - Test 12 asserts one pairing query per dashboard request and a query count that does not grow with people or events.
+- **Counting rules** (in `StaffHours`, nowhere else):
+  - A complete period counts its minutes.
+  - An open period today counts up to now.
+  - An **open period from a past day counts zero** and is reported as a number, never an estimate. An invented duration is
+    exactly what 281 refuses to write.
+  - A period with a self-declared or corrected end or start counts in its own "declared" bucket, shown as the lighter
+    blue part of the bar.
+  - Annulled events count for nothing.
+  - Periods belong to their business day; only the coverage heatmap splits minutes across the clock hours they covered,
+    in the sede's timezone.
+- **Visibility.** `WorkedHours::viewableLocationIds()` intersected with the top bar's sede. A report page's own scope
+  selector offers only those sedes: "Todas las sedes" for the owner, "Tus sedes" for a manager with several. A list
+  passed to `StaffHours::for()` or a chart's `#[Locked]` `locationIds` is intersected again, so it can only narrow.
+  - Without `staff.hours.view` everything is absent, not empty.
+  - **STAFF never see hours on the dashboard, even if granted the permission.** Their own hours stay in "Mis horas".
+  - The report page is gated on `staff.hours.view`, not `reports.view*`.
+  - Revoking the permission on the roles page takes effect on the next request.
+- **Alerts.** `DashboardAlert::STAFF_OPEN_SHIFTS` (warning) and `STAFF_UNCLOCKED_ACTIVITY` (info) cover the **last 31
+  days, not the dashboard period**, so an alert doesn't vanish on "Hoy".
+  - They are added by the panel dashboard only, not by `ViewModels\Dashboard::alerts()`, so the counter hub never carries
+    staff hours. `counterRoute()` is null for both.
+  - They land on the Registro de jornada page, so `panelResource()` may now name a Page, and
+    `panelDestinationIsOpenToActor()` asks `canAccess()` for a Page.
+  - Alert links carry `data-alert="<key>"`.
+- **Dashboard.** Added to the existing layout, nothing rebuilt:
+  - "Personal ahora" in the rail: today's live state, ignoring the period control. Each clock-in time is shown in that
+    person's own sede timezone; in the rollup the canonical sede's zone misstated North's times, which the browser check
+    caught.
+  - "Horas del personal" in the main column: bars per person, total in the label, not split by sede.
+  - Each carries a visually hidden summary line.
+- **Report "Horas del personal"** (`Reports\StaffHoursReportPage`, Informes; `StaffHoursReport` is a thin
+  `AbstractReport` over `StaffHours`):
+  - four stat cards (`<x-dashboard.stat-card>`); the delta tone is neutral, since more hours is neither good nor bad;
+  - hours per person stacked by sede (one sede: no legend);
+  - hours per day stacked by person, **per week past 62 days**, as the subtitle says;
+  - **staff coverage beside member footfall**, side by side from 1280 px and stacked below;
+  - the per-person table, with each name linking to the Registro de jornada filtered to that person and month
+    (`personId`/`month` are now `#[Url]` there), and CSV/PDF through `ReportExport`.
+  - The shared report view gained an optional `chartsView` include. The report table cell links when a row carries
+    `<key>__url`. The heatmap gained `unit`/`label`/`empty` props rather than being copied; footfall's defaults are
+    unchanged.
+- **Formatting.** `App\Support\Duration`: one shift is "7 h 30 min"; a total over days is decimal hours in the locale
+  ("152,5 h"). `ReportColumn::hours()`/`duration()` export minutes as bare decimal hours.
+- **No compensation figures.** Hours only, as in 281.
+
+Tests: `tests/Feature/Staff/StaffHoursTest` (14, all written red first) cover the counting rules, midnight attribution and
+the heatmap split, sede and role visibility, the roles-page revoke, "Personal ahora", the 31-day alerts, the stat-card
+fixture with its delta, week grouping, CSV = table, bounded queries with a single pairing pass, a soft-deleted person, and
+Spanish formatting.
+
+Browser check (real app, own seed through ClockIn/ClockOut/AnnulClockEvent; `tests/Browser/prove-285-staff-hours.mjs`;
+screenshots `storage/app/screenshots/285/`):
+- owner: dashboard in the rollup and each sede; report for this month and a custom 90 days (week grouping, name links);
+  1440 and 820×1180, light and dark; heatmaps side by side at 1440 and stacked at 820; no page-level horizontal scroll;
+- manager: attached to Central only for this check (the dev seed gives both), sees only Central;
+- staff: none of it; the dashboard and the report both send them to the counter.

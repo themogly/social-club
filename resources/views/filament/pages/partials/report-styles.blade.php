@@ -39,4 +39,6 @@
     .csc-empty-hero { padding: 2.6rem 1rem; }
     .csc-empty-hero .csc-empty-ico { width: 2.1rem; height: 2.1rem; }
     .csc-empty-hero .csc-empty-msg { font-size: 0.95rem; font-weight: 600; color: var(--tx); }
+    .csc-rep-link { color: var(--brtx); font-weight: 600; text-decoration: none; }
+    .csc-rep-link:hover { text-decoration: underline; }
 </style>

@@ -48,7 +48,14 @@
                 @foreach ($table->rows as $row)
                     <tr>
                         @foreach ($columns as $column)
-                            <td @class(['csc-num' => $column->numeric()])>{{ $column->display($row[$column->key] ?? null) }}</td>
+                            {{-- A row may carry `<key>__url` to link that cell (prompt 285: a person → their registro). --}}
+                            <td @class(['csc-num' => $column->numeric()])>
+                                @if (filled($row[$column->key.'__url'] ?? null))
+                                    <a href="{{ $row[$column->key.'__url'] }}" class="csc-rep-link">{{ $column->display($row[$column->key] ?? null) }}</a>
+                                @else
+                                    {{ $column->display($row[$column->key] ?? null) }}
+                                @endif
+                            </td>
                         @endforeach
                     </tr>
                 @endforeach

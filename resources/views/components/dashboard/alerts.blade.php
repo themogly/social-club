@@ -15,7 +15,7 @@
         @if (count($alerts))
             <div class="csc-alerts">
                 @foreach ($alerts as $alert)
-                    <a href="{{ $alert['href'] }}" @class(['csc-alert', 'csc-alert-'.$alert['severity']])>
+                    <a href="{{ $alert['href'] }}" data-alert="{{ $alert['key'] ?? '' }}" @class(['csc-alert', 'csc-alert-'.$alert['severity']])>
                         <x-filament::icon :icon="$alert['icon']" class="csc-alert-ico" />
                         <span class="csc-alert-msg">{{ $alert['message'] }}</span>
                     </a>
