@@ -15399,3 +15399,120 @@ screenshots `storage/app/screenshots/285/`):
 - Also fixed in passing: `LowStockIsDaysOfCoverTest` failed intermittently. Rows stamped "N days ago" and a window
   starting "14 days ago" a moment later disagreed when a second ticked over, dropping the 14th day. The test now
   freezes time.
+
+## Prompt 293 — The counter stops re-sending the whole screen on every tap
+
+- **What changed, in one line:** how much of the screen each tap re-renders, never what is decided. Price, limits,
+  stock, the money rules (change due, *Falta*, tab, wallet — 263/268/271), the idempotency key, `PersistsBasket`, the
+  permission checks (255/266) and the lock surface are untouched; nothing about money moved into the browser.
+- **Client-side now (view-only, zero requests), and why each is safe — it only changes what is visible over a
+  catalogue already on the page in full:**
+  - Dispensario: the **Dispensario / Barra tab** (`setCatalogueSource` removed), **list / grid** (`setGeneticLayout`
+    removed), the **Categoría / Tipo / Variedad** filters and the bar's **Categoría** (`filterCategory`,
+    `filterArticleCategory`, `filterProductType`, `filterStrainType` removed), and both **search boxes**
+    (`$geneticSearch`, `$articleSearch` and the filter properties removed).
+  - Barra: **list / grid / large** (`setArticleLayout` removed), the **Categoría** chips and 248's category tiles
+    (`filterCategory` removed), and the **search** (`$articleSearch`, `$categoryId` removed).
+  - They are Alpine state (`window.counterCatalogue`, `resources/js/app.js`). Each control is marked `data-view-only`.
+    A card lists its own facts as data attributes, and one pure rule decides whether it shows:
+    `catalogueShows()` / `catalogueMatches()` in `resources/js/catalogue-search.js`.
+  - **The layout is still remembered per device per catalogue (176/225).** The toggle hands its choice to the same
+    `#[Session]` property with `$wire.$set(prop, mode, false)`. That rides on the next real request instead of making
+    one. An unknown value is still ignored rather than stored (`updating…`/`updated…` hooks restore the previous value).
+  - **The cart's "you are browsing the bar" states** read the same Alpine store (`$store.counterCatalogue.source`).
+    These are the bar section appearing while you browse Barra, and its hint text.
+  - **Search is the server's rule, plus accent folding.** The server's rule was a trimmed, lower-cased substring of
+    the name (and, on the dispensary's bar source, of the category too). The owner's example needs "maria" to find
+    "María", and `mb_strtolower` did not fold accents, so folding is **the one intended difference**.
+    `CatalogueSearchParityTest` types the same table of queries into a verbatim copy of the old server rule and into
+    the browser module. It covers empty, whitespace, partial, case, a symbol and no match, and they agree on every
+    query without an accent mismatch.
+- **Islands, not a child component — with one deviation from the plain pattern, and why.** Livewire 4.4.6's islands
+  are registered only on the component's **first** render. A later render emits an unregistered island as an
+  empty "skip" marker (`HandlesIslands::renderIslandDirective`). The dispensary mounts with **no socio**, so the
+  catalogue is not on the page at all until one is identified: a plain `@island` would have arrived empty the moment
+  the work screen appeared, and `renderIsland()` cannot target it.
+  - **What I used instead:** `always:` is evaluated on every render, so each island is
+    `@island('…', always: $this->islandChanged('…'))`.
+  - **`App\Livewire\Counter\Concerns\RendersIslandsOnChange`** fingerprints the island's own data: this socio's
+    prices, stock, the sellable set and the locale. The island renders in place when that data is new or different,
+    and is skipped (the browser keeps it) otherwise. An island a render did not reach (a blocking state replaced it)
+    is forgotten, so its return carries it in full. A sale at another terminal, a price edit in the panel or a new
+    socio change the data, so nothing is remembered that could go stale.
+  - **Four islands:** the pane's header (tab, search, filters, *Su habitual*), each source's cards, and the
+    dispensary's **photo nag**. The nag is ~6 KB of camera dialog that changes only when the socio's photo does.
+  - **A tap on a card is `$wire.chooseGenetic(…)` / `$wire.addBarItem(…)` / `$wire.addArticle(…)`, never
+    `wire:click`, on purpose.** A `wire:` action on an element inside an island re-renders only that island (the
+    client's `closestIsland`). Choosing a genetic has to open the weight entry and the cart outside it, and an
+    Alpine `$wire` call has no origin element, so it renders the component normally.
+  - A child component would have meant moving the catalogue's rows, pricing and cover logic out of `DispensaryPos`.
+    The islands keep them where they are.
+- **Also trimmed, for every counter response:**
+  - `App\Support\CompactCounterMarkup` strips template indentation from counter components' HTML (render and
+    island), leaving `<pre>`/`<textarea>` content alone. At club size that was about a quarter of a tap's response.
+  - Tried and reverted: re-encoding Livewire JSON without the `\/` and `\uXXXX` escapes. It saved only ~0.5 KB,
+    because the cost is the required `\"` and `\n` escapes, so it was not worth a global change.
+- **Measured.** The fixture is the dev seed grown to **40 genetics with batches and prices and 50 articles** at
+  Central Branch (throwaway DB), then **80 / 100**. "Before" is `main` at `2f8a8fe`, run from its own worktree on a
+  copy of the same DB. The response is the Livewire body in bytes, from `tests/Browser/prove-293-budget.mjs`:
+
+  | action | before (main) | after, 40/50 | after, 80/100 |
+  |---|---|---|---|
+  | Dispensario: choose genetic | 174.4 KB | 36.5 KB | 36.5 KB |
+  | add to basket | 175.0 KB | 38.0 KB | 38.0 KB |
+  | add bar article | 127.3 KB | 38.5 KB | 38.5 KB |
+  | cash typed / quick cash / clear tendered | 176.3 KB each | 38.5 KB each | 38.5 KB each |
+  | remove line | 168.0 KB | 32.4 KB | 32.4 KB |
+  | Barra: add article / +1 / −1 / quick cash / clear | 103.9 KB each | 26.2 KB each | 26.2 KB each |
+  | every filter, layout, tab and search control | 1 request each (~99–175 KB) | **0 requests** | **0 requests** |
+  | **first socio on an empty counter** (not budgeted) | 160.3 KB | **199.6 KB** | 349.7 KB |
+
+  Tap-to-screen, measured with `tests/Browser/probe-tap-latency.mjs` under Ben's throttling (4× CPU, 60 ms, ~10/4
+  Mbit/s) on this machine:
+
+  | action | before (main) | after |
+  |---|---|---|
+  | choose genetic | 314 ms | 156 ms |
+  | add to basket | 329 ms | 186 ms |
+  | quick cash €20 | 302 ms | 162 ms |
+  | bar: add article | 289 ms | 196 ms |
+  | bar: +1 | 233 ms | 143 ms |
+  | bar: category filter | 168 ms | 35 ms (no request) |
+  | keypad digit | ~30 ms | ~30 ms (already client-side, 292) |
+  | select member | 286 ms | 344 ms |
+
+  This machine is faster than Ben's, so the absolute figures are lower than his table; compare the columns, not
+  against his. **The harness's trivial waits are fixed first:** quick cash now waits for the tendered figure, bar +1
+  for the quantity, and the category filter for the visible cards to change.
+- **The one tap that got heavier: identifying the first socio.** Before, it brought the genetics catalogue (160 KB);
+  it now brings **both** catalogues, so the tab and the filters need nothing more from the server (+~40 KB, +~60 ms
+  here). A commit that moves stock re-sends the cards whose stock figures changed, because those figures are live by
+  mandate. Both are measured and reported by the guard, **not budgeted**: the catalogue must reach the page once.
+  In exchange, a visit that browses the bar used to pay a whole-screen response for the tab switch (127 KB) and for
+  every tap after it. At club size nothing here needs pagination: the full catalogue renders in one response.
+- **The 40 KB budget and the guard.**
+  - `tests/Browser/CounterRoundTripBudgetTest.php` runs in the suite. It seeds 40/50, then 80/100, and asserts:
+    - every basket, member and payment action on both screens is ≤ 40 KB;
+    - none grows by more than 10 % at double size;
+    - the catalogue is sent once, skipped after, and re-sent when a price changes.
+  - `tests/Browser/prove-293-budget.mjs` is the same budget in a real browser, where every view-only control must
+    make **zero** Livewire requests.
+  - `ViewOnlyControlsTest` refuses a `wire:click`/`wire:model` on any `data-view-only` element, and asserts the old
+    server methods are gone.
+  - **Proven by planting `wire:click="$refresh"` on a filter chip:** `ViewOnlyControlsTest` went red, and the
+    browser harness failed eight controls with "1 request". Both were reverted.
+  - **Failing-first on `main`:** the new tests were run in the `main` worktree. The four behaviour pins
+    (`RoundTripPinsTest`: one combined visit's totals, stock and till entries; the tab; a permission revoked
+    mid-shift; the basket through a lock) **passed there**, as required. Every guard failed there.
+- **Tests that asserted a view change by calling a server method now test the browser's rule on the real HTML.**
+  `Tests\Concerns\FiltersTheCatalogueLikeTheBrowser` runs `catalogue-search.js` in node over the cards the server
+  rendered (StrainType, HashProductType, OneCatalogueTwoSources, BarLargeLayout). Harness frames written after a
+  skipped island put the catalogue back as the page keeps it (`Tests\Browser\Concerns\KeepsIslands`).
+- **Two bugs found by looking, fixed before commit:**
+  - Alpine's string `:class` never removes classes that were in the server-rendered attribute, so both tabs looked
+    pressed. The bindings now use object syntax, which adds and removes each class explicitly.
+  - The `as-grid:` variant matched only descendants of `[data-layout]`, not the container itself, so grid did not
+    lay out. The variants now match the element and its descendants.
+  - `prove-293-visit.mjs` now checks both, at 1180×820 and 820×1180. It runs a full visit (socio → flower → bar →
+    cash → signature → commit), checks that the stock figure follows the sale, and requires zero console errors.
+- **Club tablet:** a check for Shane is in `verification/real-device-checks.md` (pending).

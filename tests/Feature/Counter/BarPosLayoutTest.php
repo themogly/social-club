@@ -70,7 +70,7 @@ class BarPosLayoutTest extends TestCase
 
         $this->assertStringContainsString('min-w-0 flex-1', $card, 'the name cell can no longer shrink');
         $this->assertStringContainsString('block truncate font-semibold', $card, 'the name no longer truncates');
-        $this->assertStringContainsString("'flex shrink-0 text-xs'", $card, 'the price/stock side can now be squeezed');
+        $this->assertStringContainsString('"flex shrink-0 text-xs ', $card, 'the price/stock side can now be squeezed');
 
         // …and the card the Bar actually renders is that one.
         $this->assertStringContainsString('data-article-card=', $html);

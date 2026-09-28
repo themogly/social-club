@@ -443,10 +443,9 @@ class LowStockIsDaysOfCoverTest extends TestCase
         $seed(5, 24);
         $large = $coverQueries();
 
-        // The property that matters is that it does not SCALE. The absolute number is 4 rather than 2
-        // because the screen builds its rows twice per render — once for the grid and once for "Su habitual",
-        // which predates this branch; 216 owes two grouped queries per build, and delivers them.
-        $this->assertSame(4, $small, "the cover figures are not the grouped queries: {$small}");
+        // The property that matters is that it does not SCALE. 216 owes two grouped queries per build of the rows;
+        // since prompt 293 the rows are built ONCE per render (the grid and "Su habitual" share them — it was twice).
+        $this->assertSame(2, $small, "the cover figures are not the grouped queries: {$small}");
         $this->assertSame($small, $large, "cover queries scaled with the catalogue: {$small} became {$large}");
     }
 }

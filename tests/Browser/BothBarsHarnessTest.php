@@ -76,12 +76,11 @@ class BothBarsHarnessTest extends TestCase
         $member = $this->member();
 
         foreach (['grid', 'list'] as $layout) {
-            $this->write($this->barPage, 'bar-'.$layout, Livewire::test(BarPos::class)->call('setArticleLayout', $layout));
+            // Prompt 293 — the layout is the browser's; a frame starts in the remembered one (the #[Session] key).
+            session(['counter.bar.article_layout' => $layout, 'counter.pos.genetic_layout' => $layout, 'counter.pos.article_layout' => $layout]);
+            $this->write($this->barPage, 'bar-'.$layout, Livewire::test(BarPos::class));
 
-            $this->write($this->posPage, 'pos-'.$layout, Livewire::test(DispensaryPos::class)
-                ->call('selectMember', $member->id)
-                ->call('setCatalogueSource', 'bar')
-                ->call('setGeneticLayout', $layout));
+            $this->write($this->posPage, 'pos-'.$layout, Livewire::test(DispensaryPos::class)->call('selectMember', $member->id));
         }
 
         // …and the Bar with a basket, for the totalled commit.

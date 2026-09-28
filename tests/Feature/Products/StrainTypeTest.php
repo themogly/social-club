@@ -24,6 +24,7 @@ use Database\Seeders\RolePermissionSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Features\SupportTesting\Testable;
 use Livewire\Livewire;
+use Tests\Concerns\FiltersTheCatalogueLikeTheBrowser;
 use Tests\TestCase;
 
 /**
@@ -34,7 +35,7 @@ use Tests\TestCase;
  */
 class StrainTypeTest extends TestCase
 {
-    use RefreshDatabase;
+    use FiltersTheCatalogueLikeTheBrowser, RefreshDatabase;
 
     private Organisation $org;
 
@@ -118,15 +119,15 @@ class StrainTypeTest extends TestCase
         $this->genetic('IndicaOne', StrainType::INDICA);
         $this->operator();
 
-        $this->pos()
+        $html = $this->pos()
             // Labelled rows (a11y): each filter group carries its axis label.
             ->assertSeeHtml('aria-label="'.e(__('Variedad')).'"')
             ->assertSee('SativaOne')
             ->assertSee('IndicaOne')
-            // Filtering by strain narrows to that variety only.
-            ->call('filterStrainType', StrainType::SATIVA->value)
-            ->assertSee('SativaOne')
-            ->assertDontSee('IndicaOne');
+            ->html();
+
+        // Filtering by strain narrows to that variety only — in the browser since prompt 293.
+        $this->assertSame(['SativaOne'], $this->visibleInBrowser($html, 'genetics', ['strainType' => StrainType::SATIVA->value]));
     }
 
     public function test_a_strain_selection_differs_from_a_product_type_selection(): void
@@ -136,12 +137,10 @@ class StrainTypeTest extends TestCase
         $this->genetic('IndicaTwo', StrainType::INDICA);
         $this->operator();
 
-        $this->pos()
-            ->call('filterProductType', 'FLOWER')
-            ->assertSee('SativaTwo')->assertSee('IndicaTwo')   // product type: both
-            ->call('filterProductType', null)
-            ->call('filterStrainType', StrainType::SATIVA->value)
-            ->assertSee('SativaTwo')->assertDontSee('IndicaTwo'); // strain: a different, narrower set
+        $html = $this->pos()->html();
+
+        $this->assertSame(['IndicaTwo', 'SativaTwo'], $this->visibleInBrowser($html, 'genetics', ['productType' => 'FLOWER'])); // type: both
+        $this->assertSame(['SativaTwo'], $this->visibleInBrowser($html, 'genetics', ['strainType' => StrainType::SATIVA->value])); // strain: narrower
     }
 
     public function test_a_genetic_with_no_strain_type_still_shows(): void

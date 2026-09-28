@@ -149,7 +149,6 @@ class CartSectionsGateOnTheirOwnLinesTest extends TestCase
         $article = $this->article('Cerveza', 250);
 
         $component = $this->dispensary()
-            ->call('setCatalogueSource', 'bar')
             ->call('addBarItem', $article->id);
 
         // The server took it — which it always did.
@@ -193,7 +192,6 @@ class CartSectionsGateOnTheirOwnLinesTest extends TestCase
         $article = $this->article('Cerveza', 250);
 
         $html = $this->dispensary()
-            ->call('setCatalogueSource', 'bar')
             ->call('addBarItem', $article->id)
             ->call('addBarItem', $article->id)
             ->html();
@@ -264,7 +262,6 @@ class CartSectionsGateOnTheirOwnLinesTest extends TestCase
         $expectedBefore = TillSummary::breakdown($till)['expected'];
 
         $component
-            ->call('setCatalogueSource', 'bar')
             ->call('addBarItem', $article->id)
             ->call('addBarItem', $article->id)
             ->call('commitDispensation')

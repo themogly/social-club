@@ -8,6 +8,7 @@ use App\Enums\MembershipStatus;
 use App\Enums\MemberStatus;
 use App\Enums\Role;
 use App\Enums\SettingType;
+use App\Enums\StrainType;
 use App\Livewire\Counter\DispensaryPos;
 use App\Models\Article;
 use App\Models\Batch;
@@ -29,6 +30,7 @@ use Database\Seeders\RolePermissionSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Features\SupportTesting\Testable;
 use Livewire\Livewire;
+use Tests\Concerns\FiltersTheCatalogueLikeTheBrowser;
 use Tests\TestCase;
 
 /**
@@ -52,7 +54,7 @@ use Tests\TestCase;
  */
 class OneCatalogueTwoSourcesTest extends TestCase
 {
-    use RefreshDatabase;
+    use FiltersTheCatalogueLikeTheBrowser, RefreshDatabase;
 
     private Organisation $org;
 
@@ -157,15 +159,12 @@ class OneCatalogueTwoSourcesTest extends TestCase
         }
         $last = $this->article('Zumo de naranja exprimido');
 
-        $pos = $this->posWithMember()->call('setCatalogueSource', 'bar');
+        $html = $this->posWithMember()->html();
 
-        $pos->set('articleSearch', 'Zumo')
-            ->assertSee('data-article-card="'.$last->id.'"', false)
-            ->assertDontSee('Artículo 01');
-
-        // …and with no search every one of them is in the source, not a subset that fitted.
-        $pos->set('articleSearch', '');
-        $this->assertSame(41, substr_count($pos->html(), 'data-article-card='), 'the catalogue is capped');
+        // Every one of them is in the source, not a subset that fitted — prompt 293 renders the whole catalogue and
+        // searches it in the browser (CatalogueSearchParityTest proves that search matches the server's).
+        $this->assertSame(41, substr_count($html, 'data-article-card='), 'the catalogue is capped');
+        $this->assertSame(['Zumo de naranja exprimido'], $this->visibleInBrowser($html, 'bar', ['search' => ['bar' => 'Zumo']]), 'the last article cannot be found');
     }
 
     /** The chip list is gone from the cart — browsing lives in the pane that can browse. */
@@ -198,7 +197,6 @@ class OneCatalogueTwoSourcesTest extends TestCase
             ->call('chooseGenetic', $genetic->id)
             ->set('weightInput', '3,00')
             ->call('addLine')
-            ->call('setCatalogueSource', 'bar')
             ->call('addBarItem', $article->id);
 
         $this->assertCount(1, $pos->get('basket'), 'the genetic did not land on the dispensation basket');
@@ -255,16 +253,16 @@ class OneCatalogueTwoSourcesTest extends TestCase
             ->set('weightInput', '1,25')
             ->set('cashTendered', '20,00');
 
-        $pos->call('setCatalogueSource', 'bar')
-            ->assertSet('memberId', $member->id)
-            ->assertSet('weightInput', '1,25')
-            ->assertSet('cashTendered', '20,00')
-            ->assertSet('activeGeneticId', $genetic->id);
-        $this->assertCount(1, $pos->get('basket'));
+        // Prompt 293 — switching source is the browser's now: the tab is view-only and there is no server method left
+        // that it could call, so looking at the other half cannot touch the member, the basket or the tender at all.
+        $this->assertFalse(method_exists(DispensaryPos::class, 'setCatalogueSource'));
+        $tab = (string) preg_replace('/\s+/', ' ', $this->posWithMember()->html());
+        $this->assertMatchesRegularExpression('/<button[^>]*data-view-only[^>]*data-source-option="bar"[^>]*x-on:click="setSource\(\'bar\'\)"/', $tab);
 
-        // …and back again, having added a bar line in between.
+        // …and a bar line added in between leaves the weight entry and the tender as they were.
         $pos->call('addBarItem', $article->id)
-            ->call('setCatalogueSource', 'genetics')
+            ->assertSet('memberId', $member->id)
+            ->assertSet('activeGeneticId', $genetic->id)
             ->assertSet('weightInput', '1,25')
             ->assertSet('cashTendered', '20,00');
         $this->assertCount(1, $pos->get('basket'));
@@ -277,13 +275,10 @@ class OneCatalogueTwoSourcesTest extends TestCase
         $this->operator();
         $this->article('Cerveza sin alcohol');
 
-        $this->posWithMember()
-            ->set('geneticSearch', 'kush')
-            ->call('setCatalogueSource', 'bar')
-            ->set('articleSearch', 'cerveza')
-            ->call('setCatalogueSource', 'genetics')
-            ->assertSet('geneticSearch', 'kush')
-            ->assertSet('articleSearch', 'cerveza');
+        // Two boxes, two terms, held in the browser (prompt 293) — switching source shows the other box, never clears one.
+        $html = $this->posWithMember()->html();
+        $this->assertStringContainsString('x-model="search.genetics"', $html);
+        $this->assertStringContainsString('x-model="search.bar"', $html);
     }
 
     // --- What must not be offered ---------------------------------------------------------------
@@ -304,7 +299,7 @@ class OneCatalogueTwoSourcesTest extends TestCase
         $inactive = $this->article('Retirada', ['active' => false]);
         $empty = $this->article('Agotada', ['stock' => 0]);
 
-        $html = $this->posWithMember()->call('setCatalogueSource', 'bar')->html();
+        $html = $this->posWithMember()->html();
 
         $this->assertStringContainsString('data-article-card="'.$sellable->id.'"', $html);
         $this->assertStringNotContainsString('data-article-card="'.$inactive->id.'"', $html, 'an inactive article is still on the catalogue');
@@ -330,9 +325,7 @@ class OneCatalogueTwoSourcesTest extends TestCase
 
         $this->assertStringNotContainsString('data-source-option="bar"', $html, 'a sede with no bar was offered one');
         $this->assertStringContainsString('data-source-option="genetics"', $html);
-
-        // …and it cannot be reached by asking for it either.
-        $pos->call('setCatalogueSource', 'bar')->assertSet('catalogueSource', 'genetics');
+        $this->assertStringNotContainsString('data-catalogue-item="bar"', $html, 'the bar catalogue is on the page, merely hidden');
     }
 
     /** 185: the bar card states a stock STATE, never a published quantity. */
@@ -352,7 +345,7 @@ class OneCatalogueTwoSourcesTest extends TestCase
         // card's TEXT can only be the stock count itself.
         $this->article('Casi agotado', ['stock' => 7, 'low_stock_threshold' => 9, 'price_cents' => 355]);
 
-        $html = $this->posWithMember()->call('setCatalogueSource', 'bar')->html();
+        $html = $this->posWithMember()->html();
         $at = strpos($html, 'data-article-card=');
         $this->assertNotFalse($at);
         $card = substr($html, $at, (int) strpos($html, '</button>', $at) - $at);
@@ -375,15 +368,15 @@ class OneCatalogueTwoSourcesTest extends TestCase
     public function test_the_panes_furniture_follows_the_source(): void
     {
         $this->operator();
-        $this->genetic();
+        $this->genetic()->update(['strain_type' => StrainType::SATIVA]);
         $category = Category::factory()->create(['organisation_id' => $this->org->id, 'name' => 'Refrescos']);
         $this->article('Cerveza sin alcohol', ['category_id' => $category->id]);
 
-        $bar = $this->posWithMember()->call('setCatalogueSource', 'bar')->html();
+        // Both sources' furniture is on the page since prompt 293; each piece is shown only for its own source.
+        $html = (string) preg_replace('/\s+/', ' ', $this->posWithMember()->html());
 
-        $this->assertStringContainsString('Refrescos', $bar, 'the bar has no category filter');
-        $this->assertStringNotContainsString(__('Variedad'), $bar, 'the strain filter rendered on the bar source');
-        $this->assertStringNotContainsString('data-usual-genetics', $bar, '"Their usual" rendered on the bar source');
+        $this->assertMatchesRegularExpression('/x-show="source === \'bar\'"(?:(?!x-show=).)*aria-label="'.preg_quote(e(__('Categoría')), '/').'"(?:(?!x-show=).)*Refrescos/', $html, 'the bar has no category filter of its own');
+        $this->assertMatchesRegularExpression('/x-show="source === \'genetics\'"(?:(?!x-show=).)*aria-label="'.preg_quote(e(__('Variedad')), '/').'"/', $html, 'the strain filter is not the genetics source\'s alone');
     }
 
     /** The category filter really filters the bar source. */
@@ -395,13 +388,13 @@ class OneCatalogueTwoSourcesTest extends TestCase
         $drink = $this->article('Cerveza sin alcohol', ['category_id' => $drinks->id]);
         $shirt = $this->article('Camiseta', ['category_id' => $merch->id]);
 
-        $pos = $this->posWithMember()
-            ->call('setCatalogueSource', 'bar')
-            ->call('filterArticleCategory', $drinks->id);
-
-        $html = $pos->html();
-        $this->assertStringContainsString('data-article-card="'.$drink->id.'"', $html);
-        $this->assertStringNotContainsString('data-article-card="'.$shirt->id.'"', $html);
+        // The filter runs in the browser (prompt 293) over what each card says about itself: the chip sets the
+        // category, and a card shows only while its own category matches.
+        $html = $this->posWithMember()->html();
+        $this->assertStringContainsString("x-on:click=\"filter('category', '{$drinks->id}')\"", $html);
+        $this->assertSame(['Cerveza sin alcohol'], $this->visibleInBrowser($html, 'bar', ['category' => ['bar' => $drinks->id]]));
+        $this->assertSame(['Camiseta', 'Cerveza sin alcohol'], $this->visibleInBrowser($html, 'bar'));
+        unset($drink, $shirt);
     }
 
     /** 194: a catalogue search is not a member search. */
@@ -410,14 +403,9 @@ class OneCatalogueTwoSourcesTest extends TestCase
         $this->operator();
         $this->article('Cerveza sin alcohol');
 
-        foreach (['genetics', 'bar'] as $source) {
-            $html = $this->posWithMember()->call('setCatalogueSource', $source)->html();
+        // Both sources are on one page (prompt 293), so one render answers for both.
+        $html = $this->posWithMember()->html();
 
-            $this->assertLessThanOrEqual(
-                1,
-                preg_match_all('/data-member-lookup(?![-\w])/', $html),
-                $source.': a second member lookup',
-            );
-        }
+        $this->assertLessThanOrEqual(1, preg_match_all('/data-member-lookup(?![-\w])/', $html), 'a second member lookup');
     }
 }

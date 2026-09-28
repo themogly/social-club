@@ -20,6 +20,7 @@ use Database\Seeders\RolePermissionSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
 use Tests\Browser\Concerns\InlinesBuiltCss;
+use Tests\Browser\Concerns\KeepsIslands;
 use Tests\TestCase;
 
 /**
@@ -34,7 +35,7 @@ use Tests\TestCase;
  */
 class BarOnlyCartHarnessTest extends TestCase
 {
-    use InlinesBuiltCss, RefreshDatabase;
+    use InlinesBuiltCss, KeepsIslands, RefreshDatabase;
 
     public function test_it_writes_the_bar_only_cart(): void
     {
@@ -68,12 +69,9 @@ class BarOnlyCartHarnessTest extends TestCase
 
         $page = (string) $this->get(route('counter.pos'))->assertOk()->getContent();
 
-        $held = Livewire::test(DispensaryPos::class)
-            ->call('selectMember', $member->id)
-            ->call('setCatalogueSource', 'bar')
-            ->call('addBarItem', $beer->id)
-            ->call('addBarItem', $beer->id)
-            ->html();
+        $component = Livewire::test(DispensaryPos::class)->call('selectMember', $member->id);
+        $first = $component->html();
+        $held = $this->withKeptIslands($component->call('addBarItem', $beer->id)->call('addBarItem', $beer->id)->html(), $first);
 
         $open = (int) strpos($page, '<main');
         $close = (int) strrpos($page, '</main>');

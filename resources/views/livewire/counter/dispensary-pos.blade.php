@@ -305,107 +305,110 @@
                     </section>
                 @endif
 
-                {{-- Genetics grid --}}
-                <section class="rounded-2xl border border-line bg-surface p-4 dark:border-slate-800 dark:bg-slate-900">
+                {{-- THE CATALOGUE PANE — a Livewire island (prompt 293). It is re-sent only when what it shows has changed
+                     (RendersIslandsOnChange: prices for this socio, stock, the sellable set), so a basket, member or
+                     payment tap no longer returns every card on the page. Inside it nothing talks to the server except a
+                     tap on a card, and that goes through `$wire.…` rather than `wire:click` ON PURPOSE: a `wire:` action on
+                     an element inside an island re-renders only the island, and choosing a genetic has to open the weight
+                     entry and the cart outside it. The tab, the filters, the search and the layout are `data-view-only` —
+                     Alpine state over the full catalogue, zero requests — and a structural test refuses a `wire:` there. --}}
+                <section
+                    data-catalogue
+                    x-data="window.counterCatalogue(@js([
+                        'source' => 'genetics',
+                        'layouts' => ['genetics' => $geneticLayout, 'bar' => $articleLayout],
+                        'layoutProps' => ['genetics' => 'geneticLayout', 'bar' => 'articleLayout'],
+                    ]))"
+                    class="rounded-2xl border border-line bg-surface p-4 dark:border-slate-800 dark:bg-slate-900"
+                >
+                    @island('catalogue-header', always: $this->islandChanged('header'))
+                    @php
+                        $head = $this->islandView('header');
+                        $sources = $head['barEnabled']
+                            ? ['genetics' => __('Dispensario'), 'bar' => __('Barra')]
+                            : ['genetics' => __('Dispensario')];
+                        $chipOn = 'border-brand bg-brand text-white';
+                        $chipOff = 'border-line text-ink-muted dark:border-slate-700 dark:text-slate-400';
+                        $toggleOn = 'bg-brand text-white';
+                        $toggleOff = 'text-ink-muted hover:bg-surface-alt dark:text-slate-400 dark:hover:bg-slate-800';
+                    @endphp
                     {{-- Prompt 176: stacks until lg. At 820 portrait the selection pane is ~470px and
                          title + view toggle + search do not fit on one row without clipping. --}}
                     <div class="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-                        {{-- THE TOGGLE IS THE HEADING (prompt 212).
-
-                             The owner asked for the heading to read *"Dispensario"*. Two reasons it does
-                             something slightly different instead. **"Genéticas" was wrong on the facts**, so
-                             the rename is right: `ProductType` is FLOWER / CONCENTRATE / PREROLL / EDIBLE and
-                             prompt 66's own filters say so — the word under-described what was already in the
-                             pane. But *"Dispensario"* would name the panel after the screen it sits on (the
-                             bar already reads "· Dispensario"), and once the pane holds bar products it is not
-                             the dispensary; it is a catalogue with two sources.
-
-                             So the toggle is the heading, with nothing above it. It names what you are
-                             browsing, it is the control you came to press, and it removes a word rather than
-                             replacing one. A heading AND a toggle saying the same thing would be worse than
-                             either. --}}
-                        <div role="group" aria-label="{{ __('Qué estás mirando') }}" data-catalogue-source="{{ $catalogueSource }}"
+                        {{-- THE TOGGLE IS THE HEADING (prompt 212): it names what you are browsing, and it is the control
+                             you came to press. It changes what you BROWSE, never which basket you fill — a genetic tap still
+                             opens the weight entry, an article tap still adds a bar line, on their separate ledgers (118). A
+                             sede with no bar, or an operator without `pos.bar` (266), has no bar source at all. --}}
+                        <div role="group" aria-label="{{ __('Qué estás mirando') }}" x-bind:data-catalogue-source="source" data-catalogue-source="genetics"
                              class="flex w-fit shrink-0 gap-1 self-start rounded-xl border border-line p-1 dark:border-slate-700">
-                            {{-- Block form, not `@php(…)`: Blade lifts raw PHP out with a non-greedy
-                                 `/(?<!@)@php(.*?)@endphp/s` BEFORE compiling directives, so a shorthand in a
-                                 file that uses the block form later pairs with THAT file's next `@endphp` and
-                                 swallows everything between (prompt 207 hit the same trap). --}}
-                            @php
-                                $sources = $barEnabled
-                                    ? ['genetics' => __('Dispensario'), 'bar' => __('Barra')]
-                                    : ['genetics' => __('Dispensario')];
-                            @endphp
                             @foreach ($sources as $source => $label)
                                 <button
                                     type="button"
-                                    wire:click="setCatalogueSource('{{ $source }}')"
+                                    data-view-only
                                     data-source-option="{{ $source }}"
-                                    aria-pressed="{{ $catalogueSource === $source ? 'true' : 'false' }}"
-                                    @class([
-                                        'inline-flex min-h-11 items-center rounded-lg px-4 text-base font-semibold transition',
-                                        'bg-brand text-white' => $catalogueSource === $source,
-                                        'text-ink-muted hover:bg-surface-alt dark:text-slate-400 dark:hover:bg-slate-800' => $catalogueSource !== $source,
-                                    ])
+                                    x-on:click="setSource('{{ $source }}')"
+                                    aria-pressed="{{ $source === 'genetics' ? 'true' : 'false' }}"
+                                    x-bind:aria-pressed="source === '{{ $source }}' ? 'true' : 'false'"
+                                    class="inline-flex min-h-11 items-center rounded-lg px-4 text-base font-semibold transition {{ $source === 'genetics' ? $toggleOn : $toggleOff }}"
+                                    x-bind:class="{ '{{ $toggleOn }}': source === '{{ $source }}', '{{ $toggleOff }}': ! (source === '{{ $source }}') }"
                                 >{{ $label }}</button>
                             @endforeach
                         </div>
-                        {{-- List / grid. LIST is the default for genetics — see DispensaryPos::$geneticLayout.
-                             Applies to BOTH sources (prompt 212): it is a density preference about cards, not
-                             a fact about cannabis, and an operator who prefers a grid prefers it for both. --}}
+                        {{-- List / grid — one remembered choice PER SOURCE (225): list for genetics, grid for the bar by default. --}}
                         <div role="group" aria-label="{{ __('Vista') }}" class="flex w-fit shrink-0 gap-1 self-start rounded-xl border border-line p-1 dark:border-slate-700">
                             @foreach ([['list', __('Lista'), 'list'], ['grid', __('Cuadrícula'), 'grid']] as [$mode, $label, $glyph])
                                 <button
                                     type="button"
-                                    wire:click="setGeneticLayout('{{ $mode }}')"
+                                    data-view-only
                                     data-layout-option="{{ $mode }}"
+                                    x-on:click="setLayout('{{ $mode }}')"
                                     aria-label="{{ $label }}"
-                                    aria-pressed="{{ $this->catalogueLayout() === $mode ? 'true' : 'false' }}"
-                                    @class([
-                                        'inline-flex h-11 w-11 items-center justify-center rounded-lg text-base transition',
-                                        'bg-brand text-white' => $this->catalogueLayout() === $mode,
-                                        'text-ink-muted hover:bg-surface-alt dark:text-slate-400 dark:hover:bg-slate-800' => $this->catalogueLayout() !== $mode,
-                                    ])
+                                    aria-pressed="{{ $geneticLayout === $mode ? 'true' : 'false' }}"
+                                    x-bind:aria-pressed="layoutOf() === '{{ $mode }}' ? 'true' : 'false'"
+                                    class="inline-flex h-11 w-11 items-center justify-center rounded-lg text-base transition {{ $geneticLayout === $mode ? $toggleOn : $toggleOff }}"
+                                    x-bind:class="{ '{{ $toggleOn }}': layoutOf() === '{{ $mode }}', '{{ $toggleOff }}': ! (layoutOf() === '{{ $mode }}') }"
                                 ><x-counter.icon :name="$glyph" class="h-5 w-5" /></button>
                             @endforeach
                         </div>
 
-                        {{-- One search box per source, and they keep their own terms: switching source to check
-                             a price and switching back must not have cleared what you were looking for. NOT a
-                             member search (194) — this is a catalogue. --}}
-                        @if ($catalogueSource === 'bar')
+                        {{-- One search box per source, each keeping its own term: switching source to check a price and
+                             switching back must not clear what you were looking for. NOT a member search (194). --}}
+                        <input
+                            type="text"
+                            data-view-only
+                            x-model="search.genetics"
+                            x-show="source === 'genetics'"
+                            aria-label="{{ __('Buscar genética…') }}"
+                            autocomplete="off"
+                            placeholder="{{ __('Buscar genética…') }}"
+                            class="h-11 w-full rounded-xl border border-line bg-surface px-4 text-sm text-ink placeholder:text-ink-muted focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/40 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 sm:w-56"
+                        >
+                        @if ($head['barEnabled'])
                             <input
                                 type="text"
-                                wire:model.live.debounce.300ms="articleSearch" aria-label="{{ __('Buscar artículo…') }}"
+                                data-view-only
                                 data-article-search
+                                x-model="search.bar"
+                                x-show="source === 'bar'"
+                                x-cloak
+                                aria-label="{{ __('Buscar artículo…') }}"
                                 autocomplete="off"
                                 placeholder="{{ __('Buscar artículo…') }}"
-                                class="h-11 w-full rounded-xl border border-line bg-surface px-4 text-sm text-ink placeholder:text-ink-muted focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/40 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 sm:w-56"
-                            >
-                        @else
-                            <input
-                                type="text"
-                                wire:model.live.debounce.300ms="geneticSearch" aria-label="{{ __('Buscar genética…') }}"
-                                autocomplete="off"
-                                placeholder="{{ __('Buscar genética…') }}"
                                 class="h-11 w-full rounded-xl border border-line bg-surface px-4 text-sm text-ink placeholder:text-ink-muted focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/40 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 sm:w-56"
                             >
                         @endif
                     </div>
 
-                    {{-- "Their usual" (prompt 133): the member's recent genetics, one tap each, only those
-                         sellable at this sede right now. Combined with a weight preset, a regular's order is one
-                         or two taps. Sourced once on identification. --}}
-                    {{-- Genetics only (prompt 212): it is built from this member's DISPENSATION history, so on
-                         the bar source it would either be empty or, worse, show genetics while you are
-                         browsing drinks. Hidden for that source rather than shown empty. --}}
-                    @if ($catalogueSource === 'genetics' && ! empty($usualGenetics))
-                        <div class="mt-3" data-usual-genetics>
+                    {{-- "Their usual" (prompt 133): the member's recent genetics, one tap each, only those sellable at this
+                         sede right now. Genetics only (212) — it is built from DISPENSATION history. --}}
+                    @if (! empty($head['usual']))
+                        <div class="mt-3" data-usual-genetics x-show="source === 'genetics'">
                             <p class="mb-1 text-xs font-medium text-ink-muted dark:text-slate-400">{{ __('Su habitual') }}</p>
                             <div class="flex flex-wrap gap-2">
-                                @foreach ($usualGenetics as $usual)
+                                @foreach ($head['usual'] as $usual)
                                     <button
                                         type="button"
-                                        wire:click="chooseGenetic('{{ $usual['id'] }}')"
+                                        x-on:click="$wire.chooseGenetic('{{ $usual['id'] }}')"
                                         data-usual-genetic="{{ $usual['id'] }}"
                                         class="inline-flex min-h-11 items-center gap-1.5 rounded-full border border-brand/40 bg-brand-tint px-4 text-sm font-semibold text-brand transition hover:bg-brand hover:text-white dark:bg-slate-800 dark:text-slate-100"
                                     >{{ $usual['name'] }}</button>
@@ -414,187 +417,149 @@
                         </div>
                     @endif
 
-                    {{-- Prompt 176 — the filters are COLLAPSED by default, and search is the primary route.
-
-                         Three labelled filter rows (Categoría, Tipo, Variedad) stood between the heading and
-                         the first genetic; measured on main, the list began past y=1190 in an 820px viewport.
-                         Treez, the cannabis POS, is search-first for exactly this reason: a genetic carries
-                         lab figures, a category and live stock that no row of pills summarises. So search is
-                         at the top, always visible, and the axes are one tap away — labelled as before
-                         (prompt 66: unlabelled, the three read as duplicates), and opened automatically when
-                         a filter is already applied so an active filter is never hidden from the operator. --}}
-                    {{-- Which of these apply to ARTICLES (prompt 212): Categoría does — an article carries one,
-                         and it is the same club-authored taxonomy. Tipo and Variedad do not: `ProductType` and
-                         strain are facts about cannabis and would render as an empty row on the bar source,
-                         which is the "shown empty" this branch was told to avoid. So the bar gets one filter
-                         row, its own, and the pane's furniture follows the source. --}}
+                    {{-- Prompt 176 — the filters are COLLAPSED by default and search is the primary route (Treez is
+                         search-first for the same reason). Each row is LABELLED (66): Categoría, Tipo and Variedad are
+                         different axes. The bar has one row, Categoría (212) — type and strain are facts about cannabis. --}}
                     @php
-                        $paneCategories = $catalogueSource === 'bar' ? $articleCategories : $categories;
-                        $activeCategoryId = $catalogueSource === 'bar' ? $articleCategoryId : $categoryId;
-                        $categoryAction = $catalogueSource === 'bar' ? 'filterArticleCategory' : 'filterCategory';
-                        $activeFilters = $catalogueSource === 'bar'
-                            ? ($articleCategoryId !== null ? 1 : 0)
-                            : collect([$categoryId, $productType, $strainType])->filter()->count();
+                        $filterRows = [
+                            ['genetics', 'category', __('Categoría'), __('Todas'), array_map(fn (array $c): array => [$c['id'], $c['name']], $head['categories'])],
+                            ['genetics', 'productType', __('Tipo'), __('Todos los tipos'), array_map(fn (array $t): array => [$t['value'], $t['label']], $head['productTypes'])],
+                            ['genetics', 'strainType', __('Variedad'), __('Todas'), array_map(fn (array $t): array => [$t['value'], $t['label']], $head['strainTypes'])],
+                            ['bar', 'category', __('Categoría'), __('Todas'), array_map(fn (array $c): array => [$c['id'], $c['name']], $head['articleCategories'])],
+                        ];
                     @endphp
-                    <div x-data="{ open: {{ $activeFilters > 0 ? 'true' : 'false' }} }" class="mt-3">
+                    <div class="mt-3">
                         <button
                             type="button"
-                            x-on:click="open = ! open"
-                            x-bind:aria-expanded="open ? 'true' : 'false'"
+                            x-on:click="filtersOpen = ! filtersOpen"
+                            x-bind:aria-expanded="filtersOpen ? 'true' : 'false'"
+                            aria-expanded="false"
                             class="inline-flex h-11 items-center gap-2 rounded-xl border border-line px-4 text-sm font-medium text-ink-muted transition hover:bg-surface-alt dark:border-slate-700 dark:text-slate-400 dark:hover:bg-slate-800"
                         >
                             {{ __('Filtros') }}
-                            @if ($activeFilters > 0)
-                                <span class="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-brand px-1.5 text-[11px] font-bold text-white">{{ $activeFilters }}</span>
-                            @endif
-                            <span aria-hidden="true" x-text="open ? '\u25b4' : '\u25be'"></span>
+                            <span x-show="activeFilters > 0" x-cloak x-text="activeFilters" class="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-brand px-1.5 text-[11px] font-bold text-white"></span>
+                            <span aria-hidden="true" x-text="filtersOpen ? '▴' : '▾'">&#9662;</span>
                         </button>
 
-                        <div x-show="open" x-cloak>
-                    {{-- Each filter row is LABELLED (prompt 66) — Categoría (club data), Tipo (product type)
-                         and Variedad (strain) are different axes; unlabelled, they read as duplicates. --}}
-                    @if (! empty($paneCategories))
-                        <div class="mt-3">
-                            <p class="mb-1 text-xs font-medium text-ink-muted dark:text-slate-400">{{ __('Categoría') }}</p>
-                            <div role="group" aria-label="{{ __('Categoría') }}" class="flex flex-wrap gap-2">
-                                <button type="button" wire:click="{{ $categoryAction }}(null)" aria-pressed="{{ ($activeCategoryId === null) ? 'true' : 'false' }}" @class(['inline-flex items-center rounded-full border min-h-11 px-4 text-sm', 'border-brand bg-brand text-white' => $activeCategoryId === null, 'border-line text-ink-muted dark:border-slate-700 dark:text-slate-400' => $activeCategoryId !== null])>{{ __('Todas') }}</button>
-                                @foreach ($paneCategories as $category)
-                                    <button type="button" wire:click="{{ $categoryAction }}('{{ $category['id'] }}')" aria-pressed="{{ ($activeCategoryId === $category['id']) ? 'true' : 'false' }}" @class(['inline-flex items-center rounded-full border min-h-11 px-4 text-sm', 'border-brand bg-brand text-white' => $activeCategoryId === $category['id'], 'border-line text-ink-muted dark:border-slate-700 dark:text-slate-400' => $activeCategoryId !== $category['id']])>{{ $category['name'] }}</button>
-                                @endforeach
-                            </div>
-                        </div>
-                    @endif
-
-                    @if ($catalogueSource === 'genetics' && ! empty($productTypes))
-                        <div class="mt-2">
-                            <p class="mb-1 text-xs font-medium text-ink-muted dark:text-slate-400">{{ __('Tipo') }}</p>
-                            <div role="group" aria-label="{{ __('Tipo') }}" class="flex flex-wrap gap-2">
-                                <button type="button" wire:click="filterProductType(null)" aria-pressed="{{ ($productType === null) ? 'true' : 'false' }}" @class(['inline-flex items-center rounded-full border min-h-11 px-4 text-sm', 'border-brand bg-brand text-white' => $productType === null, 'border-line text-ink-muted dark:border-slate-700 dark:text-slate-400' => $productType !== null])>{{ __('Todos los tipos') }}</button>
-                                @foreach ($productTypes as $type)
-                                    <button type="button" wire:click="filterProductType('{{ $type['value'] }}')" aria-pressed="{{ ($productType === $type['value']) ? 'true' : 'false' }}" @class(['inline-flex items-center rounded-full border min-h-11 px-4 text-sm', 'border-brand bg-brand text-white' => $productType === $type['value'], 'border-line text-ink-muted dark:border-slate-700 dark:text-slate-400' => $productType !== $type['value']])>{{ $type['label'] }}</button>
-                                @endforeach
-                            </div>
-                        </div>
-                    @endif
-
-                    @if ($catalogueSource === 'genetics' && ! empty($strainTypes))
-                        <div class="mt-2">
-                            <p class="mb-1 text-xs font-medium text-ink-muted dark:text-slate-400">{{ __('Variedad') }}</p>
-                            <div role="group" aria-label="{{ __('Variedad') }}" class="flex flex-wrap gap-2">
-                                <button type="button" wire:click="filterStrainType(null)" aria-pressed="{{ ($strainType === null) ? 'true' : 'false' }}" @class(['inline-flex items-center rounded-full border min-h-11 px-4 text-sm', 'border-brand bg-brand text-white' => $strainType === null, 'border-line text-ink-muted dark:border-slate-700 dark:text-slate-400' => $strainType !== null])>{{ __('Todas') }}</button>
-                                @foreach ($strainTypes as $variety)
-                                    <button type="button" wire:click="filterStrainType('{{ $variety['value'] }}')" aria-pressed="{{ ($strainType === $variety['value']) ? 'true' : 'false' }}" @class(['inline-flex items-center rounded-full border min-h-11 px-4 text-sm', 'border-brand bg-brand text-white' => $strainType === $variety['value'], 'border-line text-ink-muted dark:border-slate-700 dark:text-slate-400' => $strainType !== $variety['value']])>{{ $variety['label'] }}</button>
-                                @endforeach
-                            </div>
-                        </div>
-                    @endif
+                        <div x-show="filtersOpen" x-cloak>
+                            @foreach ($filterRows as [$rowSource, $axis, $heading, $allLabel, $options])
+                                @continue(empty($options))
+                                @php $state = $axis === 'category' ? "category.{$rowSource}" : $axis; @endphp
+                                <div class="mt-2" x-show="source === '{{ $rowSource }}'">
+                                    <p class="mb-1 text-xs font-medium text-ink-muted dark:text-slate-400">{{ $heading }}</p>
+                                    <div role="group" aria-label="{{ $heading }}" class="flex flex-wrap gap-2">
+                                        @foreach ([[null, $allLabel], ...$options] as [$value, $label])
+                                            <button
+                                                type="button"
+                                                data-view-only
+                                                x-on:click="filter('{{ $axis }}', @js($value))"
+                                                aria-pressed="{{ $value === null ? 'true' : 'false' }}"
+                                                x-bind:aria-pressed="{{ $state }} === @js($value) ? 'true' : 'false'"
+                                                class="inline-flex min-h-11 items-center rounded-full border px-4 text-sm {{ $value === null ? $chipOn : $chipOff }}"
+                                                x-bind:class="{ '{{ $chipOn }}': {{ $state }} === @js($value), '{{ $chipOff }}': ! ({{ $state }} === @js($value)) }"
+                                            >{{ $label }}</button>
+                                        @endforeach
+                                    </div>
+                                </div>
+                            @endforeach
                         </div>
                     </div>
 
-                    {{-- THE BAR SOURCE — the same card shape, the same layout toggle, the same 44px floor.
-                         A tap adds a BAR line (`addBarItem`), never a dispensation: the toggle changes what
-                         you browse, not which basket you fill, and the cart keeps them in two labelled
-                         sections. Stock is a STATE (185), never a count. --}}
-                    @if ($catalogueSource === 'bar')
-                        <div @class([
-                            'mt-4',
-                            'flex flex-col gap-2' => $this->catalogueLayout() === 'list',
-                            'grid gap-3 sm:grid-cols-2' => $this->catalogueLayout() === 'grid',
-                        ])>
-                            @forelse ($barArticles as $article)
-                                {{-- ONE card, both bars (prompt 230). The ACTION is this screen's
-                                     (`addBarItem` fills the visit's bar side); the shape, the density, the
-                                     stock count and the sold-out state are the component's. --}}
-                                <x-counter.article-card
-                                    :article="$article"
-                                    :layout="$this->catalogueLayout()"
-                                    action="addBarItem"
-                                    :thumbs="$barHasImages"
-                                />
-                            @empty
-                                <p class="rounded-xl border border-dashed border-line px-4 py-6 text-center text-sm text-ink-muted dark:border-slate-700 dark:text-slate-400">
-                                    {{ $articleSearch !== '' || $articleCategoryId !== null
-                                        ? __('Ningún artículo coincide con la búsqueda.')
-                                        : __('No hay artículos disponibles en esta sede.') }}
-                                </p>
-                            @endforelse
-                        </div>
-                    @else
-                    <div @class([
-                        'mt-4',
-                        'flex flex-col gap-2' => $this->catalogueLayout() === 'list',
-                        'grid gap-3 sm:grid-cols-2' => $this->catalogueLayout() === 'grid',
-                    ])>
-                        {{-- Prompt 271 — the variety's photo (taken at "Añadir variedad"), 193's rule: the column only when
-                             some variety has one; a variety without gets its initial, never an invented picture. --}}
-                        @php $geneticThumbs = collect($genetics)->contains(fn (array $row): bool => $row['image_url'] !== null); @endphp
-                        @forelse ($genetics as $g)
-                            @php $disabledCard = $member === null || ! $g['has_batch']; @endphp
-                            <button
-                                type="button"
-                                @if (! $disabledCard) wire:click="chooseGenetic('{{ $g['id'] }}')" @endif
-                                @disabled($disabledCard)
-                                data-product
-                                @class([
-                                    'flex w-full min-h-11 rounded-xl border px-3 py-1.5 text-left transition',
-                                    'flex-col gap-1' => $this->catalogueLayout() === 'grid',
-                                    'flex-col gap-1 sm:flex-row sm:items-center sm:justify-between sm:gap-4' => $this->catalogueLayout() === 'list',
-                                    'border-line bg-surface hover:border-brand hover:bg-brand-tint/40 dark:border-slate-700 dark:bg-slate-950 dark:hover:border-brand dark:hover:bg-slate-800' => ! $disabledCard,
-                                    'cursor-not-allowed border-dashed border-line bg-surface-alt opacity-60 dark:border-slate-800 dark:bg-slate-900' => $disabledCard,
-                                ])
-                            >
-                                {{-- LEFT: the name, and one meta line under it. Prompt 225 compacted the card
-                                     from three stacked rows (~90px) to a name plus a meta line (~64px in list
-                                     view) — the owner asked for "compact, maybe not as much as this design",
-                                     so the density comes from padding and type scale and NOT from dropping
-                                     facts: every figure the 90px card carried is still here. --}}
-                                @if ($geneticThumbs)
-                                    <span data-genetic-thumb class="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-surface-alt dark:bg-slate-800">
-                                        @if ($g['image_url'])
-                                            <img src="{{ $g['image_url'] }}" alt="" class="h-full w-full object-cover">
-                                        @else
-                                            <span class="text-sm font-semibold text-ink-muted dark:text-slate-400">{{ mb_strtoupper(mb_substr($g['name'], 0, 1)) }}</span>
-                                        @endif
-                                    </span>
-                                @endif
-                                <span class="min-w-0 flex-1">
-                                    <span class="block truncate font-semibold leading-tight">{{ $g['name'] }}</span>
-                                    <span class="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px] leading-tight text-ink-muted dark:text-slate-400">
-                                        <span class="font-semibold text-ink-muted dark:text-slate-300">{{ $g['product_type_label'] }}</span>
-                                        @if ($g['strain_type_label'])<span class="font-semibold text-brand dark:text-slate-200">{{ $g['strain_type_label'] }}</span>@endif
-                                        <span>THC {{ number_format($g['thc_bp'] / 100, 1) }}%</span>
-                                        <span>CBD {{ number_format($g['cbd_bp'] / 100, 1) }}%</span>
-                                        @if ($g['cultivation'])<span>{{ $g['cultivation'] }}</span>@endif
-                                        @if ($g['price_label'])<span class="font-medium text-brand dark:text-slate-300">{{ $g['price_label'] }}</span>@endif
-                                    </span>
-                                </span>
+                    @endisland
 
-                                {{-- RIGHT: price over stock. 216's cover badge and the stock FIGURE are
-                                     unchanged — a staff screen carries quantities, and "≈2 días" is the
-                                     information the word "bajo" is not. --}}
-                                <span @class([
-                                    'flex shrink-0 items-center gap-3 text-xs',
-                                    'sm:flex-col sm:items-end sm:gap-0.5' => $this->catalogueLayout() === 'list',
-                                    'justify-between' => $this->catalogueLayout() === 'grid',
-                                ])>
-                                    <span class="text-sm font-semibold text-brand tabular-nums dark:text-slate-100">{{ $this->money($g['rate_cents']) }}/{{ $g['is_unit'] ? __('ud') : 'g' }}</span>
-                                    <span class="flex items-center gap-1.5 whitespace-nowrap text-ink-muted dark:text-slate-400">
-                                        <span class="tabular-nums">{{ $g['is_unit'] ? $g['remaining_units'].' '.__('uds') : $this->grams($g['remaining_cg']) }}</span>
-                                        @if ($g['has_batch'] && $g['low_stock'])
-                                            <span data-stock-cover="{{ $g['cover']['basis'] }}" class="inline-flex items-center gap-1 text-warning"><span class="h-2 w-2 rounded-full bg-warning"></span>{{ $g['cover_label'] ?? __('Stock bajo') }}</span>
-                                        @elseif ($g['has_batch'])
-                                            <span class="inline-flex items-center gap-1 text-success"><span class="h-2 w-2 rounded-full bg-success"></span>{{ __('Con lote') }}</span>
-                                        @else
-                                            <span class="inline-flex items-center gap-1"><span class="h-2 w-2 rounded-full bg-slate-400"></span>{{ __('Sin lote') }}</span>
-                                        @endif
-                                    </span>
-                                </span>
-                            </button>
-                        @empty
-                            <p class="col-span-full rounded-xl border border-dashed border-line px-4 py-8 text-center text-sm text-ink-muted dark:border-slate-700 dark:text-slate-400">{{ __('No hay genéticas con precio activo en esta sede.') }}</p>
-                        @endforelse
-                    </div>
+                    {{-- THE BAR SOURCE — the same card (230), the same layout toggle, the same 44px floor. A tap adds a BAR
+                         line (`addBarItem`), never a dispensation. Stock is a count on a staff screen (216). --}}
+                    @island('catalogue-bar', always: $this->islandChanged('bar'))
+                    @php $bar = $this->islandView('bar'); @endphp
+                    @if ($bar['enabled'])
+                        <div x-show="source === 'bar'" x-cloak>
+                            <div data-layout="{{ $articleLayout }}" x-bind:data-layout="layoutOf('bar')"
+                                 class="mt-4 as-list:flex as-list:flex-col as-list:gap-2 as-grid:grid as-grid:gap-3 as-grid:sm:grid-cols-2">
+                                @foreach ($bar['rows'] as $article)
+                                    <x-counter.article-card :article="$article" action="addBarItem" :thumbs="$bar['thumbs']"
+                                        data-catalogue-item="bar" :search="[$article['name'], (string) ($article['category_name'] ?? '')]" />
+                                @endforeach
+                            </div>
+                            <p x-show="! anyVisible('bar')" x-cloak class="mt-4 rounded-xl border border-dashed border-line px-4 py-6 text-center text-sm text-ink-muted dark:border-slate-700 dark:text-slate-400">
+                                {{ empty($bar['rows']) ? __('No hay artículos disponibles en esta sede.') : __('Ningún artículo coincide con la búsqueda.') }}
+                            </p>
+                        </div>
                     @endif
+                    @endisland
+
+                    @island('catalogue-genetics', always: $this->islandChanged('genetics'))
+                    @php $gen = $this->islandView('genetics'); @endphp
+                    <div x-show="source === 'genetics'">
+                        <div data-layout="{{ $geneticLayout }}" x-bind:data-layout="layoutOf('genetics')"
+                             class="mt-4 as-list:flex as-list:flex-col as-list:gap-2 as-grid:grid as-grid:gap-3 as-grid:sm:grid-cols-2">
+                            {{-- Prompt 271 — the variety's photo, 193's rule: the column only when some variety has one. --}}
+                            @foreach ($gen['rows'] as $g)
+                                @php $disabledCard = ! $gen['hasMember'] || ! $g['has_batch']; @endphp
+                                <button
+                                    type="button"
+                                    @if (! $disabledCard) x-on:click="$wire.chooseGenetic('{{ $g['id'] }}')" @endif
+                                    @disabled($disabledCard)
+                                    data-product
+                                    data-catalogue-item="genetics"
+                                    data-category="{{ $g['category_id'] }}"
+                                    data-type="{{ $g['product_type'] }}"
+                                    data-strain="{{ $g['strain_type'] }}"
+                                    data-search="{{ $g['name'] }}"
+                                    x-show="visible($el)"
+                                    @class([
+                                        'flex w-full min-h-11 flex-col gap-1 rounded-xl border px-3 py-1.5 text-left transition',
+                                        'as-list:sm:flex-row as-list:sm:items-center as-list:sm:justify-between as-list:sm:gap-4',
+                                        'border-line bg-surface hover:border-brand hover:bg-brand-tint/40 dark:border-slate-700 dark:bg-slate-950 dark:hover:border-brand dark:hover:bg-slate-800' => ! $disabledCard,
+                                        'cursor-not-allowed border-dashed border-line bg-surface-alt opacity-60 dark:border-slate-800 dark:bg-slate-900' => $disabledCard,
+                                    ])
+                                >
+                                    {{-- LEFT: the name and one meta line (225's density, every figure kept). --}}
+                                    @if ($gen['thumbs'])
+                                        <span data-genetic-thumb class="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-surface-alt dark:bg-slate-800">
+                                            @if ($g['image_url'])
+                                                <img src="{{ $g['image_url'] }}" alt="" class="h-full w-full object-cover">
+                                            @else
+                                                <span class="text-sm font-semibold text-ink-muted dark:text-slate-400">{{ mb_strtoupper(mb_substr($g['name'], 0, 1)) }}</span>
+                                            @endif
+                                        </span>
+                                    @endif
+                                    <span class="min-w-0 flex-1">
+                                        <span class="block truncate font-semibold leading-tight">{{ $g['name'] }}</span>
+                                        <span class="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px] leading-tight text-ink-muted dark:text-slate-400">
+                                            <span class="font-semibold text-ink-muted dark:text-slate-300">{{ $g['product_type_label'] }}</span>
+                                            @if ($g['strain_type_label'])<span class="font-semibold text-brand dark:text-slate-200">{{ $g['strain_type_label'] }}</span>@endif
+                                            <span>THC {{ number_format($g['thc_bp'] / 100, 1) }}%</span>
+                                            <span>CBD {{ number_format($g['cbd_bp'] / 100, 1) }}%</span>
+                                            @if ($g['cultivation'])<span>{{ $g['cultivation'] }}</span>@endif
+                                            @if ($g['price_label'])<span class="font-medium text-brand dark:text-slate-300">{{ $g['price_label'] }}</span>@endif
+                                        </span>
+                                    </span>
+
+                                    {{-- RIGHT: price over stock. 216's cover badge and the stock FIGURE — "≈2 días" is the
+                                         information the word "bajo" is not. --}}
+                                    <span class="flex shrink-0 items-center gap-3 text-xs as-list:sm:flex-col as-list:sm:items-end as-list:sm:gap-0.5 as-grid:justify-between">
+                                        <span class="text-sm font-semibold text-brand tabular-nums dark:text-slate-100">{{ $this->money($g['rate_cents']) }}/{{ $g['is_unit'] ? __('ud') : 'g' }}</span>
+                                        <span class="flex items-center gap-1.5 whitespace-nowrap text-ink-muted dark:text-slate-400">
+                                            <span class="tabular-nums">{{ $g['is_unit'] ? $g['remaining_units'].' '.__('uds') : $this->grams($g['remaining_cg']) }}</span>
+                                            @if ($g['has_batch'] && $g['low_stock'])
+                                                <span data-stock-cover="{{ $g['cover']['basis'] }}" class="inline-flex items-center gap-1 text-warning"><span class="h-2 w-2 rounded-full bg-warning"></span>{{ $g['cover_label'] ?? __('Stock bajo') }}</span>
+                                            @elseif ($g['has_batch'])
+                                                <span class="inline-flex items-center gap-1 text-success"><span class="h-2 w-2 rounded-full bg-success"></span>{{ __('Con lote') }}</span>
+                                            @else
+                                                <span class="inline-flex items-center gap-1"><span class="h-2 w-2 rounded-full bg-slate-400"></span>{{ __('Sin lote') }}</span>
+                                            @endif
+                                        </span>
+                                    </span>
+                                </button>
+                            @endforeach
+                        </div>
+                        @if (empty($gen['rows']))
+                            <p class="mt-4 rounded-xl border border-dashed border-line px-4 py-8 text-center text-sm text-ink-muted dark:border-slate-700 dark:text-slate-400">{{ __('No hay genéticas con precio activo en esta sede.') }}</p>
+                        @else
+                            <p x-show="! anyVisible('genetics')" x-cloak class="mt-4 rounded-xl border border-dashed border-line px-4 py-8 text-center text-sm text-ink-muted dark:border-slate-700 dark:text-slate-400">{{ __('Ninguna genética coincide con la búsqueda.') }}</p>
+                        @endif
+                    </div>
+                    @endisland
                 </section>
             @endif
             </div>
@@ -714,8 +679,10 @@
                     $hasBarLines = ! empty($barLines);
                     $hasAnyLines = $hasDispensationLines || $hasBarLines;
                     // The bar section also appears while the operator is BROWSING the bar, so the first tap
-                    // lands somewhere visible rather than into a section that does not exist yet.
-                    $showBarSection = $barEnabled && ($hasBarLines || $catalogueSource === 'bar' || $hasDispensationLines);
+                    // lands somewhere visible rather than into a section that does not exist yet. Which source is
+                    // browsed is the browser's since prompt 293 (the tab makes no request), so that case is an
+                    // `x-show` on the shared Alpine store rather than a server branch.
+                    $showBarSection = $barEnabled && ($hasBarLines || $hasDispensationLines);
                 @endphp
 
                 <section data-cart-dispensation-section class="rounded-2xl border border-line bg-surface p-4 dark:border-slate-800 dark:bg-slate-900">
@@ -791,8 +758,8 @@
                     {{-- Bar/merch side of the SAME visit (prompt 118): add articles, then settle the whole visit
                          once — one payment, but a dispensation AND a bar order on their separate ledgers. Only
                          where the sede runs a bar. The shared tender below covers the combined total. --}}
-                    @if ($showBarSection)
-                        <div data-cart-bar-section class="mt-3 rounded-xl border border-line p-3 dark:border-slate-700">
+                    @if ($barEnabled)
+                        <div data-cart-bar-section @unless ($showBarSection) x-show="$store.counterCatalogue.source === 'bar'" x-cloak @endunless class="mt-3 rounded-xl border border-line p-3 dark:border-slate-700">
                             <p class="text-xs font-semibold uppercase tracking-wide text-ink-muted dark:text-slate-400">{{ __('Barra y tienda (misma visita)') }}</p>
 
                             @if (! empty($barLines))
@@ -818,11 +785,8 @@
                                  dispensario source the operator has to be told WHERE the bar is, and on the
                                  barra source they are already there and need to know the tap will land. --}}
                             @unless ($hasBarLines)
-                                <p class="mt-2 text-xs text-ink-muted dark:text-slate-400">
-                                    {{ $catalogueSource === 'bar'
-                                        ? __('Toca un artículo para añadirlo a esta visita.')
-                                        : __('Cambia a Barra arriba para añadir artículos a esta visita.') }}
-                                </p>
+                                <p class="mt-2 text-xs text-ink-muted dark:text-slate-400" x-show="$store.counterCatalogue.source === 'bar'" x-cloak>{{ __('Toca un artículo para añadirlo a esta visita.') }}</p>
+                                <p class="mt-2 text-xs text-ink-muted dark:text-slate-400" x-show="$store.counterCatalogue.source !== 'bar'">{{ __('Cambia a Barra arriba para añadir artículos a esta visita.') }}</p>
                             @endunless
 
                             @if ($hasBarLines)

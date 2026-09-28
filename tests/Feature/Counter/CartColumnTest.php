@@ -242,10 +242,11 @@ class CartColumnTest extends TestCase
     {
         $component = $this->dispensary();
 
-        $component->call('setGeneticLayout', 'grid');
+        // Prompt 293 — the toggle is the browser's; its choice arrives as the property, riding the next request.
+        $component->set('geneticLayout', 'grid');
         $this->assertSame('grid', $component->get('geneticLayout'));
 
-        $component->call('setGeneticLayout', 'list');
+        $component->set('geneticLayout', 'list');
         $this->assertSame('list', $component->get('geneticLayout'));
     }
 
@@ -256,10 +257,10 @@ class CartColumnTest extends TestCase
 
         $component = Livewire::test(BarPos::class);
 
-        $component->call('setArticleLayout', 'list');
+        $component->set('articleLayout', 'list');
         $this->assertSame('list', $component->get('articleLayout'));
 
-        $component->call('setArticleLayout', 'grid');
+        $component->set('articleLayout', 'grid');
         $this->assertSame('grid', $component->get('articleLayout'));
     }
 
@@ -269,7 +270,7 @@ class CartColumnTest extends TestCase
         $this->genetic();
         $member = $this->member();
 
-        Livewire::test(DispensaryPos::class)->call('selectMember', $member->id)->call('setGeneticLayout', 'grid');
+        Livewire::test(DispensaryPos::class)->call('selectMember', $member->id)->set('geneticLayout', 'grid');
 
         // A FRESH mount — the same session, a new component instance, as after a reload.
         $this->assertSame('grid', Livewire::test(DispensaryPos::class)->get('geneticLayout'));
@@ -281,12 +282,12 @@ class CartColumnTest extends TestCase
         $this->genetic();
         $this->article();
 
-        Livewire::test(DispensaryPos::class)->call('setGeneticLayout', 'grid');
+        Livewire::test(DispensaryPos::class)->set('geneticLayout', 'grid');
 
         // The bar keeps its own default — one shared key would make one screen's preference the other's.
         $this->assertSame('grid', Livewire::test(BarPos::class)->get('articleLayout'));
 
-        Livewire::test(BarPos::class)->call('setArticleLayout', 'list');
+        Livewire::test(BarPos::class)->set('articleLayout', 'list');
         $this->assertSame('grid', Livewire::test(DispensaryPos::class)->get('geneticLayout'));
     }
 
@@ -294,7 +295,7 @@ class CartColumnTest extends TestCase
     {
         $component = $this->dispensary();
 
-        $component->call('setGeneticLayout', 'carousel');
+        $component->set('geneticLayout', 'carousel');
 
         $this->assertSame('list', $component->get('geneticLayout'));
     }
@@ -307,19 +308,16 @@ class CartColumnTest extends TestCase
 
         $this->assertStringContainsString(__('Filtros'), $html);
         // Closed by default: the rows are inside an x-show, so they cost no vertical space on arrival.
-        $this->assertStringContainsString('x-show="open"', $html);
+        $this->assertStringContainsString('x-show="filtersOpen"', $html);
     }
 
-    public function test_the_filters_open_themselves_when_a_filter_is_already_applied(): void
+    public function test_a_collapsed_filter_panel_still_says_a_filter_is_applied(): void
     {
-        $component = $this->dispensary();
+        // An active filter that is hidden is a filter the operator cannot see they have set. The filters are the
+        // browser's since prompt 293, so the closed "Filtros" control carries the live count of applied filters.
+        $html = (string) preg_replace('/\s+/', ' ', $this->dispensary()->html());
 
-        $this->assertStringContainsString('x-data="{ open: false }"', $component->html());
-
-        $component->call('filterProductType', 'FLOWER');
-
-        // An active filter that is hidden is a filter the operator cannot see they have set.
-        $this->assertStringContainsString('x-data="{ open: true }"', $component->html());
+        $this->assertMatchesRegularExpression('/x-on:click="filtersOpen = ! filtersOpen".*?<span x-show="activeFilters > 0" x-cloak x-text="activeFilters"/', $html);
     }
 
     // --- the touch floor, on the controls this branch moved or raised --------------------------------

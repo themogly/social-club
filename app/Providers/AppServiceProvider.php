@@ -5,6 +5,7 @@ namespace App\Providers;
 use App\Http\Middleware\AuthenticateCounter;
 use App\Http\Responses\CounterAwareLoginResponse;
 use App\Support\ActiveScope;
+use App\Support\CompactCounterMarkup;
 use App\Support\CounterHandoverConfinement;
 use App\Support\CounterLockConfinement;
 use App\Support\CounterRequest;
@@ -44,6 +45,9 @@ class AppServiceProvider extends ServiceProvider
 
         // Prompt 261 — mark counter Livewire requests, so the audit actor is the PIN operator there and only there.
         CounterRequest::register();
+
+        // Prompt 293 — a counter screen's markup leaves without its template indentation (a quarter of a basket tap).
+        CompactCounterMarkup::register();
 
         // A click on the primary button must ALWAYS produce a visible answer (prompt 168).
         //

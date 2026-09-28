@@ -141,7 +141,7 @@ class OperatorPermissionIsEnforcedServerSideTest extends TestCase
         Livewire::test(DispensaryPos::class)
             ->call('selectMember', $this->member->id)
             ->call('chooseGenetic', $this->genetic->id)->set('weightInput', '1')->call('addLine')
-            ->call('setCatalogueSource', 'bar')->call('addBarItem', $this->beer->id)
+            ->call('addBarItem', $this->beer->id)
             ->call('commitDispensation')
             ->assertSet('flashType', 'success');
 
@@ -156,8 +156,7 @@ class OperatorPermissionIsEnforcedServerSideTest extends TestCase
         Livewire::test(DispensaryPos::class)
             ->call('selectMember', $this->member->id)
             ->assertDontSeeHtml('data-source-option="bar"')
-            ->call('setCatalogueSource', 'bar')
-            ->assertSet('catalogueSource', 'genetics');
+            ->assertDontSeeHtml('data-catalogue-item="bar"'); // no bar source on the page at all, not a hidden one
     }
 
     // --- The sweep: every screen's core write asks the operator ------------------------------------------------

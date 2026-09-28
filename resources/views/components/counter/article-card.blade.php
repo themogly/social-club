@@ -15,10 +15,16 @@
 
      **Contract** — the consumer supplies:
        · `article`  a row: id, name, price_cents|price_label, stock, low_stock, category_name, image_url
-       · `layout`   `list` (default), `grid`, or `large` (prompt 248 — the standalone Bar's big-tile size;
-                    list/grid are byte-identical to before, the large classes are additive)
        · `action`   the Livewire method a tap calls — `addArticle` on the Bar, `addBarItem` on the POS. The
-                    ACTION is the consumer's; the shape is not.
+                    ACTION is the consumer's; the shape is not. Called as `$wire.…` (prompt 293): the card sits in
+                    the catalogue ISLAND, where a `wire:click` would re-render only the island and leave the cart
+                    beside it stale.
+       · `search`   the fields the catalogue's browser-side search matches (prompt 293) — the consumer's rule.
+
+     The SIZE is the container's (prompt 293): it carries `data-layout` = `list`, `grid` or `large` (248 — the
+     standalone Bar's big tile) and the card styles itself with the `as-list:` / `as-grid:` / `as-large:` variants,
+     so the list/grid/large toggle is one attribute in the browser, not a request that re-renders every card. A card
+     given `data-catalogue-item` hides itself when the pane's filters or search leave it out.
        · `thumbs`   whether this sede has any article image at all (193: a large empty glyph is a
                     broken-looking gap rather than a design, so the column exists only where a picture does)
 
@@ -32,9 +38,9 @@
      a picture (CLAUDE.md), and a test asserts the refusal rather than trusting the attribute. --}}
 @props([
     'article',
-    'layout' => 'list',
     'action' => 'addArticle',
     'thumbs' => false,
+    'search' => null,
 ])
 
 @php
@@ -45,33 +51,31 @@
 
 <button
     type="button"
-    @if (! $soldOut) wire:click="{{ $action }}('{{ $article['id'] }}')" @endif
+    @if (! $soldOut) x-on:click="$wire.{{ $action }}('{{ $article['id'] }}')" @endif
     @disabled($soldOut)
     data-product
     data-article-card="{{ $article['id'] }}"
-    @class([
+    data-category="{{ $article['category_id'] ?? '' }}"
+    data-search="{{ implode("\n", $search ?? [$article['name']]) }}"
+    @if ($attributes->has('data-catalogue-item')) x-show="visible($el)" @endif
+    {{ $attributes->class([
         'flex w-full min-h-11 rounded-xl border px-3 py-1.5 text-left transition',
         // 225's density, on both screens now: name + meta left, price over stock right.
-        'flex-col gap-1' => $layout === 'grid',
-        'flex-row items-center gap-3' => $layout === 'list',
+        'as-grid:flex-col as-grid:gap-1',
+        'as-list:flex-row as-list:items-center as-list:gap-3',
         // Prompt 248 — the LARGE size (standalone Bar only): a big tile, name and price large, stock small.
-        // `!` overrides the base min-h/padding; list/grid never see these (the condition is false there).
-        'flex-col justify-between gap-2 !min-h-[120px] !px-4 !py-3' => $layout === 'large',
+        // `!` overrides the base min-h/padding.
+        'as-large:flex-col as-large:justify-between as-large:gap-2 as-large:!min-h-[120px] as-large:!px-4 as-large:!py-3',
         // Prompt 272 — a DARK hover: on a tablet `:hover` sticks to the last tile tapped, and the light tint left
         // the tile's secondary text at 1.91:1 in dark.
         'border-line bg-surface hover:border-brand hover:bg-brand-tint/40 dark:border-slate-700 dark:bg-slate-950 dark:hover:border-brand dark:hover:bg-slate-800' => ! $soldOut,
         'cursor-not-allowed border-dashed border-line bg-surface-alt opacity-60 dark:border-slate-800 dark:bg-slate-900' => $soldOut,
-    ])
+    ]) }}
 >
     {{-- A thumbnail ONLY where an image exists (prompt 193, quoted in the Bar's own list mode while its grid
          tile still rendered a 🛒 block). Missing pictures are the club's to supply; nothing here invents one. --}}
     @if ($thumbs)
-        <span @class([
-            'flex shrink-0 items-center justify-center overflow-hidden rounded-lg bg-surface-alt dark:bg-slate-800',
-            'h-10 w-10' => $layout === 'list',
-            'h-16 w-full' => $layout === 'grid',
-            'h-24 w-full' => $layout === 'large',
-        ])>
+        <span class="flex shrink-0 items-center justify-center overflow-hidden rounded-lg bg-surface-alt dark:bg-slate-800 as-list:h-10 as-list:w-10 as-grid:h-16 as-grid:w-full as-large:h-24 as-large:w-full">
             @if ($article['image_url'] ?? null)
                 <img src="{{ $article['image_url'] }}" alt="" class="h-full w-full object-cover">
             @else
@@ -81,18 +85,14 @@
     @endif
 
     <span class="min-w-0 flex-1">
-        <span data-product-name @class(['block truncate font-semibold leading-tight', '!text-lg' => $layout === 'large'])>{{ $article['name'] }}</span>
+        <span data-product-name class="block truncate font-semibold leading-tight as-large:!text-lg">{{ $article['name'] }}</span>
         @if ($article['category_name'] ?? null)
             <span class="mt-0.5 block truncate text-[11px] leading-tight text-ink-muted dark:text-slate-400">{{ $article['category_name'] }}</span>
         @endif
     </span>
 
-    <span @class([
-        'flex shrink-0 text-xs',
-        'flex-col items-end gap-0.5' => $layout === 'list',
-        'w-full flex-row items-center justify-between' => $layout === 'grid' || $layout === 'large',
-    ])>
-        <span @class(['text-sm font-semibold text-brand tabular-nums dark:text-slate-100', '!text-xl' => $layout === 'large'])>{{ $priceLabel ?? $this->money($article['price_cents']) }}</span>
+    <span class="flex shrink-0 text-xs as-list:flex-col as-list:items-end as-list:gap-0.5 as-grid:w-full as-grid:flex-row as-grid:items-center as-grid:justify-between as-large:w-full as-large:flex-row as-large:items-center as-large:justify-between">
+        <span class="text-sm font-semibold text-brand tabular-nums dark:text-slate-100 as-large:!text-xl">{{ $priceLabel ?? $this->money($article['price_cents']) }}</span>
 
         {{-- The count, on both screens. Sold-out and low stock are said in words AND colour; neither is
              colour alone. --}}

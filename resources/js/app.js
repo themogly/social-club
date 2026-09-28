@@ -10,6 +10,7 @@
 // The module itself is ~4KB and the OCR engine is NOT in it: `readMrz()` dynamically imports tesseract.js
 // on the first click, so loading this early costs a few kilobytes and no engine.
 import './mrz-reader.js';
+import { catalogueShows } from './catalogue-search.js';
 
 // Counter camera QR scanner (prompt 35) — a progressive enhancement registered on Alpine
 // (which Livewire ships). Uses the native BarcodeDetector where available (Chrome/Edge/
@@ -143,6 +144,59 @@ window.dispensaryPad = (config = {}) => ({
     },
 });
 
+// Prompt 293 — the catalogue pane's view controls, in the browser. The tab (Dispensario / Barra), the filters, the search
+// and the list/grid/large toggle only change what is VISIBLE over a catalogue that is already on the page in full, so
+// they make no request at all: each used to re-render and re-send the whole screen (~170 KB at club size). A tap on a
+// card is still a server action (`$wire.chooseGenetic`, `$wire.addBarItem`, `$wire.addArticle`) — price, limits and
+// stock are decided there, never here. The layout choice is still remembered per device by its #[Session] property:
+// `$wire.$set(prop, mode, false)` hands it over with the next real request instead of making one.
+window.counterCatalogue = (config = {}) => ({
+    source: config.source ?? 'genetics',
+    layouts: { ...(config.layouts ?? {}) },
+    layoutProps: config.layoutProps ?? {},
+    search: { genetics: '', bar: '' },
+    category: { genetics: null, bar: null },
+    productType: null,
+    strainType: null,
+    filtersOpen: false,
+    init() {
+        this.$store.counterCatalogue.source = this.source;
+    },
+    setSource(source) {
+        this.source = source;
+        this.$store.counterCatalogue.source = source;
+    },
+    layoutOf(source) {
+        return this.layouts[source ?? this.source];
+    },
+    setLayout(mode) {
+        this.layouts[this.source] = mode;
+        const prop = this.layoutProps[this.source];
+        if (prop) this.$wire.$set(prop, mode, false);
+    },
+    filter(axis, value) {
+        if (axis === 'category') this.category[this.source] = value;
+        else this[axis] = value;
+    },
+    get activeFilters() {
+        if (this.source === 'bar') return this.category.bar === null ? 0 : 1;
+        return [this.category.genetics, this.productType, this.strainType].filter((v) => v !== null).length;
+    },
+    // A card lists its own facts as data attributes, so a card added by a later render is filtered like the rest.
+    visible(el) {
+        const d = el.dataset;
+        return catalogueShows(
+            { source: d.catalogueItem, category: d.category, type: d.type, strain: d.strain, search: (d.search ?? '').split('\n') },
+            this,
+        );
+    },
+    anyVisible(source) {
+        // Read the filter state first so Alpine re-evaluates this when any of it changes.
+        const deps = [this.search[source], this.category[source], this.productType, this.strainType];
+        return deps && [...this.$root.querySelectorAll(`[data-catalogue-item="${source}"]`)].some((el) => this.visible(el));
+    },
+});
+
 window.counterPinCheck = () => ({
     checking: false,
     holding: false,
@@ -178,6 +232,9 @@ window.counterPinCheck = () => ({
 });
 
 document.addEventListener('alpine:init', () => {
+    // Which catalogue source the dispensary is browsing (prompt 293) — the cart reads it to show the bar section.
+    window.Alpine.store('counterCatalogue', { source: 'genetics' });
+
     window.Alpine.data('cameraScan', (config = {}) => ({
         messages: config.messages || {},
         supported:

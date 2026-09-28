@@ -102,11 +102,16 @@
              scrolls away is a nag nobody acts on — it is the fix for a fact this card is already stating (no
              photo, so the initials are showing right above it). 228's wrapped row exactly as it is: the
              sentence full width, the two ≥44px controls beneath. --}}
-        @unless ($photoUrl)
+        {{-- An island (prompt 293): the camera and its dialog are ~6 KB that change only when this socio's photo does,
+             so a basket tap no longer re-sends them. A saved photo refreshes the screen and the nag goes. --}}
+        @island('photo-nag', always: $this->islandChanged('photo'))
+        @php $nag = $this->islandView('photo'); @endphp
+        @if ($nag['missing'])
             <div data-photo-nag class="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1.5 rounded-xl border border-warning/30 bg-warning/5 px-3 py-1.5">
                 <p class="w-full text-[11px] font-medium leading-tight text-warning">{{ __('Sin foto — verifica y súbela') }}</p>
-                <x-counter.photo-capture :member="$member" source="counter" />
+                <x-counter.photo-capture :member-id="$nag['memberId']" source="counter" />
             </div>
-        @endunless
+        @endif
+        @endisland
     </section>
 @endif

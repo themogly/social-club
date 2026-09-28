@@ -25,6 +25,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Features\SupportTesting\Testable;
 use Livewire\Livewire;
 use Tests\Browser\Concerns\InlinesBuiltCss;
+use Tests\Browser\Concerns\KeepsIslands;
 use Tests\TestCase;
 
 /**
@@ -36,7 +37,7 @@ use Tests\TestCase;
  */
 class PosColumnHarnessTest extends TestCase
 {
-    use InlinesBuiltCss, RefreshDatabase;
+    use InlinesBuiltCss, KeepsIslands, RefreshDatabase;
 
     private Organisation $org;
 
@@ -73,16 +74,12 @@ class PosColumnHarnessTest extends TestCase
         $genetic = Genetic::query()->where('name', 'Amnesia Haze')->firstOrFail();
 
         // 1. The working screen, a socio held and a basket started — the density and column states.
-        $this->write('working', Livewire::test(DispensaryPos::class)
-            ->call('selectMember', $clear->id)
-            ->call('chooseGenetic', $genetic->id)
-            ->set('weightInput', '2')
-            ->call('addLine'));
+        $working = Livewire::test(DispensaryPos::class)->call('selectMember', $clear->id);
+        $first = $working->html();
+        $this->write('working', $working->call('chooseGenetic', $genetic->id)->set('weightInput', '2')->call('addLine'), $first);
 
         // 2. The bar source, which defaults to a grid.
-        $this->write('bar', Livewire::test(DispensaryPos::class)
-            ->call('selectMember', $clear->id)
-            ->call('setCatalogueSource', 'bar'));
+        $this->write('bar', Livewire::test(DispensaryPos::class)->call('selectMember', $clear->id));
 
         // 3. A blocked socio: the selling surface replaced by its resolution.
         $this->write('blocked', Livewire::test(DispensaryPos::class)->call('selectMember', $this->member(2500)->id));
@@ -134,11 +131,12 @@ class PosColumnHarnessTest extends TestCase
         return $member;
     }
 
-    private function write(string $state, Testable $component): void
+    private function write(string $state, Testable $component, string ...$earlier): void
     {
         $open = (int) strpos($this->page, '<main');
         $close = (int) strrpos($this->page, '</main>');
-        $html = substr($this->page, 0, (int) strpos($this->page, '>', $open) + 1).$component->html().substr($this->page, $close);
+        $held = $this->withKeptIslands($component->html(), ...$earlier);
+        $html = substr($this->page, 0, (int) strpos($this->page, '>', $open) + 1).$held.substr($this->page, $close);
 
         file_put_contents(storage_path('app/pos-225-'.$state.'.html'), $this->inlineBuiltCss($html));
     }

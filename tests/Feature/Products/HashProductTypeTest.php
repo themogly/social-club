@@ -38,6 +38,7 @@ use Filament\Facades\Filament;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Livewire\Livewire;
+use Tests\Concerns\FiltersTheCatalogueLikeTheBrowser;
 use Tests\TestCase;
 
 /**
@@ -47,7 +48,7 @@ use Tests\TestCase;
  */
 class HashProductTypeTest extends TestCase
 {
-    use RefreshDatabase;
+    use FiltersTheCatalogueLikeTheBrowser, RefreshDatabase;
 
     private Organisation $org;
 
@@ -246,15 +247,16 @@ class HashProductTypeTest extends TestCase
         (new OpenTill)->handle($this->location, 'POS-1', 10000);
 
         $pos = Livewire::test(DispensaryPos::class)->call('selectMember', $this->member($this->location)->id);
-        $productTypes = collect($pos->viewData('productTypes'))->pluck('label', 'value')->all();
+        $productTypes = collect($pos->instance()->islandView('header')['productTypes'])->pluck('label', 'value')->all();
         $this->assertSame('Hachís', $productTypes['HASH'] ?? null);
         $this->assertSame('Extracto', $productTypes['CONCENTRATE'] ?? null);
         $this->assertStringNotContainsString('Extracto · Hachís', $pos->html());
 
-        $pos->call('filterProductType', 'HASH')
-            ->assertSee('Polen')->assertDontSee('Rosin Uno')->assertDontSee('Amnesia');
-        $pos->call('filterProductType', 'CONCENTRATE')
-            ->assertSee('Rosin Uno')->assertDontSee('Polen');
+        // The Tipo filter runs in the browser (prompt 293) over each card's own type: Hachís and Extracto are apart.
+        $html = $pos->html();
+        $this->assertSame(['Polen'], $this->visibleInBrowser($html, 'genetics', ['productType' => 'HASH']));
+        $this->assertSame(['Rosin Uno'], $this->visibleInBrowser($html, 'genetics', ['productType' => 'CONCENTRATE']));
+        $this->assertStringContainsString("x-on:click=\"filter('productType', 'HASH')\"", $html);
     }
 
     // (4) Extracto no longer offers Hachís as a subtype — on the wizard and on the edit form.
