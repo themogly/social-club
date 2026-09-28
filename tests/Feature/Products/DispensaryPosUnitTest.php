@@ -79,6 +79,7 @@ class DispensaryPosUnitTest extends TestCase
         $user->locations()->sync([$this->location->id]);
         $this->actingAs($user);
         app(ActiveScope::class)->setLocation($this->location->id);
+        CounterOperator::set($user); // identified at the PIN — with nobody there a member cannot be selected (post-296 audit)
 
         return $user;
     }

@@ -367,6 +367,9 @@
                     <span class="shrink-0 rounded-full border border-warning/30 bg-warning/10 px-2.5 py-0.5 text-xs font-semibold uppercase tracking-wide text-warning">{{ __('Abierta') }}</span>
                 </div>
 
+                {{-- Post-296 audit — the drawer's figures reach the browser only with someone at the PIN (the section, its
+                     header and the "identify yourself" notice stay). --}}
+                @if ($this->hasOperator())
                 <dl class="mt-5 divide-y divide-line text-sm dark:divide-slate-800">
                     <div class="flex items-center justify-between py-2">
                         <dt class="text-ink-muted dark:text-slate-400">{{ __('Fondo de caja') }}</dt>
@@ -424,6 +427,7 @@
                     <span class="font-semibold">{{ __('Efectivo esperado en el cajón') }}</span>
                     <span class="text-lg font-bold tabular-nums">{{ $this->money($b['expected']) }}</span>
                 </div>
+                @endif
             </section>
 
             {{-- Cash movement --}}

@@ -47,14 +47,18 @@ trait RendersIslandsOnChange
      */
     abstract protected function islandData(string $island): array;
 
-    /** @return array<string, mixed> */
-    public function islandView(string $island): array
+    /**
+     * Protected (post-296 audit): only the island's own view calls it — 260's rule, a view's data is not a wire action.
+     *
+     * @return array<string, mixed>
+     */
+    protected function islandView(string $island): array
     {
         return $this->islandMemo[$island] ??= $this->islandData($island);
     }
 
     /** Read by the island's `always:` on every render that reaches it: true when it is new or different. */
-    public function islandChanged(string $island): bool
+    protected function islandChanged(string $island): bool
     {
         $this->islandsReached[$island] = true;
         $fingerprint = md5(serialize([app()->getLocale(), $this->islandView($island)]));

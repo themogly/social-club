@@ -364,7 +364,8 @@ class MembershipCounter extends Component
         $this->applyCounterScope();
         $location = $this->resolveLocation();
 
-        $feeMember = $this->feeMemberId !== null ? Member::query()->find($this->feeMemberId) : null;
+        // Post-296 audit — the member's card waits for someone at the PIN (the id survives a lock).
+        $feeMember = $this->feeMemberId !== null && $this->hasOperator() ? Member::query()->find($this->feeMemberId) : null;
         $membership = ($feeMember !== null && $location !== null) ? $this->latestMembership($feeMember, $location) : null;
 
         // Prompt 177 — READING, added to a screen that could already collect. Every figure comes from the

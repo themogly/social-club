@@ -15705,3 +15705,29 @@ audit, and each is now a failing-first test in `tests/Feature/Security/NonOwnerS
     method.
 - **Tests adjusted:** two older tests signed in a staff user with no sede (messaging index, panel access). They now
   give that user a sede, and `PanelAccessTest` gains the no-sede denial.
+
+## Post-296 audit fix 2 — with nobody at the PIN, the counter reads nothing about a member
+
+From `audits/reports/2026-09-post-296-security.md`, Phase 1 findings 3 and 4, proven over the real endpoint. This
+finishes prompt 260's rule: *the lock surface only hides; what matters is what reaches the browser*. It also makes
+289's claim ("nothing member-related before a PIN") true; its test had nobody checked in and never selected a
+member. Failing-first tests: `tests/Feature/Security/NobodyAtThePinSeesNoMemberTest.php`, driven over HTTP.
+
+- **Who is inside.** `WhosInside` lists nobody without an operator (the aforo count still shows). Its `locationId`
+  is now `#[Locked]`; editing it had listed another sede's room.
+- **Selecting and scanning.** `FindsMembers::selectMember()` and `submitLookup()` do nothing with nobody at the PIN.
+- **At the source.** `resolveMember()` on the Dispensario, Barra and Recepción screens, and the Socios screen's
+  selected member, return nobody without an operator.
+  - The member id is KEPT, so the work still survives a lock (198); the member reaches the browser again when
+    someone identifies.
+  - The commit, the tab and the check-in now ask for the PIN FIRST. With the member withheld, "identify a socio" was
+    otherwise the answer a locked counter gave.
+- **The islands (my 293 regression).** `islandView()` and `islandChanged()` are `protected` (260's rule: a view's
+  data is not a wire action, and the island's own view can still call them). *Su habitual* is built only with an
+  operator.
+- **The till.** The drawer's figures (the breakdown and *Efectivo esperado en el cajón*) render only with an
+  operator. The section, its header and the "identify yourself" notice with the disabled forms stay.
+- **Tests adjusted:** `DispensaryPosUnitTest`'s `operator()` helper now identifies at the PIN as its name says.
+  Two tests that read island data use `invade()`.
+- **Verified:** the full-visit browser check (`prove-293-visit.mjs`) still passes at 1180×820 and 820×1180,
+  including the stock following the sale.

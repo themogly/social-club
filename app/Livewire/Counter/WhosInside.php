@@ -13,6 +13,7 @@ use App\Support\Occupancy;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\Auth;
+use Livewire\Attributes\Locked;
 use Livewire\Attributes\On;
 use Livewire\Component;
 
@@ -25,6 +26,8 @@ use Livewire\Component;
  */
 class WhosInside extends Component
 {
+    /** #[Locked] (post-296 audit): editing it listed who is inside ANOTHER sede. */
+    #[Locked]
     public ?string $locationId = null;
 
     public function mount(): void
@@ -95,6 +98,11 @@ class WhosInside extends Component
     /** @return Collection<int, CheckIn> */
     private function openCheckIns(?Location $location): Collection
     {
+        // Post-296 audit — who is inside is member data: nobody at the PIN, nobody listed (the count still shows).
+        if (CounterOperator::id() === null) {
+            return new Collection;
+        }
+
         return CheckIn::query()->withoutGlobalScopes()
             ->with('member')
             ->where('location_id', $location?->id)

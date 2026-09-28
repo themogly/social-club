@@ -247,7 +247,7 @@ class HashProductTypeTest extends TestCase
         (new OpenTill)->handle($this->location, 'POS-1', 10000);
 
         $pos = Livewire::test(DispensaryPos::class)->call('selectMember', $this->member($this->location)->id);
-        $productTypes = collect($pos->instance()->islandView('header')['productTypes'])->pluck('label', 'value')->all();
+        $productTypes = collect($pos->invade()->islandView('header')['productTypes'])->pluck('label', 'value')->all();
         $this->assertSame('Hachís', $productTypes['HASH'] ?? null);
         $this->assertSame('Extracto', $productTypes['CONCENTRATE'] ?? null);
         $this->assertStringNotContainsString('Extracto · Hachís', $pos->html());

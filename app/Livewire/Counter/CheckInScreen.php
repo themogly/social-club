@@ -187,15 +187,16 @@ class CheckInScreen extends Component
             return;
         }
 
+        // Attribution: a PIN-identified operator is required — never the device session user. FIRST: with nobody at the
+        // PIN the socio is withheld (post-296 audit), so the pad must open before "no socio" could be the answer.
+        if (! $this->requireOperator()) {
+            return;
+        }
+
         $member = $this->resolveMember();
         $location = $this->resolveLocation();
 
         if ($member === null || $location === null) {
-            return;
-        }
-
-        // Attribution: a PIN-identified operator is required — never the device session user.
-        if (! $this->requireOperator()) {
             return;
         }
 
@@ -335,9 +336,13 @@ class CheckInScreen extends Component
         return $this->locationId !== null ? Location::query()->find($this->locationId) : null;
     }
 
+    /**
+     * The socio being served — and nobody while nobody is at the PIN (post-296 audit, 260's rule for reads). The id is
+     * kept, so the work survives a lock (198); the member only reaches the browser again once someone identifies.
+     */
     private function resolveMember(): ?Member
     {
-        return $this->memberId !== null ? Member::query()->find($this->memberId) : null;
+        return $this->memberId !== null && $this->hasOperator() ? Member::query()->find($this->memberId) : null;
     }
 
     /**

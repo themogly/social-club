@@ -778,9 +778,13 @@ class BarPos extends Component
         return $this->locationId !== null ? Location::query()->find($this->locationId) : null;
     }
 
+    /**
+     * The socio being served — and nobody while nobody is at the PIN (post-296 audit, 260's rule for reads). The id is
+     * kept, so the work survives a lock (198); the member only reaches the browser again once someone identifies.
+     */
     private function resolveMember(): ?Member
     {
-        return $this->memberId !== null ? Member::query()->find($this->memberId) : null;
+        return $this->memberId !== null && $this->hasOperator() ? Member::query()->find($this->memberId) : null;
     }
 
     /** Through the ONE resolver (code-style audit) — this was a byte-identical copy of the dispensary's. */
