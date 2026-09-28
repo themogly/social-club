@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\Stock;
 
+use App\Actions\Stock\RecordStockMovement;
 use App\Enums\LocationKind;
 use App\Enums\Role;
 use App\Enums\StockMovementType;
@@ -83,7 +84,7 @@ class ArticleNeedsASedeTest extends TestCase
         app(ActiveScope::class)->setLocation(null);
 
         Livewire::test(CreateArticle::class)
-            ->fillForm($this->papers(['location_id' => $this->norte->id]))
+            ->fillForm($this->papers(['location_id' => [$this->norte->id]])) // prompt 297: a choice of sedes
             ->call('create')
             ->assertHasNoFormErrors();
 
@@ -101,7 +102,7 @@ class ArticleNeedsASedeTest extends TestCase
     {
         app(ActiveScope::class)->setLocation($this->centro->id);
 
-        Livewire::test(CreateArticle::class)->assertSchemaStateSet(['location_id' => $this->centro->id]);
+        Livewire::test(CreateArticle::class)->assertSchemaStateSet(['location_id' => [$this->centro->id]]);
     }
 
     // 4 -------------------------------------------------------------------------------------------------------------
@@ -122,10 +123,12 @@ class ArticleNeedsASedeTest extends TestCase
 
     // 5 -------------------------------------------------------------------------------------------------------------
 
-    public function test_the_sede_is_fixed_after_creation(): void
+    public function test_the_sede_is_fixed_once_the_article_has_history(): void
     {
+        // Prompt 297 — correctable until the product has a past (297's own tests cover the move); then fixed.
         app(ActiveScope::class)->setLocation($this->centro->id);
         $article = Article::factory()->create(['organisation_id' => $this->org->id, 'location_id' => $this->centro->id]);
+        (new RecordStockMovement)->handle($article, StockMovementType::ADJUSTMENT, 2, ['reason' => 'recuento']);
 
         Livewire::test(EditArticle::class, ['record' => $article->getRouteKey()])->assertFormFieldDisabled('location_id');
     }
@@ -138,7 +141,7 @@ class ArticleNeedsASedeTest extends TestCase
         app(ActiveScope::class)->setLocation(null);
 
         Livewire::test(CreateArticle::class)
-            ->fillForm($this->papers(['location_id' => $store->id]))
+            ->fillForm($this->papers(['location_id' => [$store->id]]))
             ->call('create')
             ->assertHasFormErrors(['location_id']);
 

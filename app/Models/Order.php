@@ -7,6 +7,7 @@ use App\Enums\OrderStatus;
 use App\Models\Concerns\BelongsToOrganisation;
 use App\Models\Concerns\ScopedToLocation;
 use Database\Factories\OrderFactory;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -84,5 +85,20 @@ class Order extends Model
     public function voidedBy(): BelongsTo
     {
         return $this->belongsTo(User::class, 'voided_by');
+    }
+
+    /**
+     * Orders (completed or voided) with a line for this article (prompt 297). `CommitOrder` json_encodes the snapshot as
+     * `"article_id":"…"`; MySQL's JSON column re-serialises it as `"article_id": "…"` (a space after the colon), so both
+     * spellings are matched. An article id is a ULID — nothing in it needs escaping for LIKE.
+     *
+     * @param  Builder<static>  $query
+     * @return Builder<static>
+     */
+    public function scopeContainingArticle(Builder $query, string $articleId): Builder
+    {
+        return $query->where(fn (Builder $q): Builder => $q
+            ->where('items', 'like', '%"article_id":"'.$articleId.'"%')
+            ->orWhere('items', 'like', '%"article_id": "'.$articleId.'"%'));
     }
 }

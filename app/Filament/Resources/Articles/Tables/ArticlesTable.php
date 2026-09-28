@@ -4,6 +4,7 @@ namespace App\Filament\Resources\Articles\Tables;
 
 use App\Actions\Stock\RecordStockMovement;
 use App\Enums\StockMovementType;
+use App\Filament\Resources\Articles\Actions\AddToSedesAction;
 use App\Models\Article;
 use Filament\Actions\Action;
 use Filament\Actions\BulkActionGroup;
@@ -28,6 +29,8 @@ class ArticlesTable
         return $table
             ->columns([
                 TextColumn::make('name')->label(__('Nombre'))->searchable()->sortable(),
+                // Prompt 297 — the same product can now be at several sedes; in the rollup the rows must say which.
+                TextColumn::make('location.name')->label(__('Sede'))->sortable()->toggleable(),
                 TextColumn::make('category.name')->label(__('Categoría'))->sortable()->toggleable(),
                 TextColumn::make('price_cents')
                     ->label(__('Precio'))
@@ -49,6 +52,7 @@ class ArticlesTable
             ])
             ->recordActions([
                 self::restockAction(),
+                AddToSedesAction::make(),
                 EditAction::make(),
             ])
             ->toolbarActions([
