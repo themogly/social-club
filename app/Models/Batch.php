@@ -10,6 +10,7 @@ use App\Models\Concerns\ScopedToLocation;
 use App\Support\BusinessDay;
 use Database\Factories\BatchFactory;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -32,7 +33,7 @@ class Batch extends Model
     use BelongsToOrganisation, HasFactory, HasUlids, ScopedToLocation, SoftDeletes;
 
     protected $fillable = [
-        'organisation_id', 'genetic_id', 'parent_batch_id', 'location_id', 'batch_no',
+        'organisation_id', 'genetic_id', 'parent_batch_id', 'location_id', 'batch_no', 'label',
         'acquired_or_harvested_on', 'expires_on', 'initial_cg', 'remaining_cg',
         'initial_units', 'remaining_units',
         'cost_per_gram_cents', 'price_per_gram_cents', 'price_per_unit_cents', 'price_per_eighth_cents',
@@ -91,6 +92,46 @@ class Batch extends Model
     public function parent(): BelongsTo
     {
         return $this->belongsTo(Batch::class, 'parent_batch_id');
+    }
+
+    /**
+     * The club's own name for the batch (prompt 282) — trimmed, and a blank one is stored as null.
+     *
+     * @return Attribute<?string, ?string>
+     */
+    protected function label(): Attribute
+    {
+        return Attribute::make(set: fn (?string $value): ?string => filled($value) ? trim($value) : null);
+    }
+
+    /**
+     * How a batch is shown to a person (prompt 282): "Cosecha verano 2026 · B-7QX2KD" with a name, the lote number alone
+     * without one — optionally led by the strain ("Amnesia · …"). The lote number is always there: it is the traceable
+     * key, the name is only the club's words for it.
+     */
+    public function displayName(bool $withGenetic = false): string
+    {
+        $parts = [$this->label, (string) $this->batch_no];
+        if ($withGenetic) {
+            array_unshift($parts, $this->resolveGenetic()?->name);
+        }
+
+        return implode(' · ', array_filter($parts, 'filled'));
+    }
+
+    /**
+     * Every part of this batch's lote — same organisation, strain and lote number (a part transfer keeps all three),
+     * this batch included. The name belongs to the lote, so a rename reaches all of them.
+     *
+     * @return Builder<Batch>
+     */
+    public function lotePartsQuery(): Builder
+    {
+        return Batch::query()->withoutGlobalScopes()
+            ->where('organisation_id', $this->organisation_id)
+            ->where('genetic_id', $this->genetic_id)
+            ->where('batch_no', $this->batch_no)
+            ->whereNull('deleted_at');
     }
 
     /** Does this batch carry its own sale price? (prompt 278) — per unit for a unit product, per gram otherwise. */

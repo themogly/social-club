@@ -53,6 +53,15 @@ class BatchForm
                             // The strain is fixed at intake — never reassign an existing batch.
                             ->disabled(fn (string $operation): bool => $operation !== 'create'),
 
+                        // Prompt 282 — the club's own name for the batch. Free, not unique (one harvest across several
+                        // strains shares it), editable at any time; a rename reaches every part of the lote. The lote
+                        // number stays the fixed traceability key and is not a field.
+                        TextInput::make('label')
+                            ->label(__('Nombre'))
+                            ->maxLength(60)
+                            ->helperText(__('Como lo llamáis vosotros, p. ej. «Cosecha verano 2026». Opcional.'))
+                            ->columnSpanFull(),
+
                         // Intake quantity — only at creation, and in the genetic's own unit:
                         // grams for a WEIGHT genetic, whole units for a UNIT genetic. Stock
                         // thereafter moves solely through the ledger (Ajuste / Merma), never a free edit.

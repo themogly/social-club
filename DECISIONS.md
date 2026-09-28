@@ -14727,3 +14727,56 @@ check` green in `es` and `en`. Merged to `main` on Ben's instruction.
 Tests: `tests/Feature/Staff/RegistroDeJornadaTest` (22) cover append-only, own-PIN-only, the declared end, the till-close
 offer, wrong-sede and wrong-role denials, the store refusal, UTC storage, bounded report queries, the PDF and the force-delete
 guard.
+
+## Prompt 282 — Batches get a name the club chooses, and you can search by it
+
+- **A separate field, `batches.label`** ("Nombre"): nullable, max 60, trimmed, blank stored as null (a model mutator), not
+  unique. One harvest across several strains shares a name on purpose. **The lote number (`batch_no`) stays fixed**: it is
+  the traceability key. The registro de dispensación prints it from `dispensation_lines.batch_no_snapshot`, the recall
+  hangs on it, a part transfer's child keeps it to stay one lote, and the ledger uses it as `reference`. A renamable lote
+  number would cut the link between what the register says was dispensed and where it came from.
+- **The name belongs to the lote** (same organisation, strain and `batch_no`): `TransferBatch` copies it to the child. A
+  rename goes through `App\Actions\Stock\RenameBatchLote`, one write for every part inside a transaction, with one
+  `batch.label.changed` audit entry (old and new name, the ids reached). The edit page tells the person where it applied
+  when there is more than one part ("El nombre se aplica a las 2 partes de este lote (Sede Centro, Almacén)"). No change,
+  no audit entry.
+- **One presenter, `Batch::displayName(withGenetic)`**: "Cosecha verano 2026 · B-7QX2KD", or the lote number alone, led by
+  the strain where it is shown too. Used in:
+  - the Lotes table (a Nombre column first, searchable and sortable; the search box matches the name, the lote number
+    and the strain);
+  - the edit page title and breadcrumb (`BatchResource::getRecordTitle`);
+  - the purchase form's batch picker (display name with strain, searches name and lote);
+  - the purchases table's Lote column;
+  - the transfer modal heading;
+  - the recall heading (its CSV keeps a Lote column and adds a Nombre column);
+  - the dispensary's manual lote chips (`x-counter.batch-chip`: 44px, a long name truncates with the full display name as
+    the `title`);
+  - the till's closing recount (ordered strain, then name, then lote) and its revealed results;
+  - the stock report (on hand: a Nombre column; recount variances: display name);
+  - the two staff-facing stock errors that quoted a lote ("Stock insuficiente en el lote…", "El lote … no corresponde…").
+
+  Left alone as not read by a person: `BatchPriceBackfill`'s log, ledger `reference`, the English RuntimeException.
+- **Global search**: the panel has no global search box (no resource opts in), so "the global search box" is read as the
+  Lotes table's search. Adding panel-wide global search for one resource would be new top-bar UI; not done.
+- **Never in the registro de dispensación or `dispensation_lines`.** The name can change at any time, and a legal register
+  must not show a value that could have changed after the dispensation was recorded. Test 10 commits a real dispensation
+  from a named batch and asserts both.
+- **Open, for the owner (OVERNIGHT-DEFAULT — CONFIRM):** the member menu (PWA) does not show batch names; they are
+  internal for now.
+- **Open, for the owner:** intake still can't take a real lote number (the grow's or the supplier's). `IntakeBatch`
+  accepts `batch_no`, but `BatchForm` never offers it, so every panel batch gets a random code. That's a traceability
+  decision, not built here.
+- Tests: `tests/Feature/Stock/BatchNamesTest` (12), all seen red first. `PreLiveA11yFixesTest`'s aria-pressed check now
+  reads the chip component, where the markup moved. MySQL collation (test 7) is CI's job; the column is a plain
+  `utf8mb4` varchar, so the default `_ci` collation matches case-insensitively.
+- Browser check (`tests/Browser/prove-282-batch-names.mjs`, screenshots `storage/app/screenshots/282/`), run on a
+  **throwaway seeded database**, never the dev one:
+  - the manual lote chips show the names at 1180×820 and 820×1180; the 60-character name truncates inside 44px, with the
+    full name as the title;
+  - the Lotes search for "verano" finds both halves of a transferred lote;
+  - the edit title is the display name;
+  - renaming one half reports "2 partes" and both rows show the new name.
+
+  The till recount is proven by the Livewire test through `startClose`, not driven in the browser.
+- Found while checking, not changed: a dev database restored from before prompt 262 has no `panel.access` row, so
+  nobody can open the panel from it until `php artisan csc:sync-permissions` runs (the deploy step already does this).

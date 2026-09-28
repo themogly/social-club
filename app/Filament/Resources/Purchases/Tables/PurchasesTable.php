@@ -33,7 +33,8 @@ class PurchasesTable
                     ->money('EUR', divideBy: 100)
                     ->alignEnd()
                     ->color(fn (Purchase $record): string => ($record->amount_cents->cents - $record->paid_cents->cents) > 0 ? 'warning' : 'gray'),
-                TextColumn::make('batch.batch_no')->label(__('Lote'))->placeholder('—')->toggleable(),
+                TextColumn::make('batch.batch_no')->label(__('Lote'))->placeholder('—')->toggleable()
+                    ->formatStateUsing(fn (string $state, Purchase $record): string => $record->batch?->displayName() ?? $state), // prompt 282
             ])
             ->recordActions([
                 EditAction::make(),

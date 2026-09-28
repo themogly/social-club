@@ -26,7 +26,7 @@ use Illuminate\Support\Str;
  * as an INTAKE movement (opening balances always enter through the ledger). Exactly one
  * of the cg / units column pairs is populated — the other is set null explicitly.
  *
- * @phpstan-type IntakeData array{grams?: int|float|string, units?: int|string, batch_no?: ?string, cost_per_gram_cents?: int, price_per_gram_cents?: ?int, price_per_unit_cents?: ?int, price_per_eighth_cents?: ?int, images?: list<string>, acquired_or_harvested_on?: mixed, expires_on?: mixed, lab_report_path?: ?string, notes?: ?string, operator_id?: ?string, override?: bool, override_by?: ?User, override_reason?: ?string}
+ * @phpstan-type IntakeData array{grams?: int|float|string, units?: int|string, batch_no?: ?string, label?: ?string, cost_per_gram_cents?: int, price_per_gram_cents?: ?int, price_per_unit_cents?: ?int, price_per_eighth_cents?: ?int, images?: list<string>, acquired_or_harvested_on?: mixed, expires_on?: mixed, lab_report_path?: ?string, notes?: ?string, operator_id?: ?string, override?: bool, override_by?: ?User, override_reason?: ?string}
  */
 class IntakeBatch
 {
@@ -52,6 +52,7 @@ class IntakeBatch
                 'genetic_id' => $genetic->id,
                 'location_id' => $location->id,
                 'batch_no' => $data['batch_no'] ?? 'B-'.strtoupper(Str::random(6)),
+                'label' => $data['label'] ?? null, // the club's own name (prompt 282); trimmed/nulled by the model
                 'acquired_or_harvested_on' => $data['acquired_or_harvested_on'] ?? now(),
                 'expires_on' => $data['expires_on'] ?? null,
                 'initial_cg' => $cg,
@@ -84,6 +85,7 @@ class IntakeBatch
 
             (new RecordAuditLog)->handle('batch.intake', $batch, null, array_filter([
                 'batch_no' => $batch->batch_no,
+                'label' => $batch->label,
                 'genetic' => $genetic->name,
                 'initial_cg' => $cg,
                 'initial_units' => $units,

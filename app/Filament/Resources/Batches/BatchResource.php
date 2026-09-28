@@ -13,7 +13,9 @@ use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Table;
+use Illuminate\Contracts\Support\Htmlable;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
 
 class BatchResource extends Resource
@@ -42,6 +44,17 @@ class BatchResource extends Resource
     public static function getPluralModelLabel(): string
     {
         return __('lotes');
+    }
+
+    /** A batch is named by its display name (prompt 282) — strain, the club's name, the lote number — in titles and breadcrumbs. */
+    public static function getRecordTitle(?Model $record): string|Htmlable|null
+    {
+        return $record instanceof Batch ? $record->displayName(withGenetic: true) : parent::getRecordTitle($record);
+    }
+
+    public static function hasRecordTitle(): bool
+    {
+        return true;
     }
 
     public static function form(Schema $schema): Schema

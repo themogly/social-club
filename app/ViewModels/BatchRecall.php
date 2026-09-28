@@ -66,6 +66,8 @@ class BatchRecall
                 }
 
                 return [
+                    'lote' => (string) $this->batch->batch_no,
+                    'nombre' => $this->batch->label ?? '—',
                     'member_no' => (string) $r->member_no,
                     'socio' => trim($r->first_name.' '.$r->last_name),
                     'contacto' => trim(($r->phone ?? '').' '.($r->email ?? '')) ?: '—',
@@ -101,8 +103,11 @@ class BatchRecall
     {
         return new ReportTable(
             key: 'recall',
-            title: __('Retirada de lote :batch', ['batch' => $this->batch->batch_no]),
+            title: __('Retirada de lote :batch', ['batch' => $this->batch->displayName()]),
             columns: [
+                // The lote number stays (the traceable key); the club's name sits beside it (prompt 282).
+                ReportColumn::text('lote', __('Lote'), sortable: false),
+                ReportColumn::text('nombre', __('Nombre'), sortable: false),
                 ReportColumn::text('member_no', __('Nº')),
                 ReportColumn::text('socio', __('Socio')),
                 ReportColumn::text('contacto', __('Contacto'), sortable: false),

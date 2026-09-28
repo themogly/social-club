@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\Purchases\Schemas;
 
+use App\Models\Batch;
 use App\Models\Location;
 use App\Support\DocumentUpload;
 use Filament\Forms\Components\DatePicker;
@@ -80,8 +81,11 @@ class PurchaseForm
                     ->schema([
                         Select::make('batch_id')
                             ->label(__('Lote'))
-                            ->relationship('batch', 'batch_no')
-                            ->searchable()
+                            // Prompt 282 — shown as "Amnesia · Cosecha verano 2026 · B-7QX2KD" and found by the club's name
+                            // as well as the lote number.
+                            ->relationship('batch', 'batch_no', fn (Builder $query) => $query->with('genetic'))
+                            ->getOptionLabelFromRecordUsing(fn (Batch $record): string => $record->displayName(withGenetic: true))
+                            ->searchable(['label', 'batch_no'])
                             ->preload(),
 
                         TextInput::make('intake_grams')
