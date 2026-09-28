@@ -219,7 +219,7 @@ class AutomaticBatchAllocationTest extends TestCase
             ]);
             $this->fail('an over-full manual line should have thrown');
         } catch (RuntimeException $e) {
-            $this->assertStringContainsString('SMALL-001', $e->getMessage());
+            $this->assertStringContainsString($small->displayName(), $e->getMessage()); // strain first, never the lote number (298)
         }
 
         $this->assertSame(0, Dispensation::query()->withoutGlobalScopes()->count());

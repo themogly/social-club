@@ -78,7 +78,8 @@ class NonOwnerScopeAndBulkActionsTest extends TestCase
     {
         $genetic = Genetic::factory()->create(['organisation_id' => $this->org->id]);
 
-        return (new IntakeBatch)->handle($genetic, $sede, ['grams' => '100', 'batch_no' => $batchNo, 'price_per_gram_cents' => 1000]);
+        // Named as well: the list shows names, and the lote number only when its column is switched on (298).
+        return (new IntakeBatch)->handle($genetic, $sede, ['grams' => '100', 'batch_no' => $batchNo, 'label' => $batchNo, 'price_per_gram_cents' => 1000]);
     }
 
     // --- (1) The scope ------------------------------------------------------------------------------------------------

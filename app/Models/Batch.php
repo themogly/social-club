@@ -8,6 +8,7 @@ use App\Enums\UnitType;
 use App\Models\Concerns\BelongsToOrganisation;
 use App\Models\Concerns\ScopedToLocation;
 use App\Support\BusinessDay;
+use Carbon\CarbonImmutable;
 use Database\Factories\BatchFactory;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Casts\Attribute;
@@ -33,7 +34,7 @@ class Batch extends Model
     use BelongsToOrganisation, HasFactory, HasUlids, ScopedToLocation, SoftDeletes;
 
     protected $fillable = [
-        'organisation_id', 'genetic_id', 'parent_batch_id', 'location_id', 'batch_no', 'label',
+        'organisation_id', 'genetic_id', 'parent_batch_id', 'location_id', 'batch_no', 'lote_seq', 'label',
         'acquired_or_harvested_on', 'expires_on', 'initial_cg', 'remaining_cg',
         'initial_units', 'remaining_units',
         'cost_per_gram_cents', 'price_per_gram_cents', 'price_per_unit_cents', 'price_per_eighth_cents',
@@ -47,6 +48,7 @@ class Batch extends Model
             'expires_on' => 'date',
             'initial_cg' => WeightCast::class,
             'remaining_cg' => WeightCast::class,
+            'lote_seq' => 'integer',
             'initial_units' => 'integer',
             'remaining_units' => 'integer',
             'cost_per_gram_cents' => 'integer',   // rate
@@ -105,18 +107,64 @@ class Batch extends Model
     }
 
     /**
-     * How a batch is shown to a person (prompt 282): "Cosecha verano 2026 · B-7QX2KD" with a name, the lote number alone
-     * without one — optionally led by the strain ("Amnesia · …"). The lote number is always there: it is the traceable
-     * key, the name is only the club's words for it.
+     * How a batch is shown to a person (prompt 298, after 282): WHAT it is first — the strain — then what tells it apart:
+     * the club's name for it, or the automatic description. The lote number is not part of it; it stays where
+     * traceability needs it ({@see self::referenceName()}, the registro, the recall, the snapshots).
      */
-    public function displayName(bool $withGenetic = false): string
+    public function displayName(): string
     {
-        $parts = [$this->label, (string) $this->batch_no];
-        if ($withGenetic) {
-            array_unshift($parts, $this->resolveGenetic()?->name);
+        return implode(' · ', array_filter([$this->displayTitle(), $this->displaySubtitle()], 'filled'));
+    }
+
+    /** The strain's name (prompt 298). */
+    public function displayTitle(): string
+    {
+        return (string) $this->resolveGenetic()?->name;
+    }
+
+    /**
+     * The batch's `label` when the club named it, otherwise "#3 · entrada 12 sep · 250,00 g" (prompt 298): its lote's
+     * number within the strain, the day it came in (the year only when not this year) and what came in. `short` is the
+     * counter's version under a strain heading: "#3 · 12 sep".
+     */
+    public function displaySubtitle(bool $short = false): string
+    {
+        if (filled($this->label)) {
+            return (string) $this->label;
         }
 
-        return implode(' · ', array_filter($parts, 'filled'));
+        $day = $this->receivedOn();
+        $date = $day === null ? null : $day->locale(app()->getLocale())->isoFormat('D').' '
+            .rtrim($day->locale(app()->getLocale())->isoFormat('MMM'), '.')
+            .($day->year !== now()->year ? ' '.$day->year : '');
+        $seq = $this->lote_seq !== null ? '#'.$this->lote_seq : null;
+
+        if ($short) {
+            return implode(' · ', array_filter([$seq, $date], 'filled'));
+        }
+
+        $quantity = $this->initial_units !== null
+            ? __(':count uds', ['count' => $this->initial_units])
+            : ($this->initial_cg !== null ? $this->initial_cg->formatted() : null);
+
+        return implode(' · ', array_filter([$seq, $date !== null ? __('entrada :date', ['date' => $date]) : null, $quantity], 'filled'));
+    }
+
+    /** The display name WITH the lote number — for the places traceability needs it (a recall, a stock-count report). */
+    public function referenceName(): string
+    {
+        return $this->displayName().' · '.$this->batch_no;
+    }
+
+    /** The day it came in: the harvest/acquisition date, or the business day it was entered. */
+    private function receivedOn(): ?CarbonImmutable
+    {
+        if ($this->acquired_or_harvested_on !== null) {
+            return CarbonImmutable::parse($this->acquired_or_harvested_on);
+        }
+        $location = Location::query()->withoutGlobalScopes()->find($this->location_id);
+
+        return $this->created_at !== null && $location instanceof Location ? BusinessDay::date($location, $this->created_at) : null;
     }
 
     /**

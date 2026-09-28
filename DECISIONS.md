@@ -15867,3 +15867,78 @@ several sedes at once. Failing-first tests: `tests/Feature/Stock/ArticleSedesTes
   Two fixes came from looking:
   - a sede ticked live showed an empty stock box, so it is now set to 0;
   - *Aplicar los cambios también en* sat loose beside *Activo*, so it moved into the product card.
+
+## Prompt 298 — batches say what they are: strain first, a readable description, a readable lote number
+
+Club report: batches were listed by a random `B-7QX2KD`. Failing-first tests:
+`tests/Feature/Stock/BatchDescriptionsTest.php`.
+
+- **Strain first.** `Batch::displayName()` is now *title · subtitle*, for example *"Amnesia Haze · Cosecha verano
+  2026"*.
+  - `displayTitle()` is the strain.
+  - `displaySubtitle()` is the club's `label` (282), or the automatic description.
+  - `displaySubtitle(short: true)` is the counter's version under a strain heading.
+  - `referenceName()` adds the lote number, for the places that need it.
+  - The old `withGenetic:` switch is gone, because the strain always leads.
+- **Changed call sites:**
+  - `displayName()`: the batch page title (`BatchResource`); the transfer modal; the purchase picker and list; the
+    till's closing recount (component and view); the "wrong lote" and "insufficient stock" errors.
+  - `referenceName()`: the recall title (`BatchRecall`) and modal heading; the stock-count variances in the stock
+    report.
+  - `displaySubtitle(short: true)`: the dispensary's lote chip, with `displayName()` as its title.
+
+  The recount is not grouped under strain headings, so its rows keep the strain.
+- **`lote_seq`** (unsigned int, nullable) is a lote's number within its strain, counted organisation-wide.
+  - `IntakeBatch` assigns `max + 1` inside its transaction, with the STRAIN row locked. The prompt said to lock the
+    strain's batches; locking the strain row also covers a strain's first batch, when there is no batch to lock.
+    SQLite serialises writes anyway, so the test proves sequential numbering; on MySQL the lock is what orders two
+    concurrent intakes.
+  - A part transfer copies `lote_seq`; a whole transfer keeps it.
+  - The migration backfills through `App\Support\LoteSeqBackfill`. Per strain, lotes (the same `genetic_id` +
+    `batch_no`) are numbered in order of their first `created_at`; every part of a lote shares the number. It is
+    idempotent.
+- **The automatic subtitle** is `#n · entrada {date} · {quantity}`, in English `#n · received {date} · {quantity}`.
+  - The date is `acquired_or_harvested_on`, or the business day of `created_at`. It shows as a short localised day
+    and month, with the year only when it is not this year. Carbon's Spanish *"sep."* loses its dot, as specified.
+  - The quantity is `Weight::formatted()` (*250,00 g*) or *N uds*.
+- **The readable lote number.** A new batch with no typed number gets `{CODE}-{YYMMDD}-{lote_seq}`, for example
+  `AMN-260912-3`.
+  - `CODE` is the strain's first three ASCII letters, padded with X (*Ñoño* → `NON`, *O.G* → `OGX`).
+  - The date is the intake date.
+  - It is generated once and never changes, even if the strain is renamed. A clash gets `-2`, `-3` and so on.
+- **The own number.** *Nº de lote propio* is on *Añadir stock* and on the add-strain wizard's quantity step.
+  - It is trimmed, with a maximum of 40 characters.
+  - It is refused with *"Ya existe un lote con ese número para esta variedad"* when the same strain already has
+    that number; the same number for another strain is allowed.
+  - Whether a repeat delivery tops up the lote stays 251's open question.
+- **Existing lote numbers are never changed.** The registro, every movement's `reference` and
+  `batch_no_snapshot` hang on them, which is traceability. The backfill test pins that no `batch_no` moves.
+- **Where the lote number stays:**
+  - the registro de dispensación and `batch_no_snapshot` (unchanged);
+  - the recall and its CSV (`lote` column);
+  - the stock report's count variances;
+  - the batch's own page (*Nº de lote*, with a copy button);
+  - the batches list, where *Nº lote* is a column hidden by default that the owner can switch on.
+
+  The counter never shows it.
+- **The batches list.** The first column is *Lote*: the strain in bold with the subtitle under it. One search finds
+  a batch by strain, name or lote number. It sorts by strain, then `lote_seq`. *Nombre* merges into it. The genetic
+  is eager-loaded.
+- **The demo seeder now goes through `IntakeBatch`** (CLAUDE.md's fixture rule). It built batches by hand with random
+  `B-` numbers, so a fresh demo had no lote numbers within its strains: the migration's backfill runs before
+  seeding. Its batches now read `AMN-260829-1` / *#1*, the same as a real club's.
+- **Verified in the browser** (throwaway DB, manual lote selection on, `tests/Browser/prove-298-batch-names.mjs`;
+  light and dark):
+  - *Añadir stock* twice for Amnesia Haze, once with no number and once with "GROW-17". The list reads *Amnesia
+    Haze* / *#3 · entrada 28 sep · 250,00 g* and */ #4 …*, with no lote numbers until *Nº lote* is switched on.
+  - The batch page shows *Nº de lote* GROW-17, with a copy icon.
+  - The recall's heading ends in GROW-17.
+  - At the counter (1180×820) the chips read *#1 · 29 ago · 18,44 g*, *#3 · 28 sep …*.
+  - After a sale, the closing recount lists *Amnesia Haze · #1 · entrada 29 ago …*, with no lote number anywhere.
+
+  Two fixes came from looking:
+  - *Nº de lote propio* sat alone under *Sede*; it now pairs with *Nombre*.
+  - Filament's `copyable()` gives no visible button, so the lote number gains a clipboard icon and tooltip.
+- **Tests adjusted.** These pinned the old "name · lote number" display: 282's `BatchNamesTest`, the two lote-error
+  tests, and three scope tests that found batches in the list by their lote number (now hidden by default; they
+  name the batch instead).

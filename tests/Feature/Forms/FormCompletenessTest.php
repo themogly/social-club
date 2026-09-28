@@ -88,7 +88,7 @@ class FormCompletenessTest extends TestCase
         ],
         BatchResource::class => [
             // location_id is now a required field on the form (prompt 238) — no longer scope-filled.
-            'batch_no' => 'system: generated batch number.',
+            'lote_seq' => 'system: the lote\'s number within its strain, assigned by IntakeBatch and copied by TransferBatch (prompt 298).',
             'parent_batch_id' => 'system: set by TransferBatch on a part-transfer\'s child batch (prompt 277).',
             'price_per_gram_cents' => 'entered as euros via sale_price_eur at intake; changed later by the audited Precio action (prompt 278).',
             'price_per_unit_cents' => 'entered as euros via sale_price_eur at intake (unit products); changed later by the Precio action (278).',

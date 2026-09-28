@@ -11,10 +11,12 @@ use App\Support\ActiveScope;
 use App\Support\BelowCost;
 use App\Support\Money;
 use App\Support\Weight;
+use DomainException;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\CreateRecord;
 use Filament\Support\Exceptions\Halt;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Validation\ValidationException;
 
 class CreateBatch extends CreateRecord
 {
@@ -61,6 +63,7 @@ class CreateBatch extends CreateRecord
 
         $salePriceCents = Money::fromEuros((string) ($data['sale_price_eur'] ?? 0))->cents;
         $intake = [
+            'batch_no' => $data['batch_no'] ?? null, // the grow's own number, or null to generate one (prompt 298)
             'label' => $data['label'] ?? null,
             'cost_per_gram_cents' => Money::fromEuros((string) ($data['cost_per_gram_eur'] ?? 0))->cents,
             // The batch's own sale price and photos (prompt 278).
@@ -89,7 +92,11 @@ class CreateBatch extends CreateRecord
         $this->intakeGenetic = $genetic;
         $this->intakeLocation = $location;
 
-        return (new IntakeBatch)->handle($genetic, $location, $intake);
+        try {
+            return (new IntakeBatch)->handle($genetic, $location, $intake);
+        } catch (DomainException $e) {
+            throw ValidationException::withMessages(['data.batch_no' => $e->getMessage()]);
+        }
     }
 
     /** The confirmation names WHAT went WHERE — never a bare "created" that hides the sede a batch belongs to. */

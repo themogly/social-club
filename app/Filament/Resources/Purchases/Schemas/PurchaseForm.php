@@ -85,7 +85,7 @@ class PurchaseForm
                             // Prompt 282 — shown as "Amnesia · Cosecha verano 2026 · B-7QX2KD" and found by the club's name
                             // as well as the lote number.
                             ->relationship('batch', 'batch_no', fn (Builder $query) => $query->with('genetic'))
-                            ->getOptionLabelFromRecordUsing(fn (Batch $record): string => $record->displayName(withGenetic: true))
+                            ->getOptionLabelFromRecordUsing(fn (Batch $record): string => $record->displayName())
                             ->searchable(['label', 'batch_no'])
                             ->preload(),
 

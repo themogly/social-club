@@ -152,7 +152,7 @@ class BatchNamesTest extends TestCase
             ->call('save')
             ->assertHasNoFormErrors()
             ->assertNotified()
-            ->assertSee('Amnesia · Cosecha verano 2026 · COSECHA-1'); // the page is titled by the display name
+            ->assertSee('Amnesia · Cosecha verano 2026'); // the page is titled by the display name (strain first, 298)
 
         $this->assertSame('Cosecha verano 2026', $source->fresh()->label);
         $this->assertSame('Cosecha verano 2026', $child->fresh()->label);
@@ -185,10 +185,11 @@ class BatchNamesTest extends TestCase
         $named = $this->batch($this->amnesia, 'Cosecha verano 2026', $this->centro, 'B-7QX2KD');
         $bare = $this->batch($this->critical, null, $this->centro, 'B-9ZZ9ZZ');
 
-        $this->assertSame('Cosecha verano 2026 · B-7QX2KD', $named->displayName());
-        $this->assertSame('B-9ZZ9ZZ', $bare->displayName());
-        $this->assertSame('Amnesia · Cosecha verano 2026 · B-7QX2KD', $named->displayName(withGenetic: true));
-        $this->assertSame('Critical · B-9ZZ9ZZ', $bare->displayName(withGenetic: true));
+        // Prompt 298 — the strain always leads; the lote number is kept for where traceability needs it.
+        $this->assertSame('Amnesia · Cosecha verano 2026', $named->displayName());
+        $this->assertStringStartsWith('Critical · ', $bare->displayName());
+        $this->assertStringNotContainsString('B-9ZZ9ZZ', $bare->displayName());
+        $this->assertSame('Amnesia · Cosecha verano 2026 · B-7QX2KD', $named->referenceName());
     }
 
     // 7 -------------------------------------------------------------------------------------------------------------
@@ -221,7 +222,7 @@ class BatchNamesTest extends TestCase
         $results = $select->getSearchResultsForJs('verano');
         $this->assertCount(1, $results);
         $this->assertSame($summer->id, $results[0]['value']);
-        $this->assertSame('Amnesia · Cosecha verano 2026 · B-AAA111', $results[0]['label']);
+        $this->assertSame('Amnesia · Cosecha verano 2026', $results[0]['label']); // strain first, no lote number (298)
     }
 
     // 9 -------------------------------------------------------------------------------------------------------------
@@ -232,8 +233,8 @@ class BatchNamesTest extends TestCase
 
         $chip = Blade::render('<x-counter.batch-chip :batch="$batch" :selected="false" quantity="1 g" :fefo="true" />', ['batch' => $batch]);
         $this->assertStringContainsString('Cosecha verano 2026', $chip);
-        $this->assertStringContainsString('B-AAA111', $chip);
-        $this->assertStringContainsString('title="Cosecha verano 2026 · B-AAA111"', $chip);
+        $this->assertStringNotContainsString('B-AAA111', $chip); // the counter never shows a lote number (298)
+        $this->assertStringContainsString('title="Amnesia · Cosecha verano 2026"', $chip);
 
         // The recount at the last close: touched flower batches, by name, ordered strain → name → lote.
         $batch->forceFill(['remaining_cg' => 9000])->saveQuietly();
@@ -243,11 +244,12 @@ class BatchNamesTest extends TestCase
         (new OpenTill)->handle($this->centro, 'POS-1', 10000);
 
         $html = Livewire::test(TillSession::class)->call('startClose')->assertSet('reweighing', true)->html();
-        $spring = strpos($html, 'Amnesia · Cosecha primavera · B-ZZZ999');
-        $summer = strpos($html, 'Amnesia · Cosecha verano 2026 · B-AAA111');
+        $spring = strpos($html, 'Amnesia · Cosecha primavera');
+        $summer = strpos($html, 'Amnesia · Cosecha verano 2026');
+        $this->assertStringNotContainsString('B-AAA111', $html);
         $this->assertNotFalse($spring);
         $this->assertNotFalse($summer);
-        $this->assertLessThan($summer, $spring, 'The recount is ordered strain → name → lote.');
+        $this->assertLessThan($summer, $spring, 'The recount is ordered strain → name.');
     }
 
     // 10 ------------------------------------------------------------------------------------------------------------

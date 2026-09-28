@@ -7,11 +7,11 @@ use App\Actions\Expenses\RecordTillExpense;
 use App\Actions\Memberships\EnrolMembership;
 use App\Actions\Memberships\RecordFeePayment;
 use App\Actions\Stock\IntakeArticle;
+use App\Actions\Stock\IntakeBatch;
 use App\Actions\Stock\RecordStockMovement;
 use App\Actions\Till\CloseTill;
 use App\Actions\Till\OpenTill;
 use App\Actions\Wallet\RecordWalletTransaction;
-use App\Enums\BatchStatus;
 use App\Enums\CategoryAppliesTo;
 use App\Enums\CheckInMethod;
 use App\Enums\CultivationType;
@@ -54,6 +54,7 @@ use App\Support\ActiveScope;
 use App\Support\Settings;
 use App\Support\StockCeiling;
 use App\Support\TillSummary;
+use App\Support\Weight;
 use Faker\Factory as FakerFactory;
 use Faker\Generator as FakerGenerator;
 use Illuminate\Database\Seeder;
@@ -325,21 +326,15 @@ class DemoDataSeeder extends Seeder
                 // 80% of its compliance ceiling, so a fresh seed reads "within" rather than tripping the warning
                 // by design. The dashboard/intake ceiling feature is exercised by StockCeilingTest, not the seed.
                 $initial = $intakePerBatch[$location->id]; // cg
-                // Batch starts EMPTY; opening stock enters through the single stock writer as an INTAKE
-                // movement (the real go-live path — never a free-typed remaining_cg).
-                $batch = Batch::create([
-                    'organisation_id' => $orgId, 'genetic_id' => $genetic->id, 'location_id' => $location->id,
-                    'batch_no' => 'B-'.strtoupper(Str::random(6)), 'acquired_or_harvested_on' => now()->subDays(30),
-                    'initial_cg' => $initial, 'remaining_cg' => 0, 'cost_per_gram_cents' => random_int(300, 600),
+                // Through the real writer (prompt 298, CLAUDE.md's fixture rule): IntakeBatch gives the batch its lote number
+                // within the strain and a readable lote number, and enters the opening stock as its INTAKE movement.
+                $batch = (new IntakeBatch)->handle($genetic, $location, [
+                    'grams' => intdiv($initial, 100).'.'.str_pad((string) ($initial % 100), 2, '0', STR_PAD_LEFT), // exact, never a float
+                    'acquired_or_harvested_on' => now()->subDays(30)->toDateString(),
+                    'cost_per_gram_cents' => random_int(300, 600),
                     // Prompt 278 — the sale price is the batch's; the strain's sede price row stays as the fallback.
                     'price_per_gram_cents' => $pricePerGram, 'price_per_eighth_cents' => 2300,
-                    'status' => BatchStatus::OPEN,
-                ]);
-
-                (new RecordStockMovement)->handle($batch, StockMovementType::INTAKE, $initial, [
                     'operator_id' => $staff['owner']->id,
-                    'reason' => $strings['opening_stock'],
-                    'reference' => $batch->batch_no,
                 ]);
 
                 $batchesByLocation[$location->id][] = $batch->refresh();

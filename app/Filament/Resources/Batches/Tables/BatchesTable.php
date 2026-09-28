@@ -9,6 +9,7 @@ use App\Enums\BatchStatus;
 use App\Enums\StockMovementType;
 use App\Filament\Support\ReturnFocus;
 use App\Models\Batch;
+use App\Models\Genetic;
 use App\Models\Location;
 use App\Models\User;
 use App\Support\BelowCost;
@@ -28,12 +29,14 @@ use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
 use Filament\Notifications\Notification;
 use Filament\Schemas\Components\Utilities\Get;
+use Filament\Support\Enums\FontWeight;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Filters\TrashedFilter;
 use Filament\Tables\Table;
 use Illuminate\Auth\Access\AuthorizationException;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\HtmlString;
 use InvalidArgumentException;
@@ -46,11 +49,24 @@ class BatchesTable
     {
         return $table
             ->columns([
-                // Prompt 282 — the club's own name first; the search box matches it, the lote number and the strain.
-                TextColumn::make('label')->label(__('Nombre'))->searchable()->sortable()->placeholder('—')->limit(40)
-                    ->tooltip(fn (Batch $record): ?string => $record->label),
-                TextColumn::make('batch_no')->label(__('Nº lote'))->searchable()->sortable(),
-                TextColumn::make('genetic.name')->label(__('Genética'))->searchable()->sortable(),
+                // Prompt 298 — WHAT the batch is first: the strain in bold, the club's name (282) or the automatic
+                // description under it. One search box finds it by strain, name or lote number; it sorts by strain,
+                // then by its lote's place in the strain.
+                TextColumn::make('lote')
+                    ->label(__('Lote'))
+                    ->state(fn (Batch $record): string => $record->displayTitle())
+                    ->weight(FontWeight::SemiBold)
+                    ->description(fn (Batch $record): string => $record->displaySubtitle())
+                    ->searchable(query: fn (Builder $query, string $search): Builder => $query->where(fn (Builder $q): Builder => $q
+                        ->where('batches.label', 'like', "%{$search}%")
+                        ->orWhere('batches.batch_no', 'like', "%{$search}%")
+                        ->orWhereHas('genetic', fn (Builder $g): Builder => $g->where('name', 'like', "%{$search}%"))))
+                    ->sortable(query: fn (Builder $query, string $direction): Builder => $query
+                        ->orderBy(Genetic::query()->withoutGlobalScopes()->select('name')->whereColumn('genetics.id', 'batches.genetic_id'), $direction)
+                        ->orderBy('batches.lote_seq', $direction)),
+                // The lote number is traceability, not how people find a batch: there when switched on.
+                TextColumn::make('batch_no')->label(__('Nº lote'))->sortable()->copyable()
+                    ->toggleable(isToggledHiddenByDefault: true),
                 TextColumn::make('genetic.product_type')->label(__('Tipo'))->badge()->toggleable(),
                 // Where the stock IS (prompt 148). Shown only when the org has more than one active sede — a
                 // column that reads the same on every row in a single-sede club is noise; it is essential the
@@ -137,7 +153,7 @@ class BatchesTable
             ->icon(Heroicon::OutlinedExclamationTriangle)
             ->color('danger')
             ->visible(fn (): bool => Auth::user()?->can('reports.view') ?? false)
-            ->modalHeading(fn (Batch $record): string => __('Retirada de lote :batch', ['batch' => $record->displayName()]))
+            ->modalHeading(fn (Batch $record): string => __('Retirada de lote :batch', ['batch' => $record->referenceName()]))
             ->modalDescription(fn (Batch $record): string => self::recallSummary($record))
             ->modalContent(fn (Batch $record) => view('filament.batch-recall', ['recall' => new BatchRecall($record)]))
             ->modalSubmitActionLabel(__('Descargar CSV'))
@@ -175,7 +191,7 @@ class BatchesTable
             ->label(fn (Batch $record): string => $record->location?->isStore() ? __('Asignar a sede') : __('Trasladar'))
             ->icon(Heroicon::OutlinedArrowsRightLeft)
             ->visible(fn (): bool => Auth::user()?->can('stock.transfer') ?? false)
-            ->modalHeading(fn (Batch $record): string => __('Trasladar :batch', ['batch' => $record->displayName(withGenetic: true)]))
+            ->modalHeading(fn (Batch $record): string => __('Trasladar :batch', ['batch' => $record->displayName()]))
             ->schema([
                 Select::make('to_location_id')
                     ->label(__('Destino'))
