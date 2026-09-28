@@ -2,6 +2,7 @@
 
 namespace App\Actions\MemberAuth;
 
+use App\Actions\ResolveLocale;
 use App\Enums\MemberStatus;
 use App\Mail\MemberLoginLinkMail;
 use App\Models\Member;
@@ -40,7 +41,10 @@ class IssueMemberLoginLink
             'requested_ip' => $ip,
         ]);
 
-        Mail::to((string) $member->email)->queue(new MemberLoginLinkMail($member, $token));
+        // In the member's own language (prompt 288) — a queued mail renders in the worker, which has no session.
+        Mail::to((string) $member->email)
+            ->locale((new ResolveLocale)->handle($member))
+            ->queue(new MemberLoginLinkMail($member, $token));
 
         return true;
     }

@@ -3,17 +3,12 @@
 namespace App\Mail;
 
 use App\Support\OrganisationIdentity;
-use Illuminate\Bus\Queueable;
-use Illuminate\Mail\Mailable;
 use Illuminate\Mail\Mailables\Content;
 use Illuminate\Mail\Mailables\Envelope;
-use Illuminate\Queue\SerializesModels;
 
 /** Renewal reminder sent N days before a membership expires (idempotent per period). */
-class MembershipReminderMail extends Mailable
+class MembershipReminderMail extends ClubMail
 {
-    use Queueable, SerializesModels;
-
     public function __construct(public string $memberName, public string $expiresOn) {}
 
     public function envelope(): Envelope

@@ -6,21 +6,16 @@ use App\Models\Dispensation;
 use App\Support\Money;
 use App\Support\OrganisationIdentity;
 use App\Support\Weight;
-use Illuminate\Bus\Queueable;
-use Illuminate\Mail\Mailable;
 use Illuminate\Mail\Mailables\Content;
 use Illuminate\Mail\Mailables\Envelope;
-use Illuminate\Queue\SerializesModels;
 
 /**
  * Emails a member their dispensation receipt — worded as a shared-cost CONTRIBUTION (aportación),
  * never a sale (prompt 56). Carries scalar values (not the model) so the /dev/mail preview + render
  * test need no database, and so a queued send can't drift if the record later changes.
  */
-class DispensationReceiptMail extends Mailable
+class DispensationReceiptMail extends ClubMail
 {
-    use Queueable, SerializesModels;
-
     public function __construct(
         public string $memberName,
         public string $dispensedOn,

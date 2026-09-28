@@ -49,23 +49,58 @@ class SystemHealth
     ];
 
     /**
-     * The configured mail transport and whether its required credential is present (prompt 145). A missing key
-     * is otherwise SILENT — mail simply never arrives — so a mailer that needs a credential and lacks one is
-     * surfaced here, in the same family as the scheduler/queue checks. This is a CONFIGURATION check only: it
-     * never sends a probe email (that would spend real quota and put a network call inside a health panel).
+     * The configured mail transport and whether its required credential is present (prompt 145), graded (prompt 288):
+     * **red** when mail cannot work (a `log`/`array` mailer in production, or an API mailer with no key — prompt 145's
+     * silent case), **amber** when it will send from a placeholder `example.com` address, else **green**; plus the mail
+     * jobs that failed for good in the last 7 days, by mailable. A CONFIGURATION check only: it never sends a probe email
+     * (`php artisan csc:mail-test` does that, on purpose, when a person asks).
      *
-     * @return array{mailer: string, needs_credential: bool, configured: bool}
+     * @return array{mailer: string, needs_credential: bool, configured: bool, status: string, from: string, failed_last_7_days: array<string, int>}
      */
     public function mailer(): array
     {
         $mailer = (string) config('mail.default');
         $key = self::MAILER_CREDENTIALS[$mailer] ?? null;
+        $configured = $key === null || filled(config($key));
+        $from = (string) config('mail.from.address');
 
-        if ($key === null) {
-            return ['mailer' => $mailer, 'needs_credential' => false, 'configured' => true];
+        $status = match (true) {
+            ! $configured, app()->environment('production') && in_array($mailer, ['log', 'array'], true) => 'red',
+            str_ends_with(strtolower($from), '@example.com') => 'amber',
+            default => 'green',
+        };
+
+        return [
+            'mailer' => $mailer,
+            'needs_credential' => $key !== null,
+            'configured' => $configured,
+            'status' => $status,
+            'from' => $from,
+            'failed_last_7_days' => $this->failedMail(),
+        ];
+    }
+
+    /**
+     * Mail jobs that exhausted their retries in the last 7 days, by mailable class (a queued mail's `displayName`).
+     *
+     * @return array<string, int>
+     */
+    private function failedMail(): array
+    {
+        try {
+            $counts = [];
+            foreach (DB::table('failed_jobs')->where('failed_at', '>=', now()->subDays(7))->pluck('payload') as $payload) {
+                $name = (string) data_get(json_decode((string) $payload, true), 'displayName', '');
+                if (str_starts_with($name, 'App\\Mail\\')) {
+                    $counts[$name] = ($counts[$name] ?? 0) + 1;
+                }
+            }
+            ksort($counts);
+
+            return $counts;
+        } catch (\Throwable) {
+            return [];
         }
-
-        return ['mailer' => $mailer, 'needs_credential' => true, 'configured' => filled(config($key))];
     }
 
     /**

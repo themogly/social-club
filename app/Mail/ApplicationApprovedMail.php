@@ -3,20 +3,15 @@
 namespace App\Mail;
 
 use App\Support\OrganisationIdentity;
-use Illuminate\Bus\Queueable;
-use Illuminate\Mail\Mailable;
 use Illuminate\Mail\Mailables\Content;
 use Illuminate\Mail\Mailables\Envelope;
-use Illuminate\Queue\SerializesModels;
 
 /**
  * Sent when a pre-registration is APPROVED (App\Actions\Members\ApproveApplication).
  * Operational, member-to-member onboarding — not marketing (the club may not advertise).
  */
-class ApplicationApprovedMail extends Mailable
+class ApplicationApprovedMail extends ClubMail
 {
-    use Queueable, SerializesModels;
-
     public function __construct(public string $memberName, public string $memberNo) {}
 
     public function envelope(): Envelope

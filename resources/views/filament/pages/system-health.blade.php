@@ -174,14 +174,15 @@
             @endif
         </x-filament::section>
 
-        {{-- Mail transport credential (prompt 145). A mailer that needs an API key and lacks one fails
-             SILENTLY — mail never arrives — so surface it here rather than discover it via a member's missing
-             card. Configuration check only; never a probe send. --}}
-        @php $mailerBad = $mailer['needs_credential'] && ! $mailer['configured']; @endphp
-        <x-filament::section :heading="__('Correo')" icon="heroicon-o-envelope">
+        {{-- Mail (prompts 145, 288). A mailer that needs an API key and lacks one fails SILENTLY — mail never arrives — so
+             surface it here rather than discover it via a member's missing card. Red: mail cannot work; amber: it would
+             send from a placeholder address; plus the mail that failed for good this week. Configuration check only; a
+             real test send is `php artisan csc:mail-test`. --}}
+        @php $mailColor = ['red' => 'danger', 'amber' => 'warning', 'green' => 'success'][$mailer['status']] ?? 'gray'; @endphp
+        <x-filament::section :heading="__('Correo')" icon="heroicon-o-envelope" data-health-mail>
             <div style="display:flex;align-items:center;gap:.5rem;margin-bottom:.5rem;">
-                <x-filament::badge :color="$mailerBad ? 'danger' : 'success'">
-                    {{ $mailerBad ? __('Sin credencial') : __('Configurado') }}
+                <x-filament::badge :color="$mailColor" data-health-mail-status="{{ $mailer['status'] }}">
+                    {{ match ($mailer['status']) { 'red' => __('No funcionará'), 'amber' => __('Revisar'), default => __('Configurado') } }}
                 </x-filament::badge>
             </div>
             <dl style="font-size:.875rem;display:grid;gap:.35rem;">
@@ -189,10 +190,32 @@
                     <dt style="opacity:.65;">{{ __('Transporte') }}</dt>
                     <dd>{{ $mailer['mailer'] }}</dd>
                 </div>
+                <div style="display:flex;justify-content:space-between;gap:1rem;">
+                    <dt style="opacity:.65;">{{ __('Remitente') }}</dt>
+                    <dd>{{ $mailer['from'] !== '' ? $mailer['from'] : '—' }}</dd>
+                </div>
+                <div style="display:flex;justify-content:space-between;gap:1rem;">
+                    <dt style="opacity:.65;">{{ __('Correos fallidos (7 días)') }}</dt>
+                    <dd>{{ array_sum($mailer['failed_last_7_days']) }}</dd>
+                </div>
+                @foreach ($mailer['failed_last_7_days'] as $class => $count)
+                    <div style="display:flex;justify-content:space-between;gap:1rem;padding-left:1rem;">
+                        <dt style="opacity:.65;">{{ class_basename($class) }}</dt>
+                        <dd>{{ $count }}</dd>
+                    </div>
+                @endforeach
             </dl>
-            @if ($mailerBad)
+            @if ($mailer['needs_credential'] && ! $mailer['configured'])
                 <div style="margin-top:.5rem;color:#dc2626;font-size:.85rem;">
                     {{ __('El transporte de correo seleccionado necesita una clave de API y no la encuentra. El correo no se enviará hasta configurarla.') }}
+                </div>
+            @elseif ($mailer['status'] === 'red')
+                <div style="margin-top:.5rem;color:#dc2626;font-size:.85rem;">
+                    {{ __('En producción el correo se está escribiendo en el registro o descartando: no llega a nadie. Configura un transporte real.') }}
+                </div>
+            @elseif ($mailer['status'] === 'amber')
+                <div style="margin-top:.5rem;color:#d97706;font-size:.85rem;">
+                    {{ __('El remitente es una dirección de ejemplo. Configura MAIL_FROM_ADDRESS con un dominio verificado.') }}
                 </div>
             @endif
         </x-filament::section>

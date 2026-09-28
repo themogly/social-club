@@ -4,11 +4,8 @@ namespace App\Mail;
 
 use App\Models\Convocatoria;
 use App\Support\OrganisationIdentity;
-use Illuminate\Bus\Queueable;
-use Illuminate\Mail\Mailable;
 use Illuminate\Mail\Mailables\Content;
 use Illuminate\Mail\Mailables\Envelope;
-use Illuminate\Queue\SerializesModels;
 
 /**
  * The convocatoria notice sent to ONE member (prompt 88). Carries scalar values (not the model) so the
@@ -18,10 +15,8 @@ use Illuminate\Queue\SerializesModels;
  *
  * @param  list<string>  $agenda
  */
-class ConvocatoriaMail extends Mailable
+class ConvocatoriaMail extends ClubMail
 {
-    use Queueable, SerializesModels;
-
     /**
      * @param  list<string>  $agenda
      */
