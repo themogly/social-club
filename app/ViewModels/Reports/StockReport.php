@@ -4,7 +4,7 @@ namespace App\ViewModels\Reports;
 
 use App\Enums\BatchStatus;
 use App\Enums\DispensationStatus;
-use App\Enums\ProductTypeChoice;
+use App\Enums\ProductType;
 use App\Enums\StockMovementType;
 use App\Enums\StockTakeStatus;
 use App\Models\Batch;
@@ -70,7 +70,7 @@ class StockReport extends AbstractReport
 
         $genetics = DB::table('genetics')
             ->whereIn('id', $batches->pluck('genetic_id')->unique()->all())
-            ->get(['id', 'name', 'product_type', 'concentrate_subtype', 'unit_type', 'grams_per_unit_cg'])
+            ->get(['id', 'name', 'product_type', 'unit_type', 'grams_per_unit_cg'])
             ->keyBy('id');
         $dispensed = DB::table('dispensation_lines')
             ->whereIn('batch_id', $batches->pluck('id')->all())
@@ -91,7 +91,7 @@ class StockReport extends AbstractReport
             return [
                 'lote' => (string) $b->batch_no,
                 'genetica' => (string) ($g->name ?? __('Sin genética')),
-                'tipo' => $g !== null ? ProductTypeChoice::of($g->product_type, $g->concentrate_subtype)->label() : '—', // hash reads Hachís (276)
+                'tipo' => $g !== null ? (ProductType::tryFrom((string) $g->product_type)?->label() ?? '—') : '—',
                 'restante' => $remaining,
                 'coste_g' => $rate,
                 'valor' => $value,

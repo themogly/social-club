@@ -10,7 +10,6 @@ use App\Enums\ConcentrateSubtype;
 use App\Enums\MembershipStatus;
 use App\Enums\MemberStatus;
 use App\Enums\ProductType;
-use App\Enums\ProductTypeChoice;
 use App\Enums\Role;
 use App\Enums\UnitType;
 use App\Exceptions\LimitExceededException;
@@ -37,12 +36,14 @@ use App\ViewModels\Reports\StockReport;
 use Database\Seeders\RolePermissionSeeder;
 use Filament\Facades\Filament;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Livewire\Livewire;
 use Tests\TestCase;
 
 /**
- * Prompt 276 (Ben's 269) — Hachís is a product type staff pick directly. UI only: it is stored as
- * CONCENTRATE + concentrate_subtype HASH, so it is a WEIGHT product on exactly the flower path.
+ * Prompt 276 (Ben's 269) made Hachís a first-level choice; prompt 280 made it a REAL product type (Ben: "hash should be a
+ * separate product type") — `ProductType::HASH`, WEIGHT, so it dispenses on exactly the flower path and is its own
+ * reporting category. Existing CONCENTRATE/HASH strains were migrated to it.
  */
 class HashProductTypeTest extends TestCase
 {
@@ -111,8 +112,8 @@ class HashProductTypeTest extends TestCase
             ->assertHasNoFormErrors();
 
         $genetic = Genetic::query()->withoutGlobalScopes()->where('name', 'Marroquí')->sole();
-        $this->assertSame(ProductType::CONCENTRATE, $genetic->product_type);
-        $this->assertSame(ConcentrateSubtype::HASH, $genetic->concentrate_subtype);
+        $this->assertSame(ProductType::HASH, $genetic->product_type);
+        $this->assertNull($genetic->concentrate_subtype);
         $this->assertSame(UnitType::WEIGHT, $genetic->unit_type);
         $this->assertSame(5000, Batch::query()->withoutGlobalScopes()->where('genetic_id', $genetic->id)->sole()->getRawOriginal('remaining_cg'));
 
@@ -137,7 +138,7 @@ class HashProductTypeTest extends TestCase
         $hashLocation = $this->location;
         $flowerLocation = Location::factory()->create(['organisation_id' => $this->org->id]);
 
-        $hash = Genetic::factory()->concentrate(ConcentrateSubtype::HASH)->create(['organisation_id' => $this->org->id]);
+        $hash = Genetic::factory()->create(['organisation_id' => $this->org->id, 'product_type' => ProductType::HASH]);
         $hashBatch = $this->sellable($hash);
         $flower = Genetic::factory()->create(['organisation_id' => $this->org->id]);
         GeneticPrice::factory()->create([
@@ -187,7 +188,7 @@ class HashProductTypeTest extends TestCase
         foreach ([[$hashMember, $hashLocation, $hash, $hashBatch], [$flowerMember, $flowerLocation, $flower, $flowerBatch]] as [$m, $l, $g, $b]) {
             try {
                 $at($l, fn () => (new CommitDispensation)->handle($m, $l, [['genetic_id' => $g->id, 'batch_id' => $b->id, 'grams_cg' => 1]]));
-                $this->fail('A dispensation over the limit must be blocked for '.$g->typeLabel());
+                $this->fail('A dispensation over the limit must be blocked for '.$g->product_type->label());
             } catch (LimitExceededException) {
                 $this->assertTrue(true);
             }
@@ -202,27 +203,33 @@ class HashProductTypeTest extends TestCase
         $this->assertSame(StockCeiling::forLocation($flowerLocation)['on_site_cg'], StockCeiling::forLocation($hashLocation)['on_site_cg']);
     }
 
-    // (3) An existing CONCENTRATE/HASH strain displays as Hachís — list, edit form and the counter.
-    public function test_an_existing_concentrate_hash_strain_reads_as_hachis_everywhere(): void
+    // (3) An existing CONCENTRATE/HASH strain is migrated to Hachís, and reads as Hachís everywhere.
+    public function test_an_existing_concentrate_hash_strain_is_migrated_to_hachis(): void
     {
-        $hash = Genetic::factory()->concentrate(ConcentrateSubtype::HASH)->create(['organisation_id' => $this->org->id, 'name' => 'Polen']);
+        // The pre-280 shape, written raw (the HASH subtype no longer exists on the enum).
+        $hash = Genetic::factory()->concentrate(ConcentrateSubtype::ROSIN)->create(['organisation_id' => $this->org->id, 'name' => 'Polen']);
+        DB::table('genetics')->where('id', $hash->id)->update(['concentrate_subtype' => 'HASH']);
         $rosin = Genetic::factory()->concentrate(ConcentrateSubtype::ROSIN)->create(['organisation_id' => $this->org->id, 'name' => 'Rosin Uno']);
         $flower = Genetic::factory()->create(['organisation_id' => $this->org->id, 'name' => 'Amnesia']);
 
-        $this->assertSame('Hachís', $hash->typeLabel());
-        $this->assertSame('Extracto', $rosin->typeLabel());
-        $this->assertSame('Flor', $flower->typeLabel());
+        (require database_path('migrations/2026_09_28_200000_hash_is_a_product_type.php'))->up();
+
+        $hash->refresh();
+        $this->assertSame(ProductType::HASH, $hash->product_type);
+        $this->assertNull($hash->concentrate_subtype);
+        $this->assertSame(UnitType::WEIGHT, $hash->unit_type);
+        $this->assertSame(ProductType::CONCENTRATE, $rosin->fresh()->product_type, 'a non-hash extract was moved');
+        $this->assertSame('Hachís', $hash->product_type->label());
         app()->setLocale('en');
-        $this->assertSame('Hash', $hash->typeLabel());
+        $this->assertSame('Hash', $hash->product_type->label());
         app()->setLocale('es');
 
-        // The edit form opens on Hachís, and saving it leaves the stored shape as it was.
+        // The edit form opens on Hachís, and saving it keeps it Hachís.
         Livewire::actingAs($this->owner)->test(EditGenetic::class, ['record' => $hash->getRouteKey()])
             ->assertFormSet(['product_type' => 'HASH'])
             ->call('save')
             ->assertHasNoFormErrors();
-        $this->assertSame(ProductType::CONCENTRATE, $hash->fresh()->product_type);
-        $this->assertSame(ConcentrateSubtype::HASH, $hash->fresh()->concentrate_subtype);
+        $this->assertSame(ProductType::HASH, $hash->fresh()->product_type);
 
         // The counter: the row reads Hachís, Hachís is its own chip, and it filters to hash alone.
         foreach ([$hash, $rosin, $flower] as $g) {
@@ -253,8 +260,7 @@ class HashProductTypeTest extends TestCase
     // (4) Extracto no longer offers Hachís as a subtype — on the wizard and on the edit form.
     public function test_extracto_no_longer_offers_hachis_as_a_subtype(): void
     {
-        $this->assertArrayNotHasKey('HASH', ProductTypeChoice::extractSubtypeOptions());
-        $this->assertSame(['ROSIN', 'SHATTER', 'WAX', 'LIVE_RESIN'], array_keys(ProductTypeChoice::extractSubtypeOptions()));
+        $this->assertSame(['ROSIN', 'SHATTER', 'WAX', 'LIVE_RESIN'], array_map(fn (ConcentrateSubtype $c): string => $c->value, ConcentrateSubtype::cases()));
 
         $noHash = fn ($field): bool => ! array_key_exists('HASH', $field->getOptions()) && array_key_exists('ROSIN', $field->getOptions());
 
@@ -266,7 +272,7 @@ class HashProductTypeTest extends TestCase
         Livewire::actingAs($this->owner)->test(EditGenetic::class, ['record' => $rosin->getRouteKey()])
             ->assertFormSet(['product_type' => 'CONCENTRATE', 'concentrate_subtype' => 'ROSIN'])
             ->assertFormFieldExists('concentrate_subtype', $noHash)
-            // Extracto + a smuggled HASH subtype is refused — Hachís is the other choice.
+            // Extracto + a smuggled HASH subtype is refused — Hachís is its own product type.
             ->fillForm(['concentrate_subtype' => 'HASH'])
             ->call('save')
             ->assertHasFormErrors(['concentrate_subtype']);

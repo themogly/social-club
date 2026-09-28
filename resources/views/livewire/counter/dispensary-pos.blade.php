@@ -154,7 +154,7 @@
                             <div>
                                 <div class="flex flex-wrap items-center gap-2">
                                     <h3 class="text-base font-semibold">{{ $activeGenetic->name }}</h3>
-                                    <span class="rounded-full border border-brand/30 bg-brand-tint px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-brand dark:bg-slate-800 dark:text-slate-200">{{ $activeGenetic->typeLabel() }}</span>
+                                    <span class="rounded-full border border-brand/30 bg-brand-tint px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-brand dark:bg-slate-800 dark:text-slate-200">{{ $activeGenetic->product_type->label() }}</span>
                                 </div>
                                 @if ($activeGeneticPriceCents !== null)
                                     <p class="text-sm text-ink-muted dark:text-slate-400">{{ $this->money($activeGeneticPriceCents) }} / {{ $activeGenetic->isUnitType() ? __('ud') : 'g' }}</p>

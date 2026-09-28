@@ -14642,3 +14642,18 @@ the RECOMMENDED answers and listed in the owner report for him to overrule.
 
 Tests: `BatchPriceAndPhotosTest` (10); `BatchNamesItsSedeTest` and `AddAStrainFlowTest` updated to the new rule. `composer
 check` green in `es` and `en`. Merged to `main` on Ben's instruction.
+
+## Prompt 280 — Hachís is its own product type (Ben's call on 276)
+
+276 (Ben's 269) built option (a): Hachís as a first-level CHOICE stored as CONCENTRATE + subtype HASH. Ben reviewed it:
+*"Hash should be a separate product type."* So option (b):
+
+- **`ProductType::HASH`** ("Hachís" / "Hash"), WEIGHT — every limit, ceiling, stock and report path branches on the derived
+  UnitType, so hash dispenses exactly like flower; it is now its own reporting category.
+- **`ConcentrateSubtype::HASH` is gone** — Extracto's subtypes are Rosin, Shatter, Wax, Live resin.
+- **Migration** `2026_09_28_200000_hash_is_a_product_type`: CONCENTRATE + HASH → HASH (subtype null), reversible.
+- 276's `ProductTypeChoice` enum and the `Genetic::typeChoice()/typeLabel()/scopeOfTypeChoice()` helpers were a workaround
+  for a type that did not exist — removed (no dead code); forms, filters, the counter and the reports read `ProductType`
+  again. `HashProductTypeTest` rewritten to the new shape (including the migration).
+
+`composer check` green in `es` and `en`. Merged to `main` on Ben's instruction.

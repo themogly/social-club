@@ -38,7 +38,7 @@ class GeneticFactory extends Factory
     }
 
     /** A WEIGHT-type concentrate (hash by default) — priced and dispensed per gram, like flower. */
-    public function concentrate(?ConcentrateSubtype $subtype = ConcentrateSubtype::HASH): static
+    public function concentrate(?ConcentrateSubtype $subtype = ConcentrateSubtype::ROSIN): static
     {
         return $this->state(fn (): array => [
             'product_type' => ProductType::CONCENTRATE,
