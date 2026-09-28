@@ -13,6 +13,7 @@ use App\Enums\MessageThreadStatus;
 use App\Enums\Role;
 use App\Filament\Resources\MessageThreads\MessageThreadResource;
 use App\Models\DataRequest;
+use App\Models\Location;
 use App\Models\Member;
 use App\Models\Message;
 use App\Models\MessageThread;
@@ -49,6 +50,8 @@ class MessagingTest extends TestCase
         app(ActiveScope::class)->setOrganisation($this->org->id);
         $this->manager = User::factory()->create();
         $this->manager->assignRole(Role::MANAGER->value); // MANAGER holds comms.manage
+        // Post-296 audit — a non-owner works at a sede (with none they have nothing to see in the panel).
+        $this->manager->locations()->sync([Location::factory()->create(['organisation_id' => $this->org->id])->id]);
         // A configured VAPID keypair so the reply's push notification routes (via() is otherwise empty).
         config(['webpush.vapid.public_key' => 'BPUBLICKEY', 'webpush.vapid.private_key' => 'PRIVATEKEY']);
         Notification::fake();
@@ -179,6 +182,7 @@ class MessagingTest extends TestCase
         Filament::setCurrentPanel(Filament::getPanel('admin'));
         $staff = User::factory()->create();
         $staff->assignRole(Role::STAFF->value);
+        $staff->locations()->sync($this->manager->locations()->pluck('locations.id'));
 
         $this->actingAs($staff)->get(MessageThreadResource::getUrl('index'))->assertForbidden();
         $this->actingAs($this->manager)->get(MessageThreadResource::getUrl('index'))->assertOk();

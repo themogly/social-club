@@ -6,6 +6,7 @@ use App\Actions\RecordAuditLog;
 use App\Models\Batch;
 use App\Models\User;
 use App\Support\BelowCost;
+use App\Support\LocationSwitcher;
 use Illuminate\Auth\Access\AuthorizationException;
 use InvalidArgumentException;
 
@@ -23,6 +24,10 @@ class SetBatchPrice
     {
         if (! $actor->can('prices.manage')) {
             throw new AuthorizationException(__('No tienes permiso para cambiar precios.'));
+        }
+        // Post-296 audit — and only at a location the actor works at (the owner works at all of them).
+        if (! app(LocationSwitcher::class)->canAccess($actor, $batch->location_id)) {
+            throw new AuthorizationException(__('Ese lote es de una sede en la que no trabajas.'));
         }
         if ($rateCents < 0 || ($eighthCents !== null && $eighthCents < 0)) {
             throw new InvalidArgumentException(__('El precio no puede ser negativo.'));

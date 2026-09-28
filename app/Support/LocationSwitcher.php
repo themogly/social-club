@@ -46,10 +46,11 @@ class LocationSwitcher
     }
 
     /**
-     * The location that should be active by DEFAULT when the user has made no explicit choice: the single one
-     * they can reach — so a one-sede org (owner OR a manager with one assigned sede) names that sede instead of
-     * sitting in an ambiguous rollup. Null when they can roll up across several (the owner rollup stays the
-     * default there) or when there are none yet (straight after install).
+     * The location that should be active by DEFAULT when the user has made no explicit choice. Null ONLY for an owner
+     * who can roll up across several (the rollup is theirs alone, `canAccess(null)`) or when there is nowhere yet
+     * (straight after install). Anyone else gets one of their own: the single one they reach, or — the post-296 audit
+     * fix — the first of their SEDES when they reach several (a manager with their sede and the Almacén, since 277). A
+     * null here used to mean "no location filter at all", i.e. every sede.
      */
     public function defaultLocationId(User $user): ?string
     {
@@ -58,8 +59,24 @@ class LocationSwitcher
         }
 
         $available = $this->available($user, includeStores: true);
+        $first = $available->first(fn (Location $location): bool => $location->kind === LocationKind::SEDE) ?? $available->first();
 
-        return $available->count() === 1 ? (string) $available->first()?->id : null;
+        return $first !== null ? (string) $first->id : null;
+    }
+
+    /**
+     * Post-296 audit — put the user on a location they may use, whatever the session says: the rollup kept by a
+     * non-owner, or a sede they have since been taken off. Returns whether the active location changed.
+     */
+    public function enforce(User $user): bool
+    {
+        if ($this->canAccess($user, $this->current())) {
+            return false;
+        }
+
+        app(ActiveScope::class)->setLocation($this->defaultLocationId($user));
+
+        return true;
     }
 
     /** May this user make this location (or "All locations" when null) active? */

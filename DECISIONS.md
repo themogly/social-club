@@ -15674,3 +15674,34 @@ screenshots `storage/app/screenshots/285/`):
 - **For the club** (not a build item): with limits off everything is still recorded, but the counter is not
   *enforcing* them. The club's gestor should know, because limits and the registro are part of how an association
   shows a controlled, members-only supply.
+
+## Post-296 audit fix 1 — a non-owner always has one of their own locations active; bulk actions ask the policy per record
+
+From `audits/reports/2026-09-post-296-security.md`, Phase 1 findings 1 and 2. Both were proven by request in the
+audit, and each is now a failing-first test in `tests/Feature/Security/NonOwnerScopeAndBulkActionsTest.php`.
+
+- **The scope (finding 1).**
+  - **The problem:** `LocationScope` adds no filter when no location is active, and that state is meant for the
+    owner's rollup alone (`LocationSwitcher::canAccess(null)` is owner-only). But `defaultLocationId()` returned null
+    for ANY user who reaches more than one location. Since 277 that includes a manager with their sede plus the
+    Almacén, and such a manager saw and acted on every sede: another sede's dispensation list, repricing its
+    batches, moving its stock.
+  - `defaultLocationId()` now gives a non-owner one of their own locations: the first sede, else the first location.
+  - A new **persistent** panel middleware, `EnsureActiveLocation` (page loads and Livewire updates), calls
+    `LocationSwitcher::enforce()`. It puts the user back on a permitted location whatever the session says, including
+    a rollup kept by a non-owner or a sede they were since taken off.
+  - A **non-owner with no location at all is refused (403)** with *"No tienes ninguna sede asignada…"*. Before, they
+    saw the whole organisation. An owner with none (straight after install) is unaffected.
+  - **Belt and braces in the writers:** `SetBatchPrice` and `TransferBatch` refuse a batch at a location the actor
+    does not work at (checked on the batch's SOURCE; stock may be sent to any sede). This also bounds the Precio
+    confirmation's client-editable arguments (Phase 3), which fix 3 takes from the parent record instead.
+- **Bulk actions (finding 2).** `DeleteBulkAction`, `RestoreBulkAction` and `ForceDeleteBulkAction` are configured
+  globally (`AppServiceProvider`) with `authorizeIndividualRecords('delete' | 'restore' | 'forceDelete')`. Each
+  selected record is checked against its policy, and refused ones are skipped.
+  - Before: a manager bulk-deleted their own sede, a `staff.manage` manager bulk-deleted the OWNER (reopening
+    pre-live A4), and a `members.view` holder bulk-deleted a member.
+  - No `deleteAny` methods were added: per-record authorisation is the gate that matters. `strictAuthorization()` on
+    the panel was considered and left for its own change, because it would fail every resource that lacks a policy
+    method.
+- **Tests adjusted:** two older tests signed in a staff user with no sede (messaging index, panel access). They now
+  give that user a sede, and `PanelAccessTest` gains the no-sede denial.
