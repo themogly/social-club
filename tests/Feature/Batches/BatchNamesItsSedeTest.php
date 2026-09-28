@@ -121,6 +121,7 @@ class BatchNamesItsSedeTest extends TestCase
                 'location_id' => $norte->id,
                 'genetic_id' => $genetic->id,
                 'grams' => 100,
+                'sale_price_eur' => '10',
             ])
             ->call('create')
             ->assertHasNoFormErrors();
@@ -147,20 +148,29 @@ class BatchNamesItsSedeTest extends TestCase
 
     // --- The confirmation, and the no_price consequence --------------------------
 
-    public function test_adding_stock_where_the_genetic_has_no_price_warns_with_a_link(): void
+    /**
+     * Prompt 278 — the price is the batch's, so adding stock NEEDS a sale price and the new batch carries it: a strain
+     * with no sede price is no longer a stock-but-unsellable trap (the old "no tiene precio" warning cannot arise).
+     */
+    public function test_adding_stock_needs_a_sale_price_and_the_batch_carries_it(): void
     {
         app(ActiveScope::class)->setLocation($this->centro->id);
-        $genetic = $this->genetic('Sin Precio'); // NOT priced at Centro
+        $genetic = $this->genetic('Sin Precio'); // no sede price row at Centro
 
-        Livewire::actingAs($this->owner)
-            ->test(CreateBatch::class)
+        Livewire::actingAs($this->owner)->test(CreateBatch::class)
             ->fillForm(['location_id' => $this->centro->id, 'genetic_id' => $genetic->id, 'grams' => 50])
             ->call('create')
-            ->assertHasNoFormErrors()
-            ->assertNotified(__(':genetic no tiene precio en :sede', ['genetic' => 'Sin Precio', 'sede' => 'Sede Centro']));
+            ->assertHasFormErrors(['sale_price_eur' => 'required']);
 
-        // The stock IS recorded — the warning is a nudge, not a refusal.
-        $this->assertSame(1, Batch::query()->withoutGlobalScopes()->count());
+        Livewire::actingAs($this->owner)->test(CreateBatch::class)
+            ->fillForm(['location_id' => $this->centro->id, 'genetic_id' => $genetic->id, 'grams' => 50, 'sale_price_eur' => '9.50'])
+            ->call('create')
+            ->assertHasNoFormErrors()
+            ->assertNotified(__('Lote añadido'));
+
+        $batch = Batch::query()->withoutGlobalScopes()->sole();
+        $this->assertSame(950, $batch->price_per_gram_cents);
+        $this->assertTrue($genetic->fresh()->hasActivePriceAt($this->centro->id), 'a priced batch makes the strain sellable');
     }
 
     public function test_the_warning_links_to_where_the_price_is_set(): void
@@ -180,7 +190,7 @@ class BatchNamesItsSedeTest extends TestCase
 
         Livewire::actingAs($this->owner)
             ->test(CreateBatch::class)
-            ->fillForm(['location_id' => $this->centro->id, 'genetic_id' => $genetic->id, 'grams' => 50])
+            ->fillForm(['location_id' => $this->centro->id, 'genetic_id' => $genetic->id, 'grams' => 50, 'sale_price_eur' => '10'])
             ->call('create')
             ->assertHasNoFormErrors()
             ->assertNotified(__('Lote añadido'));

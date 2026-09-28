@@ -2,24 +2,38 @@
 
 namespace App\Actions\Pricing;
 
+use App\Actions\Stock\SelectBatch;
+use App\Enums\BatchStatus;
 use App\Enums\DiscountAppliesTo;
 use App\Enums\DiscountKind;
 use App\Enums\DiscountMode;
 use App\Enums\MembershipStatus;
+use App\Models\Batch;
 use App\Models\Discount;
 use App\Models\Genetic;
 use App\Models\GeneticPrice;
 use App\Models\Location;
 use App\Models\Member;
 use App\Models\MemberDiscount;
+use App\Models\MembershipTier;
 use App\Support\PriceResult;
 use App\Support\Settings;
 use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Support\Facades\Storage;
 use RuntimeException;
 
 /**
  * THE one price resolver — POS, PWA menu, reports and receipts all call this; no
- * second copy of the arithmetic. Resolution order: **tier price → best single
+ * second copy of the arithmetic.
+ *
+ * **The price is the BATCH's (prompt 278, Ben's 271).** Two harvests of one strain differ, so the rate comes from the
+ * batch the grams are drawn from (`forBatch`); a strain's "price" at a sede is the price of the batch that will be
+ * dispensed next there (`forGenetic` → `displayBatch`, FEFO). A membership tier is a % discount on any batch (owner
+ * decision 1a, `membership_tiers.discount_bp`) competing with the other discounts. The strain's sede price in
+ * `genetic_prices` is only the FALLBACK for a batch without its own price (batches received before 278 that had no base
+ * price to backfill from, and fixtures) — and on that legacy path tier price rows still apply as before.
+ *
+ * Legacy resolution order: **tier price → best single
  * applicable discount → per-member custom (if better)**. Discounts do NOT stack
  * unless the `discounts_stack` setting says so. Therapeutic members get the
  * therapeutic discount automatically. The result is frozen into the dispensation
@@ -41,7 +55,138 @@ class ResolvePrice
      */
     private array $memo = [];
 
+    /** What this strain costs at this sede now: the price of the batch to be dispensed next (278), else the legacy row. */
     public function forGenetic(Genetic $genetic, Location $location, ?Member $member = null): PriceResult
+    {
+        $batch = $this->displayBatch($genetic, $location);
+
+        return $batch !== null ? $this->forBatch($batch, $genetic, $location, $member) : $this->legacy($genetic, $location, $member);
+    }
+
+    /** The price of grams drawn from THIS batch (278). A batch without its own price falls back to the strain's sede price. */
+    public function forBatch(Batch $batch, Genetic $genetic, Location $location, ?Member $member = null): PriceResult
+    {
+        if (! $batch->hasOwnPrice()) {
+            return $this->legacy($genetic, $location, $member);
+        }
+
+        $isUnit = $genetic->isUnitType();
+        $rate = (int) ($isUnit ? $batch->price_per_unit_cents : $batch->price_per_gram_cents);
+        $candidates = $this->applicableDiscounts($genetic, $location, $member, withTier: true);
+
+        return new PriceResult($rate, null, $this->chooseDiscount($rate, $candidates), $isUnit, $isUnit ? null : $batch->price_per_eighth_cents);
+    }
+
+    /**
+     * Price a line drawn from these batch PARTS (278, owner decision 2): each part at ITS OWN batch's price, the line
+     * the sum — honest and traceable. The counter's preview and `CommitDispensation` both call this, so the total shown
+     * is the total charged. `eighth_price` is set only when every part shares one (the basket-wide break then applies).
+     *
+     * @param  list<array{batch: Batch, qty: int}>  $parts  qty in centigrams (weight) or units
+     * @return array{parts: list<array{batch: Batch, qty: int, rate_cents: int, total_cents: int, discount_cents: int}>, total_cents: int, discount_cents: int, rate_cents: int, effective_rate_cents: int, eighth_price: ?int, label: ?string, mixed: bool}
+     */
+    public function priceParts(Genetic $genetic, Location $location, ?Member $member, array $parts, bool $isUnit): array
+    {
+        $out = [];
+        $eighths = [];
+        $firstPrice = null;
+        $firstLabel = null;
+
+        foreach ($parts as $part) {
+            $price = $this->forBatch($part['batch'], $genetic, $location, $member);
+            $line = $isUnit ? $price->lineForUnits($part['qty']) : $price->lineFor($part['qty']);
+            $firstPrice ??= $price;
+            $firstLabel ??= $line['label'];
+            $eighths[] = $isUnit ? null : $price->effectiveEighthPriceCents();
+            $out[] = ['batch' => $part['batch'], 'qty' => $part['qty'], 'rate_cents' => $line['rate_cents'], 'total_cents' => $line['total_cents'], 'discount_cents' => $line['discount_cents']];
+        }
+
+        $rates = array_unique(array_column($out, 'rate_cents'));
+
+        return [
+            'parts' => $out,
+            'total_cents' => (int) array_sum(array_column($out, 'total_cents')),
+            'discount_cents' => (int) array_sum(array_column($out, 'discount_cents')),
+            'rate_cents' => $out[0]['rate_cents'] ?? 0,
+            'effective_rate_cents' => $firstPrice?->effectiveRatePerGramCents() ?? 0,
+            'eighth_price' => count(array_unique($eighths, SORT_REGULAR)) === 1 ? ($eighths[0] ?? null) : null,
+            'label' => $firstLabel,
+            'mixed' => count($rates) > 1,
+        ];
+    }
+
+    /**
+     * The batch whose price (and photo) a strain shows at a sede (278): the one to be dispensed next (FEFO), else the
+     * most recently received priced batch still OPEN there (so an empty-but-listed strain still shows its price).
+     */
+    public function displayBatch(Genetic $genetic, Location $location): ?Batch
+    {
+        $key = 'display|'.$genetic->id.'|'.$location->id;
+
+        if (! array_key_exists($key, $this->memo)) {
+            $this->memo[$key] = (new SelectBatch)->fefo($genetic, $location)
+                ?? $this->latestPricedOpen($genetic->id, $location->id);
+        }
+
+        /** @var ?Batch */
+        return $this->memo[$key];
+    }
+
+    /**
+     * Resolve `displayBatch()` for a whole list in two queries (273's rule — the counter grid must not query per card).
+     *
+     * @param  iterable<Genetic>  $genetics
+     */
+    public function preloadDisplayBatches(iterable $genetics, Location $location): void
+    {
+        $ids = [];
+        $byId = [];
+        foreach ($genetics as $genetic) {
+            $ids[] = $genetic->id;
+            $byId[$genetic->id] = $genetic;
+        }
+        if ($ids === []) {
+            return;
+        }
+
+        $dispensable = Batch::query()->withoutGlobalScopes()->whereIn('genetic_id', $ids)->where('location_id', $location->id)
+            ->fefo($location->id)->get()->groupBy('genetic_id');
+        $priced = Batch::query()->withoutGlobalScopes()->whereIn('genetic_id', $ids)->where('location_id', $location->id)
+            ->where('status', BatchStatus::OPEN->value)
+            ->where(fn ($q) => $q->whereNotNull('price_per_gram_cents')->orWhereNotNull('price_per_unit_cents'))
+            ->orderByDesc('acquired_or_harvested_on')->orderByDesc('id')->get()->groupBy('genetic_id');
+
+        foreach ($ids as $id) {
+            $batch = $dispensable->get($id)?->first() ?? $priced->get($id)?->first();
+            // The strain rides along, so asking the batch its kind (weight/unit) is not a query per card.
+            $batch?->setRelation('genetic', $byId[$id]);
+            $this->memo['display|'.$id.'|'.$location->id] = $batch;
+        }
+    }
+
+    /**
+     * The photo a strain shows at a sede (278): the next batch's own (or its parent's), else the strain's, else null —
+     * the view draws a neutral placeholder for null, never a broken image.
+     */
+    public function photoUrl(Genetic $genetic, Location $location): ?string
+    {
+        $path = $this->displayBatch($genetic, $location)?->displayImages()[0]
+            ?? (array_values(array_filter((array) ($genetic->images ?? []), 'is_string'))[0] ?? null);
+
+        return $path !== null ? Storage::disk('public')->url($path) : null;
+    }
+
+    private function latestPricedOpen(string $geneticId, string $locationId): ?Batch
+    {
+        return Batch::query()->withoutGlobalScopes()
+            ->where('genetic_id', $geneticId)->where('location_id', $locationId)
+            ->where('status', BatchStatus::OPEN->value)
+            ->where(fn ($q) => $q->whereNotNull('price_per_gram_cents')->orWhereNotNull('price_per_unit_cents'))
+            ->orderByDesc('acquired_or_harvested_on')->orderByDesc('id')->first();
+    }
+
+    /** The pre-278 strain-level price (`genetic_prices`): tier row → base row. The fallback for an unpriced batch. */
+    private function legacy(Genetic $genetic, Location $location, ?Member $member): PriceResult
     {
         [$rate, $rateLabel, $eighth] = $this->rate($genetic, $location, $member);
         $candidates = $this->applicableDiscounts($genetic, $location, $member);
@@ -199,6 +344,20 @@ class ResolvePrice
             ->orderByDesc('updated_at')->orderByDesc('id')->first();
     }
 
+    private function activeTier(Member $member, Location $location): ?MembershipTier
+    {
+        $id = $this->activeTierId($member, $location);
+        if ($id === null) {
+            return null;
+        }
+
+        $key = 'tier-model|'.$id;
+        $this->memo[$key] ??= MembershipTier::query()->withoutGlobalScopes()->find($id);
+
+        /** @var ?MembershipTier */
+        return $this->memo[$key];
+    }
+
     private function activeTierId(Member $member, Location $location): ?string
     {
         $key = 'tier|'.$member->id.'|'.$location->id;
@@ -217,13 +376,22 @@ class ResolvePrice
     /**
      * @return list<DiscountShape>
      */
-    private function applicableDiscounts(Genetic $genetic, Location $location, ?Member $member): array
+    private function applicableDiscounts(Genetic $genetic, Location $location, ?Member $member, bool $withTier = false): array
     {
         if ($member === null) {
             return [];
         }
 
         $candidates = [];
+
+        // Prompt 278 (owner decision 1a) — on a batch price, the member's tier is a % discount, one candidate among the
+        // others (best single wins, as always). Not on the legacy path, where a tier price ROW already applies.
+        if ($withTier) {
+            $tier = $this->activeTier($member, $location);
+            if ($tier !== null && (int) $tier->discount_bp > 0) {
+                $candidates[] = ['mode' => DiscountMode::PERCENT, 'value_bp' => (int) $tier->discount_bp, 'value_cents' => null, 'label' => (string) $tier->name];
+            }
+        }
 
         // Therapeutic members get the therapeutic discount automatically.
         if ($member->is_therapeutic) {

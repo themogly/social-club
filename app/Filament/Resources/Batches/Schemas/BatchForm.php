@@ -40,7 +40,7 @@ class BatchForm
                             // A disabled field is not submitted by default; the single-sede value still must be.
                             ->dehydrated()
                             ->helperText(fn (string $operation): ?string => $operation === 'create' && ! self::singleSede()
-                                ? __('El stock pertenece a esta sede y no se puede mover luego.')
+                                ? __('Donde entra el stock. Después se puede trasladar con «Trasladar».')
                                 : null),
 
                         Select::make('genetic_id')
@@ -78,6 +78,22 @@ class BatchForm
                             ->minValue(0)
                             ->visible(fn (string $operation): bool => $operation === 'create'),
 
+                        // Prompt 278 (Ben's 271) — the SALE price is the batch's: required at intake, so no batch is ever
+                        // received unpriced. Changed later only through the audited "Precio" action (prices.manage).
+                        TextInput::make('sale_price_eur')
+                            ->label(fn (Get $get): string => self::isUnitGenetic($get('genetic_id')) ? __('Precio por unidad (€)') : __('Precio por gramo (€)'))
+                            ->numeric()
+                            ->minValue(0)
+                            ->required()
+                            ->visible(fn (string $operation): bool => $operation === 'create'),
+
+                        TextInput::make('price_per_eighth_eur')
+                            ->label(__('Precio por octavo — 3,5 g (€)'))
+                            ->helperText(__('Opcional.'))
+                            ->numeric()
+                            ->minValue(0)
+                            ->visible(fn (string $operation, Get $get): bool => $operation === 'create' && ! self::isUnitGenetic($get('genetic_id'))),
+
                         DatePicker::make('acquired_or_harvested_on')
                             ->label(__('Fecha de adquisición/cosecha')),
 
@@ -91,6 +107,20 @@ class BatchForm
                             ->visibility('private')
                             ->maxSize(DocumentUpload::maxKilobytes())
                             ->helperText(DocumentUpload::helperText()),
+
+                        // Photos of THIS harvest (278) — shown on the members' menu and the counter; public disk (a product
+                        // photo is not personal data), resized on upload so the menu stays light.
+                        FileUpload::make('images')
+                            ->label(__('Fotos del lote'))
+                            ->image()
+                            ->imageEditor()
+                            ->imageResizeMode('contain')
+                            ->imageResizeTargetWidth('1200')
+                            ->imageResizeTargetHeight('1200')
+                            ->disk('public')
+                            ->directory('batches')
+                            ->multiple()
+                            ->columnSpanFull(),
 
                         Textarea::make('notes')
                             ->label(__('Notas'))

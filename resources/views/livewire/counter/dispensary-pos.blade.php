@@ -716,6 +716,10 @@
                                         @endif
                                         @if ($line['discount_cents'] > 0)· <span class="text-success">−{{ $this->money($line['discount_cents']) }}</span>@endif
                                     </p>
+                                    {{-- Prompt 278 — the line crosses into a differently priced lote: say so BEFORE commit. --}}
+                                    @if ($line['split_note'] ?? null)
+                                        <p data-split-note class="text-xs font-medium text-warning">{{ $line['split_note'] }}</p>
+                                    @endif
                                 </div>
                                 <div class="flex shrink-0 items-center gap-2">
                                     <span class="font-semibold tabular-nums">{{ $this->money($line['total_cents']) }}</span>

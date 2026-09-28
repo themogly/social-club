@@ -26,7 +26,7 @@ use Illuminate\Support\Str;
  * as an INTAKE movement (opening balances always enter through the ledger). Exactly one
  * of the cg / units column pairs is populated — the other is set null explicitly.
  *
- * @phpstan-type IntakeData array{grams?: int|float|string, units?: int|string, batch_no?: ?string, cost_per_gram_cents?: int, acquired_or_harvested_on?: mixed, expires_on?: mixed, lab_report_path?: ?string, notes?: ?string, operator_id?: ?string, override?: bool, override_by?: ?User, override_reason?: ?string}
+ * @phpstan-type IntakeData array{grams?: int|float|string, units?: int|string, batch_no?: ?string, cost_per_gram_cents?: int, price_per_gram_cents?: ?int, price_per_unit_cents?: ?int, price_per_eighth_cents?: ?int, images?: list<string>, acquired_or_harvested_on?: mixed, expires_on?: mixed, lab_report_path?: ?string, notes?: ?string, operator_id?: ?string, override?: bool, override_by?: ?User, override_reason?: ?string}
  */
 class IntakeBatch
 {
@@ -46,7 +46,7 @@ class IntakeBatch
         // Batch + its opening-balance movement are atomic, and new stock entering the premises is
         // audited (prompt 48 — the most traceability-sensitive event in a cannabis club). INSIDE the
         // txn, so a failed audit rolls back the intake (boundary matches CommitStockTake).
-        return DB::transaction(function () use ($genetic, $location, $data, $units, $cg, $ceilingOverride): Batch {
+        return DB::transaction(function () use ($genetic, $location, $data, $units, $cg, $ceilingOverride, $isUnit): Batch {
             $batch = Batch::create([
                 'organisation_id' => $genetic->organisation_id,
                 'genetic_id' => $genetic->id,
@@ -59,6 +59,11 @@ class IntakeBatch
                 'initial_units' => $units,
                 'remaining_units' => $units,
                 'cost_per_gram_cents' => $data['cost_per_gram_cents'] ?? 0,
+                // The SALE price and photos of this batch (prompt 278). One price column per kind; the eighth is weight only.
+                'price_per_gram_cents' => $isUnit ? null : ($data['price_per_gram_cents'] ?? null),
+                'price_per_unit_cents' => $isUnit ? ($data['price_per_unit_cents'] ?? null) : null,
+                'price_per_eighth_cents' => $isUnit ? null : ($data['price_per_eighth_cents'] ?? null),
+                'images' => $data['images'] ?? null,
                 'lab_report_path' => $data['lab_report_path'] ?? null,
                 'notes' => $data['notes'] ?? null,
                 'status' => BatchStatus::OPEN,

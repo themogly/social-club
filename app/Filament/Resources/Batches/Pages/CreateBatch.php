@@ -4,11 +4,11 @@ namespace App\Filament\Resources\Batches\Pages;
 
 use App\Actions\Stock\IntakeBatch;
 use App\Filament\Resources\Batches\BatchResource;
-use App\Filament\Resources\Genetics\GeneticResource;
 use App\Models\Genetic;
 use App\Models\Location;
 use App\Support\ActiveScope;
-use Filament\Actions\Action;
+use App\Support\Money;
+use App\Support\Weight;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\CreateRecord;
 use Filament\Support\Exceptions\Halt;
@@ -25,8 +25,6 @@ class CreateBatch extends CreateRecord
     private string $intakeQuantity = '';
 
     /** True when the genetic has no active base price at the chosen sede — the batch will not dispense there. */
-    private bool $intakeUnpricedHere = false;
-
     /**
      * Intake never writes remaining_cg directly: it runs through IntakeBatch, which
      * converts grams → integer centigrams and records the opening INTAKE movement.
@@ -57,8 +55,14 @@ class CreateBatch extends CreateRecord
         /** @var Location $location */
         $location = Location::query()->findOrFail($locationId);
 
+        $salePriceCents = Money::fromEuros((string) ($data['sale_price_eur'] ?? 0))->cents;
         $intake = [
-            'cost_per_gram_cents' => (int) round_half_up(((float) ($data['cost_per_gram_eur'] ?? 0)) * 100),
+            'cost_per_gram_cents' => Money::fromEuros((string) ($data['cost_per_gram_eur'] ?? 0))->cents,
+            // The batch's own sale price and photos (prompt 278).
+            'price_per_gram_cents' => $genetic->isUnitType() ? null : $salePriceCents,
+            'price_per_unit_cents' => $genetic->isUnitType() ? $salePriceCents : null,
+            'price_per_eighth_cents' => filled($data['price_per_eighth_eur'] ?? null) ? Money::fromEuros((string) $data['price_per_eighth_eur'])->cents : null,
+            'images' => array_values((array) ($data['images'] ?? [])),
             'acquired_or_harvested_on' => $data['acquired_or_harvested_on'] ?? null,
             'expires_on' => $data['expires_on'] ?? null,
             'lab_report_path' => $data['lab_report_path'] ?? null,
@@ -73,13 +77,12 @@ class CreateBatch extends CreateRecord
         } else {
             $intake['grams'] = $data['grams'];
             // "g" is a unit symbol, not translatable copy; only the number varies.
-            $this->intakeQuantity = rtrim(rtrim((string) $data['grams'], '0'), '.').' g';
+            $this->intakeQuantity = Weight::fromGrams((string) $data['grams'])->formatted(); // the one formatter — rtrim read 250 as "25 g"
         }
 
         // Held for the confirmation: what was added, where, and whether it can actually be dispensed there.
         $this->intakeGenetic = $genetic;
         $this->intakeLocation = $location;
-        $this->intakeUnpricedHere = ! $genetic->hasActivePriceAt($location->id);
 
         return (new IntakeBatch)->handle($genetic, $location, $intake);
     }
@@ -95,34 +98,5 @@ class CreateBatch extends CreateRecord
                 'genetic' => $this->intakeGenetic->name,
                 'sede' => $this->intakeLocation->name,
             ]));
-    }
-
-    /**
-     * The `no_price` consequence, said at the moment it is created rather than discovered at the counter: a
-     * genetic with stock but no active price at a sede is simply ABSENT from that sede's POS (prompt 95 —
-     * filtered out, never an error), so an operator adds stock and then cannot find it. The warning names the
-     * gap and links straight to where the price is set.
-     */
-    protected function afterCreate(): void
-    {
-        if (! $this->intakeUnpricedHere) {
-            return;
-        }
-
-        Notification::make()
-            ->warning()
-            ->title(__(':genetic no tiene precio en :sede', [
-                'genetic' => $this->intakeGenetic->name,
-                'sede' => $this->intakeLocation->name,
-            ]))
-            ->body(__('El lote no se dispensará en esta sede hasta que definas un precio. El stock está registrado; solo falta el precio.'))
-            ->persistent()
-            ->actions([
-                Action::make('setPrice')
-                    ->label(__('Poner precio'))
-                    ->url(GeneticResource::getUrl('edit', ['record' => $this->intakeGenetic]))
-                    ->button(),
-            ])
-            ->send();
     }
 }

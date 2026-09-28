@@ -140,7 +140,7 @@ class ActiveSedeTest extends TestCase
         $genetic = Genetic::factory()->create(['organisation_id' => $this->org->id]);
 
         Livewire::test(CreateBatch::class)
-            ->fillForm(['genetic_id' => $genetic->id, 'grams' => 100, 'cost_per_gram_eur' => 3])
+            ->fillForm(['genetic_id' => $genetic->id, 'grams' => 100, 'cost_per_gram_eur' => 3, 'sale_price_eur' => 8])
             ->call('create')
             ->assertHasNoFormErrors();
 

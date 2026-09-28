@@ -11,6 +11,7 @@ use App\Actions\Dispensing\VoidDispensation;
 use App\Actions\Pricing\ResolveArticleDiscount;
 use App\Actions\Pricing\ResolvePrice;
 use App\Actions\ResolveLocale;
+use App\Actions\Stock\AllocateFromBatches;
 use App\Actions\Stock\SelectBatch;
 use App\Actions\Till\SelectTillSession;
 use App\Actions\Wallet\RecordWalletTransaction;
@@ -62,7 +63,6 @@ use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Mail;
-use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use InvalidArgumentException;
 use Livewire\Attributes\Layout;
@@ -1791,12 +1791,16 @@ class DispensaryPos extends Component
             }
 
             $units = $line['units'] ?? null;
+            $quantity = $units !== null ? (int) $units : (int) $line['grams_cg'];
 
+            // Prompt 278 — price the line from the batches it will draw from: the chosen lote, or the FEFO plan (the same
+            // resolver call CommitDispensation makes under its lock), each part at its own batch's price.
             try {
-                $price = $resolver->forGenetic($genetic, $location, $member);
-                $priced = $units !== null
-                    ? $price->lineForUnits((int) $units)
-                    : $price->lineFor((int) $line['grams_cg']);
+                $chosen = $line['batch_id'] !== null ? Batch::query()->withoutGlobalScopes()->find($line['batch_id']) : null;
+                $parts = $chosen !== null
+                    ? [['batch' => $chosen, 'qty' => $quantity]]
+                    : (new AllocateFromBatches)->preview($genetic, $location, $quantity);
+                $priced = $resolver->priceParts($genetic, $location, $member, $parts, $units !== null);
             } catch (RuntimeException) {
                 continue;
             }
@@ -1812,10 +1816,12 @@ class DispensaryPos extends Component
                 'total_cents' => $priced['total_cents'],
                 'label' => $priced['label'],
                 'eighth_applied' => false,
+                // "parte a 8,00 €/g, parte a 10,00 €/g" — said BEFORE commit, not after (278).
+                'split_note' => $priced['mixed'] ? $this->splitNote($priced['parts'], $units !== null) : null,
             ];
             $eighthInput[] = $units !== null
                 ? ['grams_cg' => (int) $line['grams_cg'], 'rate_cents' => 0, 'per_gram_total' => $priced['total_cents'], 'eighth_price' => null]
-                : ['grams_cg' => (int) $line['grams_cg'], 'rate_cents' => $price->effectiveRatePerGramCents(), 'per_gram_total' => $priced['total_cents'], 'eighth_price' => $price->effectiveEighthPriceCents()];
+                : ['grams_cg' => (int) $line['grams_cg'], 'rate_cents' => $priced['effective_rate_cents'], 'per_gram_total' => $priced['total_cents'], 'eighth_price' => $priced['eighth_price']];
         }
 
         // Basket-wide eighth (3.5 g) break (prompt 83) — the SAME resolver call CommitDispensation makes, so
@@ -1827,6 +1833,17 @@ class DispensaryPos extends Component
         }
 
         return $rows;
+    }
+
+    /** @param  list<array{batch: Batch, qty: int, rate_cents: int, total_cents: int, discount_cents: int}>  $parts */
+    private function splitNote(array $parts, bool $perUnit): string
+    {
+        $unit = $perUnit ? __('/ud') : __('/g');
+
+        return __('Parte a :rates', ['rates' => implode(', ', array_map(
+            fn (array $part): string => Money::fromCents($part['rate_cents'])->formatted().$unit,
+            $parts,
+        ))]);
     }
 
     private function basketTotalCents(?Member $member, ?Location $location): int
@@ -2014,6 +2031,8 @@ class DispensaryPos extends Component
         // Prompt 273 — the stock for the whole grid in ONE grouped query too; it was two or three per card (remaining,
         // and a FEFO lookup just to answer "has a lote"). 11 varieties cost 119 queries per render, on every key press.
         $stock = StockCover::stockFor($genetics->values()->all(), $location->id);
+        // …and each card's price/photo batch (278) in two queries, not one FEFO lookup per card.
+        $resolver->preloadDisplayBatches($genetics, $location);
 
         $rows = [];
 
@@ -2062,7 +2081,8 @@ class DispensaryPos extends Component
                 // A dispensable lote exists exactly when there is dispensable stock — the rule SelectBatch::fefo serves by.
                 'has_batch' => ($isUnit ? (int) $remainingUnits : $remainingCg) > 0,
                 // Prompt 271 — the first photo from "Añadir variedad", which nothing used to show.
-                'image_url' => filled($genetic->images[0] ?? null) ? Storage::disk('public')->url((string) $genetic->images[0]) : null,
+                // The next batch's photo, else the strain's (278 — before, only the strain's, which nothing else showed).
+                'image_url' => $resolver->photoUrl($genetic, $location),
             ];
         }
 

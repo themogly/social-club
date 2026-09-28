@@ -5,13 +5,24 @@
     </header>
 
     @forelse ($genetics as $item)
-        <article class="mt-3 rounded-2xl border border-line bg-surface p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+        <article class="mt-3 flex gap-3 rounded-2xl border border-line bg-surface p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+            {{-- Prompt 278 — the photo of the batch that will be dispensed next, else the strain's; a neutral placeholder
+                 otherwise, never a broken image. --}}
+            <span data-menu-photo class="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-surface-alt dark:bg-slate-800">
+                @if ($item['photo_url'] ?? null)
+                    <img src="{{ $item['photo_url'] }}" alt="" loading="lazy" class="h-full w-full object-cover">
+                @else
+                    <span data-menu-photo-placeholder class="text-lg font-semibold text-ink-muted dark:text-slate-400" aria-hidden="true">{{ mb_strtoupper(mb_substr($item['genetic']->name, 0, 1)) }}</span>
+                @endif
+            </span>
+            <div class="min-w-0 flex-1">
             <div class="flex items-baseline justify-between gap-3">
                 <h2 class="font-semibold">{{ $item['genetic']->name }}</h2>
                 <span class="shrink-0 font-semibold text-brand dark:text-slate-100">{{ \App\Support\Money::fromCents($item['price']->ratePerGramCents)->formatted() }}/g</span>
             </div>
             <p class="mt-1 text-xs text-ink-muted dark:text-slate-400">
-                THC {{ $item['genetic']->thc_pct ?? '—' }}% · CBD {{ $item['genetic']->cbd_pct ?? '—' }}%@if ($item['genetic']->strain_type) · {{ $item['genetic']->strain_type->label() }}@endif
+                {{-- Prompt 278 — the percentages are basis points on the model (thc_bp); `thc_pct` never existed, so every strain read "—%". --}}
+                THC {{ $item['genetic']->thc_bp !== null ? number_format($item['genetic']->thc_bp / 100, 1, ',', '') : '—' }}% · CBD {{ $item['genetic']->cbd_bp !== null ? number_format($item['genetic']->cbd_bp / 100, 1, ',', '') : '—' }}%@if ($item['genetic']->strain_type) · {{ $item['genetic']->strain_type->label() }}@endif
             </p>
 
             {{-- Prompt 185 — availability at THIS member's sede, as a state and never a quantity.
@@ -34,6 +45,7 @@
                     class="inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-semibold {{ $availabilityChip[0] }}"
                 >{{ $availabilityChip[1] }}</span>
             </p>
+            </div>
         </article>
     @empty
         <div class="mt-6 rounded-2xl border border-dashed border-line bg-surface p-8 text-center dark:border-slate-800 dark:bg-slate-900">

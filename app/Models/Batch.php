@@ -35,7 +35,8 @@ class Batch extends Model
         'organisation_id', 'genetic_id', 'parent_batch_id', 'location_id', 'batch_no',
         'acquired_or_harvested_on', 'expires_on', 'initial_cg', 'remaining_cg',
         'initial_units', 'remaining_units',
-        'cost_per_gram_cents', 'lab_report_path', 'notes', 'status',
+        'cost_per_gram_cents', 'price_per_gram_cents', 'price_per_unit_cents', 'price_per_eighth_cents',
+        'lab_report_path', 'images', 'notes', 'status',
     ];
 
     protected function casts(): array
@@ -48,6 +49,10 @@ class Batch extends Model
             'initial_units' => 'integer',
             'remaining_units' => 'integer',
             'cost_per_gram_cents' => 'integer',   // rate
+            'price_per_gram_cents' => 'integer',  // rate (prompt 278) — the SALE price of THIS batch
+            'price_per_unit_cents' => 'integer',  // rate
+            'price_per_eighth_cents' => 'integer', // rate — the 3.5 g price, weight only
+            'images' => 'array',
             'status' => BatchStatus::class,
         ];
     }
@@ -86,6 +91,29 @@ class Batch extends Model
     public function parent(): BelongsTo
     {
         return $this->belongsTo(Batch::class, 'parent_batch_id');
+    }
+
+    /** Does this batch carry its own sale price? (prompt 278) — per unit for a unit product, per gram otherwise. */
+    public function hasOwnPrice(): bool
+    {
+        return $this->isUnitType() ? $this->price_per_unit_cents !== null : $this->price_per_gram_cents !== null;
+    }
+
+    /**
+     * The photos to show for this batch (prompt 278): its own, else its parent's (a transferred part shows the harvest's
+     * photos until it gets its own — stored once, never copied), else none.
+     *
+     * @return list<string> public-disk paths
+     */
+    public function displayImages(int $depth = 0): array
+    {
+        $own = array_values(array_filter((array) ($this->images ?? []), 'is_string'));
+
+        if ($own !== [] || $this->parent_batch_id === null || $depth > 10) {
+            return $own;
+        }
+
+        return Batch::query()->withoutGlobalScopes()->find($this->parent_batch_id)?->displayImages($depth + 1) ?? [];
     }
 
     /** @return BelongsTo<Genetic, $this> */
