@@ -7,6 +7,7 @@ use App\Enums\BatchStatus;
 use App\Enums\MembershipStatus;
 use App\Enums\MemberStatus;
 use App\Enums\Role;
+use App\Enums\SettingType;
 use App\Livewire\Counter\DispensaryPos;
 use App\Models\Batch;
 use App\Models\Genetic;
@@ -20,6 +21,7 @@ use App\Models\Organisation;
 use App\Models\User;
 use App\Support\ActiveScope;
 use App\Support\CounterOperator;
+use App\Support\Settings;
 use Database\Seeders\RolePermissionSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
@@ -140,16 +142,22 @@ class DispensaryPosUnitTest extends TestCase
 
         $component = Livewire::test(DispensaryPos::class)->call('selectMember', $member->id);
 
-        // UNIT genetic → unit stepper, no grams calculator.
+        // UNIT genetic → unit stepper, no grams pad and no calculator.
         $component->call('chooseGenetic', $this->preroll->id)
             ->assertSet('unitQty', 1)
             ->assertSee('stepUnits')
-            ->assertDontSee('toggleCalculator');
+            ->assertDontSee('data-weight-pad', false)
+            ->assertDontSee('data-calculator-toggle', false);
 
-        // WEIGHT genetic → grams pad + calculator, no stepper.
+        // WEIGHT genetic → grams pad, no stepper; the € calculator only where the sede has it on (prompt 292: off by default).
         $component->call('chooseGenetic', $this->flower->id)
-            ->assertSee('toggleCalculator')
+            ->assertSee('data-weight-pad', false)
+            ->assertDontSee('data-calculator-toggle', false)
             ->assertDontSee('stepUnits');
+
+        Settings::set('dispensary_calculator_enabled', true, SettingType::BOOL, $this->location->id);
+        Livewire::test(DispensaryPos::class)->call('selectMember', $member->id)->call('chooseGenetic', $this->flower->id)
+            ->assertSee('data-calculator-toggle', false);
     }
 
     public function test_the_gauge_reads_the_same_gram_equivalent_for_an_equivalent_unit_and_weight_entry(): void

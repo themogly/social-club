@@ -121,6 +121,9 @@ class Settings
         // (Replaces the org-wide pos_require_checked_in / pos_signature_required, which no UI ever wrote.)
         'restrict_pos_to_checked_in' => false,  // only dispense to members checked in at the door
         'signature_on_dispensation' => false,   // capture an on-screen signature per withdrawal (acta-grade)
+        // Prompt 292 — the dispensary's € calculator (type euros, get grams). The owner chose OFF by default: every sede,
+        // new or existing, has it off until switched on in Sedes → Dispensario.
+        'dispensary_calculator_enabled' => false,
 
         // Prompt 220 — the applicant SIGNS the consent text at sign-up, on every route. **Default ON, and
         // that is the owner's explicit decision rather than an overnight default**: he asked for it. With it

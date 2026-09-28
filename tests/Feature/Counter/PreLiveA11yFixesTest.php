@@ -126,13 +126,14 @@ class PreLiveA11yFixesTest extends TestCase
         // Prompt 282 moved the manual-lote chip into its own component.
         $chip = (string) file_get_contents(resource_path('views/components/counter/batch-chip.blade.php'));
 
-        $this->assertStringContainsString('wire:click="toggleCalculator" aria-pressed=', $pos);
-        $this->assertStringContainsString("wire:click=\"\$set('calculatorMode', false)\" aria-pressed=", $pos);
+        // Prompt 292 — the Gramos/€ switch is client-side now; it still says which option is selected.
+        $this->assertStringContainsString('@click="setMode(true)" x-bind:aria-pressed=', $pos);
+        $this->assertStringContainsString('@click="setMode(false)" x-bind:aria-pressed=', $pos);
         $this->assertStringContainsString("wire:click=\"selectBatch('{{ \$batch->id }}')\" aria-pressed=", $chip);
         $this->assertStringContainsString('wire:click="filterStrainType(null)" aria-pressed=', $pos);
         $this->assertStringContainsString("wire:click=\"\$set('feeMethod', 'CASH')\" aria-pressed=", $fee);
         $this->assertStringContainsString('wire:click="filterCategory(null)" aria-pressed=', $bar);
-        $this->assertStringContainsString("wire:click=\"pad('back')\" aria-label=\"{{ __('Retroceso') }}\"", $pos);
+        $this->assertStringContainsString("@click=\"back()\" aria-label=\"{{ __('Retroceso') }}\"", $pos);
     }
 
     public function test_the_tender_totals_are_a_polite_live_region_on_both_screens(): void

@@ -149,7 +149,21 @@
                 </section>
                 {{-- Weight entry panel (opens when a genetic is chosen). --}}
                 @if ($activeGenetic)
-                    <section class="rounded-2xl border border-brand/40 bg-brand-tint/40 p-4 dark:border-brand/40 dark:bg-slate-900">
+                    {{-- Prompt 292 — the keypad runs in the browser (window.dispensaryPad): no key makes a request; the value
+                         reaches the server with "Añadir a la cesta" and is validated there exactly as before. Keyed per
+                         genetic so a new strain starts a fresh pad. --}}
+                    <section wire:key="weight-entry-{{ $activeGenetic->id }}"
+                             x-data="window.dispensaryPad({
+                                 value: @js($weightInput),
+                                 calc: @js($calculatorMode),
+                                 calcEnabled: @js($calculatorEnabled),
+                                 weight: @js(! $activeGenetic->isUnitType()),
+                                 rateCents: @js($activeGeneticPriceCents),
+                                 dailyRemainingCg: @js($limits?->dailyRemainingCg()),
+                                 decimal: @js(app()->getLocale() === 'es' ? ',' : '.'),
+                             })"
+                             @keydown.window="onKey($event)"
+                             class="rounded-2xl border border-brand/40 bg-brand-tint/40 p-4 dark:border-brand/40 dark:bg-slate-900">
                         <div class="flex items-start justify-between gap-3">
                             <div>
                                 <div class="flex flex-wrap items-center gap-2">
@@ -164,27 +178,30 @@
                         </div>
 
                         @if (! $activeGenetic->isUnitType())
-                        {{-- grams vs calculator (€) toggle --}}
-                        <div class="mt-3 inline-flex rounded-xl border border-line bg-surface p-0.5 text-sm dark:border-slate-700 dark:bg-slate-950">
-                            <button type="button" wire:click="$set('calculatorMode', false)" aria-pressed="{{ $calculatorMode ? 'false' : 'true' }}" @class(['inline-flex min-h-11 items-center rounded-lg px-3 font-medium', 'bg-brand text-white' => ! $calculatorMode, 'text-ink-muted dark:text-slate-400' => $calculatorMode])>{{ __('Gramos') }}</button>
-                            <button type="button" wire:click="toggleCalculator" aria-pressed="{{ $calculatorMode ? 'true' : 'false' }}" @class(['inline-flex min-h-11 items-center rounded-lg px-3 font-medium', 'bg-brand text-white' => $calculatorMode, 'text-ink-muted dark:text-slate-400' => ! $calculatorMode])>{{ __('Calculadora €') }}</button>
-                        </div>
+                        {{-- grams vs calculator (€) toggle — only where the sede has switched the calculator on (292: off by
+                             default; the server refuses calculator mode there too). --}}
+                        @if ($calculatorEnabled)
+                            <div data-calculator-toggle class="mt-3 inline-flex rounded-xl border border-line bg-surface p-0.5 text-sm dark:border-slate-700 dark:bg-slate-950">
+                                <button type="button" @click="setMode(false)" x-bind:aria-pressed="calc ? 'false' : 'true'" x-bind:class="calc ? 'text-ink-muted dark:text-slate-400' : 'bg-brand text-white'" class="inline-flex min-h-11 items-center rounded-lg px-3 font-medium">{{ __('Gramos') }}</button>
+                                <button type="button" @click="setMode(true)" x-bind:aria-pressed="calc ? 'true' : 'false'" x-bind:class="calc ? 'bg-brand text-white' : 'text-ink-muted dark:text-slate-400'" class="inline-flex min-h-11 items-center rounded-lg px-3 font-medium">{{ __('Calculadora €') }}</button>
+                            </div>
+                        @endif
 
                         {{-- display --}}
                         <div class="mt-3 flex items-center justify-between rounded-xl border border-line bg-surface px-4 py-3 dark:border-slate-700 dark:bg-slate-950">
-                            <span class="text-sm text-ink-muted dark:text-slate-400">{{ $calculatorMode ? __('Aportación (€)') : __('Peso (g)') }}</span>
-                            <span class="text-2xl font-bold tabular-nums">{{ $weightInput === '' ? '0' : $weightInput }}{{ $calculatorMode ? ' €' : ' g' }}</span>
+                            <span class="text-sm text-ink-muted dark:text-slate-400" x-text="calc ? @js(__('Aportación (€)')) : @js(__('Peso (g)'))">{{ $calculatorMode && $calculatorEnabled ? __('Aportación (€)') : __('Peso (g)') }}</span>
+                            <span data-weight-display class="text-2xl font-bold tabular-nums" x-text="(value === '' ? '0' : value) + (calc ? ' €' : ' g')">{{ $weightInput === '' ? '0' : $weightInput }}{{ $calculatorMode && $calculatorEnabled ? ' €' : ' g' }}</span>
                         </div>
 
                         {{-- One-tap weight presets (prompt 133): each shows its resulting price; 3,5 g shows the
                              eighth break. A preset over the member's remaining allowance is shown unavailable, not
                              refused after the tap. It only FILLS the weight input — the same checks apply at add. --}}
-                        @if (! $calculatorMode && ! empty($weightPresets))
-                            <div class="mt-3 grid grid-cols-4 gap-2" data-weight-presets>
+                        @if (! empty($weightPresets))
+                            <div class="mt-3 grid grid-cols-4 gap-2" data-weight-presets x-show="! calc">
                                 @foreach ($weightPresets as $preset)
                                     <button
                                         type="button"
-                                        @if ($preset['available']) wire:click="applyWeightPreset({{ $preset['grams_cg'] }})" @else disabled aria-disabled="true" @endif
+                                        @if ($preset['available']) @click="preset({{ $preset['grams_cg'] }}, @js($preset['label']))" @else disabled aria-disabled="true" @endif
                                         data-weight-preset="{{ $preset['grams_cg'] }}"
                                         @class([
                                             'flex min-h-11 flex-col items-center justify-center rounded-xl border px-1 py-1 text-sm font-semibold transition',
@@ -204,13 +221,13 @@
                         @endif
 
                         {{-- numeric pad --}}
-                        <div class="mt-3 grid grid-cols-3 gap-2">
+                        <div class="mt-3 grid grid-cols-3 gap-2" data-weight-pad>
                             @foreach (['1','2','3','4','5','6','7','8','9'] as $digit)
-                                <button type="button" wire:click="pad('{{ $digit }}')" class="h-14 rounded-xl border border-line bg-surface text-xl font-semibold text-ink transition hover:bg-surface-alt dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:hover:bg-slate-800">{{ $digit }}</button>
+                                <button type="button" @click="push('{{ $digit }}')" class="h-14 rounded-xl border border-line bg-surface text-xl font-semibold text-ink transition hover:bg-surface-alt dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:hover:bg-slate-800">{{ $digit }}</button>
                             @endforeach
-                            <button type="button" wire:click="pad(',')" class="h-14 rounded-xl border border-line bg-surface text-xl font-semibold text-ink transition hover:bg-surface-alt dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:hover:bg-slate-800">,</button>
-                            <button type="button" wire:click="pad('0')" class="h-14 rounded-xl border border-line bg-surface text-xl font-semibold text-ink transition hover:bg-surface-alt dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:hover:bg-slate-800">0</button>
-                            <button type="button" wire:click="pad('back')" aria-label="{{ __('Retroceso') }}" class="h-14 rounded-xl border border-line bg-surface text-xl font-semibold text-ink-muted transition hover:bg-surface-alt dark:border-slate-700 dark:bg-slate-950 dark:text-slate-400 dark:hover:bg-slate-800">⌫</button>
+                            <button type="button" @click="push(',')" class="h-14 rounded-xl border border-line bg-surface text-xl font-semibold text-ink transition hover:bg-surface-alt dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:hover:bg-slate-800">,</button>
+                            <button type="button" @click="push('0')" class="h-14 rounded-xl border border-line bg-surface text-xl font-semibold text-ink transition hover:bg-surface-alt dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:hover:bg-slate-800">0</button>
+                            <button type="button" @click="back()" aria-label="{{ __('Retroceso') }}" class="h-14 rounded-xl border border-line bg-surface text-xl font-semibold text-ink-muted transition hover:bg-surface-alt dark:border-slate-700 dark:bg-slate-950 dark:text-slate-400 dark:hover:bg-slate-800">⌫</button>
                         </div>
                         @else
                             {{-- Unit stepper for a UNIT genetic (preroll/edible). The gauge feedback below
@@ -225,21 +242,38 @@
                             </div>
                         @endif
 
-                        {{-- Gram-equivalent + real-time ceiling feedback — computed identically for a
-                             weighed entry and a stepped unit count (units × grams_per_unit_cg). --}}
-                        @if ($activeEntryGramsCg !== null && $activeEntryGramsCg > 0)
-                            <div class="mt-3 rounded-xl border border-line bg-surface px-4 py-2.5 text-sm dark:border-slate-700 dark:bg-slate-950">
+                        {{-- Gram-equivalent + real-time ceiling feedback. A UNIT count is the server's (units × grams per unit);
+                             a WEIGHT entry is the browser's mirror of the SAME resolver (prompt 292 — it used to read typed
+                             euros as grams). The data-* carry the server's figures for the entry it knows. --}}
+                        @if ($activeGenetic->isUnitType())
+                            @if ($activeEntryGramsCg !== null && $activeEntryGramsCg > 0)
+                                <div class="mt-3 rounded-xl border border-line bg-surface px-4 py-2.5 text-sm dark:border-slate-700 dark:bg-slate-950">
+                                    <div class="flex items-center justify-between">
+                                        <span class="text-ink-muted dark:text-slate-400">{{ __('Equivale a') }}</span>
+                                        <span class="font-semibold tabular-nums">{{ $this->grams($activeEntryGramsCg) }}</span>
+                                    </div>
+                                    @if ($limits)
+                                        @php $remainingAfter = $limits->dailyRemainingCg() - $activeEntryGramsCg; @endphp
+                                        <div class="mt-1 flex items-center justify-between text-xs">
+                                            <span class="text-ink-muted dark:text-slate-400">{{ __('Restante hoy tras esta entrada') }}</span>
+                                            <span class="font-medium {{ $remainingAfter < 0 ? 'text-error' : 'text-success' }}">{{ $this->grams(max(0, $remainingAfter)) }}</span>
+                                        </div>
+                                    @endif
+                                </div>
+                            @endif
+                        @else
+                            @php $serverRemainingAfter = ($limits && $activeEntryGramsCg !== null) ? $limits->dailyRemainingCg() - $activeEntryGramsCg : null; @endphp
+                            <div data-entry-preview data-entry-grams="{{ $activeEntryGramsCg ?? '' }}" data-remaining-after="{{ $serverRemainingAfter ?? '' }}"
+                                 x-show="enteredCg !== null && enteredCg > 0" x-cloak
+                                 class="mt-3 rounded-xl border border-line bg-surface px-4 py-2.5 text-sm dark:border-slate-700 dark:bg-slate-950">
                                 <div class="flex items-center justify-between">
                                     <span class="text-ink-muted dark:text-slate-400">{{ __('Equivale a') }}</span>
-                                    <span class="font-semibold tabular-nums">{{ $this->grams($activeEntryGramsCg) }}</span>
+                                    <span data-entry-preview-grams class="font-semibold tabular-nums" x-text="enteredCg !== null ? grams(enteredCg) : ''"></span>
                                 </div>
-                                @if ($limits)
-                                    @php $remainingAfter = $limits->dailyRemainingCg() - $activeEntryGramsCg; @endphp
-                                    <div class="mt-1 flex items-center justify-between text-xs">
-                                        <span class="text-ink-muted dark:text-slate-400">{{ __('Restante hoy tras esta entrada') }}</span>
-                                        <span class="font-medium {{ $remainingAfter < 0 ? 'text-error' : 'text-success' }}">{{ $this->grams(max(0, $remainingAfter)) }}</span>
-                                    </div>
-                                @endif
+                                <div class="mt-1 flex items-center justify-between text-xs" x-show="remainingAfter !== null">
+                                    <span class="text-ink-muted dark:text-slate-400">{{ __('Restante hoy tras esta entrada') }}</span>
+                                    <span data-entry-preview-remaining class="font-medium" x-bind:class="remainingAfter < 0 ? 'text-error' : 'text-success'" x-text="remainingAfter !== null ? grams(remainingAfter) : ''"></span>
+                                </div>
                             </div>
                         @endif
 
@@ -266,7 +300,8 @@
                             </div>
                         @endif
 
-                        <x-button size="lg" class="mt-4 w-full" wire:click="addLine" wire:loading.attr="disabled" wire:target="addLine">{{ __('Añadir a la cesta') }}</x-button>
+                        {{-- One request in flight: only this button shows a loading state, and a double tap adds one line. --}}
+                        <x-button size="lg" class="mt-4 w-full" data-add-line @click="add()" x-bind:disabled="adding" x-bind:aria-busy="adding">{{ __('Añadir a la cesta') }}</x-button>
                     </section>
                 @endif
 

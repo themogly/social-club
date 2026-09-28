@@ -29,6 +29,7 @@ class LocationForm
     public const SETTING_TOGGLES = [
         'bar_enabled',
         'signature_on_dispensation',
+        'dispensary_calculator_enabled', // prompt 292 — the € calculator, off by default
         'restrict_pos_to_checked_in',
         'camera_scan_enabled',
         'ring_fenced',
@@ -287,6 +288,12 @@ class LocationForm
                         Toggle::make('signature_on_dispensation')
                             ->label(__('Firma en dispensación'))
                             ->helperText(__('El socio firma en la pantalla cada dispensación; la firma queda cifrada con el registro.')),
+
+                        // Prompt 292 — the owner's decision: OFF by default. When off the counter shows no Gramos/€ toggle
+                        // and the server treats every entry as grams.
+                        Toggle::make('dispensary_calculator_enabled')
+                            ->label(__('Calculadora € en el dispensario'))
+                            ->helperText(__('Permite introducir un importe en euros y calcular los gramos. Desactivada por defecto.')),
 
                         // One-tap weight presets on the dispensary POS (prompt 133). Grams; 3,5 g triggers the eighth
                         // break. A sede sets its own list.

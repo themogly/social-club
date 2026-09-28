@@ -15342,3 +15342,60 @@ screenshots `storage/app/screenshots/285/`):
   - at a 1 % threshold the dashboard alert appears and lands on the 7-day report;
   - the manager sees only their sede;
   - staff are refused (sent to the counter).
+
+## Prompt 292 — The dispensary keypad answers instantly; the € calculator is a per-sede option, off by default, and correct when on
+
+- **The € calculator is per sede and OFF by default** (the owner's decision: *"on and off, but default off"*). The
+  setting is `dispensary_calculator_enabled` (default `false`, beside `signature_on_dispensation`), in Sedes → Dispensario
+  as *Calculadora € en el dispensario*. Every existing sede has it off after deploy with no migration: the key is absent
+  and the default is false. **When off, the server refuses it too:** `toggleCalculator()` does nothing, and `addLine()`
+  treats the value as grams whatever mode the browser sends. Hiding the toggle is not the gate (false-green §4).
+- **The keypad is client-side** (`window.dispensaryPad` in `resources/js/app.js`):
+  - The value, the display, the comma rule (one comma; a leading comma becomes `0,`), backspace, presets and the
+    Gramos/€ switch are all local.
+  - The physical keyboard types into the same pad (digits, `,` or `.`, Backspace). Enter adds, except when focus is on
+    a pad key or in another field (272's rule).
+  - The value reaches the server only with **Añadir a la cesta**, as `addLine(value, mode)`, validated exactly as a
+    typed amount always was.
+  - Only that button shows a loading state, and a double tap sends one request.
+  - **`pad()` is removed** (nothing calls it). `applyWeightPreset()` stays as the server's thin filler, because tests
+    and the preset contract use it.
+- **Measured** with a club-sized catalogue (20 strains, 30 products), a member selected, and 4× CPU / 60 ms / ~10 Mbit/s
+  throttling:
+
+  | | before (Ben's probe at `a61f227`) | after |
+  |---|---|---|
+  | one key press | ~580 ms and ~160–175 KB (a full re-render) | ~51–58 ms (1180×820 / 820×1180), no request |
+  | "12,5" typed at a normal pace | ~1.4 s, 347 KB down | ten rapid taps shown in ~300 ms, no request |
+
+  My own "before" probe against a `main` worktree could not be made to drive the old markup reliably, so the before
+  figures are Ben's measurement of that same code.
+- **The preview bug, and why the basket was never affected.** In calculator mode, `activeEntryGramsCg()` parsed the typed
+  euros **as grams** (€20 at €10/g previewed 20,00 g and "nothing left today"), while `addLine()` used
+  `resolveGramsCg()`, which back-solves correctly. So no wrong amount was ever recorded, but staff saw a wrong figure.
+  Now:
+  - **One PHP resolver:** `activeEntryGramsCg()` calls `resolveGramsCg()`.
+  - **One JS mirror** (`window.dispensaryPadMath`): the same regexes as `Weight::canonicalGrams` and
+    `Money::parseTyped`, and `floor(cents × 100 / rate)` in integers, never a float.
+  - **One parity test** (`tests/Browser/prove-292-keypad.mjs`): 36 cases (20, 7,5, 0,01, 3,33, 100, 12,34, empty, 0
+    and a lone comma; both modes; €10/g and **€9.50/g**) against expected values from `resolveGramsCg()` itself. It
+    was **proven by planting `Math.round`**: four €9.50/g cases failed, then it was reverted.
+- Unchanged: the price charged, the limit checks, the override flow, stock allocation and the commit (all on the server);
+  the unit-type stepper.
+- **Open, for the owner (OVERNIGHT-DEFAULT — CONFIRM):** with the calculator on, grams are back-solved from the
+  **undiscounted** per-gram rate. A member with a 15 % discount who asks for "€20 worth" gets 2,00 g and pays €17.
+  Whether "€20 worth" should mean the member *pays* €20 is the owner's call. Not changed here.
+- Tests: `DispensaryCalculatorTest` (9), seen red first; the off-by-default and tampered-value pins were green from the
+  start. Updated rather than deleted, to "present when enabled, absent when disabled": `DispensaryPosUnitTest`
+  (toggle) and `PreLiveA11yFixesTest` (the switch's `aria-pressed` and the backspace's name).
+- Browser (harness above, throwaway database, 1180×820 and 820×1180, screenshots `storage/app/screenshots/292/`):
+  - keys make no request;
+  - ten rapid taps come out in order;
+  - Shane's case (€20 at €10/g) previews 2,00 g and adds a 2,00 g line;
+  - a double tap adds one line;
+  - the keyboard types, and Enter on a pad key doesn't add;
+  - all 36 parity cases pass.
+- **For Shane:** typing is instant, and the Gramos/€ toggle is gone until switched on in Sedes → Dispensario.
+- Also fixed in passing: `LowStockIsDaysOfCoverTest` failed intermittently. Rows stamped "N days ago" and a window
+  starting "14 days ago" a moment later disagreed when a second ticked over, dropping the 14th day. The test now
+  freezes time.

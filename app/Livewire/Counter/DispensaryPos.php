@@ -530,8 +530,15 @@ class DispensaryPos extends Component
 
     public function toggleCalculator(): void
     {
-        $this->calculatorMode = ! $this->calculatorMode;
+        // Prompt 292 — refused, not just hidden, when the sede has the calculator off (the owner's default).
+        $this->calculatorMode = $this->calculatorEnabled() && ! $this->calculatorMode;
         $this->weightInput = '';
+    }
+
+    /** Prompt 292 — does THIS sede offer the € calculator? Off by default (the owner's decision), per sede. */
+    public function calculatorEnabled(): bool
+    {
+        return (bool) Settings::get('dispensary_calculator_enabled', false, $this->locationId);
     }
 
     public function filterCategory(?string $categoryId): void
@@ -539,34 +546,23 @@ class DispensaryPos extends Component
         $this->categoryId = $categoryId;
     }
 
-    /** Numeric pad: append a digit / decimal, backspace or clear. */
-    public function pad(string $key): void
+    /**
+     * Prompt 292 — the keypad runs in the browser, so the typed value (and whether it is grams or euros) arrives HERE,
+     * with the tap on "Añadir a la cesta", and is validated exactly as a typed amount always was. `$mode` is ignored when
+     * the sede's calculator is off: the value is grams. Both arguments are optional for callers that set the fields.
+     */
+    public function addLine(?string $value = null, ?string $mode = null): void
     {
-        if ($key === 'clear') {
-            $this->weightInput = '';
-
-            return;
+        if ($value !== null) {
+            $this->weightInput = $value;
+        }
+        if ($mode !== null) {
+            $this->calculatorMode = $mode === 'calculator';
+        }
+        if (! $this->calculatorEnabled()) {
+            $this->calculatorMode = false;
         }
 
-        if ($key === 'back') {
-            $this->weightInput = mb_substr($this->weightInput, 0, -1);
-
-            return;
-        }
-
-        if ($key === ',') {
-            if (! str_contains($this->weightInput, ',')) {
-                $this->weightInput = ($this->weightInput === '' ? '0' : $this->weightInput).',';
-            }
-
-            return;
-        }
-
-        $this->weightInput .= $key;
-    }
-
-    public function addLine(): void
-    {
         $member = $this->resolveMember();
         $location = $this->resolveLocation();
 
@@ -1505,6 +1501,7 @@ class DispensaryPos extends Component
             'usualGenetics' => $this->usualGenetics($member, $allGenetics),
             'activeGeneticBatches' => $this->activeGeneticBatches($location),
             'activeGeneticPriceCents' => $this->activeGeneticRateCents($location, $member),
+            'calculatorEnabled' => $this->calculatorEnabled(), // prompt 292
             'openTill' => $openTill,
             'requireSignature' => $this->signatureRequired(),
             'requireCheckedIn' => $this->checkedInRequired(),
@@ -1682,7 +1679,11 @@ class DispensaryPos extends Component
             return max(1, $this->unitQty) * (int) $genetic->grams_per_unit_cg;
         }
 
-        return $this->parseGramsCg($this->weightInput);
+        // Prompt 292 — the SAME resolver the basket uses: in calculator mode the typed euros are back-solved to grams
+        // (it used to read them AS grams — €20 at €10/g previewed 20,00 g and "nothing left today").
+        $location = $this->resolveLocation();
+
+        return $location !== null ? $this->resolveGramsCg($genetic, $location) : $this->parseGramsCg($this->weightInput);
     }
 
     // --- Weight / calculator resolution -----------------------------------------
@@ -1695,7 +1696,7 @@ class DispensaryPos extends Component
      */
     private function resolveGramsCg(Genetic $genetic, Location $location): ?int
     {
-        if (! $this->calculatorMode) {
+        if (! $this->calculatorMode || ! $this->calculatorEnabled()) {
             return $this->parseGramsCg($this->weightInput);
         }
 

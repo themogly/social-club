@@ -56,6 +56,93 @@ window.addEventListener('appinstalled', () => {
     window.dispatchEvent(new CustomEvent('csc-installed'));
 });
 
+// Prompt 292 — the dispensary keypad runs in the BROWSER. Every key used to be a full server round trip that re-rendered
+// the whole dispensary (~170 KB), and Livewire queues one request per component, so taps waited in line — the "disabled
+// pad" the owner felt. Now keys, the comma rule, backspace, presets and the Gramos/€ switch are local; the value goes to
+// the server only with "Añadir a la cesta" (`addLine(value, mode)`), which validates it exactly as before.
+//
+// The preview mirrors the PHP rules with integer arithmetic — never a float product that can land on 199.9999:
+//   grams: Weight::canonicalGrams (digits, optional , or . and 1–2 decimals) → centigrams
+//   euros: Money::parseTyped (1–9 digits, optional 1–2 decimals) → cents; grams = floor(cents × 100 / rate)
+// One PHP resolver (DispensaryPos::resolveGramsCg), this one mirror, and a parity harness that proves they agree.
+window.dispensaryPadMath = {
+    gramsToCg(value) {
+        const m = String(value ?? '').trim().match(/^(\d+)(?:[.,](\d{1,2}))?$/);
+        return m ? parseInt(m[1], 10) * 100 + parseInt((m[2] ?? '0').padEnd(2, '0'), 10) : null;
+    },
+    eurosToCents(value) {
+        const m = String(value ?? '').trim().match(/^(\d{1,9})(?:[.,](\d{1,2}))?$/);
+        return m ? parseInt(m[1], 10) * 100 + parseInt((m[2] ?? '0').padEnd(2, '0'), 10) : null;
+    },
+    backSolveCg(cents, rateCents) {
+        if (cents === null || cents <= 0 || ! rateCents || rateCents <= 0) return null;
+        const scaled = cents * 100;
+        return (scaled - (scaled % rateCents)) / rateCents; // floor, in integers
+    },
+    formatGrams(cg, decimal) {
+        const whole = Math.floor(cg / 100);
+        return `${whole}${decimal}${String(cg % 100).padStart(2, '0')} g`;
+    },
+};
+
+window.dispensaryPad = (config = {}) => ({
+    value: config.value ?? '',
+    calc: !! config.calc && !! config.calcEnabled,
+    calcEnabled: !! config.calcEnabled,
+    weight: !! config.weight,
+    rate: config.rateCents ?? null,
+    dailyRemaining: config.dailyRemainingCg ?? null,
+    decimal: config.decimal ?? ',',
+    adding: false,
+    push(key) {
+        if (key === ',') {
+            if (! this.value.includes(',')) this.value = (this.value === '' ? '0' : this.value) + ',';
+            return;
+        }
+        this.value += key; // no length cap, as the server pad had none; addLine validates the value
+    },
+    back() { this.value = this.value.slice(0, -1); },
+    clear() { this.value = ''; },
+    setMode(calc) {
+        calc = calc && this.calcEnabled;
+        if (calc !== this.calc) { this.calc = calc; this.value = ''; }
+    },
+    preset(cg, label) { this.calc = false; this.value = label; },
+    get enteredCg() {
+        const m = window.dispensaryPadMath;
+        return this.calc ? m.backSolveCg(m.eurosToCents(this.value), this.rate) : m.gramsToCg(this.value);
+    },
+    get remainingAfter() {
+        return this.dailyRemaining === null || this.enteredCg === null ? null : this.dailyRemaining - this.enteredCg;
+    },
+    grams(cg) { return window.dispensaryPadMath.formatGrams(Math.max(0, cg), this.decimal); },
+    // One request in flight: a double tap adds one line. The keys are never disabled by a request.
+    add() {
+        if (this.adding) return;
+        this.adding = true;
+        const call = this.weight ? this.$wire.addLine(this.value, this.calc ? 'calculator' : 'grams') : this.$wire.addLine();
+        Promise.resolve(call).finally(() => {
+            this.adding = false;
+            this.value = this.$wire.weightInput ?? '';
+        });
+    },
+    // A physical keyboard types into the same pad (digits, , or ., Backspace); Enter adds — except when focus is on one
+    // of the pad's own buttons (those activate themselves) or in any other field, or an overlay is open (272's rule).
+    onKey(e) {
+        if (! this.weight || e.ctrlKey || e.metaKey || e.altKey) return;
+        const t = e.target;
+        if (t?.closest?.('input, textarea, select, [contenteditable="true"]')) return;
+        if ([...document.querySelectorAll('[role="dialog"][aria-modal="true"]')].some((d) => d.offsetParent !== null)) return;
+        if (e.key === 'Enter') {
+            if (t?.closest?.('[data-weight-pad] button, [data-add-line]')) return;
+            e.preventDefault(); this.add(); return;
+        }
+        if (/^[0-9]$/.test(e.key)) { e.preventDefault(); this.push(e.key); return; }
+        if (e.key === ',' || e.key === '.') { e.preventDefault(); this.push(','); return; }
+        if (e.key === 'Backspace') { e.preventDefault(); this.back(); }
+    },
+});
+
 window.counterPinCheck = () => ({
     checking: false,
     holding: false,

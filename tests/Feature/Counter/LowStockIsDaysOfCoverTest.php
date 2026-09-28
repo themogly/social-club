@@ -56,6 +56,9 @@ class LowStockIsDaysOfCoverTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
+        // Time stands still: rows are stamped "N days ago" and the window starts "14 days ago" a moment later — a
+        // second ticking over between the two dropped the 14th day and failed the suite intermittently.
+        $this->freezeTime();
         $this->seed(RolePermissionSeeder::class);
         $this->org = Organisation::factory()->create();
         app(ActiveScope::class)->setOrganisation($this->org->id);
