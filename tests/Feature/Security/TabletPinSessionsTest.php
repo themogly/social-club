@@ -209,4 +209,23 @@ class TabletPinSessionsTest extends TestCase
     {
         $this->actingAs($this->manager)->get('/')->assertOk();
     }
+
+    public function test_your_own_pin_after_your_password_is_not_asked_but_someone_elses_is(): void
+    {
+        $this->actingAs($this->manager);
+        $this->post(route('counter.location'), ['location_id' => $this->centro->id]);
+        Auth::login($this->manager);
+        (new OpenTill)->handle($this->centro, 'POS-1', 10000);
+        CounterOperator::clear();
+
+        $snapshot = $this->snapshotFrom('/counter/till', 'counter.till-session');
+        $this->livewirePost($snapshot, ['operatorPin' => '22228888'], [['unlockOperator']])->assertOk();
+        $this->get('/')->assertOk();
+
+        $snapshot = $this->snapshotFrom('/counter/till', 'counter.till-session');
+        $this->livewirePost($snapshot, [], [['lockCounter']])->assertOk();
+        $this->livewirePost($this->snapshotFrom('/counter/till', 'counter.till-session'), ['operatorPin' => '11119999'], [['unlockOperator']])->assertOk();
+        $this->assertSame($this->owner->id, Auth::id());
+        $this->get('/users')->assertRedirect(ConfirmIdentity::getUrl());
+    }
 }

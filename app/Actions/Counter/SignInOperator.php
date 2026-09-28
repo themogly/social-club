@@ -41,6 +41,9 @@ class SignInOperator
     {
         $from = Auth::id();
         $guard = Auth::guard('web');
+        // A PIN session is one the PIN OPENED: nobody signed in, someone else, or already a PIN session. The same person
+        // typing their PIN in a session they opened with their password has already given it (297's harness found this).
+        $viaPin = $from === null || (string) $from !== (string) $operator->getKey() || session('auth.via_pin') === true;
 
         CounterOperator::set($operator);
         $guard->login($operator);
@@ -50,7 +53,7 @@ class SignInOperator
         session()->forget('scope.location_id');
         // Post-296 audit — remember HOW and WHERE this person signed in: by PIN (so the panel asks for their password once
         // a shift, finding 7) and on which registered tablet (so revoking it signs them out, finding 5).
-        session(['auth.via_pin' => true, 'counter.terminal_id' => CounterTerminals::current()?->id]);
+        session(['auth.via_pin' => $viaPin, 'counter.terminal_id' => CounterTerminals::current()?->id]);
 
         (new RecordAuditLog)->handle('counter.operator.signed_in', $location, null, [
             'location_id' => $location?->id,
