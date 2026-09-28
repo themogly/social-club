@@ -4,6 +4,7 @@ namespace App\Filament\Pages;
 
 use App\Actions\RecordAuditLog;
 use App\Actions\Settings\SetConsumptionLimits;
+use App\Console\Commands\PruneStaffClockEvents;
 use App\Enums\SettingType;
 use App\Models\User;
 use App\Support\CounterScreens;
@@ -74,6 +75,7 @@ class ManageSettings extends Page
         'audit_retention_days' => SettingType::INT,
         'message_retention_days' => SettingType::INT,
         'application_retention_days' => SettingType::INT,
+        'staff_clock_retention_years' => SettingType::INT,
         'signed_url_ttl_seconds' => SettingType::INT,
         'qr_scan_max_failures_per_minute' => SettingType::INT,
         'counter_hero' => SettingType::STRING,
@@ -293,6 +295,10 @@ class ManageSettings extends Page
                             ->helperText(__('El texto de los mensajes con socios se redacta pasado este plazo; queda el hilo como evidencia del contacto.')),
                         TextInput::make('application_retention_days')->label(__('Retención de solicitudes (días)'))->numeric()->minValue(1)->required()
                             ->helperText(__('Una solicitud rechazada o abandonada se anonimiza y su foto de identidad se borra pasado este plazo. Las aprobadas no se tocan (la foto pasa a ser del socio).')),
+                        // Post-296 audit — the registro de jornada's end: never under the legal 4 years (art. 34.9 ET).
+                        TextInput::make('staff_clock_retention_years')->label(__('Retención del registro de jornada (años)'))->integer()
+                            ->minValue(PruneStaffClockEvents::MIN_YEARS)->maxValue(20)->required()
+                            ->helperText(__('Los fichajes del personal se borran cada noche pasado este plazo. La ley exige al menos 4 años.')),
                         TextInput::make('signed_url_ttl_seconds')->label(__('Tiempo abierto de un enlace a un documento (seg.)'))->integer()->minValue(60)->maxValue(3600)->required()
                             ->helperText(__('Cuánto tiempo sigue abierto el enlace a un DNI o documento de un socio antes de caducar (60–3600 s).')),
                         TextInput::make('qr_scan_max_failures_per_minute')->label(__('Máx. escaneos fallidos por minuto'))->numeric()->minValue(1)->required()

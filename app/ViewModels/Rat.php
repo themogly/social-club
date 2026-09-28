@@ -2,6 +2,7 @@
 
 namespace App\ViewModels;
 
+use App\Console\Commands\PruneStaffClockEvents;
 use App\Enums\Role as RoleEnum;
 use App\Support\OrganisationIdentity;
 use App\Support\Permissions;
@@ -90,7 +91,7 @@ class Rat
                 'article_9' => false,
                 'recipients' => $emailProcessor,
                 'transfers' => $emailTransfer,
-                'retention' => $memberRetention.' '.__('Los archivos CSV de importación de socios en preparación (datos en tránsito, en un directorio privado fuera de la web) se conservan como máximo :hours horas y un barrido programado los elimina.', ['hours' => $importStagingHours]),
+                'retention' => $memberRetention.' '.__('Un correo que no se pudo entregar se conserva en la cola de fallidos como máximo :days días y un barrido programado lo elimina; la supresión del socio también lo borra.', ['days' => intdiv((int) config('queue.failed.retention_hours', 168), 24)]).' '.__('Los archivos CSV de importación de socios en preparación (datos en tránsito, en un directorio privado fuera de la web) se conservan como máximo :hours horas y un barrido programado los elimina.', ['hours' => $importStagingHours]),
             ],
             [
                 'ref' => 'RAT-02',
@@ -200,7 +201,7 @@ class Rat
                 'article_9' => false,
                 'recipients' => __('La propia persona y los roles con permiso para ver el registro de jornada; la Inspección de Trabajo cuando la ley lo exija.'),
                 'transfers' => $noTransfer,
-                'retention' => __('4 años como mínimo, también tras la baja de la persona.'),
+                'retention' => __('4 años como mínimo (también tras la baja de la persona); un barrido programado elimina los registros a los :years años.', ['years' => PruneStaffClockEvents::years()]),
             ],
         ];
     }

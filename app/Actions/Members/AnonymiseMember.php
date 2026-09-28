@@ -11,6 +11,7 @@ use App\Models\Member;
 use App\Models\MemberApplication;
 use App\Models\Message;
 use App\Models\MessageThread;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 
 /**
@@ -105,6 +106,7 @@ class AnonymiseMember
         // The name is needed AFTER the row is scrubbed, to find where it survives as free text elsewhere
         // (step 5). Captured here because step 2 is about to destroy it.
         $originalName = trim($member->first_name.' '.$member->last_name);
+        $originalEmail = trim((string) $member->email);
 
         // 2. Scrub the member row — including the HEALTH flag and the medical-cert path (Art. 9).
         $clearedFields = ['first_name', 'last_name', 'email', 'phone', 'address', 'date_of_birth', 'document_number', 'document_hash', 'is_therapeutic', 'medical_cert_path'];
@@ -168,6 +170,13 @@ class AnonymiseMember
                 ->whereRaw('LOWER(TRIM(proxy_holder)) = ?', [mb_strtolower($originalName)])
                 ->update(['proxy_holder' => '[borrado]']);
         }
+
+        // Post-296 audit — a mail that failed to send keeps its payload in the dead-letter table (a receipt's grams, the
+        // address, a card token). Remove every failed job that names this member, by id or by address.
+        DB::table((string) config('queue.failed.table', 'failed_jobs'))
+            ->where(fn ($query) => $query->where('payload', 'like', '%'.$member->id.'%')
+                ->when(filled($originalEmail), fn ($q) => $q->orWhere('payload', 'like', '%'.$originalEmail.'%')))
+            ->delete();
 
         // 6. Record the erasure itself WITHOUT any of the scrubbed values — the fact, not the data.
         (new RecordAuditLog)->handle('member.anonymised', $member, null, ['fields_cleared' => $clearedFields]);
