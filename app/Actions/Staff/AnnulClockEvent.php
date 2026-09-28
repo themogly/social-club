@@ -28,6 +28,9 @@ class AnnulClockEvent
         if ($event->location === null || ! WorkedHours::canManageAt($actor, $event->location)) {
             throw new AuthorizationException(__('No tienes permiso para corregir el registro de jornada de esta sede.'));
         }
+        if (! WorkedHours::mayCorrect($actor, User::withTrashed()->findOrFail($event->user_id))) {
+            throw new AuthorizationException(__('Tus propias horas las corrige otra persona responsable.'));
+        }
         if (trim($reason) === '') {
             throw new InvalidArgumentException(__('Indica el motivo de la corrección.'));
         }

@@ -26,6 +26,9 @@ final class ClockRules
             if (! WorkedHours::canManageAt($recordedBy, $location)) {
                 throw new AuthorizationException(__('No tienes permiso para corregir el registro de jornada de esta sede.'));
             }
+            if (! WorkedHours::mayCorrect($recordedBy, $user)) {
+                throw new AuthorizationException(__('Tus propias horas las corrige otra persona responsable.'));
+            }
         } elseif (! $recordedBy->is($user)) {
             // PIN, TILL_CLOSE and SELF_DECLARED are the person's OWN act — personal, as the record requires.
             throw new AuthorizationException(__('Cada persona ficha su propia jornada.'));

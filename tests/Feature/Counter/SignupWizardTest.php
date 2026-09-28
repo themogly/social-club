@@ -223,6 +223,7 @@ class SignupWizardTest extends TestCase
             ->set('altaInviteEmail', 'nueva@example.es')
             ->call('sendAltaInvitation');
         $application = MemberApplication::query()->withoutGlobalScopes()->latest('id')->firstOrFail();
+        $this->travel(11)->minutes(); // one email per invitation every 10 minutes (post-296 audit A·8)
 
         $component->call('toggleAlta')->call('toggleAlta')
             ->assertSee('data-alta-invite-resend', false)

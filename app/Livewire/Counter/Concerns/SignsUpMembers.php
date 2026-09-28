@@ -685,9 +685,10 @@ trait SignsUpMembers
             return;
         }
 
-        (new SendApplicationInvite)->handle($application)
+        $sender = new SendApplicationInvite;
+        $sender->handle($application)
             ? $this->flash(__('Invitación reenviada a :email.', ['email' => (string) $application->applicant_email]), 'success')
-            : $this->flash(__('No se pudo reenviar la invitación.'), 'error');
+            : $this->flash($sender->refusal ?? __('No se pudo reenviar la invitación.'), 'error');
     }
 
     /**

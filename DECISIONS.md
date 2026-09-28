@@ -15966,3 +15966,39 @@ From `audits/reports/2026-09-post-296-security.md`, Phase 2. Tests: `tests/Featu
   - It is idempotent, has `--dry-run` and writes a heartbeat. The model itself still refuses `delete()`, and a test
     pins that.
   - RAT-08 now states the end.
+
+## Post-296 audit fix 5 — hardening (Phase 3)
+
+From `audits/reports/2026-09-post-296-security.md`, Phase 3. Tests: `tests/Feature/Security/HardeningAfter296Test.php`
+(8 of its 9 fail without the fix; the ninth pins that a right PIN still costs nothing).
+
+- **P3-1, Precio's below-cost confirmation.** It priced whatever batch id the (client-editable) `mountedActions`
+  arguments named. The batch now comes from the parent Precio action's record, and the id is no longer passed at
+  all. The rate stays an argument, because it is only a price the same person could type.
+- **P3-2, staff hours inside the organisation.** An owner's "every sede" in `WorkedHours::viewableLocationIds` is now
+  every sede of the ACTIVE organisation. `canManageAt` also requires the sede to be in it, which covers annulling and
+  adding a salida to an event loaded by id.
+- **P3-3, the registro's data is not a wire action.** `reportRows`, `peopleOptions`, `sedeOptions` and `canManage` on
+  `RegistroJornada` are protected. The page's own view still calls them (260's rule). `reportRows` returned raw
+  models, staff e-mails included. Three tests read the rows through `invade()`.
+- **P3-4, nobody corrects their own hours but the owner.** `WorkedHours::mayCorrect()` is enforced in `ClockRules`
+  (adding a period or a salida) and in `AnnulClockEvent`. *Añadir jornada* no longer offers a responsable their own
+  name. The owner answers to nobody inside the club, so they still may.
+- **A·6, the PIN throttle under parallel requests.** An attempt is now reserved BEFORE the PIN is checked
+  (`Cache::add` then `Cache::increment`, which is atomic on Redis). A request over the limit locks the pad; a right
+  PIN gives its attempt back; a wrong one keeps it, and the one that fills the set locks out. Before, N parallel
+  requests all passed the "locked?" check before any failure was written, which meant N guesses per window.
+  - The strike counter also starts with `Cache::add`, because the database store's `increment` returns false on a
+    missing key.
+  - A cache outage still fails open (124).
+- **A·7, `/csp-report` starts no session.** The route moved out of the `web` group into `bootstrap/app.php`'s
+  `then:`, keeping `throttle:60,1`. There is no session or CSRF there any more, as its docblock always claimed.
+  `TRUSTED_PROXIES` must not be `*` in production, or the per-IP key is spoofable; that goes on the go-live checklist.
+- **A·8, invitation mail is rate-limited** in the one sender (`SendApplicationInvite`):
+  - one email per invitation every 10 minutes, and five a day;
+  - twenty an hour per person sending;
+  - only mail actually queued counts;
+  - a refusal is audited (`application.invite.throttled`), and the reason is shown to staff by the counter's and
+    the panel's *Reenviar*.
+  - Two older tests invited and resent at once; they now wait out the cooldown (`SignupWizardTest`,
+    `SendApplicationInviteTest`).

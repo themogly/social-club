@@ -174,16 +174,24 @@ class WorkedHours
             return [];
         }
 
+        // Post-296 audit (P3-2) — "every sede" is every sede of THIS organisation (the multi-org keying rule).
         return $user->hasRole(Role::OWNER->value)
-            ? Location::query()->withoutGlobalScopes()->sedes()->pluck('id')->all()
+            ? Location::query()->withoutGlobalScopes()->sedes()->where('organisation_id', app(ActiveScope::class)->organisationId())->pluck('id')->all()
             : $user->locations()->pluck('locations.id')->all();
     }
 
-    /** May this person correct hours at this sede? `staff.hours.manage`, and the sede is theirs (an owner: every sede). */
+    /** May this person correct hours at this sede? `staff.hours.manage`, and the sede is theirs (an owner: every sede of the organisation). */
     public static function canManageAt(User $user, Location $location): bool
     {
         return $user->can('staff.hours.manage')
+            && $location->organisation_id === app(ActiveScope::class)->organisationId()
             && ($user->hasRole(Role::OWNER->value) || $user->locations()->whereKey($location->id)->exists());
+    }
+
+    /** Post-296 audit (P3-4) — nobody corrects their own hours but the owner (who answers to nobody in the club). */
+    public static function mayCorrect(User $actor, User $whose): bool
+    {
+        return ! $actor->is($whose) || $actor->hasRole(Role::OWNER->value);
     }
 
     /** @return Builder<StaffClockEvent> */

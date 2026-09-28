@@ -85,6 +85,16 @@ class UnlockOperator
             return null;
         }
 
+        // Post-296 audit (A·6) — reserve this attempt BEFORE checking the PIN, atomically. Checking first and counting
+        // after let N parallel requests all pass the lockout check before any failure was written: N guesses a window.
+        $maxAttempts = $this->maxAttemptsAt($location);
+        $attempt = $this->reserveAttempt($throttleKey);
+        if ($attempt !== null && $attempt > $maxAttempts) {
+            $this->lockOut($throttleKey);
+
+            return null;
+        }
+
         $lookup = PinLookup::for($pin);
 
         /** @var Collection<int, User> $matches */
@@ -100,6 +110,7 @@ class UnlockOperator
 
         if ($all->count() === 1) {
             $operator = $all->first();
+            $this->releaseAttempt($throttleKey); // a right PIN costs nothing
 
             return $legacy->isNotEmpty() ? $this->upgrade($operator, $lookup) : $operator;
         }
@@ -111,7 +122,10 @@ class UnlockOperator
             ]);
         }
 
-        $this->registerFailure($throttleKey, $this->maxAttemptsAt($location));
+        // The failure keeps its reserved attempt; the one that fills the set locks the pad.
+        if ($attempt === null || $attempt >= $maxAttempts) {
+            $this->lockOut($throttleKey);
+        }
 
         return null;
     }
@@ -172,19 +186,28 @@ class UnlockOperator
         return max(0, $until - now()->getTimestamp());
     }
 
-    private function registerFailure(string $throttleKey, int $maxAttempts): void
+    /** The attempt's number in this window (1-based), counted atomically; null when the cache is unreachable (fail open, 124). */
+    private function reserveAttempt(string $throttleKey): ?int
     {
-        $this->safely(function () use ($throttleKey, $maxAttempts): void {
-            $attempts = (int) Cache::get($this->key($throttleKey, 'attempts'), 0) + 1;
-            Cache::put($this->key($throttleKey, 'attempts'), $attempts, self::ATTEMPT_TTL);
+        return $this->safely(function () use ($throttleKey): int {
+            Cache::add($this->key($throttleKey, 'attempts'), 0, self::ATTEMPT_TTL);
 
-            if ($attempts < $maxAttempts) {
-                return;
-            }
+            return (int) Cache::increment($this->key($throttleKey, 'attempts'));
+        }, null);
+    }
 
-            // Locked out: escalate the window by how many times this sede has locked out recently.
-            $strikes = (int) Cache::get($this->key($throttleKey, 'strikes'), 0) + 1;
-            Cache::put($this->key($throttleKey, 'strikes'), $strikes, self::STRIKE_TTL);
+    private function releaseAttempt(string $throttleKey): void
+    {
+        $this->safely(fn () => Cache::decrement($this->key($throttleKey, 'attempts')), null);
+    }
+
+    /** Lock the pad, the window escalating with how many times this sede has locked out recently. */
+    private function lockOut(string $throttleKey): void
+    {
+        $this->safely(function () use ($throttleKey): void {
+            Cache::add($this->key($throttleKey, 'strikes'), 0, self::STRIKE_TTL);
+            $strikes = (int) Cache::increment($this->key($throttleKey, 'strikes'));
+            Cache::put($this->key($throttleKey, 'strikes'), $strikes, self::STRIKE_TTL); // decays after an hour of calm
 
             $window = self::LOCKOUT_WINDOWS[min($strikes - 1, count(self::LOCKOUT_WINDOWS) - 1)];
             Cache::put($this->key($throttleKey, 'lockout'), now()->getTimestamp() + $window, $window);

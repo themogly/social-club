@@ -373,7 +373,7 @@ class RegistroDeJornadaTest extends TestCase
 
         $this->actingAs($elsewhere);
         app(ActiveScope::class)->setLocation($this->norte->id);
-        $rows = Livewire::test(RegistroJornada::class)->instance()->reportRows();
+        $rows = Livewire::test(RegistroJornada::class)->invade()->reportRows();
         $this->assertSame([], $rows, 'a manager saw a sede they are not assigned to');
     }
 
@@ -409,7 +409,7 @@ class RegistroDeJornadaTest extends TestCase
         $this->staff->delete();
 
         $this->actingAs($this->owner);
-        $rows = Livewire::test(RegistroJornada::class)->instance()->reportRows();
+        $rows = Livewire::test(RegistroJornada::class)->invade()->reportRows();
         $this->assertSame($name, $rows[0]['name']);
 
         $this->expectException(RuntimeException::class);
@@ -439,7 +439,7 @@ class RegistroDeJornadaTest extends TestCase
         }
 
         $this->actingAs($this->owner);
-        $page = Livewire::test(RegistroJornada::class)->instance();
+        $page = Livewire::test(RegistroJornada::class)->invade(); // reportRows is protected (post-296 P3-3)
         $count = function () use ($page): int {
             DB::flushQueryLog();
             DB::enableQueryLog();

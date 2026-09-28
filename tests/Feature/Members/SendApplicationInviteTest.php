@@ -69,6 +69,7 @@ class SendApplicationInviteTest extends TestCase
         Mail::assertQueued(ApplicationInviteMail::class, 1);
 
         $application = MemberApplication::query()->withoutGlobalScopes()->sole();
+        $this->travel(11)->minutes(); // one email per invitation every 10 minutes (post-296 audit A·8)
         Livewire::test(ListMemberApplications::class)
             ->callTableAction('resend', $application)
             ->assertNotified(__('Invitación reenviada (en cola)'));

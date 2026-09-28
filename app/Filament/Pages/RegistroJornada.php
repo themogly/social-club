@@ -5,6 +5,7 @@ namespace App\Filament\Pages;
 use App\Actions\Staff\AnnulClockEvent;
 use App\Actions\Staff\ClockIn;
 use App\Actions\Staff\ClockOut;
+use App\Enums\Role;
 use App\Enums\StaffClockSource;
 use App\Enums\StaffClockType;
 use App\Filament\Concerns\GuardsStatutoryDocuments;
@@ -113,12 +114,13 @@ class RegistroJornada extends Page
     }
 
     /**
-     * The report: one row per period, per annulled event (struck through) and per day of unclocked activity — in a
+     * Post-296 audit (P3-3) — protected: the page's view reads it, the browser cannot call it (it returned raw models,
+     * staff e-mails included). The report: one row per period, per annulled event (struck through) and per day of unclocked activity — in a
      * bounded number of queries, whatever the number of rows.
      *
      * @return list<array{kind: string, user_id: string, name: string, business_date: string, location: string, in: ?StaffClockEvent, out: ?StaffClockEvent, minutes: ?int, flags: list<string>}>
      */
-    public function reportRows(): array
+    protected function reportRows(): array
     {
         $locationIds = $this->locationIds();
         if ($locationIds === []) {
@@ -157,7 +159,7 @@ class RegistroJornada extends Page
     }
 
     /** @return array<string, string> the people with hours at the sedes this viewer may see */
-    public function peopleOptions(): array
+    protected function peopleOptions(): array
     {
         $ids = StaffClockEvent::query()->withoutGlobalScopes()->whereIn('location_id', $this->locationIds() ?: ['-'])->distinct()->pluck('user_id');
 
@@ -165,14 +167,14 @@ class RegistroJornada extends Page
     }
 
     /** @return array<string, string> */
-    public function sedeOptions(): array
+    protected function sedeOptions(): array
     {
         $user = Auth::user();
 
         return Location::query()->withoutGlobalScopes()->whereIn('id', $user instanceof User ? WorkedHours::viewableLocationIds($user) : [])->orderBy('name')->pluck('name', 'id')->all();
     }
 
-    public function canManage(): bool
+    protected function canManage(): bool
     {
         return Auth::user()?->can('staff.hours.manage') ?? false;
     }
@@ -290,7 +292,11 @@ class RegistroJornada extends Page
     /** @return array<string, string> the people a manager may add hours for: staff assigned to the sedes they see */
     private function staffOptions(): array
     {
+        // Post-296 audit (P3-4) — a responsable is not offered their own hours to correct (the owner is).
+        $actor = $this->actor();
+
         return User::query()->whereHas('locations', fn ($q) => $q->whereIn('locations.id', $this->locationIds() ?: ['-']))
+            ->when(! $actor->hasRole(Role::OWNER->value), fn ($q) => $q->whereKeyNot($actor->getKey()))
             ->orderBy('name')->pluck('name', 'id')->all();
     }
 
