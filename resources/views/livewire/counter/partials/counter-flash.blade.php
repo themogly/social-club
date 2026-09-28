@@ -26,13 +26,22 @@
      Hidden CLIENT-SIDE only: the message is in the live region when it renders, so it is announced once
      whatever happens next, and a timer that fired a Livewire round trip would spend a request to say nothing.
      An error persists — prompt 60's refusal must stay until it is read or resolved. --}}
+{{-- Prompt 279 — two optional inputs, both for a message rendered INSIDE a form card rather than at a fixed spot:
+       · `$nonce` joins the key. The key is otherwise the message itself, so the SAME confirmation twice in a row
+         (two 10,00 € entradas) morphed onto the old, already-faded element and showed nothing the second time.
+       · `$reveal` scrolls the message into view only if it is not already — `block: 'nearest'`, instant, so a
+         visible message never moves the page and there is no animation to gate on reduced motion. --}}
+@php($revealJs = ($reveal ?? false) ? "\$nextTick(() => \$el.scrollIntoView({ block: 'nearest' }));" : '')
 @if ($flashMessage)
     <div
-        wire:key="flash-{{ $flashType }}-{{ md5($flashMessage) }}"
+        wire:key="flash-{{ $flashType }}-{{ md5($flashMessage) }}{{ isset($nonce) ? '-'.$nonce : '' }}"
         @if ($flashType === 'success')
             x-data="{ show: true }"
             x-show="show"
-            x-init="setTimeout(() => show = false, 6000)"
+            x-init="{{ $revealJs }} setTimeout(() => show = false, 6000)"
+        @elseif ($revealJs !== '')
+            x-data
+            x-init="{{ $revealJs }}"
         @endif
         {{ $anchor ?? '' }}
         role="{{ $flashType === 'error' ? 'alert' : 'status' }}"

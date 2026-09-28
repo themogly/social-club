@@ -1640,7 +1640,7 @@
     "Motivo:": "Motivo:",
     "Motivos que pueden impedir dispensar": "Motivos que pueden impedir dispensar",
     "Movida a lista de espera": "Movida a lista de espera",
-    "Movimiento registrado: :amount.": "Movimiento registrado: :amount.",
+    "Movimiento registrado: :amount (:type).": "Movimiento registrado: :amount (:type).",
     "Movimientos": "Movimientos",
     "Movimientos de efectivo": "Movimientos de efectivo",
     "Movimientos económicos y saldo del monedero": "Movimientos económicos y saldo del monedero",
