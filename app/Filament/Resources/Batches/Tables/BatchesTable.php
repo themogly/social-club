@@ -3,10 +3,12 @@
 namespace App\Filament\Resources\Batches\Tables;
 
 use App\Actions\Stock\RecordStockMovement;
+use App\Actions\Stock\TransferBatch;
 use App\Enums\BatchStatus;
 use App\Enums\StockMovementType;
 use App\Models\Batch;
 use App\Models\Location;
+use App\Models\User;
 use App\Support\Spreadsheet\ReportExport;
 use App\Support\Weight;
 use App\ViewModels\BatchRecall;
@@ -16,15 +18,20 @@ use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteBulkAction;
 use Filament\Actions\EditAction;
 use Filament\Actions\RestoreBulkAction;
+use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
+use Filament\Forms\Components\Toggle;
 use Filament\Notifications\Notification;
+use Filament\Schemas\Components\Utilities\Get;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Filters\TrashedFilter;
 use Filament\Tables\Table;
+use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Support\Facades\Auth;
+use InvalidArgumentException;
 use RuntimeException;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
@@ -83,6 +90,7 @@ class BatchesTable
             ->recordActions([
                 ActionGroup::make([
                     self::recallAction(),
+                    self::transferAction(),
                     self::adjustAction(),
                     self::mermaAction(),
                     EditAction::make(),
@@ -141,6 +149,53 @@ class BatchesTable
     }
 
     /** Ajuste — a signed correction recorded through the stock ledger, in the batch's own unit. */
+    /**
+     * Trasladar / Asignar a sede (prompt 277, Ben's 270) — move some or all of this batch to another location through
+     * the one writer, `TransferBatch`. On a batch at the grow / central store it reads "Asignar a sede". Gated on
+     * `stock.transfer`; the destinations are the locations this person may write to (stores included).
+     */
+    protected static function transferAction(): Action
+    {
+        return Action::make('transfer')
+            ->label(fn (Batch $record): string => $record->location?->isStore() ? __('Asignar a sede') : __('Trasladar'))
+            ->icon(Heroicon::OutlinedArrowsRightLeft)
+            ->visible(fn (): bool => Auth::user()?->can('stock.transfer') ?? false)
+            ->schema([
+                Select::make('to_location_id')
+                    ->label(__('Destino'))
+                    ->options(fn (Batch $record): array => array_diff_key(Location::assignableOptions(includeStores: true), [$record->location_id => true]))
+                    ->required(),
+                Toggle::make('all')
+                    ->label(__('Todo lo que queda'))
+                    ->live(),
+                TextInput::make('quantity')
+                    ->label(fn (Batch $record): string => $record->isUnitType() ? __('Cantidad (uds)') : __('Cantidad (g)'))
+                    ->helperText(fn (Batch $record): string => __('Quedan :left.', ['left' => $record->isUnitType()
+                        ? (int) $record->remaining_units.' '.__('uds')
+                        : $record->remaining_cg->formatted()]))
+                    ->required(fn (Get $get): bool => ! $get('all'))
+                    ->hidden(fn (Get $get): bool => (bool) $get('all')),
+            ])
+            ->modalSubmitActionLabel(__('Trasladar'))
+            ->action(function (Batch $record, array $data): void {
+                $actor = Auth::user();
+                $to = Location::query()->withoutGlobalScopes()->find($data['to_location_id'] ?? null);
+
+                try {
+                    abort_unless($actor instanceof User && $to instanceof Location, 403);
+                    $quantity = ! empty($data['all'])
+                        ? ($record->isUnitType() ? (int) $record->remaining_units : $record->remaining_cg->centigrams)
+                        : ($record->isUnitType() ? (int) $data['quantity'] : Weight::fromGrams((string) $data['quantity'])->centigrams);
+
+                    (new TransferBatch)->handle($record, $to, $quantity, $actor);
+
+                    Notification::make()->title(__('Stock trasladado a :to', ['to' => $to->name]))->success()->send();
+                } catch (InvalidArgumentException|RuntimeException|AuthorizationException $e) {
+                    Notification::make()->title(__('No se pudo trasladar'))->body($e->getMessage())->danger()->send();
+                }
+            });
+    }
+
     protected static function adjustAction(): Action
     {
         return Action::make('adjust')

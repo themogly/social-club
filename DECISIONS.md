@@ -14459,3 +14459,35 @@ The remaining "do these" items after 270–274 (memory note `pre-live-audit-left
     in the owner report as a known gap.
   - *Event/convocatoria times typed before 271* — stored as wall-clock values, displayed shifted by the UTC offset. Whether
     any exist is a data question for the owner (report).
+
+## Prompt 277 (Ben's 270) — a central store for the grow, and batches moved (whole or part) between locations
+
+Numbering: Ben's prompts diverged from this log after 268; his "270" runs here as 277. He asked to run his prompts and
+merge; the two owner decisions it lists are built on the RECOMMENDED answers and listed in the owner report.
+
+- **The store is a location with a kind** (`locations.kind`: `SEDE` default, `ALMACEN` "Almacén / cultivo"), not "no
+  location". `batches.location_id` stays NOT NULL, so FEFO, the recount, the stock report and every location filter keep
+  working unchanged — a nullable location would have broken allocation, ceilings and reports quietly. The store has no
+  counter: `LocationSwitcher::available()` returns sedes only for every counter caller (the panel's switcher passes
+  `includeStores`, so an owner can look at and move store stock), `Location::assignableOptions()` offers the store only
+  where stock is received or moved (batch form, add-a-strain, transfers), `OpenTill` and `EnrolMembership` refuse it, and
+  the counter's sede POST cannot choose it. The sede form fixes the kind at creation and hides the counter sections for a
+  store. Creating one takes `locations.manage` (270's policy).
+- **One writer for a transfer, `TransferBatch`** — both legs through `RecordStockMovement` in one transaction (locked row,
+  refuses negative), so it cannot race a dispensation. WHOLE → the batch itself moves (same id, lote, history) with
+  TRANSFER_OUT + TRANSFER_IN; PART → the source is decremented and a CHILD batch is created at the destination with the same
+  lote number, genetic, dates, lab report and cost, and `parent_batch_id` = the source (repeatable; the chain keeps the
+  provenance, and a dispensation from the child reports the harvest's lote). Refused: no `stock.transfer` (the existing
+  permission, now used), zero/negative, more than remains, the same location, another organisation. Stock ENTERING a sede
+  obeys that sede's ceiling when it is set to BLOCK (the intake rule); WARN lets it through. Audited `stock.transferred`.
+  The panel action on a batch is "Trasladar" ("Asignar a sede" on a store batch), with "Todo lo que queda".
+- **Ceilings.** The per-sede ceiling is unchanged for sedes. The store has none (no members → it would read "0 allowed" and
+  always be exceeded). `StockCeiling::forOrganisation()` gives the association-wide figure — every batch at every location
+  against members with an active membership anywhere × daily limit × ceiling days — shown as a WARNING alert on the owner's
+  rollup dashboard only. **Its legal basis is UNCONFIRMED** (a question for the club's gestor); it informs, it never blocks.
+- The demo seed has no store (adding one would change the demo's association-wide figure); an owner creates one under Sedes.
+
+Tests: `CentralStoreTransferTest` (10). Also: two older tests assumed a lote that expired "yesterday" is out of date at any
+hour; under 275's business-date rule it is in date until the 06:00 cutoff, so they failed when the suite ran between midnight
+and 06:00 Madrid. They now pin the clock to midday (the rule is right; the tests were time-of-day dependent).
+`composer check` green in `es` and `en`. Merged to `main` on Ben's instruction.

@@ -11,6 +11,7 @@ use App\Support\CounterOperator;
 use App\Support\TerminalName;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use RuntimeException;
 
 /** Open a till session with a float. One open session per terminal per location. */
 class OpenTill
@@ -20,6 +21,11 @@ class OpenTill
      */
     public function handle(Location $location, string $terminal, int $floatCents, array $options = []): TillSession
     {
+        // The grow / central store has no counter (prompt 277): no till, so nothing can be dispensed or sold there.
+        if ($location->isStore()) {
+            throw new RuntimeException(__('El almacén no tiene caja: solo guarda stock para las sedes.'));
+        }
+
         // Normalise so "POS 1"/"POS-1"/"pos-1" are one terminal, and register it on the location (prompt 84).
         $terminal = TerminalName::clean($terminal);
         $key = TerminalName::key($terminal);

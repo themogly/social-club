@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Enums\LocationKind;
 use App\Enums\Role;
 use App\Models\Concerns\BelongsToOrganisation;
 use Database\Factories\LocationFactory;
@@ -24,7 +25,7 @@ class Location extends Model
     use BelongsToOrganisation, HasFactory, HasUlids, SoftDeletes;
 
     protected $fillable = [
-        'organisation_id', 'name', 'address', 'capacity', 'timezone',
+        'organisation_id', 'name', 'kind', 'address', 'capacity', 'timezone',
         'business_day_cutoff', 'opening_time', 'closing_time', 'accent', 'active',
         'terminals',
     ];
@@ -32,6 +33,7 @@ class Location extends Model
     protected function casts(): array
     {
         return [
+            'kind' => LocationKind::class,
             'capacity' => 'integer',
             'active' => 'boolean',
             'terminals' => 'array',
@@ -58,6 +60,24 @@ class Location extends Model
     public function memberships(): HasMany
     {
         return $this->hasMany(Membership::class);
+    }
+
+    /** The grow / central store (prompt 277): holds stock, has no counter. */
+    public function isStore(): bool
+    {
+        return $this->kind === LocationKind::ALMACEN;
+    }
+
+    /**
+     * Premises with a counter — everything that lists sedes for counter work (the sede picker, memberships, tills,
+     * the per-sede ceiling) reads this, so the store can never behave like a counter (prompt 277).
+     *
+     * @param  Builder<static>  $query
+     * @return Builder<static>
+     */
+    public function scopeSedes(Builder $query): Builder
+    {
+        return $query->where('kind', LocationKind::SEDE->value);
     }
 
     /**
@@ -101,11 +121,14 @@ class Location extends Model
      *
      * @return array<string, string>
      */
-    public static function assignableOptions(): array
+    public static function assignableOptions(bool $includeStores = false): array
     {
         $user = Auth::user();
 
-        return static::query()->assignableTo($user instanceof User ? $user : null)->orderBy('name')->pluck('name', 'id')->all();
+        // The store (277) is offered only where stock is received or moved; never for members, tills or money.
+        return static::query()->assignableTo($user instanceof User ? $user : null)
+            ->when(! $includeStores, fn (Builder $query): Builder => $query->sedes())
+            ->orderBy('name')->pluck('name', 'id')->all();
     }
 
     /**

@@ -287,6 +287,9 @@ class MenuAvailabilityTest extends TestCase
 
     public function test_an_expired_batch_does_not_count_as_available(): void
     {
+        // Expiry is judged on the sede's BUSINESS date (prompt 275): before the 06:00 cutoff a lote that expired
+        // "yesterday" is still in date. Pin the clock to midday so the test does not depend on when it runs.
+        $this->travelTo(now()->setTime(12, 0));
         $genetic = $this->priced('Old Stock', $this->a);
         $batch = $this->stock($genetic, $this->a, cg: 50000);
         $batch->update(['expires_on' => now()->subDay()]);

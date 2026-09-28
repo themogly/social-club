@@ -243,6 +243,7 @@ class Dashboard extends BaseDashboard
                 'memberships_expiring' => [trans_choice(':count membresía por vencer|:count membresías por vencer', $count, ['count' => $count]), Heroicon::OutlinedClock],
                 'pending_applications' => [trans_choice(':count solicitud pendiente de revisión|:count solicitudes pendientes de revisión', $count, ['count' => $count]), Heroicon::OutlinedInbox],
                 'genetics_low_stock' => [trans_choice(':count variedad con stock bajo|:count variedades con stock bajo', $count, ['count' => $count]), Heroicon::OutlinedArchiveBoxXMark],
+                'association_stock_ceiling' => [__('La asociación tiene más stock en total (sedes y almacén) que el techo orientativo'), Heroicon::OutlinedArchiveBox],
                 'articles_low_stock' => [trans_choice(':count artículo de barra y tienda con stock bajo|:count artículos de barra y tienda con stock bajo', $count, ['count' => $count]), Heroicon::OutlinedShoppingBag],
                 default => [$case?->label($count) ?? __('Aviso'), Heroicon::OutlinedBell],
             };

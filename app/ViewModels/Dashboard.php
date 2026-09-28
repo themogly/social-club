@@ -274,6 +274,8 @@ class Dashboard
         $add(DashboardAlert::PENDING_APPLICATIONS, $this->pendingApplications());
         $add(DashboardAlert::GENETICS_LOW_STOCK, $this->lowStockGenetics());
         $add(DashboardAlert::ARTICLES_LOW_STOCK, $this->lowStockArticles());
+        // Prompt 277 — the association-wide figure (sedes + the grow), on the owner's rollup only.
+        $add(DashboardAlert::ASSOCIATION_STOCK_CEILING, $this->isRollup && StockCeiling::forOrganisation($this->organisationId)['exceeded'] ? 1 : 0);
 
         return $alerts;
     }
@@ -346,7 +348,7 @@ class Dashboard
     public function ceilingBreaches(): array
     {
         return $this->scopeLocations()
-            ->filter(fn (Location $l): bool => StockCeiling::forLocation($l)['exceeded'])
+            ->filter(fn (Location $l): bool => ! $l->isStore() && StockCeiling::forLocation($l)['exceeded'])
             ->map(fn (Location $l): string => $l->id)->values()->all();
     }
 
@@ -361,7 +363,7 @@ class Dashboard
      */
     public function ceilingHeadroom(): array
     {
-        return $this->scopeLocations()->map(function (Location $location): array {
+        return $this->scopeLocations()->reject(fn (Location $l): bool => $l->isStore())->values()->map(function (Location $location): array {
             $c = StockCeiling::forLocation($location);
             $headroom = $c['ceiling_cg'] - $c['on_site_cg'];
 

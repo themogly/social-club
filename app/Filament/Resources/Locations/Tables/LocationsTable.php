@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\Locations\Tables;
 
+use App\Enums\LocationKind;
 use App\Models\Location;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteBulkAction;
@@ -19,6 +20,7 @@ class LocationsTable
         return $table
             ->columns([
                 TextColumn::make('name')->label(__('Nombre'))->searchable()->sortable(),
+                TextColumn::make('kind')->label(__('Tipo'))->badge()->formatStateUsing(fn (LocationKind $state): string => $state->label()), // 277
                 // Derived (prompt 93): a sede with no active price is a counter that sells nothing. Never stored.
                 TextColumn::make('prices_gap')
                     ->label(__('Precios'))

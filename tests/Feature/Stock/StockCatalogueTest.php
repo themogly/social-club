@@ -44,6 +44,9 @@ class StockCatalogueTest extends TestCase
 
     public function test_fefo_picks_the_oldest_open_batch_and_skips_expired(): void
     {
+        // Expiry is judged on the sede's BUSINESS date (prompt 275): before the 06:00 cutoff a lote that expired
+        // "yesterday" is still in date. Pin the clock to midday so the test does not depend on when it runs.
+        $this->travelTo(now()->setTime(12, 0));
         $newer = Batch::factory()->create(['organisation_id' => $this->org->id, 'genetic_id' => $this->genetic->id, 'location_id' => $this->location->id, 'status' => BatchStatus::OPEN, 'remaining_cg' => 5000, 'acquired_or_harvested_on' => now()->subDays(10)]);
         $older = Batch::factory()->create(['organisation_id' => $this->org->id, 'genetic_id' => $this->genetic->id, 'location_id' => $this->location->id, 'status' => BatchStatus::OPEN, 'remaining_cg' => 5000, 'acquired_or_harvested_on' => now()->subDays(30)]);
         $expired = Batch::factory()->create(['organisation_id' => $this->org->id, 'genetic_id' => $this->genetic->id, 'location_id' => $this->location->id, 'status' => BatchStatus::OPEN, 'remaining_cg' => 5000, 'acquired_or_harvested_on' => now()->subDays(60), 'expires_on' => now()->subDay()]);

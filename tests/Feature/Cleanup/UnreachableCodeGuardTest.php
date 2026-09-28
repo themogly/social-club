@@ -50,7 +50,6 @@ class UnreachableCodeGuardTest extends TestCase
         // member.limits.set + cash.bank were WIRED in prompt 81 (SetMemberLimits + MemberPolicy::setLimits;
         // the till's BANKED movement gated on cash.bank) — removed from the allowlist, now enforced as checked.
         'members.transfer' => 'declared + role-assigned; the cross-location member transfer UI is not built yet — wire or remove.',
-        'stock.transfer' => 'declared + role-assigned; the inter-location stock transfer UI is not built yet — wire or remove.',
     ];
 
     // --- The guards ------------------------------------------------------------
