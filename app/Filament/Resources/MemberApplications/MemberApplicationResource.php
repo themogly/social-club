@@ -3,7 +3,7 @@
 namespace App\Filament\Resources\MemberApplications;
 
 use App\Actions\Members\ApproveApplication;
-use App\Actions\ResolveLocale;
+use App\Actions\Members\SendApplicationInvite;
 use App\Enums\ApplicationStatus;
 use App\Filament\Resources\MemberApplications\Pages\EditMemberApplication;
 use App\Filament\Resources\MemberApplications\Pages\ListMemberApplications;
@@ -12,7 +12,6 @@ use App\Filament\Resources\MemberApplications\Schemas\MemberApplicationForm;
 use App\Filament\Resources\MemberApplications\Schemas\MemberApplicationInfolist;
 use App\Filament\Resources\MemberApplications\Tables\MemberApplicationsTable;
 use App\Mail\ApplicationApprovedMail;
-use App\Mail\ApplicationInviteMail;
 use App\Mail\ApplicationRejectedMail;
 use App\Models\MemberApplication;
 use BackedEnum;
@@ -236,7 +235,11 @@ class MemberApplicationResource extends Resource
             });
     }
 
-    /** Reenviar invitación — re-email the SAME token to the applicant's email (prompts 45 + 149: queued, best-effort). */
+    /**
+     * Reenviar invitación — re-email the SAME token to the applicant's email (prompts 45 + 149), through the one sender
+     * (287). Gated on `applications.review` like ISSUING an invitation (174): resending is the same act again, so staff
+     * who can invite can resend. Revoking stays on `members.create`.
+     */
     public static function resendAction(): Action
     {
         return Action::make('resend')
@@ -246,19 +249,11 @@ class MemberApplicationResource extends Resource
             ->visible(fn (MemberApplication $record): bool => self::isOutstandingInvite($record)
                 && filled($record->applicant_email)
                 && $record->inviteUrl() !== null
-                && (Auth::user()?->can('members.create') ?? false))
+                && (Auth::user()?->can('applications.review') ?? false))
             ->action(function (MemberApplication $record): void {
-                try {
-                    Mail::to((string) $record->applicant_email)
-                        ->locale((new ResolveLocale)->handle())
-                        ->queue(new ApplicationInviteMail(
-                            (string) $record->inviteUrl(),
-                            $record->invite_expires_at?->format('d/m/Y') ?? '',
-                        ));
-                    Notification::make()->title(__('Invitación reenviada (en cola)'))->success()->send();
-                } catch (\Throwable $e) {
-                    Notification::make()->title(__('No se pudo reenviar'))->body($e->getMessage())->danger()->send();
-                }
+                (new SendApplicationInvite)->handle($record)
+                    ? Notification::make()->title(__('Invitación reenviada (en cola)'))->success()->send()
+                    : Notification::make()->title(__('No se pudo reenviar'))->danger()->send();
             });
     }
 

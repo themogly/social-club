@@ -6,9 +6,11 @@ use App\Actions\Members\ApproveApplication;
 use App\Actions\Members\FindDuplicateMembers;
 use App\Actions\Members\IssueApplicationInvite;
 use App\Actions\Members\ResolveAvalador;
+use App\Actions\Members\SendApplicationInvite;
 use App\Actions\Members\SubmitApplication;
 use App\Actions\Memberships\EnrolMembership;
 use App\Actions\RecordAuditLog;
+use App\Enums\ApplicationStatus;
 use App\Enums\ConsentChannel;
 use App\Exceptions\DuplicateMemberException;
 use App\Http\Requests\SubmitApplicationRequest;
@@ -81,6 +83,15 @@ trait SignsUpMembers
      * renders on the screen behind it.
      */
     public bool $altaInviteSent = false;
+
+    /** Prompt 287 — the address the invitation went to, named in the confirmation so a typo is caught at the counter. */
+    public ?string $altaInviteSentTo = null;
+
+    /**
+     * Prompt 287 — the invitation exists but its email could not be queued: its link, shown with a copy button so staff
+     * can send it another way. Never shown with the success tick.
+     */
+    public ?string $altaInviteFailedUrl = null;
 
     /**
      * The staff-typed form (prompt 210) — open, its fields, and how consent was captured.
@@ -207,6 +218,7 @@ trait SignsUpMembers
         $this->altaOpen = false;
         $this->altaStaffFormOpen = false;
         $this->altaInviteSent = false;
+        $this->reset(['altaInviteSentTo', 'altaInviteFailedUrl']);
         $this->resetAltaForm();
         $this->altaConsentHeld = false;
         $this->reset(['altaApplicationId', 'altaTierId', 'altaDuplicateBlocked']);
@@ -637,12 +649,69 @@ trait SignsUpMembers
             return;
         }
 
-        if ($this->issueApplication($operator, email: $email, reference: null) === null) {
+        $application = $this->issueApplication($operator, email: $email, reference: null);
+
+        if ($application === null) {
             return;
         }
 
         $this->altaInviteEmail = '';
-        $this->altaInviteSent = true;
+
+        // Prompt 287 — the counter now actually sends it, through the one sender, and says only what is true.
+        if ((new SendApplicationInvite)->handle($application)) {
+            $this->altaInviteSent = true;
+            $this->altaInviteSentTo = (string) $application->applicant_email;
+            $this->altaInviteFailedUrl = null;
+        } else {
+            $this->altaInviteSent = false;
+            $this->altaInviteFailedUrl = $application->inviteUrl();
+        }
+    }
+
+    /**
+     * Reenviar (prompt 287) — re-email an outstanding invitation from the counter's list, through the one sender. Staff
+     * who can issue an invitation (`applications.review`, 174) can resend it; the sede must be this counter's.
+     */
+    public function resendAltaInvitation(string $applicationId): void
+    {
+        if ($this->requireOperatorForAlta() === null || ! $this->userCan('applications.review')) {
+            return;
+        }
+
+        $application = MemberApplication::query()->withoutGlobalScopes()
+            ->where('location_id', $this->locationId)->whereKey($applicationId)->first();
+
+        if ($application === null) {
+            return;
+        }
+
+        (new SendApplicationInvite)->handle($application)
+            ? $this->flash(__('Invitación reenviada a :email.', ['email' => (string) $application->applicant_email]), 'success')
+            : $this->flash(__('No se pudo reenviar la invitación.'), 'error');
+    }
+
+    /**
+     * Invitations emailed from this sede and not yet filled in (prompt 287) — listed with Reenviar. Not a wire action.
+     *
+     * @return Collection<int, MemberApplication>
+     */
+    protected function outstandingAltaInvites(): Collection
+    {
+        if ($this->locationId === null || ! $this->userCan('applications.review')) {
+            return collect();
+        }
+
+        return MemberApplication::query()->withoutGlobalScopes()
+            ->where('location_id', $this->locationId)
+            ->where('status', ApplicationStatus::PENDING->value)
+            ->whereNull('submitted_at')->whereNull('revoked_at')
+            ->whereNotNull('applicant_email')
+            ->where(fn ($q) => $q->whereNull('invite_expires_at')->orWhere('invite_expires_at', '>', now()))
+            ->latest('created_at')
+            ->limit(10)
+            ->get()
+            ->filter(fn (MemberApplication $application): bool => $application->acceptsSubmission())
+            ->values();
     }
 
     /**

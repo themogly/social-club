@@ -15017,3 +15017,54 @@ screenshots `storage/app/screenshots/285/`):
   1440 and 820×1180, light and dark; heatmaps side by side at 1440 and stacked at 820; no page-level horizontal scroll;
 - manager: attached to Central only for this check (the dev seed gives both), sees only Central;
 - staff: none of it; the dashboard and the report both send them to the counter.
+
+## Prompt 287 — "Enviar invitación" at the counter actually sends the email
+
+- **One sender, `App\Actions\Members\SendApplicationInvite`**, the only place `ApplicationInviteMail` is queued. Callers:
+  - the panel's Invitar and Reenviar;
+  - the counter's invite card and its new Reenviar.
+
+  Prompt 149 split *creating* an invitation (`IssueApplicationInvite`) from *mailing* it ("best-effort by the caller").
+  The panel callers mailed; the counter's caller, added later, didn't, and still told staff "Invitación enviada". The
+  three tests meant to catch it asserted the row and the flag, never the mail. They now assert the queued mail.
+- The sender refuses anything but an outstanding invitation with an email (approved, rejected, revoked, expired or no
+  email return false and queue nothing). It uses the same locale resolution as before (`ResolveLocale`), the same URL
+  (`inviteUrl()`) and the same expiry format. It is best-effort: a failure returns false and never removes the invitation
+  or hides its link. It audits `application.invite.sent` with `{queued}`, never the address or the token.
+- **The counter tells the truth.**
+  - When the email was queued: "✓ Invitación enviada a lucia@example.es…", naming the address so a typo is caught while
+    the person is still there.
+  - When it wasn't: "Invitación creada, pero no se pudo enviar el email." with the link and a copy button, and no tick.
+  - Outstanding emailed invitations from this sede are listed on the same chooser ("Invitaciones enviadas") with
+    **Reenviar** (`resendAltaInvitation`, `applications.review`, this sede only). The pending list shows only submitted
+    applications, so outstanding invitations needed their own rows.
+- **Resend moves to `applications.review`**, matching *issuing* an invitation (174): it's the same act again, and staff
+  could create an invitation but not resend it. **Revoke stays on `members.create`**: withdrawing a live invitation is a
+  heavier call than re-sending one.
+- **Wider check** — every message claiming an email went out (*enviad*, *enviamos*, *recibirás*, *te llegará*, *en
+  cola*):
+  - Dispensation receipt (`DispensaryPos`): the success flash follows a real `Mail::…->queue()`, and a failure flashes
+    an error.
+  - Member card resend (`MemberResource::resendQrAction` → `SendMemberCard`): queues. If queueing throws, the action
+    errors rather than claiming success. The button needs an email.
+  - Login link ("te hemos enviado un enlace"): `IssueMemberLoginLink` queues. The wording is deliberately
+    non-enumerating.
+  - Lockdown ("el enlace enviado a los propietarios"): `LockdownReactivationMail` is queued by `InitiateLockdown`.
+  - The application form's "si se aprueba, recibirás por correo tu tarjeta": `ApproveApplication` → `SendMemberCard`,
+    on both the panel and the counter.
+  - "Respuesta enviada" (message threads) is an in-app reply plus push, not an email.
+
+  Nothing else found. Known and left to 288: the *approved* email is sent only from the panel's approve action, not from
+  a counter approval, and its "recibirás tu carné en un correo aparte" is true either way because the card always goes.
+- Tests: `SendApplicationInviteTest` (4) and three new tests in `SignupWizardTest`, all seen red first. The three
+  existing tests (`SignupWizardTest`, `CounterAltaWizardTest`, `SigningSomeoneUpTest`) now assert the mail.
+- Browser check (`tests/Browser/prove-287-invite-email.mjs`), as staff at 820×1180, with `MAIL_MAILER=log` and
+  `QUEUE_CONNECTION=sync`, on a throwaway database:
+  - the confirmation names the address;
+  - the log holds the email with its link;
+  - Reenviar from the list puts a second email in the log;
+  - the link opens the application form (200) on a fresh phone-sized browser.
+
+  Screenshots are in `storage/app/screenshots/287/`. The panel's Invitar is covered by the feature test (same sender).
+- **For Ben, before this ships:** invitations already sent from the counter have valid links, but nobody received an
+  email. In the panel under Solicitudes, use **Reenviar** on the outstanding ones that have an address.

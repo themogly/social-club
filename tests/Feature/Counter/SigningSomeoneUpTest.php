@@ -9,6 +9,7 @@ use App\Enums\MemberStatus;
 use App\Enums\Role;
 use App\Enums\SettingType;
 use App\Livewire\Counter\MembershipCounter;
+use App\Mail\ApplicationInviteMail;
 use App\Models\Location;
 use App\Models\Member;
 use App\Models\MemberApplication;
@@ -24,6 +25,7 @@ use App\Support\Settings;
 use Database\Seeders\RolePermissionSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Str;
 use Livewire\Features\SupportTesting\Testable;
 use Livewire\Livewire;
@@ -440,6 +442,7 @@ class SigningSomeoneUpTest extends TestCase
     {
         $this->staff();
 
+        Mail::fake();
         Livewire::test(MembershipCounter::class)
             ->call('toggleAlta')
             ->set('altaInviteEmail', 'lucia@example.es')
@@ -447,6 +450,7 @@ class SigningSomeoneUpTest extends TestCase
 
         $application = $this->latestApplication();
         $this->assertSame('lucia@example.es', $application->applicant_email);
+        Mail::assertQueued(ApplicationInviteMail::class, fn (ApplicationInviteMail $mail): bool => $mail->hasTo('lucia@example.es')); // prompt 287
         $this->assertNull($application->submitted_at, 'an invitation must not arrive already submitted');
     }
 

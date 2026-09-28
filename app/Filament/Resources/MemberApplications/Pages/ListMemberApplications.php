@@ -3,9 +3,8 @@
 namespace App\Filament\Resources\MemberApplications\Pages;
 
 use App\Actions\Members\IssueApplicationInvite;
-use App\Actions\ResolveLocale;
+use App\Actions\Members\SendApplicationInvite;
 use App\Filament\Resources\MemberApplications\MemberApplicationResource;
-use App\Mail\ApplicationInviteMail;
 use App\Models\Location;
 use App\Models\User;
 use Filament\Actions\Action;
@@ -91,21 +90,9 @@ class ListMemberApplications extends ListRecords
                     return;
                 }
 
-                // QUEUED, best-effort: a delivery problem belongs in Horizon's failed jobs, never on this
-                // screen, and must never decide whether the invitation exists or its link is shown.
-                $mailFailed = false;
-                if (filled($application->applicant_email)) {
-                    try {
-                        Mail::to((string) $application->applicant_email)
-                            ->locale((new ResolveLocale)->handle())
-                            ->queue(new ApplicationInviteMail(
-                                (string) $application->inviteUrl(),
-                                $application->invite_expires_at?->format('d/m/Y') ?? '',
-                            ));
-                    } catch (Throwable) {
-                        $mailFailed = true;
-                    }
-                }
+                // QUEUED, best-effort, through the one sender (prompt 287): a delivery problem never decides whether the
+                // invitation exists or its link is shown.
+                $mailFailed = filled($application->applicant_email) && ! (new SendApplicationInvite)->handle($application);
 
                 // The link IS the deliverable — always shown, persistent so a dismissed toast never loses it.
                 Notification::make()
