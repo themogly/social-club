@@ -109,14 +109,14 @@ class InvitationViewPageTest extends TestCase
             ->assertDontSee(__('Estado de la invitación')); // the invitation section is hidden
     }
 
-    public function test_a_user_without_members_create_sees_no_invite_actions(): void
+    public function test_a_user_without_members_create_can_resend_but_not_manage_the_invite(): void
     {
         $reviewerOnly = User::factory()->create();
-        $reviewerOnly->givePermissionTo('applications.review'); // can view the queue, but cannot manage invites
+        $reviewerOnly->givePermissionTo('applications.review'); // can issue invitations (174), so can re-send one (287)
 
         $this->viewPage($reviewerOnly, $this->invitation())
             ->assertActionHidden('copyLink')
-            ->assertActionHidden('resend')
+            ->assertActionVisible('resend')
             ->assertActionHidden('revoke');
     }
 }

@@ -9,6 +9,7 @@ use App\Enums\ApplicationStatus;
 use App\Enums\MemberStatus;
 use App\Enums\Role;
 use App\Livewire\Counter\MembershipCounter;
+use App\Mail\ApplicationInviteMail;
 use App\Models\Location;
 use App\Models\Member;
 use App\Models\MemberApplication;
@@ -24,6 +25,7 @@ use App\Support\CounterOperator;
 use Database\Seeders\RolePermissionSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Mail;
 use Livewire\Livewire;
 use RuntimeException;
 use Spatie\Permission\PermissionRegistrar;
@@ -190,11 +192,13 @@ class CounterAltaWizardTest extends TestCase
     {
         $this->staff();
 
+        Mail::fake();
         Livewire::test(MembershipCounter::class)->call('toggleAlta')
             ->set('altaInviteEmail', 'nuevo@example.es')->call('sendAltaInvitation');
 
         $application = $this->latestApplication();
         $this->assertSame('nuevo@example.es', $application->applicant_email);
+        Mail::assertQueued(ApplicationInviteMail::class, fn (ApplicationInviteMail $mail): bool => $mail->hasTo('nuevo@example.es')); // prompt 287
         $this->assertSame($this->location->id, $application->location_id);
         $this->assertNotNull($application->inviteUrl(), 'a counter invitation must carry the same token shape');
 

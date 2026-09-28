@@ -8,6 +8,7 @@ use App\Enums\ApplicationStatus;
 use App\Enums\Role;
 use App\Enums\SettingType;
 use App\Livewire\Counter\MembershipCounter;
+use App\Mail\ApplicationInviteMail;
 use App\Models\Location;
 use App\Models\MemberApplication;
 use App\Models\Organisation;
@@ -20,6 +21,7 @@ use App\Support\CounterOperator;
 use App\Support\Settings;
 use Database\Seeders\RolePermissionSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Mail;
 use Livewire\Features\SupportTesting\Testable;
 use Livewire\Livewire;
 use Tests\TestCase;
@@ -165,6 +167,7 @@ class SignupWizardTest extends TestCase
     /** Card 3 sends the real invitation and the chooser says so where the operator is looking. */
     public function test_the_invite_card_sends_the_real_invitation_and_confirms_it(): void
     {
+        Mail::fake();
         $this->staff();
 
         $component = Livewire::test(MembershipCounter::class)
@@ -176,8 +179,56 @@ class SignupWizardTest extends TestCase
         $this->assertSame('nueva@example.es', $application->applicant_email);
         $this->assertNotNull($application->invite_token);
 
+        // Prompt 287 — the name claimed it; now it is true: exactly one invitation email, to that address, with the
+        // application's own link and expiry.
+        Mail::assertQueued(ApplicationInviteMail::class, 1);
+        Mail::assertQueued(ApplicationInviteMail::class, fn (ApplicationInviteMail $mail): bool => $mail->hasTo('nueva@example.es')
+            && $mail->url === $application->inviteUrl()
+            && $mail->expiresOn === $application->invite_expires_at?->format('d/m/Y'));
+
         $component->assertSet('altaInviteSent', true)
-            ->assertSee('data-alta-invite-sent', false);
+            ->assertSee('data-alta-invite-sent', false)
+            ->assertSee('nueva@example.es'); // the message names the address, so a typo is caught at the counter
+    }
+
+    /** Prompt 287 — when the email can't be queued, the invitation survives, its link is shown, and nothing claims "sent". */
+    public function test_a_failed_send_keeps_the_invitation_shows_its_link_and_never_ticks(): void
+    {
+        $this->staff();
+        Mail::shouldReceive('to')->andThrow(new \RuntimeException('transport down'));
+
+        $component = Livewire::test(MembershipCounter::class)
+            ->call('toggleAlta')
+            ->set('altaInviteEmail', 'lucia@example.es')
+            ->call('sendAltaInvitation');
+
+        $application = MemberApplication::query()->withoutGlobalScopes()->latest('id')->firstOrFail();
+        $this->assertTrue($application->acceptsSubmission());
+
+        $component->assertSet('altaInviteSent', false)
+            ->assertDontSee('data-alta-invite-sent', false)
+            ->assertSee('data-alta-invite-failed', false)
+            ->assertSee(e((string) $application->inviteUrl()), false)
+            ->assertSee('data-alta-invite-copy', false);
+    }
+
+    /** Prompt 287 — an outstanding emailed invitation can be re-sent from the counter by staff (applications.review). */
+    public function test_staff_resend_an_outstanding_invitation_from_the_pending_list(): void
+    {
+        Mail::fake();
+        $this->staff();
+
+        $component = Livewire::test(MembershipCounter::class)
+            ->call('toggleAlta')
+            ->set('altaInviteEmail', 'nueva@example.es')
+            ->call('sendAltaInvitation');
+        $application = MemberApplication::query()->withoutGlobalScopes()->latest('id')->firstOrFail();
+
+        $component->call('toggleAlta')->call('toggleAlta')
+            ->assertSee('data-alta-invite-resend', false)
+            ->call('resendAltaInvitation', $application->id);
+
+        Mail::assertQueued(ApplicationInviteMail::class, 2);
     }
 
     /** A bad email is refused without pretending an invitation went out. */

@@ -323,9 +323,22 @@
                 </div>
 
                 @if ($altaInviteSent)
-                    <p data-alta-invite-sent class="flex min-h-11 items-center gap-2 rounded-xl border border-success/30 bg-success/10 px-4 text-sm font-medium text-success">
-                        ✓ {{ __('Invitación enviada. Puede darse de alta y firmar desde su móvil.') }}
+                    {{-- Prompt 287 — only after the email was actually queued, and naming the address. --}}
+                    <p data-alta-invite-sent class="flex min-h-11 items-center gap-2 rounded-xl border border-success/30 bg-success/10 px-4 py-2 text-sm font-medium text-success">
+                        ✓ {{ __('Invitación enviada a :email. Puede darse de alta y firmar desde su móvil.', ['email' => $altaInviteSentTo]) }}
                     </p>
+                @elseif ($altaInviteFailedUrl !== null)
+                    {{-- The invitation exists but the email could not be queued: its link, to send another way. No tick. --}}
+                    <div data-alta-invite-failed role="alert" class="space-y-2 rounded-xl border border-warning/40 bg-warning/10 p-3 text-sm">
+                        <p class="font-medium text-warning">{{ __('Invitación creada, pero no se pudo enviar el email.') }}</p>
+                        <div class="flex items-center gap-2" x-data="{ copied: false }">
+                            <input type="text" readonly value="{{ $altaInviteFailedUrl }}" aria-label="{{ __('Enlace de invitación') }}"
+                                   class="h-11 min-w-0 flex-1 rounded-lg border border-line bg-surface px-3 text-xs dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100">
+                            <button type="button" data-alta-invite-copy x-on:click="navigator.clipboard.writeText(@js($altaInviteFailedUrl)); copied = true"
+                                    class="inline-flex h-11 shrink-0 items-center rounded-lg border border-line px-3 text-sm font-semibold transition hover:bg-surface-alt dark:border-slate-700 dark:hover:bg-slate-800"
+                                    x-text="copied ? @js(__('Copiado')) : @js(__('Copiar enlace'))">{{ __('Copiar enlace') }}</button>
+                        </div>
+                    </div>
                 @else
                     <div class="flex gap-2">
                         <label for="alta-email" class="sr-only">{{ __('Email para la invitación') }}</label>
@@ -333,6 +346,23 @@
                                class="h-12 min-w-0 flex-1 rounded-xl border border-line bg-surface px-4 text-base dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100">
                         <button type="button" wire:click="sendAltaInvitation" data-alta-invite
                                 class="inline-flex h-12 shrink-0 items-center rounded-xl border border-line px-4 text-sm font-semibold transition hover:bg-surface-alt dark:border-slate-700 dark:hover:bg-slate-800">{{ __('Enviar invitación') }}</button>
+                    </div>
+                @endif
+
+                {{-- Prompt 287 — invitations emailed from this sede and not yet filled in, each with Reenviar. --}}
+                @php $invites = $this->outstandingAltaInvites(); @endphp
+                @if ($invites->isNotEmpty())
+                    <div class="pt-2">
+                        <p class="text-xs font-medium uppercase tracking-wide text-ink-muted dark:text-slate-400">{{ __('Invitaciones enviadas') }}</p>
+                        <ul data-alta-invites class="mt-2 divide-y divide-line overflow-hidden rounded-xl border border-line dark:divide-slate-800 dark:border-slate-800">
+                            @foreach ($invites as $invite)
+                                <li class="flex min-h-11 items-center justify-between gap-3 bg-surface px-4 py-2 text-sm dark:bg-slate-900">
+                                    <span class="min-w-0 truncate">{{ $invite->applicant_email }}</span>
+                                    <button type="button" data-alta-invite-resend wire:click="resendAltaInvitation('{{ $invite->id }}')" wire:loading.attr="disabled" wire:target="resendAltaInvitation('{{ $invite->id }}')"
+                                            class="inline-flex min-h-11 shrink-0 items-center rounded-lg px-3 text-sm font-semibold text-brand transition hover:bg-brand-tint disabled:opacity-60 dark:hover:bg-slate-800">{{ __('Reenviar') }}</button>
+                                </li>
+                            @endforeach
+                        </ul>
                     </div>
                 @endif
 
