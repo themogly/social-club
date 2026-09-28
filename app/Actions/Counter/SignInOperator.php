@@ -6,6 +6,7 @@ use App\Actions\RecordAuditLog;
 use App\Models\Location;
 use App\Models\User;
 use App\Support\CounterOperator;
+use App\Support\CounterTerminals;
 use Illuminate\Auth\SessionGuard;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cookie;
@@ -47,6 +48,9 @@ class SignInOperator
             Cookie::queue(Cookie::forget($guard->getRecallerName()));
         }
         session()->forget('scope.location_id');
+        // Post-296 audit — remember HOW and WHERE this person signed in: by PIN (so the panel asks for their password once
+        // a shift, finding 7) and on which registered tablet (so revoking it signs them out, finding 5).
+        session(['auth.via_pin' => true, 'counter.terminal_id' => CounterTerminals::current()?->id]);
 
         (new RecordAuditLog)->handle('counter.operator.signed_in', $location, null, [
             'location_id' => $location?->id,

@@ -5,6 +5,7 @@ namespace App\Filament\Resources\Users\Schemas;
 use App\Enums\Role;
 use App\Models\User;
 use App\Support\Email;
+use App\Support\PinCollisionGuard;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
@@ -92,9 +93,12 @@ class UserForm
                     ->maxLength(8)
                     ->helperText(__('4–8 dígitos. Identifica al operador en el mostrador.'))
                     // Prompt 270 — a PIN is a sign-in, so it must name exactly one person.
+                    // Post-296 audit — and the "taken" answer is throttled and audited (PinCollisionGuard), so the form is no
+                    // longer a way to find somebody else's PIN.
                     ->rule(fn (?User $record): \Closure => function (string $attribute, mixed $value, \Closure $fail) use ($record): void {
-                        if (filled($value) && User::pinIsTaken((string) $value, $record?->id)) {
-                            $fail(__('Ese PIN ya lo usa otra persona. Elige otro.'));
+                        $refusal = filled($value) ? PinCollisionGuard::refusal((string) $value, $record?->id) : null;
+                        if ($refusal !== null) {
+                            $fail($refusal);
                         }
                     })
                     ->visible(fn (string $operation, Get $get): bool => $operation === 'create' || (bool) $get('set_pin'))

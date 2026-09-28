@@ -15731,3 +15731,52 @@ member. Failing-first tests: `tests/Feature/Security/NobodyAtThePinSeesNoMemberT
   Two tests that read island data use `invade()`.
 - **Verified:** the full-visit browser check (`prove-293-visit.mjs`) still passes at 1180×820 and 820×1180,
   including the stock following the sale.
+
+## Post-296 audit fix 3 — the registered tablet and the PIN: revocation signs out, "PIN taken" is throttled, the panel asks for the password once a shift
+
+From `audits/reports/2026-09-post-296-security.md`, Phase 1 findings 5, 6 and 7. Failing-first tests:
+`tests/Feature/Security/TabletPinSessionsTest.php` (revocation, the throttle and the confirmation are all driven over
+the real endpoints).
+
+- **Revocation ends the session (finding 5).** `SignInOperator` records `counter.terminal_id` (the tablet the PIN was
+  typed on) and `auth.via_pin` in the session.
+  - `RecogniseCounterTerminal` signs the person out on the tablet's next request once that terminal is no longer
+    the current one (revoked, or its cookie gone), and regenerates the session.
+  - `lockCounter()` signs out on a revoked tablet too. Before, it only did so while the tablet was still valid, so
+    a revoked tablet kept its last person signed in.
+- **"Ese PIN ya lo usa otra persona" (finding 6).** The answer stays, because a PIN is a sign-in and must name one
+  person (270). But it now goes through `App\Support\PinCollisionGuard`:
+  - every hit is audited (`user.pin.collision`; the PIN itself is never logged);
+  - after five hits an hour per person setting PINs, EVERY PIN gets the same "too many tries" refusal, taken or
+    not.
+
+  Before, a `staff.manage` holder (owner-grantable) could walk the PIN space and find the owner's PIN.
+- **The panel from a PIN session (finding 7 — the owner's call: "once per a shift").** A PIN session reaching any
+  panel page is sent to `/confirmar-identidad` (`App\Filament\Pages\Auth\ConfirmIdentity`). There the person gives
+  their password, plus their MFA code if enrolled.
+  - Once confirmed, `App\Support\PanelIdentity` remembers it for 12 h (`SHIFT_HOURS`), per person per tablet. The
+    same person locking and coming back that shift is not asked again; someone else on that tablet, or the same
+    person on another, is asked for theirs.
+  - A password login is never asked. The counter itself stays PIN-only.
+  - `ConfirmIdentityForPinSessions` is persistent panel middleware:
+    - a Livewire call from a panel page left open into the next shift is refused with a 403 (not redirected);
+    - the confirmation form's own calls pass, matched on its snapshot name, which is checksummed;
+    - so does signing out.
+  - An unreadable cache fails closed (ask).
+  - The confirmation is rate-limited (five tries) and audited (`counter.panel.identity_confirmed`).
+  - It carries a labelled *Volver al mostrador* (252): not confirming is fine, because the counter needs only the
+    PIN.
+  - One catch while testing over HTTP: Filament registers its pages under their CLASS name, not a kebab alias. The
+    first cut matched `.confirm-identity` and would have refused its own form in a real browser, while the in-process
+    `Livewire::test()` passed. The real-endpoint test now pins it.
+- **Tests adjusted:**
+  - `PinIsASignInTest` and `PreLiveSignInHardeningTest` are about whose panel a PIN opens; their `pin()` helpers now
+    also confirm the shift (`PanelIdentity::confirmed`).
+  - `HandoverConfinementOverHttpTest` now expects `/` after the PIN to go to the confirmation, not the applicant's
+    form. Before, it expected the dashboard.
+- **Verified in the browser** (throwaway DB, `tests/Browser/prove-296-panel-identity.mjs`): register, a new day,
+  PIN, `/` asks, a wrong password is refused, the right one opens the panel, and revoking from the owner's browser
+  signs the tablet out on its next request.
+- **Test-harness note:** Livewire applies a route's persistent middleware only once per path until `flush-state`,
+  which runs at the end of a real request but not between requests in a test. A test that posts the same panel
+  snapshot twice therefore sees the middleware only the first time. The stale-page test posts once.

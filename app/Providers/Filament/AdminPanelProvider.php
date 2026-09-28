@@ -4,6 +4,7 @@ namespace App\Providers\Filament;
 
 use App\Filament\Pages\Auth\Login;
 use App\Filament\Pages\Auth\RequestPasswordReset;
+use App\Http\Middleware\ConfirmIdentityForPinSessions;
 use App\Http\Middleware\EnforceCounterHandover;
 use App\Http\Middleware\EnsureActiveLocation;
 use App\Http\Middleware\RecogniseCounterTerminal;
@@ -208,6 +209,8 @@ class AdminPanelProvider extends PanelProvider
             ->middleware([SetDisplayTimezone::class], isPersistent: true)
             // Post-296 audit — a non-owner is always on one of their own locations; only the owner may roll up.
             ->middleware([EnsureActiveLocation::class], isPersistent: true)
+            // Post-296 audit — a PIN session gives its password (and MFA code) once a shift before the panel opens.
+            ->middleware([ConfirmIdentityForPinSessions::class], isPersistent: true)
             ->authMiddleware([
                 Authenticate::class,
             ]);

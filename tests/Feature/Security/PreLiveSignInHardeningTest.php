@@ -18,9 +18,11 @@ use App\Models\Organisation;
 use App\Models\User;
 use App\Support\ActiveScope;
 use App\Support\CounterOperator;
+use App\Support\PanelIdentity;
 use Database\Seeders\RolePermissionSeeder;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Testing\TestResponse;
@@ -87,10 +89,16 @@ class PreLiveSignInHardeningTest extends TestCase
         CounterOperator::clear();
     }
 
+    /** The PIN, then the once-a-shift password (post-296 fix 3) — these tests are about who the panel belongs to. */
     private function pin(string $pin): TestResponse
     {
-        return $this->livewirePost($this->snapshotFrom('/counter/till', 'counter.till-session'),
+        $response = $this->livewirePost($this->snapshotFrom('/counter/till', 'counter.till-session'),
             ['operatorPin' => $pin], [['unlockOperator']]);
+        if (Auth::user() instanceof User) {
+            PanelIdentity::confirmed(Auth::user());
+        }
+
+        return $response;
     }
 
     // --- A1. The till handover is a sign-in ------------------------------------------------------------------------
