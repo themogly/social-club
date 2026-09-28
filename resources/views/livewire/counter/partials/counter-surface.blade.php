@@ -33,6 +33,9 @@
     data-surface-mode="{{ $surfaceMode ?? 'none' }}"
     x-cloak
     x-data="{
+        {{-- Prompt 286 — the one shared PIN behaviour (resources/js/app.js): checking, the greeting, the shake. --}}
+        ...window.counterPinCheck(),
+        successTemplate: '',
         pin: '',
         {{-- Prompt 188: the mode is READ from $wire, never copied into local state. `serverMode:
              @js($surfaceMode)` snapshotted it at init, and Livewire preserves the DOM across a re-render, so
@@ -53,16 +56,22 @@
              facts, read once at init like every other seed here. --}}
         staffPad: @js(\App\Support\CounterHandover::submitted()),
         submitted: @js(\App\Support\CounterHandover::submitted()),
-        push(d) { if (this.pin.length < 8) this.pin += d },
-        back() { this.pin = this.pin.slice(0, -1) },
-        clear() { this.pin = '' },
+        get keysLocked() { return this.pinBusy() || $wire.pinLocked },
+        push(d) { if (! this.keysLocked && this.pin.length < 8) this.pin += d },
+        back() { if (! this.keysLocked) this.pin = this.pin.slice(0, -1) },
+        clear() { if (! this.keysLocked) this.pin = '' },
+        {{-- Prompt 286 — the dots STAY filled while the PIN is checked, and nothing can be typed or submitted again
+             until the answer is in; they clear on the answer (after the greeting, or with the shake). --}}
         submit() {
-            if (this.pin === '') return
-            $wire.operatorPin = this.pin; this.pin = ''
+            if (this.pin === '' || this.keysLocked) return
+            $wire.operatorPin = this.pin
             {{-- Prompt 281 — in the clock-out step the same pad confirms "Fichar salida" instead of signing in. --}}
-            if (this.mode === 'clock') { $wire.confirmClockOut(); return }
-            $wire.unlockOperator()
+            const clockOut = this.mode === 'clock'
+            {{-- The semicolon is load-bearing: Blade swallows the newline after an @js() directive. --}}
+            this.successTemplate = clockOut ? @js(__('Salida fichada. Hasta luego, :name.')) : @js(__('Hola, :name'));
+            this.checkPin(() => clockOut ? $wire.confirmClockOut() : $wire.unlockOperator()).then(() => { this.pin = '' })
         },
+        get successText() { return this.successTemplate.replace(':name', this.greeting) },
         {{-- Prompt 272 — the keyboard. Enter used to be bound on window as "submit": but Enter is how a focused
              <button> is activated, and keydown reaches window before the button's click — so Enter on the
              second digit key submitted the ONE digit typed so far ("PIN no reconocido"), each key after the
@@ -101,9 +110,10 @@
             if ($store.counter.locked) return 'locked'
             return $wire.surfaceModeState ?? null
         },
-        get open() { return this.mode !== null },
+        {{-- Checking or greeting holds the surface up even when the server's answer has already closed it. --}}
+        get open() { return this.pinBusy() || this.mode !== null },
         {{-- The pad is the same pad in all three modes; only what it says differs. --}}
-        get padVisible() { return this.mode === 'locked' || this.mode === 'unidentified' || (this.mode === 'handover' && this.staffPad) || (this.mode === 'clock' && $wire.clockPrompt === 'out') },
+        get padVisible() { return this.pinBusy() || this.mode === 'locked' || this.mode === 'unidentified' || (this.mode === 'handover' && this.staffPad) || (this.mode === 'clock' && $wire.clockPrompt === 'out') },
     }"
     x-effect="if (mode !== 'handover') staffPad = false"
     x-init="$watch('open', (v) => focusChanged(v)); if (open) focusChanged(true)"
@@ -171,7 +181,7 @@
          an idle-lock unlock of an open period (one step — asked every few minutes it would be tapped through blindly),
          never after a handover, never for the supervisor PIN. Clocking in is NOT a precondition for working. --}}
     @if ($clockPrompt === 'in')
-        <div data-clock-in-question x-show="mode === 'clock'" x-cloak class="w-full max-w-sm rounded-2xl border border-line bg-surface p-6 text-center shadow-xl dark:border-slate-800 dark:bg-slate-900">
+        <div data-clock-in-question x-show="mode === 'clock' && ! pinBusy()" x-cloak class="w-full max-w-sm rounded-2xl border border-line bg-surface p-6 text-center shadow-xl dark:border-slate-800 dark:bg-slate-900">
             <h2 class="text-base font-semibold">{{ __('¿Fichas la entrada?') }}</h2>
             <p class="mt-1 text-sm text-ink-muted dark:text-slate-400">{{ __('Hola, :name. Registra el inicio de tu jornada aquí.', ['name' => $this->currentOperatorName() ?? '']) }}</p>
             @if ($clockFeedback !== null)
@@ -184,7 +194,7 @@
         @php($openPeriod = \App\Support\WorkedHours::openPeriodFor(\App\Support\CounterOperator::current() ?? new \App\Models\User))
         @if ($openPeriod !== null)
             @php($tz = $openPeriod->location->timezone ?: 'Europe/Madrid')
-            <div data-clock-declare x-show="mode === 'clock'" x-cloak class="w-full max-w-sm rounded-2xl border border-line bg-surface p-6 shadow-xl dark:border-slate-800 dark:bg-slate-900">
+            <div data-clock-declare x-show="mode === 'clock' && ! pinBusy()" x-cloak class="w-full max-w-sm rounded-2xl border border-line bg-surface p-6 shadow-xl dark:border-slate-800 dark:bg-slate-900">
                 <h2 class="text-base font-semibold">{{ __('Tu jornada sigue abierta') }}</h2>
                 <p class="mt-1 text-sm text-ink-muted dark:text-slate-400">{{ __('Tu jornada del :date en :sede sigue abierta. ¿A qué hora terminaste?', ['date' => $openPeriod->business_date->translatedFormat('l j'), 'sede' => $openPeriod->location->name]) }}</p>
                 <label for="declared-end" class="mt-4 block text-sm font-medium">{{ __('Hora de salida') }}</label>
@@ -204,16 +214,23 @@
 
     {{-- LOCKED, UNIDENTIFIED, and HANDED-OVER-with-the-staff-pad-open — the same PIN pad, the same
          UnlockOperator call and therefore the same throttle, differing only in what it says. --}}
-    <div x-show="padVisible" x-cloak class="w-full max-w-xs rounded-2xl border border-line bg-surface p-6 shadow-xl dark:border-slate-800 dark:bg-slate-900">
+    <div x-show="padVisible" x-cloak data-pin-pad
+         x-bind:data-pin-state="checking ? 'checking' : (holding ? 'success' : (shaking ? 'error' : 'ready'))"
+         x-bind:class="{ 'pin-shake': shaking, '!border-success': holding }"
+         class="w-full max-w-xs rounded-2xl border border-line bg-surface p-6 shadow-xl dark:border-slate-800 dark:bg-slate-900">
             <div class="flex flex-col items-center text-center">
-                <span class="inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-brand-tint text-brand dark:bg-slate-800">
+                {{-- Prompt 286 — a correct PIN turns the pad green with a check mark and the person's first name. --}}
+                <span x-show="holding" x-cloak class="inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-success/10 text-success">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" class="h-7 w-7" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5"/></svg>
+                </span>
+                <span x-show="! holding" class="inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-brand-tint text-brand dark:bg-slate-800">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" class="h-6 w-6" aria-hidden="true">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 1 0-9 0v3.75m-.75 0h10.5a2.25 2.25 0 0 1 2.25 2.25v6.75a2.25 2.25 0 0 1-2.25 2.25H6.75a2.25 2.25 0 0 1-2.25-2.25v-6.75a2.25 2.25 0 0 1 2.25-2.25Z"/>
                     </svg>
                 </span>
-                <h2 data-surface-heading class="mt-3 text-base font-semibold"
-                    x-text="mode === 'clock' ? @js(__('Fichar salida')) : (mode === 'handover' ? (submitted ? @js(__('Solicitud recibida')) : @js(__('Recuperar el mostrador'))) : (mode === 'locked' ? @js(__('Pantalla bloqueada')) : @js(__('¿Quién está trabajando?'))))"></h2>
-                <p class="mt-1 text-sm text-ink-muted dark:text-slate-400"
+                <h2 data-surface-heading class="mt-3 text-base font-semibold" x-bind:class="holding && 'text-success'"
+                    x-text="holding ? successText : mode === 'clock' ? @js(__('Fichar salida')) : (mode === 'handover' ? (submitted ? @js(__('Solicitud recibida')) : @js(__('Recuperar el mostrador'))) : (mode === 'locked' ? @js(__('Pantalla bloqueada')) : @js(__('¿Quién está trabajando?'))))"></h2>
+                <p x-show="! holding" class="mt-1 text-sm text-ink-muted dark:text-slate-400"
                    x-text="mode === 'clock' ? @js(__('Confirma tu salida con tu PIN.')) : (mode === 'handover' ? @js(__('Introduce tu PIN para finalizar la entrega y volver al mostrador.')) : (mode === 'locked' ? @js(__('Introduce tu PIN para continuar. El trabajo en curso se conserva.')) : @js(__('Introduce tu PIN para identificarte en el mostrador.'))))"></p>
             </div>
 
@@ -226,6 +243,8 @@
             </div>
             {{-- The dots are aria-hidden, so the COUNT is announced instead (never the digits). --}}
             <p data-pin-count class="sr-only" aria-live="polite" x-text="digitsLabel(pin.length)"></p>
+            {{-- Checking and success are announced as a status; a wrong PIN stays the server's role="alert" line below. --}}
+            <p data-pin-status role="status" class="sr-only" x-text="checking ? @js(__('Comprobando…')) : (holding ? successText : '')"></p>
 
             @if ($clockPrompt === 'out' && $clockFeedback !== null)
                 <p data-clock-feedback role="alert" class="mt-3 rounded-lg bg-error/10 px-3 py-2 text-center text-sm font-medium text-error">{{ $clockFeedback }}</p>
@@ -236,7 +255,10 @@
             @endif
 
             @if ($this->operatorLockedOut())
-                <p class="mt-3 text-center text-sm text-ink-muted dark:text-slate-400">{{ __('Demasiados intentos. Inténtalo en :s s.', ['s' => $this->operatorLockoutSeconds()]) }}</p>
+                {{-- Prompt 286 — the keys stay disabled (the same state as checking) until the lockout ends; then the pad
+                     asks the server once, which clears `pinLocked` and gives the keys back. --}}
+                <p data-pin-lockout x-init="setTimeout(() => $wire.$refresh(), {{ ($this->operatorLockoutSeconds() + 1) * 1000 }})"
+                   class="mt-3 text-center text-sm text-ink-muted dark:text-slate-400">{{ __('Demasiados intentos. Inténtalo en :s s.', ['s' => $this->operatorLockoutSeconds()]) }}</p>
                 {{-- Where the key is (prompt 235): the wait is not the only way out any more, and the person
                      staring at this countdown is the one who most needs to know that. --}}
                 <p data-lockout-hint class="mt-1 text-center text-xs text-ink-muted dark:text-slate-400">{{ __('Un responsable puede desbloquearlo desde Administración › Seguridad.') }}</p>
@@ -246,15 +268,18 @@
                  confirm, which was 155x42 in the partial this replaces. --}}
             <div class="mt-4 grid grid-cols-3 gap-2">
                 @foreach (['1', '2', '3', '4', '5', '6', '7', '8', '9'] as $digit)
-                    <button type="button" @click="push('{{ $digit }}')" class="min-h-[2.75rem] min-w-[2.75rem] rounded-lg border border-line py-3 text-lg font-semibold transition hover:bg-brand-tint hover:text-brand dark:border-slate-700 dark:hover:bg-slate-800 dark:hover:text-white">{{ $digit }}</button>
+                    <button type="button" @click="push('{{ $digit }}')" x-bind:disabled="keysLocked" class="disabled:opacity-50 min-h-[2.75rem] min-w-[2.75rem] rounded-lg border border-line py-3 text-lg font-semibold transition hover:bg-brand-tint hover:text-brand dark:border-slate-700 dark:hover:bg-slate-800 dark:hover:text-white">{{ $digit }}</button>
                 @endforeach
-                <button type="button" @click="clear()" class="min-h-[2.75rem] min-w-[2.75rem] rounded-lg border border-line py-3 text-sm font-medium text-ink-muted transition hover:bg-slate-100 dark:border-slate-700 dark:hover:bg-slate-800">{{ __('Borrar') }}</button>
-                <button type="button" @click="push('0')" class="min-h-[2.75rem] min-w-[2.75rem] rounded-lg border border-line py-3 text-lg font-semibold transition hover:bg-brand-tint hover:text-brand dark:border-slate-700 dark:hover:bg-slate-800 dark:hover:text-white">0</button>
-                <button type="button" @click="back()" aria-label="{{ __('Retroceso') }}" class="min-h-[2.75rem] min-w-[2.75rem] rounded-lg border border-line py-3 text-lg transition hover:bg-slate-100 dark:border-slate-700 dark:hover:bg-slate-800">⌫</button>
+                <button type="button" @click="clear()" x-bind:disabled="keysLocked" class="disabled:opacity-50 min-h-[2.75rem] min-w-[2.75rem] rounded-lg border border-line py-3 text-sm font-medium text-ink-muted transition hover:bg-slate-100 dark:border-slate-700 dark:hover:bg-slate-800">{{ __('Borrar') }}</button>
+                <button type="button" @click="push('0')" x-bind:disabled="keysLocked" class="disabled:opacity-50 min-h-[2.75rem] min-w-[2.75rem] rounded-lg border border-line py-3 text-lg font-semibold transition hover:bg-brand-tint hover:text-brand dark:border-slate-700 dark:hover:bg-slate-800 dark:hover:text-white">0</button>
+                <button type="button" @click="back()" x-bind:disabled="keysLocked" aria-label="{{ __('Retroceso') }}" class="disabled:opacity-50 min-h-[2.75rem] min-w-[2.75rem] rounded-lg border border-line py-3 text-lg transition hover:bg-slate-100 dark:border-slate-700 dark:hover:bg-slate-800">⌫</button>
             </div>
 
-            <button type="button" data-counter-surface-unlock x-ref="pinPad" @click="submit()" class="mt-4 min-h-[2.75rem] h-12 w-full rounded-lg bg-brand text-sm font-semibold text-white transition hover:bg-brand-dark"
-                    x-text="mode === 'clock' ? @js(__('Fichar salida')) : (mode === 'handover' ? @js(__('Recuperar el mostrador')) : (mode === 'locked' ? @js(__('Desbloquear')) : @js(__('Identificarse'))))"></button>
+            <button type="button" data-counter-surface-unlock x-ref="pinPad" @click="submit()" x-bind:disabled="keysLocked" x-bind:aria-busy="checking"
+                    class="mt-4 inline-flex min-h-[2.75rem] h-12 w-full items-center justify-center gap-2 rounded-lg bg-brand text-sm font-semibold text-white transition hover:bg-brand-dark disabled:cursor-not-allowed disabled:opacity-70">
+                <svg x-show="checking" x-cloak class="h-4 w-4 motion-safe:animate-spin" viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="3" class="opacity-25"/><path d="M21 12a9 9 0 0 0-9-9" stroke="currentColor" stroke-width="3" stroke-linecap="round"/></svg>
+                <span x-text="checking ? @js(__('Comprobando…')) : holding ? successText : (mode === 'clock' ? @js(__('Fichar salida')) : (mode === 'handover' ? @js(__('Recuperar el mostrador')) : (mode === 'locked' ? @js(__('Desbloquear')) : @js(__('Identificarse')))))"></span>
+            </button>
 
             @if ($clockPrompt === 'out')
                 <button type="button" data-clock-out-cancel wire:click="cancelClockOut" class="mt-3 min-h-[2.75rem] w-full rounded-lg px-4 text-sm font-medium text-ink-muted transition hover:text-ink dark:text-slate-400 dark:hover:text-slate-300">{{ __('Cancelar') }}</button>

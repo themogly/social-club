@@ -94,6 +94,10 @@ Everything used in code/config appears in `.env.example`. Highlights:
     sistema** renders and reports the cache as *No accesible*. Recovery is automatic — Redis returning restores
     everything with no restart. `database` (not `file`/`array`) so a role edit + `php artisan
     permission:cache-reset` still propagates across workers; use `file` only on a single-server box.
+- **`APP_KEY` — generate once, never rotate.** It encrypts sessions, cookies and encrypted columns, and (prompt 286)
+  it keys every counter PIN's lookup: rotating it invalidates **every PIN**, and each person would need a new one set
+  in the panel. After the first busy evening, `php artisan csc:pin-upgrade-status` shows who is still on the old,
+  slower PIN hash (they upgrade by entering their PIN once).
 - **Mail:** local `MAIL_MAILER=log`. Production uses **Resend** via Laravel's first-party transport — the
   `resend/resend-php` package is already required (do **not** add `resend/resend-laravel`); set
   `MAIL_MAILER=resend` and `RESEND_API_KEY` (Laravel's own convention — `config/services.php` reads it), and a

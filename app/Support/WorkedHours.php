@@ -28,16 +28,37 @@ class WorkedHours
     /** How far before a report window events are read, so a period that started just before it still pairs. */
     private const LOOKBACK_DAYS = 31;
 
-    /** The person's open period anywhere in their organisation, or null — the latest unannulled IN with no OUT after it. */
+    /**
+     * The person's open period anywhere in their organisation, or null — the latest unannulled IN with no unannulled OUT
+     * after it. Bounded (prompt 286): it runs on every sign-in, so it reads that one IN and asks whether an OUT follows,
+     * never the person's whole history.
+     */
     public static function openPeriodFor(User $user): ?StaffClockEvent
     {
-        $open = null;
+        $notAnnulled = fn ($q) => $q->whereNotExists(fn ($a) => $a->from('staff_clock_events as annul')
+            ->where('annul.type', StaffClockType::ANNUL->value)
+            ->whereColumn('annul.corrects_event_id', 'staff_clock_events.id'));
 
-        foreach (self::effectiveEvents(self::eventsQuery()->where('user_id', $user->id)->get()) as $event) {
-            $open = $event->type === StaffClockType::IN ? $event : null;
+        /** @var StaffClockEvent|null $in */
+        $in = StaffClockEvent::query()->withoutGlobalScopes()->with('location')
+            ->where('user_id', $user->id)->where('type', StaffClockType::IN->value)->where($notAnnulled)
+            ->orderByDesc('occurred_at')->orderByDesc('recorded_at')->orderByDesc('id')
+            ->first();
+
+        if ($in === null) {
+            return null;
         }
 
-        return $open;
+        // "After" in the reader's own order: occurred_at, then recorded_at, then id.
+        $closed = StaffClockEvent::query()->withoutGlobalScopes()
+            ->where('user_id', $user->id)->where('type', StaffClockType::OUT->value)->where($notAnnulled)
+            ->where(fn ($q) => $q->where('occurred_at', '>', $in->occurred_at)
+                ->orWhere(fn ($q) => $q->where('occurred_at', $in->occurred_at)
+                    ->where(fn ($q) => $q->where('recorded_at', '>', $in->recorded_at)
+                        ->orWhere(fn ($q) => $q->where('recorded_at', $in->recorded_at)->where('id', '>', $in->id)))))
+            ->exists();
+
+        return $closed ? null : $in;
     }
 
     /**

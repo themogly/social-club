@@ -650,14 +650,16 @@
                                 @include('livewire.counter.partials.counter-flash', ['anchor' => 'data-till-feedback=handover', 'spacing' => '', 'nonce' => $flashSeq, 'reveal' => true])
                             @endif
 
+                            {{-- Prompt 286 — the incoming person's PIN is checked once: one request in flight, "Comprobando…". --}}
                             <button
                                 type="button"
-                                wire:click="handOver"
+                                x-data="window.counterPinCheck()"
+                                x-on:click="checkPin(() => $wire.handOver(), { feedback: false })"
+                                x-bind:disabled="checking"
+                                x-bind:aria-busy="checking"
                                 data-handover-confirm
-                                wire:loading.attr="disabled"
-                                wire:target="handOver"
                                 class="h-14 w-full rounded-xl bg-brand text-base font-semibold text-white transition hover:bg-brand-dark focus:outline-none focus:ring-2 focus:ring-brand/40 disabled:opacity-60"
-                            >{{ __('Entregar la caja') }}</button>
+                            ><span x-text="checking ? @js(__('Comprobando…')) : @js(__('Entregar la caja'))">{{ __('Entregar la caja') }}</span></button>
                         </div>
                     @endif
 

@@ -29,7 +29,8 @@ class UserFactory extends Factory
             'email' => fake()->unique()->safeEmail(),
             'email_verified_at' => now(),
             'password' => static::$password ??= Hash::make('password'),
-            'pin' => '1234',
+            // Prompt 286 — a PIN is unique (stored as its keyed lookup), so every factory person gets their own.
+            'pin' => (string) fake()->unique()->numberBetween(10_000_000, 99_999_999),
             'active' => true,
             'remember_token' => Str::random(10),
         ];

@@ -21,6 +21,7 @@ use Carbon\CarbonImmutable;
 use DomainException;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Str;
 use InvalidArgumentException;
 use Livewire\Attributes\On;
 
@@ -45,6 +46,9 @@ trait IdentifiesOperator
 
     /** Last unlock feedback for the panel (wrong PIN / locked out); never the PIN itself. */
     public ?string $operatorFeedback = null;
+
+    /** Prompt 286 — is the PIN pad locked out right now? Refreshed on every response ({@see dehydrateIdentifiesOperator}). */
+    public bool $pinLocked = false;
 
     /**
      * {@see surfaceMode()} as a PROPERTY, so the client can read it LIVE (prompt 188).
@@ -294,8 +298,16 @@ trait IdentifiesOperator
         $this->flashMessage = null;
     }
 
-    /** Verify the entered PIN against the location's active staff and, on success, set the operator. */
-    public function unlockOperator(): void
+    /**
+     * Verify the entered PIN against the location's active staff and, on success, set the operator.
+     *
+     * Prompt 286 — returns the outcome to the pad's promise (`$wire.unlockOperator().then(…)`), so the pad can say
+     * "Hola, Marta" or shake, and hold its "checking" state until the answer is in: one request in flight, never a
+     * retype queued behind it (each retype that lands wrong costs an attempt against the lockout).
+     *
+     * @return array{ok: bool, name?: string}
+     */
+    public function unlockOperator(): array
     {
         $location = $this->resolveLocation();
 
@@ -306,7 +318,7 @@ trait IdentifiesOperator
             // precondition. "Sin sede activa." was accurate and useless.
             $this->operatorFeedback = __('Sin sede activa. Elige tu sede en la barra superior antes de identificarte.');
 
-            return;
+            return ['ok' => false];
         }
 
         $pin = trim($this->operatorPin);
@@ -315,17 +327,15 @@ trait IdentifiesOperator
         if ($pin === '') {
             $this->operatorFeedback = __('Introduce tu PIN.');
 
-            return;
+            return ['ok' => false];
         }
 
         $operator = (new UnlockOperator)->handle($location, $pin, $this->operatorThrottleKey());
 
         if ($operator === null) {
-            $this->operatorFeedback = $this->operatorLockedOut()
-                ? __('Demasiados intentos. Espera un momento antes de reintentar.')
-                : __('PIN no reconocido.');
+            $this->operatorFeedback = $this->pinFailureMessage();
 
-            return;
+            return ['ok' => false];
         }
 
         // The PIN is how EVERY mode ends — locked, unidentified and handed over alike. Ending a handover
@@ -365,6 +375,8 @@ trait IdentifiesOperator
         if ($submittedAlta !== null) {
             $this->redirect(route('counter.members', ['alta' => $submittedAlta]));
         }
+
+        return ['ok' => true, 'name' => Str::before(trim((string) $operator->name), ' ')];
     }
 
     /**
@@ -481,8 +493,12 @@ trait IdentifiesOperator
         $this->operatorPin = '';
     }
 
-    /** The PIN for "Fichar salida": the same pad, the same UnlockOperator throttle — and it must be THIS person's PIN. */
-    public function confirmClockOut(): void
+    /**
+     * The PIN for "Fichar salida": the same pad, the same UnlockOperator throttle — and it must be THIS person's PIN.
+     *
+     * @return array{ok: bool, name?: string}
+     */
+    public function confirmClockOut(): array
     {
         $operator = CounterOperator::current();
         $location = $this->resolveLocation();
@@ -490,23 +506,21 @@ trait IdentifiesOperator
         $this->operatorPin = '';
 
         if ($operator === null || $location === null || $pin === '') {
-            return;
+            return ['ok' => false];
         }
 
         $matched = (new UnlockOperator)->handle($location, $pin, $this->operatorThrottleKey());
 
         if ($matched === null) {
-            $this->clockFeedback = $this->operatorLockedOut()
-                ? __('Demasiados intentos. Espera un momento antes de reintentar.')
-                : __('PIN no reconocido.');
+            $this->clockFeedback = $this->pinFailureMessage();
 
-            return;
+            return ['ok' => false];
         }
 
         if (! $matched->is($operator)) {
             $this->clockFeedback = __('Ese PIN no es el tuyo: cada persona ficha su propia salida.');
 
-            return;
+            return ['ok' => false];
         }
 
         try {
@@ -514,7 +528,7 @@ trait IdentifiesOperator
         } catch (DomainException|InvalidArgumentException $e) {
             $this->clockFeedback = $e->getMessage();
 
-            return;
+            return ['ok' => false];
         }
 
         $this->clockPrompt = null;
@@ -522,6 +536,8 @@ trait IdentifiesOperator
         // This person has finished: lock, so the next person identifies themselves.
         $this->lockCounter();
         $this->dispatch('counter-lock');
+
+        return ['ok' => true, 'name' => Str::before(trim((string) $operator->name), ' ')];
     }
 
     #[On('counter-my-hours')]
@@ -584,9 +600,7 @@ trait IdentifiesOperator
         $authoriser = (new UnlockOperator)->handle($location, $pin, $this->operatorThrottleKey());
 
         if ($authoriser === null) {
-            $this->flash($this->operatorLockedOut()
-                ? __('Demasiados intentos. Espera un momento antes de reintentar.')
-                : __('PIN no reconocido.'), 'error');
+            $this->flash($this->pinFailureMessage(), 'error');
 
             return null;
         }
@@ -622,6 +636,28 @@ trait IdentifiesOperator
      * devices and a browser session is trivial to rotate — so the count is keyed to the sede only, and every
      * device at that sede shares one escalating lockout. A wrong-sede/no-sede terminal buckets under 'none'.
      */
+    /**
+     * Prompt 286 — what a wrong PIN says, everywhere a PIN is entered: how many attempts are left before the lockout
+     * ("PIN incorrecto. Te quedan 2 intentos."), or the lockout itself. Seeing that a wrong attempt costs something is
+     * what stops the blind retyping.
+     */
+    protected function pinFailureMessage(): string
+    {
+        if ($this->operatorLockedOut()) {
+            return __('Demasiados intentos. Espera un momento antes de reintentar.');
+        }
+
+        $left = (new UnlockOperator)->attemptsRemaining($this->resolveLocation(), $this->operatorThrottleKey());
+
+        return trans_choice('PIN incorrecto. Te queda :count intento.|PIN incorrecto. Te quedan :count intentos.', $left, ['count' => $left]);
+    }
+
+    /** Prompt 286 — the lockout as live component state, so the pad's keys disable (and re-enable) with it. */
+    public function dehydrateIdentifiesOperator(): void
+    {
+        $this->pinLocked = $this->operatorLockedOut();
+    }
+
     private function operatorThrottleKey(): string
     {
         $locationId = app(ActiveScope::class)->locationId() ?? 'none';

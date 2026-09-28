@@ -11,6 +11,7 @@ use App\Models\Location;
 use App\Models\Organisation;
 use App\Models\User;
 use App\Support\ActiveScope;
+use App\Support\PinLookup;
 use Database\Seeders\RolePermissionSeeder;
 use Filament\Facades\Filament;
 use Filament\Forms\Components\Field;
@@ -146,7 +147,7 @@ class UserCredentialAutofillTest extends TestCase
 
         $fresh = $this->admin->fresh();
         $this->assertSame($before, $fresh?->getRawOriginal('password'));
-        $this->assertTrue(Hash::check('5678', (string) $fresh?->getRawOriginal('pin')));
+        $this->assertSame(PinLookup::for('5678'), $fresh?->getRawOriginal('pin_lookup')); // prompt 286: stored as its lookup
     }
 
     // --- the security case ---------------------------------------------------------------------

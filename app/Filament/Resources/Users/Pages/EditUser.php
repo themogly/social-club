@@ -42,7 +42,7 @@ class EditUser extends EditRecord
         (new EnsureRoleChangeIsAllowed)->handle($actor, $user, (array) ($this->data['roles'] ?? []));
         $this->rolesBefore = $user->getRoleNames()->sort()->values()->all();
         $this->passwordBefore = $user->getRawOriginal('password');
-        $this->pinBefore = $user->getRawOriginal('pin');
+        $this->pinBefore = $user->getRawOriginal('pin').'|'.$user->getRawOriginal('pin_lookup'); // prompt 286: either column
     }
 
     protected function afterSave(): void
@@ -65,7 +65,7 @@ class EditUser extends EditRecord
             (new RecordAuditLog)->handle('user.password.updated', $user);
         }
 
-        if ($fresh?->getRawOriginal('pin') !== $this->pinBefore) {
+        if ($fresh?->getRawOriginal('pin').'|'.$fresh?->getRawOriginal('pin_lookup') !== $this->pinBefore) {
             (new RecordAuditLog)->handle('user.pin.updated', $user);
         }
     }

@@ -329,7 +329,7 @@ class TillSession extends Component
         $incoming = (new UnlockOperator)->handle($location, $pin, $this->operatorThrottleKey());
 
         if ($incoming === null) {
-            $this->flash(__('PIN no reconocido.'), 'error');
+            $this->flash($this->pinFailureMessage(), 'error');
 
             return;
         }

@@ -2,9 +2,10 @@
 
 namespace App\Models;
 
-// use Illuminate\Contracts\Auth\MustVerifyEmail;
 use App\Casts\NormalisedEmail;
 use App\Enums\Role;
+// use Illuminate\Contracts\Auth\MustVerifyEmail;
+use App\Support\PinLookup;
 use Database\Factories\UserFactory;
 use Filament\Auth\MultiFactor\App\Contracts\HasAppAuthentication;
 use Filament\Auth\MultiFactor\App\Contracts\HasAppAuthenticationRecovery;
@@ -13,6 +14,7 @@ use Filament\Panel;
 use Illuminate\Contracts\Translation\HasLocalePreference;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
+use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
@@ -24,7 +26,7 @@ use SensitiveParameter;
 use Spatie\Permission\Traits\HasRoles;
 
 #[Fillable(['name', 'email', 'password', 'pin', 'active', 'locale'])]
-#[Hidden(['password', 'remember_token', 'pin', 'mfa_secret', 'mfa_recovery_codes'])]
+#[Hidden(['password', 'remember_token', 'pin', 'pin_lookup', 'mfa_secret', 'mfa_recovery_codes'])]
 class User extends Authenticatable implements FilamentUser, HasAppAuthentication, HasAppAuthenticationRecovery, HasLocalePreference
 {
     /** @use HasFactory<UserFactory> */
@@ -68,27 +70,53 @@ class User extends Authenticatable implements FilamentUser, HasAppAuthentication
     }
 
     /**
-     * Is this PIN already someone else's? (prompt 270)
+     * Is this PIN already someone else's? (prompt 270; prompt 286 made it an indexed lookup)
      *
-     * Since 267 a PIN is a sign-in, and `UnlockOperator` cannot tell two people with the same PIN apart — first-match
-     * signed a staff member in as the owner. PINs are hashed, so this checks the candidate against every other stored
-     * hash (a club has tens of staff, not thousands). Inactive accounts count too: reactivating one must not collide.
+     * Since 267 a PIN is a sign-in, so it must name exactly one person. The lookup is unique in the database; the only
+     * bcrypt left is for people still on a LEGACY hash (set before 286 and not yet used) — a set that empties as
+     * everyone enters their PIN once. Inactive and soft-deleted accounts count too: reactivating one must not collide.
      */
     public static function pinIsTaken(#[SensitiveParameter] string $pin, ?string $exceptUserId = null): bool
     {
-        $query = static::query()->withTrashed()->whereNotNull('pin');
+        $others = static::query()->withTrashed()->when($exceptUserId !== null, fn ($q) => $q->whereKeyNot($exceptUserId));
 
-        if ($exceptUserId !== null) {
-            $query->whereKeyNot($exceptUserId);
+        if ((clone $others)->where('pin_lookup', PinLookup::for($pin))->exists()) {
+            return true;
         }
 
-        foreach ($query->pluck('pin') as $hash) {
+        foreach ((clone $others)->whereNull('pin_lookup')->whereNotNull('pin')->pluck('pin') as $hash) {
             if (Hash::check($pin, (string) $hash)) {
                 return true;
             }
         }
 
         return false;
+    }
+
+    /**
+     * Writing a PIN (prompt 286): a plain PIN is stored as its lookup only — no bcrypt hash beside it, which would keep
+     * the offline route open without the key. A value that is ALREADY a password hash is a legacy PIN (older fixtures and
+     * data) and is kept as it is, to upgrade on first use. Null clears both.
+     *
+     * @return Attribute<?string, ?string>
+     */
+    protected function pin(): Attribute
+    {
+        return Attribute::make(set: function (#[SensitiveParameter] ?string $value): array {
+            if (blank($value)) {
+                return ['pin' => null, 'pin_lookup' => null];
+            }
+
+            return Hash::isHashed((string) $value)
+                ? ['pin' => $value, 'pin_lookup' => null]
+                : ['pin' => null, 'pin_lookup' => PinLookup::for((string) $value)];
+        });
+    }
+
+    /** Has this person a counter PIN at all — a lookup, or a legacy hash not yet upgraded? */
+    public function hasPin(): bool
+    {
+        return filled($this->getRawOriginal('pin_lookup')) || filled($this->getRawOriginal('pin'));
     }
 
     /** @return BelongsToMany<Location, $this> */
@@ -119,7 +147,7 @@ class User extends Authenticatable implements FilamentUser, HasAppAuthentication
         if ($this->locations()->count() === 0) {
             $reasons[] = 'no_location';
         }
-        if (blank($this->getRawOriginal('pin'))) {
+        if (! $this->hasPin()) {
             $reasons[] = 'no_pin';
         }
 
@@ -173,7 +201,6 @@ class User extends Authenticatable implements FilamentUser, HasAppAuthentication
             'email' => NormalisedEmail::class,   // login identifier — normalised lowercase at the boundary (prompt 146)
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
-            'pin' => 'hashed',
             'mfa_secret' => 'encrypted',
             'mfa_confirmed_at' => 'datetime',
             'mfa_recovery_codes' => 'encrypted:array',
