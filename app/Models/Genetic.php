@@ -142,14 +142,20 @@ class Genetic extends Model
     /** Has an active base (non-tier) price at this location — the exact condition the POS filters on. */
     public function hasActivePriceAt(string $locationId): bool
     {
-        return $this->prices()->withoutGlobalScopes()
-            ->where('location_id', $locationId)->whereNull('tier_id')->where('active', true)->exists();
+        // A priced open batch at the sede (278), or the sede's base price row (the fallback).
+        return $this->batches()->withoutGlobalScopes()->where('location_id', $locationId)->where('status', BatchStatus::OPEN->value)
+            ->where(fn (Builder $q) => $q->whereNotNull('price_per_gram_cents')->orWhereNotNull('price_per_unit_cents'))->exists()
+            || $this->prices()->withoutGlobalScopes()
+                ->where('location_id', $locationId)->whereNull('tier_id')->where('active', true)->exists();
     }
 
     /** Has an active base price at ANY location (i.e. it can be dispensed somewhere). */
     public function hasAnyActivePrice(): bool
     {
-        return $this->prices()->withoutGlobalScopes()->whereNull('tier_id')->where('active', true)->exists();
+        // A priced batch counts (the price lives on the batch since prompt 278), as does a base price row.
+        return $this->batches()->withoutGlobalScopes()->where('status', BatchStatus::OPEN->value)
+            ->where(fn (Builder $q) => $q->whereNotNull('price_per_gram_cents')->orWhereNotNull('price_per_unit_cents'))->exists()
+            || $this->prices()->withoutGlobalScopes()->whereNull('tier_id')->where('active', true)->exists();
     }
 
     /** Has an OPEN batch with stock at this location (weight or units). */
@@ -177,11 +183,18 @@ class Genetic extends Model
      */
     public function scopeSellableAt(Builder $query, string $locationId): Builder
     {
+        // Prompt 278 — sellable = active AND priced here: an OPEN batch at the sede carrying its own price (the price
+        // lives on the batch now), or — the fallback — an active base price row for the strain at the sede.
         return $query->where('active', true)
-            ->whereHas('prices', fn (Builder $q) => $q->withoutGlobalScopes()
-                ->where('location_id', $locationId)
-                ->whereNull('tier_id')
-                ->where('active', true));
+            ->where(fn (Builder $priced) => $priced
+                ->whereHas('batches', fn (Builder $q) => $q->withoutGlobalScopes()
+                    ->where('location_id', $locationId)
+                    ->where('status', BatchStatus::OPEN->value)
+                    ->where(fn (Builder $p) => $p->whereNotNull('price_per_gram_cents')->orWhereNotNull('price_per_unit_cents')))
+                ->orWhereHas('prices', fn (Builder $q) => $q->withoutGlobalScopes()
+                    ->where('location_id', $locationId)
+                    ->whereNull('tier_id')
+                    ->where('active', true)));
     }
 
     /**

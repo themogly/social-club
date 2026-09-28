@@ -53,6 +53,15 @@ class MembershipTierForm
                     ->minValue(0)
                     ->step(0.01),
 
+                // Prompt 278 (owner decision 1a) — prices live on the batch, so a tier's price is a % DISCOUNT on any
+                // batch. It competes with the member's other discounts; the best single one applies.
+                TextInput::make('discount_pct')
+                    ->label(__('Descuento de la tarifa (%)'))
+                    ->helperText(__('Opcional. Se descuenta del precio de cualquier lote a los socios de esta tarifa; si tienen otro descuento, se aplica el mejor.'))
+                    ->numeric()
+                    ->minValue(0)
+                    ->maxValue(100),
+
                 Textarea::make('benefits')
                     ->label(__('Ventajas'))
                     ->columnSpanFull(),

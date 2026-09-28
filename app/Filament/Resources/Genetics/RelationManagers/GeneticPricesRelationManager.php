@@ -56,6 +56,9 @@ class GeneticPricesRelationManager extends RelationManager
         $perUnit = $this->genetic()->isUnitType();
 
         return $table
+            // Prompt 278 — the sale price lives on each BATCH now; this row is the sede's fallback for a batch without a
+            // price (and the per-sede low-stock alert). Said on the table so nobody prices here expecting it to win.
+            ->description(__('El precio lo lleva cada lote (Lotes ▸ Precio). Aquí: el precio de respaldo de la sede para lotes sin precio propio, y el aviso de stock bajo.'))
             // A genetic is org-wide, so show its prices across every sede the viewer works at (an owner: all of them) —
             // prompt 273: a manager used to see and edit every sede's rows.
             ->modifyQueryUsing(fn (Builder $query): Builder => $query->withoutGlobalScope(LocationScope::class)

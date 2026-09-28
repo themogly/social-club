@@ -2,7 +2,6 @@
 
 namespace App\Filament\Resources\Genetics\Pages;
 
-use App\Actions\Pricing\SaveGeneticPrice;
 use App\Actions\Stock\IntakeBatch;
 use App\Enums\CultivationType;
 use App\Enums\ProductTypeChoice;
@@ -35,7 +34,7 @@ use Illuminate\Support\Facades\DB;
  * the first was invisible at every counter until the other two were filled, with nothing saying so
  * (`sellableAt` needs active + a base price + stock; prompt 95). This is a Filament Wizard whose FINISH writes
  * all three THROUGH THE EXISTING SINGLE WRITERS, in one transaction: the genetic (active), the batch via
- * `IntakeBatch` (238's intake, the INTAKE movement, the ceiling checks), the price via `SaveGeneticPrice`. No
+ * `IntakeBatch` (238's intake, the INTAKE movement, the ceiling checks), with the price on that batch (278). No
  * rule is reimplemented — the flow composes them. All or nothing: a failure in any step rolls back the whole
  * strain, so a half-created genetic with no price never exists.
  *
@@ -113,7 +112,7 @@ class CreateGenetic extends CreateRecord
                 ]),
 
             Step::make(__('Precio'))
-                ->description(__('El precio en esa sede'))
+                ->description(__('El precio de este lote'))
                 ->schema([
                     TextInput::make('price_per_gram_eur')->label(__('Precio por gramo (€)'))->numeric()->minValue(0)->required()
                         ->visible(fn (Get $get): bool => ! self::isUnit($get('product_type')))
@@ -127,7 +126,8 @@ class CreateGenetic extends CreateRecord
                 ->description(__('Una foto (opcional)'))
                 ->schema([
                     // The tablet's camera directly: `capture` opens it on a phone; no photo means no image (193).
-                    FileUpload::make('images')->label(__('Foto'))->image()->disk('public')->multiple()
+                    FileUpload::make('images')->label(__('Foto'))->image()->disk('public')->directory('batches')->multiple()
+                        ->imageResizeMode('contain')->imageResizeTargetWidth('1200')->imageResizeTargetHeight('1200')
                         ->extraInputAttributes(['accept' => 'image/*', 'capture' => 'environment']),
                 ]),
         ];
@@ -135,8 +135,8 @@ class CreateGenetic extends CreateRecord
 
     /**
      * The finish — three writes, one transaction, all or nothing. The genetic first (its observer derives
-     * unit_type from product_type), then the batch through `IntakeBatch` and the price through
-     * `SaveGeneticPrice`. If the price write throws, the genetic and the batch roll back with it.
+     * unit_type from product_type), then the batch — carrying its own price and photo (278) — through `IntakeBatch`.
+     * If the batch write throws, the genetic rolls back with it.
      *
      * @param  array<string, mixed>  $data
      */
@@ -151,7 +151,6 @@ class CreateGenetic extends CreateRecord
                 'thc_bp' => filled($data['thc_pct'] ?? null) ? (int) round_half_up(((float) $data['thc_pct']) * 100) : null,
                 'cbd_bp' => filled($data['cbd_pct'] ?? null) ? (int) round_half_up(((float) $data['cbd_pct']) * 100) : null,
                 'grams_per_unit_cg' => filled($data['grams_per_unit_g'] ?? null) ? Weight::fromGrams($data['grams_per_unit_g'])->centigrams : null,
-                'images' => $data['images'] ?? [],
                 'active' => true,
                 'published' => true,
             ]);
@@ -159,18 +158,20 @@ class CreateGenetic extends CreateRecord
             /** @var Location $location */
             $location = Location::query()->findOrFail($data['location_id']);
 
+            // Prompt 278 (Ben's 271) — the price and the photo belong to THIS opening batch, not to the strain.
+            $priceCents = Money::fromEuros((string) ($genetic->isUnitType() ? ($data['price_per_unit_eur'] ?? 0) : ($data['price_per_gram_eur'] ?? 0)))->cents;
             $intake = [
                 'cost_per_gram_cents' => Money::fromEuros((string) ($data['cost_per_gram_eur'] ?? 0))->cents, // the one conversion (273)
                 'lab_report_path' => $data['lab_report_path'] ?? null,
+                'price_per_gram_cents' => $genetic->isUnitType() ? null : $priceCents,
+                'price_per_unit_cents' => $genetic->isUnitType() ? $priceCents : null,
+                'images' => array_values((array) ($data['images'] ?? [])),
             ];
             $genetic->isUnitType()
                 ? $intake['units'] = (int) ($data['units'] ?? 0)
                 : $intake['grams'] = $data['grams'];
 
             (new IntakeBatch)->handle($genetic, $location, $intake);
-
-            $priceEur = $genetic->isUnitType() ? ($data['price_per_unit_eur'] ?? 0) : ($data['price_per_gram_eur'] ?? 0);
-            (new SaveGeneticPrice)->handle($genetic, $location, null, Money::fromEuros((string) $priceEur)->cents);
 
             $this->createdSummary = $this->summarise($genetic, $location, $data);
 

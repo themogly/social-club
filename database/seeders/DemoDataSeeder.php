@@ -331,6 +331,8 @@ class DemoDataSeeder extends Seeder
                     'organisation_id' => $orgId, 'genetic_id' => $genetic->id, 'location_id' => $location->id,
                     'batch_no' => 'B-'.strtoupper(Str::random(6)), 'acquired_or_harvested_on' => now()->subDays(30),
                     'initial_cg' => $initial, 'remaining_cg' => 0, 'cost_per_gram_cents' => random_int(300, 600),
+                    // Prompt 278 — the sale price is the batch's; the strain's sede price row stays as the fallback.
+                    'price_per_gram_cents' => $pricePerGram, 'price_per_eighth_cents' => 2300,
                     'status' => BatchStatus::OPEN,
                 ]);
 

@@ -36,13 +36,37 @@ class AllocateFromBatches
      */
     public function handle(Genetic $genetic, Location $location, int $quantity): array
     {
+        return $this->plan($genetic, $location, $quantity, lock: true);
+    }
+
+    /**
+     * The same FEFO plan WITHOUT locking — for the counter's preview (prompt 278), which prices a line from the batches
+     * it will actually draw from, so a sale crossing into a differently priced lote is shown before commit. The commit
+     * re-plans under the lock; the preview only informs.
+     *
+     * @return list<array{batch: Batch, qty: int}>
+     *
+     * @throws StockUnavailableException
+     */
+    public function preview(Genetic $genetic, Location $location, int $quantity): array
+    {
+        return $this->plan($genetic, $location, $quantity, lock: false);
+    }
+
+    /**
+     * @return list<array{batch: Batch, qty: int}>
+     *
+     * @throws StockUnavailableException
+     */
+    private function plan(Genetic $genetic, Location $location, int $quantity, bool $lock): array
+    {
         $isUnit = $genetic->isUnitType();
 
         $batches = Batch::query()->withoutGlobalScopes()
             ->where('genetic_id', $genetic->id)
             ->where('location_id', $location->id)
             ->fefo($location->id)
-            ->lockForUpdate()
+            ->when($lock, fn ($q) => $q->lockForUpdate())
             ->get();
 
         $remaining = $quantity;

@@ -92,10 +92,14 @@ class PwaController extends Controller
                 // The counter still sees unpublished varieties: it is the staff's catalogue, not the menu.
                 ->published()
                 ->orderBy('name')
-                ->get()
+                ->get();
+            $resolver->preloadDisplayBatches($genetics, $location); // one pair of queries, not one per strain (273/278)
+            $genetics = $genetics
                 ->map(fn (Genetic $g): array => [
                     'genetic' => $g,
                     'price' => $resolver->forGenetic($g, $location, $member),
+                    // Prompt 278 — the photo of the batch to be dispensed next here, else the strain's, else none.
+                    'photo_url' => $resolver->photoUrl($g, $location),
                     // Prompt 185 — a STATE, never a quantity. Resolved per SEDE (the member's own), because a
                     // genetic in stock at Sede Norte and empty at Sede Centro must not read as available to
                     // someone walking into Centro. No gram figure is passed to the view at all, so none can

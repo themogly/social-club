@@ -75,10 +75,9 @@ class AddAStrainFlowTest extends TestCase
             ->where('stockable_type', Batch::class)->where('stockable_id', $batch->id)
             ->where('type', StockMovementType::INTAKE->value)->count());
 
-        // A base price at A (€8/g = 800 c).
-        $price = GeneticPrice::query()->withoutGlobalScopes()
-            ->where('genetic_id', $genetic->id)->where('location_id', $this->a->id)->whereNull('tier_id')->sole();
-        $this->assertSame(800, (int) $price->getRawOriginal('price_per_gram_cents'));
+        // Prompt 278 — the price (€8/g = 800 c) is on the opening BATCH, not a strain-level row.
+        $this->assertSame(800, $batch->fresh()->price_per_gram_cents);
+        $this->assertFalse(GeneticPrice::query()->withoutGlobalScopes()->where('genetic_id', $genetic->id)->exists());
 
         // Sellable at A immediately, and NOT at B.
         $this->assertTrue($genetic->fresh()->hasActivePriceAt($this->a->id) && $genetic->fresh()->hasStockAt($this->a->id));

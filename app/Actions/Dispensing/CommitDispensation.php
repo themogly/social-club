@@ -388,25 +388,19 @@ class CommitDispensation
                 $allocation = (new AllocateFromBatches)->handle($genetic, $location, $quantity);
             }
 
-            $price = $resolver->forGenetic($genetic, $location, $member);
+            // Prompt 278 — each part at ITS OWN batch's price (owner decision 2); the line is their sum.
+            $whole = $resolver->priceParts($genetic, $location, $member, $allocation, $units !== null);
 
-            if ($units !== null) {
-                $whole = $price->lineForUnits($units); // no eighth (weight only)
-                $rateFreeze = ['price_per_gram_cents' => null, 'price_per_unit_cents' => $whole['rate_cents']];
-                $eighthInput[] = ['grams_cg' => $grams, 'rate_cents' => 0, 'per_gram_total' => $whole['total_cents'], 'eighth_price' => null];
-            } else {
-                $whole = $price->lineFor($grams);
-                $rateFreeze = ['price_per_gram_cents' => $whole['rate_cents'], 'price_per_unit_cents' => null];
-                $eighthInput[] = ['grams_cg' => $grams, 'rate_cents' => $price->effectiveRatePerGramCents(), 'per_gram_total' => $whole['total_cents'], 'eighth_price' => $price->effectiveEighthPriceCents()];
-            }
+            $eighthInput[] = $units !== null
+                ? ['grams_cg' => $grams, 'rate_cents' => 0, 'per_gram_total' => $whole['total_cents'], 'eighth_price' => null]
+                : ['grams_cg' => $grams, 'rate_cents' => $whole['effective_rate_cents'], 'per_gram_total' => $whole['total_cents'], 'eighth_price' => $whole['eighth_price']];
 
             $priced[] = [
                 'genetic' => $genetic,
                 'is_unit' => $units !== null,
                 'quantity' => $quantity,          // total in the allocation unit
                 'discount_cents' => $whole['discount_cents'],
-                'rate_freeze' => $rateFreeze,
-                'allocation' => $allocation,
+                'parts' => $whole['parts'],       // per part: its batch, qty, rate, total and discount
             ];
         }
 
@@ -427,8 +421,11 @@ class CommitDispensation
             $lineDiscount = $p['discount_cents'];
             $pricingNote = $adjusted[$i]['eighth_applied'] ? __('Octavo (1/8)') : null;
             $qtyTotal = $p['quantity'];
-            $parts = $p['allocation'];
+            $parts = $p['parts'];
             $lastIndex = count($parts) - 1;
+            // Without an eighth break, every part keeps its OWN batch-priced total (278). An eighth break re-prices the
+            // line as a whole, so its total is then split by quantity as before (prompt 250).
+            $ownTotals = ! $adjusted[$i]['eighth_applied'];
 
             $allocatedTotal = 0;
             $allocatedDiscount = 0;
@@ -439,8 +436,10 @@ class CommitDispensation
                 $partQty = $part['qty'];
                 $isLast = $j === $lastIndex;
 
-                $partTotal = $isLast ? $lineTotal - $allocatedTotal : intdiv($lineTotal * $partQty, $qtyTotal);
-                $partDiscount = $isLast ? $lineDiscount - $allocatedDiscount : intdiv($lineDiscount * $partQty, $qtyTotal);
+                $partTotal = $ownTotals ? (int) $part['total_cents']
+                    : ($isLast ? $lineTotal - $allocatedTotal : intdiv($lineTotal * $partQty, $qtyTotal));
+                $partDiscount = $ownTotals ? (int) $part['discount_cents']
+                    : ($isLast ? $lineDiscount - $allocatedDiscount : intdiv($lineDiscount * $partQty, $qtyTotal));
                 $allocatedTotal += $partTotal;
                 $allocatedDiscount += $partDiscount;
 
@@ -463,7 +462,9 @@ class CommitDispensation
                     'pricing_note' => $pricingNote,
                     'genetic_name_snapshot' => $p['genetic']->name,
                     'batch_no_snapshot' => $batch->batch_no,
-                    ...$p['rate_freeze'],
+                    // The rate THIS part was charged at — its own batch's (278) — frozen with the row.
+                    'price_per_gram_cents' => $p['is_unit'] ? null : (int) $part['rate_cents'],
+                    'price_per_unit_cents' => $p['is_unit'] ? (int) $part['rate_cents'] : null,
                 ];
                 $total += $partTotal;
             }

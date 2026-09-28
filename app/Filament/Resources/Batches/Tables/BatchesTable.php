@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\Batches\Tables;
 
+use App\Actions\Pricing\SetBatchPrice;
 use App\Actions\Stock\RecordStockMovement;
 use App\Actions\Stock\TransferBatch;
 use App\Enums\BatchStatus;
@@ -9,6 +10,7 @@ use App\Enums\StockMovementType;
 use App\Models\Batch;
 use App\Models\Location;
 use App\Models\User;
+use App\Support\Money;
 use App\Support\Spreadsheet\ReportExport;
 use App\Support\Weight;
 use App\ViewModels\BatchRecall;
@@ -64,6 +66,12 @@ class BatchesTable
 
                         return number_format($record->remaining_cg->centigrams / 100, 2).' g';
                     }),
+                // Prompt 278 — the batch's own sale price ("—" = none yet: the strain's sede price applies, if any).
+                TextColumn::make('sale_price')
+                    ->label(__('Precio'))
+                    ->state(fn (Batch $record): string => ($rate = $record->isUnitType() ? $record->price_per_unit_cents : $record->price_per_gram_cents) !== null
+                        ? Money::fromCents((int) $rate)->formatted().($record->isUnitType() ? __('/ud') : __('/g'))
+                        : '—'),
                 TextColumn::make('status')
                     ->label(__('Estado'))
                     ->badge()
@@ -92,6 +100,7 @@ class BatchesTable
                 ActionGroup::make([
                     self::recallAction(),
                     self::transferAction(),
+                    self::priceAction(),
                     self::adjustAction(),
                     self::mermaAction(),
                     EditAction::make(),
@@ -194,6 +203,43 @@ class BatchesTable
                 } catch (InvalidArgumentException|RuntimeException|AuthorizationException $e) {
                     Notification::make()->title(__('No se pudo trasladar'))->body($e->getMessage())->danger()->send();
                 }
+            });
+    }
+
+    /** Precio (prompt 278) — change THIS batch's sale price; audited, gated on prices.manage, future sales only. */
+    protected static function priceAction(): Action
+    {
+        return Action::make('price')
+            ->label(__('Precio'))
+            ->icon(Heroicon::OutlinedCurrencyEuro)
+            ->visible(fn (): bool => Auth::user()?->can('prices.manage') ?? false)
+            ->fillForm(fn (Batch $record): array => [
+                'rate_eur' => ($record->isUnitType() ? $record->price_per_unit_cents : $record->price_per_gram_cents) !== null
+                    ? Money::fromCents((int) ($record->isUnitType() ? $record->price_per_unit_cents : $record->price_per_gram_cents))->euros() : null,
+                'eighth_eur' => $record->price_per_eighth_cents !== null ? Money::fromCents((int) $record->price_per_eighth_cents)->euros() : null,
+            ])
+            ->schema([
+                TextInput::make('rate_eur')
+                    ->label(fn (Batch $record): string => $record->isUnitType() ? __('Precio por unidad (€)') : __('Precio por gramo (€)'))
+                    ->numeric()->minValue(0)->required(),
+                TextInput::make('eighth_eur')
+                    ->label(__('Precio por octavo — 3,5 g (€)'))
+                    ->helperText(__('Opcional.'))
+                    ->numeric()->minValue(0)
+                    ->hidden(fn (Batch $record): bool => $record->isUnitType()),
+            ])
+            ->modalDescription(__('Cambia el precio de este lote. Solo afecta a las aportaciones a partir de ahora; queda en la auditoría.'))
+            ->modalSubmitActionLabel(__('Guardar precio'))
+            ->action(function (Batch $record, array $data): void {
+                $actor = Auth::user();
+                abort_unless($actor instanceof User, 403);
+                (new SetBatchPrice)->handle(
+                    $record,
+                    Money::fromEuros((string) $data['rate_eur'])->cents,
+                    filled($data['eighth_eur'] ?? null) ? Money::fromEuros((string) $data['eighth_eur'])->cents : null,
+                    $actor,
+                );
+                Notification::make()->title(__('Precio actualizado'))->success()->send();
             });
     }
 

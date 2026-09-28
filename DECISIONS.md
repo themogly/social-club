@@ -14596,3 +14596,45 @@ business-date expiry) the suite shows **two failures that are not this branch's 
 run between midnight and the sede's 06:00 cutoff, `BusinessDay::today()` is still yesterday, so the batch is not yet expired.
 Neither test touches the till. Left for 275's owner rather than fixed here (one prompt, one task); they pass after 06:00.
 MySQL left to CI. Not merged.
+
+## Prompt 278 (Ben's 271) — the price and the photos are set on the batch, not on the strain
+
+Numbering: Ben's "271" runs here as 278 (after his 270 → 277, which it relies on). His three owner decisions are built on
+the RECOMMENDED answers and listed in the owner report for him to overrule.
+
+- **The model.** `batches.price_per_gram_cents` (weight) / `price_per_unit_cents` (unit) / `price_per_eighth_cents` (the
+  3.5 g price, weight only — prompt 83's break now per batch) and `batches.images`. Required on the batch form and the
+  add-a-strain wizard (whose price and photo now land on the opening batch, not the strain); changed afterwards only by the
+  "Precio" action (`SetBatchPrice`: `prices.manage`, audited `batch.price.updated` from→to, future sales only — every line
+  froze its rate). **Decision 3: price per gram** (per unit for unit products).
+- **Resolving.** `ResolvePrice::forBatch()` prices grams from a batch; `forGenetic()` is the price of the batch to be
+  dispensed next at the sede (`displayBatch`: FEFO, else the latest priced open batch, so an empty-but-listed strain still
+  shows a price). `preloadDisplayBatches()` keeps the counter grid and the member menu at a fixed number of queries (273).
+- **Decision 2: a sale crossing batches prices each part at its own batch's price** (`priceParts`, shared by the counter's
+  preview and `CommitDispensation`, so shown = charged). Each part's row stores its own rate. The counter says so BEFORE
+  commit ("Parte a 8,00 €/g, 10,00 €/g", `data-split-note`), from a non-locking FEFO preview (`AllocateFromBatches::preview`).
+  If an eighth break applies to the line, the line is re-priced as a whole and split by quantity as before (250).
+- **Decision 1a: tier prices → a % discount.** `membership_tiers.discount_bp` ("Descuento de la tarifa (%)") is a discount
+  candidate on any batch price; the best single discount wins, as always. Tier price ROWS in `genetic_prices` apply only on
+  the fallback path below.
+- **The strain's sede price stays as the FALLBACK, deliberately** (not retired outright): a batch without its own price is
+  priced from `genetic_prices` as before. After the backfill that is only batches whose strain had no base price — which
+  therefore cannot be dispensed (the fallback finds nothing). It keeps every older path (fixtures, 69 test files, anything
+  unmigrated) working without guessing prices. The price table on a strain now says it is the fallback + the low-stock
+  alert; the "price every genetic at every sede" requirement is gone (a priced batch makes a strain sellable:
+  `sellableAt`, `hasActivePriceAt`, `hasAnyActivePrice`). Retiring the table fully is an owner call (report).
+- **Migration.** `BatchPriceBackfill` gives each existing batch its strain's BASE price at the batch's sede (and its eighth);
+  batches with none are logged (`batch-price-backfill` warning) and left unpriced — never guessed.
+- **Transfers (277).** A child batch inherits the parent's prices (editable per batch); its photos are the parent's until it
+  gets its own (`Batch::displayImages`, resolved through the parent — stored once, never copied).
+- **Photos.** Fallback order **batch (or its parent) → strain → neutral placeholder**, via `ResolvePrice::photoUrl()`: the
+  member menu shows the photo of the batch to be dispensed next (and moves to the next batch's when the first runs out); the
+  counter's list shows the same. Public disk (a product photo is not personal data) — covered by the storage/app backup, not
+  the DB backup. Uploads are resized client-side to ≤1200 px (Filament/FilePond) so the menu stays light; no server-side
+  thumbnail generation (would need an image library — noted, not added).
+- Also: the batch form's "no se puede mover luego" helper was false since 277 (now "se puede trasladar"); CreateBatch's
+  confirmation had the same "250 g → 25 g" rtrim bug 271 fixed in the wizard; its "no price at this sede" warning became
+  unreachable (a batch always carries a price) and was removed. Demo batches carry their own price.
+
+Tests: `BatchPriceAndPhotosTest` (10); `BatchNamesItsSedeTest` and `AddAStrainFlowTest` updated to the new rule. `composer
+check` green in `es` and `en`. Merged to `main` on Ben's instruction.

@@ -88,6 +88,9 @@ class FormCompletenessTest extends TestCase
             // location_id is now a required field on the form (prompt 238) — no longer scope-filled.
             'batch_no' => 'system: generated batch number.',
             'parent_batch_id' => 'system: set by TransferBatch on a part-transfer\'s child batch (prompt 277).',
+            'price_per_gram_cents' => 'entered as euros via sale_price_eur at intake; changed later by the audited Precio action (prompt 278).',
+            'price_per_unit_cents' => 'entered as euros via sale_price_eur at intake (unit products); changed later by the Precio action (278).',
+            'price_per_eighth_cents' => 'entered as euros via price_per_eighth_eur at intake; changed later by the Precio action (278).',
             'initial_cg' => 'entered as grams; converted on intake by IntakeBatch (WEIGHT genetics).',
             'remaining_cg' => 'system-computed: maintained by the stock-movement ledger.',
             'initial_units' => 'entered as units; recorded on intake by IntakeBatch (UNIT genetics).',
@@ -165,6 +168,7 @@ class FormCompletenessTest extends TestCase
             'default_fee_cents' => 'entered as euros via default_fee_eur.',
             'daily_limit_cg' => 'entered as grams via daily_limit_g.',
             'monthly_limit_cg' => 'entered as grams via monthly_limit_g.',
+            'discount_bp' => 'entered as a percentage via discount_pct (prompt 278).',
         ],
         MinuteResource::class => [
             'number' => 'system: sequential per (organisation, book), assigned under a row lock.',

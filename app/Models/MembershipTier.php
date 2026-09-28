@@ -20,7 +20,7 @@ class MembershipTier extends Model
 
     protected $fillable = [
         'organisation_id', 'name', 'default_fee_cents', 'default_period',
-        'daily_limit_cg', 'monthly_limit_cg', 'benefits', 'active',
+        'daily_limit_cg', 'monthly_limit_cg', 'discount_bp', 'benefits', 'active',
     ];
 
     protected function casts(): array
@@ -30,6 +30,7 @@ class MembershipTier extends Model
             'default_period' => MembershipPeriod::class,
             'daily_limit_cg' => 'integer',
             'monthly_limit_cg' => 'integer',
+            'discount_bp' => 'integer', // prompt 278 — the tier's price as a % discount on any batch (basis points)
             'active' => 'boolean',
         ];
     }
