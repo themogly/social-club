@@ -83,14 +83,14 @@ class Help
         MembershipTier::class => ['heading' => 'Sin cuotas de socio', 'description' => 'Una cuota (tarifa) define el importe y periodicidad de la aportación de socio. Crea la primera para poder enrolar socios.'],
         Genetic::class => ['heading' => 'Sin genéticas', 'description' => 'Una genética es la definición de una variedad. Para dispensarla necesitará además un precio por sede y un lote con stock.'],
         Batch::class => ['heading' => 'Sin lotes', 'description' => 'Un lote es stock real de una genética en una sede, con su número, fecha y peso. Registra una compra o una entrada para crear el primero.'],
-        Article::class => ['heading' => 'Sin artículos', 'description' => 'Los artículos son productos de barra y tienda (bebidas, comida, merch), contados por unidades. Crea el primero para venderlo en la barra.'],
+        Article::class => ['heading' => 'Sin productos', 'description' => 'Los productos de barra y tienda son bebidas, comida y merch, contados por unidades. Crea el primero para venderlo en la barra.'],
         Discount::class => ['heading' => 'Sin descuentos', 'description' => 'Los descuentos reducen la aportación de determinados socios (p. ej. terapéuticos). Se aplican en el mostrador automáticamente.'],
         Dispensation::class => ['heading' => 'Sin dispensaciones', 'description' => 'Las dispensaciones (aportaciones por peso) se registran en el mostrador. Esta pantalla es solo de consulta.'],
         Order::class => ['heading' => 'Sin ventas de barra', 'description' => 'Las ventas de barra y tienda se registran en el TPV de barra. Esta pantalla es solo de consulta.'],
         Expense::class => ['heading' => 'Sin gastos', 'description' => 'Los gastos registran salidas de dinero (caja chica y generales). Registra el primero para que cuadren las cuentas.'],
         ExpenseCategory::class => ['heading' => 'Sin categorías de gasto', 'description' => 'Las categorías agrupan los gastos para los informes. Crea las que use el club (alquiler, suministros, etc.).'],
         Purchase::class => ['heading' => 'Sin compras', 'description' => 'Una compra registra la entrada de stock de un proveedor y su coste. Genera el lote y su coste por gramo.'],
-        Supplier::class => ['heading' => 'Sin proveedores', 'description' => 'Los proveedores son de quienes el club adquiere género o artículos. Crea el primero para registrar compras.'],
+        Supplier::class => ['heading' => 'Sin proveedores', 'description' => 'Los proveedores son de quienes el club adquiere género o productos. Crea el primero para registrar compras.'],
         TillSession::class => ['heading' => 'Sin cajas', 'description' => 'Las sesiones de caja se abren y cierran en el terminal del mostrador. Esta pantalla es solo de supervisión.'],
         Location::class => ['heading' => 'Sin sedes', 'description' => 'Una sede es un local del club, con su propio stock, caja y aforo. Crea la primera para empezar a operar.'],
         User::class => ['heading' => 'Sin usuarios', 'description' => 'Los usuarios son el personal con acceso. Cada uno necesita un rol y una o varias sedes; sin rol no puede entrar al panel.'],
@@ -151,8 +151,8 @@ class Help
             'Cada lote es stock real de una genética en una sede. El stock se mueve siempre por el registro de movimientos, nunca a mano.',
             'Consecuencias: poner un lote en cuarentena o cerrarlo lo retira del mostrador. La retirada muestra quién recibió producto de un lote.',
         ]],
-        Article::class => ['permission' => 'articles.manage', 'title' => 'Artículos', 'body' => [
-            'Los artículos de barra y tienda (bebidas, comida, merch) y las unidades como prerolls o comestibles. Se dispensan o venden por unidad.',
+        Article::class => ['permission' => 'articles.manage', 'title' => 'Productos', 'body' => [
+            'Los productos de barra y tienda (bebidas, comida, merch) y las unidades como prerolls o comestibles. Se dispensan o venden por unidad.',
             'El ingreso de barra y tienda va a un libro aparte, nunca a la contabilidad de la asociación; una genética nunca aparece aquí.',
         ]],
         Discount::class => ['permission' => 'discounts.manage', 'title' => 'Descuentos', 'body' => [

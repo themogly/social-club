@@ -115,10 +115,11 @@ class AddAStrainFlowTest extends TestCase
     {
         $src = (string) file_get_contents(app_path('Filament/Resources/Genetics/Pages/CreateGenetic.php'));
 
+        // Prompt 295 — the rear camera is one tap (Hacer foto), beside Elegir archivo; the picker no longer forces it.
         $this->assertMatchesRegularExpression(
-            "/make\('images'\)[\s\S]*?'capture'\s*=>\s*'environment'/",
+            "/CameraOrFile::field\(FileUpload::make\('images'\)[\s\S]*?camera: 'environment'/",
             $src,
-            'the photo step must carry the rear-camera hint',
+            'the photo step must offer the rear camera',
         );
     }
 

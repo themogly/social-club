@@ -93,7 +93,7 @@ class BarPosScreenTest extends TestCase
         Livewire::test(BarPos::class)
             ->assertOk()
             ->assertSet('noLocation', false)
-            ->assertSee(__('Artículos'))
+            ->assertSee(__('Productos'))
             ->assertSee('Agua con gas'); // the article grid lists the sede's active article
     }
 

@@ -27,7 +27,7 @@ class BarSalesRenameTest extends TestCase
         $org = Organisation::factory()->create();
         app(ActiveScope::class)->setOrganisation($org->id);
 
-        $this->assertSame('Barra y tienda por artículo', (new BarSalesReport($org->id, null, Period::thisMonth()))->title());
+        $this->assertSame('Barra y tienda por producto', (new BarSalesReport($org->id, null, Period::thisMonth()))->title());
         $this->assertSame('Barra y tienda', BarSalesReportPage::getNavigationLabel());
     }
 

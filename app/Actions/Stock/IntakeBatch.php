@@ -11,6 +11,7 @@ use App\Models\Genetic;
 use App\Models\Location;
 use App\Models\StockMovement;
 use App\Models\User;
+use App\Support\BelowCost;
 use App\Support\Settings;
 use App\Support\StockCeiling;
 use App\Support\Weight;
@@ -90,6 +91,8 @@ class IntakeBatch
                 'initial_cg' => $cg,
                 'initial_units' => $units,
                 'cost_per_gram_cents' => (int) ($data['cost_per_gram_cents'] ?? 0),
+                // Prompt 295 — received at a sale price below its cost (a warning the owner confirmed, never a block).
+                'below_cost' => BelowCost::forBatch($batch) !== [] ? true : null,
             ], fn ($v): bool => $v !== null));
 
             // A ceiling override is its OWN audit row — a reasoned, permissioned breach of a compliance limit.

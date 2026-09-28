@@ -143,7 +143,7 @@
                     {{-- Prompt 176: wraps rather than clips. At 820 portrait the selection pane is ~470px
                          and title + view toggle + search + manual-line did not fit on one row. --}}
                     <div class="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-                        <h2 class="text-base font-semibold">{{ __('Artículos') }}</h2>
+                        <h2 class="text-base font-semibold">{{ __('Productos') }}</h2>
                         {{-- List / grid / large. GRID is the default for articles — a name and a price fit a tile. --}}
                         <div role="group" aria-label="{{ __('Vista') }}" class="flex w-fit shrink-0 gap-1 self-start rounded-xl border border-line p-1 dark:border-slate-700">
                             @foreach ([['list', __('Lista'), 'list'], ['grid', __('Cuadrícula'), 'grid'], ['large', __('Grande'), 'large']] as [$mode, $label, $glyph])
@@ -166,9 +166,9 @@
                                 type="text"
                                 data-view-only
                                 x-model="search.bar"
-                                aria-label="{{ __('Buscar artículo…') }}"
+                                aria-label="{{ __('Buscar producto…') }}"
                                 autocomplete="off"
-                                placeholder="{{ __('Buscar artículo…') }}"
+                                placeholder="{{ __('Buscar producto…') }}"
                                 class="h-11 w-full min-w-0 rounded-xl border border-line bg-surface px-4 text-sm text-ink placeholder:text-ink-muted focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/40 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 sm:w-48"
                             >
                             <button type="button" @click="openMisc()" data-misc-open class="inline-flex h-11 shrink-0 items-center gap-1 rounded-xl border border-brand/40 bg-brand-tint/40 px-3 text-sm font-semibold text-brand transition hover:bg-brand-tint dark:border-brand/40 dark:bg-slate-800 dark:text-slate-100 dark:hover:bg-slate-700">
@@ -216,9 +216,9 @@
                         @endforeach
                     </div>
                     @if (empty($cat['articles']))
-                        <p class="mt-4 rounded-xl border border-dashed border-line px-4 py-8 text-center text-sm text-ink-muted dark:border-slate-700 dark:text-slate-400">{{ __('No hay artículos activos en esta sede.') }}</p>
+                        <p class="mt-4 rounded-xl border border-dashed border-line px-4 py-8 text-center text-sm text-ink-muted dark:border-slate-700 dark:text-slate-400">{{ __('No hay productos activos en esta sede.') }}</p>
                     @else
-                        <p x-show="! anyVisible('bar')" x-cloak class="mt-4 rounded-xl border border-dashed border-line px-4 py-8 text-center text-sm text-ink-muted dark:border-slate-700 dark:text-slate-400">{{ __('Ningún artículo coincide con la búsqueda.') }}</p>
+                        <p x-show="! anyVisible('bar')" x-cloak class="mt-4 rounded-xl border border-dashed border-line px-4 py-8 text-center text-sm text-ink-muted dark:border-slate-700 dark:text-slate-400">{{ __('Ningún producto coincide con la búsqueda.') }}</p>
                     @endif
                 </section>
                 @endisland
@@ -247,7 +247,7 @@
                             <div>
                                 <label for="misc-ref" class="block text-xs font-medium text-ink-muted dark:text-slate-400">{{ __('Motivo') }}</label>
                                 <div class="mt-1 flex flex-wrap gap-1.5">
-                                    @foreach ([__('Artículo sin dar de alta'), __('Precio especial'), __('Evento')] as $reason)
+                                    @foreach ([__('Producto sin dar de alta'), __('Precio especial'), __('Evento')] as $reason)
                                         <button type="button" @click="$wire.set('miscReference', @js($reason))" class="min-h-11 rounded-full border border-line px-3 py-1.5 text-sm text-ink transition hover:bg-surface-alt dark:border-slate-700 dark:text-slate-100 dark:hover:bg-slate-800">{{ $reason }}</button>
                                     @endforeach
                                 </div>
@@ -354,7 +354,7 @@
                                 </div>
                             </li>
                         @empty
-                            <li class="py-6 text-center text-sm text-ink-muted dark:text-slate-400">{{ __('Cesta vacía. Toca un artículo para añadirlo.') }}</li>
+                            <li class="py-6 text-center text-sm text-ink-muted dark:text-slate-400">{{ __('Cesta vacía. Toca un producto para añadirlo.') }}</li>
                         @endforelse
                     </ul>
 

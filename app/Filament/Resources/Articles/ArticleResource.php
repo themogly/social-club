@@ -26,7 +26,7 @@ class ArticleResource extends Resource
 
     public static function getNavigationLabel(): string
     {
-        return __('Artículos'); // under "Barra y tienda" — "(bar)" hid the shop (prompt 273)
+        return __('Productos'); // under "Barra y tienda" — "(bar)" hid the shop (prompt 273)
     }
 
     public static function getNavigationGroup(): ?string
@@ -36,12 +36,12 @@ class ArticleResource extends Resource
 
     public static function getModelLabel(): string
     {
-        return __('artículo');
+        return __('producto');
     }
 
     public static function getPluralModelLabel(): string
     {
-        return __('artículos');
+        return __('productos');
     }
 
     public static function form(Schema $schema): Schema

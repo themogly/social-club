@@ -5,6 +5,7 @@ namespace App\Filament\Resources\Members\Schemas;
 use App\Actions\Members\IssueDocumentUrl;
 use App\Enums\IdDocumentType;
 use App\Enums\MemberDocumentType;
+use App\Filament\Forms\CameraOrFile;
 use App\Models\Member;
 use App\Models\User;
 use App\Rules\AvaladorWithinSponseeCap;
@@ -91,7 +92,7 @@ class MemberForm
                             ->label(__('Número de documento'))
                             ->maxLength(255),
 
-                        FileUpload::make('document_scan_path')
+                        CameraOrFile::field(FileUpload::make('document_scan_path')
                             ->label(__('Escaneo del documento'))
                             ->disk('documents')
                             ->getUploadedFileUsing(DocumentUpload::withoutDirectUrl())
@@ -103,7 +104,7 @@ class MemberForm
                             ->previewable(false)
                             ->helperText(DocumentUpload::helperText(__('PDF o imagen. Se guarda cifrado y solo se puede ver mediante un enlace firmado y registrado.')))
                             ->hintAction(self::viewScanAction('id', MemberDocumentType::ID))
-                            ->columnSpanFull(),
+                            ->columnSpanFull(), camera: 'environment', accept: 'image/*,application/pdf'),
                     ])
                     ->columns(2),
 
@@ -151,7 +152,7 @@ class MemberForm
                         // its own vocabulary and the declaration-drift flag can fire. Set at registration via
                         // the same action (the field is nullable until first declared).
 
-                        FileUpload::make('medical_cert_path')
+                        CameraOrFile::field(FileUpload::make('medical_cert_path')
                             ->label(__('Certificado médico'))
                             ->visible(fn (Get $get): bool => (bool) $get('is_therapeutic'))
                             ->disk('documents')
@@ -164,13 +165,13 @@ class MemberForm
                             ->previewable(false)
                             ->helperText(DocumentUpload::helperText(__('Solo socios terapéuticos. PDF o imagen; mismo tratamiento seguro que el escaneo del documento.')))
                             ->hintAction(self::viewScanAction('medical', MemberDocumentType::MEDICAL))
-                            ->columnSpanFull(),
+                            ->columnSpanFull(), camera: 'environment', accept: 'image/*,application/pdf'),
                     ])
                     ->columns(2),
 
                 Section::make(__('Fotografía'))
                     ->schema([
-                        FileUpload::make('photo_path')
+                        CameraOrFile::field(FileUpload::make('photo_path')
                             ->label(__('Foto'))
                             ->image()
                             ->disk('documents')
@@ -182,7 +183,7 @@ class MemberForm
                             ->saveUploadedFileUsing(fn (TemporaryUploadedFile $file): string => DocumentVault::storeUpload($file, 'member-photos'))
                             ->maxSize(DocumentUpload::maxKilobytes())
                             ->previewable(false)
-                            ->helperText(DocumentUpload::helperText(__('Se guarda cifrada y solo se puede ver mediante un enlace firmado y registrado.'))),
+                            ->helperText(DocumentUpload::helperText(__('Se guarda cifrada y solo se puede ver mediante un enlace firmado y registrado.'))), camera: 'user'),
                     ]),
 
                 Section::make(__('Declaraciones'))

@@ -84,7 +84,7 @@ await step('bar: category filter (view only)', async () => { await page.locator(
 await step('bar: add article', async () => { await page.locator('[data-catalogue-item="bar"]:not([disabled]):visible').first().click(); });
 await step('bar: +1', async () => { await page.locator('[wire\\:click^="incrementLine"]').first().click(); });
 await step('bar: -1', async () => { await page.locator('[wire\\:click^="decrementLine"]').first().click(); });
-await step('bar: type article search (view only)', async () => { await page.locator('input[aria-label="Buscar artículo…"]').pressSequentially('Agu', { delay: 120 }); });
+await step('bar: type article search (view only)', async () => { await page.locator('input[aria-label="Buscar producto…"]').pressSequentially('Agu', { delay: 120 }); });
 
 // --- Recepción / Socios / Caja: load and idle
 await step('checkin: load', async () => { await page.goto(`${BASE}/counter/checkin`, { waitUntil: 'networkidle' }); });

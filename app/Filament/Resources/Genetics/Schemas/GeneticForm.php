@@ -7,6 +7,7 @@ use App\Enums\ConcentrateSubtype;
 use App\Enums\CultivationType;
 use App\Enums\ProductType;
 use App\Enums\StrainType;
+use App\Filament\Forms\CameraOrFile;
 use App\Models\Category;
 use App\Rules\GramAmount;
 use Filament\Forms\Components\FileUpload;
@@ -128,12 +129,12 @@ class GeneticForm
 
                 Section::make(__('Imágenes'))
                     ->schema([
-                        FileUpload::make('images')
+                        CameraOrFile::field(FileUpload::make('images')
                             ->label(__('Imágenes'))
                             ->image()
                             ->imageEditor()
                             ->disk('public')
-                            ->multiple(),
+                            ->multiple(), camera: 'environment'),
                     ]),
 
                 Section::make(__('Publicación'))

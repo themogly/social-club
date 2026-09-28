@@ -186,12 +186,12 @@ class WizardParityWithAdminFormTest extends TestCase
         $wizard = (string) file_get_contents(resource_path('views/livewire/counter/partials/alta-staff-form.blade.php'));
         $online = (string) file_get_contents(resource_path('views/socio/application.blade.php'));
 
-        // The wizard: face = front camera, document + certificate = rear camera.
-        $this->assertMatchesRegularExpression('/data-alta-photo[^>]*capture="user"|capture="user"[^>]*data-alta-photo/', $wizard);
-        $this->assertMatchesRegularExpression('/data-alta-scan[^>]*capture="environment"|capture="environment"[^>]*data-alta-scan/', $wizard);
-        $this->assertMatchesRegularExpression('/data-alta-medical-cert[^>]*capture="environment"|capture="environment"[^>]*data-alta-medical-cert/', $wizard);
+        // The wizard: face = front camera, document + certificate = rear camera — on each field's Hacer foto (295).
+        $this->assertMatchesRegularExpression('/id="alta-photo"[^>]*camera="user"[^>]*data-alta-photo/', $wizard);
+        $this->assertMatchesRegularExpression('/id="alta-scan"[^>]*camera="environment"[^>]*data-alta-scan/', $wizard);
+        $this->assertMatchesRegularExpression('/id="alta-medical-cert"[^>]*camera="environment"[^>]*data-alta-medical-cert/', $wizard);
 
         // The online applicant form: the photo opens the front camera on a phone.
-        $this->assertMatchesRegularExpression('/id="photo"[^>]*capture="user"/', $online);
+        $this->assertMatchesRegularExpression('/id="photo"[^>]*camera="user"/', $online);
     }
 }

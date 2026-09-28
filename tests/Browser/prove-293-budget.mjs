@@ -85,8 +85,8 @@ await measure('pos: remove line', () => page.locator('[wire\\:click^="removeLine
 // --- Barra ------------------------------------------------------------------------------------------------------
 await open('/counter/bar');
 console.log(`INFO bar screen at ${page.url()}`);
-await measure('bar: article search', () => page.locator('input[aria-label="Buscar artículo…"]').first().pressSequentially('Art', { delay: 60 }), { server: false });
-await measure('bar: clear article search', () => page.locator('input[aria-label="Buscar artículo…"]').first().fill(''), { server: false });
+await measure('bar: article search', () => page.locator('input[aria-label="Buscar producto…"]').first().pressSequentially('Art', { delay: 60 }), { server: false });
+await measure('bar: clear article search', () => page.locator('input[aria-label="Buscar producto…"]').first().fill(''), { server: false });
 await measure('bar: grid layout', () => page.click('[data-layout-option="grid"]'), { server: false });
 await measure('bar: list layout', () => page.click('[data-layout-option="list"]'), { server: false });
 await measure('bar: category filter', () => page.locator('button[data-view-only][aria-pressed="false"]:not([data-layout-option]):visible').first().click(), { server: false });

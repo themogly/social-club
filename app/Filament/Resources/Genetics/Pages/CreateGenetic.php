@@ -8,11 +8,14 @@ use App\Enums\CultivationType;
 use App\Enums\ProductType;
 use App\Enums\StrainType;
 use App\Enums\UnitType;
+use App\Filament\Concerns\WarnsBelowCost;
+use App\Filament\Forms\CameraOrFile;
 use App\Filament\Resources\Genetics\GeneticResource;
 use App\Models\Genetic;
 use App\Models\Location;
 use App\Rules\GramAmount;
 use App\Support\ActiveScope;
+use App\Support\BelowCost;
 use App\Support\DocumentUpload;
 use App\Support\Money;
 use App\Support\Weight;
@@ -43,7 +46,10 @@ use Illuminate\Support\Facades\DB;
  */
 class CreateGenetic extends CreateRecord
 {
-    use HasWizard;
+    use HasWizard, WarnsBelowCost;
+
+    /** The *Precio* step's index: leaving it asks about a price below cost (295). */
+    private const PRICE_STEP = 4;
 
     protected static string $resource = GeneticResource::class;
 
@@ -94,10 +100,10 @@ class CreateGenetic extends CreateRecord
                         ->visible(fn (Get $get): bool => self::isUnit($get('product_type')))
                         ->required(fn (Get $get): bool => self::isUnit($get('product_type'))),
                     TextInput::make('cost_per_gram_eur')->label(__('Coste por gramo (€)'))->numeric()->minValue(0),
-                    FileUpload::make('lab_report_path')->label(__('Informe de laboratorio'))
+                    CameraOrFile::field(FileUpload::make('lab_report_path')->label(__('Informe de laboratorio'))
                         ->disk('documents')->getUploadedFileUsing(DocumentUpload::withoutDirectUrl())
                         ->visibility('private')->maxSize(DocumentUpload::maxKilobytes())
-                        ->helperText(DocumentUpload::helperText()),
+                        ->helperText(DocumentUpload::helperText()), camera: 'environment', accept: 'image/*,application/pdf'),
                 ])->columns(2),
 
             Step::make(__('Sede'))
@@ -114,6 +120,8 @@ class CreateGenetic extends CreateRecord
 
             Step::make(__('Precio'))
                 ->description(__('El precio de este lote'))
+                // Prompt 295 — the cost came two steps earlier, so leaving this step is where a price below it is caught.
+                ->afterValidation(fn () => $this->askIfBelowCost(self::PRICE_STEP))
                 ->schema([
                     TextInput::make('price_per_gram_eur')->label(__('Precio por gramo (€)'))->numeric()->minValue(0)->required()
                         ->visible(fn (Get $get): bool => ! self::isUnit($get('product_type')))
@@ -126,12 +134,31 @@ class CreateGenetic extends CreateRecord
             Step::make(__('Foto'))
                 ->description(__('Una foto (opcional)'))
                 ->schema([
-                    // The tablet's camera directly: `capture` opens it on a phone; no photo means no image (193).
-                    FileUpload::make('images')->label(__('Foto'))->image()->disk('public')->directory('batches')->multiple()
-                        ->imageResizeMode('contain')->imageResizeTargetWidth('1200')->imageResizeTargetHeight('1200')
-                        ->extraInputAttributes(['accept' => 'image/*', 'capture' => 'environment']),
+                    // Hacer foto (the back camera) or Elegir archivo (295); no photo means no image (193).
+                    CameraOrFile::field(FileUpload::make('images')->label(__('Foto'))->image()->disk('public')->directory('batches')->multiple()
+                        ->imageResizeMode('contain')->imageResizeTargetWidth('1200')->imageResizeTargetHeight('1200'), camera: 'environment'),
                 ]),
         ];
+    }
+
+    /** @return list<array{field: string, price_cents: int, cost_cents: int, line: string}> */
+    protected function belowCostOffences(): array
+    {
+        $unit = self::isUnit($this->data['product_type'] ?? null);
+
+        return BelowCost::offences(
+            self::typedCents($this->data['cost_per_gram_eur'] ?? null),
+            $unit ? null : self::typedCents($this->data['price_per_gram_eur'] ?? null),
+            $unit ? self::typedCents($this->data['price_per_unit_eur'] ?? null) : null,
+            null,
+            $unit && filled($this->data['grams_per_unit_g'] ?? null) && is_numeric($this->data['grams_per_unit_g'])
+                ? Weight::fromGrams($this->data['grams_per_unit_g'])->centigrams : null,
+        );
+    }
+
+    protected function belowCostField(string $offence): string
+    {
+        return $offence === 'per_unit' ? 'price_per_unit_eur' : 'price_per_gram_eur';
     }
 
     /**
@@ -183,9 +210,10 @@ class CreateGenetic extends CreateRecord
 
     private string $createdSummary = '';
 
+    /** Back to the strains list (prompt 295, Shane) — the created notification carries the summary there. */
     protected function getRedirectUrl(): string
     {
-        return GeneticResource::getUrl('edit', ['record' => $this->getRecord()]);
+        return GeneticResource::getUrl('index');
     }
 
     /** The outcome the tester was missing: what is in stock, at what price, and that it is visible NOW. */

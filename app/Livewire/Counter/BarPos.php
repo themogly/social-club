@@ -239,7 +239,7 @@ class BarPos extends Component
         $article = Article::query()->where('location_id', $location->id)->active()->find($articleId);
 
         if ($article === null) {
-            $this->flash(__('Artículo no disponible.'), 'error');
+            $this->flash(__('Producto no disponible.'), 'error');
 
             return;
         }
@@ -475,7 +475,7 @@ class BarPos extends Component
 
             return;
         } catch (ModelNotFoundException) {
-            $this->flash(__('Algún artículo ya no está disponible.'), 'error');
+            $this->flash(__('Algún producto ya no está disponible.'), 'error');
 
             return;
         } catch (RuntimeException) {

@@ -25,7 +25,7 @@ class BarSalesReport extends AbstractReport
 
     public function title(): string
     {
-        return __('Barra y tienda por artículo');
+        return __('Barra y tienda por producto');
     }
 
     protected function build(): array
@@ -99,7 +99,7 @@ class BarSalesReport extends AbstractReport
             'importe' => array_sum(array_column($rows, 'importe')),
         ];
 
-        $columns = [ReportColumn::text('articulo', __('Artículo'), sortable: false)];
+        $columns = [ReportColumn::text('articulo', __('Producto'), sortable: false)];
         if ($showSede) {
             $columns[] = ReportColumn::text('sede', __('Sede'), sortable: false);
         }
@@ -108,12 +108,12 @@ class BarSalesReport extends AbstractReport
 
         return new ReportTable(
             key: 'articulos',
-            title: __('Barra y tienda por artículo'),
+            title: __('Barra y tienda por producto'),
             columns: $columns,
             rows: $rows,
             totals: $totals,
             empty: __('Sin ventas de barra en este período'),
-            emptyHint: __('Cuando se registren ventas en la barra aparecerán aquí, por artículo.'),
+            emptyHint: __('Cuando se registren ventas en la barra aparecerán aquí, por producto.'),
             defaultSort: 'importe',
             defaultSortDir: 'desc',
             sortable: true,

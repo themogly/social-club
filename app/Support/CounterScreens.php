@@ -37,7 +37,7 @@ class CounterScreens
             'counter.checkin' => __('Identifica al socio y registra su entrada'),
             'counter.members' => __('Ficha, cuota y alta de socios'),
             'counter.pos' => __('Dispensa por peso y registra la aportación'),
-            'counter.bar' => __('Cobra bebidas y artículos'),
+            'counter.bar' => __('Cobra bebidas y productos'),
             'counter.till' => __('Abre, arquea y cierra la caja'),
             default => '',
         };

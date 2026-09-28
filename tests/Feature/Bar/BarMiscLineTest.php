@@ -83,7 +83,7 @@ class BarMiscLineTest extends TestCase
         Livewire::test(BarPos::class)
             ->set('miscDescription', 'Café')
             ->set('miscAmount', '2,00')
-            ->set('miscReference', __('Artículo sin dar de alta'))
+            ->set('miscReference', __('Producto sin dar de alta'))
             ->call('addMiscLine')
             ->assertHasNoErrors()
             ->set('cashTendered', '2')
@@ -94,7 +94,7 @@ class BarMiscLineTest extends TestCase
         $item = collect($order->items)->firstWhere('name', 'Café');
         $this->assertNotNull($item);
         $this->assertNull($item['article_id']);                                  // off-catalogue → distinguishable
-        $this->assertSame(__('Artículo sin dar de alta'), $item['reference']);   // the reason travels onto the order
+        $this->assertSame(__('Producto sin dar de alta'), $item['reference']);   // the reason travels onto the order
         $this->assertSame(200, $order->total_cents->cents);
         $this->assertSame(10, $article->refresh()->stock);                        // a manual line moves NO stock
     }

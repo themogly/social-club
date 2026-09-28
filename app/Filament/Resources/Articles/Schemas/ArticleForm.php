@@ -2,7 +2,7 @@
 
 namespace App\Filament\Resources\Articles\Schemas;
 
-use App\Enums\CategoryAppliesTo;
+use App\Filament\Forms\CameraOrFile;
 use App\Models\Location;
 use App\Support\ActiveScope;
 use Filament\Forms\Components\FileUpload;
@@ -11,7 +11,6 @@ use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Schema;
-use Illuminate\Database\Eloquent\Builder;
 
 class ArticleForm
 {
@@ -19,7 +18,7 @@ class ArticleForm
     {
         return $schema
             ->components([
-                Section::make(__('Artículo'))
+                Section::make(__('Producto'))
                     ->schema([
                         // WHERE the article is sold (prompt 294, the same field as BatchForm's — prompt 238). Stock always
                         // belongs to a sede, so the form must NAME it rather than inherit an invisible scope: in the "Todas
@@ -43,15 +42,9 @@ class ArticleForm
                             ->required()
                             ->maxLength(255),
 
-                        Select::make('category_id')
-                            ->label(__('Categoría'))
-                            ->relationship(
-                                'category',
-                                'name',
-                                modifyQueryUsing: fn (Builder $query): Builder => $query->where('applies_to', CategoryAppliesTo::ARTICLE->value),
-                            )
-                            ->searchable()
-                            ->preload(),
+                        // No *Categoría* (prompt 295, Shane): nothing in the app can create a product category — only the demo
+                        // seeder does — so on a live club the drop-down was always empty. The `category_id` column and any
+                        // existing values stay; grouping bar products would be a small resource of its own.
 
                         // The model stores integer cents in price_cents; the pages
                         // convert euros ↔ cents (mutate hooks on Create/Edit).
@@ -79,12 +72,12 @@ class ArticleForm
 
                 Section::make(__('Imágenes'))
                     ->schema([
-                        FileUpload::make('images')
+                        CameraOrFile::field(FileUpload::make('images')
                             ->label(__('Imágenes'))
                             ->image()
                             ->imageEditor()
                             ->disk('public')
-                            ->multiple(),
+                            ->multiple(), camera: 'environment'),
                     ]),
 
                 Toggle::make('active')

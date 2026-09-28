@@ -11,6 +11,7 @@
 // on the first click, so loading this early costs a few kilobytes and no engine.
 import './mrz-reader.js';
 import { catalogueShows } from './catalogue-search.js';
+import './photo-buttons.js';
 
 // Counter camera QR scanner (prompt 35) — a progressive enhancement registered on Alpine
 // (which Livewire ships). Uses the native BarcodeDetector where available (Chrome/Edge/

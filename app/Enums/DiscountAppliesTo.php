@@ -14,7 +14,7 @@ enum DiscountAppliesTo: string implements HasLabel
     {
         return match ($this) {
             self::GENETIC => __('Genéticas'),
-            self::ARTICLE => __('Artículos'),
+            self::ARTICLE => __('Productos'),
             self::BOTH => __('Ambos'),
         };
     }

@@ -27,7 +27,7 @@ class IntakeArticle
 
             if ($openingUnits > 0) {
                 (new RecordStockMovement)->handle($article, StockMovementType::INTAKE, $openingUnits, $options + [
-                    'reason' => __('Alta de artículo'),
+                    'reason' => __('Alta de producto'),
                 ]);
             }
 

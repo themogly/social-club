@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\Purchases\Schemas;
 
+use App\Filament\Forms\CameraOrFile;
 use App\Models\Batch;
 use App\Models\Location;
 use App\Support\DocumentUpload;
@@ -60,19 +61,19 @@ class PurchaseForm
                             ->required(),
 
                         KeyValue::make('items')
-                            ->label(__('Artículos'))
+                            ->label(__('Productos'))
                             ->keyLabel(__('Concepto'))
                             ->valueLabel(__('Detalle'))
                             ->columnSpanFull(),
 
-                        FileUpload::make('invoice_path')
+                        CameraOrFile::field(FileUpload::make('invoice_path')
                             ->label(__('Factura'))
                             ->disk('documents')
                             ->getUploadedFileUsing(DocumentUpload::withoutDirectUrl())
                             ->visibility('private')
                             ->maxSize(DocumentUpload::maxKilobytes())
                             ->helperText(DocumentUpload::helperText())
-                            ->columnSpanFull(),
+                            ->columnSpanFull(), camera: 'environment', accept: 'image/*,application/pdf'),
                     ])
                     ->columns(2),
 
