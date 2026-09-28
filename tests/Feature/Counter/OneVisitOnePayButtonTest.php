@@ -103,7 +103,6 @@ class OneVisitOnePayButtonTest extends TestCase
         }
 
         if ($beers > 0) {
-            $pos->call('setCatalogueSource', 'bar');
             for ($i = 0; $i < $beers; $i++) {
                 $pos->call('addBarItem', $this->beer->id); // €1.50 each
             }

@@ -19,6 +19,7 @@ use Database\Seeders\RolePermissionSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Blade;
 use Livewire\Livewire;
+use Tests\Concerns\FiltersTheCatalogueLikeTheBrowser;
 use Tests\TestCase;
 
 /**
@@ -30,7 +31,7 @@ use Tests\TestCase;
  */
 class BarLargeLayoutTest extends TestCase
 {
-    use RefreshDatabase;
+    use FiltersTheCatalogueLikeTheBrowser, RefreshDatabase;
 
     private Organisation $org;
 
@@ -83,11 +84,12 @@ class BarLargeLayoutTest extends TestCase
 
         Livewire::test(BarPos::class)
             ->assertSet('articleLayout', 'grid') // the code default
-            ->call('setArticleLayout', 'large')
+            // Prompt 293 — the toggle is the browser's; its choice arrives as the property with the next request.
+            ->set('articleLayout', 'large')
             ->assertSet('articleLayout', 'large')
-            ->call('setArticleLayout', 'massive')  // not a layout
+            ->set('articleLayout', 'massive')  // not a layout
             ->assertSet('articleLayout', 'large')  // ignored, not stored
-            ->call('setArticleLayout', 'list')
+            ->set('articleLayout', 'list')
             ->assertSet('articleLayout', 'list');
     }
 
@@ -101,29 +103,23 @@ class BarLargeLayoutTest extends TestCase
         $this->article('Café', 5, $drinks);
         $this->article('Gominolas', 5, $sweets);
 
-        $html = Livewire::test(BarPos::class)
-            ->call('setArticleLayout', 'large')
-            ->html();
+        session(['counter.bar.article_layout' => 'large']);
+        $html = (string) preg_replace('/\s+/', ' ', Livewire::test(BarPos::class)->html());
 
-        // Category tiles, not the compact chips: Todo + each category as big tiles.
-        $this->assertStringContainsString('data-category-tiles', $html);
+        // Category tiles, shown in large mode (the compact chips in the others): Todo + each category as big tiles.
+        $this->assertMatchesRegularExpression('/data-category-tiles x-show="layoutOf\(\) === \'large\'"/', $html);
         $this->assertStringContainsString('data-category-tile', $html);
         $this->assertStringContainsString(__('Todo'), $html);
         $this->assertStringContainsString('Bebidas', $html);
         $this->assertStringContainsString('Chuches', $html);
 
-        // Filtering is the chips' semantics exactly (filterCategory) — choosing one shows only its articles.
-        $filtered = Livewire::test(BarPos::class)
-            ->call('setArticleLayout', 'large')
-            ->call('filterCategory', $drinks->id);
-
-        $this->assertStringContainsString('Café', $filtered->html());
-        $this->assertStringNotContainsString('Gominolas', $filtered->html());
-
-        // Todo (filterCategory(null)) shows every article again.
-        $all = $filtered->call('filterCategory', null)->html();
-        $this->assertStringContainsString('Café', $all);
-        $this->assertStringContainsString('Gominolas', $all);
+        // Filtering is the chips' semantics exactly — a tile and a chip set the same category, in the browser
+        // (prompt 293), and a card shows only while its own category matches; Todo is the null category.
+        $this->assertSame(2, substr_count($html, "x-on:click=\"filter('category', '{$drinks->id}')\""), 'a tile and a chip, one filter');
+        $this->assertSame(2, substr_count($html, "x-on:click=\"filter('category', null)\""));
+        $this->assertSame(['Café'], $this->visibleInBrowser($html, 'bar', ['category' => ['bar' => $drinks->id]]));
+        $this->assertSame(['Café', 'Gominolas'], $this->visibleInBrowser($html, 'bar'));
+        unset($sweets);
     }
 
     public function test_sold_out_is_disabled_and_visible_in_large_mode(): void
@@ -133,14 +129,16 @@ class BarLargeLayoutTest extends TestCase
         // label, so the name assertion passed on the label alone.
         $this->article('Tónica Probe', 0);
 
-        $html = Livewire::test(BarPos::class)->call('setArticleLayout', 'large')->html();
+        session(['counter.bar.article_layout' => 'large']);
+        $html = Livewire::test(BarPos::class)->html();
 
         // 230's rule holds at the new size: the sold-out article is shown, with its count, disabled.
         $this->assertStringContainsString(e('Tónica Probe'), $html);    // the article name (visible, not hidden)
         $this->assertStringContainsString('disabled', $html);           // the button carries the disabled attribute
         $this->assertStringContainsString('cursor-not-allowed', $html); // …and the sold-out card styling
         $this->assertStringContainsString(e(__('Agotado')), $html);     // the sold-out state, in the running locale
-        $this->assertStringContainsString('!min-h-[120px]', $html, 'the sold-out tile is not the large size');
+        $this->assertStringContainsString('data-layout="large"', $html, 'the catalogue is not in large mode');
+        $this->assertStringContainsString('as-large:!min-h-[120px]', $html, 'the sold-out tile is not the large size');
     }
 
     // --- The choice sticks to the device ----------------------------------------
@@ -149,7 +147,7 @@ class BarLargeLayoutTest extends TestCase
     {
         $this->operator();
 
-        Livewire::test(BarPos::class)->call('setArticleLayout', 'large');
+        Livewire::test(BarPos::class)->set('articleLayout', 'large');
 
         // #[Session] wrote it to the terminal's session — a fresh mount (a reload) reads it back.
         $this->assertSame('large', session('counter.bar.article_layout'));
@@ -172,24 +170,24 @@ class BarLargeLayoutTest extends TestCase
         Livewire::test(BarPos::class)->assertSet('articleLayout', 'grid');
     }
 
-    // --- Compact list and grid are byte-identical to before (a toggle, not a change) ---
+    // --- One card, three sizes, chosen by the container (prompt 293) ---
 
-    public function test_the_compact_cards_are_byte_identical_and_carry_no_large_tokens(): void
+    public function test_the_card_carries_each_size_under_its_own_variant_and_no_bare_large_token(): void
     {
         $article = ['id' => 'A1', 'name' => 'Café', 'price_label' => '€2,50', 'stock' => 5, 'low_stock' => false, 'category_name' => 'Bebidas', 'image_url' => null];
 
-        foreach (['list' => 'flex-row items-center gap-3', 'grid' => 'flex-col gap-1'] as $layout => $rootVariant) {
-            $html = Blade::render('<x-counter.article-card :article="$article" :layout="$layout" action="addArticle" />', ['article' => $article, 'layout' => $layout]);
+        $html = Blade::render('<x-counter.article-card :article="$article" action="addArticle" :thumbs="true" />', ['article' => $article]);
 
-            // The exact compact class strings (unchanged from main).
-            $this->assertStringContainsString('flex w-full min-h-11 rounded-xl border px-3 py-1.5 text-left transition '.$rootVariant, $html);
-            $this->assertStringContainsString('<span data-product-name class="block truncate font-semibold leading-tight">', $html);
-            $this->assertStringContainsString('<span class="text-sm font-semibold text-brand tabular-nums dark:text-slate-100">', $html);
+        // 225's compact forms, unchanged in substance: a row in list, a tile in grid — now keyed to the container's
+        // `data-layout`, so the toggle is one attribute in the browser instead of a re-render of every card.
+        $this->assertStringContainsString('flex w-full min-h-11 rounded-xl border px-3 py-1.5 text-left transition', $html);
+        $this->assertStringContainsString('as-list:flex-row as-list:items-center as-list:gap-3', $html);
+        $this->assertStringContainsString('as-grid:flex-col as-grid:gap-1', $html);
 
-            // NONE of the large-only tokens leak into compact.
-            foreach (['!min-h-[120px]', '!text-lg', '!text-xl', 'h-24 w-full', '!px-4'] as $largeToken) {
-                $this->assertStringNotContainsString($largeToken, $html, "compact $layout leaked a large token: $largeToken");
-            }
+        // Every large-only token applies ONLY in large mode — none may leak into list or grid.
+        foreach (['!min-h-[120px]', '!text-lg', '!text-xl', 'h-24', '!px-4'] as $largeToken) {
+            $this->assertMatchesRegularExpression('/\sas-large:'.preg_quote($largeToken, '/').'/', $html, "large token $largeToken is missing");
+            $this->assertDoesNotMatchRegularExpression('/[\s"]'.preg_quote($largeToken, '/').'/', $html, "large token $largeToken applies outside large mode");
         }
     }
 }

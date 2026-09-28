@@ -29,6 +29,7 @@ use App\Livewire\Counter\Concerns\HandlesTender;
 use App\Livewire\Counter\Concerns\IdentifiesOperator;
 use App\Livewire\Counter\Concerns\OpensMemberships;
 use App\Livewire\Counter\Concerns\PersistsBasket;
+use App\Livewire\Counter\Concerns\RendersIslandsOnChange;
 use App\Livewire\Counter\Concerns\ResolvesCounterLocation;
 use App\Livewire\Counter\Concerns\ShowsSettledOutcome;
 use App\Mail\DispensationReceiptMail;
@@ -91,39 +92,12 @@ use RuntimeException;
 #[Layout('components.layouts.counter', ['fullHeight' => true])] // prompt 176: the page must not scroll; the selection pane does
 class DispensaryPos extends Component
 {
-    use CollectsMembershipFees, FindsMembers, HandlesTender, IdentifiesOperator, OpensMemberships, PersistsBasket, ResolvesCounterLocation, ShowsSettledOutcome;
+    use CollectsMembershipFees, FindsMembers, HandlesTender, IdentifiesOperator, OpensMemberships, PersistsBasket, RendersIslandsOnChange, ResolvesCounterLocation, ShowsSettledOutcome;
 
     // --- Identity ---------------------------------------------------------------
     // The ONE lookup field ($lookup) and everything behind it live in FindsMembers (prompt 194). This screen
     // used to carry two stacked inputs of its own — a scan box above a name box, each already doing the
     // other's job — plus its own copy of the org-wide search query.
-
-    /** Live filter over the genetics grid (name). */
-    public string $geneticSearch = '';
-
-    /**
-     * Which SOURCE the catalogue pane is browsing: `genetics` or `bar` (prompt 212).
-     *
-     * The owner: *"to add bar products to the same transaction you only got a couple of choices on the side.
-     * Instead you should have full access."* The premise was right and the reason worse than "a couple":
-     * `barArticleRows()` is **not capped** — it returned every active in-stock article at the sede and the
-     * cart rendered each as a `+ Name` chip. Five today because the seed has five; a club with forty gets
-     * forty chips stacked in the narrow column that already carries the member, the basket, the tender and
-     * the commit — **no search, no categories, no price, no stock**. It had no browsing model at all, and it
-     * degraded as the club grew rather than as it shrank.
-     *
-     * Meanwhile the centre pane already has everything a catalogue needs. So the bar moved into the pane that
-     * can browse. **The toggle changes what you are BROWSING; it never changes which basket you are filling** —
-     * a genetic tap still opens the weight entry and adds a dispensation line, an article tap still adds a bar
-     * line, and the two records stay on their separate ledgers exactly as prompt 118 left them.
-     */
-    public string $catalogueSource = 'genetics';
-
-    /** The article name/category search, kept apart from `$geneticSearch` so switching source loses neither. */
-    public string $articleSearch = '';
-
-    /** Category filter for the bar source — its own, for the same reason. */
-    public ?string $articleCategoryId = null;
 
     /**
      * Genetics: LIST by default, grid available, remembered per screen (prompt 176).
@@ -135,29 +109,47 @@ class DispensaryPos extends Component
      * GRID on the bar, where an article is a name and a price.
      *
      * #[Session] rather than a column: it is a per-operator display preference, not club data, and it must
-     * survive a reload without a migration or a write on every toggle.
+     * survive a reload without a migration or a write on every toggle. Since prompt 293 the toggle is the
+     * browser's (a view change makes no request); it hands the choice back with `$wire.$set(…, false)`, which
+     * rides on the next real request instead of making one.
      */
     #[Session(key: 'counter.pos.genetic_layout')]
     public string $geneticLayout = 'list';
 
     /**
      * …and the bar's own layout, which the docblock above promised and the code never gave it (prompt 225).
-     *
-     * Both sources rendered from `$geneticLayout`, so "list for genetics, grid for the bar" was true of the
-     * comment and of nothing else: switching to Barra inherited whatever the genetics pane was set to. Two
-     * properties, one toggle — the control writes to whichever source is on screen.
+     * One toggle, two remembered choices — it writes to whichever source is on screen.
      */
     #[Session(key: 'counter.pos.article_layout')]
     public string $articleLayout = 'grid';
 
-    /** Category filter over the genetics grid (null = all). */
-    public ?string $categoryId = null;
+    /** @var array<string, string> the layouts as they were before the browser's choice arrived */
+    private array $layoutBefore = [];
 
-    /** Product-type filter over the genetics grid (FLOWER|CONCENTRATE|PREROLL|EDIBLE, null = all). */
-    public ?string $productType = null;
+    /** The toggle's choice arrives from the browser (prompt 293): anything but list/grid is ignored rather than stored (176). */
+    public function updatingGeneticLayout(): void
+    {
+        $this->layoutBefore['geneticLayout'] = $this->geneticLayout;
+    }
 
-    /** Strain-variety filter over the genetics grid (SATIVA|INDICA|HYBRID, null = all — prompt 66). */
-    public ?string $strainType = null;
+    public function updatingArticleLayout(): void
+    {
+        $this->layoutBefore['articleLayout'] = $this->articleLayout;
+    }
+
+    public function updatedGeneticLayout(string $value): void
+    {
+        if (! in_array($value, ['list', 'grid'], true)) {
+            $this->geneticLayout = $this->layoutBefore['geneticLayout'] ?? 'list';
+        }
+    }
+
+    public function updatedArticleLayout(string $value): void
+    {
+        if (! in_array($value, ['list', 'grid'], true)) {
+            $this->articleLayout = $this->layoutBefore['articleLayout'] ?? 'grid';
+        }
+    }
 
     /** The held socio (id only — the model is resolved live, never stored on the component). */
     public ?string $memberId = null;
@@ -454,27 +446,6 @@ class DispensaryPos extends Component
     }
 
     /**
-     * Switch what the pane is browsing.
-     *
-     * Deliberately touches NOTHING else: not the basket, not the member, not the tender, not a weight entry
-     * in progress. If an operator can lose work by looking at the other half of the catalogue, this branch
-     * has made the screen worse rather than better.
-     */
-    public function setCatalogueSource(string $source): void
-    {
-        if (! in_array($source, ['genetics', 'bar'], true)) {
-            return;
-        }
-
-        // A sede with no bar has no bar source at all — not an empty one.
-        if ($source === 'bar' && ! $this->barEnabled()) {
-            return;
-        }
-
-        $this->catalogueSource = $source;
-    }
-
-    /**
      * Whether the bar is offered on this screen: the sede runs a bar (prompt 118's setting) AND the PIN operator may
      * sell at it (`pos.bar`, prompt 266 — the operator decides, 255). Without the permission there is no bar source at
      * all, and the server refuses a crafted bar line too.
@@ -484,48 +455,6 @@ class DispensaryPos extends Component
         $location = $this->resolveLocation();
 
         return $location !== null && (bool) Settings::get('bar_enabled', true, $location->id) && $this->userCan('pos.bar');
-    }
-
-    public function filterArticleCategory(?string $categoryId): void
-    {
-        $this->articleCategoryId = $categoryId;
-    }
-
-    public function filterProductType(?string $productType): void
-    {
-        $this->productType = $productType;
-    }
-
-    public function filterStrainType(?string $strainType): void
-    {
-        $this->strainType = $strainType;
-    }
-
-    /**
-     * List or grid for the pane on screen. Anything else is ignored rather than stored (prompt 176).
-     *
-     * Writes to the ACTIVE source's preference (prompt 225): an operator who prefers a dense list of genetics
-     * and a grid of drinks gets both, and neither choice overwrites the other.
-     */
-    public function setGeneticLayout(string $layout): void
-    {
-        if (! in_array($layout, ['list', 'grid'], true)) {
-            return;
-        }
-
-        if ($this->catalogueSource === 'bar') {
-            $this->articleLayout = $layout;
-
-            return;
-        }
-
-        $this->geneticLayout = $layout;
-    }
-
-    /** The layout of whichever catalogue is on screen — one place, so the toggle and the grid agree. */
-    public function catalogueLayout(): string
-    {
-        return $this->catalogueSource === 'bar' ? $this->articleLayout : $this->geneticLayout;
     }
 
     public function toggleCalculator(): void
@@ -539,11 +468,6 @@ class DispensaryPos extends Component
     public function calculatorEnabled(): bool
     {
         return (bool) Settings::get('dispensary_calculator_enabled', false, $this->locationId);
-    }
-
-    public function filterCategory(?string $categoryId): void
-    {
-        $this->categoryId = $categoryId;
     }
 
     /**
@@ -1466,8 +1390,6 @@ class DispensaryPos extends Component
         $barTotal = $this->barBasketTotalCents($member, $location);
         [$cashPreview, $walletPreview] = $this->tenderSplit($total + $barTotal);
 
-        $allGenetics = $this->geneticRows($location, $member);
-        $allArticles = $this->barArticleRows($location);
         $activeGeneticModel = $this->activeGeneticId !== null ? Genetic::query()->find($this->activeGeneticId) : null;
 
         return view('livewire.counter.dispensary-pos', [
@@ -1484,10 +1406,6 @@ class DispensaryPos extends Component
             'owesHereCents' => max(0, -$walletCents),
             'tab' => $member !== null && $location !== null ? $this->tabState($member, $location, $total + $barTotal) : null,
             'photoUrl' => $member !== null ? $this->photoUrl($member) : null,
-            'genetics' => $this->filterGenetics($allGenetics),
-            'categories' => $this->deriveCategories($allGenetics),
-            'productTypes' => $this->deriveProductTypes($allGenetics),
-            'strainTypes' => $this->deriveStrainTypes($allGenetics),
             'activeEntryGramsCg' => $this->activeEntryGramsCg(),
             'basketLines' => $basketLines,
             'basketTotalCents' => $total,
@@ -1498,7 +1416,6 @@ class DispensaryPos extends Component
             'shortfallCents' => $this->shortfallCents($cashPreview), // prompt 268 — "Falta"
             'activeGenetic' => $activeGeneticModel,
             'weightPresets' => $this->weightPresets($activeGeneticModel, $location, $member, $limits),
-            'usualGenetics' => $this->usualGenetics($member, $allGenetics),
             'activeGeneticBatches' => $this->activeGeneticBatches($location),
             'activeGeneticPriceCents' => $this->activeGeneticRateCents($location, $member),
             'calculatorEnabled' => $this->calculatorEnabled(), // prompt 292
@@ -1517,23 +1434,70 @@ class DispensaryPos extends Component
             // Bar side of the same visit (prompt 118) — only where the sede runs a bar. barArticles feeds the
             // quick-add; barLines + barTotalCents render the in-progress bar basket.
             'barEnabled' => $this->barEnabled(), // sede runs a bar AND the operator may sell at it (prompt 266)
-            // The bar's catalogue, browsable in the centre pane (prompt 212) — filtered, with its own
-            // categories, instead of every row as a chip in the cart column.
-            'barArticles' => $this->filterArticles($allArticles),
-            // 193: the thumbnail column exists only where a picture does — asked ONCE for the sede rather
-            // than per card, so a catalogue with no images has no empty column at all.
-            'barHasImages' => collect($allArticles)->contains(fn (array $row): bool => filled($row['image_url'] ?? null)),
-            'articleCategories' => $this->deriveArticleCategories($allArticles),
             'barLines' => $this->barBasketView($location),
             'barTotalCents' => $barTotal,
         ]);
     }
 
     /**
-     * The articles this sede can add to a visit's bar side — active, in stock — for the quick-add.
+     * The islands' data (prompt 293). The catalogue's three — the pane's `header` (tab, search, filters), and each
+     * source's cards — carry BOTH sources in full: the tab, the filters and the search run in the browser over what is
+     * already on the page, so they only change what is visible, never what is sold or at what price. The `photo` nag
+     * is the socio's, and goes when a photo arrives.
      *
-     * @return list<array{id: string, name: string, price_cents: int}>
+     * @return array<string, mixed>
      */
+    protected function islandData(string $island): array
+    {
+        if ($island === 'photo') {
+            $member = $this->resolveMember();
+
+            return ['memberId' => $member?->id, 'missing' => $member !== null && $this->photoUrl($member) === null];
+        }
+
+        return $this->catalogueData()[$island] ?? [];
+    }
+
+    /** @var array<string, array<string, mixed>>|null */
+    private ?array $catalogueMemo = null;
+
+    /** @return array<string, array<string, mixed>> the catalogue's three islands, built together from one set of rows */
+    private function catalogueData(): array
+    {
+        if ($this->catalogueMemo !== null) {
+            return $this->catalogueMemo;
+        }
+
+        $location = $this->resolveLocation();
+        $member = $this->resolveMember();
+        $genetics = $this->geneticRows($location, $member);
+        $barEnabled = $this->barEnabled();
+        $articles = $barEnabled ? $this->barArticleRows($location) : [];
+
+        return $this->catalogueMemo = [
+            'header' => [
+                'barEnabled' => $barEnabled,
+                'usual' => array_map(fn (array $row): array => ['id' => $row['id'], 'name' => $row['name']], $this->usualGenetics($member, $genetics)),
+                'categories' => $this->deriveCategories($genetics),
+                'productTypes' => $this->deriveProductTypes($genetics),
+                'strainTypes' => $this->deriveStrainTypes($genetics),
+                'articleCategories' => $this->deriveArticleCategories($articles),
+            ],
+            'genetics' => [
+                'rows' => $genetics,
+                'hasMember' => $member !== null,
+                'thumbs' => collect($genetics)->contains(fn (array $row): bool => $row['image_url'] !== null),
+            ],
+            'bar' => [
+                'enabled' => $barEnabled,
+                'rows' => $articles,
+                // 193: the thumbnail column exists only where a picture does — asked ONCE for the sede rather
+                // than per card, so a catalogue with no images has no empty column at all.
+                'thumbs' => collect($articles)->contains(fn (array $row): bool => filled($row['image_url'] ?? null)),
+            ],
+        ];
+    }
+
     /**
      * The bar's catalogue, in the same shape the genetics side uses (prompt 212).
      *
@@ -1577,33 +1541,6 @@ class DispensaryPos extends Component
                 'image_url' => ArticleImage::url($a),
             ])
             ->all();
-    }
-
-    /**
-     * The bar catalogue after the pane's search and category filter.
-     *
-     * In memory, like `filterGenetics()`: the sellable set was already queried live, and re-querying per
-     * keystroke on a counter tablet buys nothing.
-     *
-     * @param  list<array<string, mixed>>  $rows
-     * @return list<array<string, mixed>>
-     */
-    private function filterArticles(array $rows): array
-    {
-        $term = mb_strtolower(trim($this->articleSearch));
-
-        return array_values(array_filter($rows, function (array $row) use ($term): bool {
-            if ($this->articleCategoryId !== null && (string) $row['category_id'] !== $this->articleCategoryId) {
-                return false;
-            }
-
-            if ($term === '') {
-                return true;
-            }
-
-            return str_contains(mb_strtolower((string) $row['name']), $term)
-                || str_contains(mb_strtolower((string) ($row['category_name'] ?? '')), $term);
-        }));
     }
 
     /**
@@ -2087,34 +2024,6 @@ class DispensaryPos extends Component
         }
 
         return $rows;
-    }
-
-    /**
-     * Apply the grid's live name search + category filter (in memory — the sellable
-     * set was already queried live above).
-     *
-     * @param  list<array<string, mixed>>  $rows
-     * @return list<array<string, mixed>>
-     */
-    private function filterGenetics(array $rows): array
-    {
-        $term = mb_strtolower(trim($this->geneticSearch));
-
-        return array_values(array_filter($rows, function (array $row) use ($term): bool {
-            if ($this->categoryId !== null && (string) $row['category_id'] !== $this->categoryId) {
-                return false;
-            }
-
-            if ($this->productType !== null && (string) $row['product_type'] !== $this->productType) {
-                return false;
-            }
-
-            if ($this->strainType !== null && (string) ($row['strain_type'] ?? '') !== $this->strainType) {
-                return false;
-            }
-
-            return $term === '' || str_contains(mb_strtolower((string) $row['name']), $term);
-        }));
     }
 
     /**

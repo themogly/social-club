@@ -12,6 +12,7 @@ use App\Livewire\Counter\Concerns\FindsMembers;
 use App\Livewire\Counter\Concerns\HandlesTender;
 use App\Livewire\Counter\Concerns\IdentifiesOperator;
 use App\Livewire\Counter\Concerns\PersistsBasket;
+use App\Livewire\Counter\Concerns\RendersIslandsOnChange;
 use App\Livewire\Counter\Concerns\ResolvesCounterLocation;
 use App\Livewire\Counter\Concerns\ShowsSettledOutcome;
 use App\Models\Article;
@@ -64,7 +65,7 @@ use Throwable;
 #[Layout('components.layouts.counter', ['fullHeight' => true])] // prompt 176: the page must not scroll; the selection pane does
 class BarPos extends Component
 {
-    use FindsMembers, HandlesTender, IdentifiesOperator, PersistsBasket, ResolvesCounterLocation, ShowsSettledOutcome;
+    use FindsMembers, HandlesTender, IdentifiesOperator, PersistsBasket, RendersIslandsOnChange, ResolvesCounterLocation, ShowsSettledOutcome;
 
     // --- Identity / scope -------------------------------------------------------
     // The ONE lookup field ($lookup) lives in FindsMembers (prompt 194). The bar used to offer a name box with
@@ -74,15 +75,28 @@ class BarPos extends Component
     /** The attached socio (id only — the model is resolved live). Optional: cash guests are fine. */
     public ?string $memberId = null;
 
-    /** Live filter over the article grid (name). */
-    public string $articleSearch = '';
-
-    /** Articles: GRID by default (a name and a price fit a tile), list available — see DispensaryPos. */
+    /**
+     * Articles: GRID by default (a name and a price fit a tile), list and large available — see DispensaryPos. The
+     * toggle, the category filter and the search are the browser's since prompt 293 (no request); the layout rides
+     * back to this #[Session] property with the next real request.
+     */
     #[Session(key: 'counter.bar.article_layout')]
     public string $articleLayout = 'grid';
 
-    /** Category filter over the article grid (null = all). */
-    public ?string $categoryId = null;
+    private string $layoutBefore = 'grid';
+
+    /** The toggle's choice arrives from the browser (prompt 293): anything else is ignored rather than stored (176). */
+    public function updatingArticleLayout(): void
+    {
+        $this->layoutBefore = $this->articleLayout;
+    }
+
+    public function updatedArticleLayout(string $value): void
+    {
+        if (! in_array($value, ['list', 'grid', 'large'], true)) {
+            $this->articleLayout = $this->layoutBefore;
+        }
+    }
 
     /** The active location id, resolved in mount(). #[Locked] (prompt 75): the client can never retarget the counter's sede. */
     #[Locked]
@@ -204,25 +218,6 @@ class BarPos extends Component
     }
 
     // --- Article grid → basket --------------------------------------------------
-
-    /**
-     * List, grid or large for the articles pane. Anything else is ignored rather than stored (prompt 176).
-     *
-     * Prompt 248 — `large` is the third SIZE (category-first big tiles), a toggle beside ≡ and ▦, never a
-     * replacement. It is the standalone Bar's alone: the POS's Barra source (a separate component beside the
-     * cart column) keeps list/grid, where a category-first pane has no room.
-     */
-    public function setArticleLayout(string $layout): void
-    {
-        if (in_array($layout, ['list', 'grid', 'large'], true)) {
-            $this->articleLayout = $layout;
-        }
-    }
-
-    public function filterCategory(?string $categoryId): void
-    {
-        $this->categoryId = $categoryId;
-    }
 
     public function addArticle(string $articleId): void
     {
@@ -568,7 +563,6 @@ class BarPos extends Component
             ? Wallet::balance($member->id, $location->id)
             : 0;
 
-        $allArticles = $this->articleRows($location);
         $basketLines = $this->basketView($location);
         $total = (int) array_sum(array_map(fn (array $l): int => (int) $l['line_total_cents'], $basketLines));
         [$cashPosted, $walletApplied] = $this->tenderSplit($total);
@@ -578,8 +572,6 @@ class BarPos extends Component
             'member' => $member,
             'walletCents' => $walletCents,
             'projectedWalletCents' => $walletCents - $walletApplied,
-            'articles' => $this->filterArticles($allArticles),
-            'categories' => $this->deriveCategories($allArticles),
             'basketLines' => $basketLines,
             'basketTotalCents' => $total,
             'cashPostedCents' => $cashPosted,
@@ -594,6 +586,23 @@ class BarPos extends Component
             'ticketReferenceEnabled' => (bool) Settings::get('bar_ticket_reference_enabled', false),
             'canVoid' => $this->userCan('order.void'),
         ]);
+    }
+
+    /**
+     * The catalogue island's data (prompt 293): every active article at the sede, in full, so the category filter and
+     * the search only change what is visible in the browser. Its fingerprint decides whether the pane is re-sent.
+     *
+     * @return array<string, mixed>
+     */
+    protected function islandData(string $island): array
+    {
+        $articles = $this->articleRows($this->resolveLocation());
+
+        return [
+            'articles' => $articles,
+            'categories' => $this->deriveCategories($articles),
+            'thumbs' => collect($articles)->contains(fn (array $a): bool => filled($a['image_url'])),
+        ];
     }
 
     /** Money for display (integer cents), via the shared value object. */
@@ -726,26 +735,6 @@ class BarPos extends Component
         }
 
         return $rows;
-    }
-
-    /**
-     * Apply the grid's live name search + category filter (in memory — the sellable set
-     * was already queried live above).
-     *
-     * @param  list<array<string, mixed>>  $rows
-     * @return list<array<string, mixed>>
-     */
-    private function filterArticles(array $rows): array
-    {
-        $term = mb_strtolower(trim($this->articleSearch));
-
-        return array_values(array_filter($rows, function (array $row) use ($term): bool {
-            if ($this->categoryId !== null && (string) ($row['category_id'] ?? '') !== $this->categoryId) {
-                return false;
-            }
-
-            return $term === '' || str_contains(mb_strtolower((string) $row['name']), $term);
-        }));
     }
 
     /**

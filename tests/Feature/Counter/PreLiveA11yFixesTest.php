@@ -130,9 +130,11 @@ class PreLiveA11yFixesTest extends TestCase
         $this->assertStringContainsString('@click="setMode(true)" x-bind:aria-pressed=', $pos);
         $this->assertStringContainsString('@click="setMode(false)" x-bind:aria-pressed=', $pos);
         $this->assertStringContainsString("wire:click=\"selectBatch('{{ \$batch->id }}')\" aria-pressed=", $chip);
-        $this->assertStringContainsString('wire:click="filterStrainType(null)" aria-pressed=', $pos);
+        // Prompt 293 — the filter chips are the browser's; each still says, live, whether it is the one selected.
+        $this->assertStringContainsString("x-on:click=\"filter('{{ \$axis }}', @js(\$value))\"\n                                                aria-pressed=", $pos);
+        $this->assertStringContainsString('x-bind:aria-pressed="{{ $state }} === @js($value)', $pos);
         $this->assertStringContainsString("wire:click=\"\$set('feeMethod', 'CASH')\" aria-pressed=", $fee);
-        $this->assertStringContainsString('wire:click="filterCategory(null)" aria-pressed=', $bar);
+        $this->assertStringContainsString("x-bind:aria-pressed=\"category.bar === @js(\$value) ? 'true' : 'false'\"", $bar);
         $this->assertStringContainsString("@click=\"back()\" aria-label=\"{{ __('Retroceso') }}\"", $pos);
     }
 

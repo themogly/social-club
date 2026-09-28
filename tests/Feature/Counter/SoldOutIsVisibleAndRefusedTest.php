@@ -112,7 +112,7 @@ class SoldOutIsVisibleAndRefusedTest extends TestCase
 
         $screens = [
             'bar' => Livewire::test(BarPos::class)->html(),
-            'pos' => Livewire::test(DispensaryPos::class)->call('selectMember', $this->member()->id)->call('setCatalogueSource', 'bar')->html(),
+            'pos' => Livewire::test(DispensaryPos::class)->call('selectMember', $this->member()->id)->html(),
         ];
 
         foreach ($screens as $screen => $html) {
@@ -132,7 +132,6 @@ class SoldOutIsVisibleAndRefusedTest extends TestCase
 
         $component = Livewire::test(DispensaryPos::class)
             ->call('selectMember', $this->member()->id)
-            ->call('setCatalogueSource', 'bar')
             ->call('addBarItem', $out->id);
 
         $component->assertSet('barBasket', []);

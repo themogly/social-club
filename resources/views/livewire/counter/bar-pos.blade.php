@@ -116,26 +116,47 @@
                  }"
                  x-on:misc-added.window="closeMisc()"
                  x-on:popstate.window="if (showMisc) { showMisc = false; miscTrigger?.focus?.() }">
-                <section class="rounded-2xl border border-line bg-surface p-4 dark:border-slate-800 dark:bg-slate-900">
+                {{-- THE CATALOGUE PANE — a Livewire island (prompt 293), re-sent only when what it shows has changed
+                     (RendersIslandsOnChange). A basket or payment tap no longer returns every article. The layout, the
+                     category filter and the search are `data-view-only` Alpine state over the full catalogue (zero
+                     requests); a tap on an article is `$wire.addArticle(…)`, a real server action that renders the cart. --}}
+                @island('catalogue', always: $this->islandChanged('catalogue'))
+                @php
+                    $cat = $this->islandView('catalogue');
+                    $chipOn = 'border-brand bg-brand text-white';
+                    $chipOff = 'border-line text-ink-muted dark:border-slate-700 dark:text-slate-400';
+                    $tileOn = 'border-brand bg-brand text-white';
+                    $tileOff = 'border-line bg-surface text-ink hover:border-brand hover:bg-brand-tint/40 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:hover:bg-slate-800';
+                    $toggleOn = 'bg-brand text-white';
+                    $toggleOff = 'text-ink-muted hover:bg-surface-alt dark:text-slate-400 dark:hover:bg-slate-800';
+                    $categoryOptions = [[null, __('Todas'), __('Todo')], ...array_map(fn (array $c): array => [$c['id'], $c['name'], $c['name']], $cat['categories'])];
+                @endphp
+                <section
+                    data-catalogue
+                    x-data="window.counterCatalogue(@js([
+                        'source' => 'bar',
+                        'layouts' => ['bar' => $articleLayout],
+                        'layoutProps' => ['bar' => 'articleLayout'],
+                    ]))"
+                    class="rounded-2xl border border-line bg-surface p-4 dark:border-slate-800 dark:bg-slate-900"
+                >
                     {{-- Prompt 176: wraps rather than clips. At 820 portrait the selection pane is ~470px
                          and title + view toggle + search + manual-line did not fit on one row. --}}
                     <div class="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
                         <h2 class="text-base font-semibold">{{ __('Artículos') }}</h2>
-                        {{-- List / grid. GRID is the default for articles — a name and a price fit a tile,
-                             which is the case Loyverse describes; the dispensary defaults the other way. --}}
+                        {{-- List / grid / large. GRID is the default for articles — a name and a price fit a tile. --}}
                         <div role="group" aria-label="{{ __('Vista') }}" class="flex w-fit shrink-0 gap-1 self-start rounded-xl border border-line p-1 dark:border-slate-700">
                             @foreach ([['list', __('Lista'), 'list'], ['grid', __('Cuadrícula'), 'grid'], ['large', __('Grande'), 'large']] as [$mode, $label, $glyph])
                                 <button
                                     type="button"
-                                    wire:click="setArticleLayout('{{ $mode }}')"
+                                    data-view-only
                                     data-layout-option="{{ $mode }}"
+                                    x-on:click="setLayout('{{ $mode }}')"
                                     aria-label="{{ $label }}"
                                     aria-pressed="{{ $articleLayout === $mode ? 'true' : 'false' }}"
-                                    @class([
-                                        'inline-flex h-11 w-11 items-center justify-center rounded-lg text-base transition',
-                                        'bg-brand text-white' => $articleLayout === $mode,
-                                        'text-ink-muted hover:bg-surface-alt dark:text-slate-400 dark:hover:bg-slate-800' => $articleLayout !== $mode,
-                                    ])
+                                    x-bind:aria-pressed="layoutOf() === '{{ $mode }}' ? 'true' : 'false'"
+                                    class="inline-flex h-11 w-11 items-center justify-center rounded-lg text-base transition {{ $articleLayout === $mode ? $toggleOn : $toggleOff }}"
+                                    x-bind:class="{ '{{ $toggleOn }}': layoutOf() === '{{ $mode }}', '{{ $toggleOff }}': ! (layoutOf() === '{{ $mode }}') }"
                                 ><x-counter.icon :name="$glyph" class="h-5 w-5" /></button>
                             @endforeach
                         </div>
@@ -143,7 +164,9 @@
                         <div class="flex min-w-0 flex-1 items-center gap-2">
                             <input
                                 type="text"
-                                wire:model.live.debounce.300ms="articleSearch" aria-label="{{ __('Buscar artículo…') }}"
+                                data-view-only
+                                x-model="search.bar"
+                                aria-label="{{ __('Buscar artículo…') }}"
                                 autocomplete="off"
                                 placeholder="{{ __('Buscar artículo…') }}"
                                 class="h-11 w-full min-w-0 rounded-xl border border-line bg-surface px-4 text-sm text-ink placeholder:text-ink-muted focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/40 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 sm:w-48"
@@ -154,75 +177,51 @@
                         </div>
                     </div>
 
-                    {{-- Prompt 248 — LARGE mode is category-FIRST: one big tile per category plus Todo (no icons
-                         invented — the model has none), then the chosen category's articles as large tiles. The
-                         filter semantics are the chips' exactly (filterCategory), only rendered as tiles. --}}
-                    @if ($articleLayout === 'large' && ! empty($categories))
-                        <div data-category-tiles class="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3">
-                            <button type="button" wire:click="filterCategory(null)" data-category-tile aria-pressed="{{ $categoryId === null ? 'true' : 'false' }}" @class(['flex min-h-[112px] items-center justify-center rounded-xl border p-4 text-center text-lg font-semibold transition', 'border-brand bg-brand text-white' => $categoryId === null, 'border-line bg-surface text-ink hover:border-brand hover:bg-brand-tint/40 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:hover:bg-slate-800' => $categoryId !== null])>{{ __('Todo') }}</button>
-                            @foreach ($categories as $category)
-                                <button type="button" wire:click="filterCategory('{{ $category['id'] }}')" data-category-tile aria-pressed="{{ $categoryId === $category['id'] ? 'true' : 'false' }}" @class(['flex min-h-[112px] items-center justify-center rounded-xl border p-4 text-center text-lg font-semibold transition', 'border-brand bg-brand text-white' => $categoryId === $category['id'], 'border-line bg-surface text-ink hover:border-brand hover:bg-brand-tint/40 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:hover:bg-slate-800' => $categoryId !== $category['id']])>{{ $category['name'] }}</button>
+                    @if (! empty($cat['categories']))
+                        {{-- Prompt 248 — LARGE mode is category-FIRST: one big tile per category plus Todo (no icons
+                             invented — the model has none), then the chosen category's articles as large tiles. The
+                             filter is the chips' exactly, only rendered as tiles. --}}
+                        <div data-category-tiles x-show="layoutOf() === 'large'" @if ($articleLayout !== 'large') x-cloak @endif class="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3">
+                            @foreach ($categoryOptions as [$value, , $tileLabel])
+                                <button type="button" data-view-only data-category-tile
+                                    x-on:click="filter('category', @js($value))"
+                                    aria-pressed="{{ $value === null ? 'true' : 'false' }}"
+                                    x-bind:aria-pressed="category.bar === @js($value) ? 'true' : 'false'"
+                                    class="flex min-h-[112px] items-center justify-center rounded-xl border p-4 text-center text-lg font-semibold transition {{ $value === null ? $tileOn : $tileOff }}"
+                                    x-bind:class="{ '{{ $tileOn }}': category.bar === @js($value), '{{ $tileOff }}': ! (category.bar === @js($value)) }"
+                                >{{ $tileLabel }}</button>
+                            @endforeach
+                        </div>
+
+                        {{-- Compact chips — list/grid only. In large mode the big tiles above are the category control. --}}
+                        <div x-show="layoutOf() !== 'large'" @if ($articleLayout === 'large') x-cloak @endif class="mt-3 flex flex-wrap gap-2">
+                            @foreach ($categoryOptions as [$value, $chipLabel])
+                                <button type="button" data-view-only
+                                    x-on:click="filter('category', @js($value))"
+                                    aria-pressed="{{ $value === null ? 'true' : 'false' }}"
+                                    x-bind:aria-pressed="category.bar === @js($value) ? 'true' : 'false'"
+                                    class="inline-flex min-h-11 items-center rounded-full border px-4 text-sm {{ $value === null ? $chipOn : $chipOff }}"
+                                    x-bind:class="{ '{{ $chipOn }}': category.bar === @js($value), '{{ $chipOff }}': ! (category.bar === @js($value)) }"
+                                >{{ $chipLabel }}</button>
                             @endforeach
                         </div>
                     @endif
 
-                    {{-- Compact chips — list/grid only. In large mode the big tiles above are the category
-                         control; the markup here is BYTE-IDENTICAL to before (prompt 248: a toggle, not a change). --}}
-                    @if (! empty($categories) && $articleLayout !== 'large')
-                        <div class="mt-3 flex flex-wrap gap-2">
-                            <button type="button" wire:click="filterCategory(null)" aria-pressed="{{ ($categoryId === null) ? 'true' : 'false' }}" @class(['inline-flex items-center rounded-full border min-h-11 px-4 text-sm', 'border-brand bg-brand text-white' => $categoryId === null, 'border-line text-ink-muted dark:border-slate-700 dark:text-slate-400' => $categoryId !== null])>{{ __('Todas') }}</button>
-                            @foreach ($categories as $category)
-                                <button type="button" wire:click="filterCategory('{{ $category['id'] }}')" aria-pressed="{{ ($categoryId === $category['id']) ? 'true' : 'false' }}" @class(['inline-flex items-center rounded-full border min-h-11 px-4 text-sm', 'border-brand bg-brand text-white' => $categoryId === $category['id'], 'border-line text-ink-muted dark:border-slate-700 dark:text-slate-400' => $categoryId !== $category['id']])>{{ $category['name'] }}</button>
-                            @endforeach
-                        </div>
-                    @endif
-
-                    @php
-                        // A full @php block, not @php(...): an arrow function's `=>` inside the parenthesised
-                        // form is a Blade parse error, and the harness happily asserted against the 500 page.
-                        $showThumbs = collect($articles)->contains(fn (array $a): bool => filled($a['image_url']));
-                    @endphp
-
-                    @if ($articleLayout === 'large')
-                        {{-- Large tiles — the same article-card, one size up (prompt 248). --}}
-                        <div class="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3">
-                            @forelse ($articles as $a)
-                                <x-counter.article-card
-                                    :article="$a"
-                                    layout="large"
-                                    action="addArticle"
-                                    :thumbs="$showThumbs"
-                                />
-                            @empty
-                                <p class="col-span-full rounded-xl border border-dashed border-line px-4 py-8 text-center text-sm text-ink-muted dark:border-slate-700 dark:text-slate-400">{{ __('No hay artículos activos en esta sede.') }}</p>
-                            @endforelse
-                        </div>
-                    @else
-                    <div @class([
-                        'mt-4',
-                        'flex flex-col gap-1.5' => $articleLayout === 'list',
-                        'grid gap-3 sm:grid-cols-2 lg:grid-cols-3' => $articleLayout === 'grid',
-                    ])>
-                        @forelse ($articles as $a)
-                            {{-- ONE card, both bars (prompt 230). The owner: *"make the standalone bar POS the
-                                 same design as the other one."* Everything that made these two screens
-                                 disagree — a 68px row against a 60px one, a 166px tile with a 🛒 block, a stock
-                                 count on one and not the other, sold-out visible here and hidden there — is
-                                 the component's to decide now, once. The `addArticle` action stays this
-                                 screen's; 193's row-is-not-a-rotated-tile lesson moved into the component
-                                 with the markup that carried it. --}}
-                            <x-counter.article-card
-                                :article="$a"
-                                :layout="$articleLayout"
-                                action="addArticle"
-                                :thumbs="$showThumbs"
-                            />
-                        @empty
-                            <p class="col-span-full rounded-xl border border-dashed border-line px-4 py-8 text-center text-sm text-ink-muted dark:border-slate-700 dark:text-slate-400">{{ __('No hay artículos activos en esta sede.') }}</p>
-                        @endforelse
+                    {{-- ONE card, both bars (prompt 230); the size is this container's `data-layout` (list, grid, or 248's
+                         large tile) and the `addArticle` action is this screen's. --}}
+                    <div data-layout="{{ $articleLayout }}" x-bind:data-layout="layoutOf()"
+                         class="mt-4 as-list:flex as-list:flex-col as-list:gap-1.5 as-grid:grid as-grid:gap-3 as-grid:sm:grid-cols-2 as-grid:lg:grid-cols-3 as-large:grid as-large:grid-cols-2 as-large:gap-3 as-large:sm:grid-cols-3">
+                        @foreach ($cat['articles'] as $a)
+                            <x-counter.article-card :article="$a" action="addArticle" :thumbs="$cat['thumbs']" data-catalogue-item="bar" />
+                        @endforeach
                     </div>
+                    @if (empty($cat['articles']))
+                        <p class="mt-4 rounded-xl border border-dashed border-line px-4 py-8 text-center text-sm text-ink-muted dark:border-slate-700 dark:text-slate-400">{{ __('No hay artículos activos en esta sede.') }}</p>
+                    @else
+                        <p x-show="! anyVisible('bar')" x-cloak class="mt-4 rounded-xl border border-dashed border-line px-4 py-8 text-center text-sm text-ink-muted dark:border-slate-700 dark:text-slate-400">{{ __('Ningún artículo coincide con la búsqueda.') }}</p>
                     @endif
                 </section>
+                @endisland
 
                 {{-- Manual-line entry as an on-demand modal (prompt 126) — opened from the header button, so it is
                      reachable at 1024×768 without scrolling past the catalogue. The reason is ONE TAP for the

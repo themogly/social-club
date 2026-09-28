@@ -172,6 +172,12 @@ glossary in `DECISIONS.md`; never let "translate" slip into commercial framing (
   `app/Livewire/Counter/TillSession.php` (till open + cash movements + BLIND close), and
   `app/Livewire/Counter/DispensaryPos.php` (member-first weight POS — a THIN shell that only resolves
   + calls the Actions; idempotency key per basket, fail-closed offline, no member ⇒ no commit).
+- Counter round-trip budget (prompt 293): a part of a counter screen that rarely changes is a Livewire island re-sent
+  only when its data changes — `@island('…', always: $this->islandChanged('…'))` with
+  `app/Livewire/Counter/Concerns/RendersIslandsOnChange.php` (not a targeted `renderIsland()`: 4.4.6 registers islands
+  on the FIRST render only). Card taps inside an island are `$wire.…` calls, never `wire:click`. View-only controls
+  (filters, layout, tab, search) are Alpine state marked `data-view-only` — `window.counterCatalogue` +
+  `resources/js/catalogue-search.js` — guarded by `ViewOnlyControlsTest` and the 40 KB `CounterRoundTripBudgetTest`.
 - Counter-wide precondition guard (a whole class of screens gated in ONE place, not a card per screen):
   `app/Http/Middleware/RequireOpenTill.php` (prompt 236) — appended globally, matches on PATHS with a
   shared `guardsPath()`/`isAllowedPath()` classifier, redirects to the open-till screen with the intended

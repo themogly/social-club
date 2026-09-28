@@ -1,4 +1,4 @@
-@props(['member', 'source' => 'counter'])
+@props(['member' => null, 'memberId' => null, 'source' => 'counter'])
 
 {{--
     Member identity-photo capture (prompt 157) — a PROGRESSIVE ENHANCEMENT. The upload fallback (a file input)
@@ -12,7 +12,7 @@
 --}}
 <div
     x-data="photoCapture({
-        endpoint: @js(route('counter.members.photo', ['member' => $member->id])),
+        endpoint: @js(route('counter.members.photo', ['member' => $memberId ?? $member->id])),
         csrf: @js(csrf_token()),
         source: @js($source),
         messages: {

@@ -255,10 +255,14 @@ class BlockedMemberReplacesTheCatalogueTest extends TestCase
             'name' => 'Cerveza', 'price_cents' => 250, 'stock' => 100, 'active' => true,
         ]);
 
-        $html = Livewire::test(BarPos::class)->call('selectMember', $this->owesAFee()->id)->html();
+        $bar = Livewire::test(BarPos::class);
+        $this->assertStringContainsString('data-product', $bar->html());
+
+        $html = $bar->call('selectMember', $this->owesAFee()->id)->html();
 
         $this->assertStringNotContainsString('data-blocked-member', $html, 'the bar screen blocked a coffee');
-        $this->assertStringContainsString('data-product', $html, 'the bar catalogue disappeared');
+        // Prompt 293 — the catalogue island is kept in place (skipped: nothing it shows changed), never removed.
+        $this->assertMatchesRegularExpression('/FRAGMENT:type=island\|name=catalogue\|token=[^|]+\|mode=skip/', $html, 'the bar catalogue disappeared');
     }
 
     /** The server still refuses, and still says why: the gate did not become a picture. */
@@ -339,15 +343,19 @@ class BlockedMemberReplacesTheCatalogueTest extends TestCase
         $this->assertSame('list', $component->get('geneticLayout'));
         $this->assertSame('grid', $component->get('articleLayout'));
 
-        // Switching the BAR to list must not touch the genetics preference.
-        $component->call('setCatalogueSource', 'bar')->call('setGeneticLayout', 'list');
+        // One toggle, and it writes to the source ON SCREEN (prompt 293 moved it to the browser): each source has its
+        // own layout and its own #[Session] property to hand the choice back to.
+        $html = $component->html();
+        $this->assertStringContainsString('x-on:click="setLayout(\'list\')"', $html);
+        $this->assertMatchesRegularExpression('/layoutProps.{0,80}geneticLayout.{0,40}articleLayout/s', html_entity_decode($html));
+        $js = (string) file_get_contents(resource_path('js/app.js'));
+        $this->assertStringContainsString('this.layouts[this.source] = mode;', $js);
+        $this->assertStringContainsString('if (prop) this.$wire.$set(prop, mode, false);', $js);
 
-        $this->assertSame('list', $component->get('articleLayout'));
+        // …and the server keeps the two apart: the bar's choice arriving leaves the genetics one alone.
+        $component->set('articleLayout', 'list');
         $this->assertSame('list', $component->get('geneticLayout'));
-
-        $component->call('setCatalogueSource', 'genetics')->call('setGeneticLayout', 'grid');
-
-        $this->assertSame('grid', $component->get('geneticLayout'), 'the genetics layout did not change');
+        $component->set('geneticLayout', 'grid');
         $this->assertSame('list', $component->get('articleLayout'), 'changing the genetics layout changed the bar\'s');
     }
 }

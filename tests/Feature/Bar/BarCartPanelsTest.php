@@ -167,15 +167,18 @@ class BarCartPanelsTest extends TestCase
     {
         $this->article();
 
+        // Prompt 293 — the size is the container's `data-layout`; the card styles itself per size.
         $card = (string) file_get_contents(resource_path('views/components/counter/article-card.blade.php'));
-        $this->assertStringContainsString('flex-row items-center gap-3', $card, 'the list form is not a row');
-        $this->assertStringContainsString('flex-col gap-1', $card, 'the grid form is not a tile');
+        $this->assertStringContainsString('as-list:flex-row as-list:items-center as-list:gap-3', $card, 'the list form is not a row');
+        $this->assertStringContainsString('as-grid:flex-col as-grid:gap-1', $card, 'the grid form is not a tile');
 
-        $list = Livewire::test(BarPos::class)->call('setArticleLayout', 'list')->html();
-        $grid = Livewire::test(BarPos::class)->call('setArticleLayout', 'grid')->html();
+        session(['counter.bar.article_layout' => 'list']);
+        $list = Livewire::test(BarPos::class)->html();
+        session(['counter.bar.article_layout' => 'grid']);
+        $grid = Livewire::test(BarPos::class)->html();
 
-        $this->assertStringContainsString('flex-row items-center gap-3', $list, 'list mode does not render rows');
-        $this->assertStringContainsString('flex-col gap-1', $grid, 'grid mode does not render tiles');
+        $this->assertStringContainsString('data-layout="list"', $list, 'list mode does not render rows');
+        $this->assertStringContainsString('data-layout="grid"', $grid, 'grid mode does not render tiles');
         $this->assertStringContainsString('data-article-card=', $list, 'the Bar is not rendering the shared card');
     }
 
