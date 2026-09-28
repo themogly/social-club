@@ -199,7 +199,7 @@ class EveryEmailSentTest extends TestCase
     {
         config(['mail.default' => 'array']);
         $this->assertSame(0, Artisan::call('csc:mail-test', ['email' => 'probe@example.test']));
-        $this->assertStringContainsString('Enviado', Artisan::output());
+        $this->assertStringContainsString(__('Enviado (:mailer).', ['mailer' => 'array']), Artisan::output());
 
         Mail::shouldReceive('raw')->andThrow(new RuntimeException('Expected response code 250 but got 535'));
         $this->assertSame(1, Artisan::call('csc:mail-test', ['email' => 'probe@example.test']));
