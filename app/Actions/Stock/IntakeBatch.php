@@ -104,7 +104,8 @@ class IntakeBatch
     private function authoriseCeiling(Genetic $genetic, Location $location, ?int $cg, ?int $units, array $data): ?array
     {
         $incomingCg = $cg ?? (($units ?? 0) * (int) $genetic->grams_per_unit_cg);
-        if ($incomingCg <= 0) {
+        // The grow / central store has no per-location ceiling (prompt 277); stock ENTERING a sede is checked there.
+        if ($incomingCg <= 0 || $location->isStore()) {
             return null;
         }
 

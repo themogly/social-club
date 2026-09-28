@@ -87,6 +87,7 @@ class FormCompletenessTest extends TestCase
         BatchResource::class => [
             // location_id is now a required field on the form (prompt 238) — no longer scope-filled.
             'batch_no' => 'system: generated batch number.',
+            'parent_batch_id' => 'system: set by TransferBatch on a part-transfer\'s child batch (prompt 277).',
             'initial_cg' => 'entered as grams; converted on intake by IntakeBatch (WEIGHT genetics).',
             'remaining_cg' => 'system-computed: maintained by the stock-movement ledger.',
             'initial_units' => 'entered as units; recorded on intake by IntakeBatch (UNIT genetics).',

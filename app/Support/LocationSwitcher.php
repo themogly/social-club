@@ -2,6 +2,7 @@
 
 namespace App\Support;
 
+use App\Enums\LocationKind;
 use App\Enums\Role;
 use App\Models\Location;
 use App\Models\User;
@@ -20,13 +21,17 @@ class LocationSwitcher
      *
      * @return Collection<int, Location>
      */
-    public function available(User $user): Collection
+    public function available(User $user, bool $includeStores = false): Collection
     {
-        if ($user->hasRole(Role::OWNER->value)) {
-            return Location::query()->active()->orderBy('name')->get();
-        }
+        // Prompt 277 — the grow / central store has no counter. Every COUNTER caller asks for sedes only (the default),
+        // so the store never appears in the counter's sede picker; the PANEL's switcher includes it, so its stock can be
+        // looked at and moved.
+        $query = $user->hasRole(Role::OWNER->value)
+            ? Location::query()->active()
+            : $user->locations()->where('active', true);
 
-        return $user->locations()->where('active', true)->orderBy('name')->get();
+        return $query->when(! $includeStores, fn ($q) => $q->where('kind', LocationKind::SEDE->value))
+            ->orderBy('name')->get();
     }
 
     /**
@@ -37,7 +42,7 @@ class LocationSwitcher
      */
     public function canSwitchToAll(User $user): bool
     {
-        return $user->hasRole(Role::OWNER->value) && $this->available($user)->count() > 1;
+        return $user->hasRole(Role::OWNER->value) && $this->available($user, includeStores: true)->count() > 1;
     }
 
     /**
@@ -52,7 +57,7 @@ class LocationSwitcher
             return null; // a genuine multi-sede owner still defaults to the rollup
         }
 
-        $available = $this->available($user);
+        $available = $this->available($user, includeStores: true);
 
         return $available->count() === 1 ? (string) $available->first()?->id : null;
     }
@@ -64,7 +69,7 @@ class LocationSwitcher
             return $this->canSwitchToAll($user);
         }
 
-        return $this->available($user)->contains(fn (Location $location) => $location->id === $locationId);
+        return $this->available($user, includeStores: true)->contains(fn (Location $location) => $location->id === $locationId);
     }
 
     /**

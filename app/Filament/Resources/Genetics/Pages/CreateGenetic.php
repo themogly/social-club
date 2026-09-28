@@ -105,9 +105,9 @@ class CreateGenetic extends CreateRecord
                 ->schema([
                     // 238's rule exactly: default to the scope, required, blank in the rollup, locked single-sede.
                     Select::make('location_id')->label(__('Sede'))
-                        ->options(fn (): array => Location::assignableOptions())
+                        ->options(fn (): array => Location::assignableOptions(includeStores: true)) // stock may be received at the store (277)
                         ->default(fn (): ?string => app(ActiveScope::class)->locationId())
-                        ->disabled(fn (): bool => count(Location::assignableOptions()) === 1)
+                        ->disabled(fn (): bool => count(Location::assignableOptions(includeStores: true)) === 1)
                         ->dehydrated()
                         ->required(),
                 ]),

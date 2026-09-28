@@ -13,6 +13,7 @@ use App\Models\MembershipTier;
 use App\Models\User;
 use Carbon\CarbonInterface;
 use Illuminate\Auth\Access\AuthorizationException;
+use RuntimeException;
 
 /**
  * Enrol a member at a location on a tier. Expiry is computed from the tier period;
@@ -29,6 +30,11 @@ class EnrolMembership
      */
     public function handle(Member $member, Location $location, MembershipTier $tier, array $options = []): Membership
     {
+        // The grow / central store has no members (prompt 277) — membership is of a sede with a counter.
+        if ($location->isStore()) {
+            throw new RuntimeException(__('El almacén no tiene socios: la membresía es de una sede.'));
+        }
+
         // ONE active membership per member per location (prompt 203). There is no schema constraint and
         // there was no check here, which was survivable while the callers were a wizard, the panel and an
         // import — a counter button on a tablet is none of those, and a double-tap would have inflated the

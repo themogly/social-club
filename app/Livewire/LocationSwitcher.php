@@ -50,7 +50,7 @@ class LocationSwitcher extends Component
         $user = Auth::user();
 
         return view('livewire.location-switcher', [
-            'locations' => $user !== null ? $switcher->available($user) : collect(),
+            'locations' => $user !== null ? $switcher->available($user, includeStores: true) : collect(), // the panel shows the store (277)
             'canSwitchToAll' => $user !== null && $switcher->canSwitchToAll($user),
         ]);
     }

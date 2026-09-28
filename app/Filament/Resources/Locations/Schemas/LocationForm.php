@@ -3,6 +3,7 @@
 namespace App\Filament\Resources\Locations\Schemas;
 
 use App\Actions\UnlockOperator;
+use App\Enums\LocationKind;
 use App\Enums\Role;
 use App\Models\Location;
 use App\Support\Settings;
@@ -13,6 +14,7 @@ use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\TimePicker;
 use Filament\Forms\Components\Toggle;
 use Filament\Schemas\Components\Section;
+use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Schema;
 use Illuminate\Support\Facades\Auth;
 
@@ -122,6 +124,18 @@ class LocationForm
                             ->required()
                             ->maxLength(255),
 
+                        // Prompt 277 — a counter premises or the grow / central store. Fixed once created: a location with
+                        // members, tills and dispensations cannot become a store, nor the other way round.
+                        Select::make('kind')
+                            ->label(__('Tipo de ubicación'))
+                            ->options(collect(LocationKind::cases())->mapWithKeys(fn (LocationKind $k): array => [$k->value => $k->label()])->all())
+                            ->default(LocationKind::SEDE->value)
+                            ->selectablePlaceholder(false)
+                            ->required()
+                            ->live()
+                            ->disabled(fn (string $operation): bool => $operation === 'edit')
+                            ->helperText(__('El almacén / cultivo guarda stock y lo asigna a las sedes; no tiene mostrador, caja ni socios.')),
+
                         TextInput::make('address')
                             ->label(__('Dirección'))
                             ->maxLength(255),
@@ -132,7 +146,8 @@ class LocationForm
                             ->label(__('Aforo'))
                             ->integer()
                             ->minValue(1)
-                            ->required()
+                            ->required(fn (Get $get): bool => $get('kind') !== LocationKind::ALMACEN->value)
+                            ->visible(fn (Get $get): bool => $get('kind') !== LocationKind::ALMACEN->value)
                             // A new sede pre-fills from the org-wide aforo_default (prompt 44 — previously a
                             // dead setting nothing read); editable per location, so it's only a starting point.
                             ->default(fn (): int => (int) Settings::get('aforo_default', 50))
@@ -192,6 +207,7 @@ class LocationForm
                     ->columns(2),
 
                 Section::make(__('Barra'))
+                    ->visible(fn (Get $get): bool => $get('kind') !== LocationKind::ALMACEN->value) // no counter at the store (277)
                     ->schema([
                         // Per-location settings (prompt 59): these five are stored as LOCATION-SCOPED Setting
                         // rows — the one mechanism Settings::get reads — loaded + saved by the Edit/Create pages,
@@ -237,6 +253,7 @@ class LocationForm
                     ->columns(2),
 
                 Section::make(__('Dispensario'))
+                    ->visible(fn (Get $get): bool => $get('kind') !== LocationKind::ALMACEN->value) // no counter at the store (277)
                     ->schema([
                         // Prompt 250 — how the dispensary picks the lote a dispensation draws from at this sede.
                         Select::make('dispensary_batch_selection')
@@ -263,6 +280,7 @@ class LocationForm
                     ->columns(2),
 
                 Section::make(__('Monedero'))
+                    ->visible(fn (Get $get): bool => $get('kind') !== LocationKind::ALMACEN->value) // no counter at the store (277)
                     ->schema([
                         Toggle::make('ring_fenced')
                             ->label(__('Monedero separado por sede'))
@@ -279,6 +297,7 @@ class LocationForm
                     ->columns(2),
 
                 Section::make(__('Cajas'))
+                    ->visible(fn (Get $get): bool => $get('kind') !== LocationKind::ALMACEN->value) // no counter at the store (277)
                     ->schema([
                         // One drawer is the default (prompt 102): OFF, and opening a caja asks only for the float. ON
                         // lets the sede run several terminals at once and the operator picks which to open.
@@ -296,6 +315,7 @@ class LocationForm
                     ->columns(2),
 
                 Section::make(__('Seguridad del mostrador'))
+                    ->visible(fn (Get $get): bool => $get('kind') !== LocationKind::ALMACEN->value) // no counter at the store (277)
                     ->schema([
                         Toggle::make('restrict_pos_to_checked_in')
                             ->label(__('Solo dispensar a socios que han entrado'))

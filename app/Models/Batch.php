@@ -32,7 +32,7 @@ class Batch extends Model
     use BelongsToOrganisation, HasFactory, HasUlids, ScopedToLocation, SoftDeletes;
 
     protected $fillable = [
-        'organisation_id', 'genetic_id', 'location_id', 'batch_no',
+        'organisation_id', 'genetic_id', 'parent_batch_id', 'location_id', 'batch_no',
         'acquired_or_harvested_on', 'expires_on', 'initial_cg', 'remaining_cg',
         'initial_units', 'remaining_units',
         'cost_per_gram_cents', 'lab_report_path', 'notes', 'status',
@@ -75,6 +75,17 @@ class Batch extends Model
                 throw new RuntimeException('A by-weight batch must set initial_cg/remaining_cg and leave the unit columns null.');
             }
         });
+    }
+
+    /**
+     * The batch this one was split from by a part-transfer (prompt 277) — same lote number, same harvest. Null for a
+     * batch received directly.
+     *
+     * @return BelongsTo<Batch, $this>
+     */
+    public function parent(): BelongsTo
+    {
+        return $this->belongsTo(Batch::class, 'parent_batch_id');
     }
 
     /** @return BelongsTo<Genetic, $this> */

@@ -40,6 +40,7 @@ enum DashboardAlert: string
     case PENDING_APPLICATIONS = 'pending_applications';
     case GENETICS_LOW_STOCK = 'genetics_low_stock';
     case ARTICLES_LOW_STOCK = 'articles_low_stock';
+    case ASSOCIATION_STOCK_CEILING = 'association_stock_ceiling';
 
     /** error | warning | info — how loudly the rail says it. */
     public function severity(): string
@@ -48,7 +49,7 @@ enum DashboardAlert: string
             self::STOCK_CEILING_EXCEEDED => 'error',
             self::MEMBERS_OVER_LIMIT, self::ACTIVE_MEMBER_CAP,
             self::UNRECONCILED_TILL, self::BATCHES_EXPIRING,
-            self::GENETICS_LOW_STOCK, self::ARTICLES_LOW_STOCK => 'warning',
+            self::GENETICS_LOW_STOCK, self::ARTICLES_LOW_STOCK, self::ASSOCIATION_STOCK_CEILING => 'warning',
             self::MEMBERSHIPS_EXPIRING, self::PENDING_APPLICATIONS => 'info',
         };
     }
@@ -71,6 +72,7 @@ enum DashboardAlert: string
             self::PENDING_APPLICATIONS => trans_choice(':count solicitud pendiente|:count solicitudes pendientes', $count, ['count' => $count]),
             self::GENETICS_LOW_STOCK => trans_choice(':count variedad con stock bajo|:count variedades con stock bajo', $count, ['count' => $count]),
             self::ARTICLES_LOW_STOCK => trans_choice(':count artículo de barra y tienda con stock bajo|:count artículos de barra y tienda con stock bajo', $count, ['count' => $count]),
+            self::ASSOCIATION_STOCK_CEILING => __('La asociación tiene más stock en total (sedes y almacén) que el techo orientativo'),
         };
     }
 
@@ -96,7 +98,7 @@ enum DashboardAlert: string
             // Low stock (prompt 269) is the same decision as expiring batches: the remedy is a purchase, which the
             // counter does not make. The dispensary picker already badges the variety itself.
             self::BATCHES_EXPIRING, self::STOCK_CEILING_EXCEEDED, self::ACTIVE_MEMBER_CAP,
-            self::GENETICS_LOW_STOCK, self::ARTICLES_LOW_STOCK => null,
+            self::GENETICS_LOW_STOCK, self::ARTICLES_LOW_STOCK, self::ASSOCIATION_STOCK_CEILING => null,
         };
     }
 
@@ -114,7 +116,7 @@ enum DashboardAlert: string
         return match ($this) {
             self::MEMBERS_OVER_LIMIT, self::ACTIVE_MEMBER_CAP, self::MEMBERSHIPS_EXPIRING => MemberResource::class,
             self::UNRECONCILED_TILL => TillSessionResource::class,
-            self::BATCHES_EXPIRING, self::STOCK_CEILING_EXCEEDED => BatchResource::class,
+            self::BATCHES_EXPIRING, self::STOCK_CEILING_EXCEEDED, self::ASSOCIATION_STOCK_CEILING => BatchResource::class,
             self::GENETICS_LOW_STOCK => GeneticResource::class,
             self::PENDING_APPLICATIONS => MemberApplicationResource::class,
             self::ARTICLES_LOW_STOCK => ArticleResource::class,
