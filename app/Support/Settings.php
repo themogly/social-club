@@ -42,6 +42,9 @@ class Settings
         'monthly_window' => 'calendar',     // calendar | rolling30
         'forecast_options_g' => [30, 50, 60, 90],
         'active_member_cap' => 750,
+        // Prompt 291 — an operator's overrides + waivers over 7 days above this % of their takings raise a dashboard alert
+        // (with at least €50 of takings). OVERNIGHT-DEFAULT — CONFIRM.
+        'discount_alert_threshold_pct' => 10,
         'stock_ceiling_days' => 5,
 
         // Consumption gauge thresholds (percent of monthly allowance)

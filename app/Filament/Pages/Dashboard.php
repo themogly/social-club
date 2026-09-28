@@ -19,6 +19,7 @@ use App\Support\Period;
 use App\Support\Weight;
 use App\ViewModels\Dashboard as DashboardData;
 use App\ViewModels\DashboardCharts;
+use App\ViewModels\Reports\DiscountsReport;
 use App\ViewModels\StaffHours;
 use Carbon\CarbonImmutable;
 use Filament\Actions\Action;
@@ -154,7 +155,7 @@ class Dashboard extends BaseDashboard
             'data' => $data,
             'occupancy' => $occ = $charts->occupancy(),
             'stats' => $this->statCards($data, $charts, $period, $canSeeFinance),
-            'alerts' => $this->decorateAlerts(array_merge($data->alerts(), $this->staffAlerts($staffHours))),
+            'alerts' => $this->decorateAlerts(array_merge($data->alerts(), $this->staffAlerts($staffHours), $this->discountAlerts($user, $data))),
             'staffHours' => $staffHours,
             'staffNow' => $staffHours?->now() ?? [],
             'ceilingHeadroom' => $data->ceilingHeadroom(),
@@ -241,6 +242,26 @@ class Dashboard extends BaseDashboard
         }
 
         return $alerts;
+    }
+
+    /**
+     * Prompt 291 — operators above the discount threshold over the last 7 days (never the dashboard period), at the sedes
+     * this dashboard shows, for holders of reports.view only.
+     *
+     * @return list<array{severity: string, key: string, count: int}>
+     */
+    private function discountAlerts(User $user, DashboardData $data): array
+    {
+        if (! $user->can('reports.view')) {
+            return [];
+        }
+
+        $ids = $data->locationIds ?? Location::query()->withoutGlobalScopes()->where('organisation_id', $data->organisationId)->sedes()->pluck('id')->all();
+        $count = DiscountsReport::operatorsAboveThreshold(array_values($ids));
+
+        return $count > 0
+            ? [['severity' => DashboardAlert::DISCOUNTS_ABOVE_THRESHOLD->severity(), 'key' => DashboardAlert::DISCOUNTS_ABOVE_THRESHOLD->value, 'count' => $count]]
+            : [];
     }
 
     /**

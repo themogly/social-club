@@ -3,12 +3,14 @@
 namespace App\Enums;
 
 use App\Filament\Pages\RegistroJornada;
+use App\Filament\Pages\Reports\DiscountsReportPage;
 use App\Filament\Resources\Articles\ArticleResource;
 use App\Filament\Resources\Batches\BatchResource;
 use App\Filament\Resources\Genetics\GeneticResource;
 use App\Filament\Resources\MemberApplications\MemberApplicationResource;
 use App\Filament\Resources\Members\MemberResource;
 use App\Filament\Resources\TillSessions\TillSessionResource;
+use App\ViewModels\Reports\DiscountsReport;
 use Filament\Pages\Page;
 use Filament\Resources\Resource;
 
@@ -47,6 +49,9 @@ enum DashboardAlert: string
     // panel dashboard only and only for holders of `staff.hours.view`.
     case STAFF_OPEN_SHIFTS = 'staff_open_shifts';
     case STAFF_UNCLOCKED_ACTIVITY = 'staff_unclocked_activity';
+    // Prompt 291 — operators whose overrides + waivers over the last 7 days exceed the threshold % of their own takings
+    // (with at least €50 of takings). Panel only, for holders of reports.view at their sedes.
+    case DISCOUNTS_ABOVE_THRESHOLD = 'discounts_above_threshold';
 
     /** error | warning | info — how loudly the rail says it. */
     public function severity(): string
@@ -56,7 +61,7 @@ enum DashboardAlert: string
             self::MEMBERS_OVER_LIMIT, self::ACTIVE_MEMBER_CAP,
             self::UNRECONCILED_TILL, self::BATCHES_EXPIRING,
             self::GENETICS_LOW_STOCK, self::ARTICLES_LOW_STOCK, self::ASSOCIATION_STOCK_CEILING,
-            self::STAFF_OPEN_SHIFTS => 'warning',
+            self::STAFF_OPEN_SHIFTS, self::DISCOUNTS_ABOVE_THRESHOLD => 'warning',
             self::MEMBERSHIPS_EXPIRING, self::PENDING_APPLICATIONS, self::STAFF_UNCLOCKED_ACTIVITY => 'info',
         };
     }
@@ -82,6 +87,7 @@ enum DashboardAlert: string
             self::ASSOCIATION_STOCK_CEILING => __('La asociación tiene más stock en total (sedes y almacén) que el techo orientativo'),
             self::STAFF_OPEN_SHIFTS => trans_choice(':count jornada sin fichar salida|:count jornadas sin fichar salida', $count, ['count' => $count]),
             self::STAFF_UNCLOCKED_ACTIVITY => trans_choice(':count día con actividad sin fichar|:count días con actividad sin fichar', $count, ['count' => $count]),
+            self::DISCOUNTS_ABOVE_THRESHOLD => trans_choice(':count operador por encima del umbral de descuentos (7 días)|:count operadores por encima del umbral de descuentos (7 días)', $count, ['count' => $count]),
         };
     }
 
@@ -110,6 +116,8 @@ enum DashboardAlert: string
             self::GENETICS_LOW_STOCK, self::ARTICLES_LOW_STOCK, self::ASSOCIATION_STOCK_CEILING => null,
             // Hours are corrected in the panel's registro (staff.hours.manage), never at the counter.
             self::STAFF_OPEN_SHIFTS, self::STAFF_UNCLOCKED_ACTIVITY => null,
+            // Discounts are reviewed in the panel's report, never at the counter.
+            self::DISCOUNTS_ABOVE_THRESHOLD => null,
         };
     }
 
@@ -134,6 +142,7 @@ enum DashboardAlert: string
             self::PENDING_APPLICATIONS => MemberApplicationResource::class,
             self::ARTICLES_LOW_STOCK => ArticleResource::class,
             self::STAFF_OPEN_SHIFTS, self::STAFF_UNCLOCKED_ACTIVITY => RegistroJornada::class,
+            self::DISCOUNTS_ABOVE_THRESHOLD => DiscountsReportPage::class,
         };
     }
 
@@ -143,6 +152,11 @@ enum DashboardAlert: string
         // Both low-stock tables have a "Stock bajo" filter — arrive with it on, not on the whole catalogue (269/273).
         if ($this === self::ARTICLES_LOW_STOCK || $this === self::GENETICS_LOW_STOCK) {
             return $this->panelResource()::getUrl('index', ['filters' => ['low_stock' => ['isActive' => true]]]);
+        }
+
+        // The discounts alert opens the report on the same 7 days it counted, sorted by discretionary % (prompt 291).
+        if ($this === self::DISCOUNTS_ABOVE_THRESHOLD) {
+            return DiscountsReportPage::getUrl(['days' => DiscountsReport::ALERT_DAYS]);
         }
 
         return $this->panelResource()::getUrl();

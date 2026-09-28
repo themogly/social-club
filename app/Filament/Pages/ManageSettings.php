@@ -49,6 +49,7 @@ class ManageSettings extends Page
         'active_member_cap' => SettingType::INT,
         'stock_ceiling_days' => SettingType::INT,
         'gauge_warning_pct' => SettingType::INT,
+        'discount_alert_threshold_pct' => SettingType::INT, // prompt 291
         'gauge_alert_pct' => SettingType::INT,
         'avalador_policy' => SettingType::STRING,
         'avalador_max_sponsees' => SettingType::INT,
@@ -167,6 +168,14 @@ class ManageSettings extends Page
                         TextInput::make('stock_ceiling_days')->label(__('Días para techo de stock'))->integer()->minValue(1)->maxValue(365)->required()
                             ->helperText(__('socios × límite diario × estos días = stock máximo recomendado en sede.')),
                     ])->columns(3),
+
+                // Prompt 291 — the dashboard's "operators above the discount threshold" alert.
+                Section::make(__('Descuentos y ajustes'))
+                    ->schema([
+                        TextInput::make('discount_alert_threshold_pct')->label(__('Umbral de alerta de descuentos (%)'))
+                            ->integer()->minValue(1)->maxValue(100)->required()
+                            ->helperText(__('Avisa en el panel cuando los ajustes de precio y las cuotas condonadas de una persona superan este % de lo que ha recaudado en 7 días (con al menos 50 € recaudados).')),
+                    ]),
 
                 Section::make(__('Indicador de consumo'))
                     ->schema([

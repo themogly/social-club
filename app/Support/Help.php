@@ -21,6 +21,7 @@ use App\Filament\Pages\Reports\AttendanceReportPage;
 use App\Filament\Pages\Reports\BarSalesReportPage;
 use App\Filament\Pages\Reports\ConsumptionReportPage;
 use App\Filament\Pages\Reports\DebtorReportPage;
+use App\Filament\Pages\Reports\DiscountsReportPage;
 use App\Filament\Pages\Reports\FinancialReportPage;
 use App\Filament\Pages\Reports\MembersReportPage;
 use App\Filament\Pages\Reports\StaffHoursReportPage;
@@ -314,6 +315,12 @@ class Help
         ]],
         BarSalesReportPage::class => ['permission' => 'reports.view', 'title' => 'Informe de barra y tienda', 'body' => [
             'El ingreso auxiliar no cannábico (Barra y tienda), en su libro aparte para no mezclarlo con la aportación de socios.',
+        ]],
+        // Prompt 291 — everything given away, by whom.
+        DiscountsReportPage::class => ['permission' => 'reports.view', 'title' => 'Descuentos y ajustes', 'body' => [
+            'Todo lo que se ha cedido en el período: descuentos de socio, ajustes de precio y cuotas condonadas, y aparte las líneas manuales de barra (dinero cobrado, no cedido, pero donde se esconde cobrar de menos).',
+            'Por operador: sus ajustes y condonaciones como % de lo que ha recaudado (lo «discrecional»). Los descuentos de socio siguen al socio, no a quien atiende, y se muestran solo como información.',
+            'Las ventas anuladas no cuentan. El aviso del panel usa los últimos 7 días y el umbral de Ajustes (por defecto 10 %, con al menos 50 € recaudados).',
         ]],
         ConsumptionReportPage::class => ['permission' => 'reports.view', 'title' => 'Informe de consumo', 'body' => [
             'Gramos dispensados por período, dentro de los límites configurados. Refleja lo dispensado, no lo autoriza.',
