@@ -8,6 +8,7 @@ use App\Models\Member;
 use App\Support\ConsumptionForecast;
 use App\Support\Money;
 use App\Support\Period;
+use App\Support\Reports\GivenAwayQueries;
 use App\Support\Weight;
 use Illuminate\Support\Facades\DB;
 
@@ -77,10 +78,8 @@ class ConsumptionReport extends AbstractReport
     {
         [$start, $end] = $this->bounds();
 
-        return (int) DB::table('dispensations')
-            ->whereIn('location_id', $this->resolvedLocationIds())
-            ->whereNotNull('original_total_cents')
-            ->where('dispensed_at', '>=', $start)->where('dispensed_at', '<', $end)
+        // The shared query (prompt 291) — the discounts report reads the same one.
+        return (int) GivenAwayQueries::priceOverrides($this->resolvedLocationIds(), $start, $end)
             ->sum(DB::raw('original_total_cents - total_cents'));
     }
 

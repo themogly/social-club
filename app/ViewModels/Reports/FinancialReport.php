@@ -7,6 +7,7 @@ use App\Enums\FeePaymentMethod;
 use App\Enums\OrderStatus;
 use App\Models\Expense;
 use App\Support\Money;
+use App\Support\Reports\GivenAwayQueries;
 use Illuminate\Database\Query\Builder as QueryBuilder;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -205,13 +206,8 @@ class FinancialReport extends AbstractReport
         $ids = $this->resolvedLocationIds();
         [$start, $end] = $this->bounds();
 
-        $rows = DB::table('membership_fee_payments')
-            ->join('memberships', 'membership_fee_payments.membership_id', '=', 'memberships.id')
-            ->join('members', 'memberships.member_id', '=', 'members.id')
-            ->leftJoin('users', 'membership_fee_payments.recorded_by', '=', 'users.id')
-            ->whereIn('memberships.location_id', $ids)
-            ->where('membership_fee_payments.method', FeePaymentMethod::WAIVED->value)
-            ->where('membership_fee_payments.paid_at', '>=', $start)->where('membership_fee_payments.paid_at', '<', $end)
+        // The shared query (prompt 291) — the discounts report reads the same one.
+        $rows = GivenAwayQueries::waivedFees($ids, $start, $end)
             ->orderBy('membership_fee_payments.paid_at')
             ->get([
                 'membership_fee_payments.paid_at as paid_at',

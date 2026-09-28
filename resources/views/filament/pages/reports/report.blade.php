@@ -86,6 +86,11 @@
                 </div>
             @endif
 
+            {{-- A report's own controls above its tables (prompt 291: the discounts detail's filters and pager). --}}
+            @isset($controlsView)
+                @include($controlsView)
+            @endisset
+
             {{-- Tables — the primary is sortable + exportable; the rest are supporting breakdowns. --}}
             @foreach ($tables as $i => $table)
                 <x-dashboard.section :title="$table->title">

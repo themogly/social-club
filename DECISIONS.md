@@ -15292,3 +15292,53 @@ screenshots `storage/app/screenshots/285/`):
   worker, and that the member app still opens as its own app.
 - **For Ben / Shane, after deploy:** on each tablet, open the counter in Chrome and use the install button (or Chrome's
   own menu: *Instalar aplicación*), then open it from the new icon from then on.
+
+## Prompt 291 — Descuentos y ajustes: everything given away, by whom, in one report
+
+- **Informes → Descuentos y ajustes** (`DiscountsReportPage` / `App\ViewModels\Reports\DiscountsReport`). It uses
+  `reports.view` like every report: a manager sees their sedes, the owner the rollup, STAFF are refused. The default
+  period is the current month. The four kinds are kept apart because they mean different things:
+  - **Descuentos de socio** (tier / assigned / Personalizado; dispensary lines plus bar lines) follow the **member**,
+    not the operator. Per operator they are **information only**, never part of the discretionary %, and the column's
+    note says so, so nobody is blamed for a therapeutic member's automatic discount.
+  - **Ajustes de precio** are attributed to whoever **authorised** the price (`price_override_by`), else the operator.
+    **Cuotas condonadas** go to whoever recorded them. Together they are the operator's **discretionary** total, shown
+    as a % of their own takings.
+  - **Líneas manuales** (bar lines with no article) are money **taken, not forgone**, so they are **never in "Total
+    cedido"**. They get their own card and columns because selling a catalogue item as a cheap manual line is where
+    undercharging hides.
+- **Cards:** Descuentos de socio, Ajustes de precio, Cuotas condonadas, Líneas manuales (count · value), and Total
+  cedido (the first three, as a % of gross takings).
+- **Tables:**
+  - **Por operador** is sortable, with CSV export; each name links to the detail filtered to that person.
+  - **Por tipo de descuento** groups by the frozen `pricing_note` label; bar member discounts carry no label and group
+    as "Barra y tienda: descuento de socio".
+  - **Detalle** has one row per event, with member discounts grouped **per sale**, filtered by kind and operator, 50
+    rows a page. Each row links to the dispensation or order.
+- **Voided sales count nowhere.** Soft-deleted staff keep their name, marked "(ya no está)".
+- **One query per existing figure** (`App\Support\Reports\GivenAwayQueries`): the Consumption report's *Ajustes de
+  precio* and the Financial report's *Cuotas condonadas* now read the same queries as this report, pinned by a test
+  written first (same values before and after).
+  - **Correction:** the shared override query counts COMPLETED dispensations only. Consumption used to include a voided
+    sale's override, which gave nothing away.
+- **Bar lines** are loaded in chunks with only the needed columns and summed in PHP. No JSON-path SQL, so MySQL is
+  assumed to behave the same as SQLite (nothing in SQL touches the JSON). The report runs a fixed number of queries
+  whatever the number of sales (tested).
+- **Dashboard alert `DISCOUNTS_ABOVE_THRESHOLD`** (warning; every `match` arm implemented; panel only; holders of
+  `reports.view`, their sedes). It fires for an operator whose overrides plus waivers over the **last 7 days** (never the
+  dashboard period) exceed **Umbral de alerta de descuentos** (a new owner setting in Ajustes, default **10 %**) of
+  their takings, **with at least €50 of takings**, so one waiver on a quiet day doesn't raise it. It links to the report
+  on those 7 days, sorted by discretionary %. **10 % / 7 days / €50: OVERNIGHT-DEFAULT — CONFIRM.**
+- Vocabulary: the per-operator count is **Operaciones**, never "ventas" (CLAUDE.md). The report shared view gained one
+  optional include (`controlsView`) for the detail's filters and pager.
+- **Deferred:** voids and refunds, the other way value leaves the till. They are manager-only by default and already
+  audited; they could be a sixth card if the owner wants it.
+- Tests: `DiscountsReportTest` (10). The pin was green before and after the extraction; the rest were seen red first.
+- Browser check (`tests/Browser/prove-291-discounts.mjs`, throwaway database with the fixture across both sedes,
+  screenshots `storage/app/screenshots/291/`):
+  - the owner's rollup at 1440 and 820 shows both sedes and the five cards;
+  - an operator's name opens their detail;
+  - the CSV downloads;
+  - at a 1 % threshold the dashboard alert appears and lands on the 7-day report;
+  - the manager sees only their sede;
+  - staff are refused (sent to the counter).
