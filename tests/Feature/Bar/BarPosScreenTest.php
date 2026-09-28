@@ -148,7 +148,7 @@ class BarPosScreenTest extends TestCase
             ->assertDontSee('Amnesia Test');  // …and never a genetic
 
         // The product grid is built ONLY from Article records — no genetic id is present.
-        $ids = array_map(fn (array $row): string => (string) $row['id'], $component->instance()->islandView('catalogue')['articles']);
+        $ids = array_map(fn (array $row): string => (string) $row['id'], $component->invade()->islandView('catalogue')['articles']);
         $this->assertContains($article->id, $ids);
         $this->assertNotContains($genetic->id, $ids);
 

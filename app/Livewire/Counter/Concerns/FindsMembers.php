@@ -67,7 +67,8 @@ trait FindsMembers
     {
         $term = trim($this->lookup);
 
-        if ($term === '') {
+        // Post-296 audit — a scan with nobody at the PIN finds nobody (260's rule for reads).
+        if ($term === '' || ! $this->hasOperator()) {
             return;
         }
 
@@ -112,6 +113,11 @@ trait FindsMembers
     /** A result row was tapped. */
     public function selectMember(string $memberId): void
     {
+        // Post-296 audit — nobody at the PIN, nobody to select (260's rule for reads).
+        if (! $this->hasOperator()) {
+            return;
+        }
+
         $member = Member::query()->find($memberId);
 
         if ($member === null) {
