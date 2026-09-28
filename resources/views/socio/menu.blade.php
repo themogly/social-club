@@ -21,7 +21,8 @@
                 <span class="shrink-0 font-semibold text-brand dark:text-slate-100">{{ \App\Support\Money::fromCents($item['price']->ratePerGramCents)->formatted() }}/g</span>
             </div>
             <p class="mt-1 text-xs text-ink-muted dark:text-slate-400">
-                THC {{ $item['genetic']->thc_pct ?? '—' }}% · CBD {{ $item['genetic']->cbd_pct ?? '—' }}%@if ($item['genetic']->strain_type) · {{ $item['genetic']->strain_type->label() }}@endif
+                {{-- Prompt 278 — the percentages are basis points on the model (thc_bp); `thc_pct` never existed, so every strain read "—%". --}}
+                THC {{ $item['genetic']->thc_bp !== null ? number_format($item['genetic']->thc_bp / 100, 1, ',', '') : '—' }}% · CBD {{ $item['genetic']->cbd_bp !== null ? number_format($item['genetic']->cbd_bp / 100, 1, ',', '') : '—' }}%@if ($item['genetic']->strain_type) · {{ $item['genetic']->strain_type->label() }}@endif
             </p>
 
             {{-- Prompt 185 — availability at THIS member's sede, as a state and never a quantity.

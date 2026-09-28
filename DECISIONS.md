@@ -14634,7 +14634,11 @@ the RECOMMENDED answers and listed in the owner report for him to overrule.
   thumbnail generation (would need an image library — noted, not added).
 - Also: the batch form's "no se puede mover luego" helper was false since 277 (now "se puede trasladar"); CreateBatch's
   confirmation had the same "250 g → 25 g" rtrim bug 271 fixed in the wizard; its "no price at this sede" warning became
-  unreachable (a batch always carries a price) and was removed. Demo batches carry their own price.
+  unreachable (a batch always carries a price) and was removed. Demo batches carry their own price. The member menu printed
+  "THC —% · CBD —%" for every strain (it read a `thc_pct` that never existed); it now reads the basis points.
+- Browser check (real app, fresh demo): the member menu shows the batch's photo and placeholders for the rest; the counter at
+  820×1180 shows the photo on the list and the product list starts above the fold (616 px). Screenshots
+  `storage/app/screenshots/278/`. (Locally the photo URL follows `APP_URL`; the harness serves with a matching one.)
 
 Tests: `BatchPriceAndPhotosTest` (10); `BatchNamesItsSedeTest` and `AddAStrainFlowTest` updated to the new rule. `composer
 check` green in `es` and `en`. Merged to `main` on Ben's instruction.
