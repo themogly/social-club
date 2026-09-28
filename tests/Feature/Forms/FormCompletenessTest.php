@@ -81,7 +81,7 @@ class FormCompletenessTest extends TestCase
             'roll_count' => 'system: size of the frozen recipient roll, set at issue.',
         ],
         ArticleResource::class => [
-            'location_id' => 'scope: active location (ScopedToLocation).',
+            // location_id is now a required field on the form (prompt 294) — no longer scope-filled.
             'price_cents' => 'entered as euros via price_eur (MoneyCast at the edge).',
         ],
         BatchResource::class => [
