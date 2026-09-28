@@ -14822,3 +14822,52 @@ plus the list badge and a sede regression pin. Test 3's cutoff-required and defa
 store-helper assertion is what made it red. Browser (`tests/Browser/prove-283-almacen-form.mjs`, screenshots
 `storage/app/screenshots/283/`), as the owner: switching Sede ↔ Almacén makes the fields and the heading follow; a saved
 store reopens without hours or accent; the list shows no price warning on it; 390 dark checked.
+## Prompt 284 — Changing sede in the panel's top bar keeps you on the same page
+
+Owner: *"When you select all locations on the top menu, don't go back to the homepage."* The cause was not specific to
+the rollup: every choice ended `LocationSwitcher::switchTo()` with `redirect('/')`.
+
+- **The page URL is captured at `mount()`**, on the real page request, into a `#[Locked]` `$returnUrl`: the scheme and
+  host plus the raw request URI, so Filament's search, filters and tab in the query string survive in their original
+  order. Inside `switchTo()`, `request()` is Livewire's update endpoint, which is why it can't be read there.
+- **A search typed after the page loaded (a judgment call past the prompt's design).** Filament writes a table search,
+  filter or tab into the address bar in the browser (`replaceState`) after `mount()` has run. The mount-time URL alone
+  therefore dropped the owner's search, and the browser check caught it. So the switcher also sends
+  `window.location.href`.
+  - `PanelReturnUrl::samePage()` honours it **only when it is the same page** as the locked mount URL (same scheme,
+    host, port and path). It can change the query string, nothing else; any other value falls back to the mount URL.
+  - The result still goes through `after()`.
+  - The handler is Alpine (`x-on:change="$wire.switchTo(…, window.location.href)"`) because Livewire 4's `wire:`
+    expression evaluator has no `window`.
+- **It is still a full reload** (`navigate: false`), so every scoped query, table and widget re-resolves under the new
+  scope. Only the destination changed.
+- **Only panel pages on this host are followed**, via `App\Support\PanelReturnUrl::after()`:
+  - The URL must be http(s) with the same host and port as the app.
+  - `//` and `\` are refused.
+  - It must **resolve to a `filament.admin.*` route**.
+  - Because the panel path is `''`, a path prefix proves nothing. `/counter`, `/socio`, Livewire's endpoint and every
+    other non-panel route are refused by route name, not by a list of prefixes.
+  - Anything else goes to `/`. The client can't change the property (`#[Locked]`), and the resolver checks it anyway.
+- **Record pages**: a Filament resource page holding a `{record}` (the pages using `InteractsWithRecord`: edit, view,
+  manage-related) re-resolves its record under the scope just applied, through `resolveRecordRouteBinding`. If the record
+  is visible, you stay on the page. If not, you land on that resource's list, so no 404. Nothing cleverer than that.
+- Pages that already behave differently under the rollup, such as the batch form leaving the sede blank (148), keep
+  doing so. Only the landing page changed.
+- **`CounterLocationController`** already redirects back (`back()`), so it was confirmed and left alone.
+- **Wider search, other panel redirects after a scope or settings change:**
+  - `LocaleSwitcher` already returns to `url()->previous()` (the Referer of the Livewire POST, which is the page).
+    Unchanged.
+  - `Seguridad::trip()` goes to `/` after a real lockdown on purpose, because the lockdown blocks every page.
+  - `Asamblea` redirects to the new minute.
+  - None of these loses your place, so nothing else changed.
+- **How test 1 goes through the real page**: the tests in `tests/Feature/Locations/ActiveSedeTest.php` GET the real page
+  (Lotes list, batch edit, Registro de dispensación). The switcher mounts on that request, and its `wire:snapshot` is
+  taken from the HTML. `switchTo` is then POSTed to Livewire's real update endpoint (`PostsLivewireOverHttp`), and the
+  test asserts on `effects.redirect`. `Livewire::test()` alone would have no page URL. Test 7 follows the redirect and
+  sees the other sede's rows. Tests 1–7 were seen red first. The typed-after-load test and the custom-page test were
+  added with the fix that followed the browser check.
+- Browser check (real app, fresh demo, owner, 1440×900 and 820×1180, `tests/Browser/prove-284-sede-switch.mjs`,
+  screenshots `storage/app/screenshots/284/`):
+  - Lotes with "B-" typed in, then the rollup, then North: stays on `/batches?search=B-` with the box still filled.
+  - A Central batch's edit page: the rollup stays on it; North lands on `/batches`.
+  - Registro de dispensación and the RAT stay put.
