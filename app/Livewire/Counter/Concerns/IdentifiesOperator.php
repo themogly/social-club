@@ -4,13 +4,24 @@ namespace App\Livewire\Counter\Concerns;
 
 use App\Actions\Counter\SignInOperator;
 use App\Actions\RecordAuditLog;
+use App\Actions\Staff\ClockIn;
+use App\Actions\Staff\ClockOut;
 use App\Actions\UnlockOperator;
+use App\Enums\StaffClockSource;
+use App\Models\Location;
 use App\Models\User;
 use App\Support\ActiveScope;
+use App\Support\BusinessDay;
 use App\Support\CounterBlocker;
 use App\Support\CounterHandover;
 use App\Support\CounterOperator;
+use App\Support\Period;
+use App\Support\WorkedHours;
+use Carbon\CarbonImmutable;
+use DomainException;
+use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Support\Facades\Auth;
+use InvalidArgumentException;
 use Livewire\Attributes\On;
 
 /**
@@ -51,6 +62,23 @@ trait IdentifiesOperator
     public ?string $surfaceModeState = null;
 
     /**
+     * The registro de jornada question the surface is asking (prompt 281, Ben's 280), server-side so it survives a
+     * re-render: 'in' — "Fichar entrada / Solo identificarme" after a PIN with no open period; 'declare' — a period left
+     * open from a previous business day, whose end is declared first; 'out' — "Fichar salida", awaiting the PIN again.
+     */
+    public ?string $clockPrompt = null;
+
+    /** The declared end of a forgotten period, as the sede's local "Y-m-d\TH:i" (datetime-local). */
+    public string $declaredEnd = '';
+
+    public string $declaredReason = '';
+
+    public ?string $clockFeedback = null;
+
+    /** "Mis horas" — the signed-in person's own hours sheet. */
+    public bool $myHoursOpen = false;
+
+    /**
      * Refresh the mirror on EVERY render, before the view and before the snapshot is built. A hook, not a
      * line in each transition: the whole defect was one path forgetting to tell the client, and a rule
      * that has to be remembered in six places will be forgotten in a seventh.
@@ -83,6 +111,10 @@ trait IdentifiesOperator
     {
         if (CounterHandover::active()) {
             return 'handover';
+        }
+
+        if ($this->clockPrompt !== null) {
+            return 'clock';
         }
 
         $blocker = CounterBlocker::first([
@@ -204,6 +236,7 @@ trait IdentifiesOperator
         }
 
         CounterOperator::clear();
+        $this->dispatch('counter-clock-state', open: false);
 
         // Prompt 198 keeps the BASKET across a lock, deliberately — work survives a step away from the screen.
         // A confirmation is not work; it is a receipt for a transaction that is over, and whoever unlocks may
@@ -300,7 +333,8 @@ trait IdentifiesOperator
         // application id (if any) is read BEFORE end() disposes of the handover, so the operator can be carried
         // to its review below.
         $submittedAlta = null;
-        if (CounterHandover::active()) {
+        $wasHandover = CounterHandover::active();
+        if ($wasHandover) {
             $submittedAlta = CounterHandover::submittedApplicationId();
             (new RecordAuditLog)->handle('counter.handover.ended', $this->resolveLocation());
             CounterHandover::end();
@@ -315,6 +349,14 @@ trait IdentifiesOperator
         $this->dispatch('counter-unlocked');
         $this->flash(__('Trabajando: :name', ['name' => $operator->name]), 'success');
 
+        // Prompt 281 — the registro de jornada question, ONLY when this person has no open period (the idle-lock
+        // unlock stays one step: a question on every unlock would be tapped through blindly within a day) and never
+        // after a handover. A period left open from an earlier business day is declared first — never invented.
+        if (! $wasHandover) {
+            $this->clockPrompt = $this->clockPromptFor($operator, $location);
+        }
+        $this->dispatch('counter-clock-state', open: WorkedHours::openPeriodFor($operator) !== null);
+
         // Prompt 249 — when the handover that just ended had a SUBMITTED form, land the operator on its review
         // (the counter's 243 rule: the screen shows the outcome, no "revísala" flash). Prompt 188 rejected a
         // redirect after identifying to preserve basket and form state — but a handover has already disposed of
@@ -323,6 +365,201 @@ trait IdentifiesOperator
         if ($submittedAlta !== null) {
             $this->redirect(route('counter.members', ['alta' => $submittedAlta]));
         }
+    }
+
+    /**
+     * Which clock question, if any, a fresh sign-in should see. Every change to the open period is also announced to the
+     * browser as `counter-clock-state` — the top bar's "Fichar salida" is drawn once per page and follows it.
+     */
+    private function clockPromptFor(User $operator, Location $location): ?string
+    {
+        $open = WorkedHours::openPeriodFor($operator);
+
+        if ($open === null) {
+            return 'in';
+        }
+
+        $today = BusinessDay::today($open->location);
+        $this->declaredEnd = '';
+        $this->declaredReason = '';
+
+        return $open->business_date->toDateString() < $today ? 'declare' : null;
+    }
+
+    /** "Fichar entrada" — an IN at now, confirmed by the PIN just entered. */
+    public function clockInNow(): void
+    {
+        $operator = CounterOperator::current();
+        $location = $this->resolveLocation();
+
+        // Guarded by the FACTS, not by which question the component thinks it asked: the signed-in person, their own
+        // IN, refused by ClockIn when they already have an open period.
+        if ($operator === null || $location === null) {
+            return;
+        }
+
+        try {
+            (new ClockIn)->handle($operator, $location, $operator);
+            $this->clockPrompt = null;
+            $this->clockFeedback = null;
+            $this->dispatch('counter-clock-state', open: true);
+            $this->flash(__('Entrada fichada: :time', ['time' => local_datetime(now(), 'H:i', $location)]), 'success');
+        } catch (DomainException|InvalidArgumentException $e) {
+            $this->clockFeedback = $e->getMessage();
+        }
+    }
+
+    /** "Solo identificarme" — signed in, no clock event (a manager passing through). */
+    public function skipClockIn(): void
+    {
+        $this->clockPrompt = null;
+        $this->clockFeedback = null;
+    }
+
+    /** The forgotten clock-out: the person declares when the open period ended (reason required), then clocks in. */
+    public function declareForgottenEnd(): void
+    {
+        $operator = CounterOperator::current();
+        $location = $this->resolveLocation();
+        $open = $operator !== null ? WorkedHours::openPeriodFor($operator) : null;
+
+        // Only a period left open from an EARLIER business day can be declared here.
+        if ($operator === null || $location === null || $open === null
+            || $open->business_date->toDateString() >= BusinessDay::today($open->location)) {
+            return;
+        }
+
+        try {
+            // An empty or malformed time is the person's slip, not an error to echo: Carbon's own message is not for staff.
+            $end = rescue(fn () => CarbonImmutable::createFromFormat('Y-m-d\TH:i', $this->declaredEnd, $open->location->timezone ?: 'Europe/Madrid'), null, false);
+            if (! $end instanceof CarbonImmutable) {
+                throw new InvalidArgumentException(__('Indica la hora a la que terminaste.'));
+            }
+            (new ClockOut)->handle($operator, $operator, StaffClockSource::SELF_DECLARED, $end, $this->declaredReason);
+            (new ClockIn)->handle($operator, $location, $operator);
+            $this->clockPrompt = null;
+            $this->clockFeedback = null;
+            $this->declaredEnd = '';
+            $this->declaredReason = '';
+            $this->dispatch('counter-clock-state', open: true);
+            $this->flash(__('Salida declarada y entrada fichada.'), 'success');
+        } catch (DomainException|InvalidArgumentException|AuthorizationException $e) {
+            $this->clockFeedback = $e->getMessage();
+        } catch (\Throwable) {
+            $this->clockFeedback = __('Indica la hora a la que terminaste.');
+        }
+    }
+
+    /**
+     * "Fichar salida" from the operator menu — it asks for the PIN AGAIN: a tablet left signed in must not let somebody
+     * else clock this person out. Browser-dispatched from the top bar (outside every component's DOM).
+     */
+    #[On('counter-clock-out')]
+    public function beginClockOut(): void
+    {
+        $operator = CounterOperator::current();
+
+        if ($operator === null) {
+            return;
+        }
+
+        if (WorkedHours::openPeriodFor($operator) === null) {
+            $this->flash(__('No tienes una jornada abierta.'), 'warning');
+
+            return;
+        }
+
+        $this->operatorPin = '';
+        $this->clockFeedback = null;
+        $this->clockPrompt = 'out';
+    }
+
+    public function cancelClockOut(): void
+    {
+        $this->clockPrompt = null;
+        $this->clockFeedback = null;
+        $this->operatorPin = '';
+    }
+
+    /** The PIN for "Fichar salida": the same pad, the same UnlockOperator throttle — and it must be THIS person's PIN. */
+    public function confirmClockOut(): void
+    {
+        $operator = CounterOperator::current();
+        $location = $this->resolveLocation();
+        $pin = trim($this->operatorPin);
+        $this->operatorPin = '';
+
+        if ($operator === null || $location === null || $pin === '') {
+            return;
+        }
+
+        $matched = (new UnlockOperator)->handle($location, $pin, $this->operatorThrottleKey());
+
+        if ($matched === null) {
+            $this->clockFeedback = $this->operatorLockedOut()
+                ? __('Demasiados intentos. Espera un momento antes de reintentar.')
+                : __('PIN no reconocido.');
+
+            return;
+        }
+
+        if (! $matched->is($operator)) {
+            $this->clockFeedback = __('Ese PIN no es el tuyo: cada persona ficha su propia salida.');
+
+            return;
+        }
+
+        try {
+            (new ClockOut)->handle($operator, $operator, StaffClockSource::PIN);
+        } catch (DomainException|InvalidArgumentException $e) {
+            $this->clockFeedback = $e->getMessage();
+
+            return;
+        }
+
+        $this->clockPrompt = null;
+        $this->clockFeedback = null;
+        // This person has finished: lock, so the next person identifies themselves.
+        $this->lockCounter();
+        $this->dispatch('counter-lock');
+    }
+
+    #[On('counter-my-hours')]
+    public function openMyHours(): void
+    {
+        $this->myHoursOpen = CounterOperator::id() !== null;
+    }
+
+    public function closeMyHours(): void
+    {
+        $this->myHoursOpen = false;
+    }
+
+    /**
+     * "Mis horas" — ONLY the signed-in person's own periods, this week and this month, whatever their role.
+     *
+     * @return array{periods: list<array<string, mixed>>, week_minutes: int, month_minutes: int}
+     */
+    public function myHours(): array
+    {
+        $operator = CounterOperator::current();
+        $location = $this->resolveLocation();
+
+        if ($operator === null || $location === null) {
+            return ['periods' => [], 'week_minutes' => 0, 'month_minutes' => 0];
+        }
+
+        $month = Period::thisMonth($location);
+        $week = Period::thisWeek($location);
+        $sedes = Location::query()->withoutGlobalScopes()->where('organisation_id', $location->organisation_id)->pluck('id')->all();
+        $periods = WorkedHours::periods([$operator->id], $sedes, $month->start->setTimezone($location->timezone ?: 'Europe/Madrid')->startOfDay(), $month->end->setTimezone($location->timezone ?: 'Europe/Madrid')->startOfDay()->addDay());
+        $weekFrom = BusinessDay::date($location, $week->start)->toDateString();
+
+        return [
+            'periods' => array_reverse($periods),
+            'week_minutes' => array_sum(array_map(fn (array $p): int => $p['business_date'] >= $weekFrom ? (int) $p['minutes'] : 0, $periods)),
+            'month_minutes' => array_sum(array_map(fn (array $p): int => (int) $p['minutes'], $periods)),
+        ];
     }
 
     /**

@@ -56,6 +56,17 @@ class User extends Authenticatable implements FilamentUser, HasAppAuthentication
         return $this->active && $this->hasAnyRole(array_column(Role::cases(), 'value'));
     }
 
+    protected static function booted(): void
+    {
+        // Prompt 281 — the registro de jornada is kept at least 4 years, also after the person leaves (a soft delete keeps
+        // it; the FK restricts). A force-delete of someone with recent clock events is refused, saying why.
+        static::forceDeleting(function (User $user): void {
+            if (StaffClockEvent::query()->withoutGlobalScopes()->where('user_id', $user->id)->where('occurred_at', '>=', now()->subYears(4))->exists()) {
+                throw new \RuntimeException(__('No se puede borrar definitivamente: su registro de jornada debe conservarse 4 años.'));
+            }
+        });
+    }
+
     /**
      * Is this PIN already someone else's? (prompt 270)
      *

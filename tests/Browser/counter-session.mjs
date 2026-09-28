@@ -76,6 +76,14 @@ export async function signInToCounter(page, url = '/counter/members', { sede = n
         }
         await pad.click();
         await page.waitForTimeout(1200);
+
+        // Prompt 281 — with no open period the surface asks the registro de jornada question. The harnesses are
+        // about their own screens, not the time clock, so they answer "Solo identificarme" (writes no event).
+        const skip = await page.$('[data-clock-skip]');
+        if (skip && await skip.isVisible()) {
+            await skip.click();
+            await page.waitForTimeout(800);
+        }
     }
 
     return !! await page.$('[data-counter-topbar]');

@@ -264,6 +264,29 @@
                      turn; the device logout is now a responsable-only action (below). --}}
                 <span class="sr-only">· {{ __('Cambiar de persona') }}</span>
             </button>
+
+            {{-- Prompt 281 — the registro de jornada from the operator's own controls: "Mis horas" always (your OWN hours,
+                 no permission); "Fichar salida" (below) while you have an open period, asking for your PIN again. Both
+                 dispatch to the screen's component, like the switch above (the bar is outside every component's DOM). --}}
+            <button type="button" data-counter-my-hours @click="window.Livewire.dispatch('counter-my-hours')"
+                    aria-label="{{ __('Mis horas') }}" title="{{ __('Mis horas') }}"
+                    class="inline-flex min-h-11 min-w-11 items-center justify-center rounded-lg px-3 text-sm font-medium text-ink-muted transition hover:bg-brand-tint hover:text-brand dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-white">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" class="h-5 w-5 shrink-0" aria-hidden="true">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"/>
+                </svg>
+            </button>
+        @endif
+        @if ($user !== null)
+            {{-- Rendered for every signed-in device and SHOWN while the operator has an open period: the bar is drawn once
+                 per page, so the screen's component announces each clock in/out (`counter-clock-state`) and this follows
+                 it — "Fichar salida" appears the moment you clock in, not on the next page. --}}
+            @php($clockOperator = \App\Support\CounterOperator::current())
+            <button type="button" data-counter-clock-out @click="window.Livewire.dispatch('counter-clock-out')"
+                    x-data="{ open: @js($clockOperator !== null && \App\Support\WorkedHours::openPeriodFor($clockOperator) !== null) }"
+                    x-show="open" x-cloak x-on:counter-clock-state.window="open = $event.detail.open"
+                    class="inline-flex min-h-11 items-center gap-2 rounded-lg px-3 text-sm font-medium text-ink-muted transition hover:bg-brand-tint hover:text-brand dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-white">
+                {{ __('Fichar salida') }}
+            </button>
         @endif
 
         {{-- LOCK — prompt 198's requirement, settled: a first-class control in the bar, on every screen,

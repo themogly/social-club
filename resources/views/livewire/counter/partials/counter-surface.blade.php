@@ -56,7 +56,13 @@
         push(d) { if (this.pin.length < 8) this.pin += d },
         back() { this.pin = this.pin.slice(0, -1) },
         clear() { this.pin = '' },
-        submit() { if (this.pin === '') return; $wire.operatorPin = this.pin; this.pin = ''; $wire.unlockOperator() },
+        submit() {
+            if (this.pin === '') return
+            $wire.operatorPin = this.pin; this.pin = ''
+            {{-- Prompt 281 — in the clock-out step the same pad confirms "Fichar salida" instead of signing in. --}}
+            if (this.mode === 'clock') { $wire.confirmClockOut(); return }
+            $wire.unlockOperator()
+        },
         {{-- Prompt 272 — the keyboard. Enter used to be bound on window as "submit": but Enter is how a focused
              <button> is activated, and keydown reaches window before the button's click — so Enter on the
              second digit key submitted the ONE digit typed so far ("PIN no reconocido"), each key after the
@@ -90,12 +96,14 @@
              Otherwise a client-side idle lock outranks the server's 'no operator yet'. --}}
         get mode() {
             if ($wire.surfaceModeState === 'handover') return 'handover'
+            {{-- Prompt 281 — the clock question/step arrives as the server mode 'clock'; the unlock that raises it
+                 also lifts the client lock in the same response, so the order here is unchanged. --}}
             if ($store.counter.locked) return 'locked'
             return $wire.surfaceModeState ?? null
         },
         get open() { return this.mode !== null },
         {{-- The pad is the same pad in all three modes; only what it says differs. --}}
-        get padVisible() { return this.mode === 'locked' || this.mode === 'unidentified' || (this.mode === 'handover' && this.staffPad) },
+        get padVisible() { return this.mode === 'locked' || this.mode === 'unidentified' || (this.mode === 'handover' && this.staffPad) || (this.mode === 'clock' && $wire.clockPrompt === 'out') },
     }"
     x-effect="if (mode !== 'handover') staffPad = false"
     x-init="$watch('open', (v) => focusChanged(v)); if (open) focusChanged(true)"
@@ -159,6 +167,41 @@
             >{{ __('Personal del club') }}</button>
         </div>
 
+    {{-- Prompt 281 (Ben's 280) — the registro de jornada question, after a PIN from somebody with NO open period. Never on
+         an idle-lock unlock of an open period (one step — asked every few minutes it would be tapped through blindly),
+         never after a handover, never for the supervisor PIN. Clocking in is NOT a precondition for working. --}}
+    @if ($clockPrompt === 'in')
+        <div data-clock-in-question x-show="mode === 'clock'" x-cloak class="w-full max-w-sm rounded-2xl border border-line bg-surface p-6 text-center shadow-xl dark:border-slate-800 dark:bg-slate-900">
+            <h2 class="text-base font-semibold">{{ __('¿Fichas la entrada?') }}</h2>
+            <p class="mt-1 text-sm text-ink-muted dark:text-slate-400">{{ __('Hola, :name. Registra el inicio de tu jornada aquí.', ['name' => $this->currentOperatorName() ?? '']) }}</p>
+            @if ($clockFeedback !== null)
+                <p role="alert" class="mt-3 rounded-lg bg-error/10 px-3 py-2 text-sm font-medium text-error">{{ $clockFeedback }}</p>
+            @endif
+            <x-button type="button" wire:click="clockInNow" data-clock-in class="mt-4 min-h-[2.75rem] w-full">{{ __('Fichar entrada') }}</x-button>
+            <x-button type="button" variant="secondary" wire:click="skipClockIn" data-clock-skip class="mt-2 min-h-[2.75rem] w-full">{{ __('Solo identificarme') }}</x-button>
+        </div>
+    @elseif ($clockPrompt === 'declare')
+        @php($openPeriod = \App\Support\WorkedHours::openPeriodFor(\App\Support\CounterOperator::current() ?? new \App\Models\User))
+        @if ($openPeriod !== null)
+            @php($tz = $openPeriod->location->timezone ?: 'Europe/Madrid')
+            <div data-clock-declare x-show="mode === 'clock'" x-cloak class="w-full max-w-sm rounded-2xl border border-line bg-surface p-6 shadow-xl dark:border-slate-800 dark:bg-slate-900">
+                <h2 class="text-base font-semibold">{{ __('Tu jornada sigue abierta') }}</h2>
+                <p class="mt-1 text-sm text-ink-muted dark:text-slate-400">{{ __('Tu jornada del :date en :sede sigue abierta. ¿A qué hora terminaste?', ['date' => $openPeriod->business_date->translatedFormat('l j'), 'sede' => $openPeriod->location->name]) }}</p>
+                <label for="declared-end" class="mt-4 block text-sm font-medium">{{ __('Hora de salida') }}</label>
+                <input id="declared-end" type="datetime-local" wire:model="declaredEnd"
+                       min="{{ $openPeriod->occurred_at->setTimezone($tz)->format('Y-m-d\TH:i') }}" max="{{ now($tz)->format('Y-m-d\TH:i') }}"
+                       class="mt-1 block min-h-[2.75rem] w-full rounded-lg border border-line bg-surface px-3 dark:border-slate-700 dark:bg-slate-950">
+                <label for="declared-reason" class="mt-3 block text-sm font-medium">{{ __('Motivo') }}</label>
+                <input id="declared-reason" type="text" wire:model="declaredReason" maxlength="200" placeholder="{{ __('p. ej. me olvidé de fichar') }}"
+                       class="mt-1 block min-h-[2.75rem] w-full rounded-lg border border-line bg-surface px-3 dark:border-slate-700 dark:bg-slate-950">
+                @if ($clockFeedback !== null)
+                    <p data-clock-feedback role="alert" class="mt-3 rounded-lg bg-error/10 px-3 py-2 text-sm font-medium text-error">{{ $clockFeedback }}</p>
+                @endif
+                <x-button type="button" wire:click="declareForgottenEnd" data-clock-declare-submit class="mt-4 min-h-[2.75rem] w-full">{{ __('Guardar y fichar entrada') }}</x-button>
+            </div>
+        @endif
+    @endif
+
     {{-- LOCKED, UNIDENTIFIED, and HANDED-OVER-with-the-staff-pad-open — the same PIN pad, the same
          UnlockOperator call and therefore the same throttle, differing only in what it says. --}}
     <div x-show="padVisible" x-cloak class="w-full max-w-xs rounded-2xl border border-line bg-surface p-6 shadow-xl dark:border-slate-800 dark:bg-slate-900">
@@ -169,9 +212,9 @@
                     </svg>
                 </span>
                 <h2 data-surface-heading class="mt-3 text-base font-semibold"
-                    x-text="mode === 'handover' ? (submitted ? @js(__('Solicitud recibida')) : @js(__('Recuperar el mostrador'))) : (mode === 'locked' ? @js(__('Pantalla bloqueada')) : @js(__('¿Quién está trabajando?')))"></h2>
+                    x-text="mode === 'clock' ? @js(__('Fichar salida')) : (mode === 'handover' ? (submitted ? @js(__('Solicitud recibida')) : @js(__('Recuperar el mostrador'))) : (mode === 'locked' ? @js(__('Pantalla bloqueada')) : @js(__('¿Quién está trabajando?'))))"></h2>
                 <p class="mt-1 text-sm text-ink-muted dark:text-slate-400"
-                   x-text="mode === 'handover' ? @js(__('Introduce tu PIN para finalizar la entrega y volver al mostrador.')) : (mode === 'locked' ? @js(__('Introduce tu PIN para continuar. El trabajo en curso se conserva.')) : @js(__('Introduce tu PIN para identificarte en el mostrador.')))"></p>
+                   x-text="mode === 'clock' ? @js(__('Confirma tu salida con tu PIN.')) : (mode === 'handover' ? @js(__('Introduce tu PIN para finalizar la entrega y volver al mostrador.')) : (mode === 'locked' ? @js(__('Introduce tu PIN para continuar. El trabajo en curso se conserva.')) : @js(__('Introduce tu PIN para identificarte en el mostrador.'))))"></p>
             </div>
 
             {{-- Masked, client-side display of the digits entered so far. --}}
@@ -183,6 +226,10 @@
             </div>
             {{-- The dots are aria-hidden, so the COUNT is announced instead (never the digits). --}}
             <p data-pin-count class="sr-only" aria-live="polite" x-text="digitsLabel(pin.length)"></p>
+
+            @if ($clockPrompt === 'out' && $clockFeedback !== null)
+                <p data-clock-feedback role="alert" class="mt-3 rounded-lg bg-error/10 px-3 py-2 text-center text-sm font-medium text-error">{{ $clockFeedback }}</p>
+            @endif
 
             @if ($operatorFeedback !== null)
                 <p data-counter-surface-feedback role="alert" class="mt-3 rounded-lg bg-error/10 px-3 py-2 text-center text-sm font-medium text-error">{{ $operatorFeedback }}</p>
@@ -207,7 +254,11 @@
             </div>
 
             <button type="button" data-counter-surface-unlock x-ref="pinPad" @click="submit()" class="mt-4 min-h-[2.75rem] h-12 w-full rounded-lg bg-brand text-sm font-semibold text-white transition hover:bg-brand-dark"
-                    x-text="mode === 'handover' ? @js(__('Recuperar el mostrador')) : (mode === 'locked' ? @js(__('Desbloquear')) : @js(__('Identificarse')))"></button>
+                    x-text="mode === 'clock' ? @js(__('Fichar salida')) : (mode === 'handover' ? @js(__('Recuperar el mostrador')) : (mode === 'locked' ? @js(__('Desbloquear')) : @js(__('Identificarse'))))"></button>
+
+            @if ($clockPrompt === 'out')
+                <button type="button" data-clock-out-cancel wire:click="cancelClockOut" class="mt-3 min-h-[2.75rem] w-full rounded-lg px-4 text-sm font-medium text-ink-muted transition hover:text-ink dark:text-slate-400 dark:hover:text-slate-300">{{ __('Cancelar') }}</button>
+            @endif
 
             {{-- Opened by mistake, or the staff member changed their mind: hand the tablet back to the
                  applicant rather than leaving them facing a PIN pad. Handover mode only — and NOT once the
@@ -224,3 +275,42 @@
             @endunless
         </div>
 </div>
+
+{{-- Prompt 281 — "Mis horas": the signed-in person's OWN hours, this week and this month. Read-only, no permission needed,
+     never anyone else's. A sheet inside the page (nothing leaves the tab); the back gesture closes it. --}}
+@if ($myHoursOpen)
+    @php($mine = $this->myHours())
+    <div data-my-hours role="dialog" aria-modal="true" aria-label="{{ __('Mis horas') }}"
+         x-data x-init="history.pushState({ myHours: true }, ''); window.addEventListener('popstate', () => $wire.closeMyHours(), { once: true })"
+         class="fixed inset-0 z-50 flex items-end justify-center bg-ink/40 p-0 sm:items-center sm:p-4">
+        <div class="max-h-[90svh] w-full max-w-lg overflow-y-auto rounded-t-2xl border border-line bg-surface p-5 shadow-xl dark:border-slate-800 dark:bg-slate-900 sm:rounded-2xl">
+            <div class="flex items-center justify-between gap-3">
+                <h2 class="text-base font-semibold">{{ __('Mis horas') }}</h2>
+                <button type="button" wire:click="closeMyHours" class="inline-flex min-h-[2.75rem] items-center rounded-lg px-3 text-sm font-medium text-ink-muted hover:text-ink dark:text-slate-400">{{ __('Cerrar') }}</button>
+            </div>
+            <p class="mt-1 text-sm text-ink-muted dark:text-slate-400">
+                {{ __('Esta semana: :week · Este mes: :month', ['week' => sprintf('%d h %02d min', intdiv($mine['week_minutes'], 60), $mine['week_minutes'] % 60), 'month' => sprintf('%d h %02d min', intdiv($mine['month_minutes'], 60), $mine['month_minutes'] % 60)]) }}
+            </p>
+            <ul class="mt-3 divide-y divide-line dark:divide-slate-800">
+                @forelse ($mine['periods'] as $p)
+                    <li data-my-hours-row class="flex items-center justify-between gap-3 py-2 text-sm">
+                        <span class="min-w-0">
+                            <span class="font-medium">{{ \Carbon\CarbonImmutable::parse($p['business_date'])->translatedFormat('D j M') }}</span>
+                            <span class="text-ink-muted dark:text-slate-400">· {{ $p['in']->location->name }}</span>
+                            @foreach ($p['flags'] as $flag)
+                                <span class="ml-1 rounded-full border border-warning/40 px-1.5 text-[11px] font-semibold text-warning">{{ $flag }}</span>
+                            @endforeach
+                        </span>
+                        <span class="shrink-0 tabular-nums">
+                            {{ local_datetime($p['in']->occurred_at, 'H:i', $p['in']->location) }}–{{ $p['out'] ? local_datetime($p['out']->occurred_at, 'H:i', $p['in']->location) : '…' }}
+                            @if ($p['minutes'] !== null)<span class="text-ink-muted dark:text-slate-400">· {{ sprintf('%d:%02d', intdiv($p['minutes'], 60), $p['minutes'] % 60) }}</span>@endif
+                        </span>
+                    </li>
+                @empty
+                    <li class="py-6 text-center text-sm text-ink-muted dark:text-slate-400">{{ __('Todavía no has fichado este mes.') }}</li>
+                @endforelse
+            </ul>
+        </div>
+    </div>
+@endif
+

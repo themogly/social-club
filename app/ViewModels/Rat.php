@@ -185,6 +185,23 @@ class Rat
                 'transfers' => $noTransfer,
                 'retention' => __(':base — deliberadamente más larga que la de los datos de socio, para poder evidenciar accesos pasados.', ['base' => $auditRetention]),
             ],
+            // Prompt 281 (Ben's 280). OVERNIGHT-DEFAULT — CONFIRM: whether compensated volunteers fall under the registro de
+            // jornada regime (RD-ley 8/2019, art. 34.9 ET) is the gestor's call, so the legal basis is written neutrally.
+            [
+                'ref' => 'RAT-08',
+                'name' => __('Registro de jornada del personal'),
+                'purpose' => __('Registro de la hora de inicio y fin de la jornada de cada persona en el club, y su puesta a disposición de la propia persona y de la autoridad competente.'),
+                'legal_basis' => __('Cumplimiento de una obligación legal (registro de jornada) o, en su caso, interés legítimo en acreditar la dedicación del voluntariado compensado — pendiente de confirmar con la gestoría.'),
+                'data_categories' => [
+                    __('Identificativos (nombre)'),
+                    __('Sede y horas de entrada y salida'),
+                    __('Correcciones y sus motivos'),
+                ],
+                'article_9' => false,
+                'recipients' => __('La propia persona y los roles con permiso para ver el registro de jornada; la Inspección de Trabajo cuando la ley lo exija.'),
+                'transfers' => $noTransfer,
+                'retention' => __('4 años como mínimo, también tras la baja de la persona.'),
+            ],
         ];
     }
 

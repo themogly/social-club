@@ -149,6 +149,9 @@ class CounterSurfaceTest extends TestCase
         Livewire::actingAs($this->device)->test(TillSession::class)
             ->set('operatorPin', '4321')
             ->call('unlockOperator')
+            // Prompt 281 — no open period yet, so the surface asks the registro de jornada question first.
+            ->assertSee('data-surface-mode="clock"', false)
+            ->call('skipClockIn')
             ->assertSee('data-surface-mode="none"', false);
 
         $this->assertSame($this->operator->id, CounterOperator::id());

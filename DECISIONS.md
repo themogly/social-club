@@ -14657,3 +14657,73 @@ check` green in `es` and `en`. Merged to `main` on Ben's instruction.
   again. `HashProductTypeTest` rewritten to the new shape (including the migration).
 
 `composer check` green in `es` and `en`. Merged to `main` on Ben's instruction.
+
+## Prompt 281 (Ben's 280) — Registro de jornada: staff clock in and out with their PIN
+
+- **Its own append-only event log** (`staff_clock_events`: IN / OUT / ANNUL, ULID keys). It is kept separate from the counter
+  sign-ins in `audit_logs` and from `TillShift`: a sign-in is "who is at the till now", while a clock event is "when my working
+  day started or ended". Mixing them would turn every handover into a spurious period. Model events and the builder
+  (`AppendOnlyBuilder`) both refuse update and delete. **A correction is a new row** (MANAGER_CORRECTION or SELF_DECLARED,
+  with a required reason), and an annulment is an ANNUL row pointing at the original, which the report still shows struck
+  through. A raw `DB::table()` write can't be guarded at the model level; nothing in the app does one.
+- **One reader**, `App\Support\WorkedHours`: periods are derived (IN → next OUT) and never stored, and flagged "Sin fichar
+  salida", "Hora declarada" or "Corregido por :name". It never reads hours from the audit log. Its single audit read is the
+  "Actividad sin fichar" cross-check, which lists days with counter sign-ins and no period, in one query.
+- **Writers**: `ClockIn`, `ClockOut` and `AnnulClockEvent`, with the rules in one place (`ClockRules`):
+  - You clock only yourself, unless it's a manager correction at a sede you manage.
+  - Declared times need a reason and can't be in the future.
+  - An OUT must fall between its IN and now.
+  - One open period per person, org-wide.
+  - Not at the store (a working day belongs to a sede).
+  - Times are normalised to UTC before storing, because Eloquent writes the wall-clock digits.
+  - `business_date` is the IN's business day, so a night that runs past midnight stays one period.
+- **Counter**: after a PIN unlock (not a handover) the counter asks "¿Fichas la entrada?". "Solo identificarme" skips it, and
+  clocking in is **not** a `CounterBlocker`, so the till still works for someone who doesn't clock in. If the person's previous
+  period is still open from an earlier business day, they're asked what time they finished (SELF_DECLARED, with a reason),
+  then clocked in.
+  - "Fichar salida" in the top bar asks for the operator's own PIN again (a second person can't clock you out) and then locks
+    the counter.
+  - Closing the till offers "¿Fichar salida ahora?" without a second PIN, because the closer has just proved who they are by
+    counting.
+  - **There is no automatic clock-out**: a forgotten OUT stays open and flagged until declared or corrected. An invented end
+    time would be a false record.
+  - "Mis horas" is a sheet that shows your own periods for this week and month.
+- **Panel**: Sistema → "Registro de jornada" (`staff.hours.view`, own sedes; the owner sees all).
+  - It filters by person, sede and month.
+  - With `staff.hours.manage` you can add a working period (IN + OUT together, which covers the prompt's "add IN"), add a
+    missing OUT, or annul an entry, each with a reason.
+  - CSV export and a monthly PDF sheet per person with a signature line. The PDF goes through `GuardsStatutoryDocuments`.
+  - Both permissions are manager defaults and depend on `panel.access`.
+- **No compensation data** (rates, pay) is stored. The record is about time, not pay.
+- **Retention**: RAT-08 "Registro de jornada del personal" keeps records for 4 years minimum. `User` refuses a force delete
+  while it has clock events under 4 years old. Nothing force-deletes users today, so this guard is a pin.
+- Checked as the prompt asked: `CloseTill` has one success path (the offer hooks after it); Users sit in "Sistema"; no user
+  force delete exists.
+- **Open, for the gestor (OVERNIGHT-DEFAULT — CONFIRM):** whether the registro de jornada regime covers compensated volunteers
+  at all (built as if it does, which is the safer side), and the RAT's legal basis (worded neutrally: legal obligation, or
+  legitimate interest for volunteers). **Open, for the owner:** retention beyond 4 years.
+
+- **The top bar is drawn once per page**, so "Fichar salida" is always rendered for a signed-in device and shown by Alpine.
+  The component announces each change to the open period as `counter-clock-state` (unlock, clock in, declared end,
+  clock out, lock, till-close clock-out). Otherwise the button would only appear on the next page load, which the browser
+  check caught. The operator chip still has its older same-page staleness; that is out of scope here.
+- Existing surface tests (`SurfaceModeReactivityTest`, `CounterSurfaceTest`, `OperatorUnlockTest`) assumed a PIN clears the
+  surface at once. They now pre-clock the operator in (the idle-unlock case) or answer "Solo identificarme", which keeps
+  what they were testing. The shared browser preamble `tests/Browser/counter-session.mjs` answers "Solo identificarme" too.
+- An empty or malformed declared time shows "Indica la hora a la que terminaste.", never Carbon's parser message.
+- Browser check on the real app with a fresh demo (`tests/Browser/prove-281-{clock,declare,panel}.mjs`, screenshots
+  `storage/app/screenshots/281/`), at 1180×820 light and 820×1180 dark:
+  - The first PIN asks the question, which fits above the fold with 44px buttons. "Fichar entrada" clears it and shows
+    "Fichar salida".
+  - Two idle lock/unlock cycles ask nothing.
+  - "Mis horas" opens, and Back closes it on the counter.
+  - "Fichar salida" asks for the PIN, then locks.
+  - A period left open from yesterday asks for the end time first; an empty submit is refused in plain words.
+  - Panel as manager: periods and flags show, an annulment appears struck through (and reopens the period), and the
+    monthly PDF downloads. No page-level horizontal scroll at 1024 or 390.
+  - **Not driven in the browser:** the till-close offer. The HTTP test covers it
+    (`test_closing_the_till_offers_clock_out_and_yes_writes_till_close`).
+
+Tests: `tests/Feature/Staff/RegistroDeJornadaTest` (22) cover append-only, own-PIN-only, the declared end, the till-close
+offer, wrong-sede and wrong-role denials, the store refusal, UTC storage, bounded report queries, the PDF and the force-delete
+guard.

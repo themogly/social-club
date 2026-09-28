@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\Counter;
 
+use App\Actions\Staff\ClockIn;
 use App\Enums\Role;
 use App\Livewire\Counter\BarPos;
 use App\Livewire\Counter\CheckInScreen;
@@ -56,6 +57,11 @@ class SurfaceModeReactivityTest extends TestCase
         $this->device = $this->staff('Device Login', null);
         $this->operator = $this->staff('Marta Operadora', '4321');
         $this->second = $this->staff('Luis Segundo', '8765');
+
+        // Prompt 281 — both are already clocked in, so every unlock here is the idle-lock case: the surface clears
+        // in one step. (With no open period it asks the clock-in question first — RegistroDeJornadaTest covers that.)
+        (new ClockIn)->handle($this->operator, $this->location, $this->operator);
+        (new ClockIn)->handle($this->second, $this->location, $this->second);
     }
 
     private function staff(string $name, ?string $pin): User
