@@ -15240,3 +15240,55 @@ screenshots `storage/app/screenshots/285/`):
   Chrome for a night; see `verification/real-device-checks.md`.
 - **For Ben, after deploy:** register each club tablet once, as a manager or the owner, with the "Este dispositivo"
   button in the counter's top bar. Staff then never need a password on it.
+
+## Prompt 290 — The counter installs as an app on the tablet, with no browser bar
+
+- **Two apps, two manifests.** The member area keeps its static `/socio` manifest. The counter gets its own,
+  **`/counter.webmanifest`**, built by a route so it carries the club's name and language:
+  - `id` `/counter`, name "<club> · Mostrador" (or "· Counter" when the organisation's locale is `en`), short name
+    "Mostrador"/"Counter";
+  - `start_url` `/counter`, `display: standalone`, `orientation: any`;
+  - `lang` from the organisation's locale (not the viewer's);
+  - theme `#2563eb`, background `#f8fafc` (the counter's tokens);
+  - icons in `public/counter-icons/`: the same leaf, recoloured to the brand blue on the dark surface (`#0f172a`), so
+    nobody installs the wrong one. **Placeholders — OWNER task:** the club supplies real artwork.
+- **Why `scope: "/"`:** the counter sends people to `/login`, the lockdown page and the panel. A narrower scope would
+  open each under Chrome's out-of-scope bar, which is what the owner wants gone. The member app's `/socio` scope is
+  more specific, so it is unaffected. **To confirm on a device** (checks 3 and 6 below).
+- **The manifest is not a public page.** It sits behind the counter's own gate (a person or a registered counter, 289)
+  and is linked with `crossorigin="use-credentials"`, so the club's name is never served to the internet (no public
+  surface).
+- **Only the counter layout links it**, with `theme-color` for light and dark, `mobile-web-app-capable`, the
+  `apple-mobile-web-app-*` tags and an `apple-touch-icon`. The panel's and the member area's `<head>` are unchanged.
+- **No service worker, and no caching on the counter.** The counter shows member data. Recent Chrome installs without
+  one, but **that must be confirmed on the tablet** (check 5). If it turns out to be needed, the plan is a separate
+  `/counter-sw.js` scoped to `/counter` that passes every request to the network. The test already refuses a
+  `caches.` call in one, and refuses `/sw.js` on any counter page.
+- **Safe areas:** the iOS status-bar style is `default`, not `black-translucent`, so the app never draws under the
+  status bar and the top bar needs no inset. The shell's `svh` sizing is untouched (`CounterShellUsesStableViewportHeightTest`
+  passes). Whether the tablet's navigation bar overlaps a commit button in standalone mode is a device check; add
+  `env(safe-area-inset-*)` to the shell only if it does.
+- **"Instalar como app"** is an icon button in the top bar, with its name as the accessible label and tooltip, like the
+  bar's other icon controls:
+  - it shows only after the browser fires `beforeinstallprompt` (captured in `app.js`);
+  - it hides once running standalone or after `appinstalled`;
+  - a browser that never offers installation never shows it;
+  - it needs no permission (installing grants nothing; the PIN gates everything).
+- **App pinning** is documented as an owner option in the Manual's security runbook (*Ajustes → Seguridad → Fijar
+  aplicación*; unpin by holding Back and Overview), not built.
+- **With 289:** on Android the installed app shares Chrome's cookies, so a registered tablet stays registered in the
+  app. **To confirm on the device** (check 4).
+- Tests: `CounterInstallsAsAppTest` (6), seen red first. The no-service-worker check was green from the start, because
+  none exists, and now guards against one being added.
+- Browser, headless (`tests/Browser/prove-290-counter-app.mjs`):
+  - the manifest loads with credentials ("… · Mostrador", `es`, scope `/`, standalone);
+  - the page links it;
+  - no service worker is registered;
+  - the install button stays hidden when no install is offered.
+
+  **Not provable headless (false-green §9):** the install flow, the missing address bar and the scope. These are the
+  real-device checks in `verification/real-device-checks.md`: install, no bar in both orientations, login/lockdown/panel
+  stay inside the app, the registered tablet reopens on the PIN pad, whether Chrome offered install without a service
+  worker, and that the member app still opens as its own app.
+- **For Ben / Shane, after deploy:** on each tablet, open the counter in Chrome and use the install button (or Chrome's
+  own menu: *Instalar aplicación*), then open it from the new icon from then on.

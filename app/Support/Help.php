@@ -400,6 +400,11 @@ class Help
                 ['title' => 'Una tablet perdida o robada', 'body' => [
                     'Si roban o pierden una tablet: Sistema → Mostradores registrados → Revocar.',
                 ]],
+                // Prompt 290 — App pinning, an owner option (documented, not built).
+                ['title' => 'Fijar la app del mostrador (opcional)', 'body' => [
+                    'Para que el personal no salga de la app del mostrador, Android permite fijarla: Ajustes → Seguridad → Fijar aplicación. Con la app abierta, abre las apps recientes y elige «Fijar».',
+                    'Para soltarla, mantén pulsados a la vez Atrás y Recientes. Es una opción de Android, no de esta aplicación.',
+                ]],
                 ['title' => 'Ensayarlo', 'body' => [
                     'Haz un simulacro desde Seguridad. El simulacro cierra las pantallas igual que el real para que el equipo lo viva, pero avisa de que es un simulacro y un propietario puede terminarlo desde el panel al momento.',
                 ]],

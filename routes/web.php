@@ -4,6 +4,7 @@ use App\Http\Controllers\ApplicationController;
 use App\Http\Controllers\BarReceiptController;
 use App\Http\Controllers\Counter\MemberPhotoController;
 use App\Http\Controllers\CounterLocationController;
+use App\Http\Controllers\CounterManifestController;
 use App\Http\Controllers\CounterPanicController;
 use App\Http\Controllers\CspReportController;
 use App\Http\Controllers\DispensationReceiptController;
@@ -61,6 +62,12 @@ Route::middleware(['web', 'auth', 'signed'])
 //
 // Local-only developer routes (e.g. /dev/mail) live in routes/dev.php, loaded only
 // in the local environment from bootstrap/app.php.
+
+// Prompt 290 — the counter's installable-app manifest ("Mostrador"), in the club's name and language. Behind the counter's
+// gate (never a public page) and fetched with credentials; only the counter layout links it.
+Route::middleware(['web', AuthenticateCounter::class])
+    ->get('/counter.webmanifest', [CounterManifestController::class, 'show'])
+    ->name('counter.manifest');
 
 // Prompt 289 — the six counter SCREENS take AuthenticateCounter: a signed-in person OR a registered counter (which only
 // ever shows the lock surface until a PIN). Receipts, photo, panic and the sede switch still need a person (`auth`).

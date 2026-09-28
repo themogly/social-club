@@ -307,6 +307,18 @@
             </svg>
         </button>
 
+        {{-- Prompt 290 — "Instalar como app": only when the browser has offered installation, never once installed. --}}
+        <button type="button" data-counter-install x-cloak
+                x-data="{ can: !! window.cscInstallPrompt && ! window.matchMedia('(display-mode: standalone)').matches }"
+                x-show="can"
+                x-on:csc-installable.window="can = ! window.matchMedia('(display-mode: standalone)').matches"
+                x-on:csc-installed.window="can = false"
+                @click="window.cscInstallPrompt?.prompt(); window.cscInstallPrompt?.userChoice.finally(() => { window.cscInstallPrompt = null; can = false })"
+                aria-label="{{ __('Instalar como app') }}" title="{{ __('Instalar como app') }}"
+                class="inline-flex min-h-11 min-w-11 items-center justify-center rounded-lg px-3 text-sm font-medium text-ink-muted transition hover:bg-brand-tint hover:text-brand dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-white">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" class="h-5 w-5 shrink-0" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M16.5 12 12 16.5m0 0L7.5 12m4.5 4.5V3"/></svg>
+        </button>
+
         {{-- Prompt 289 — "Este dispositivo": register THIS tablet as a counter, or forget it. terminals.manage only, and it
              asks for the operator's PIN again (the dialog lives on every screen's surface). --}}
         @if (\App\Support\CounterOperator::current()?->can('terminals.manage'))
