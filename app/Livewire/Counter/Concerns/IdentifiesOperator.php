@@ -15,6 +15,7 @@ use App\Support\BusinessDay;
 use App\Support\CounterBlocker;
 use App\Support\CounterHandover;
 use App\Support\CounterOperator;
+use App\Support\CounterTerminals;
 use App\Support\Period;
 use App\Support\WorkedHours;
 use Carbon\CarbonImmutable;
@@ -39,6 +40,8 @@ use Livewire\Attributes\On;
  */
 trait IdentifiesOperator
 {
+    use RegistersCounterTerminal;
+
     /** Bound to the PIN pad. Never persisted, never logged, cleared after every attempt. */
     public string $operatorPin = '';
 
@@ -203,7 +206,11 @@ trait IdentifiesOperator
     /** May the tablet's login open this screen at all? Mount gates only — see {@see deviceUser()}. */
     protected function deviceCan(string $permission): bool
     {
-        return $this->deviceUser()?->can($permission) ?? false;
+        $user = $this->deviceUser();
+
+        // Prompt 289 — a registered counter with nobody signed in mounts the screen behind its lock surface; nothing on it
+        // is readable or doable without a PIN operator (userCan → counterActor).
+        return $user !== null ? $user->can($permission) : CounterTerminals::current() !== null;
     }
 
     public function hasOperator(): bool
@@ -241,6 +248,13 @@ trait IdentifiesOperator
 
         CounterOperator::clear();
         $this->dispatch('counter-clock-state', open: false);
+
+        // Prompt 289 — on a REGISTERED counter "locked" means nobody is signed in, not "whoever typed last": the person is
+        // signed out, the session (basket, sede) is kept and its id regenerated. An ordinary browser keeps its login.
+        if (CounterTerminals::current() !== null && Auth::guard('web')->check()) {
+            Auth::guard('web')->logout();
+            session()->regenerate();
+        }
 
         // Prompt 198 keeps the BASKET across a lock, deliberately — work survives a step away from the screen.
         // A confirmation is not work; it is a receipt for a transaction that is over, and whoever unlocks may

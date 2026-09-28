@@ -2,6 +2,7 @@
 
 namespace App\Providers;
 
+use App\Http\Middleware\AuthenticateCounter;
 use App\Http\Responses\CounterAwareLoginResponse;
 use App\Support\ActiveScope;
 use App\Support\CounterHandoverConfinement;
@@ -12,6 +13,7 @@ use Filament\Auth\Http\Responses\Contracts\LoginResponse;
 use Filament\Schemas\Components\Form;
 use Filament\Tables\Table;
 use Illuminate\Support\ServiceProvider;
+use Livewire\Livewire;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -32,6 +34,10 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        // Prompt 289 — a counter screen's Livewire updates are held to the same gate as its page (a person or a
+        // registered counter), as Laravel's `auth` already is by default.
+        Livewire::addPersistentMiddleware([AuthenticateCounter::class]);
+
         // Prompt 254 — while an applicant holds the counter tablet, Livewire answers only the handover surface.
         CounterHandoverConfinement::register();
         CounterLockConfinement::register();

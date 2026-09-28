@@ -15172,3 +15172,71 @@ screenshots `storage/app/screenshots/285/`):
   - choosing North Branch saves it (the database shows the article at North Branch only, which is what that sede's bar
     lists);
   - with Central Branch in the top bar, the field is pre-filled.
+
+## Prompt 289 — A registered counter: the tablet opens on the PIN pad, never on a password
+
+- **A registered terminal, not a PIN on `/login`** (Ben's decision). `/login` is on the public internet, and a 4-digit PIN
+  is 10⁴ values tested against everyone's PIN at once. Today's PIN is safe because it is the second factor on a device
+  that is already signed in. A manager registers the tablet once; the tablet is what you have, the PIN what you know.
+  This only makes the "have" part last.
+- **`counter_terminals`**: id, organisation, home sede, name (≤ 40), `token_hash` (SHA-256 of a 64-char token; **the
+  token is never stored**), `registered_by`/`registered_at`, `last_seen_at`, `revoked_at`/`revoked_by`. No IP address.
+  The **`csc_terminal` cookie** (`App\Support\CounterTerminals`, the one reader and writer):
+  - holds "id|token", encrypted by `EncryptCookies` (not excluded), HttpOnly, SameSite=Lax;
+  - Secure everywhere except a plain-http `local` dev server, which would otherwise never get it back;
+  - lasts 400 days (Chrome's maximum) and is **re-issued with a fresh 400 days on each hourly `last_seen_at` stamp**;
+  - is compared with `hash_equals`;
+  - a revoked, unknown or mismatched cookie is cleared and ignored, and the tablet is an ordinary browser again.
+- **Registering** happens at the counter: the top bar's "Este dispositivo" button (only for an operator with the new
+  `terminals.manage`: OWNER and MANAGER, a manager at their own sedes, never the store). It asks for a name, a sede
+  and **the operator's own PIN again** (the same `UnlockOperator` throttle), then sets the cookie and audits
+  `counter.terminal.registered`. On a registered tablet the same button shows "Este dispositivo: Tablet barra · Sede
+  Centro" with **Olvidar este dispositivo** (same permission and PIN), which revokes it and clears the cookie. **Till
+  selection is unchanged**; terminal names aren't suggested from `terminals` (tills), because a free name was enough.
+- **A registered tablet with nobody signed in** (`RecogniseCounterTerminal`, on the web group **and** the panel's own
+  stack, after StartSession — the 241 lesson; a structural test was proven red by moving it):
+  - `/` and `/login` go to the counter;
+  - the counter's sede and organisation come from the terminal;
+  - `/login?password=1` ("Entrar con contraseña" on the lock surface) still reaches the password form.
+
+  **The terminal authorises nothing.** The six counter screens take `AuthenticateCounter` (a person **or** a terminal),
+  registered as Livewire persistent middleware so updates face the same gate. Receipts, photo upload, panic and the sede
+  switch still need a person (`auth`).
+- **What `deviceUser()` means on a terminal.** It is still `Auth::user()`, so it is null before a PIN. The places that
+  decided what a signed-out tablet could open now ask the terminal when there is no user:
+  - `CounterScreens::forUser()`: every screen may mount, behind its lock surface;
+  - `IdentifiesOperator::deviceCan()` and `WhosInside::deviceCan()`: the mount gates;
+  - `CounterTerminals::availableSedes()`, used by `ResolvesCounterLocation`, `CounterHome::availableSedes()` and the
+    top bar: the terminal's home sede only.
+
+  After a PIN everything is the person's, as before. Checked and unchanged: `RequireOpenTill` (session only),
+  `EnforceCounterHandover`, `MembershipCounter`'s document viewer (needs an operator anyway), `TillSession::landingUrl`
+  (via `CounterScreens`), `CounterHome::canReachPanel` (a signed-out tablet has no panel).
+- **Nothing member-related before a PIN.** Proven screen by screen (`/counter`, checkin, members, till, pos, bar): a
+  distinctive member name and number appear in no page and no Livewire snapshot.
+- **Locking a registered tablet signs the person out** (`Auth::guard('web')->logout()` plus a session id regeneration)
+  and **keeps the session**: basket, sede, till state. So "locked" means *nobody* is signed in, not whoever typed last.
+  An unregistered device locks exactly as before (its login stays). The lock's existing 173 rule still ends a handover
+  on timeout (the timer must land on the lock screen); the logout itself keeps every session key.
+- **Lockdown:** a terminal is not an authenticated owner, so it gets the lockdown page, drill included (503).
+- **Panel:** Sistema → **Mostradores registrados** (`terminals.manage`; a manager sees and revokes only their sedes'
+  tablets). It lists name, sede, registrar and date, and last use, with **Revocar** (confirmed, audited
+  `counter.terminal.revoked`). The revoked tablet's next request lands on the login. The Manual's lockdown runbook has
+  a new step: "Si roban o pierden una tablet: Sistema → Mostradores registrados → Revocar." The page has its own help
+  topic.
+- **RAT:** no change needed. The table holds a device name and a last-seen time about club devices; `registered_by` is
+  staff data already covered by the staff-data entry.
+- Tests: `RegisteredCounterTerminalTest` (15), seen red first (the unregistered-lock pin was green before and after, as
+  intended). Two test-client details that aren't app behaviour:
+  - JSON (Livewire) requests carry cookies only with `withCredentials()`, whereas a browser always sends them;
+  - the test container's cookie jar keeps queued cookies between requests, so the renewal test flushes it.
+- Browser check (`tests/Browser/prove-289-terminal.mjs`, throwaway database, 1180×820 and 820×1180, screenshots
+  `storage/app/screenshots/289/`), all passing:
+  - the manager registers the tablet and the HttpOnly `csc_terminal` cookie is set;
+  - with **only the session cookie cleared**, `/` opens the counter on the PIN pad with "Entrar con contraseña";
+  - a staff PIN, a bar basket and the idle lock: the basket survives;
+  - the owner revokes it in the panel, and the tablet then lands on `/login`.
+- **Not verified here:** the overnight real-device check on the club's Android tablet (Shane). Playwright can't close
+  Chrome for a night; see `verification/real-device-checks.md`.
+- **For Ben, after deploy:** register each club tablet once, as a manager or the owner, with the "Este dispositivo"
+  button in the counter's top bar. Staff then never need a password on it.

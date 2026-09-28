@@ -288,6 +288,13 @@
             {{-- Opened by mistake, or the staff member changed their mind: hand the tablet back to the
                  applicant rather than leaving them facing a PIN pad. Handover mode only — and NOT once the
                  form is submitted (prompt 249): there is no applicant screen left to return to. --}}
+            {{-- Prompt 289 — on a registered counter the lock surface is the front door; the password way in stays one tap away
+                 (an owner wanting the full panel, or recovery). --}}
+            @if (\App\Support\CounterTerminals::current() !== null && ! auth()->check())
+                <a href="{{ url('/login?password=1') }}" data-terminal-password-login
+                   class="mt-3 inline-flex min-h-[2.75rem] w-full items-center justify-center rounded-lg px-4 text-xs font-medium text-ink-muted transition hover:text-ink dark:text-slate-400 dark:hover:text-slate-300">{{ __('Entrar con contraseña') }}</a>
+            @endif
+
             @unless (\App\Support\CounterHandover::submitted())
                 <button
                     type="button"
@@ -300,6 +307,47 @@
             @endunless
         </div>
 </div>
+
+{{-- Prompt 289 — register this tablet as a counter, or forget it. A sheet inside the page; the operator's own PIN confirms. --}}
+@if ($terminalDialog !== null)
+    @php($thisTerminal = \App\Support\CounterTerminals::current())
+    <div data-terminal-dialog role="dialog" aria-modal="true" aria-label="{{ __('Este dispositivo') }}"
+         x-data x-init="history.pushState({ terminalDialog: true }, ''); window.addEventListener('popstate', () => $wire.cancelTerminal(), { once: true })"
+         class="fixed inset-0 z-50 flex items-end justify-center bg-ink/40 p-0 sm:items-center sm:p-4">
+        <div class="max-h-[90svh] w-full max-w-md overflow-y-auto rounded-t-2xl border border-line bg-surface p-5 shadow-xl dark:border-slate-800 dark:bg-slate-900 sm:rounded-2xl">
+            @if ($terminalDialog === 'forget' && $thisTerminal !== null)
+                <h2 class="text-base font-semibold">{{ __('Este dispositivo: :name · :sede', ['name' => $thisTerminal->name, 'sede' => $thisTerminal->location?->name]) }}</h2>
+                <p class="mt-1 text-sm text-ink-muted dark:text-slate-400">{{ __('Olvidarlo deja de abrir el mostrador sin contraseña. Confirma con tu PIN.') }}</p>
+            @else
+                <h2 class="text-base font-semibold">{{ __('Registrar este dispositivo como mostrador') }}</h2>
+                <p class="mt-1 text-sm text-ink-muted dark:text-slate-400">{{ __('Abrirá siempre el mostrador con el teclado de PIN, sin pedir contraseña. Cada acción sigue necesitando el PIN de quien trabaja.') }}</p>
+                <label for="terminal-name" class="mt-4 block text-sm font-medium">{{ __('Nombre') }}</label>
+                <input id="terminal-name" type="text" wire:model="terminalName" maxlength="40" placeholder="{{ __('p. ej. Tablet barra') }}"
+                       class="mt-1 block min-h-[2.75rem] w-full rounded-lg border border-line bg-surface px-3 dark:border-slate-700 dark:bg-slate-950">
+                <label for="terminal-sede" class="mt-3 block text-sm font-medium">{{ __('Sede') }}</label>
+                <select id="terminal-sede" wire:model="terminalLocationId" class="mt-1 block min-h-[2.75rem] w-full rounded-lg border border-line bg-surface px-3 dark:border-slate-700 dark:bg-slate-950">
+                    @foreach ($this->terminalSedeOptions() as $id => $name)
+                        <option value="{{ $id }}">{{ $name }}</option>
+                    @endforeach
+                </select>
+            @endif
+            <label for="terminal-pin" class="mt-3 block text-sm font-medium">{{ __('Tu PIN') }}</label>
+            <input id="terminal-pin" type="password" inputmode="numeric" autocomplete="off" wire:model="terminalPin" maxlength="8"
+                   class="mt-1 block min-h-[2.75rem] w-full rounded-lg border border-line bg-surface px-3 tracking-[0.4em] dark:border-slate-700 dark:bg-slate-950">
+            @if ($terminalFeedback !== null)
+                <p data-terminal-feedback role="alert" class="mt-3 rounded-lg bg-error/10 px-3 py-2 text-sm font-medium text-error">{{ $terminalFeedback }}</p>
+            @endif
+            <div class="mt-4 flex gap-2">
+                <x-button type="button" variant="secondary" wire:click="cancelTerminal" class="min-h-[2.75rem] flex-1">{{ __('Cancelar') }}</x-button>
+                @if ($terminalDialog === 'forget')
+                    <x-button type="button" variant="danger" wire:click="confirmForgetTerminal" data-terminal-forget class="min-h-[2.75rem] flex-1">{{ __('Olvidar este dispositivo') }}</x-button>
+                @else
+                    <x-button type="button" wire:click="confirmRegisterTerminal" data-terminal-register class="min-h-[2.75rem] flex-1">{{ __('Registrar') }}</x-button>
+                @endif
+            </div>
+        </div>
+    </div>
+@endif
 
 {{-- Prompt 281 — "Mis horas": the signed-in person's OWN hours, this week and this month. Read-only, no permission needed,
      never anyone else's. A sheet inside the page (nothing leaves the tab); the back gesture closes it. --}}

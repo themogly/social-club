@@ -5,6 +5,7 @@ namespace App\Livewire\Counter\Concerns;
 use App\Actions\Till\SelectTillSession;
 use App\Models\Location;
 use App\Support\ActiveScope;
+use App\Support\CounterTerminals;
 use App\Support\LocationSwitcher;
 
 /**
@@ -31,9 +32,8 @@ trait ResolvesCounterLocation
     protected function resolveCounterLocation(): void
     {
         $user = $this->deviceUser();
-        $available = $user !== null
-            ? app(LocationSwitcher::class)->available($user)
-            : collect();
+        // The person's sedes — or, on a registered counter with nobody signed in, its home sede (prompt 289).
+        $available = CounterTerminals::availableSedes($user);
 
         $chosen = session('counter.location_id');
         $chosen = is_string($chosen) ? $chosen : null;

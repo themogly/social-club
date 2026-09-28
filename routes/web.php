@@ -16,6 +16,7 @@ use App\Http\Controllers\MemberDocumentController;
 use App\Http\Controllers\MemberMediaController;
 use App\Http\Controllers\Socio\AuthController as SocioAuthController;
 use App\Http\Controllers\Socio\PwaController;
+use App\Http\Middleware\AuthenticateCounter;
 use App\Livewire\Counter\BarPos;
 use App\Livewire\Counter\CheckInScreen;
 use App\Livewire\Counter\CounterHome;
@@ -61,11 +62,13 @@ Route::middleware(['web', 'auth', 'signed'])
 // Local-only developer routes (e.g. /dev/mail) live in routes/dev.php, loaded only
 // in the local environment from bootstrap/app.php.
 
+// Prompt 289 — the six counter SCREENS take AuthenticateCounter: a signed-in person OR a registered counter (which only
+// ever shows the lock surface until a PIN). Receipts, photo, panic and the sede switch still need a person (`auth`).
 // The counter's front door (prompt 189) — big tiles, one per destination the operator may open, plus the
 // terminal operations that are not specific to any transaction (switch operator, switch sede, lock, panel,
 // log out). Gated on being able to reach ANY counter screen; the destinations and their gates come from the
 // one shared list in App\Support\CounterScreens, never a second copy.
-Route::middleware(['web', 'auth'])
+Route::middleware(['web', AuthenticateCounter::class])
     ->get('/counter', CounterHome::class)
     ->name('counter.home');
 
@@ -74,14 +77,14 @@ Route::middleware(['web', 'auth'])
 // check-in "door" is the first; the dispensary + bar POS (prompts 11/12) follow the
 // same pattern. The active location comes from ActiveScope; the component resolves the
 // operator's first assigned sede when none is set, and 403s a user without checkin.manage.
-Route::middleware(['web', 'auth'])
+Route::middleware(['web', AuthenticateCounter::class])
     ->get('/counter/checkin', CheckInScreen::class)
     ->name('counter.checkin');
 
 // Socios — the counter membership tab (prompt 127): find a member, see what's owed, collect a fee. A THIN
 // shell over the shared CollectsMembershipFees concern → RecordFeePayment. Gated in the component on
 // membership.fee.collect.
-Route::middleware(['web', 'auth'])
+Route::middleware(['web', AuthenticateCounter::class])
     ->get('/counter/members', MembershipCounter::class)
     ->name('counter.members');
 
@@ -89,7 +92,7 @@ Route::middleware(['web', 'auth'])
 // session and recording cash movements all happen here (never inside Filament, which is
 // oversight-only). Closing is a BLIND arqueo: the expected figure is withheld until the
 // operator has entered their count. Gated in the component on till.open OR till.close.
-Route::middleware(['web', 'auth'])
+Route::middleware(['web', AuthenticateCounter::class])
     ->get('/counter/till', TillSession::class)
     ->name('counter.till');
 
@@ -98,7 +101,7 @@ Route::middleware(['web', 'auth'])
 // stock/pricing enforced atomically). Gated in the component on pos.use; contributions
 // attach to the open till session. The printable contribution ticket is served by a
 // ULID route and authorization-checked through DispensationPolicy (never a guessable id).
-Route::middleware(['web', 'auth'])
+Route::middleware(['web', AuthenticateCounter::class])
     ->get('/counter/pos', DispensaryPos::class)
     ->name('counter.pos');
 
@@ -141,7 +144,7 @@ Route::middleware(['web', 'auth'])
 // pos.bar. The socio is OPTIONAL (cash guests are fine); wallet payment requires one.
 // The printable SALE ticket (venta / ticket — distinct from the contribution vocabulary)
 // is served by a ULID route and authorization-checked through OrderPolicy.
-Route::middleware(['web', 'auth'])
+Route::middleware(['web', AuthenticateCounter::class])
     ->get('/counter/bar', BarPos::class)
     ->name('counter.bar');
 

@@ -22,6 +22,21 @@ export const PIN = process.env.AUDIT_PIN ?? process.env.DEV_PIN ?? '1234';
 export const SEDE = process.env.AUDIT_SEDE ?? 'Central Branch';
 
 /**
+ * The dev seed's accounts (DevAdminSeeder) — the ONE place a harness finds their credentials (prompt 289: a harness
+ * that needs two people, e.g. a manager registering a tablet and the owner revoking it, names them here rather than
+ * hard-coding a second login). Pass `{ account: 'manager' }` to signIn / signInToCounter.
+ */
+export const DEV_ACCOUNTS = {
+    owner: { email: 'owner@club.test', password: 'password', pin: '1234' },
+    manager: { email: 'manager@club.test', password: 'password', pin: '2345' },
+    staff: { email: 'staff@club.test', password: 'password', pin: '3456' },
+};
+
+function credentials(account) {
+    return account ? DEV_ACCOUNTS[account] : { email: EMAIL, password: PASSWORD, pin: PIN };
+}
+
+/**
  * Sign in, and nothing else — for the harnesses that shoot an ADMIN page and never touch the counter.
  *
  * The `waitForURL` is `shoot-lockdown`'s hard-won lesson, moved in rather than left behind: Filament's login
@@ -30,10 +45,12 @@ export const SEDE = process.env.AUDIT_SEDE ?? 'Central Branch';
  *
  * @returns {Promise<boolean>} false when the session never left `/login`.
  */
-export async function signIn(page) {
-    await page.goto(`${BASE}/login`, { waitUntil: 'networkidle', timeout: 20000 });
-    await page.fill('input[type="email"]', EMAIL);
-    await page.fill('input[type="password"]', PASSWORD);
+export async function signIn(page, { account = null } = {}) {
+    const { email, password } = credentials(account);
+    // `?password=1` (prompt 289): on a registered counter tablet `/login` goes to the PIN pad; this is its way in.
+    await page.goto(`${BASE}/login?password=1`, { waitUntil: 'networkidle', timeout: 20000 });
+    await page.fill('input[type="email"]', email);
+    await page.fill('input[type="password"]', password);
     await page.press('input[type="password"]', 'Enter');
 
     return await page.waitForURL((url) => ! url.pathname.startsWith('/login'), { timeout: 20000 })
@@ -52,8 +69,8 @@ export async function signIn(page) {
  *                             skipping: "the harness could not get in" and "the feature is broken" are
  *                             different findings and must not read the same.
  */
-export async function signInToCounter(page, url = '/counter/members', { sede = null } = {}) {
-    if (! await signIn(page)) {
+export async function signInToCounter(page, url = '/counter/members', { sede = null, account = null } = {}) {
+    if (! await signIn(page, { account })) {
         return false;
     }
 
@@ -71,7 +88,7 @@ export async function signInToCounter(page, url = '/counter/members', { sede = n
     // The PIN pad, when the counter surface is up (prompt 173).
     const pad = await page.$('[data-counter-surface-unlock]');
     if (pad) {
-        for (const digit of PIN.split('')) {
+        for (const digit of credentials(account).pin.split('')) {
             await page.click(`[data-counter-surface] button:has-text("${digit}")`).catch(() => {});
         }
         await pad.click();
