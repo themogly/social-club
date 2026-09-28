@@ -206,9 +206,9 @@ class StockReport extends AbstractReport
                 'stock_take_lines.variance_cg as variance_cg',
             ]);
 
-        // Shown by display name (prompt 282): the club's name, then the lote number.
-        $batchNames = Batch::query()->withoutGlobalScopes()->whereIn('id', $lines->pluck('batch_id')->all())->get(['id', 'batch_no', 'label'])
-            ->mapWithKeys(fn (Batch $b): array => [$b->id => $b->displayName()]);
+        // Strain and description first (298), then the lote number — a stock-count report is traceability (282).
+        $batchNames = Batch::query()->withoutGlobalScopes()->with('genetic')->whereIn('id', $lines->pluck('batch_id')->all())->get()
+            ->mapWithKeys(fn (Batch $b): array => [$b->id => $b->referenceName()]);
 
         $rows = $lines->map(fn (\stdClass $r): array => [
             'lote' => (string) ($batchNames[$r->batch_id] ?? '—'),

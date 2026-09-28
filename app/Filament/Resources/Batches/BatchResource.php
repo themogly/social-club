@@ -49,7 +49,7 @@ class BatchResource extends Resource
     /** A batch is named by its display name (prompt 282) — strain, the club's name, the lote number — in titles and breadcrumbs. */
     public static function getRecordTitle(?Model $record): string|Htmlable|null
     {
-        return $record instanceof Batch ? $record->displayName(withGenetic: true) : parent::getRecordTitle($record);
+        return $record instanceof Batch ? $record->displayName() : parent::getRecordTitle($record);
     }
 
     public static function hasRecordTitle(): bool

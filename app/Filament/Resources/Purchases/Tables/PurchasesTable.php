@@ -34,7 +34,7 @@ class PurchasesTable
                     ->alignEnd()
                     ->color(fn (Purchase $record): string => ($record->amount_cents->cents - $record->paid_cents->cents) > 0 ? 'warning' : 'gray'),
                 TextColumn::make('batch.batch_no')->label(__('Lote'))->placeholder('—')->toggleable()
-                    ->formatStateUsing(fn (string $state, Purchase $record): string => $record->batch?->displayName() ?? $state), // prompt 282
+                    ->formatStateUsing(fn (string $state, Purchase $record): string => $record->batch?->displayName() ?? $state), // prompt 282, strain first since 298
             ])
             ->recordActions([
                 EditAction::make(),

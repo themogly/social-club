@@ -3,6 +3,7 @@
 namespace App\Filament\Resources\Batches\Schemas;
 
 use App\Filament\Forms\CameraOrFile;
+use App\Models\Batch;
 use App\Models\Genetic;
 use App\Models\Location;
 use App\Rules\GramAmount;
@@ -13,9 +14,13 @@ use Filament\Forms\Components\FileUpload;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
+use Filament\Infolists\Components\TextEntry;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Schema;
+use Filament\Support\Enums\FontWeight;
+use Filament\Support\Enums\IconPosition;
+use Filament\Support\Icons\Heroicon;
 
 class BatchForm
 {
@@ -60,8 +65,27 @@ class BatchForm
                         TextInput::make('label')
                             ->label(__('Nombre'))
                             ->maxLength(60)
-                            ->helperText(__('Como lo llamáis vosotros, p. ej. «Cosecha verano 2026». Opcional.'))
-                            ->columnSpanFull(),
+                            ->helperText(__('Como lo llamáis vosotros, p. ej. «Cosecha verano 2026». Opcional.')),
+
+                        // Prompt 298 — the grow's or supplier's own lote number, if there is one; left empty, a readable one is
+                        // generated (AMN-260912-3). Only at intake: the lote number is the fixed traceability key.
+                        TextInput::make('batch_no')
+                            ->label(__('Nº de lote propio'))
+                            ->maxLength(40)
+                            ->helperText(__('El número del cultivo o del proveedor, si lo tiene. Si lo dejas vacío, se genera uno.'))
+                            ->visible(fn (string $operation): bool => $operation === 'create'),
+
+                        // On the batch's own page the lote number is shown clearly, with a copy button.
+                        TextEntry::make('lote_number')
+                            ->label(__('Nº de lote'))
+                            ->state(fn (?Batch $record): ?string => $record?->batch_no)
+                            ->copyable()
+                            ->copyMessage(__('Copiado'))
+                            ->icon(Heroicon::OutlinedClipboardDocument) // the visible "copy" cue: a click copies it
+                            ->iconPosition(IconPosition::After)
+                            ->tooltip(__('Copiar'))
+                            ->weight(FontWeight::SemiBold)
+                            ->visible(fn (string $operation): bool => $operation !== 'create'),
 
                         // Intake quantity — only at creation, and in the genetic's own unit:
                         // grams for a WEIGHT genetic, whole units for a UNIT genetic. Stock

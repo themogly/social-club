@@ -190,8 +190,8 @@ class ActiveSedeTest extends TestCase
         $centro = $this->location();
         $norte = $this->location();
         $genetic = Genetic::factory()->create(['organisation_id' => $this->org->id]);
-        $inCentro = Batch::factory()->create(['organisation_id' => $this->org->id, 'location_id' => $centro->id, 'genetic_id' => $genetic->id, 'batch_no' => 'B-CENTRO1']);
-        Batch::factory()->create(['organisation_id' => $this->org->id, 'location_id' => $norte->id, 'genetic_id' => $genetic->id, 'batch_no' => 'B-NORTE22']);
+        $inCentro = Batch::factory()->create(['organisation_id' => $this->org->id, 'location_id' => $centro->id, 'genetic_id' => $genetic->id, 'batch_no' => 'B-CENTRO1', 'label' => 'B-CENTRO1']); // the list shows names, not lote numbers (298)
+        Batch::factory()->create(['organisation_id' => $this->org->id, 'location_id' => $norte->id, 'genetic_id' => $genetic->id, 'batch_no' => 'B-NORTE22', 'label' => 'B-NORTE22']);
         $this->actingAs($owner);
 
         return [$centro, $norte, $inCentro];

@@ -100,6 +100,9 @@ class CreateGenetic extends CreateRecord
                         ->visible(fn (Get $get): bool => self::isUnit($get('product_type')))
                         ->required(fn (Get $get): bool => self::isUnit($get('product_type'))),
                     TextInput::make('cost_per_gram_eur')->label(__('Coste por gramo (€)'))->numeric()->minValue(0),
+                    // Prompt 298 — the grow's own lote number, or empty for a generated one.
+                    TextInput::make('batch_no')->label(__('Nº de lote propio'))->maxLength(40)
+                        ->helperText(__('El número del cultivo o del proveedor, si lo tiene. Si lo dejas vacío, se genera uno.')),
                     CameraOrFile::field(FileUpload::make('lab_report_path')->label(__('Informe de laboratorio'))
                         ->disk('documents')->getUploadedFileUsing(DocumentUpload::withoutDirectUrl())
                         ->visibility('private')->maxSize(DocumentUpload::maxKilobytes())
@@ -190,6 +193,7 @@ class CreateGenetic extends CreateRecord
             // Prompt 278 (Ben's 271) — the price and the photo belong to THIS opening batch, not to the strain.
             $priceCents = Money::fromEuros((string) ($genetic->isUnitType() ? ($data['price_per_unit_eur'] ?? 0) : ($data['price_per_gram_eur'] ?? 0)))->cents;
             $intake = [
+                'batch_no' => $data['batch_no'] ?? null,
                 'cost_per_gram_cents' => Money::fromEuros((string) ($data['cost_per_gram_eur'] ?? 0))->cents, // the one conversion (273)
                 'lab_report_path' => $data['lab_report_path'] ?? null,
                 'price_per_gram_cents' => $genetic->isUnitType() ? null : $priceCents,

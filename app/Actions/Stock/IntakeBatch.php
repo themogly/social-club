@@ -12,9 +12,12 @@ use App\Models\Location;
 use App\Models\StockMovement;
 use App\Models\User;
 use App\Support\BelowCost;
+use App\Support\BusinessDay;
 use App\Support\Settings;
 use App\Support\StockCeiling;
 use App\Support\Weight;
+use Carbon\CarbonImmutable;
+use DomainException;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -33,6 +36,8 @@ class IntakeBatch
 {
     /**
      * @param  IntakeData  $data
+     *
+     * @throws DomainException a typed lote number the strain already has, or one over 40 characters
      */
     public function handle(Genetic $genetic, Location $location, array $data): Batch
     {
@@ -48,13 +53,23 @@ class IntakeBatch
         // audited (prompt 48 — the most traceability-sensitive event in a cannabis club). INSIDE the
         // txn, so a failed audit rolls back the intake (boundary matches CommitStockTake).
         return DB::transaction(function () use ($genetic, $location, $data, $units, $cg, $ceilingOverride, $isUnit): Batch {
+            // Prompt 298 — the lote's number within its strain, organisation-wide. The STRAIN row is locked for the rest of
+            // the intake, so two intakes of the same strain at once take turns and never share a number (locking the
+            // strain rather than its batches also covers a strain's very first batch, when there is nothing else to lock).
+            Genetic::query()->withoutGlobalScopes()->whereKey($genetic->getKey())->lockForUpdate()->first();
+            $loteSeq = (int) Batch::query()->withoutGlobalScopes()
+                ->where('organisation_id', $genetic->organisation_id)->where('genetic_id', $genetic->id)
+                ->max('lote_seq') + 1;
+            $receivedOn = CarbonImmutable::parse($data['acquired_or_harvested_on'] ?? BusinessDay::today($location));
+
             $batch = Batch::create([
                 'organisation_id' => $genetic->organisation_id,
                 'genetic_id' => $genetic->id,
                 'location_id' => $location->id,
-                'batch_no' => $data['batch_no'] ?? 'B-'.strtoupper(Str::random(6)),
+                'batch_no' => $this->loteNumber($genetic, $data['batch_no'] ?? null, $receivedOn, $loteSeq),
+                'lote_seq' => $loteSeq,
                 'label' => $data['label'] ?? null, // the club's own name (prompt 282); trimmed/nulled by the model
-                'acquired_or_harvested_on' => $data['acquired_or_harvested_on'] ?? now(),
+                'acquired_or_harvested_on' => $data['acquired_or_harvested_on'] ?? $receivedOn->toDateString(),
                 'expires_on' => $data['expires_on'] ?? null,
                 'initial_cg' => $cg,
                 'remaining_cg' => $cg,
@@ -102,6 +117,41 @@ class IntakeBatch
 
             return $batch;
         });
+    }
+
+    /**
+     * The lote number (prompt 298). The grow's or supplier's own, when typed — trimmed, and refused if that strain already
+     * has a lote with it (whether a repeat delivery tops up a lote is still 251's open question). Otherwise a readable
+     * one, generated once and never changed: the strain's first three letters, ASCII, padded with X, the intake date and
+     * the lote's number within the strain — `AMN-260912-3` — with `-2`, `-3`… in the unlikely case it already exists.
+     */
+    private function loteNumber(Genetic $genetic, ?string $typed, CarbonImmutable $receivedOn, int $loteSeq): string
+    {
+        $typed = trim((string) $typed);
+        $taken = fn (string $number, bool $sameStrain): bool => Batch::query()->withoutGlobalScopes()
+            ->where('organisation_id', $genetic->organisation_id)
+            ->when($sameStrain, fn ($query) => $query->where('genetic_id', $genetic->id))
+            ->where('batch_no', $number)->exists();
+
+        if ($typed !== '') {
+            if (mb_strlen($typed) > 40) {
+                throw new DomainException(__('El número de lote no puede tener más de 40 caracteres.'));
+            }
+            if ($taken($typed, true)) {
+                throw new DomainException(__('Ya existe un lote con ese número para esta variedad.'));
+            }
+
+            return $typed;
+        }
+
+        $code = str_pad(substr((string) preg_replace('/[^A-Z]/', '', strtoupper(Str::ascii($genetic->name))), 0, 3), 3, 'X');
+        $base = $code.'-'.$receivedOn->format('ymd').'-'.$loteSeq;
+        $number = $base;
+        for ($n = 2; $taken($number, false); $n++) {
+            $number = $base.'-'.$n;
+        }
+
+        return $number;
     }
 
     /**

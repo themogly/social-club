@@ -624,11 +624,11 @@ class TillSession extends Component
             ->whereHas('genetic', fn ($q) => $q->where('unit_type', UnitType::WEIGHT->value))
             ->with('genetic')
             ->get()
-            // Prompt 282 — listed as the club names them: strain, then the club's name, then the lote number.
+            // Prompt 282 / 298 — listed as the club reads them: strain, then the club's name, then the lote's place in the strain.
             ->sortBy([
                 fn (Batch $a, Batch $b): int => strcasecmp((string) $a->genetic?->name, (string) $b->genetic?->name),
                 fn (Batch $a, Batch $b): int => strcasecmp((string) $a->label, (string) $b->label),
-                fn (Batch $a, Batch $b): int => strcmp((string) $a->batch_no, (string) $b->batch_no),
+                fn (Batch $a, Batch $b): int => ($a->lote_seq ?? 0) <=> ($b->lote_seq ?? 0),
             ])
             ->values();
     }
@@ -746,7 +746,7 @@ class TillSession extends Component
 
             if ($line !== null && $line->not_counted) {
                 return [
-                    'name' => $batch->displayName(withGenetic: true),
+                    'name' => $batch->displayName(),
                     'counted' => null, 'variance' => null, 'adjusted' => false,
                     'not_counted' => true, 'reason' => $line->not_counted_reason,
                     // Flag a jar that keeps escaping the count — exactly what a count exists to catch.
@@ -758,7 +758,7 @@ class TillSession extends Component
             $counted = $line?->counted_cg->centigrams ?? 0;
 
             return [
-                'name' => $batch->displayName(withGenetic: true),
+                'name' => $batch->displayName(),
                 'counted' => Weight::fromCentigrams($counted)->formatted(),
                 'variance' => Weight::fromCentigrams($variance)->formatted(),
                 'adjusted' => $variance !== 0,

@@ -193,7 +193,7 @@ class CommitValidatesItsLinesTest extends TestCase
             $this->commit([['genetic_id' => $this->genetic->id, 'batch_id' => $other->id, 'grams_cg' => 100]]);
             $this->fail('A lote of another genetic was drawn from.');
         } catch (RuntimeException $e) {
-            $this->assertSame(__('El lote :batch no corresponde a este producto en esta sede.', ['batch' => $other->batch_no]), $e->getMessage());
+            $this->assertSame(__('El lote :batch no corresponde a este producto en esta sede.', ['batch' => $other->displayName()]), $e->getMessage());
         }
 
         $this->assertNothingWritten();
@@ -209,7 +209,7 @@ class CommitValidatesItsLinesTest extends TestCase
             $this->commit([['genetic_id' => $this->genetic->id, 'batch_id' => $norteBatch->id, 'grams_cg' => 100]]);
             $this->fail("Another sede's lote was drawn from by this counter.");
         } catch (RuntimeException $e) {
-            $this->assertSame(__('El lote :batch no corresponde a este producto en esta sede.', ['batch' => $norteBatch->batch_no]), $e->getMessage());
+            $this->assertSame(__('El lote :batch no corresponde a este producto en esta sede.', ['batch' => $norteBatch->displayName()]), $e->getMessage());
         }
 
         $this->assertNothingWritten();

@@ -103,7 +103,7 @@ class BatchRecall
     {
         return new ReportTable(
             key: 'recall',
-            title: __('Retirada de lote :batch', ['batch' => $this->batch->displayName()]),
+            title: __('Retirada de lote :batch', ['batch' => $this->batch->referenceName()]),
             columns: [
                 // The lote number stays (the traceable key); the club's name sits beside it (prompt 282).
                 ReportColumn::text('lote', __('Lote'), sortable: false),
