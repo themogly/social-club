@@ -124,6 +124,9 @@ return [
         'driver' => env('QUEUE_FAILED_DRIVER', 'database-uuids'),
         'database' => env('DB_CONNECTION', 'sqlite'),
         'table' => 'failed_jobs',
+        // Post-296 audit — a failed mail job's payload holds personal data (a receipt's grams, a name, a token), so the
+        // dead-letter table is pruned: `queue:prune-failed` keeps this many hours (the Trabajos fallidos page's window).
+        'retention_hours' => 168,
     ],
 
 ];

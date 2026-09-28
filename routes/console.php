@@ -48,6 +48,13 @@ Schedule::command('applications:prune-retention')->dailyAt('05:55');
 // multi-step form, not a record. Idempotent and safe on an empty/absent directory.
 Schedule::command('imports:prune-staging')->hourly();
 
+// Post-296 audit — failed jobs keep their payload (a receipt's grams, names, tokens), outside every other retention path.
+// Prune them after the dead-letter window; RGPD erasure also removes a member's (AnonymiseMember). Idempotent.
+Schedule::command('queue:prune-failed', ['--hours' => (int) config('queue.failed.retention_hours', 168)])->dailyAt('05:58');
+
+// Post-296 audit — the registro de jornada is kept the legal minimum (4 years) and then deleted, never forever.
+Schedule::command('staff:prune-clock-events')->dailyAt('06:05');
+
 // Cross-location wallet settlement — credit at one unfenced sede clears debt at another.
 // Reads live balances; a no-op when nothing to settle, so a double-fire moves no extra money.
 Schedule::command('wallet:settle-cross-location')->dailyAt('03:30');

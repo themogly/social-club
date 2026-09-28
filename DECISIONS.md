@@ -15942,3 +15942,27 @@ Club report: batches were listed by a random `B-7QX2KD`. Failing-first tests:
 - **Tests adjusted.** These pinned the old "name · lote number" display: 282's `BatchNamesTest`, the two lote-error
   tests, and three scope tests that found batches in the list by their lote number (now hidden by default; they
   name the batch instead).
+
+## Post-296 audit fix 4 — failed mail and the registro de jornada get a retention end
+
+From `audits/reports/2026-09-post-296-security.md`, Phase 2. Tests: `tests/Feature/Security/RetentionEndsTest.php`
+(5 of its 7 fail without the fix).
+
+- **`failed_jobs`.** A mail that fails after its retries (288) keeps its payload in the dead-letter table: a receipt's
+  grams (Article 9), a name, an address, a card or invite token. Horizon's trim covers only its Redis copy.
+  - `queue:prune-failed --hours=168` now runs daily at 05:58. The window, `queue.failed.retention_hours`, is also
+    the *Trabajos fallidos* page's retry window.
+  - `AnonymiseMember` deletes every failed job whose payload names the member, by id or by the address they had.
+  - RAT-01 declares it.
+  - The window is a config value rather than a Setting: it is operational, not a compliance threshold.
+- **The registro de jornada.** RAT-08 said "4 años como mínimo" and nothing ever ended it.
+  - `staff:prune-clock-events` runs daily at 06:05. It deletes events whose business day is older than the new
+    Setting `staff_clock_retention_years`: default 5, never under 4, editable under *Privacidad y datos*.
+  - It is the model's ONE documented carve-out from append-only: a raw delete in one transaction, corrections first
+    (the table restricts the other order), and one `staff.clock.retention.pruned` audit entry with the count and
+    cutoff.
+  - An old event that a kept correction still points at stays. The ids are read first, because MySQL refuses a
+    DELETE whose subquery reads the same table (error 1093).
+  - It is idempotent, has `--dry-run` and writes a heartbeat. The model itself still refuses `delete()`, and a test
+    pins that.
+  - RAT-08 now states the end.
