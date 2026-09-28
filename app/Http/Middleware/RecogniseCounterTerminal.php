@@ -2,6 +2,7 @@
 
 namespace App\Http\Middleware;
 
+use App\Support\CounterOperator;
 use App\Support\CounterTerminals;
 use Closure;
 use Illuminate\Http\Request;
@@ -29,6 +30,16 @@ class RecogniseCounterTerminal
             $terminal = CounterTerminals::current($request);
         } catch (Throwable) {
             return $next($request);
+        }
+
+        // Post-296 audit, finding 5 — a person signed in by PIN on a tablet stays signed in only while THAT tablet is
+        // registered: revoking a stolen tablet signs out whoever was on it, from its very next request.
+        $signedInOn = session('counter.terminal_id');
+        if (is_string($signedInOn) && $signedInOn !== $terminal?->id && Auth::guard('web')->check()) {
+            Auth::guard('web')->logout();
+            CounterOperator::clear();
+            session()->forget(['counter.terminal_id', 'auth.via_pin']);
+            session()->regenerate();
         }
 
         if ($terminal === null) {

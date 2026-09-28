@@ -11,6 +11,7 @@ use App\Models\Organisation;
 use App\Models\User;
 use App\Support\ActiveScope;
 use App\Support\CounterOperator;
+use App\Support\PanelIdentity;
 use Database\Seeders\RolePermissionSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Auth;
@@ -74,10 +75,16 @@ class PinIsASignInTest extends TestCase
         CounterOperator::clear();
     }
 
+    /** The PIN, then the once-a-shift password (post-296 fix 3) — these tests are about who the panel belongs to. */
     private function pin(string $pin): TestResponse
     {
-        return $this->livewirePost($this->snapshotFrom('/counter/till', 'counter.till-session'),
+        $response = $this->livewirePost($this->snapshotFrom('/counter/till', 'counter.till-session'),
             ['operatorPin' => $pin], [['unlockOperator']]);
+        if (Auth::user() instanceof User) {
+            PanelIdentity::confirmed(Auth::user());
+        }
+
+        return $response;
     }
 
     private function assertSentToTheCounter(string $url): void

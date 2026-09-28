@@ -251,8 +251,10 @@ trait IdentifiesOperator
 
         // Prompt 289 — on a REGISTERED counter "locked" means nobody is signed in, not "whoever typed last": the person is
         // signed out, the session (basket, sede) is kept and its id regenerated. An ordinary browser keeps its login.
-        if (CounterTerminals::current() !== null && Auth::guard('web')->check()) {
+        // Post-296 audit — also when the tablet was revoked since the PIN sign-in (it is no longer "current").
+        if ((CounterTerminals::current() !== null || is_string(session('counter.terminal_id'))) && Auth::guard('web')->check()) {
             Auth::guard('web')->logout();
+            session()->forget(['counter.terminal_id', 'auth.via_pin']);
             session()->regenerate();
         }
 

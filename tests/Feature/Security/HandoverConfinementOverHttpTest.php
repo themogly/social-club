@@ -5,6 +5,7 @@ namespace Tests\Feature\Security;
 use App\Actions\Till\OpenTill;
 use App\Enums\Role;
 use App\Enums\TillSessionStatus;
+use App\Filament\Pages\Auth\ConfirmIdentity;
 use App\Models\AuditLog;
 use App\Models\Location;
 use App\Models\Member;
@@ -123,8 +124,9 @@ class HandoverConfinementOverHttpTest extends TestCase
         $this->assertSame($this->operator->id, CounterOperator::id());
         $this->assertTrue(AuditLog::query()->where('action', 'counter.handover.ended')->exists());
 
-        // And the tablet is the counter's again — typing `/` no longer lands on the applicant's form.
-        $this->get('/')->assertOk();
+        // And the tablet is the counter's again — typing `/` no longer lands on the applicant's form (the panel then asks
+        // the PIN session for the password once a shift, post-296 fix 3).
+        $this->get('/')->assertRedirect(ConfirmIdentity::getUrl());
     }
 
     public function test_the_pin_ends_a_submitted_handover_and_lands_on_the_review(): void
