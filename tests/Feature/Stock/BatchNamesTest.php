@@ -108,6 +108,7 @@ class BatchNamesTest extends TestCase
 
     public function test_a_name_over_60_characters_is_refused_in_spanish(): void
     {
+        app()->setLocale('es'); // the club's working language, whatever the suite's locale
         $component = Livewire::test(CreateBatch::class)->fillForm($this->createForm(str_repeat('a', 61)))->call('create')
             ->assertHasFormErrors(['label' => 'max']);
 
