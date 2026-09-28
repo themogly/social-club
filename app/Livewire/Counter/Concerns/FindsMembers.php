@@ -110,6 +110,25 @@ trait FindsMembers
         $this->submitLookup();
     }
 
+    /**
+     * Prompt 299 — a card reader's burst, caught at window level while the dispensary's search is hidden
+     * (`resources/js/card-wedge.js`). The same token resolution as the search's Enter; only when this sede has card
+     * readers on. A burst that is not a card leaves the hidden search clean and says so.
+     */
+    public function submitWedgeScan(string $token): void
+    {
+        if (! $this->cardReadersEnabled()) {
+            return;
+        }
+
+        $this->submitCameraScan($token);
+
+        if ($this->lookupSearched) {
+            $this->clearLookup();
+            $this->flash(__('Tarjeta no reconocida.'), 'error');
+        }
+    }
+
     /** A result row was tapped. */
     public function selectMember(string $memberId): void
     {

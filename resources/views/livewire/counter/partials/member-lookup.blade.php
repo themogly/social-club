@@ -92,7 +92,9 @@
             x-ref="field"
             type="text"
             wire:model.live.debounce.250ms="lookup"
-            @if ($autofocus ?? false) autofocus @endif
+            {{-- `autofocus` only works on a page load; after a morph (the dispensary's *Cambiar socio*, 299) the field is
+                 focused by Alpine as it appears. --}}
+            @if ($autofocus ?? false) autofocus data-member-lookup-focus x-init="$nextTick(function () { $el.focus() })" @endif
             autocomplete="off"
             spellcheck="false"
             role="combobox"

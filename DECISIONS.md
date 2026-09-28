@@ -16045,3 +16045,61 @@ From `audits/reports/2026-09-post-296-completeness.md`.
   - the pending device checks;
   - the retention periods, for the gestoría;
   - `CSP_ENFORCE`.
+
+## Prompt 299 — once a member is chosen, the dispensary stops asking "find a member"
+
+Club report (photo from Sede Deadpool): with *Member Two* chosen, a full-width *Busca un socio* field and *Escanear con
+cámara* still sat above the pad, so the screen looked as if nobody was identified. Failing-first tests:
+`tests/Feature/Dispensing/MemberChosenTest.php`.
+
+- **The search hides once a socio is chosen.** It was kept "so an operator can scan the next socio without clearing
+  the current one first". That job now belongs to:
+  - the member card's scan button;
+  - a card reader, caught at window level (below);
+  - *Cambiar socio*, which brings the search back, focused.
+
+  With no socio, the blocking state *Identifica a un socio* is unchanged. Two things are left alone:
+  - the BLOCKED-member surface keeps its own *O atiende a otro socio* search, because there the current socio cannot
+    be served;
+  - Barra, Socios and Recepción are unchanged (pin test).
+- **The card is the one "who".**
+  - *Cerrar* is renamed **Cambiar socio** (accessible name *Cambiar de socio*), with the same action and the same 263
+    question.
+  - Beside it is an icon button, **Escanear otro socio** (the camera scanner's new `compact` variant, 44×44), shown
+    only with `camera_scan_enabled`. Its scan goes through the same token path, so another member with unpaid lines
+    gets 263's question.
+  - Both sit on their own row under the identity: squeezed beside it, the name read "Yvet…" at 820×1180.
+- **The card-reader catcher** (`resources/js/card-wedge.js`, mounted as `window.cardWedge` only with a socio chosen and
+  `card_readers_enabled` on):
+  - A capture-phase window `keydown` listener takes a burst of keys at most 50 ms apart, ended by Enter, and sends it
+    to `submitWedgeScan`. That calls the same token resolution; a burst that is not a card clears the hidden search
+    and says *Tarjeta no reconocida*.
+  - It never acts while focus is in a field or a dialog is open.
+  - The weight pad also listens to the whole window, and its Enter ADDS A LINE. So from the third fast key on the
+    burst is swallowed (no person types three keys 50 ms apart), the burst's Enter never reaches the pad, and the
+    pad undoes the few keys that leaked (`undoSince`, from the burst's start).
+  - One deliberate difference from the prompt: focus on a weight-pad BUTTON does not disable the catcher. After any
+    pad tap, focus sits there, so a card scan would otherwise fail in the most common state. Timing is what protects
+    people: slow typing is never taken.
+  - Tested in node over the real module (burst taken, slow typing and typing in a field ignored), and in the browser.
+- **The missing photo is a chip.** One amber *Sin foto* chip (44 px) opens a sheet with the same sentence and 295's
+  *Hacer foto* / *Elegir archivo*. The upload is unchanged, and it is still the 293 island.
+- **A shared sheet**, `x-counter.sheet`, uses the receipt sheet's rules (in-page, `x-show`, Android back closes it,
+  Escape, backdrop, focus on Cerrar), so 300's void sheet can reuse it.
+- **Details:**
+  - the lookup's `autofocus` now also focuses after a morph (`x-init`);
+  - `camera` and `qr-code` glyphs were added to the counter icon set;
+  - a valueless component attribute renders as `name="name"`, so the chip's markers carry an empty value (a test
+    counts `data-photo-nag`).
+- **Tests adjusted:** `DispensaryPosScreenTest` expected the search label with a socio chosen; `OneLookupHarnessTest` photographed the search in the selling pane and now asserts it is absent.
+- **Verified in the browser** (throwaway DB, card readers on, `tests/Browser/prove-299-member-chosen.mjs`; 1180×820 and
+  820×1180, light and dark; all 22 checks each run):
+  - no search with a socio chosen;
+  - *Cambiar socio* → the search, focused;
+  - with a line → 263's question;
+  - a typed card burst with unpaid lines → the question, with the pad's "2" untouched;
+  - slow typing → nothing;
+  - a burst on an empty basket → the scanned member;
+  - *Sin foto* → the sheet; Escape closes it;
+  - no page errors.
+- **Tablet (Shane):** the photo of the same screen, and a second member's card on the reader — pending.

@@ -11,6 +11,7 @@
 // on the first click, so loading this early costs a few kilobytes and no engine.
 import './mrz-reader.js';
 import { catalogueShows } from './catalogue-search.js';
+import { createCardWedge } from './card-wedge.js';
 import './photo-buttons.js';
 
 // Counter camera QR scanner (prompt 35) — a progressive enhancement registered on Alpine
@@ -96,6 +97,7 @@ window.dispensaryPad = (config = {}) => ({
     dailyRemaining: config.dailyRemainingCg ?? null,
     decimal: config.decimal ?? ',',
     adding: false,
+    trail: [], // prompt 299 — the value before each keyboard key, so a card-reader burst's leaked keys can be undone
     push(key) {
         if (key === ',') {
             if (! this.value.includes(',')) this.value = (this.value === '' ? '0' : this.value) + ',';
@@ -139,9 +141,43 @@ window.dispensaryPad = (config = {}) => ({
             if (t?.closest?.('[data-weight-pad] button, [data-add-line]')) return;
             e.preventDefault(); this.add(); return;
         }
-        if (/^[0-9]$/.test(e.key)) { e.preventDefault(); this.push(e.key); return; }
-        if (e.key === ',' || e.key === '.') { e.preventDefault(); this.push(','); return; }
-        if (e.key === 'Backspace') { e.preventDefault(); this.back(); }
+        if (/^[0-9]$/.test(e.key)) { e.preventDefault(); this.remember(e); this.push(e.key); return; }
+        if (e.key === ',' || e.key === '.') { e.preventDefault(); this.remember(e); this.push(','); return; }
+        if (e.key === 'Backspace') { e.preventDefault(); this.remember(e); this.back(); }
+    },
+    remember(e) {
+        this.trail.push({ t: e.timeStamp, value: this.value });
+        if (this.trail.length > 12) this.trail.shift();
+    },
+    // Prompt 299 — a card reader's first keys reach the pad before the burst is recognised (card-wedge.js); put the
+    // value back as it was before the burst began.
+    undoSince(startedAt) {
+        const first = this.trail.find((entry) => entry.t >= startedAt - 1);
+        if (first) this.value = first.value;
+        this.trail = [];
+    },
+});
+
+// Prompt 299 — the keyboard-wedge catcher (card-wedge.js), mounted on the dispensary only while a socio is chosen and
+// only when the sede has card readers on. Capture phase, so a burst it recognises never reaches the weight pad.
+window.cardWedge = () => ({
+    wedge: null,
+    handler: null,
+    init() {
+        this.wedge = createCardWedge({
+            onScan: (value, startedAt) => {
+                window.dispatchEvent(new CustomEvent('counter-card-scan', { detail: { startedAt } }));
+                this.$wire.submitWedgeScan(value);
+            },
+            dialogOpen: () => [...document.querySelectorAll('[role="dialog"][aria-modal="true"]')].some((d) => d.offsetParent !== null),
+        });
+        this.handler = (e) => {
+            if (this.wedge.handle(e) !== 'pass') { e.preventDefault(); e.stopImmediatePropagation(); }
+        };
+        window.addEventListener('keydown', this.handler, true);
+    },
+    destroy() {
+        window.removeEventListener('keydown', this.handler, true);
     },
 });
 

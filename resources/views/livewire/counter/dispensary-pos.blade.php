@@ -139,14 +139,13 @@
             @if ($blockedSurface)
                 @include('livewire.counter.partials.blocked-member')
             @else
-                {{-- Identify — the same shared lookup the member blocking state uses, wrapped in this column's
-                     card chrome. Kept here so an operator can scan the next socio without clearing the current
-                     one first; the audit's finding 3 (this column eating the top of the screen) is prompt 176.
-                     No autofocus: a basket is already in progress and the cursor belongs to it. --}}
-                <section class="rounded-2xl border border-line bg-surface p-4 dark:border-slate-800 dark:bg-slate-900">
-                    @include('livewire.counter.partials.member-lookup', ['autofocus' => false])
-                    @include('livewire.counter.partials.checked-in-required')
-                </section>
+                {{-- Prompt 299 — no search once a socio is chosen. It stayed "so an operator can scan the next socio
+                     without clearing the current one", and the cost was a screen that looked as if nobody was identified,
+                     with the pad pushed down. The next socio is now the member card's scan button (camera) or a card
+                     reader, caught at window level below; *Cambiar socio* brings the search back. --}}
+                @if ($cardReadersEnabled)
+                    <div data-card-wedge x-data="window.cardWedge()" hidden></div>
+                @endif
                 {{-- Weight entry panel (opens when a genetic is chosen). --}}
                 @if ($activeGenetic)
                     {{-- Prompt 292 — the keypad runs in the browser (window.dispensaryPad): no key makes a request; the value
@@ -163,6 +162,7 @@
                                  decimal: @js(app()->getLocale() === 'es' ? ',' : '.'),
                              })"
                              @keydown.window="onKey($event)"
+                             @counter-card-scan.window="undoSince($event.detail.startedAt)"
                              class="rounded-2xl border border-brand/40 bg-brand-tint/40 p-4 dark:border-brand/40 dark:bg-slate-900">
                         <div class="flex items-start justify-between gap-3">
                             <div>

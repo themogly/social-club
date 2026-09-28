@@ -34,17 +34,26 @@
                     @include('livewire.counter.partials.member-status-badge', ['status' => $member->status])
                 </p>
             </div>
+        </div>
 
-            {{-- Was 52x32 — under the counter's 44x44 floor, measured in a real browser after a rebuild. --}}
+        {{-- Prompt 299 — the card is the one "who" once a socio is chosen (the search is gone), so it carries the two ways
+             to change who: *Cambiar socio* (was *Cerrar*: close the card? the sale? the till? — same action, same 263
+             question) and, when this sede scans by camera, the next card here. Their own row, so the name and the
+             number always read in full in the narrow cart column (measured at 820×1180). --}}
+        <div class="mt-2 flex items-center justify-end gap-1">
+            @if ($cameraScanEnabled ?? false)
+                <x-counter.camera-scan compact :label="__('Escanear otro socio')" data-member-rescan="" />
+            @endif
             <button
                 type="button"
                 wire:click="clearMember"
-                aria-label="{{ __('Cerrar ficha del socio') }}"
-                class="inline-flex h-11 min-w-[2.75rem] shrink-0 items-center justify-center rounded-lg px-2 text-sm text-ink-muted transition hover:bg-black/5 dark:text-slate-400 dark:hover:bg-white/5"
-            >{{ __('Cerrar') }}</button>
+                data-change-member
+                aria-label="{{ __('Cambiar de socio') }}"
+                class="inline-flex h-11 shrink-0 items-center justify-center rounded-lg border border-line px-3 text-sm font-medium text-ink transition hover:bg-surface-alt dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
+            >{{ __('Cambiar socio') }}</button>
         </div>
 
-        {{-- Prompt 263 — closing (or switching to another member) with anything unpaid ASKS first. "Cerrar" used to
+        {{-- Prompt 263 — changing (or switching to another member) with anything unpaid ASKS first. "Cerrar" used to
              discard both baskets outright, which is how drinks left the counter unpaid and unrecorded. --}}
         @if ($confirmDiscard)
             {{-- Prompt 272 — a NAMED alertdialog that takes focus when it appears (WCAG 2.4.3): it was unnamed
@@ -106,11 +115,20 @@
              so a basket tap no longer re-sends them. A saved photo refreshes the screen and the nag goes. --}}
         @island('photo-nag', always: $this->islandChanged('photo'))
         @php $nag = $this->islandView('photo'); @endphp
+        {{-- Prompt 299 — one small chip in the middle of a sale, not two full-size buttons; the two 295 buttons and the
+             same sentence are one tap away, in a sheet. The upload itself is unchanged. --}}
         @if ($nag['missing'])
-            <div data-photo-nag class="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1.5 rounded-xl border border-warning/30 bg-warning/5 px-3 py-1.5">
-                <p class="w-full text-[11px] font-medium leading-tight text-warning">{{ __('Sin foto — verifica y súbela') }}</p>
-                <x-counter.photo-capture :member-id="$nag['memberId']" source="counter" />
-            </div>
+            <x-counter.sheet name="photo" data-photo-nag="" data-photo-sheet="" :heading="__('Foto del socio')" class="mt-2">
+                <x-slot:trigger>
+                    <button type="button" data-photo-chip @click="open()"
+                            class="inline-flex h-11 items-center gap-1.5 rounded-full border border-warning/40 bg-warning/10 px-3 text-sm font-semibold text-warning transition hover:bg-warning/15">
+                        <x-counter.icon name="camera" class="h-4 w-4" />
+                        {{ __('Sin foto') }}
+                    </button>
+                </x-slot:trigger>
+                <p class="text-sm font-medium text-warning">{{ __('Sin foto — verifica y súbela') }}</p>
+                <x-counter.photo-capture :member-id="$nag['memberId']" source="counter" class="mt-3" />
+            </x-counter.sheet>
         @endif
         @endisland
     </section>

@@ -8,6 +8,8 @@
     resources/js/app.js; translated copy is passed in here. Camera access needs a secure
     context (HTTPS or localhost).
 --}}
+{{-- Prompt 299 — `compact`: a 44×44 icon button (the member card's *Escanear otro socio*), the same scanner behind it. --}}
+@props(['compact' => false, 'label' => null])
 <div
     x-cloak
     x-data="cameraScan({ messages: {
@@ -15,8 +17,19 @@
         unsupported: @js(__('Este navegador no admite el escaneo con cámara aquí.')),
     } })"
     x-on:livewire:navigating.window="teardown()"
-    class="mt-3"
+    @class(['mt-3' => ! $compact, 'shrink-0' => $compact])
+    {{ $attributes }}
 >
+    @if ($compact)
+    <button
+        type="button"
+        x-show="supported"
+        x-on:click="openScanner()"
+        aria-label="{{ $label ?? __('Escanear con cámara') }}"
+        title="{{ $label ?? __('Escanear con cámara') }}"
+        class="inline-flex h-11 w-11 items-center justify-center rounded-lg text-ink-muted transition hover:bg-black/5 dark:text-slate-400 dark:hover:bg-white/5"
+    ><x-counter.icon name="qr-code" class="h-5 w-5" /></button>
+    @else
     <x-button
         variant="secondary"
         size="md"
@@ -30,6 +43,7 @@
         </svg>
         {{ __('Escanear con cámara') }}
     </x-button>
+    @endif
 
     {{-- Full-screen camera overlay while scanning. --}}
     <div
