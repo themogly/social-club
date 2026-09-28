@@ -31,6 +31,9 @@
          (two 10,00 € entradas) morphed onto the old, already-faded element and showed nothing the second time.
        · `$reveal` scrolls the message into view only if it is not already — `block: 'nearest'`, instant, so a
          visible message never moves the page and there is no animation to gate on reduced motion. --}}
+{{-- Post-296 completeness D3 — every counter screen now numbers its flashes (`$flashSeq`), so the nonce defaults to it:
+     a screen that includes this partial no longer has to remember to pass it. --}}
+@php($nonce = $nonce ?? ($flashSeq ?? null))
 @php($revealJs = ($reveal ?? false) ? "\$nextTick(() => \$el.scrollIntoView({ block: 'nearest' }));" : '')
 @if ($flashMessage)
     <div

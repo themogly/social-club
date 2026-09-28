@@ -115,7 +115,7 @@ class PosQuickEntryTest extends TestCase
         $component = Livewire::test(DispensaryPos::class)
             ->call('selectMember', $member->id)
             ->call('chooseGenetic', $genetic->id)
-            ->call('applyWeightPreset', 350);
+            ->set('weightInput', '3,5'); // a preset tap fills the input client-side (292); addLine does the checks
 
         // Same grams as typing 3,50 (the preset only fills the input).
         $this->assertSame('3,5', $component->get('weightInput'));

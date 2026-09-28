@@ -51,6 +51,7 @@ use App\Models\Setting;
 use App\Models\TillSession;
 use App\Models\User;
 use App\Support\ActiveScope;
+use App\Support\MemberNumber;
 use App\Support\Settings;
 use App\Support\StockCeiling;
 use App\Support\TillSummary;
@@ -469,6 +470,10 @@ class DemoDataSeeder extends Seeder
 
     private function makeMember(string $orgId, int $number, MemberStatus $status, bool $therapeutic): Member
     {
+        // Post-296 completeness D1 — the number is placed by hand, so move the organisation's counter past it (the same
+        // call the member import makes); otherwise the first real alta on a demo database collides.
+        MemberNumber::advanceAtLeast($orgId, $number);
+
         return Member::create([
             'organisation_id' => $orgId,
             'member_no' => sprintf('M-%05d', $number),

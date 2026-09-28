@@ -86,6 +86,13 @@ class CheckInScreen extends Component
     /** success | warning | error */
     public string $flashType = 'success';
 
+    /**
+     * Bumped by every `flash()` and joined to the message's key (prompt 279, post-296 completeness D3). Without it the
+     * same confirmation twice morphed onto the first one's already-faded element and showed nothing.
+     */
+    #[Locked]
+    public int $flashSeq = 0;
+
     public function mount(): void
     {
         abort_unless($this->deviceCan('checkin.manage'), 403);
@@ -409,6 +416,7 @@ class CheckInScreen extends Component
 
     private function flash(string $message, string $type): void
     {
+        $this->flashSeq++;
         $this->flashMessage = $message;
         $this->flashType = $type;
     }

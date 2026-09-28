@@ -101,7 +101,9 @@ Everything used in code/config appears in `.env.example`. Highlights:
 - **Mail:** local `MAIL_MAILER=log`. Production uses **Resend** via Laravel's first-party transport — the
   `resend/resend-php` package is already required (do **not** add `resend/resend-laravel`); set
   `MAIL_MAILER=resend` and `RESEND_API_KEY` (Laravel's own convention — `config/services.php` reads it), and a
-  verified `MAIL_FROM_ADDRESS`.
+  verified `MAIL_FROM_ADDRESS`. To prove delivery end to end after a deploy (or when *Salud del sistema* shows Correo
+  amber or red), run `php artisan csc:mail-test you@example.com`: it sends one real test email through the configured
+  mailer and reports whether it was accepted.
 - **Storage:** `FILESYSTEM_DISK` for general uploads. **ID documents & member photos use the separate
   private `documents` disk** — `DOCUMENTS_DRIVER=local` in dev; production sets `s3` with a dedicated
   private `AWS_DOCUMENTS_BUCKET`. Encrypted at rest, signed-URL access only, access-logged (prompt 04).

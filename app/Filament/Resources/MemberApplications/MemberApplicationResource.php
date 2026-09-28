@@ -3,8 +3,8 @@
 namespace App\Filament\Resources\MemberApplications;
 
 use App\Actions\Members\ApproveApplication;
+use App\Actions\Members\RejectApplication;
 use App\Actions\Members\SendApplicationInvite;
-use App\Actions\ResolveLocale;
 use App\Enums\ApplicationStatus;
 use App\Filament\Resources\MemberApplications\Pages\EditMemberApplication;
 use App\Filament\Resources\MemberApplications\Pages\ListMemberApplications;
@@ -12,8 +12,8 @@ use App\Filament\Resources\MemberApplications\Pages\ViewMemberApplication;
 use App\Filament\Resources\MemberApplications\Schemas\MemberApplicationForm;
 use App\Filament\Resources\MemberApplications\Schemas\MemberApplicationInfolist;
 use App\Filament\Resources\MemberApplications\Tables\MemberApplicationsTable;
-use App\Mail\ApplicationRejectedMail;
 use App\Models\MemberApplication;
+use App\Models\User;
 use BackedEnum;
 use Filament\Actions\Action;
 use Filament\Forms\Components\Textarea;
@@ -24,7 +24,6 @@ use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Table;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Mail;
 use Livewire\Component;
 use RuntimeException;
 
@@ -148,24 +147,10 @@ class MemberApplicationResource extends Resource
                     ->required(),
             ])
             ->action(function (MemberApplication $record, array $data): void {
+                $actor = Auth::user();
+                abort_unless($actor instanceof User, 403);
                 $reason = $data['reason'] ?? null;
-
-                $record->update([
-                    'status' => ApplicationStatus::REJECTED,
-                    'reject_reason' => $reason,
-                    'reviewed_by' => Auth::id(),
-                    'reviewed_at' => now(),
-                ]);
-
-                $email = data_get($record->payload, 'email');
-                if (is_string($email) && $email !== '') {
-                    $name = trim((string) data_get($record->payload, 'first_name').' '.(string) data_get($record->payload, 'last_name'));
-                    // In the language they applied in (prompt 288), else the club default — never the worker's.
-                    $applied = data_get($record->payload, 'consent_locale');
-                    Mail::to($email)
-                        ->locale(in_array($applied, ['en', 'es'], true) ? $applied : (new ResolveLocale)->handle())
-                        ->queue(new ApplicationRejectedMail($name !== '' ? $name : $email, is_string($reason) ? $reason : null));
-                }
+                (new RejectApplication)->handle($record, $actor, is_string($reason) ? $reason : null);
 
                 Notification::make()
                     ->title(__('Solicitud rechazada'))

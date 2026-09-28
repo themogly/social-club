@@ -157,6 +157,13 @@ class BarPos extends Component
     /** success | warning | error */
     public string $flashType = 'success';
 
+    /**
+     * Bumped by every `flash()` and joined to the message's key (prompt 279, post-296 completeness D3). Without it the
+     * same confirmation twice morphed onto the first one's already-faded element and showed nothing.
+     */
+    #[Locked]
+    public int $flashSeq = 0;
+
     public function mount(): void
     {
         abort_unless($this->deviceCan('pos.bar'), 403);
@@ -853,6 +860,7 @@ class BarPos extends Component
 
     private function flash(string $message, string $type): void
     {
+        $this->flashSeq++;
         // Any message other than a settled one means the previous outcome is no longer what is on screen
         // (prompt 202). `flashSettled()` re-sets it immediately after; nothing else may.
         $this->settled = [];

@@ -271,12 +271,6 @@ trait IdentifiesOperator
         $this->operatorFeedback = null;
     }
 
-    public function closeOperatorPanel(): void
-    {
-        $this->operatorPanelOpen = false;
-        $this->operatorPin = '';
-    }
-
     /**
      * Sign the current operator out and reopen the pad for the next person.
      *
