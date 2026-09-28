@@ -3,7 +3,7 @@
 namespace App\ViewModels\Reports;
 
 use App\Enums\DispensationStatus;
-use App\Enums\ProductType;
+use App\Enums\ProductTypeChoice;
 use App\Models\Member;
 use App\Support\ConsumptionForecast;
 use App\Support\Money;
@@ -163,6 +163,7 @@ class ConsumptionReport extends AbstractReport
             ->get([
                 DB::raw('MAX(dispensation_lines.genetic_name_snapshot) as genetica'),
                 DB::raw('MAX(genetics.product_type) as product_type'),
+                DB::raw('MAX(genetics.concentrate_subtype) as concentrate_subtype'),
                 DB::raw('COUNT(DISTINCT dispensation_lines.dispensation_id) as tx'),
                 DB::raw('SUM(dispensation_lines.grams_cg) as grams_cg'),
                 DB::raw('SUM(dispensation_lines.units_dispensed) as uds'),
@@ -170,8 +171,8 @@ class ConsumptionReport extends AbstractReport
             ])
             ->map(fn (\stdClass $r): array => [
                 'genetica' => (string) ($r->genetica ?? __('Sin genética')),
-                // product_type as a breakdown dimension; UNIT lines also carry a unit count.
-                'tipo' => $r->product_type !== null ? (ProductType::tryFrom((string) $r->product_type)?->label() ?? '—') : '—',
+                // The type as staff read it (hash is Hachís, prompt 276); UNIT lines also carry a unit count.
+                'tipo' => $r->product_type !== null ? ProductTypeChoice::of($r->product_type, $r->concentrate_subtype)->label() : '—',
                 'tx' => (int) $r->tx,
                 'grams' => (int) $r->grams_cg,
                 'uds' => (int) $r->uds,

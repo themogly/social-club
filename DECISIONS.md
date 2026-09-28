@@ -14491,3 +14491,29 @@ Tests: `CentralStoreTransferTest` (10). Also: two older tests assumed a lote tha
 hour; under 275's business-date rule it is in date until the 06:00 cutoff, so they failed when the suite ran between midnight
 and 06:00 Madrid. They now pin the clock to midday (the rule is right; the tests were time-of-day dependent).
 `composer check` green in `es` and `en`. Merged to `main` on Ben's instruction.
+## Prompt 276 (Ben's 269) — Hachís is a product type you can pick directly
+
+Hash was already modelled (`ProductType::CONCENTRATE` + `ConcentrateSubtype::HASH`), but reaching it meant Extracto → Hachís,
+a path staff did not know to take — so to the owner "there is no hash". Hachís is now a first-level choice beside Flor,
+Extracto, Preliado and Comestible, on the add-a-strain wizard and on the edit form.
+
+- **Option (a), UI only — chosen and why.** Choosing Hachís STORES `CONCENTRATE` + `concentrate_subtype = HASH`; no migration,
+  no new `ProductType` case. Every limit, ceiling, stock and report path branches on the derived `UnitType` (two paths, not
+  four), and hash already sat on the WEIGHT path — a fifth stored type (option b) would have added a case to every
+  `match`/observer/report for zero behavioural difference, and needed a backfill of existing hash rows. With (a) every
+  existing CONCENTRATE/HASH strain reads as Hachís the moment this deploys.
+- **One helper, not scattered conditionals.** `App\Enums\ProductTypeChoice` (FLOWER / HASH / CONCENTRATE / PREROLL / EDIBLE) is
+  the type as staff pick and read it — never stored. `ProductTypeChoice::of($type, $subtype)` maps a stored pair to it,
+  `->attributes()` maps it back, `options()` is the picker, `extractSubtypeOptions()` is Extracto's list without Hachís.
+  `Genetic::typeChoice()` / `Genetic::typeLabel()` are the model's entry points, `Genetic::scopeOfTypeChoice()` the query.
+- **Where it shows:** the Genéticas table column and its type filter (Hachís its own option; Extracto = every other
+  concentrate), the Lotes table type column, the counter's product rows, weight panel badge and type chips (Hachís its own
+  chip), the stock report's on-hand table and the consumption report's by-genetic table. A hash strain reads "Hachís" /
+  "Hash", never "Extracto · Hachís". The form field keeps its name `product_type` (the four shared values are unchanged, so
+  existing callers and tests filling `FLOWER`/`CONCENTRATE` still work); `EditGenetic` maps the pair to the choice on fill and
+  back on save, and drops a stale HASH subtype so Extracto never shows a value its list no longer offers. Extracto + a
+  smuggled `HASH` subtype is refused by the select's own option validation.
+- Tests: `tests/Feature/Products/HashProductTypeTest.php` — Hachís creates a WEIGHT CONCENTRATE/HASH strain and the list reads
+  Hachís; a hash dispensation moves the same centigrams, the same daily/monthly used figures, the same block at the limit and
+  the same stock-ceiling on-site figure as flower of the same grams; existing hash strains read Hachís on the list, the edit
+  form, the counter and both reports; Extracto no longer offers Hachís. `lang/en.json` already carried "Hachís" → "Hash".

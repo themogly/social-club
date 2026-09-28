@@ -6,6 +6,7 @@ use App\Enums\BatchStatus;
 use App\Enums\ConcentrateSubtype;
 use App\Enums\CultivationType;
 use App\Enums\ProductType;
+use App\Enums\ProductTypeChoice;
 use App\Enums\StrainType;
 use App\Enums\UnitType;
 use App\Models\Concerns\BelongsToOrganisation;
@@ -66,6 +67,36 @@ class Genetic extends Model
     public function isUnitType(): bool
     {
         return $this->unit_type === UnitType::UNIT;
+    }
+
+    /** The type as staff pick and read it — a CONCENTRATE/HASH strain is Hachís (prompt 276). Display only. */
+    public function typeChoice(): ProductTypeChoice
+    {
+        return ProductTypeChoice::of($this->product_type, $this->concentrate_subtype);
+    }
+
+    /** The one label for a strain's type wherever staff see it: "Hachís", never "Extracto · Hachís". */
+    public function typeLabel(): string
+    {
+        return $this->typeChoice()->label();
+    }
+
+    /**
+     * Genetics that read as $choice — Hachís is CONCENTRATE + HASH, Extracto is every other concentrate.
+     *
+     * @param  Builder<static>  $query
+     * @return Builder<static>
+     */
+    public function scopeOfTypeChoice(Builder $query, ProductTypeChoice $choice): Builder
+    {
+        $query->where('product_type', $choice->productType()->value);
+
+        return match ($choice) {
+            ProductTypeChoice::HASH => $query->where('concentrate_subtype', ConcentrateSubtype::HASH->value),
+            ProductTypeChoice::CONCENTRATE => $query->where(fn (Builder $q): Builder => $q
+                ->whereNull('concentrate_subtype')->orWhere('concentrate_subtype', '!=', ConcentrateSubtype::HASH->value)),
+            default => $query,
+        };
     }
 
     /** @return BelongsTo<Category, $this> */

@@ -3,9 +3,8 @@
 namespace App\Filament\Resources\Genetics\Schemas;
 
 use App\Enums\CategoryAppliesTo;
-use App\Enums\ConcentrateSubtype;
 use App\Enums\CultivationType;
-use App\Enums\ProductType;
+use App\Enums\ProductTypeChoice;
 use App\Enums\StrainType;
 use App\Models\Category;
 use App\Rules\GramAmount;
@@ -44,16 +43,16 @@ class GeneticForm
                     ->schema([
                         // product_type drives the derived, stored unit_type (set by GeneticObserver).
                         // unit_type is never a form field — it is observer-derived, never user-entered.
+                        // The picker offers the type as staff know it — Hachís first-level (prompt 276); the
+                        // EditGenetic page maps the choice onto product_type + concentrate_subtype both ways.
                         Select::make('product_type')
                             ->label(__('Tipo de producto'))
-                            ->options(collect(ProductType::cases())
-                                ->mapWithKeys(fn (ProductType $case): array => [$case->value => $case->label()])
-                                ->all())
-                            ->default(ProductType::FLOWER->value)
+                            ->options(ProductTypeChoice::options())
+                            ->default(ProductTypeChoice::FLOWER->value)
                             ->required()
                             ->live()
                             ->helperText(fn (Get $get): string => __('Se dispensa: :modo', [
-                                'modo' => (ProductType::tryFrom((string) $get('product_type')) ?? ProductType::FLOWER)->unitType()->label(),
+                                'modo' => (ProductTypeChoice::tryFrom((string) $get('product_type')) ?? ProductTypeChoice::FLOWER)->unitType()->label(),
                             ])),
 
                         // Strain variety (prompt 66) — sativa/indica/hybrid, nullable (some products have none).
@@ -64,13 +63,11 @@ class GeneticForm
                                 ->all())
                             ->placeholder(__('Sin especificar')),
 
-                        // Descriptive only, concentrates only.
+                        // Descriptive only, concentrates only — and never Hachís, which is its own choice above.
                         Select::make('concentrate_subtype')
                             ->label(__('Subtipo de extracto'))
-                            ->options(collect(ConcentrateSubtype::cases())
-                                ->mapWithKeys(fn (ConcentrateSubtype $case): array => [$case->value => $case->label()])
-                                ->all())
-                            ->visible(fn (Get $get): bool => $get('product_type') === ProductType::CONCENTRATE->value),
+                            ->options(ProductTypeChoice::extractSubtypeOptions())
+                            ->visible(fn (Get $get): bool => $get('product_type') === ProductTypeChoice::CONCENTRATE->value),
 
                         // Entered as grams (2 dp); the page converts to grams_per_unit_cg. Required for units.
                         TextInput::make('grams_per_unit_g')
@@ -81,8 +78,8 @@ class GeneticForm
                             ->minValue(0)
                             ->step(0.01)
                             ->suffix('g')
-                            ->visible(fn (Get $get): bool => in_array($get('product_type'), [ProductType::PREROLL->value, ProductType::EDIBLE->value], true))
-                            ->required(fn (Get $get): bool => in_array($get('product_type'), [ProductType::PREROLL->value, ProductType::EDIBLE->value], true)),
+                            ->visible(fn (Get $get): bool => in_array($get('product_type'), [ProductTypeChoice::PREROLL->value, ProductTypeChoice::EDIBLE->value], true))
+                            ->required(fn (Get $get): bool => in_array($get('product_type'), [ProductTypeChoice::PREROLL->value, ProductTypeChoice::EDIBLE->value], true)),
 
                         // Edibles only — potency per unit, stored directly in milligrams.
                         TextInput::make('thc_mg_per_unit')
@@ -91,7 +88,7 @@ class GeneticForm
                             ->minValue(0)
                             ->step(1)
                             ->suffix('mg')
-                            ->visible(fn (Get $get): bool => $get('product_type') === ProductType::EDIBLE->value),
+                            ->visible(fn (Get $get): bool => $get('product_type') === ProductTypeChoice::EDIBLE->value),
                     ])
                     ->columns(2),
 
