@@ -2,12 +2,20 @@
 
 namespace App\Filament\Resources\Articles\Pages;
 
+use App\Actions\Stock\UpdateArticleAcrossSedes;
 use App\Filament\Concerns\AuditsResourceChanges;
+use App\Filament\Resources\Articles\Actions\AddToSedesAction;
 use App\Filament\Resources\Articles\ArticleResource;
+use App\Filament\Support\AllOption;
 use App\Models\Article;
+use App\Models\User;
+use DomainException;
 use Filament\Actions\DeleteAction;
 use Filament\Actions\RestoreAction;
 use Filament\Resources\Pages\EditRecord;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Validation\ValidationException;
 
 class EditArticle extends EditRecord
 {
@@ -18,6 +26,7 @@ class EditArticle extends EditRecord
     protected function getHeaderActions(): array
     {
         return [
+            AddToSedesAction::make(),
             DeleteAction::make(),
             RestoreAction::make(),
         ];
@@ -65,5 +74,29 @@ class EditArticle extends EditRecord
         unset($data['price_eur']);
 
         return $data;
+    }
+
+    /**
+     * Prompt 297 — the save, a sede correction and the ticked sedes of the group, in one transaction
+     * ({@see UpdateArticleAcrossSedes}). A refused move (the product has history, or a sale landed while the form was
+     * open) is an error on the Sede field, and nothing is saved.
+     *
+     * @param  array<string, mixed>  $data
+     */
+    protected function handleRecordUpdate(Model $record, array $data): Model
+    {
+        /** @var Article $record */
+        $siblings = AllOption::chosen($data['apply_to'] ?? []);
+        $locationId = is_string($data['location_id'] ?? null) ? $data['location_id'] : null;
+        unset($data['apply_to'], $data['location_id']);
+
+        $actor = Auth::user();
+        abort_unless($actor instanceof User, 403);
+
+        try {
+            return (new UpdateArticleAcrossSedes)->handle($record, $data, $locationId, $siblings, $actor);
+        } catch (DomainException $e) {
+            throw ValidationException::withMessages(['data.location_id' => $e->getMessage()]);
+        }
     }
 }

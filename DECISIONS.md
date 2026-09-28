@@ -15780,3 +15780,90 @@ the real endpoints).
 - **Test-harness note:** Livewire applies a route's persistent middleware only once per path until `flush-state`,
   which runs at the end of a real request but not between requests in a test. A test that posts the same panel
   snapshot twice therefore sees the middleware only the first time. The stale-page test posts once.
+
+## Post-296 audit fix 3, follow-up — your own PIN after your own password is not a "PIN session"
+
+Found by 297's browser harness: a person who signed in with their password and then typed their own PIN at the counter
+was asked for the password again before the panel. `SignInOperator` now marks the session `auth.via_pin` only when the
+PIN OPENED it: nobody was signed in, someone else was, or it was already a PIN session. Switching to another person
+still counts, including after a lock on an ordinary browser, which keeps the login (289). Test:
+`TabletPinSessionsTest::test_your_own_pin_after_your_password_is_not_asked_but_someone_elses_is`.
+
+## Prompt 297 — a product's sede can be corrected until it has history; any choice of sedes on create; per-sede edits
+
+Club report: a product created at the wrong sede could never be corrected, and there was no way to put a product at
+several sedes at once. Failing-first tests: `tests/Feature/Stock/ArticleSedesTest.php`.
+
+- **When the sede can change: no history.** `Article::hasHistory()`, queried live. It is true when the product has any
+  of:
+  - an order naming it, completed or voided (`Order::scopeContainingArticle`);
+  - a stock movement other than its single opening `INTAKE`. A *Reponer* restock is a second INTAKE, so it counts;
+  - a stock-count line.
+
+  Purchases cannot reference an article (the schema has `purchases.batch_id` only; `items` is free text), so there is
+  nothing to check there. Stock counts were added to the prompt's list, because a count is history too.
+- **The JSON match.** `CommitOrder` stores `"article_id":"<ulid>"` through `json_encode`, and the SQLite test pins
+  that. **MySQL does NOT keep that text**, contrary to the prompt: `orders.items` is a JSON column, and MySQL
+  re-serialises it as `"article_id": "<ulid>"`, with a space. The scope matches both spellings with `LIKE`. A ULID
+  needs no escaping. `whereJsonContains` was not used, because Laravel's SQLite grammar can only match scalars in an
+  array, not an object inside one.
+- **Why history locks the sede:** stock movements carry `location_id`, and each sale belongs to its sede's counter.
+  Moving a product with a past would move that past, and both sedes' stock and sales reports would be rewritten. Once
+  the sede is locked, the field says why and points to *Añadir a otra sede*.
+- **`MoveArticleToLocation`** runs in one transaction with the article row locked. `CommitOrder` locks the same row,
+  so a sale made while the form was open is seen and the move refuses; the refusal shows on the Sede field. In that
+  transaction it:
+  - re-checks the history;
+  - moves the article and its opening INTAKE, so stock still reconciles;
+  - audits `article.location.changed` (before/after `location_id`).
+
+  It refuses:
+  - a sede the actor does not work at;
+  - the Almacén;
+  - a sede where the product's group already has a product.
+- **Any choice of sedes on create.** With more than one sede, *Sede* becomes a multi-choice, *Sedes*.
+  - The field keeps its name, `location_id`, so 294's "every create page asks for the sede" contract still holds.
+    294's tests now submit a list.
+  - The first option is *Todas las sedes* for the owner, or *Tus sedes* for a manager, covering only the sedes they
+    can reach.
+  - That option stays in step with the rest (`App\Filament\Support\AllOption`):
+    - ticking it ticks every sede;
+    - unticking any sede unticks it;
+    - unticking it clears the selection;
+    - ticking the last sede by hand ticks it too.
+  - The default is the top-bar sede, or nothing in the rollup (148). With one sede, the field is 294's single locked
+    one.
+  - Opening stock is one number per ticked sede (*Existencias en {sede}*), and the list follows the selection live.
+    With one sede ticked it is the single field.
+  - `IntakeArticleAtLocations` creates one product per sede through `IntakeArticle`, all in one transaction (all or
+    nothing).
+  - After saving: the list, with *"Producto creado en N sedes"*.
+- **`articles.group_id`** (nullable ULID) links products created together. A product made at one sede, and every
+  existing product, keeps null; there is no backfill by name.
+- **Where an edit applies: a choice, not a switch.** On a grouped product the edit page shows *Aplicar los cambios
+  también en*.
+  - It is a checkbox list of the group's OTHER sedes the user can reach, with *Todas* first. Nothing is ticked by
+    default.
+  - `UpdateArticleAcrossSedes` saves, in one transaction:
+    - any sede correction;
+    - this product;
+    - the SHARED fields on the ticked siblings only: name, price, photos, threshold and active. Stock never is.
+  - One `article.group.updated` entry lists the article and sede ids.
+  - A sibling id from outside the group, or at a sede the actor does not work at, is refused rather than skipped. A
+    manager is never offered one either.
+- **Añadir a otra sede** is on the list row and the edit page (`AddToSedesAction` → `AddArticleToLocations`).
+  - It is a multi-choice with *Todas las sedes restantes* first, and an opening stock for each chosen sede.
+  - Only sedes the user works at that do not already have a product of that name are offered.
+  - The copies join the source's group, which is created if the source had none.
+- **The list** gains a *Sede* column, since the same product can now appear once per sede in the rollup.
+- **Verified in the browser** (throwaway DB with three sedes, `tests/Browser/prove-297-article-sedes.mjs`; 1440×900
+  light and dark, 820×1180). All passed:
+  - "Papers" created at Central by mistake, then moved to North; it lists at North and not at Central;
+  - after one sale, reopening shows the sede locked with its reason;
+  - "Mechero" at two of three sedes, with 10 and 4 in stock, lists at those two only;
+  - "Papel" with *Todas las sedes* lands at all three;
+  - Mechero's price changed at Central with South ticked: South reads the new price and still has its own 4.
+
+  Two fixes came from looking:
+  - a sede ticked live showed an empty stock box, so it is now set to 0;
+  - *Aplicar los cambios también en* sat loose beside *Activo*, so it moved into the product card.
