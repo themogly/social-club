@@ -179,7 +179,7 @@ class DebtAndLocationSettingsTest extends TestCase
             'event_reminder_lead_hours',
             // Per-location counter settings, edited on each LocationForm (not the org page): the POS
             // check-in / signature requirements (prompt 44 — now genuinely per-location) + camera QR (prompt 35).
-            'restrict_pos_to_checked_in', 'signature_on_dispensation', 'camera_scan_enabled',
+            'restrict_pos_to_checked_in', 'signature_on_dispensation', 'dispensary_calculator_enabled', 'camera_scan_enabled',
             // Per-location toggles reconciled to Setting rows (prompt 59/102), edited on LocationForm.
             'bar_enabled', 'ring_fenced', 'multiple_tills_enabled', 'managers_can_approve_debt',
             // Per-location bar cart panels (prompt 193): attaching a socio and the ticket reference are
