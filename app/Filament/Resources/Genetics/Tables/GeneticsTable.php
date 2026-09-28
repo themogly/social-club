@@ -3,7 +3,7 @@
 namespace App\Filament\Resources\Genetics\Tables;
 
 use App\Enums\BatchStatus;
-use App\Enums\ProductTypeChoice;
+use App\Enums\ProductType;
 use App\Enums\StrainType;
 use App\Models\Genetic;
 use App\Models\Location;
@@ -47,9 +47,7 @@ class GeneticsTable
                         'no_stock' => __('Añade un lote con stock para poder dispensarla.'),
                         default => null,
                     }),
-                // Prompt 276 — a CONCENTRATE/HASH strain reads "Hachís", through the one display helper.
-                TextColumn::make('product_type')->label(__('Tipo'))->badge()->sortable()
-                    ->formatStateUsing(fn (Genetic $record): string => $record->typeLabel()),
+                TextColumn::make('product_type')->label(__('Tipo'))->badge()->sortable(),
                 TextColumn::make('strain_type')->label(__('Variedad'))->badge()->placeholder('—')->toggleable(),
                 TextColumn::make('category.name')->label(__('Categoría'))->sortable()->toggleable(),
                 TextColumn::make('thc_bp')
@@ -85,11 +83,11 @@ class GeneticsTable
                 Filter::make('low_stock')
                     ->label(__('Stock bajo'))
                     ->query(fn (Builder $query): Builder => $query->whereIn('id', StockCover::lowGeneticIds(self::sedesInScope()))),
-                // The type as staff read it: Hachís its own option, Extracto every other concentrate.
                 SelectFilter::make('product_type')
                     ->label(__('Tipo de producto'))
-                    ->options(ProductTypeChoice::options())
-                    ->query(fn (Builder $query, array $data): Builder => self::ofTypeChoice($query, $data['value'] ?? null)),
+                    ->options(collect(ProductType::cases())
+                        ->mapWithKeys(fn (ProductType $case): array => [$case->value => $case->label()])
+                        ->all()),
                 SelectFilter::make('strain_type')
                     ->label(__('Variedad'))
                     ->options(collect(StrainType::cases())
@@ -116,19 +114,6 @@ class GeneticsTable
             // what to do first.
             ->emptyStateHeading(__('Sin genéticas'))
             ->emptyStateDescription(__('Una genética es una variedad con su precio por gramo en cada sede. Crea la primera y después registra un lote con su stock.'));
-    }
-
-    /**
-     * The type filter, through the model scope (Hachís is CONCENTRATE + HASH; Extracto every other concentrate).
-     *
-     * @param  Builder<Genetic>  $query
-     * @return Builder<Genetic>
-     */
-    private static function ofTypeChoice(Builder $query, mixed $value): Builder
-    {
-        $choice = ProductTypeChoice::tryFrom((string) $value);
-
-        return $choice === null ? $query : $query->ofTypeChoice($choice);
     }
 
     /** @return Collection<int, Location> the active sede, or every sede of the organisation for the rollup */

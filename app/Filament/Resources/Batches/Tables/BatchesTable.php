@@ -45,8 +45,7 @@ class BatchesTable
             ->columns([
                 TextColumn::make('batch_no')->label(__('Nº lote'))->searchable()->sortable(),
                 TextColumn::make('genetic.name')->label(__('Genética'))->searchable()->sortable(),
-                TextColumn::make('genetic.product_type')->label(__('Tipo'))->badge()->toggleable()
-                    ->formatStateUsing(fn (Batch $record): string => $record->genetic?->typeLabel() ?? '—'),
+                TextColumn::make('genetic.product_type')->label(__('Tipo'))->badge()->toggleable(),
                 // Where the stock IS (prompt 148). Shown only when the org has more than one active sede — a
                 // column that reads the same on every row in a single-sede club is noise; it is essential the
                 // moment there are two.

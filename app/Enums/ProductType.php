@@ -12,13 +12,15 @@ use Filament\Support\Contracts\HasLabel;
  *  | product_type | unit_type | dispensed as                                        |
  *  |--------------|-----------|-----------------------------------------------------|
  *  | FLOWER       | WEIGHT    | grams (existing, unchanged)                         |
- *  | CONCENTRATE  | WEIGHT    | grams (hash/rosin/etc. — one type + concentrate_subtype) |
+ *  | HASH         | WEIGHT    | grams (prompt 280 — its own type, the owner's call)  |
+ *  | CONCENTRATE  | WEIGHT    | grams (rosin/shatter/etc. — one type + concentrate_subtype) |
  *  | PREROLL      | UNIT      | units (fixed gram content each)                     |
  *  | EDIBLE       | UNIT      | units (fixed gram-equivalent + thc_mg_per_unit)     |
  */
 enum ProductType: string implements HasLabel
 {
     case FLOWER = 'FLOWER';
+    case HASH = 'HASH';
     case CONCENTRATE = 'CONCENTRATE';
     case PREROLL = 'PREROLL';
     case EDIBLE = 'EDIBLE';
@@ -27,7 +29,7 @@ enum ProductType: string implements HasLabel
     public function unitType(): UnitType
     {
         return match ($this) {
-            self::FLOWER, self::CONCENTRATE => UnitType::WEIGHT,
+            self::FLOWER, self::HASH, self::CONCENTRATE => UnitType::WEIGHT,
             self::PREROLL, self::EDIBLE => UnitType::UNIT,
         };
     }
@@ -36,6 +38,7 @@ enum ProductType: string implements HasLabel
     {
         return match ($this) {
             self::FLOWER => __('Flor'),
+            self::HASH => __('Hachís'),
             self::CONCENTRATE => __('Extracto'),
             self::PREROLL => __('Preliado'),
             self::EDIBLE => __('Comestible'),

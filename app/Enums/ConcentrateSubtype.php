@@ -5,13 +5,12 @@ namespace App\Enums;
 use Filament\Support\Contracts\HasLabel;
 
 /**
- * A descriptive sub-classification for a CONCENTRATE genetic (hash, rosin, shatter,
- * wax, live resin). Nullable and cosmetic only — concentrates are ONE top-level
+ * A descriptive sub-classification for a CONCENTRATE genetic (rosin, shatter, wax, live resin). Hash is not one
+ * of these since prompt 280 — it is its own {@see ProductType::HASH}. Nullable and cosmetic only — concentrates are ONE top-level
  * {@see ProductType} (WEIGHT), never four separate types; this just labels the form.
  */
 enum ConcentrateSubtype: string implements HasLabel
 {
-    case HASH = 'HASH';
     case ROSIN = 'ROSIN';
     case SHATTER = 'SHATTER';
     case WAX = 'WAX';
@@ -20,7 +19,6 @@ enum ConcentrateSubtype: string implements HasLabel
     public function label(): string
     {
         return match ($this) {
-            self::HASH => __('Hachís'),
             self::ROSIN => __('Rosin'),
             self::SHATTER => __('Shatter'),
             self::WAX => __('Wax'),

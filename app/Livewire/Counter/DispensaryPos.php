@@ -2050,9 +2050,8 @@ class DispensaryPos extends Component
             $rows[] = [
                 'id' => $genetic->id,
                 'name' => $genetic->name,
-                // The type as staff read it (prompt 276): a hash strain is "Hachís" and its own filter chip.
-                'product_type' => $genetic->typeChoice()->value,
-                'product_type_label' => $genetic->typeLabel(),
+                'product_type' => $genetic->product_type->value,
+                'product_type_label' => $genetic->product_type->label(),
                 'is_unit' => $isUnit,
                 'strain_type' => $genetic->strain_type?->value,
                 'strain_type_label' => $genetic->strain_type?->label(),
