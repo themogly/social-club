@@ -6,6 +6,45 @@ Add the answer under the entry (date, device, who), and turn anything that looks
 
 ---
 
+## 289 — a registered tablet opens on the PIN pad, even the next day
+
+**Who:** Ben or Shane (a manager or the owner registers it), on each club tablet.
+
+**Do:** on the counter, tap **Este dispositivo** in the top bar and register the tablet for its sede (your PIN once
+more). Close Chrome and leave the tablet overnight. Next day, open the counter again.
+
+**Report:**
+
+- Did it open straight on the **PIN pad**, with no email and password, and did a staff PIN get in?
+- After the idle lock, did the basket survive, and did the PIN pad come back rather than a login?
+- Since post-296 fix 3: the first time a PIN session opens the **panel** (Administración) it asks for that person's
+  password (and MFA code) — once a shift. Was that clear, and did *Volver al mostrador* take you back?
+- (Optional, once) Revoke the tablet in the panel (*Sistema → Mostradores registrados*): did the tablet's next tap
+  land on the login?
+
+**Answer:** _(pending)_
+
+---
+
+## 290 — the counter as an installed app
+
+**Who:** Shane, on each counter tablet, in Chrome.
+
+**Do:** open the counter and use the **install** button (or Chrome's menu → *Instalar aplicación*), then open the
+counter from the new icon from then on.
+
+**Report:**
+
+- Was **install offered** at all? (There is deliberately no service worker; say if Chrome refused.)
+- Opened from the icon, is there **no address bar**, in portrait and in landscape?
+- Do the login, the lockdown screen and the panel **stay inside the app** (no jump out to a Chrome tab)?
+- Does a registered tablet still reopen on the **PIN pad** from the icon?
+- Does the **member app** (the socio area) still install and open as its own, separate app?
+
+**Answer:** _(pending)_
+
+---
+
 ## 293 — the counter stops re-sending the whole screen on every tap
 
 **Who:** Shane, on the counter tablet, on the club Wi-Fi.

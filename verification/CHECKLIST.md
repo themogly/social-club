@@ -94,6 +94,23 @@ its real S3 bucket. Write down every failure as a numbered-prompt fix — never 
 - [ ] Config/route/event caches built on deploy AND all caches busted on deploy. One full deploy rehearsal on staging first.
 - [ ] The suite has been run once on the **production PHP/Node version** (CI is 8.3/20; prod 8.5/24 — see PRE-STAGING gate).
 
+- [ ] **`TRUSTED_PROXIES` is the load balancer's address(es), never `*`** — with `*` any client can spoof
+      `X-Forwarded-For` and every per-IP throttle (login, PIN, magic link, CSP reports) is bypassable (post-296 audit).
+- [ ] `php artisan migrate` ran on deploy. Two of today's migrations touch existing data: `lote_seq` numbers every
+      existing batch per strain (display only — **no `batch_no` changes**), `articles.group_id` is added empty. Spot-check
+      the *Lotes* list afterwards: each row reads *strain* / *#n · entrada …*.
+
+## I-bis. Go-live tasks from the post-296 round (owner / Shane)
+- [ ] Register each club tablet once with **Este dispositivo** (counter top bar), as a manager or the owner (289).
+- [ ] Everyone sets a **fresh, distinct PIN** in the panel; after the first busy evening run
+      `php artisan csc:pin-upgrade-status` (270/286).
+- [ ] The first time a PIN session opens the panel it asks for the person's password (+ MFA) — once per 12 h shift.
+      Make sure every manager knows their panel password before opening night (post-296 fix 3).
+- [ ] Run the pending real-device checks in `verification/real-device-checks.md` (289, 290, 293, 295).
+- [ ] Confirm with the gestoría: the registro de jornada is deleted after **5 years** (Ajustes → Privacidad y datos;
+      the law's minimum is 4); failed emails are kept 7 days.
+- [ ] Flip `CSP_ENFORCE` once the `csp.violation` log has been clean for a while (270).
+
 ## J. Design / a11y spot-check on the real host
 - [ ] Dark mode across admin + counter + PWA (dim interiors); tablet widths on the counter apps; above-the-fold text visible
   without JS; effects respect `prefers-reduced-motion`; AA button contrast.

@@ -179,8 +179,7 @@ class CounterHome extends Component
         return $this->dashboard()->canSeeFinance;
     }
 
-    /** A sentence per alert key — never a raw slug on a screen a person reads. */
-    /** The rail's sentence, owned by the enum so the two dashboards cannot drift into different vocabularies. */
+    /** The rail's sentence per alert key, owned by the enum so the two dashboards cannot drift into different vocabularies. */
     public function alertLabel(string $key, int $count): string
     {
         return DashboardAlert::tryFrom($key)?->label($count) ?? $key;

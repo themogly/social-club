@@ -31,7 +31,6 @@ class ArticlesTable
                 TextColumn::make('name')->label(__('Nombre'))->searchable()->sortable(),
                 // Prompt 297 — the same product can now be at several sedes; in the rollup the rows must say which.
                 TextColumn::make('location.name')->label(__('Sede'))->sortable()->toggleable(),
-                TextColumn::make('category.name')->label(__('Categoría'))->sortable()->toggleable(),
                 TextColumn::make('price_cents')
                     ->label(__('Precio'))
                     ->state(fn (Article $record): int => $record->price_cents->cents)

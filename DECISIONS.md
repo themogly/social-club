@@ -16002,3 +16002,46 @@ From `audits/reports/2026-09-post-296-security.md`, Phase 3. Tests: `tests/Featu
     the panel's *Reenviar*.
   - Two older tests invited and resent at once; they now wait out the cooldown (`SignupWizardTest`,
     `SendApplicationInviteTest`).
+
+## Post-296 audit fix 6 — the completeness report's items
+
+From `audits/reports/2026-09-post-296-completeness.md`.
+
+- **D1, the demo seed's member numbers.** `DemoDataSeeder` placed `M-00001…` by hand and never moved the
+  organisation's counter, so the first real alta on a demo database collided. `makeMember()` now calls
+  `MemberNumber::advanceAtLeast()`, as the member import does. Test: `tests/Feature/Seed/DemoSeedMemberNumbersTest.php`,
+  which runs the demo seed in the `local` environment it is gated on.
+- **D2, the device checklists.** `verification/real-device-checks.md` gains the 289 (registered tablet, overnight;
+  now also fix 3's once-a-shift password) and 290 (installed counter app) sections, each with a pending answer.
+- **D3, a repeated confirmation shows again.** The Dispensario, Barra, Recepción and Socios screens now number their
+  flashes (`#[Locked] $flashSeq`, bumped in `flash()`), as the till has since 279. The shared partial's nonce
+  defaults to `$flashSeq`, so no include has to remember it. Test: `tests/Feature/Counter/RepeatedFlashTest.php`.
+- **P1/P6, dead code.**
+  - Deleted: `DispensaryPos::toggleCalculator()` and `applyWeightPreset()` (orphaned by 292; the calculator
+    tests now use `addLine($value, $mode)`, the real path), `IdentifiesOperator::closeOperatorPanel()` (no caller at
+    all), and the orphan and duplicated docblocks.
+  - Kept: `CounterHome::canSeeTakings()` and `DispensaryPos::quickEntryPresets()`, because their tests pin real
+    rules (takings visibility, preset availability) that the views compute the same way.
+- **P2.** The Productos table's *Categoría* column is gone: nothing in the app can create a product category (295).
+- **P3.** `csc:mail-test` is documented in SETUP.md's mail section.
+- **P4, rejection is an audited Action.** `App\Actions\Members\RejectApplication` replaces the resource closure:
+  - PENDING and submitted only;
+  - it records the reviewer;
+  - it audits `application.rejected` with the reviewer and whether a reason was given, never the address or the
+    reason's text;
+  - it mails the applicant in their language.
+
+  Test: `tests/Feature/Members/RejectApplicationTest.php`.
+- **P5.** The unused `public/counter-icons/favicon-32.png` is deleted.
+- **Left as it is: P7**, the inert per-sede setting rows written for a store. Nothing reads them, and 283 recorded
+  it.
+- **Migrations tested against existing data** (CLAUDE.md): 297's `group_id` and 298's `lote_seq` backfill were run on a
+  COPY of the dev database. All 12 existing batches were numbered per strain, `lote_seq` is null on none, and a
+  before/after dump of every `id|batch_no` is identical.
+- **The go-live checklist** (`verification/CHECKLIST.md`) gains today's items:
+  - `TRUSTED_PROXIES` never `*`;
+  - the two data-touching migrations;
+  - registering the tablets, fresh PINs, and every manager knowing their panel password (fix 3);
+  - the pending device checks;
+  - the retention periods, for the gestoría;
+  - `CSP_ENFORCE`.

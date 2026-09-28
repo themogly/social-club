@@ -134,6 +134,13 @@ class MembershipCounter extends Component
     /** A counter answers a question; it is not an export (177's rule, same figure). */
     private const WORKLIST_LIMIT = 10;
 
+    /**
+     * Bumped by every `flash()` and joined to the message's key (prompt 279, post-296 completeness D3). Without it the
+     * same confirmation twice morphed onto the first one's already-faded element and showed nothing.
+     */
+    #[Locked]
+    public int $flashSeq = 0;
+
     public function mount(): void
     {
         abort_unless($this->deviceCan('membership.fee.collect'), 403);
@@ -494,6 +501,7 @@ class MembershipCounter extends Component
 
     protected function flash(string $message, string $type): void
     {
+        $this->flashSeq++;
         $this->flashMessage = $message;
         $this->flashType = $type;
     }

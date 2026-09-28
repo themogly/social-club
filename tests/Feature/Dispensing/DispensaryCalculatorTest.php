@@ -108,8 +108,7 @@ class DispensaryCalculatorTest extends TestCase
     {
         $pos = $this->serve($this->centro);
 
-        $pos->call('toggleCalculator')->assertSet('calculatorMode', false);
-        $pos->call('addLine', '20', 'calculator');
+        $pos->call('addLine', '20', 'calculator')->assertSet('calculatorMode', false); // the real path: addLine carries the mode
 
         $this->assertSame(2000, (int) collect($pos->get('basket'))->sum('grams_cg'), '20 typed = 20,00 g, never a €20 back-solve');
     }
@@ -145,7 +144,7 @@ class DispensaryCalculatorTest extends TestCase
     public function test_with_the_calculator_on_twenty_euros_at_ten_a_gram_previews_two_grams(): void
     {
         $this->enableCalculator($this->centro);
-        $pos = $this->serve($this->centro)->call('toggleCalculator')->set('weightInput', '20');
+        $pos = $this->serve($this->centro)->set('calculatorMode', true)->set('weightInput', '20'); // the keypad's € switch is client-side (292)
 
         $this->assertSame(200, $pos->instance()->activeEntryGramsCg());
         $pos->assertSee('data-entry-grams="200"', false);
@@ -156,7 +155,7 @@ class DispensaryCalculatorTest extends TestCase
     public function test_remaining_after_this_entry_subtracts_the_back_solved_grams(): void
     {
         $this->enableCalculator($this->centro);
-        $pos = $this->serve($this->centro)->call('toggleCalculator')->set('weightInput', '20');
+        $pos = $this->serve($this->centro)->set('calculatorMode', true)->set('weightInput', '20'); // the keypad's € switch is client-side (292)
 
         // Default daily limit 3,5 g → 3,5 − 2,0 = 1,5 g left, not "0,00 g" (which 20 g would have claimed).
         $pos->assertSee('data-remaining-after="150"', false);

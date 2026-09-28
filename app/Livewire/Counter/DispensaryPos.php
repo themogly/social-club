@@ -253,6 +253,13 @@ class DispensaryPos extends Component
     /** success | warning | error */
     public string $flashType = 'success';
 
+    /**
+     * Bumped by every `flash()` and joined to the message's key (prompt 279, post-296 completeness D3). Without it the
+     * same confirmation twice morphed onto the first one's already-faded element and showed nothing.
+     */
+    #[Locked]
+    public int $flashSeq = 0;
+
     public function mount(): void
     {
         abort_unless($this->deviceCan('pos.use'), 403);
@@ -455,13 +462,6 @@ class DispensaryPos extends Component
         $location = $this->resolveLocation();
 
         return $location !== null && (bool) Settings::get('bar_enabled', true, $location->id) && $this->userCan('pos.bar');
-    }
-
-    public function toggleCalculator(): void
-    {
-        // Prompt 292 — refused, not just hidden, when the sede has the calculator off (the owner's default).
-        $this->calculatorMode = $this->calculatorEnabled() && ! $this->calculatorMode;
-        $this->weightInput = '';
     }
 
     /** Prompt 292 — does THIS sede offer the € calculator? Off by default (the owner's decision), per sede. */
@@ -1799,23 +1799,6 @@ class DispensaryPos extends Component
     }
 
     /**
-     * The genetics sellable at this sede — active, with an active base price here.
-     * Each row carries its live per-gram price and remaining stock.
-     *
-     * @return list<array<string, mixed>>
-     */
-    /**
-     * Apply a one-tap weight preset (prompt 133). It only FILLS the same weight input a typed amount would, so
-     * eligibility, carencia and the daily/monthly limits are enforced identically at addLine — a preset is an
-     * input, never a fast path around the checks.
-     */
-    public function applyWeightPreset(int $gramsCg): void
-    {
-        $this->calculatorMode = false;
-        $this->weightInput = str_replace('.', ',', rtrim(rtrim(number_format($gramsCg / 100, 2, '.', ''), '0'), '.'));
-    }
-
-    /**
      * The weight presets for the CURRENT active genetic + member (component state) — the public entry point the
      * view and tests share; render passes the already-computed locals to the private logic for efficiency.
      *
@@ -2344,6 +2327,7 @@ class DispensaryPos extends Component
 
     private function flash(string $message, string $type): void
     {
+        $this->flashSeq++;
         // Any message other than a settled one means the previous outcome is no longer what is on screen
         // (prompt 202). `flashSettled()` re-sets it immediately after; nothing else may.
         $this->settled = [];
