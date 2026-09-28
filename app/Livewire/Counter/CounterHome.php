@@ -8,7 +8,7 @@ use App\Livewire\Counter\Concerns\ResolvesCounterLocation;
 use App\Models\Location;
 use App\Models\User;
 use App\Support\CounterScreens;
-use App\Support\LocationSwitcher;
+use App\Support\CounterTerminals;
 use App\Support\Money;
 use App\Support\Period;
 use App\Support\Settings;
@@ -258,9 +258,7 @@ class CounterHome extends Component
      */
     public function availableSedes(): Collection
     {
-        $user = $this->deviceUser();
-
-        return $user !== null ? app(LocationSwitcher::class)->available($user) : collect();
+        return CounterTerminals::availableSedes($this->deviceUser()); // the terminal's home sede before a PIN (289)
     }
 
     /** Can this user reach the admin panel? The same gate the sidebar and the old overflow menu used. */

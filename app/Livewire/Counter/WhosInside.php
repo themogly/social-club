@@ -8,6 +8,7 @@ use App\Models\Location;
 use App\Models\User;
 use App\Support\ActiveScope;
 use App\Support\CounterOperator;
+use App\Support\CounterTerminals;
 use App\Support\Occupancy;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Collection;
@@ -126,7 +127,8 @@ class WhosInside extends Component
     {
         $user = Auth::user();
 
-        return $user instanceof User ? $user->can($permission) : false;
+        // A registered counter with nobody signed in may mount it behind the lock surface (prompt 289).
+        return $user instanceof User ? $user->can($permission) : CounterTerminals::current() !== null;
     }
 
     /**

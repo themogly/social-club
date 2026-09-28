@@ -4,6 +4,7 @@ namespace App\Support;
 
 use App\Actions\Pricing\ResolvePrice;
 use App\Filament\Pages\Asamblea;
+use App\Filament\Pages\CounterTerminals;
 use App\Filament\Pages\Dashboard;
 use App\Filament\Pages\ExportacionContable;
 use App\Filament\Pages\FailedJobs;
@@ -237,6 +238,12 @@ class Help
             'Todas las cifras se consultan en vivo, nunca se guardan en caché.',
         ]],
         // Prompt 281 (Ben's 280) — the registro de jornada.
+        // Prompt 289 — the registered counters.
+        CounterTerminals::class => ['permission' => 'terminals.manage', 'title' => 'Mostradores registrados', 'body' => [
+            'Las tablets registradas como mostrador abren siempre el teclado de PIN, sin contraseña. Se registran desde el propio mostrador con el botón «Este dispositivo» de la barra superior, confirmando con tu PIN.',
+            'Un mostrador no autoriza nada por sí mismo: cada acción sigue necesitando el PIN de quien trabaja. Al bloquearse, nadie queda con la sesión abierta.',
+            'Si roban o pierden una tablet, revócala aquí: su próxima petición irá al inicio de sesión normal.',
+        ]],
         RegistroJornada::class => ['permission' => 'staff.hours.view', 'title' => 'Registro de jornada', 'body' => [
             'Cada persona ficha su entrada en el mostrador con su PIN (al identificarse, «Fichar entrada») y su salida con «Fichar salida» en la barra superior, que vuelve a pedir su PIN. Al cerrar la caja se le ofrece fichar la salida.',
             'Si alguien se olvida de fichar la salida, la próxima vez que fiche la entrada se le pregunta a qué hora terminó (con un motivo): queda como «Hora declarada». Nada cierra una jornada solo.',
@@ -388,6 +395,10 @@ class Help
                     'Enlace del propietario: cada propietario recibe un enlace de un solo uso en su correo. Se reactiva DESDE SU PROPIO MÓVIL, fuera del terminal, cuando sea seguro. No se puede reactivar desde el mostrador.',
                     'Plazo automático: si nadie reactiva, el sistema se reabre solo pasado el plazo configurado (por defecto 24 h), para que el club —que es el responsable de los datos— nunca quede fuera de su propio libro de socios.',
                     'Rotura de cristal: un operador de la plataforma puede reactivarlo por línea de comandos (php artisan lockdown:reactivate), que exige acceso al servidor.',
+                ]],
+                // Prompt 289 — the counter tablets are registered devices; a lost one is revoked from the panel.
+                ['title' => 'Una tablet perdida o robada', 'body' => [
+                    'Si roban o pierden una tablet: Sistema → Mostradores registrados → Revocar.',
                 ]],
                 ['title' => 'Ensayarlo', 'body' => [
                     'Haz un simulacro desde Seguridad. El simulacro cierra las pantallas igual que el real para que el equipo lo viva, pero avisa de que es un simulacro y un propietario puede terminarlo desde el panel al momento.',

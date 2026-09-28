@@ -3,6 +3,7 @@
 use App\Http\Middleware\EndInactiveSessions;
 use App\Http\Middleware\EnforceCounterHandover;
 use App\Http\Middleware\EnforceOrgLockdown;
+use App\Http\Middleware\RecogniseCounterTerminal;
 use App\Http\Middleware\RequireOpenTill;
 use App\Http\Middleware\SecurityHeaders;
 use App\Http\Middleware\SetLocale;
@@ -58,6 +59,8 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->web(append: [
             // Prompt 270 — a deactivated account is signed out on its next request, before any counter guard runs.
             EndInactiveSessions::class,
+            // Prompt 289 — a registered counter opens on the PIN pad; reads the session, so AFTER StartSession.
+            RecogniseCounterTerminal::class,
             EnforceCounterHandover::class,
             RequireOpenTill::class,
             SetLocale::class,

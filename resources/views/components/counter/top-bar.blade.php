@@ -34,7 +34,7 @@
     // `counter.location_id`) — never the admin panel scope, and switching goes through the validated
     // POST /counter/location route. A single-sede operator shows their only sede even before the component
     // has persisted the adoption; several sedes with none chosen ⇒ the operator must pick (never a guess).
-    $availableSedes = $user !== null ? app(\App\Support\LocationSwitcher::class)->available($user) : collect();
+    $availableSedes = \App\Support\CounterTerminals::availableSedes($user); // a registered counter's home sede before a PIN (289)
     $currentSedeId = session('counter.location_id');
     $currentSede = is_string($currentSedeId) ? $availableSedes->firstWhere('id', $currentSedeId) : null;
     if ($currentSede === null && $availableSedes->count() === 1) {
@@ -306,6 +306,18 @@
                 <path stroke-linecap="round" stroke-linejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 1 0-9 0v3.75m-.75 0h10.5a2.25 2.25 0 0 1 2.25 2.25v6.75a2.25 2.25 0 0 1-2.25 2.25H6.75a2.25 2.25 0 0 1-2.25-2.25v-6.75a2.25 2.25 0 0 1 2.25-2.25Z"/>
             </svg>
         </button>
+
+        {{-- Prompt 289 — "Este dispositivo": register THIS tablet as a counter, or forget it. terminals.manage only, and it
+             asks for the operator's PIN again (the dialog lives on every screen's surface). --}}
+        @if (\App\Support\CounterOperator::current()?->can('terminals.manage'))
+            @php($thisTerminal = \App\Support\CounterTerminals::current())
+            <button type="button" data-counter-terminal @click="window.Livewire.dispatch('counter-terminal')"
+                    aria-label="{{ $thisTerminal ? __('Este dispositivo: :name · :sede', ['name' => $thisTerminal->name, 'sede' => $thisTerminal->location?->name]) : __('Registrar este dispositivo como mostrador') }}"
+                    title="{{ $thisTerminal ? __('Este dispositivo: :name · :sede', ['name' => $thisTerminal->name, 'sede' => $thisTerminal->location?->name]) : __('Registrar este dispositivo como mostrador') }}"
+                    class="inline-flex min-h-11 min-w-11 items-center justify-center rounded-lg px-3 text-sm font-medium text-ink-muted transition hover:bg-brand-tint hover:text-brand dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-white">
+                <x-counter.icon name="tablet" class="h-5 w-5 shrink-0" />
+            </button>
+        @endif
 
         {{-- ======== THE CONTROLS THAT LEAVE THE COUNTER (prompt 206) ========
              Everything above stays INSIDE the counter — Home and Lock change nothing about the session.

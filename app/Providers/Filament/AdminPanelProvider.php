@@ -5,6 +5,7 @@ namespace App\Providers\Filament;
 use App\Filament\Pages\Auth\Login;
 use App\Filament\Pages\Auth\RequestPasswordReset;
 use App\Http\Middleware\EnforceCounterHandover;
+use App\Http\Middleware\RecogniseCounterTerminal;
 use App\Http\Middleware\RedirectCounterOnlyAccounts;
 use App\Http\Middleware\SetDisplayTimezone;
 use App\Http\Middleware\SetLocale;
@@ -186,6 +187,9 @@ class AdminPanelProvider extends PanelProvider
                 // URL (a live Article-9 leak, confirmed on a real request). Here the session is started, so the
                 // gate actually fires. RequireOpenTill is NOT added — it only guards `counter/*`, which are web
                 // routes, not panel routes.
+                // Prompt 289 — a registered counter asking for `/` or `/login` with nobody signed in goes to the counter's
+                // PIN pad, never the password form. After StartSession (it reads the session).
+                RecogniseCounterTerminal::class,
                 EnforceCounterHandover::class,
                 // Prompt 262 — a counter-only account (no panel.access) asking for a panel URL goes to the counter.
                 // HERE, before ShareErrorsFromSession: Laravel's middleware priority hoists Filament's Authenticate

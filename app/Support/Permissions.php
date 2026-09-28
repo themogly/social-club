@@ -51,7 +51,7 @@ class Permissions
         'data.request.handle', 'data.erase',
         // System ('settings.consent' — edit the org-wide consent declarations everyone ticks: a sensitive,
         // legal-content capability held separately from the routine thresholds of 'settings.manage'; prompt 153)
-        'locations.manage', 'staff.manage', 'staff.hours.view', 'staff.hours.manage', 'settings.manage', 'settings.manage.location', 'settings.consent', 'audit.view',
+        'locations.manage', 'staff.manage', 'staff.hours.view', 'staff.hours.manage', 'terminals.manage', 'settings.manage', 'settings.manage.location', 'settings.consent', 'audit.view',
         // Prompt 262 — may this role open the admin panel at all? Off => a counter-only login: it signs in at
         // /login and lands on the counter, and any panel URL sends it back there.
         'panel.access',
@@ -68,6 +68,7 @@ class Permissions
         'member.sanction', 'applications.review',
         'member.documents.view', // prompt 262 — the owner: everyone may open members' ID scans
         'staff.hours.view', 'staff.hours.manage', // prompt 281 — the registro de jornada at their sedes
+        'terminals.manage', // prompt 289 — register / revoke the counter tablets at their sedes
         'membership.enrol', 'membership.fee.override', 'membership.fee.collect', 'membership.fee.waive',
         'carencia.waive',
         'checkin.manage', 'checkin.override',
@@ -220,7 +221,7 @@ class Permissions
             __('Dinero') => ['wallet.adjust', 'till.open', 'till.close', 'cash.bank', 'expenses.record', 'expenses.approve', 'expenses.overheads', 'expenses.categories', 'purchases.manage'],
             __('Gobierno') => ['documents.generate', 'minutes.manage', 'minute.sign', 'register.view', 'comms.manage'],
             __('Privacidad') => ['data.request.handle', 'data.erase'],
-            __('Sistema') => ['locations.manage', 'staff.manage', 'staff.hours.view', 'staff.hours.manage', 'settings.manage', 'settings.manage.location', 'settings.consent', 'audit.view'],
+            __('Sistema') => ['locations.manage', 'staff.manage', 'staff.hours.view', 'staff.hours.manage', 'terminals.manage', 'settings.manage', 'settings.manage.location', 'settings.consent', 'audit.view'],
             __('Seguridad') => ['lockdown.initiate', 'lockdown.manage'],
         ];
     }
@@ -284,6 +285,7 @@ class Permissions
             'staff.manage' => __('Gestionar el personal'),
             'staff.hours.view' => __('Ver el registro de jornada del personal'),
             'staff.hours.manage' => __('Corregir el registro de jornada'),
+            'terminals.manage' => __('Registrar y revocar mostradores (tablets)'),
             'settings.manage' => __('Cambiar los ajustes de la organización'),
             'settings.manage.location' => __('Cambiar los ajustes de su sede'),
             'settings.consent' => __('Editar los textos de consentimiento'),
