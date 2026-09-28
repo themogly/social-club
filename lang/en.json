@@ -1851,6 +1851,7 @@
     "No se puede borrar definitivamente: su registro de jornada debe conservarse 4 años.": "Can't be permanently deleted: their working hours record must be kept for 4 years.",
     "No se puede contar": "Can't count it",
     "No se puede crear el socio: faltan datos obligatorios de la solicitud (:fields).": "Cannot create the member: required application details are missing (:fields).",
+    "No se puede crear sin sede: elige una sede.": "Can't create without a location: choose a location.",
     "No se puede dispensar a :name": "Cannot dispense to :name",
     "No se puede dispensar a este socio.": "This member cannot be dispensed to.",
     "No se puede trasladar a una ubicación de otra organización.": "You cannot transfer to another organisation's location.",

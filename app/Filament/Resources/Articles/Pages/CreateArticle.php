@@ -4,9 +4,11 @@ namespace App\Filament\Resources\Articles\Pages;
 
 use App\Actions\Stock\IntakeArticle;
 use App\Filament\Resources\Articles\ArticleResource;
+use DomainException;
 use Filament\Resources\Pages\CreateRecord;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Validation\ValidationException;
 
 class CreateArticle extends CreateRecord
 {
@@ -39,6 +41,12 @@ class CreateArticle extends CreateRecord
         $openingStock = (int) ($data['stock'] ?? 0);
         unset($data['stock']);
 
-        return (new IntakeArticle)->handle($data, $openingStock, ['operator_id' => Auth::id()]);
+        // The Sede field makes a missing sede a form error first; the model guard (prompt 294) is the backstop, shown
+        // on the same field rather than as a 500.
+        try {
+            return (new IntakeArticle)->handle($data, $openingStock, ['operator_id' => Auth::id()]);
+        } catch (DomainException $e) {
+            throw ValidationException::withMessages(['data.location_id' => $e->getMessage()]);
+        }
     }
 }

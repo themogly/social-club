@@ -15135,3 +15135,40 @@ screenshots `storage/app/screenshots/285/`):
 - Found while checking, not fixed here: on a **demo-seeded** database the first real approval collides with a seeded
   member number (`members.organisation_id + member_no` unique). The demo seeder writes member numbers without advancing
   the sequence. It's a seeding bug only (production has no demo data); worth its own prompt.
+
+## Prompt 294 — Creating a bar/shop article crashes when the panel is on "Todas las sedes"
+
+- **The production crash** (Sentry, 28 Sept, `CreateArticle`): `location_id cannot be null`.
+  - `ArticleForm` never asked for a sede, so `ScopedToLocation::creating()` filled it from `ActiveScope::locationId()`,
+    which is null in the "Todas las sedes" view, and MySQL refused the insert.
+  - Owners now land in that view far more often. Since 267/270 a PIN sign-in forgets `scope.location_id`, so a
+    multi-sede owner comes back to the panel in the rollup. Since 284, switching to the rollup keeps you on the page
+    you were on.
+  - Sentry blamed the PIN commit. It didn't break the form; it made the rollup the normal place to be.
+- **Articles now name their sede, like batches (238).** `ArticleForm` has the same `location_id` field as `BatchForm`:
+  - required;
+  - defaults to the top-bar sede, **blank in the rollup** (never a guessed first row, 148);
+  - disabled, pre-filled and still dehydrated with a single sede;
+  - disabled on edit (moving an article between sedes is out of scope).
+
+  Options are `Location::assignableOptions()` **without stores**: a bar/shop article is sold at a counter, and the
+  Almacén / cultivo has none (**OVERNIGHT-DEFAULT — CONFIRM** whether the owner ever wants articles at the store). The
+  `FormCompletenessTest` allowlist entry that recorded "location_id: scope-filled" for articles, the very gap, is gone.
+- **Model guard:** `ScopedToLocation::creating()` now throws a `DomainException` ("No se puede crear sin sede: elige una
+  sede.") when `location_id` is still null after the scope fallback, instead of letting the database raise 1048. All 12
+  models using the trait have `location_id NOT NULL`, so nothing legitimate is refused. `CreateArticle` turns it into a
+  form error on Sede. The field already makes it unreachable there; the guard catches the next model that forgets one.
+- **Structural test:** every admin resource whose model uses `ScopedToLocation` and has a create page must have a
+  `location_id` form field. Today that's Article and Batch. It was red while the article form lacked the field.
+  - Other scoped models (`CheckIn`, `Membership`, `Refund`, `WalletTransaction`, `StockTake`, `GeneticPrice`,
+    `StockMovement`) are created by actions that pass `location_id` explicitly.
+  - Dispensations, Orders and TillSessions have no create page.
+- **Existing data:** none to repair. The column is `NOT NULL`, so no article was ever saved without a sede. The owner
+  just creates "Papers" again.
+- Tests: `tests/Feature/Stock/ArticleNeedsASedeTest` (8), all seen red first. Test 1 reproduced the crash.
+- Browser check (`tests/Browser/prove-294-article-sede.mjs`, throwaway database, screenshots
+  `storage/app/screenshots/294/`), as owner:
+  - in "Todas las sedes", pressing Crear without a sede gives "El campo sede es obligatorio." on the field, with no 500;
+  - choosing North Branch saves it (the database shows the article at North Branch only, which is what that sede's bar
+    lists);
+  - with Central Branch in the top bar, the field is pre-filled.

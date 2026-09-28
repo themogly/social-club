@@ -1851,6 +1851,7 @@
     "No se puede borrar definitivamente: su registro de jornada debe conservarse 4 años.": "No se puede borrar definitivamente: su registro de jornada debe conservarse 4 años.",
     "No se puede contar": "No se puede contar",
     "No se puede crear el socio: faltan datos obligatorios de la solicitud (:fields).": "No se puede crear el socio: faltan datos obligatorios de la solicitud (:fields).",
+    "No se puede crear sin sede: elige una sede.": "No se puede crear sin sede: elige una sede.",
     "No se puede dispensar a :name": "No se puede dispensar a :name",
     "No se puede dispensar a este socio.": "No se puede dispensar a este socio.",
     "No se puede trasladar a una ubicación de otra organización.": "No se puede trasladar a una ubicación de otra organización.",
