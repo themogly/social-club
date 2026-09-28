@@ -9,6 +9,7 @@ use App\Exceptions\StockCeilingExceededException;
 use App\Models\Batch;
 use App\Models\Location;
 use App\Models\User;
+use App\Support\LocationSwitcher;
 use App\Support\Settings;
 use App\Support\StockCeiling;
 use Illuminate\Auth\Access\AuthorizationException;
@@ -43,6 +44,10 @@ class TransferBatch
     {
         if (! $actor->can('stock.transfer')) {
             throw new AuthorizationException(__('No tienes permiso para trasladar stock.'));
+        }
+        // Post-296 audit — and only at a location the actor works at (the owner works at all of them).
+        if (! app(LocationSwitcher::class)->canAccess($actor, $batch->location_id)) {
+            throw new AuthorizationException(__('Ese lote es de una sede en la que no trabajas.'));
         }
         if ($quantity <= 0) {
             throw new InvalidArgumentException(__('La cantidad a trasladar debe ser mayor que cero.'));

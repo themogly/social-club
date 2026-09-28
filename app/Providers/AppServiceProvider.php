@@ -10,6 +10,9 @@ use App\Support\CounterHandoverConfinement;
 use App\Support\CounterLockConfinement;
 use App\Support\CounterRequest;
 use App\Support\Help;
+use Filament\Actions\DeleteBulkAction;
+use Filament\Actions\ForceDeleteBulkAction;
+use Filament\Actions\RestoreBulkAction;
 use Filament\Auth\Http\Responses\Contracts\LoginResponse;
 use Filament\Schemas\Components\Form;
 use Filament\Tables\Table;
@@ -64,6 +67,13 @@ class AppServiceProvider extends ServiceProvider
         // (the reported case), a file upload, a repeater or a rich editor. Filament's own server-side
         // validation already covers every field, renders the message next to it and scrolls to the
         // first one; `novalidate` is what lets it run.
+        // Post-296 audit, Phase 1 finding 2 — a bulk delete / restore / force-delete asks the record's policy for EACH
+        // selected record (and skips the ones refused): without it a manager bulk-deleted their own sede, and a manager
+        // holding `staff.manage` bulk-deleted the OWNER, both refused one at a time.
+        DeleteBulkAction::configureUsing(fn (DeleteBulkAction $action): DeleteBulkAction => $action->authorizeIndividualRecords('delete'));
+        RestoreBulkAction::configureUsing(fn (RestoreBulkAction $action): RestoreBulkAction => $action->authorizeIndividualRecords('restore'));
+        ForceDeleteBulkAction::configureUsing(fn (ForceDeleteBulkAction $action): ForceDeleteBulkAction => $action->authorizeIndividualRecords('forceDelete'));
+
         Form::configureUsing(fn (Form $form): Form => $form->extraAttributes(['novalidate' => 'novalidate'], merge: true));
 
         // Empty states that teach (prompt 92): ONE global default gives every resource table a heading +

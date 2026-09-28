@@ -5,6 +5,7 @@ namespace App\Providers\Filament;
 use App\Filament\Pages\Auth\Login;
 use App\Filament\Pages\Auth\RequestPasswordReset;
 use App\Http\Middleware\EnforceCounterHandover;
+use App\Http\Middleware\EnsureActiveLocation;
 use App\Http\Middleware\RecogniseCounterTerminal;
 use App\Http\Middleware\RedirectCounterOnlyAccounts;
 use App\Http\Middleware\SetDisplayTimezone;
@@ -205,6 +206,8 @@ class AdminPanelProvider extends PanelProvider
             ])
             // Prompt 271 — times in the sede's timezone, for page loads AND Livewire updates (persistent).
             ->middleware([SetDisplayTimezone::class], isPersistent: true)
+            // Post-296 audit — a non-owner is always on one of their own locations; only the owner may roll up.
+            ->middleware([EnsureActiveLocation::class], isPersistent: true)
             ->authMiddleware([
                 Authenticate::class,
             ]);

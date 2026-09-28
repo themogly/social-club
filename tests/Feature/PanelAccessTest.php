@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Enums\Role;
+use App\Models\Location;
 use App\Models\User;
 use Database\Seeders\RolePermissionSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -36,8 +37,19 @@ class PanelAccessTest extends TestCase
 
         $user = User::factory()->create();
         $user->assignRole(Role::STAFF->value);
+        $user->locations()->sync([Location::factory()->create()->id]); // post-296 audit: a non-owner works at a sede
 
         $this->actingAs($user)->get('/')->assertOk();
+    }
+
+    /** Post-296 audit — a non-owner with no sede at all has nothing to see: refused, never the whole organisation. */
+    public function test_a_non_owner_with_no_sede_is_refused_rather_than_shown_everything(): void
+    {
+        $this->giveStaffThePanel();
+        $user = User::factory()->create();
+        $user->assignRole(Role::STAFF->value);
+
+        $this->actingAs($user)->get('/')->assertForbidden();
     }
 
     /** Denial: the panel gate blocks an account with no role. */
