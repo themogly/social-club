@@ -10,6 +10,7 @@ use App\Models\Member;
 use App\Models\User;
 use App\Support\ActiveScope;
 use App\Support\Money;
+use App\Support\Settings;
 use App\Support\VaultUrl;
 use App\Support\Weight;
 use Filament\Infolists\Components\IconEntry;
@@ -92,6 +93,14 @@ class MemberInfolist
         }
 
         $snapshot = (new ResolveMemberLimits)->handle($member, $location);
+
+        // Prompt 296 — limits switched off: what was taken, and why there is no limit beside it.
+        if (! Settings::limitsEnabled()) {
+            return __('Hoy: :du · Este mes: :mu — Límites desactivados en Ajustes', [
+                'du' => Weight::fromCentigrams($snapshot->dailyUsedCg)->formatted(),
+                'mu' => Weight::fromCentigrams($snapshot->monthlyUsedCg)->formatted(),
+            ]);
+        }
 
         return __('Diario: :du / :dl · Mensual: :mu / :ml (:pct%)', [
             'du' => Weight::fromCentigrams($snapshot->dailyUsedCg)->formatted(),

@@ -24,6 +24,7 @@ use App\Models\TillSession;
 use App\Models\User;
 use App\Support\CounterOperator;
 use App\Support\Money;
+use App\Support\Settings;
 use App\Support\VaultUrl;
 use App\Support\Wallet;
 use App\Support\Weight;
@@ -255,6 +256,11 @@ class MembershipCounter extends Component
      */
     private function overLimitRows(Location $location): Collection
     {
+        // Prompt 296 — nobody is over a limit while the owner has switched limits off.
+        if (! Settings::limitsEnabled()) {
+            return collect();
+        }
+
         $resolver = new ResolveMemberLimits;
 
         return Member::query()
@@ -369,7 +375,7 @@ class MembershipCounter extends Component
 
         if ($feeMember !== null && $location !== null) {
             $verdict = (new ResolveMemberEligibility)->handle($feeMember, $location, 'counter');
-            $limits = (new ResolveMemberLimits)->handle($feeMember, $location);
+            $limits = (new ResolveMemberLimits)->shown($feeMember, $location); // none while limits are off (296)
         }
 
         return view('livewire.counter.membership-counter', [

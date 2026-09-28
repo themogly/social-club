@@ -245,10 +245,12 @@ class MemberResource extends Resource
             ->schema([
                 TextInput::make('daily_limit_g')
                     ->label(__('Límite diario (g)'))
+                    ->hint(fn (): ?string => Settings::limitsEnabled() ? null : __('Límites desactivados en Ajustes')) // kept, not cleared (296)
                     ->numeric()->minValue(0)->step('0.01')
                     ->helperText(__('Vacío = usar el límite de la cuota, la sede o la organización.')),
                 TextInput::make('monthly_limit_g')
                     ->label(__('Límite mensual (g)'))
+                    ->hint(fn (): ?string => Settings::limitsEnabled() ? null : __('Límites desactivados en Ajustes')) // kept, not cleared (296)
                     ->numeric()->minValue(0)->step('0.01'),
                 Textarea::make('reason')
                     ->label(__('Motivo'))

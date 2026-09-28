@@ -1375,7 +1375,7 @@ class DispensaryPos extends Component
 
         if ($member !== null && $location !== null) {
             $verdict = (new ResolveMemberEligibility)->handle($member, $location, 'counter');
-            $limits = (new ResolveMemberLimits)->handle($member, $location);
+            $limits = (new ResolveMemberLimits)->shown($member, $location); // none while limits are off (296)
             $membership = $this->activeMembership($member, $location);
             $walletCents = Wallet::balance($member->id, $location->id);
         }
@@ -1820,7 +1820,7 @@ class DispensaryPos extends Component
         $location = $this->resolveLocation();
         $member = $this->resolveMember();
         $genetic = $this->activeGeneticId !== null ? Genetic::query()->find($this->activeGeneticId) : null;
-        $limits = ($member !== null && $location !== null) ? (new ResolveMemberLimits)->handle($member, $location) : null;
+        $limits = ($member !== null && $location !== null) ? (new ResolveMemberLimits)->shown($member, $location) : null;
 
         return $this->weightPresets($genetic, $location, $member, $limits);
     }

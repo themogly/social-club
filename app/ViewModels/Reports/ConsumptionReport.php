@@ -9,6 +9,7 @@ use App\Support\ConsumptionForecast;
 use App\Support\Money;
 use App\Support\Period;
 use App\Support\Reports\GivenAwayQueries;
+use App\Support\Settings;
 use App\Support\Weight;
 use Illuminate\Support\Facades\DB;
 
@@ -36,12 +37,13 @@ class ConsumptionReport extends AbstractReport
 
     protected function build(): array
     {
-        return [
+        // Prompt 296 — with limits switched off there is no "over limit"; the grams per member and per genetic stay.
+        return array_values(array_filter([
             $this->byMember(),
             $this->byGenetic(),
-            $this->overLimit(),
+            Settings::limitsEnabled() ? $this->overLimit() : null,
             $this->overrideLog(),
-        ];
+        ]));
     }
 
     public function summary(): array
@@ -50,16 +52,16 @@ class ConsumptionReport extends AbstractReport
         $overrideValue = $this->priceOverrideValueCents();
         $refundValue = $this->refundValueCents();
 
-        return [
+        return array_values(array_filter([
             ['label' => __('Dispensado'), 'value' => Weight::fromCentigrams($this->dispensedCg)->formatted()],
             ['label' => __('Previsión declarada'), 'value' => Weight::fromCentigrams(ConsumptionForecast::authorisedVolumeCg($this->organisationId))->formatted()],
-            ['label' => __('Socios sobre límite'), 'value' => (string) $this->overLimitCount, 'tone' => $this->overLimitCount > 0 ? 'warning' : 'success'],
+            Settings::limitsEnabled() ? ['label' => __('Socios sobre límite'), 'value' => (string) $this->overLimitCount, 'tone' => $this->overLimitCount > 0 ? 'warning' : 'success'] : null,
             // Prompt 64: how much product left below the resolved price this period (comps / give-aways),
             // surfaced so a manager can answer "how much left at below cost, and why" without grepping the log.
             ['label' => __('Ajustes de precio'), 'value' => Money::fromCents($overrideValue)->formatted(), 'tone' => $overrideValue > 0 ? 'warning' : 'success'],
             // Prompt 65: a period's refunds belong alongside its takings, not only in the audit log.
             ['label' => __('Reembolsos'), 'value' => Money::fromCents($refundValue)->formatted(), 'tone' => $refundValue > 0 ? 'warning' : 'success'],
-        ];
+        ]));
     }
 
     /** Total refunded to members this period: SUM(amount_cents) over the refunds in scope. */

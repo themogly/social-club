@@ -15615,3 +15615,62 @@ screenshots `storage/app/screenshots/285/`):
   - `tests/Browser/prove-295-counter-photo.mjs`: the staff alta's front-camera picture reaches the field and uploads.
 - **The club tablet (Shane)** is in `verification/real-device-checks.md`: does each *Hacer foto* open the right
   camera on the Android tablet, and does a desktop show only *Elegir archivo*? Pending.
+
+## Prompt 296 — Consumption limits can be switched off; switching them on asks for the default limit
+
+- **A switch, not a deletion:** Shane's *"can we have a setting just to disable it?"*.
+  - The setting is `consumption_limits_enabled`: org-wide, and **on by default**, so every existing install is
+    unchanged after deploy (there is no row, and the default is on).
+  - It lives in **Ajustes → Cumplimiento** as *Aplicar límites de consumo*, above the limit fields, with the
+    prompt's helper text.
+  - Per-sede on/off is out of scope (org-wide for now), and deleting the feature is out of scope.
+- **Owner only** — `settings.manage`, the permission that already edits the default limits; there is no new
+  permission. The only writer is `App\Actions\Settings\SetConsumptionLimits`, which refuses anyone without it.
+- **Implemented in one place, as a check whose mode is OFF.**
+  - `Settings::limitsEnabled()` is the flag. While it is off, `Settings::enforcement()` returns `OFF` for
+    `daily_limit` and `monthly_limit`. `CommitDispensation::assertWithinLimits` skips OFF as it skipped WARN, so there
+    is no block, no warning and no override; the override modal and the supervisor PIN can never be reached.
+  - For display, `ResolveMemberLimits::shown()` returns no snapshot while limits are off. The Dispensario, Recepción
+    and Socios screens already render nothing when there is no snapshot, so the allowance, the month bar and %, and
+    *Restante hoy tras esta entrada* all go. Presets are never greyed for a limit (they still are for stock). No
+    view has its own switch check, apart from the weight preview's row, which was Alpine-hidden only.
+- **Everywhere else that shows a limit, while limits are off:**
+  - **Member area:** what was taken today and this month (`data-consumption-taken`), with no allowance and no %.
+  - **Panel member record:** grams taken plus *Límites desactivados en Ajustes*.
+  - **Consumption report:** the *over limit* table and its KPI are gone; the grams per member and per genetic stay.
+  - **Dashboard:** `MEMBERS_OVER_LIMIT` does not fire. The "share of the limit" histogram is hidden, because it is a
+    chart of a limit.
+  - **Socios screen:** its over-limit list is empty.
+  - **Enforcement page:** the two limit rows read *Desactivado — ver Ajustes*, read-only, and saving that page keeps
+    their stored mode for when limits return.
+- **Everything is still recorded:** every dispensation's grams, the registro, the report's grams and the declared
+  forecast. Switching off changes no stored row.
+- **The legal stock ceiling does not move.**
+  - `StockCeiling` still reads `daily_limit_cg`, because the ceiling is a legal-evidence figure (members × daily
+    limit × days), not a counter check.
+  - The daily limit field stays editable while limits are off, with *Se sigue usando para calcular el techo legal
+    de existencias*.
+  - A pin test and the browser check confirm the ceiling is identical on and off.
+- **Per-member and per-tier limits are kept, not cleared.** They stay stored and editable, with *Límites
+  desactivados en Ajustes* beside them as a field hint, so switching back on restores each one. This is tested
+  through off → on.
+- **Switching on:**
+  - The toggle snaps back and opens *Activar límites de consumo*, with both defaults pre-filled and validated as
+    the Ajustes fields are. Nothing is saved until the modal is confirmed.
+  - The modal shows the impact when it opens: *N socios sin límite propio usarán estos valores* (active members
+    with no per-member and no tier limit) and *M socios ya superarían el límite mensual este mes*. M is counted with
+    `ResolveMemberLimits` itself, given the proposed defaults (its new `$defaults` argument), so there is no second
+    formula. Exactly at the limit is not over it.
+  - One line says members with their own limit keep it.
+  - *Activar* saves both defaults and the flag in one transaction, with one `settings.consumption_limits.enabled`
+    audit entry naming the defaults. *Cancelar* leaves limits off.
+- **Switching off** asks *"El mostrador dejará de comprobar límites. ¿Continuar?"* and writes
+  `settings.consumption_limits.disabled`. The page's *Guardar* never writes the flag.
+- **Verified** in `tests/Browser/prove-296-limits-switch.mjs`, as the owner at 1180×820 on a throwaway DB:
+  - **On:** the modal shows its counts; at 3,5 g / 100 g the counter shows the allowance, and 10 g asks for a
+    manager's reasoned override.
+  - **Off:** after the confirmation there is no limit anywhere on the Dispensario, the same 10 g commits, and the
+    dashboard's stock-ceiling figures are identical.
+- **For the club** (not a build item): with limits off everything is still recorded, but the counter is not
+  *enforcing* them. The club's gestor should know, because limits and the registro are part of how an association
+  shows a controlled, members-only supply.
