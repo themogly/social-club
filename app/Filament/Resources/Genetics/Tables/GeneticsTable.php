@@ -38,13 +38,15 @@ class GeneticsTable
                 TextColumn::make('completeness')
                     ->label(__('Estado'))
                     ->badge()
-                    ->state(fn (Genetic $record): string => match ($record->completenessReason()) {
+                    // Prompt 320 — a strain is created without a batch now, so "no stock anywhere" is the ordinary first
+                    // state and says so (its price comes with its first batch), rather than "Sin precio".
+                    ->state(fn (Genetic $record): string => ! $record->hasAnyStock() ? __('Sin existencias') : match ($record->completenessReason()) {
                         'no_price' => __('Sin precio'),
                         'no_stock' => __('Sin stock'),
                         default => __('Lista'),
                     })
                     ->color(fn (Genetic $record): string => $record->completenessReason() === null ? 'success' : 'warning')
-                    ->tooltip(fn (Genetic $record): ?string => match ($record->completenessReason()) {
+                    ->tooltip(fn (Genetic $record): ?string => ! $record->hasAnyStock() ? __('Añade existencias con «Crear lote».') : match ($record->completenessReason()) {
                         'no_price' => __('Añade un precio por sede para poder dispensarla.'),
                         'no_stock' => __('Añade un lote con stock para poder dispensarla.'),
                         default => null,
@@ -71,10 +73,11 @@ class GeneticsTable
                         if ($record->isUnitType()) {
                             $units = (int) $open->sum('remaining_units');
 
-                            return $units.' '.__('uds').' ('.Weight::fromCentigrams($units * (int) $record->grams_per_unit_cg)->formatted().')';
+                            return $units === 0 ? __('Sin existencias') : $units.' '.__('uds').' ('.Weight::fromCentigrams($units * (int) $record->grams_per_unit_cg)->formatted().')';
                         }
+                        $cg = (int) $open->sum('remaining_cg');
 
-                        return Weight::fromCentigrams((int) $open->sum('remaining_cg'))->formatted();
+                        return $cg === 0 ? __('Sin existencias') : Weight::fromCentigrams($cg)->formatted();
                     }),
                 IconColumn::make('published')->label(__('Publicada'))->boolean(),
                 IconColumn::make('active')->label(__('Activa'))->boolean(),

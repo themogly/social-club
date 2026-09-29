@@ -175,39 +175,24 @@ class GuidedFlowsTest extends TestCase
         $this->assertFalse($this->b->fresh()->hasActivePrices()); // only that sede
     }
 
-    public function test_creating_a_genetic_is_one_flow_and_yields_a_complete_strain(): void
+    public function test_creating_a_genetic_is_the_strain_alone_and_guided_on_to_crear_lote(): void
     {
-        // Prompt 247 — the create path no longer saves a genetic ALONE to be "guided onward" to a price and a
-        // batch; it is ONE flow (strain → type → stock → sede → price → photo) whose finish is a SELLABLE
-        // strain. Prompt 93's derived-completeness / stop-anywhere-visible model still governs records made
-        // incomplete by OTHER paths (a price removed, stock run to zero) — the completeness tests above — but
-        // you can no longer create an incomplete genetic HERE.
+        // Prompt 320 (Ben) — reverses 247's "one flow to a sellable strain": the strain is created alone, which is the
+        // derived-completeness model of 93 again — the list says what is missing and the notification opens «Crear lote».
         $owner = User::factory()->create();
         $owner->assignRole(Role::OWNER->value);
         $owner->locations()->sync([$this->a->id]);
         $this->actingAs($owner);
         app(ActiveScope::class)->setLocation($this->a->id);
 
-        $component = Livewire::test(CreateGenetic::class)
-            ->fillForm([
-                'name' => 'Nueva Cepa', 'product_type' => 'FLOWER',
-                'grams' => 200, 'cost_per_gram_eur' => 4,
-                'location_id' => $this->a->id, 'price_per_gram_eur' => 8,
-            ])
-            ->call('create')
-            ->assertHasNoFormErrors();
-
-        $genetic = Genetic::query()->where('name', 'Nueva Cepa')->firstOrFail();
-
-        // Back to the strains list (prompt 295, Shane), and COMPLETE — no 'no_price'/'no_stock' gap left behind.
-        $component->assertRedirect(GeneticResource::getUrl('index'));
-        $this->assertNull($genetic->completenessReason());
-
-        // And you can no longer create an incomplete one: a name-only submit is REFUSED, nothing is saved.
         Livewire::test(CreateGenetic::class)
             ->fillForm(['name' => 'Solo Nombre', 'product_type' => 'FLOWER'])
             ->call('create')
-            ->assertHasFormErrors(['grams', 'price_per_gram_eur']);
-        $this->assertSame(0, Genetic::query()->where('name', 'Solo Nombre')->count());
+            ->assertHasNoFormErrors()
+            ->assertRedirect(GeneticResource::getUrl('index'));
+
+        $genetic = Genetic::query()->where('name', 'Solo Nombre')->sole();
+        $this->assertFalse($genetic->hasAnyStock());
+        $this->assertSame(0, Genetic::query()->sellableAt($this->a->id)->whereKey($genetic->id)->count());
     }
 }

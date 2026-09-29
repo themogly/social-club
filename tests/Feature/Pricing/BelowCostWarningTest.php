@@ -6,7 +6,6 @@ use App\Actions\Stock\IntakeBatch;
 use App\Enums\Role;
 use App\Filament\Resources\Batches\Pages\CreateBatch;
 use App\Filament\Resources\Batches\Pages\ListBatches;
-use App\Filament\Resources\Genetics\Pages\CreateGenetic;
 use App\Models\AuditLog;
 use App\Models\Batch;
 use App\Models\Genetic;
@@ -18,7 +17,6 @@ use App\Support\BelowCost;
 use App\Support\Money;
 use Database\Seeders\RolePermissionSeeder;
 use Filament\Facades\Filament;
-use Filament\Schemas\Components\Wizard;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
 use Tests\TestCase;
@@ -54,12 +52,19 @@ class BelowCostWarningTest extends TestCase
         $this->actingAs($this->owner);
     }
 
-    /** @param  array<string, mixed>  $overrides */
-    private function strain(array $overrides = []): array
+    /**
+     * Prompt 320 — the add-strain wizard that also took a first batch and its price is gone; its below-cost cases are
+     * asked of *Crear lote*, where a batch and its price are entered now.
+     *
+     * @param  array<string, mixed>  $overrides
+     */
+    private function batch(array $overrides = []): array
     {
+        $genetic = Genetic::query()->firstOrCreate(['organisation_id' => $this->org->id, 'name' => 'Amnesia Haze'], ['product_type' => 'FLOWER', 'active' => true]);
+
         return array_merge([
-            'name' => 'Amnesia Haze', 'product_type' => 'FLOWER', 'grams' => 100,
-            'cost_per_gram_eur' => '9.50', 'location_id' => $this->sede->id, 'price_per_gram_eur' => '8',
+            'location_id' => $this->sede->id, 'genetic_id' => $genetic->id, 'grams' => '100',
+            'cost_per_gram_eur' => '9.50', 'sale_price_eur' => '8',
         ], $overrides);
     }
 
@@ -86,71 +91,35 @@ class BelowCostWarningTest extends TestCase
         $this->assertSame([], BelowCost::offences(900, perGramCents: 1000, perEighthCents: 3150));
     }
 
-    // --- Añadir variedad ----------------------------------------------------------------------------------------------
+    // --- Crear lote (the cases the add-strain wizard used to carry, prompt 320) --------------------------------------------
 
-    public function test_the_wizard_asks_before_creating_and_go_back_saves_nothing(): void
+    public function test_crear_lote_asks_before_creating_and_go_back_saves_nothing(): void
     {
-        $component = Livewire::test(CreateGenetic::class)
-            ->fillForm($this->strain())
-            ->call('create')
-            ->assertActionMounted('belowCost');
+        $component = Livewire::test(CreateBatch::class)->fillForm($this->batch())->call('create')->assertActionMounted('belowCost');
         $component->assertMountedActionModalSee([__('El precio de venta es menor que el coste'), __('Precio por gramo'), __('Coste por gramo')]);
         $component->call('unmountAction'); // Volver y corregir
 
-        $this->assertSame(0, Genetic::query()->withoutGlobalScopes()->count(), 'Volver y corregir saved the strain');
-        $this->assertSame(0, Batch::query()->withoutGlobalScopes()->count());
+        $this->assertSame(0, Batch::query()->withoutGlobalScopes()->count(), 'Volver y corregir saved the batch');
     }
 
-    public function test_continue_creates_it_as_entered_and_the_intake_says_below_cost(): void
+    public function test_a_unit_batch_compares_the_unit_price_with_the_cost_of_a_unit(): void
     {
-        Livewire::test(CreateGenetic::class)
-            ->fillForm($this->strain())
-            ->call('create')
-            ->assertActionMounted('belowCost')
-            ->callMountedAction()
-            ->assertHasNoFormErrors();
+        $preroll = Genetic::factory()->create(['organisation_id' => $this->org->id, 'name' => 'Preroll', 'product_type' => 'PREROLL', 'grams_per_unit_cg' => 100]);
 
-        $batch = Batch::query()->withoutGlobalScopes()->sole();
-        $this->assertSame(800, $batch->price_per_gram_cents);
-        $this->assertSame(950, $batch->cost_per_gram_cents);
-        $this->assertTrue((bool) ($this->intakeAudit()?->after['below_cost'] ?? false));
-    }
-
-    public function test_the_wizard_also_asks_when_leaving_the_price_step(): void
-    {
-        // What the browser does on "Siguiente" from the Precio step (index 4): the wizard validates it and moves on.
-        $component = Livewire::test(CreateGenetic::class)->fillForm($this->strain());
-        $wizard = $component->instance()->getSchema('form')->getComponent(fn ($c): bool => $c instanceof Wizard, withHidden: true);
-        $component->call('callSchemaComponentMethod', $wizard->getKey(), 'nextStep', [4])
-            ->assertActionMounted('belowCost')
-            ->assertNotDispatched('next-wizard-step');
-
-        // Continuar moves on to the photo step; nothing is created until Crear.
-        $component->callMountedAction()->assertDispatched('next-wizard-step');
-        $this->assertSame(0, Genetic::query()->withoutGlobalScopes()->count());
-    }
-
-    public function test_a_unit_strain_compares_the_unit_price_with_the_cost_of_a_unit(): void
-    {
-        Livewire::test(CreateGenetic::class)
-            ->fillForm([
-                'name' => 'Preroll', 'product_type' => 'PREROLL', 'grams_per_unit_g' => '1', 'units' => 10,
-                'cost_per_gram_eur' => '5', 'location_id' => $this->sede->id, 'price_per_unit_eur' => '4.99',
-            ])
+        Livewire::test(CreateBatch::class)
+            ->fillForm($this->batch(['genetic_id' => $preroll->id, 'grams' => null, 'units' => '10', 'cost_per_gram_eur' => '5', 'sale_price_eur' => '4.99']))
             ->call('create')
             ->assertActionMounted('belowCost');
     }
 
     public function test_equal_to_cost_and_no_cost_do_not_ask(): void
     {
-        Livewire::test(CreateGenetic::class)->fillForm($this->strain(['price_per_gram_eur' => '9.50']))->call('create')
-            ->assertActionNotMounted('belowCost')->assertHasNoFormErrors();
-        Livewire::test(CreateGenetic::class)->fillForm($this->strain(['name' => 'Sin coste', 'cost_per_gram_eur' => null]))->call('create')
-            ->assertActionNotMounted('belowCost')->assertHasNoFormErrors();
-        Livewire::test(CreateGenetic::class)->fillForm($this->strain(['name' => 'Coste cero', 'cost_per_gram_eur' => '0']))->call('create')
-            ->assertActionNotMounted('belowCost')->assertHasNoFormErrors();
+        foreach ([['sale_price_eur' => '9.50'], ['cost_per_gram_eur' => null], ['cost_per_gram_eur' => '0']] as $case) {
+            Livewire::test(CreateBatch::class)->fillForm($this->batch($case))->call('create')
+                ->assertActionNotMounted('belowCost')->assertHasNoFormErrors();
+        }
 
-        $this->assertSame(3, Genetic::query()->withoutGlobalScopes()->count());
+        $this->assertSame(3, Batch::query()->withoutGlobalScopes()->count());
         $this->assertArrayNotHasKey('below_cost', (array) $this->intakeAudit()?->after);
     }
 

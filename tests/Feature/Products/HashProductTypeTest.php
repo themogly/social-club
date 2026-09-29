@@ -13,6 +13,7 @@ use App\Enums\ProductType;
 use App\Enums\Role;
 use App\Enums\UnitType;
 use App\Exceptions\LimitExceededException;
+use App\Filament\Resources\Batches\Pages\CreateBatch;
 use App\Filament\Resources\Genetics\Pages\CreateGenetic;
 use App\Filament\Resources\Genetics\Pages\EditGenetic;
 use App\Filament\Resources\Genetics\Pages\ListGenetics;
@@ -105,10 +106,7 @@ class HashProductTypeTest extends TestCase
         Livewire::actingAs($this->owner)->test(CreateGenetic::class)
             ->assertFormFieldExists('product_type', fn ($field): bool => array_key_exists('HASH', $field->getOptions())
                 && $field->getOptions()['HASH'] === 'Hachís')
-            ->fillForm([
-                'name' => 'Marroquí', 'product_type' => 'HASH',
-                'grams' => 50, 'cost_per_gram_eur' => 3, 'location_id' => $this->location->id, 'price_per_gram_eur' => 7,
-            ])
+            ->fillForm(['name' => 'Marroquí', 'product_type' => 'HASH'])
             ->call('create')
             ->assertHasNoFormErrors();
 
@@ -116,6 +114,11 @@ class HashProductTypeTest extends TestCase
         $this->assertSame(ProductType::HASH, $genetic->product_type);
         $this->assertNull($genetic->concentrate_subtype);
         $this->assertSame(UnitType::WEIGHT, $genetic->unit_type);
+
+        // Its stock comes through «Crear lote» (prompt 320), by weight like flower.
+        Livewire::actingAs($this->owner)->test(CreateBatch::class)
+            ->fillForm(['location_id' => $this->location->id, 'genetic_id' => $genetic->id, 'grams' => '50', 'cost_per_gram_eur' => '3', 'sale_price_eur' => '7'])
+            ->call('create')->assertHasNoFormErrors();
         $this->assertSame(5000, Batch::query()->withoutGlobalScopes()->where('genetic_id', $genetic->id)->sole()->getRawOriginal('remaining_cg'));
 
         Livewire::actingAs($this->owner)->test(ListGenetics::class)

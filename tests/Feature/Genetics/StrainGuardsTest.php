@@ -131,11 +131,11 @@ class StrainGuardsTest extends TestCase
         foreach (['lemon haze', '  LEMON  HAZE ', 'Lémon Haze'] as $typed) {
             Livewire::test(CreateGenetic::class)
                 ->fillForm(['name' => $typed])
-                ->goToNextWizardStep()
+                ->call('create')
                 ->assertHasFormErrors(['name' => __('Ya existe una genética con este nombre.')]);
         }
 
-        Livewire::test(CreateGenetic::class)->fillForm(['name' => 'Lemon Kush'])->goToNextWizardStep()->assertHasNoFormErrors(['name']);
+        Livewire::test(CreateGenetic::class)->fillForm(['name' => 'Lemon Kush'])->call('create')->assertHasNoFormErrors(['name']);
     }
 
     public function test_a_deleted_strain_with_the_name_is_offered_back(): void
@@ -145,7 +145,7 @@ class StrainGuardsTest extends TestCase
 
         Livewire::test(CreateGenetic::class)
             ->fillForm(['name' => 'bubble Gum'])
-            ->goToNextWizardStep()
+            ->call('create')
             ->assertHasFormErrors(['name' => __('Ya existe una genética borrada con este nombre. Restáurala en lugar de crear otra.')])
             ->assertSeeHtml(e(GeneticResource::getUrl('edit', ['record' => $gum])));
     }

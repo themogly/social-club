@@ -6,7 +6,7 @@ use App\Models\Batch;
 
 /**
  * Prompt 295 (Shane's note 5) — is a sale price below what the stock cost? One rule, read by every place a price meets
- * a cost: the *Añadir variedad* wizard, *Añadir stock* and a batch's audited *Precio* action.
+ * a cost: *Crear lote* (the add-strain wizard that also asked went in 320), *Añadir stock* and a batch's audited *Precio* action.
  *
  * Compared per unit of sale, in integer cents and centigrams (never a float product):
  *   · by weight — the price per gram against the cost per gram;

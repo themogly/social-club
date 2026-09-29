@@ -9,8 +9,8 @@ use App\Enums\BatchStatus;
 use App\Enums\MembershipStatus;
 use App\Enums\MemberStatus;
 use App\Enums\Role;
+use App\Filament\Resources\Batches\Pages\CreateBatch;
 use App\Filament\Resources\Dispensations\Pages\ViewDispensation;
-use App\Filament\Resources\Genetics\Pages\CreateGenetic;
 use App\Filament\Resources\Members\Pages\ViewMember;
 use App\Livewire\Counter\DispensaryPos;
 use App\Models\Batch;
@@ -38,7 +38,7 @@ use Tests\TestCase;
  *
  * `Weight::fromGrams` turned every comma into a decimal point and left dots alone, so both `1.000` (a Spanish
  * thousand) and `1,000` (an English thousand) became ONE gram. The tester's tablet submitted a separated value
- * into "Cantidad (g)" on the new-strain wizard and a thousand grams of opening stock became one. The contract is
+ * into "Cantidad (g)" on the new-strain wizard (since 320, *Crear lote*) and a thousand grams of opening stock became one. The contract is
  * now "no guessing": a single separator followed by one or two digits is a decimal (unambiguous in both
  * conventions — neither groups by one or two), and anything else — a separator in a thousands position, two
  * separators, grouping — is REFUSED where the operator sees it, never reinterpreted.
@@ -67,13 +67,13 @@ class GramInputIsNeverGuessedTest extends TestCase
         Filament::setCurrentPanel('admin');
     }
 
+    /** Prompt 320 — the grams are typed on *Crear lote* now (the add-strain wizard that took them is gone). */
     private function createStrain(string $grams): Testable
     {
-        return Livewire::actingAs($this->owner)->test(CreateGenetic::class)
-            ->fillForm([
-                'name' => 'Amnesia Haze', 'product_type' => 'FLOWER', 'grams' => $grams,
-                'cost_per_gram_eur' => 4, 'location_id' => $this->location->id, 'price_per_gram_eur' => 8,
-            ])
+        $genetic = Genetic::query()->firstOrCreate(['organisation_id' => $this->org->id, 'name' => 'Amnesia Haze'], ['product_type' => 'FLOWER', 'active' => true]);
+
+        return Livewire::actingAs($this->owner)->test(CreateBatch::class)
+            ->fillForm(['location_id' => $this->location->id, 'genetic_id' => $genetic->id, 'grams' => $grams, 'sale_price_eur' => '8'])
             ->call('create');
     }
 
