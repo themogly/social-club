@@ -73,6 +73,10 @@ class ManageSettings extends Page
         'stock_cover_window_days' => SettingType::INT,
         'stock_cover_low_days' => SettingType::INT,
         'discounts_stack' => SettingType::BOOL,
+        'stock_count_show_expected' => SettingType::BOOL, // prompt 318 — Inventario
+        'stock_count_tolerance_pct' => SettingType::INT,
+        'stock_count_tolerance_g' => SettingType::INT,
+        'stock_count_tolerance_units' => SettingType::INT,
         'data_retention_days' => SettingType::INT,
         'audit_retention_days' => SettingType::INT,
         'message_retention_days' => SettingType::INT,
@@ -279,6 +283,17 @@ class ManageSettings extends Page
                             ->helperText(__('Opcional. Vacío = aviso automático por días de cobertura. Una cifra puesta en el precio de una variedad en su sede manda sobre esta.')),
                         Toggle::make('discounts_stack')->label(__('Los descuentos se acumulan'))
                             ->helperText(__('Si se desactiva, se aplica solo el mejor descuento de cada socio; si se activa, se suman.')),
+                    ])->columns(2),
+
+                // Prompt 318 — the full count (*Inventario*): blind by default; a difference above the tolerance needs a reason.
+                Section::make(__('Inventario'))
+                    ->schema([
+                        Toggle::make('stock_count_show_expected')->label(__('Mostrar cantidad del sistema al contar'))
+                            ->helperText(__('Desactivado, quien cuenta pesa sin ver la cifra del sistema: se cuenta, no se confirma un número.')),
+                        TextInput::make('stock_count_tolerance_pct')->label(__('Tolerancia de diferencia (%)'))->integer()->minValue(0)->maxValue(100)->required(),
+                        TextInput::make('stock_count_tolerance_g')->label(__('Tolerancia de diferencia (g)'))->integer()->minValue(0)->required()
+                            ->helperText(__('Por encima del mayor de los dos, la diferencia necesita un motivo y una nota.')),
+                        TextInput::make('stock_count_tolerance_units')->label(__('Tolerancia de diferencia (unidades)'))->integer()->minValue(0)->required(),
                     ])->columns(2),
 
                 Section::make(__('Caja'))

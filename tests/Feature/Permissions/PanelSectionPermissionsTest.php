@@ -40,7 +40,7 @@ class PanelSectionPermissionsTest extends TestCase
 {
     use ChangesRolePermissions, RefreshDatabase;
 
-    private const SECTIONS = ['panel.members', 'panel.applications', 'panel.tills', 'panel.member_documents', 'panel.security'];
+    private const SECTIONS = ['panel.members', 'panel.applications', 'panel.tills', 'panel.member_documents', 'panel.security', 'panel.stock_count'];
 
     /** Always there for anyone with the panel: the home page, the way back to the counter, the help. */
     private const ALWAYS = ['Panel', 'Mostrador', 'Manual', 'Glosario'];
@@ -134,13 +134,13 @@ class PanelSectionPermissionsTest extends TestCase
 
     public function test_the_owners_panel_is_unchanged(): void
     {
-        $this->assertSame(['Panel', 'Mostrador', 'Manual', 'Glosario', 'Socios', 'Solicitudes', 'Tarifas', 'Genéticas', 'Lotes', 'Descuentos', 'Productos', 'Cajas', 'Dispensaciones', 'Gastos', 'Barra y tienda', 'Categorías de gasto', 'Compras', 'Proveedores', 'Financiero', 'Barra y tienda', 'Consumo', 'Descuentos y ajustes', 'Existencias', 'Asistencia', 'Horas del personal', 'Cajas', 'Socios', 'Deudores', 'Comité / Asamblea', 'Libro de socios', 'Actas', 'Convocatorias', 'Asamblea', 'Plantillas', 'Registro de dispensación', 'Exportación contable', 'Documentos generados', 'Avisos', 'Mensajes', 'Eventos', 'Mostradores registrados', 'Registro de jornada', 'Seguridad', 'Personal', 'Sedes', 'Identidad del club', 'Ajustes', 'Textos de consentimiento', 'Matriz de cumplimiento', 'Registro de auditoría', 'Solicitudes RGPD', 'RAT — Registro de tratamientos', 'Roles y permisos', 'Brechas de seguridad', 'Salud del sistema', 'Trabajos fallidos'],
+        $this->assertSame(['Panel', 'Mostrador', 'Manual', 'Glosario', 'Socios', 'Solicitudes', 'Tarifas', 'Genéticas', 'Lotes', 'Inventario', 'Descuentos', 'Productos', 'Cajas', 'Dispensaciones', 'Gastos', 'Barra y tienda', 'Categorías de gasto', 'Compras', 'Proveedores', 'Financiero', 'Barra y tienda', 'Consumo', 'Descuentos y ajustes', 'Existencias', 'Asistencia', 'Horas del personal', 'Cajas', 'Socios', 'Deudores', 'Comité / Asamblea', 'Libro de socios', 'Actas', 'Convocatorias', 'Asamblea', 'Plantillas', 'Registro de dispensación', 'Exportación contable', 'Documentos generados', 'Avisos', 'Mensajes', 'Eventos', 'Mostradores registrados', 'Registro de jornada', 'Seguridad', 'Personal', 'Sedes', 'Identidad del club', 'Ajustes', 'Textos de consentimiento', 'Matriz de cumplimiento', 'Registro de auditoría', 'Solicitudes RGPD', 'RAT — Registro de tratamientos', 'Roles y permisos', 'Brechas de seguridad', 'Salud del sistema', 'Trabajos fallidos'],
             $this->navigation($this->user(Role::OWNER)));
     }
 
     public function test_the_managers_panel_is_unchanged(): void
     {
-        $this->assertSame(['Panel', 'Mostrador', 'Manual', 'Glosario', 'Socios', 'Solicitudes', 'Genéticas', 'Lotes', 'Descuentos', 'Productos', 'Cajas', 'Dispensaciones', 'Gastos', 'Barra y tienda', 'Compras', 'Proveedores', 'Financiero', 'Barra y tienda', 'Consumo', 'Descuentos y ajustes', 'Existencias', 'Asistencia', 'Horas del personal', 'Cajas', 'Socios', 'Deudores', 'Libro de socios', 'Actas', 'Convocatorias', 'Asamblea', 'Plantillas', 'Registro de dispensación', 'Exportación contable', 'Documentos generados', 'Avisos', 'Mensajes', 'Eventos', 'Mostradores registrados', 'Registro de jornada', 'Seguridad', 'Sedes'],
+        $this->assertSame(['Panel', 'Mostrador', 'Manual', 'Glosario', 'Socios', 'Solicitudes', 'Genéticas', 'Lotes', 'Inventario', 'Descuentos', 'Productos', 'Cajas', 'Dispensaciones', 'Gastos', 'Barra y tienda', 'Compras', 'Proveedores', 'Financiero', 'Barra y tienda', 'Consumo', 'Descuentos y ajustes', 'Existencias', 'Asistencia', 'Horas del personal', 'Cajas', 'Socios', 'Deudores', 'Libro de socios', 'Actas', 'Convocatorias', 'Asamblea', 'Plantillas', 'Registro de dispensación', 'Exportación contable', 'Documentos generados', 'Avisos', 'Mensajes', 'Eventos', 'Mostradores registrados', 'Registro de jornada', 'Seguridad', 'Sedes'],
             $this->navigation($this->user(Role::MANAGER)));
     }
 
