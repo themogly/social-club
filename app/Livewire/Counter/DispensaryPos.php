@@ -16,6 +16,7 @@ use App\Actions\Stock\SelectBatch;
 use App\Actions\Till\SelectTillSession;
 use App\Actions\Wallet\RecordWalletTransaction;
 use App\Enums\DispensationStatus;
+use App\Enums\ProductType;
 use App\Enums\TillSessionStatus;
 use App\Enums\WalletTransactionType;
 use App\Exceptions\DebtLimitExceededException;
@@ -2028,6 +2029,8 @@ class DispensaryPos extends Component
                 'grams_per_unit_cg' => (int) $genetic->grams_per_unit_cg,
                 'thc_bp' => (int) $genetic->thc_bp,
                 'cbd_bp' => (int) $genetic->cbd_bp,
+                // Prompt 326 — an edible's strength is its THC per unit ("10 mg THC"), not a percentage.
+                'thc_mg' => $genetic->product_type === ProductType::EDIBLE ? $genetic->thc_mg_per_unit : null,
                 // Pre-labelled like product_type_label / strain_type_label — never the raw enum value, which
                 // the blade would have printed as INDOOR/OUTDOOR in both languages (prompt 94).
                 'cultivation' => $genetic->cultivation_type?->label(),

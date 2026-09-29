@@ -5,6 +5,7 @@ namespace App\Observers;
 use App\Enums\ProductType;
 use App\Enums\UnitType;
 use App\Models\Genetic;
+use App\Support\EdibleEquivalence;
 use DomainException;
 use InvalidArgumentException;
 
@@ -33,6 +34,12 @@ class GeneticObserver
         }
         if ($productType !== ProductType::CONCENTRATE) {
             $genetic->concentrate_subtype = null;
+        }
+
+        // Prompt 326 — an edible is entered by its THC; what it counts as in grams is worked out, never typed. An edible
+        // without a THC figure (made before 326) keeps its stored grams until someone gives it one.
+        if ($productType === ProductType::EDIBLE && (int) $genetic->thc_mg_per_unit > 0) {
+            $genetic->grams_per_unit_cg = EdibleEquivalence::gramsCg((int) $genetic->thc_mg_per_unit);
         }
 
         // A per-unit product must declare the gram content of one unit — grams_cg for

@@ -120,8 +120,8 @@ class ProductTypeTest extends TestCase
 
     public function test_switching_away_from_a_unit_type_clears_the_unit_only_fields(): void
     {
-        $genetic = Genetic::factory()->edible(100, 10)->create(['organisation_id' => $this->org->id]);
-        $this->assertSame(100, $genetic->grams_per_unit_cg);
+        $genetic = Genetic::factory()->edible(10)->create(['organisation_id' => $this->org->id]);
+        $this->assertSame(7, $genetic->grams_per_unit_cg); // prompt 326: 10 mg at 150 mg/g, worked out
         $this->assertSame(10, $genetic->thc_mg_per_unit);
 
         $genetic->update(['product_type' => ProductType::FLOWER]);

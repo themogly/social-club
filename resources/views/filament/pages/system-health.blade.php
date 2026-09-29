@@ -29,6 +29,18 @@
     @endif
 
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:1rem;">
+        {{-- Prompt 326 — edibles still counted by typed grams (no THC figure yet). Only shown when there are any. --}}
+        @if ($ediblesWithoutThc !== [])
+            <x-filament::section :heading="__('Comestibles sin cifra de THC')" icon="heroicon-o-exclamation-triangle" data-edibles-without-thc>
+                <p class="text-sm text-gray-600 dark:text-gray-400">{{ __('Siguen contando con los gramos que se escribieron a mano. Edita cada uno y pon su THC por unidad (mg): a partir de ahí cuenta por la equivalencia del club.') }}</p>
+                <ul class="mt-2 list-disc ps-5 text-sm">
+                    @foreach ($ediblesWithoutThc as $name)
+                        <li>{{ $name }}</li>
+                    @endforeach
+                </ul>
+            </x-filament::section>
+        @endif
+
         <x-filament::section :heading="__('Planificador')" icon="heroicon-o-clock">
             <div style="display:flex;align-items:center;gap:.5rem;margin-bottom:.5rem;">
                 <x-filament::badge :color="$scheduler['stale'] ? 'danger' : 'success'">

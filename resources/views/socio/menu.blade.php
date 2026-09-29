@@ -22,7 +22,11 @@
             </div>
             <p class="mt-1 text-xs text-ink-muted dark:text-slate-400">
                 {{-- Prompt 278 — the percentages are basis points on the model (thc_bp); `thc_pct` never existed, so every strain read "—%". --}}
+                @if ($item['genetic']->product_type === \App\Enums\ProductType::EDIBLE && $item['genetic']->thc_mg_per_unit){{-- prompt 326 --}}
+                    {{ __(':mg mg THC', ['mg' => $item['genetic']->thc_mg_per_unit]) }}
+                @else
                 THC {{ $item['genetic']->thc_bp !== null ? \App\Support\NumberFormat::decimal($item['genetic']->thc_bp / 100, 1) : '—' }}% · CBD {{ $item['genetic']->cbd_bp !== null ? \App\Support\NumberFormat::decimal($item['genetic']->cbd_bp / 100, 1) : '—' }}%@if ($item['genetic']->strain_type) · {{ $item['genetic']->strain_type->label() }}@endif
+                @endif
             </p>
 
             {{-- Prompt 185 — availability at THIS member's sede, as a state and never a quantity.

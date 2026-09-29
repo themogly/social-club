@@ -2,7 +2,9 @@
 
 namespace App\ViewModels;
 
+use App\Enums\ProductType;
 use App\Models\AuditLog;
+use App\Models\Genetic;
 use App\Models\HeartbeatLog;
 use App\Models\Organisation;
 use App\Support\PermissionDrift;
@@ -264,6 +266,19 @@ class SystemHealth
             'stale' => $age === null || $age > $threshold,
             'threshold_seconds' => $threshold,
         ];
+    }
+
+    /**
+     * Prompt 326 — edibles made before they were counted by THC, still with no THC figure: they keep the grams typed for
+     * them until someone gives them one (their edit form requires it).
+     *
+     * @return list<string> their names
+     */
+    public function ediblesWithoutThc(): array
+    {
+        return Genetic::query()->where('product_type', ProductType::EDIBLE->value)
+            ->where(fn ($q) => $q->whereNull('thc_mg_per_unit')->orWhere('thc_mg_per_unit', '<=', 0))
+            ->orderBy('name')->pluck('name')->map(fn (mixed $name): string => (string) $name)->values()->all();
     }
 
     /**

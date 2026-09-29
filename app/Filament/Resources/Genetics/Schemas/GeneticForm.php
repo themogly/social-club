@@ -14,6 +14,8 @@ use App\Models\Category;
 use App\Models\Genetic;
 use App\Rules\GramAmount;
 use App\Rules\UniqueGeneticName;
+use App\Support\EdibleEquivalence;
+use App\Support\NumberFormat;
 use Filament\Forms\Components\FileUpload;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TagsInput;
@@ -21,6 +23,7 @@ use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
 use Filament\Schemas\Components\Section;
+use Filament\Schemas\Components\Text;
 use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Schema;
 use Illuminate\Database\Eloquent\Builder;
@@ -101,26 +104,42 @@ class GeneticForm
                                 ->all())
                             ->visible(fn (Get $get): bool => $get('product_type') === ProductType::CONCENTRATE->value),
 
-                        // Entered as grams (2 dp); the page converts to grams_per_unit_cg. Required for units.
+                        // Pre-rolls only (prompt 326): weighed plant material, entered as grams (2 dp); the page converts to
+                        // grams_per_unit_cg. An edible's grams are never typed — they are worked out from its THC below.
                         DecimalInput::make('grams_per_unit_g')
-                            ->label(__('Gramos por unidad (g)'))
-                            ->helperText(__('Contenido en gramos de cada unidad.'))
+                            ->label(__('Peso por unidad (g)'))
+                            ->helperText(__('Lo que cuenta para límites y existencias.'))
                             ->numeric()
                             ->rule(new GramAmount)
                             ->minValue(0)
                             ->step(0.01)
                             ->suffix('g')
-                            ->visible(fn (Get $get): bool => in_array($get('product_type'), [ProductType::PREROLL->value, ProductType::EDIBLE->value], true))
-                            ->required(fn (Get $get): bool => in_array($get('product_type'), [ProductType::PREROLL->value, ProductType::EDIBLE->value], true)),
+                            ->visible(fn (Get $get): bool => $get('product_type') === ProductType::PREROLL->value)
+                            ->required(fn (Get $get): bool => $get('product_type') === ProductType::PREROLL->value),
 
-                        // Edibles only — potency per unit, stored directly in milligrams.
+                        // Edibles (prompt 326): the THC per unit is THE figure; what one unit counts as is worked out from it
+                        // through the club's equivalence (EdibleEquivalence) and shown beside it, live.
                         TextInput::make('thc_mg_per_unit')
                             ->label(__('THC por unidad (mg)'))
-                            ->numeric()
-                            ->minValue(0)
+                            ->integer()
+                            ->minValue(1)
+                            // The sanity cap (a constant, not a setting): above it the figure is almost certainly a typo.
+                            ->rule(fn (): \Closure => function (string $attribute, mixed $value, \Closure $fail): void {
+                                if ((int) $value > EdibleEquivalence::MAX_THC_MG_PER_UNIT) {
+                                    $fail(__('Revisa la cifra: parece demasiado alta para una unidad.'));
+                                }
+                            })
                             ->step(1)
                             ->suffix('mg')
-                            ->visible(fn (Get $get): bool => $get('product_type') === ProductType::EDIBLE->value),
+                            ->live(debounce: 300)
+                            ->visible(fn (Get $get): bool => $get('product_type') === ProductType::EDIBLE->value)
+                            ->required(fn (Get $get): bool => $get('product_type') === ProductType::EDIBLE->value),
+
+                        Text::make(fn (Get $get): string => __('Cuenta como :g g por unidad', [
+                            'g' => NumberFormat::decimal(EdibleEquivalence::gramsCg((int) $get('thc_mg_per_unit')) / 100, 2),
+                        ]))
+                            ->extraAttributes(['data-edible-counts-as' => true])
+                            ->visible(fn (Get $get): bool => $get('product_type') === ProductType::EDIBLE->value && (int) $get('thc_mg_per_unit') > 0),
                     ])
                     ->columns(2),
 

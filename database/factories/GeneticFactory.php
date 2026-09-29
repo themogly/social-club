@@ -7,6 +7,7 @@ use App\Enums\CultivationType;
 use App\Enums\ProductType;
 use App\Models\Genetic;
 use App\Models\Organisation;
+use App\Support\EdibleEquivalence;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 /**
@@ -55,13 +56,13 @@ class GeneticFactory extends Factory
         ]);
     }
 
-    /** A UNIT-type edible — a fixed gram-equivalent + THC (mg) per unit. */
-    public function edible(int $gramsPerUnitCg = 100, int $thcMgPerUnit = 10): static
+    /** A UNIT-type edible, by its THC (mg) per unit — its grams are worked out from it (prompt 326, EdibleEquivalence). */
+    public function edible(int $thcMgPerUnit = 10): static
     {
         return $this->state(fn (): array => [
             'product_type' => ProductType::EDIBLE,
-            'grams_per_unit_cg' => $gramsPerUnitCg,
             'thc_mg_per_unit' => $thcMgPerUnit,
+            'grams_per_unit_cg' => EdibleEquivalence::gramsCg($thcMgPerUnit), // the observer derives it too
         ]);
     }
 }

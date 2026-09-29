@@ -17643,3 +17643,62 @@ one tap away after every bar sale.
     `.ended` were written.
 - **For Shane on the club tablet:** the prompt's check (Lotes, Cajas, the member's history, the registro and the audit
   log after a practice visit).
+
+## Prompt 326 — edibles: enter the THC (mg) only; the grams it counts as are worked out
+
+- **Why:** Ben typed 0.4 g AND 400 mg for one gummy, treating them as the same thing; that would be 100 % THC.
+  *"Can we not just use the mg value to work out what's in each edible?"*
+- **Edibles are entered by THC only.**
+  - On the strain form (`GeneticForm`, create and edit) an edible shows **THC por unidad (mg)**: required, a whole number
+    ≥ 1. No grams input.
+  - Beside it, live as the mg are typed: **"Cuenta como 0.07 g por unidad"**.
+  - Saving stores `thc_mg_per_unit`, and `GeneticObserver` works out `grams_per_unit_cg` from it on every save, so no
+    path (form, factory, import) can store an edible's grams by hand.
+  - An edible without a THC figure (made before 326) keeps its stored grams; its edit form now requires a figure.
+- **Pre-rolls stay by weight:** the field is relabelled **Peso por unidad (g)**, with "Lo que cuenta para límites y
+  existencias." Pre-rolls have no mg field (the observer already cleared it for non-edibles).
+- **The conversion is ONE club setting and ONE helper.**
+  - `edible_thc_mg_per_gram`, *Ajustes → Cumplimiento → "Equivalencia de comestibles: mg de THC por gramo"*.
+  - **Default 150** (≈ flower at 15 % THC). **OVERNIGHT-DEFAULT — CONFIRM WITH THE CLUB'S GESTOR:** how edibles count
+    against a gram limit is a policy and legal question, not a technical one.
+  - Owner only: the field is disabled for anyone else, and `save()` drops the value from a non-owner's payload.
+  - Changes are audited in the existing `settings.updated` entry, with the old and new values.
+  - `App\Support\EdibleEquivalence::gramsCg()` = round_half_up(mg × 100 / setting), in integer arithmetic, **at least
+    1 cg** (an edible never counts as nothing). The form's line, the observer, the recalculation and the migration all
+    use it. 15 mg → 10 cg, 10 mg → 7 cg, 1 mg → 1 cg.
+- **Changing the setting recalculates every edible at once** (`App\Actions\Stock\RecalculateEdibleGrams`):
+  - one transaction, deleted strains included; a plain column write, so it cannot read the stale setting;
+  - a notification says how many were recalculated and **"Solo afecta a las dispensaciones a partir de ahora."** (also in
+    the field's help);
+  - **past dispensations keep their grams**: each line stored its own `grams_cg`, so the registro and past limits are
+    never rewritten (pinned).
+- **Existing edibles** (`2026_09_30_100000_derive_edible_grams_from_thc`):
+  - edibles WITH a THC figure are recalculated at the default 150, each printed on deploy as "edible NAME: OLD cg → NEW cg";
+  - edibles WITHOUT one keep their grams, are printed, and are listed on **Salud del sistema → "Comestibles sin cifra de
+    THC"** until someone edits them;
+  - **Changed strains in the demo data: none**. It has no edibles (every strain is flower); the live list is the
+    migration's deploy output.
+- **Sanity cap:** more than **1000 mg** per unit is refused with "Revisa la cifra: parece demasiado alta para una
+  unidad." It is a setting-free constant (`EdibleEquivalence::MAX_THC_MG_PER_UNIT`) and a closure rule, because Filament's
+  `maxValue` message didn't carry the text.
+- **The counter and the member menu:** the prompt said they show "10 mg THC" "as now", but nothing showed an edible's mg
+  (checked). An edible's card on the POS and its line on the member menu now read **":mg mg THC"** instead of THC/CBD %.
+  The counted grams appear only where limits do (the remaining-today figure).
+- **Unchanged:** weight products; pre-roll maths; `CommitDispensation`'s rule that a unit line stores units × grams per
+  unit; `StockCeiling`; past dispensations. The factory's `edible()` state now takes the mg only (grams derived), and
+  `ProductTypeTest` asserts the derived 7 cg.
+- **Tests:** `tests/Feature/Genetics/EdiblesByThcTest.php` (7). The first six were all red first:
+  1. the form, and 15 mg → 10 cg, 1 mg → 1 cg;
+  2. a pre-roll is by weight;
+  3. three units → 30 cg on the line and in the daily usage;
+  4. the setting to 100 → 15 cg, audited old/new, a past line kept at 30;
+  5. the migration, the health list, and the edit form requiring THC;
+  6. the 1000 mg cap.
+
+  The seventh (the member menu reads mg) was added with the display.
+- **Verified in a browser** (`tests/Browser/prove-326-edibles-by-thc.mjs`, throwaway DB), all PASS:
+  - an edible at 10 mg reads "Cuenta como 0.07 g por unidad" and saves 10 mg / 7 cg;
+  - a pre-roll at 1 g saves 100 cg;
+  - after *Crear lote*, the counter card reads "10 mg THC", and dispensing 2 takes **0.14 g** off *Restante hoy* (3.50 →
+    3.36), line 14 cg;
+  - the setting (default 150) changed to 100 → the edible counts 0.10 g, its form says so, and the past line keeps 14 cg.
