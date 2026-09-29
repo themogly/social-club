@@ -559,6 +559,7 @@ class DispensaryPos extends Component
         }
 
         $this->basket[] = $line;
+        $this->forgetLastSale();
 
         if ($this->idempotencyKey === null) {
             $this->idempotencyKey = (string) Str::ulid();
@@ -1103,6 +1104,7 @@ class DispensaryPos extends Component
         }
 
         $this->barBasket[] = ['article_id' => $articleId, 'qty' => 1];
+        $this->forgetLastSale();
         $this->dismissOutcome();
     }
 
@@ -1352,6 +1354,39 @@ class DispensaryPos extends Component
     }
 
     /**
+     * Prompt 300 — the after-sale line goes with the next thing that happens (a line added, a member changed). It used to
+     * clear only on a void, so it stayed through the next member's whole visit. Voiding later is the panel's job.
+     */
+    private function forgetLastSale(): void
+    {
+        $this->lastDispensationId = null;
+        $this->lastOrderId = null;
+        $this->voidReason = '';
+    }
+
+    /**
+     * The after-sale line (prompt 300): "Última: 15,00 € · 1,00 g · 14:02", and whether the socio has an address to email.
+     *
+     * @return array{summary: string, emailable: bool}|null
+     */
+    protected function lastSale(): ?array
+    {
+        $dispensation = $this->lastDispensationId !== null ? $this->lastDispensation()?->load('member') : null;
+        if ($dispensation === null) {
+            return null;
+        }
+
+        return [
+            'summary' => __('Última: :total · :grams · :time', [
+                'total' => $dispensation->total_cents->formatted(),
+                'grams' => Weight::fromCentigrams($dispensation->dispensedGramsCg())->formatted(),
+                'time' => local_datetime($dispensation->created_at, 'H:i', $this->resolveLocation()),
+            ]),
+            'emailable' => filled($dispensation->member?->email),
+        ];
+    }
+
+    /**
      * The contribution this counter just committed — scoped to THIS sede (prompt 255, audit F5). The id is a
      * public property the client can set, so `withoutGlobalScopes()->find()` alone found ANY organisation's
      * dispensation for a void or a receipt e-mail. Scoped to the counter's #[Locked] sede, the reach is what the
@@ -1433,6 +1468,7 @@ class DispensaryPos extends Component
             'overridableRules' => $verdict !== null ? $this->overridableRules($verdict) : [],
             'canOverride' => $this->userCan('limits.override'),
             'canVoid' => $this->userCan('dispensation.void'),
+            'lastSale' => $this->lastSale(),
             // Inline fee (prompt 127): the collect action follows the unpaid-fee verdict onto the POS card.
             'canCollectFee' => $this->userCan('membership.fee.collect'),
             'feeOwedCents' => $membership !== null ? $this->owedCents($membership) : 0,
@@ -2310,7 +2346,7 @@ class DispensaryPos extends Component
         $this->reset([
             'basket', 'activeGeneticId', 'activeBatchId', 'weightInput', 'calculatorMode', 'unitQty',
             'cashTendered', 'walletInput', 'requireOverride', 'limitBreach', 'overrideReason',
-            'signaturePath', 'lastDispensationId', 'voidReason', 'flashMessage', 'barBasket', 'confirmDiscard',
+            'signaturePath', 'lastDispensationId', 'lastOrderId', 'voidReason', 'flashMessage', 'barBasket', 'confirmDiscard',
         ]);
         $this->idempotencyKey = (string) Str::ulid();
     }

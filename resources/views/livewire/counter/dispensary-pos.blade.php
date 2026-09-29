@@ -996,27 +996,18 @@
                     @endif
                 </section>
 
-                {{-- Just committed → receipt + void affordance. --}}
-                @if ($lastDispensationId)
-                    <section class="rounded-2xl border border-line bg-surface-alt p-4 dark:border-slate-700 dark:bg-slate-800/50">
-                        {{-- A label over the receipt and the void, not a second confirmation — see BarPos and
-                             prompt 202. The one that announces the commit is beside the commit. --}}
-                        <p class="text-sm font-semibold text-ink-muted dark:text-slate-400">{{ __('Última dispensación') }}</p>
-                        <div class="mt-3 flex flex-col gap-2">
-                            {{-- Prompt 252 — a SHEET over the POS, not a new tab. Same receipt route, shown in place. --}}
-                            <x-counter.receipt-sheet :url="route('counter.pos.receipt', $lastDispensationId)" :label="__('Ver / imprimir recibo')" />
-
-                            <button type="button" wire:click="emailReceipt" wire:loading.attr="disabled" wire:target="emailReceipt" class="inline-flex h-11 items-center justify-center rounded-xl border border-line bg-surface px-4 text-sm font-semibold text-ink transition hover:bg-surface-alt disabled:opacity-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100">{{ __('Enviar comprobante por email') }}</button>
-
-                            @if ($canVoid)
-                                <div class="rounded-xl border border-line bg-surface p-3 dark:border-slate-700 dark:bg-slate-900">
-                                    <label for="pos-void-reason" class="block text-xs font-medium text-ink-muted dark:text-slate-400">{{ __('Anular esta dispensación') }}</label>
-                                    <textarea id="pos-void-reason" wire:model="voidReason" rows="2" placeholder="{{ __('Motivo de la anulación (queda registrado)') }}" class="mt-1 w-full rounded-lg border border-line bg-surface px-3 py-2 text-sm focus:border-error focus:outline-none focus:ring-2 focus:ring-error/30 dark:border-slate-700 dark:bg-slate-950"></textarea>
-                                    <button type="button" wire:click="voidLast" wire:confirm="{{ __('¿Anular la dispensación? Se revertirán stock y monedero.') }}" class="mt-2 h-11 w-full rounded-lg border border-error/40 bg-error/10 text-sm font-semibold text-error transition hover:bg-error/20">{{ __('Anular') }}</button>
-                                </div>
-                            @endif
-                        </div>
-                    </section>
+                {{-- Just committed → one line, the receipt / email / void behind *Opciones* (prompt 300). --}}
+                @if ($lastSale)
+                    @include('livewire.counter.partials.last-sale', [
+                        'summary' => $lastSale['summary'],
+                        'receiptUrl' => route('counter.pos.receipt', $lastDispensationId),
+                        'receiptLabel' => __('Ver / imprimir recibo'),
+                        'receiptHeading' => __('Recibo'),
+                        'emailable' => $lastSale['emailable'],
+                        'canVoid' => $canVoid,
+                        'voidHeading' => __('Anular la dispensación'),
+                        'voidReasonId' => 'pos-void-reason',
+                    ])
                 @endif
                 </div>
 

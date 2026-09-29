@@ -452,30 +452,19 @@
                          control: same message, same mechanism, rendered once. --}}
                 </section>
 
-                {{-- Just committed → ticket + void affordance.
-
-                     Prompt 202 took the CONFIRMATION out of this block. It used to be success-green and
-                     headed *"Última venta registrada"*, which is a second "it worked" on a screen that already
-                     has one beside Charge — the same defect 199 fixed one block up, in a different costume.
-                     What is left is what only this block can offer: the ticket, and the void. It is a LABEL
-                     over two affordances now, not an announcement, so it is neutral and carries no live
-                     region. --}}
-                @if ($lastOrderId)
-                    <section class="rounded-2xl border border-line bg-surface-alt p-4 dark:border-slate-700 dark:bg-slate-800/50">
-                        <p class="text-sm font-semibold text-ink-muted dark:text-slate-400">{{ __('Última venta') }}</p>
-                        <div class="mt-3 flex flex-col gap-2">
-                            {{-- Prompt 252 — a SHEET over the POS, not a new tab. Same ticket route, shown in place. --}}
-                            <x-counter.receipt-sheet :url="route('counter.bar.receipt', $lastOrderId)" :label="__('Ver / imprimir ticket')" :heading="__('Ticket')" />
-
-                            @if ($canVoid)
-                                <div class="rounded-xl border border-line bg-surface p-3 dark:border-slate-700 dark:bg-slate-900">
-                                    <label for="bar-void-reason" class="block text-xs font-medium text-ink-muted dark:text-slate-400">{{ __('Anular esta venta') }}</label>
-                                    <textarea id="bar-void-reason" wire:model="voidReason" rows="2" placeholder="{{ __('Motivo de la anulación (queda registrado)') }}" class="mt-1 w-full rounded-lg border border-line bg-surface px-3 py-2 text-sm focus:border-error focus:outline-none focus:ring-2 focus:ring-error/30 dark:border-slate-700 dark:bg-slate-950"></textarea>
-                                    <button type="button" wire:click="voidLast" wire:confirm="{{ __('¿Anular la venta? Se revertirán stock y monedero.') }}" class="mt-2 h-11 w-full rounded-lg border border-error/40 bg-error/10 text-sm font-semibold text-error transition hover:bg-error/20">{{ __('Anular') }}</button>
-                                </div>
-                            @endif
-                        </div>
-                    </section>
+                {{-- Just committed → one line, the ticket and the void behind *Opciones* (prompt 300; 202 had already taken the
+                     confirmation out of this block — it lives beside Cobrar). --}}
+                @if ($lastSaleSummary)
+                    @include('livewire.counter.partials.last-sale', [
+                        'summary' => $lastSaleSummary,
+                        'receiptUrl' => route('counter.bar.receipt', $lastOrderId),
+                        'receiptLabel' => __('Ver / imprimir ticket'),
+                        'receiptHeading' => __('Ticket'),
+                        'emailable' => false,
+                        'canVoid' => $canVoid,
+                        'voidHeading' => __('Anular la venta'),
+                        'voidReasonId' => 'bar-void-reason',
+                    ])
                 @endif
                 </div>
 

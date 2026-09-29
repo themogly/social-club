@@ -4,9 +4,11 @@
      - in the page, never a new tab; `x-show`, never `x-if`, because it sits inside a Livewire-morphed POS view (245);
      - the Android back gesture closes it before it leaves the page: `history.pushState` on open, `popstate` closes;
      - Escape and a tap beside the panel close it; focus goes to its close button;
-     - a server action can close it with a `counter-sheet-close` browser event naming it.
+     - a server action can close it with a `counter-sheet-close` browser event naming it, and anything can open it with
+       `counter-sheet-open` — which is how a menu item opens one without the sheet living INSIDE the menu (a sheet
+       nested in an absolutely positioned popover is trapped under the rest of the screen: 300's lesson).
 
-     `$trigger` is what opens it (it calls `open()`); the default slot is the content. --}}
+     `$trigger` (optional) is what opens it (it calls `open()`); the default slot is the content. --}}
 @props(['heading', 'name'])
 
 <div
@@ -23,14 +25,23 @@
             this.isOpen = false;
             if (history.state?.counterSheet === @js($name)) history.back();
         },
+        onPop: null,
         init() {
-            window.addEventListener('popstate', () => { this.isOpen = false; });
+            this.onPop = () => { this.isOpen = false; };
+            window.addEventListener('popstate', this.onPop);
+        },
+        {{-- A sheet the server removes while open (300: the void succeeded, so the line is gone) takes its history
+             entry with it, so the next back gesture is not spent on nothing. --}}
+        destroy() {
+            window.removeEventListener('popstate', this.onPop);
+            if (this.isOpen && history.state?.counterSheet === @js($name)) history.back();
         },
     }"
     x-on:counter-sheet-close.window="if (! $event.detail?.name || $event.detail.name === @js($name)) close()"
+    x-on:counter-sheet-open.window="if ($event.detail?.name === @js($name)) open()"
     {{ $attributes }}
 >
-    {{ $trigger }}
+    {{ $trigger ?? '' }}
 
     <div
         x-show="isOpen"

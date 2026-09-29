@@ -215,11 +215,13 @@ class BarPos extends Component
     {
         // The basket is kept — a socio can be attached at any point to enable wallet payment.
         $this->memberId = $member->id;
+        $this->forgetLastSale();
     }
 
     public function clearMember(): void
     {
         $this->memberId = null;
+        $this->forgetLastSale();
         $this->walletInput = '';
         $this->clearLookup();
     }
@@ -266,6 +268,7 @@ class BarPos extends Component
             $this->basket[] = ['type' => 'article', 'article_id' => $article->id, 'qty' => 1];
         }
 
+        $this->forgetLastSale();
         $this->ensureIdempotencyKey();
         $this->dismissOutcome();
     }
@@ -312,6 +315,7 @@ class BarPos extends Component
         ];
 
         $this->reset(['miscDescription', 'miscAmount', 'miscReference']);
+        $this->forgetLastSale();
         $this->ensureIdempotencyKey();
         $this->dismissOutcome();
         // Tell the blade's modal to close — but only now, on SUCCESS, so a validation refusal keeps it open with
@@ -504,6 +508,28 @@ class BarPos extends Component
         $this->flashSettled(SettledOutcome::forOrder($order, $change), __('Pedido registrado.'));
     }
 
+    // --- The after-sale line (prompt 300) ------------------------------------------
+
+    /** The line goes with the next thing that happens (a line added, a socio attached or removed); it used to stay. */
+    private function forgetLastSale(): void
+    {
+        $this->lastOrderId = null;
+        $this->voidReason = '';
+    }
+
+    /** "Última venta: 12,50 € · 14:02" — the order this counter just recorded, at this sede. */
+    protected function lastSaleSummary(): ?string
+    {
+        $order = $this->lastOrderId !== null
+            ? Order::query()->withoutGlobalScopes()->where('location_id', $this->locationId)->find($this->lastOrderId)
+            : null;
+
+        return $order === null ? null : __('Última venta: :total · :time', [
+            'total' => $order->total_cents->formatted(),
+            'time' => local_datetime($order->created_at, 'H:i', $this->resolveLocation()),
+        ]);
+    }
+
     // --- Void -------------------------------------------------------------------
 
     public function voidLast(): void
@@ -592,6 +618,7 @@ class BarPos extends Component
             'attachSocioEnabled' => (bool) Settings::get('bar_attach_socio_enabled', false),
             'ticketReferenceEnabled' => (bool) Settings::get('bar_ticket_reference_enabled', false),
             'canVoid' => $this->userCan('order.void'),
+            'lastSaleSummary' => $this->lastSaleSummary(),
         ]);
     }
 
