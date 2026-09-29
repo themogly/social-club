@@ -16325,3 +16325,28 @@ tests: `tests/Feature/Ops/ResetForLaunchTest.php`.
   - `csc:launch` → *En marcha desde…*; the reset and `csc:install --force` both refuse.
 - **Docs:** SETUP.md *Reinicio antes del lanzamiento*; the go-live checklist gains the reset and "`csc:launch` run on
   the day of the first real member".
+
+## Prompt 301 — the stock label no longer spills out of the genetic tile in grid view
+
+Club report (photo, Sede Deadpool, portrait, grid, a socio chosen): "In stock" ran past the tile's right edge.
+
+- **Cause, confirmed:** the tile's bottom row was ONE line that could not wrap or shrink: the price, then a
+  `whitespace-nowrap` span with the figure, the dot and the status word, in a `shrink-0` row. A portrait grid tile is
+  about 200 px wide with a socio chosen, so "499,00 g ● Con lote" or "18,46 g ● ≈58 días" ran out.
+- **The fix, grid only** (`as-grid:` variants, so list view keeps 225's price-over-stock on the right):
+  - the price and the stock are two left-aligned lines in a column that may shrink (`min-w-0`);
+  - the figure and the dot never shrink;
+  - the status word truncates with an ellipsis as a last resort, keeping its full text in `title`.
+
+  Colours, figures, words, the 44 px floor and the 293 island are unchanged.
+- **The bar's product card** was checked at the same widths with a five-digit stock and does not overflow, so it is
+  unchanged.
+- **Tests:**
+  - `tests/Browser/prove-301-tile-fit.mjs` asserts that every descendant of every visible tile lies inside the
+    tile's box, for genetics and bar cards in grid view, and that list view keeps the price on the right. It runs at
+    820×1180 and 1180×820, in Spanish and in English, the language set on the user and checked through `<html
+    lang>`. The throwaway DB has a 499,00 g strain, four strains flagged low with a cover label (`stock_cover_low_days`
+    raised and a short window on the copy), a strain with no batch, and a five-digit bar stock.
+  - That check failed on the old markup in portrait ("18,46 g ● ≈58 días" spilling) and passes now.
+  - `tests/Feature/Dispensing/GeneticTileFitTest.php` pins the markup, and was red without the fix.
+- **Tablet (Shane):** a photo of the same screen — pending.
