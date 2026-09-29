@@ -457,7 +457,8 @@
                 @if ($lastSaleSummary)
                     @include('livewire.counter.partials.last-sale', [
                         'summary' => $lastSaleSummary,
-                        'receiptUrl' => route('counter.bar.receipt', $lastOrderId),
+                        // Prompt 317 — no ticket unless this sede offers it (the route refuses too).
+                        'receiptUrl' => (bool) \App\Support\Settings::get('bar_receipt_enabled', false, $locationId) ? route('counter.bar.receipt', $lastOrderId) : null,
                         'receiptLabel' => __('Ver / imprimir ticket'),
                         'receiptHeading' => __('Ticket'),
                         'emailable' => false,

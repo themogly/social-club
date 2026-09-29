@@ -28,6 +28,7 @@ class LocationForm
      */
     public const SETTING_TOGGLES = [
         'bar_enabled',
+        'bar_receipt_enabled', // prompt 317
         'signature_on_dispensation',
         'dispensary_calculator_enabled', // prompt 292 — the € calculator, off by default
         'restrict_pos_to_checked_in',
@@ -235,6 +236,12 @@ class LocationForm
                         Toggle::make('bar_enabled')
                             ->label(__('Bar activado'))
                             ->default(true), // a new sede runs a bar unless turned off
+
+                        // Prompt 317 — the bar ticket reads like an invoice ("Ticket de venta"); off until a sede wants it.
+                        Toggle::make('bar_receipt_enabled')
+                            ->label(__('Ofrecer ticket de barra'))
+                            ->helperText(__('Permite ver e imprimir un ticket tras una venta de barra. Desactivado por defecto.'))
+                            ->default(false),
 
                         // Prompt 193 — the bar's two optional cart panels. Off by default because most bar sales are
                         // a coffee for cash; when off the panel is not rendered at all, so the cart opens on the
