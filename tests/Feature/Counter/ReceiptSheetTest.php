@@ -30,12 +30,18 @@ class ReceiptSheetTest extends TestCase
         foreach (self::POS_VIEWS as $view) {
             $source = (string) file_get_contents(base_path($view));
 
-            $this->assertStringContainsString('<x-counter.receipt-sheet', $source,
+            // Prompt 300 — both reach it through the one after-sale partial, which is the stronger form of "one sheet".
+            $this->assertTrue(str_contains($source, '<x-counter.receipt-sheet') || str_contains($source, "partials.last-sale'"),
                 "$view does not use the shared receipt sheet — it must not hand-roll its own");
             // The receipt is no longer opened in a new tab.
             $this->assertStringNotContainsString('target="_blank"', $source,
                 "$view still opens something in a new tab");
         }
+    }
+
+    public function test_the_after_sale_partial_uses_the_one_receipt_sheet(): void
+    {
+        $this->assertStringContainsString('<x-counter.receipt-sheet', (string) file_get_contents(resource_path('views/livewire/counter/partials/last-sale.blade.php')));
     }
 
     public function test_the_sheet_is_closed_by_default_and_its_iframe_points_at_the_receipt_route(): void

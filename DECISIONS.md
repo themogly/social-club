@@ -16103,3 +16103,51 @@ cámara* still sat above the pad, so the screen looked as if nobody was identifi
   - *Sin foto* → the sheet; Escape closes it;
   - no page errors.
 - **Tablet (Shane):** the photo of the same screen, and a second member's card on the reader — pending.
+
+## Prompt 300 — after a sale, one small line instead of a receipt-and-void panel
+
+Club report (photo): after a contribution the basket column kept a permanent *Última dispensación* block with a receipt
+button, a full-width email button and an OPEN void form. Failing-first tests: `tests/Feature/Counter/AfterSaleLineTest.php`.
+
+- **One line, the options behind it.** The dispensary and the bar share one partial,
+  `partials/last-sale.blade.php`: "✓ Última: 15,00 € · 1,00 g · 14:02" (bar: "Última venta: 12,50 € · 14:02") with
+  **Opciones ▾**. The menu offers:
+  - *Ver / imprimir recibo* (or *ticket*);
+  - *Enviar por email* — the dispensary only, and **only when the member has an address**. The email button used to
+    show regardless and `emailReceipt` found out afterwards;
+  - *Anular…*, only with the void permission.
+
+  The line wraps rather than truncates: in the portrait cart column truncation lost the grams and the time. Each part
+  stays whole.
+- **The void is a sheet** (299's `x-counter.sheet`) with the reason (required) and *Cancelar / Anular*.
+  - *Anular* is disabled until a reason is typed, and the server still refuses an empty one.
+  - The browser's `wire:confirm` dialog is gone; the sheet is the confirmation.
+  - `voidLast` is unchanged: permissions, audit, stock and wallet reversal.
+  - The textarea never sits open on the main screen.
+- **The sheets live beside the menu, not inside it.** Nested in the absolutely positioned popover, the receipt sheet
+  was trapped under the product list: its *Cerrar* could not be tapped (found in the browser). Menu items open the
+  sheets by event instead:
+  - `counter-receipt-open`; the receipt sheet gained `trigger: false`;
+  - `counter-sheet-open` with a name.
+
+  The sheet also drops its history entry if the server removes it while it is open, as after a void.
+- **It goes away by itself.** `forgetLastSale()` clears `lastDispensationId` / `lastOrderId` and the reason when:
+  - a line is actually added (the dispensary's `addLine` and `addBarItem`; the bar's `addArticle` and
+    `addMiscLine`; a refused add leaves it);
+  - the member is attached, changed or cleared (the dispensary's `holdMember` now also resets `lastOrderId`).
+
+  It used to clear only on a void, so it stayed through the next member's visit. That was a bug, not a feature;
+  voiding later is the panel's job, as it always was.
+- **Unchanged:** the receipt routes and content, the mailable, `voidLast`, and the commit confirmation beside the
+  commit button (202).
+- **Tests adjusted:** `ReceiptSheetTest`'s static check now accepts the shared partial, and also checks that the
+  partial uses the one receipt sheet.
+- **Verified in the browser** (`tests/Browser/prove-300-after-sale.mjs`, throwaway DB; 1180×820 and 820×1180, light and
+  dark; 24 checks each run):
+  - one line (47 px landscape, wrapping to two in portrait), with the time shown in full;
+  - no void form and no email button on the screen;
+  - *Opciones* lists the receipt and the void; the receipt sheet opens and closes;
+  - *Anular* is disabled, then enabled with a reason; voiding removes the line;
+  - a new contribution, then adding a line, removes it again;
+  - no page errors.
+- **Tablet (Shane):** a photo straight after a contribution — pending.

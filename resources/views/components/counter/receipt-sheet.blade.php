@@ -18,10 +18,12 @@
     'url',
     'label' => __('Ver / imprimir recibo'),
     'heading' => __('Recibo'),
+    'trigger' => true, // prompt 300 — false when a menu item opens it with the `counter-receipt-open` event instead
 ])
 
 <div
     data-receipt-sheet
+    x-on:counter-receipt-open.window="open()"
     x-data="{
         isOpen: false,
         src: 'about:blank',
@@ -53,12 +55,14 @@
         },
     }"
 >
+    @if ($trigger)
     <button
         type="button"
         data-receipt-open
         @click="open()"
         class="inline-flex h-11 items-center justify-center rounded-xl border border-line bg-surface px-4 text-sm font-semibold text-ink transition hover:bg-surface-alt dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
     >{{ $label }}</button>
+    @endif
 
     <div
         x-show="isOpen"
