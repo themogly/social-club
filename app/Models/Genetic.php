@@ -11,6 +11,7 @@ use App\Enums\UnitType;
 use App\Models\Concerns\BelongsToOrganisation;
 use App\Observers\GeneticObserver;
 use App\Support\ActiveScope;
+use App\Support\NumberFormat;
 use App\Support\Settings;
 use App\Support\StockCover;
 use App\Support\Weight;
@@ -86,6 +87,17 @@ class Genetic extends Model
     public function batches(): HasMany
     {
         return $this->hasMany(Batch::class);
+    }
+
+    /**
+     * Prompt 323 — how a strain reads in a picker: the name, then its variety and THC, leaving out what is empty
+     * ("Cali · Híbrida · THC 22%"), so two similar names can be told apart. Search still matches the name.
+     */
+    public function pickerLabel(): string
+    {
+        $thc = $this->thc_bp === null ? null : 'THC '.NumberFormat::decimal($this->thc_bp / 100, $this->thc_bp % 100 === 0 ? 0 : ($this->thc_bp % 10 === 0 ? 1 : 2)).'%';
+
+        return implode(' · ', array_filter([(string) $this->name, $this->strain_type?->label(), $thc], 'filled'));
     }
 
     /**

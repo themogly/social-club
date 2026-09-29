@@ -117,7 +117,7 @@ class HashProductTypeTest extends TestCase
 
         // Its stock comes through «Crear lote» (prompt 320), by weight like flower.
         Livewire::actingAs($this->owner)->test(CreateBatch::class)
-            ->fillForm(['location_id' => $this->location->id, 'genetic_id' => $genetic->id, 'grams' => '50', 'cost_per_gram_eur' => '3', 'sale_price_eur' => '7'])
+            ->fillForm(['location_id' => $this->location->id, 'product_type' => $genetic->product_type->value, 'genetic_id' => $genetic->id, 'grams' => '50', 'cost_per_gram_eur' => '3', 'sale_price_eur' => '7'])
             ->call('create')->assertHasNoFormErrors();
         $this->assertSame(5000, Batch::query()->withoutGlobalScopes()->where('genetic_id', $genetic->id)->sole()->getRawOriginal('remaining_cg'));
 

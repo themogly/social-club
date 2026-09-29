@@ -73,7 +73,7 @@ class GramInputIsNeverGuessedTest extends TestCase
         $genetic = Genetic::query()->firstOrCreate(['organisation_id' => $this->org->id, 'name' => 'Amnesia Haze'], ['product_type' => 'FLOWER', 'active' => true]);
 
         return Livewire::actingAs($this->owner)->test(CreateBatch::class)
-            ->fillForm(['location_id' => $this->location->id, 'genetic_id' => $genetic->id, 'grams' => $grams, 'sale_price_eur' => '8'])
+            ->fillForm(['location_id' => $this->location->id, 'product_type' => $genetic->product_type->value, 'genetic_id' => $genetic->id, 'grams' => $grams, 'sale_price_eur' => '8'])
             ->call('create');
     }
 

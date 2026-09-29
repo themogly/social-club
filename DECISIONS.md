@@ -17495,3 +17495,51 @@ one tap away after every bar sale.
   - 4826 opens the Central Branch counter as Club Staff (the audit's `counter.operator.signed_in` names Club Staff).
 - **Still for Ben:** the Mac check with saved passwords for `dg.padron.app` in Safari and Chrome (no autofill, no
   strong-password suggestion). There's no WebKit locally, so that part can only be seen on the real device.
+
+## Prompt 323 — *Crear lote*: pick the product type first, then the strain
+
+- **Why:** Ben — typing "cali" in *Genética* offered just "Cali", with nothing to say whether it was flower, hash or a
+  concentrate. *"When you select a genetic you should first select the type."*
+- **Type first, as a filter only:**
+  - `BatchForm` gets **Tipo de producto** before *Genética*: the `ProductType` cases with their translated labels;
+    required, `live()`, `dehydrated(false)`, shown on create only.
+  - It is never stored. The batch has no type column and takes its type from its strain, as before (pinned: no
+    `product_type` column, the batch saves exactly as it did).
+  - **On edit it is hidden**, because the strain is fixed there as before.
+- ***Genética* depends on it:**
+  - disabled until a type is chosen, with the placeholder **"Elige primero el tipo"**;
+  - its options (and search) are only **active** strains of that type (`modifyQueryUsing`, create only; edit shows the
+    batch's strain as is);
+  - changing the type clears a strain that no longer fits (`afterStateUpdated`);
+  - a forged `genetic_id` of another type, or a retired strain, is refused server-side: "Elige una genética del tipo
+    seleccionado."
+- **The richer label** is `Genetic::pickerLabel()`: name · variety · THC, leaving out what is empty ("Cali · Híbrida ·
+  THC 22%"; a hash with no variety or THC reads just "Cali Hash"). THC drops trailing zeros (22 %, 18.5 %). Search
+  matches the **name** only (`searchable(['name'])`).
+- **320's hand-off:** `CreateBatch::afterFill()` fills *Tipo de producto* from the `?genetic=` strain, as well as the
+  strain itself. The 320 guard is unchanged: only a strain the user can see.
+- **Other strain pickers, checked:**
+  - *Crear lote* is the only place staff choose a strain from the full list;
+  - *Añadir existencias en otra sede* starts from an existing batch;
+  - purchases (`PurchaseForm`) pick a **lote**, already labelled with strain · name · number (282), so left as is;
+  - discounts restrict by **category**, not strain;
+  - the reports list strains but have no strain filter;
+  - the counter catalogue already filters by product type (its own chips).
+
+  Nothing else changed.
+- **Tests:** `tests/Feature/Stock/TypeFirstStrainPickerTest.php` (5), all red first:
+  - disabled until a type, then only active strains of it, and a forged wrong-type id refused;
+  - a type change clears the strain;
+  - the label and search by name;
+  - the `?genetic=` pre-fill of the type and the strain;
+  - the batch saves as before, with no type stored, and the type hidden on edit.
+
+  Eleven older test files that fill *Crear lote* now choose the strain's own type first (a one-line change beside each
+  `genetic_id`).
+- **Verified in a browser** (`tests/Browser/prove-323-type-first-strain.mjs`, throwaway DB with "Cali" (Flor · Híbrida ·
+  22 %) and "Cali Hash" added), 7/7 PASS:
+  - *Genética* is disabled with «Elige primero el tipo»;
+  - Flor + "cali" offers only "Cali · Híbrida · THC 22%";
+  - choosing it, then switching to Hachís, clears it;
+  - a new strain "Cali Nueva" (Hachís) → «Crear lote» opens with Hachís and Cali Nueva filled;
+  - screenshots at 820 and 1440 dark.
