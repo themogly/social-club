@@ -116,10 +116,18 @@ class Batch extends Model
         return implode(' · ', array_filter([$this->displayTitle(), $this->displaySubtitle()], 'filled'));
     }
 
-    /** The strain's name (prompt 298). */
+    /**
+     * The strain's name (prompt 298). A DELETED strain's stock is still real and still counts, so it is named with
+     * "(eliminada)" rather than left blank (prompt 302 — a blank row at the store nobody could identify).
+     */
     public function displayTitle(): string
     {
-        return (string) $this->resolveGenetic()?->name;
+        $genetic = $this->resolveGenetic();
+        if ($genetic === null) {
+            return '';
+        }
+
+        return $genetic->trashed() ? __(':name (eliminada)', ['name' => $genetic->name]) : (string) $genetic->name;
     }
 
     /**
@@ -234,13 +242,20 @@ class Batch extends Model
         return $this->remaining_cg->centigrams;
     }
 
+    /** The batch's strain, a deleted one included (prompt 302) — what every display of the batch reads. */
+    public function strain(): ?Genetic
+    {
+        return $this->resolveGenetic();
+    }
+
     private function resolveGenetic(): ?Genetic
     {
-        if ($this->relationLoaded('genetic')) {
+        // A loaded relation is null for a soft-deleted strain (prompt 302): look it up including deleted ones.
+        if ($this->relationLoaded('genetic') && $this->genetic !== null) {
             return $this->genetic;
         }
 
-        return Genetic::withoutGlobalScopes()->find($this->genetic_id);
+        return Genetic::withoutGlobalScopes()->withTrashed()->find($this->genetic_id);
     }
 
     /** @return MorphMany<StockMovement, $this> */

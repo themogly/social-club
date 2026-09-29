@@ -69,6 +69,7 @@
     ":n socios": ":n members",
     ":n socios activos × :d × :days días = techo :ceiling": ":n active members × :d × :days days = ceiling :ceiling",
     ":n socios con deuda": ":n members in debt",
+    ":name (eliminada)": ":name (deleted)",
     ":name (ya no está)": ":name (has left)",
     ":name ha entrado.": ":name has checked in.",
     ":name ha salido.": ":name has checked out.",

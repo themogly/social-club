@@ -3,6 +3,7 @@
 namespace App\Filament\Resources\Batches\Pages;
 
 use App\Actions\Stock\RenameBatchLote;
+use App\Filament\Resources\Batches\BatchActions;
 use App\Filament\Resources\Batches\BatchResource;
 use App\Models\Batch;
 use Filament\Actions\DeleteAction;
@@ -29,6 +30,8 @@ class EditBatch extends EditRecord
     protected function getHeaderActions(): array
     {
         return [
+            // Prompt 302 — moving the stock is the page's main job for a store batch: the primary button, the list's action.
+            BatchActions::transfer(),
             DeleteAction::make(),
             RestoreAction::make(),
         ];
