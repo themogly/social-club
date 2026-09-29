@@ -17,8 +17,12 @@ class CounterOperator
     /** Request attribute holding the resolved operator (prompt 273). */
     private const MEMO = 'counter.operator';
 
+    /** The till close's automatic clock-out may be undone only by the same person, until the counter changes hands (312). */
+    public const CLOCK_UNDO = 'counter.clock_undo';
+
     public static function set(User $operator): void
     {
+        session()->forget(self::CLOCK_UNDO);
         session([self::KEY => $operator->id]);
         request()->attributes->remove(self::MEMO);
     }
@@ -54,7 +58,7 @@ class CounterOperator
 
     public static function clear(): void
     {
-        session()->forget(self::KEY);
+        session()->forget([self::KEY, self::CLOCK_UNDO]);
         request()->attributes->remove(self::MEMO);
     }
 }

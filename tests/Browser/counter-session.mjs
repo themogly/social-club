@@ -32,6 +32,11 @@ export const DEV_ACCOUNTS = {
     staff: { email: 'staff@club.test', password: 'password', pin: '3456' },
 };
 
+/** An account's PIN — for a harness where someone else types theirs at the counter (prompt 312). */
+export function accountPin(account = null) {
+    return credentials(account).pin;
+}
+
 /** An account's password — for a harness that must type it again, e.g. on *Confirma tu identidad* (prompt 310). */
 export function accountPassword(account = null) {
     return credentials(account).password;

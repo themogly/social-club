@@ -29,6 +29,26 @@ class WorkedHours
     private const LOOKBACK_DAYS = 31;
 
     /**
+     * Prompt 312 — who is still clocked in AT this sede (their open period started here), except `$except`: the people the
+     * till close lists. The same open-period rule as {@see self::openPeriodFor()}, per person.
+     *
+     * @return list<StaffClockEvent> each person's open IN, with `user` loaded, oldest first
+     */
+    public static function openPeriodsAt(Location $location, ?User $except = null): array
+    {
+        $userIds = StaffClockEvent::query()->withoutGlobalScopes()
+            ->where('location_id', $location->id)->where('type', StaffClockType::IN->value)
+            ->when($except !== null, fn ($q) => $q->where('user_id', '!=', $except?->id))
+            ->distinct()->pluck('user_id');
+
+        return User::query()->whereIn('id', $userIds)->get()
+            ->map(fn (User $user): ?StaffClockEvent => self::openPeriodFor($user)?->setRelation('user', $user))
+            ->filter(fn (?StaffClockEvent $in): bool => $in !== null && $in->location_id === $location->id)
+            ->sortBy(fn (StaffClockEvent $in): int => $in->occurred_at->getTimestamp())
+            ->values()->all();
+    }
+
+    /**
      * The person's open period anywhere in their organisation, or null — the latest unannulled IN with no unannulled OUT
      * after it. Bounded (prompt 286): it runs on every sign-in, so it reads that one IN and asks whether an OUT follows,
      * never the person's whole history.

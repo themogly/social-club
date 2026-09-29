@@ -17011,3 +17011,63 @@ Six rough edges the owner would meet in week one, found by browser-testing a fre
     - 0,50 g left of 3,50 g reads amber;
     - desktop Chrome with an en-GB locale keeps a typed `1000,01`, and the batch reads `1000,01 g` on the list;
     - the *Recuento* dialog shows "En sistema" and no "In system".
+
+## Prompt 312 — closing the till clocks the closer out automatically, with an undo
+
+The club: *"Automatically clock staff out if they close a till."* Until now the close offered *¿Fichar salida ahora?*,
+which cost an extra tap at the end of every shift and was easy to dismiss by habit. The forgotten-clock-out flow then
+caught it the next day, as a *declared* time.
+
+- **The closer is automatic; everyone else uses their own PIN.** The registro de jornada is **personal** (281):
+  `ClockRules` refuses anything that isn't the person's own act. So:
+  - **The closer.** Their PIN just closed the till, so clocking them out is still their own act: `ClockOut` with source
+    `TILL_CLOSE`, at the close's own time (`closed_at`, a real event, not an invented one), in the same request, with no
+    question. If they weren't clocked in, nothing happens, and no clock-in is invented. A failure leaves the period open
+    for the forgotten-clock-out flow and never touches the close.
+  - **Everyone else still clocked in at this sede** (`WorkedHours::openPeriodsAt`; people at other sedes are never
+    shown) is listed under *Aún con jornada abierta* with first name and clock-in time only, never hours. Each row's
+    *Fichar salida* asks for **that person's PIN**:
+    - the same pad rule and `UnlockOperator` throttle as 281's operator-menu clock-out;
+    - a wrong PIN writes nothing and counts toward the throttle;
+    - another colleague's PIN is refused ("cada persona ficha su propia salida");
+    - the right PIN writes their own `PIN` OUT (`recorded_by` = themselves) and **does not sign them in** at the
+      counter, so the closer stays the operator;
+    - anyone left open is handled as today: the report flags them, and their next clock-in asks the time.
+- **The 2-minute *Deshacer*:**
+  - the confirmation reads *"Salida fichada a las 23:04."* with *Deshacer*;
+  - undoing writes an **ANNUL** event pointing at the OUT (`UndoTillCloseClockOut`; append-only, never a delete),
+    reopens the period and audits `staff.clock.undone` beside the original `staff.clock.out`. The report shows the
+    undone OUT struck through as *Anulado*;
+  - it is allowed only for the same person, within `WINDOW_SECONDS` (120), on the same counter session. The token lives
+    in the session (`CounterOperator::CLOCK_UNDO`), and `CounterOperator::set()`/`clear()` drop it, so a lock or
+    someone else's PIN ends it;
+  - the server refuses anything else. The button also hides itself after 2 minutes;
+  - it is not `AnnulClockEvent`, which is a manager's correction of someone else's hours and refuses self-correction.
+    This is the person taking back their own automatic act, straight away.
+- **Per-sede setting**, *Sedes → Cajas → Fichar salida al cerrar la caja*: **Automático** (the default, as the owner
+  asked) or **Preguntar** (281's question, kept unchanged for a sede that prefers it). It is stored as a location
+  setting, `till_close_clock_out`.
+- **Unchanged:** the close itself (counts, variance, Z report, the flower recount), `ClockRules`' personal rule, 281's
+  forgotten-clock-out flow and the hours report.
+- **Tests:** `tests/Feature/Staff/TillCloseClockOutTest.php` (8 tests):
+  - the closer is clocked out at `closed_at` with no question, and someone not clocked in gets nothing;
+  - undo within 2 minutes writes an ANNUL, reopens the period and audits;
+  - undo is refused after 2 minutes, after a lock, or after someone else's PIN;
+  - *Preguntar* keeps the question (a pin test);
+  - the list shows exactly the two colleagues at this sede and not the one elsewhere; a wrong PIN writes nothing and
+    costs an attempt; another colleague's PIN is refused; the right PIN writes their own `PIN` OUT without signing them
+    in;
+  - `ClockRules` still refuses clocking someone else out (a pin test);
+  - the close figures are identical whether the clock-out succeeds, has nothing to do, or is undone.
+
+  Clock events are append-only, so each looping case uses its own closer.
+- **Verified in a browser** (`tests/Browser/prove-312-close-clocks-out.mjs`, 1180×820, throwaway DB; the prep gives
+  staff `till.close`, commits today's recount through `CommitStockTake`, and clocks staff and manager in through
+  `ClockIn`):
+  - staff close the till → *"Salida fichada a las 13:13."* with *Deshacer*;
+  - undo → *"Salida deshecha…"*;
+  - reopen and close → *Aún con jornada abierta: Club (desde 10:13)* (the manager; the closer isn't listed);
+  - a wrong PIN is refused, and the manager's PIN clocks them out;
+  - *Registro de jornada* shows both clock-outs, and the undone one as *Anulado*;
+  - the record's sources: staff OUT `TILL_CLOSE`, ANNUL, OUT `TILL_CLOSE`; manager OUT `PIN`.
+  - `counter-session.mjs` gained `accountPin()`, so the credentials stay in the one harness file.
