@@ -116,9 +116,10 @@ window.dispensaryPadMath = {
         const scaled = cents * 100;
         return (scaled - (scaled % rateCents)) / rateCents; // floor, in integers
     },
-    formatGrams(cg, decimal) {
+    // The one display rule (prompt 316): a decimal point in every language — NumberFormat on the server.
+    formatGrams(cg) {
         const whole = Math.floor(cg / 100);
-        return `${whole}${decimal}${String(cg % 100).padStart(2, '0')} g`;
+        return `${whole}.${String(cg % 100).padStart(2, '0')} g`;
     },
 };
 
@@ -129,12 +130,12 @@ window.dispensaryPad = (config = {}) => ({
     weight: !! config.weight,
     rate: config.rateCents ?? null,
     dailyRemaining: config.dailyRemainingCg ?? null,
-    decimal: config.decimal ?? ',',
     adding: false,
     trail: [], // prompt 299 — the value before each keyboard key, so a card-reader burst's leaked keys can be undone
     push(key) {
-        if (key === ',') {
-            if (! this.value.includes(',')) this.value = (this.value === '' ? '0' : this.value) + ',';
+        // Prompt 316 — the decimal key is a POINT, as every figure is shown; a typed comma is read as the same key.
+        if (key === '.' || key === ',') {
+            if (! /[.,]/.test(this.value)) this.value = (this.value === '' ? '0' : this.value) + '.';
             return;
         }
         this.value += key; // no length cap, as the server pad had none; addLine validates the value
@@ -153,7 +154,7 @@ window.dispensaryPad = (config = {}) => ({
     get remainingAfter() {
         return this.dailyRemaining === null || this.enteredCg === null ? null : this.dailyRemaining - this.enteredCg;
     },
-    grams(cg) { return window.dispensaryPadMath.formatGrams(Math.max(0, cg), this.decimal); },
+    grams(cg) { return window.dispensaryPadMath.formatGrams(Math.max(0, cg)); },
     // One request in flight: a double tap adds one line. The keys are never disabled by a request.
     add() {
         if (this.adding) return;
@@ -176,7 +177,7 @@ window.dispensaryPad = (config = {}) => ({
             e.preventDefault(); this.add(); return;
         }
         if (/^[0-9]$/.test(e.key)) { e.preventDefault(); this.remember(e); this.push(e.key); return; }
-        if (e.key === ',' || e.key === '.') { e.preventDefault(); this.remember(e); this.push(','); return; }
+        if (e.key === ',' || e.key === '.') { e.preventDefault(); this.remember(e); this.push('.'); return; }
         if (e.key === 'Backspace') { e.preventDefault(); this.remember(e); this.back(); }
     },
     remember(e) {

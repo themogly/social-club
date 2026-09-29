@@ -22,11 +22,10 @@ class Duration
     }
 
     /** The bare number, for a chart axis or a spreadsheet cell. */
-    public static function decimalHours(int $minutes, ?string $decimal = null): string
+    public static function decimalHours(int $minutes): string
     {
-        $decimal ??= app()->getLocale() === 'es' ? ',' : '.';
         $value = round(max(0, $minutes) / 60, 1);
 
-        return floor($value) == $value ? (string) (int) $value : number_format($value, 1, $decimal, '');
+        return floor($value) == $value ? (string) (int) $value : NumberFormat::decimal($value, 1); // a point (prompt 316)
     }
 }

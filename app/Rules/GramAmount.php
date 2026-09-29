@@ -20,7 +20,7 @@ class GramAmount implements ValidationRule
         }
 
         if (Weight::canonicalGrams((string) $value) === null) {
-            $fail(__('Escribe los gramos sin separador de miles y con dos decimales como máximo (p. ej. 1000 o 3,5).'));
+            $fail(__('Escribe los gramos sin separador de miles y con dos decimales como máximo (p. ej. 1000 o 3.5).'));
         }
     }
 }

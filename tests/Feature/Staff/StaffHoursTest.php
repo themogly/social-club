@@ -377,7 +377,7 @@ class StaffHoursTest extends TestCase
         app()->setLocale('es');
         $this->assertSame('7 h 30 min', Duration::format(450));
         $this->assertSame('0 h 05 min', Duration::format(5));
-        $this->assertSame('152,5 h', Duration::hours(9150));
+        $this->assertSame('152.5 h', Duration::hours(9150));
         $this->assertSame('8 h', Duration::hours(480));
     }
 }

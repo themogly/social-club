@@ -22,7 +22,7 @@
             </div>
             <p class="mt-1 text-xs text-ink-muted dark:text-slate-400">
                 {{-- Prompt 278 — the percentages are basis points on the model (thc_bp); `thc_pct` never existed, so every strain read "—%". --}}
-                THC {{ $item['genetic']->thc_bp !== null ? number_format($item['genetic']->thc_bp / 100, 1, ',', '') : '—' }}% · CBD {{ $item['genetic']->cbd_bp !== null ? number_format($item['genetic']->cbd_bp / 100, 1, ',', '') : '—' }}%@if ($item['genetic']->strain_type) · {{ $item['genetic']->strain_type->label() }}@endif
+                THC {{ $item['genetic']->thc_bp !== null ? \App\Support\NumberFormat::decimal($item['genetic']->thc_bp / 100, 1) : '—' }}% · CBD {{ $item['genetic']->cbd_bp !== null ? \App\Support\NumberFormat::decimal($item['genetic']->cbd_bp / 100, 1) : '—' }}%@if ($item['genetic']->strain_type) · {{ $item['genetic']->strain_type->label() }}@endif
             </p>
 
             {{-- Prompt 185 — availability at THIS member's sede, as a state and never a quantity.

@@ -57,11 +57,11 @@ class SmallFixesTest extends TestCase
 
     // --- 1. Weights in panel tables ---------------------------------------------------------------------------------------
 
-    public function test_the_batch_list_shows_weights_with_a_spanish_decimal_comma(): void
+    public function test_the_batch_list_shows_weights_through_the_one_formatter(): void
     {
         Batch::factory()->create(['organisation_id' => $this->org->id, 'genetic_id' => $this->genetic->id, 'location_id' => $this->centro->id, 'remaining_cg' => 30001]);
 
-        Livewire::test(ListBatches::class)->assertSee(Weight::fromCentigrams(30001)->formatted())->assertSee('300,01 g')->assertDontSee('300.01 g');
+        Livewire::test(ListBatches::class)->assertSee(Weight::fromCentigrams(30001)->formatted())->assertSee('300.01 g')->assertDontSee('300,01 g'); // 316: a point everywhere
     }
 
     // --- 2. No generated English label in the Recuento dialog ---------------------------------------------------------------

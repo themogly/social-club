@@ -7,6 +7,7 @@ use App\Models\Location;
 use App\Models\Member;
 use App\Models\Organisation;
 use App\Support\ActiveScope;
+use App\Support\NumberFormat;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
 
@@ -79,7 +80,7 @@ class SettleCrossLocationWallets extends Command
             }
         }
 
-        $this->info("Cross-location settlement: {$membersSettled} member(s), ".number_format($totalCents / 100, 2).' EUR moved.');
+        $this->info("Cross-location settlement: {$membersSettled} member(s), ".NumberFormat::decimal($totalCents / 100, 2).' EUR moved.');
 
         return self::SUCCESS;
     }

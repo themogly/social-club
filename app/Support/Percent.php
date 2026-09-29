@@ -10,6 +10,6 @@ final class Percent
 {
     public static function formatted(float $value, int $decimals = 2, ?string $locale = null): string
     {
-        return number_format($value, $decimals, (($locale ?? app()->getLocale()) === 'es') ? ',' : '.', '').' %';
+        return NumberFormat::decimal($value, $decimals).' %'; // a point in every language (prompt 316)
     }
 }

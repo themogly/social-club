@@ -17113,3 +17113,81 @@ whatever `ResolveLocale` fell back to. `users.locale` was only ever written by t
   - the new staff member's PIN at the counter gives `<html lang="es">`;
   - the owner's profile set to English → the panel is `lang="en"` and the top bar shows EN;
   - rows: owner `en`, manager `es`, staff `es`, the new person `es`, none empty.
+
+## Prompt 316 — a decimal point everywhere, in both languages
+
+Ben: *"We wanted to use a decimal point everywhere, not commas."* **This reverses 306's comma display** (306 made panel
+weights follow the Spanish convention because the prices did).
+
+- **The one display rule** (`App\Support\NumberFormat::decimal($value, $places)`): a decimal **point** and **no thousands
+  separator** in every language, for everything shown on screen or in printed documents: `1234.56 €`, `300.01 g`,
+  `57.0 %`, `7.5 h`. No grouping at all, because a comma or a dot in the thousands place is exactly the ambiguity being
+  removed. **OVERNIGHT-DEFAULT — CONFIRM with Ben:** if he'd rather read `1,234.56`, it is the one `''` in the helper.
+- **The currency symbol keeps its language's position:** `10.00 €` in Spanish, `€10.00` in English. `Money::formatted()`
+  keeps PHP's per-locale currency pattern (so the symbol sits where each language puts it) and overrides only the
+  decimal/monetary separator (`.`) and grouping (off).
+- **Through the helper:** `Weight::formatted()`, `Money::formatted()`, `Duration::decimalHours()` (its `$decimal`
+  parameter removed), `Percent::formatted()`, `ReportColumn::display()` (NUMBER no longer groups; PERCENT uses a point),
+  and so everything built on them: the counter, the panel, reports and their PDFs, the Z report and arqueo, charts, the
+  member area, receipts, emails and Telegram alerts.
+- **The 22 `number_format(` calls, one by one:**
+  - **→ the helper, or a formatter built on it (10):**
+    - `Weight`, `Percent`, `Duration`, the `Money` fallback;
+    - `ReportColumn` NUMBER and PERCENT;
+    - `Rat` retention years;
+    - `TillSession`'s float prefill;
+    - `PriceResult`'s discount percent (→ `Percent`);
+    - `SettleCrossLocationWallets`' console total.
+  - **→ the helper, in views (5):**
+    - the member menu's THC/CBD;
+    - the dispensary tile's THC/CBD;
+    - the membership-fee and inline-fee placeholders.
+  - **Stay, because they already write a point for a form VALUE (2):** `CollectsMembershipFees`' amount and
+    `MemberResource`'s forecast.
+  - **Stay, as the spreadsheet rule (4):** `ReportColumn::export()` ×3 and the `NumberFormat` helper itself.
+  - **The accounting and registro CSVs** now read their separator from `ReportExport::localeCsvFormat()`, the ONE
+    spreadsheet rule, instead of repeating it.
+- **The spreadsheet exception:** every CSV export (report CSVs, `AccountingExport`, the registro de dispensación CSV)
+  keeps the **Spanish-Excel** format when exporting in Spanish: a comma decimal with `;` columns. These are files for the
+  gestor's Spanish Excel, where a point decimal imports as text or a date. The prompt names `AccountingExport`; the
+  report CSVs and the registro CSV are the same kind of file and already shared that rule, so they are the same
+  exception, in one place (`localeCsvFormat()`, now public). If Ben wants points there too, it is that one line.
+  Stored values are unchanged: nothing about cents or centigrams moves.
+- **The browser side:**
+  - the dispensary keypad's decimal key is **`.`** (labelled *Punto decimal* for screen readers);
+  - the pad stores and previews with a point (`dispensaryPadMath.formatGrams` has no `decimal` argument any more);
+  - a comma typed on a Spanish keyboard is read as the same key;
+  - the 11 money placeholders read `0.00`;
+  - no JS used `toLocaleString`/`Intl.NumberFormat`.
+  - **Typing still accepts both separators** (`TypedNumber`, 306's `DecimalInput`); only display changed.
+- **Copy:** the 12 translated strings that wrote a comma decimal (the octavo's "3,5 g", "0,01", "p. ej. 1000 o 3,5") now
+  write a point, in the code and in both language files.
+- **Tests:**
+  - `tests/Feature/Formatting/DecimalPointTest.php` (7 tests; all red first except the export pin):
+    - the formatters in `es` and `en`;
+    - report columns;
+    - the batch list and an alert in Spanish;
+    - **a structural guard:** no `number_format` writes a literal `','` decimal outside `ReportExport`, and no
+      translated key writes one, proven with a planted violation;
+    - the keypad's point key, and typing `12,5` or `12.5` still reads 12.5;
+    - the accounting CSV keeps the Spanish comma (a pin).
+  - **Existing tests updated, not deleted: 9 tests (12 assertions)** that pinned commas:
+    - OwnerAlerts;
+    - TillOpenScreen ×2;
+    - GeneticTileFit;
+    - SmallFixes (renamed "…through the one formatter");
+    - StaffHours;
+    - BatchDescriptions (×3 assertions);
+    - BarPosScreen;
+    - BatchPriceAndPhotos.
+- **Verified in a browser** (`tests/Browser/prove-316-decimal-point.mjs`, Spanish, 1180×820, throwaway DB):
+  - the batch list;
+  - the till float prefill;
+  - the keypad's `.` key;
+  - a typed `1,5` previewing as `1.50 g`;
+  - the basket and tender;
+  - the last-sale line `15.00 € · 1.50 g`;
+  - the arqueo;
+  - the registro de dispensación.
+
+  Every figure uses a point, and none reads with a comma. The Telegram alert text is asserted in `DecimalPointTest`.

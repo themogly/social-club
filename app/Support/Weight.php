@@ -88,7 +88,7 @@ final class Weight
      */
     public function formatted(?string $locale = null): string
     {
-        return number_format($this->grams(), 2, (($locale ?? app()->getLocale()) === 'es') ? ',' : '.', '').' g';
+        return NumberFormat::decimal($this->grams(), 2).' g'; // a point in every language (prompt 316)
     }
 
     public function __toString(): string

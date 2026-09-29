@@ -4,6 +4,7 @@ namespace App\ViewModels;
 
 use App\Console\Commands\PruneStaffClockEvents;
 use App\Enums\Role as RoleEnum;
+use App\Support\NumberFormat;
 use App\Support\OrganisationIdentity;
 use App\Support\Permissions;
 use App\Support\Settings;
@@ -236,7 +237,7 @@ class Rat
     private function retentionText(int $days, bool $sinceLeaving): string
     {
         $years = round($days / 365, 1);
-        $yearsText = $years == (int) $years ? (string) (int) $years : number_format($years, 1, ',', '.');
+        $yearsText = $years == (int) $years ? (string) (int) $years : NumberFormat::decimal($years, 1);
 
         return $sinceLeaving
             ? __(':days días (~:years años) desde la baja del socio.', ['days' => $days, 'years' => $yearsText])

@@ -254,7 +254,7 @@ class BatchesTable
                     ->label(fn (Batch $record): string => $record->isUnitType() ? __('Precio por unidad (€)') : __('Precio por gramo (€)'))
                     ->numeric()->minValue(0)->required(),
                 DecimalInput::make('eighth_eur')
-                    ->label(__('Precio por octavo — 3,5 g (€)'))
+                    ->label(__('Precio por octavo — 3.5 g (€)'))
                     ->helperText(__('Opcional.'))
                     ->numeric()->minValue(0)
                     ->hidden(fn (Batch $record): bool => $record->isUnitType()),

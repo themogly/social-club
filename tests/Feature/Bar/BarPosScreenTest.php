@@ -355,7 +355,7 @@ class BarPosScreenTest extends TestCase
             ->assertSee(__('Ticket de venta'))     // SALE vocabulary…
             ->assertSee('Tortilla')
             ->assertSee($member->fullName())
-            ->assertSee('3,50')                     // the €3,50 total on the ticket
+            ->assertSee('3.50')                     // the €3.50 total on the ticket (a point, 316)
             ->assertDontSee('aportación')           // …deliberately NOT the contribution vocabulary
             ->assertDontSee('Comprobante de aportación')
             ->assertDontSee('dispensación');

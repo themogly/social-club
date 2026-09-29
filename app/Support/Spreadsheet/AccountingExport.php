@@ -45,8 +45,9 @@ class AccountingExport
 
     public function csv(): string
     {
-        $decimal = app()->getLocale() === 'es' ? ',' : '.';
-        $delimiter = app()->getLocale() === 'es' ? ';' : ',';
+        // The spreadsheet rule, not the display rule (prompt 316): a file for the gestor's Spanish Excel, where a point
+        // decimal imports as text or a date. The ONE rule every CSV export follows.
+        [$delimiter, $decimal] = ReportExport::localeCsvFormat();
         $euros = fn (int $cents): string => number_format($cents / 100, 2, $decimal, '');
 
         $writer = Writer::createFromString();

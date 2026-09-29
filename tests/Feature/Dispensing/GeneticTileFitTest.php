@@ -36,7 +36,7 @@ class GeneticTileFitTest extends TestCase
 
     public function test_the_grid_stacks_price_and_stock_inside_the_tile_and_the_list_is_unchanged(): void
     {
-        app()->setLocale('es'); // the figure is asserted in Spanish ("499,00 g")
+        app()->setLocale('es'); // the figure is asserted as shown ("499.00 g" — a point in every language, 316)
         $this->seed(RolePermissionSeeder::class);
         $org = Organisation::factory()->create();
         app(ActiveScope::class)->setOrganisation($org->id);
@@ -70,7 +70,7 @@ class GeneticTileFitTest extends TestCase
         preg_match('/<span data-genetic-stock class="([^"]*)">(.*?)<\/span>\s*<\/span>\s*<\/button>/s', $html, $stock);
         $this->assertNotEmpty($stock, 'the stock row was not found');
         $this->assertStringContainsString('min-w-0', $stock[1]);
-        $this->assertMatchesRegularExpression('/<span class="shrink-0 tabular-nums">499,00 g<\/span>/', $stock[2], 'the figure may shrink');
+        $this->assertMatchesRegularExpression('/<span class="shrink-0 tabular-nums">499\.00 g<\/span>/', $stock[2], 'the figure may shrink');
         $this->assertMatchesRegularExpression('/title="[^"]+"[^>]*><span class="h-2 w-2 shrink-0[^"]*"><\/span><span class="truncate">/', $stock[2], 'the status word neither truncates nor keeps its title');
     }
 }

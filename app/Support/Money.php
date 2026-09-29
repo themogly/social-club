@@ -88,13 +88,18 @@ final class Money
     }
 
     /**
-     * Locale-aware display, e.g. "1.234,56 €" in Spanish. Display edge only.
+     * Display edge only: "1234.56 €" in Spanish, "€1234.56" in English. The currency symbol keeps its language's position
+     * (the locale's own currency pattern); the number follows the one rule — a decimal POINT and no grouping (prompt
+     * 316, {@see NumberFormat}).
      */
     public function formatted(?string $locale = null): string
     {
         $formatter = new NumberFormatter($locale ?? app()->getLocale(), NumberFormatter::CURRENCY);
+        $formatter->setSymbol(NumberFormatter::MONETARY_SEPARATOR_SYMBOL, '.');
+        $formatter->setSymbol(NumberFormatter::DECIMAL_SEPARATOR_SYMBOL, '.');
+        $formatter->setAttribute(NumberFormatter::GROUPING_USED, 0);
 
-        return $formatter->formatCurrency($this->euros(), 'EUR') ?: number_format($this->euros(), 2);
+        return $formatter->formatCurrency($this->euros(), 'EUR') ?: NumberFormat::decimal($this->euros(), 2).' €';
     }
 
     public function __toString(): string

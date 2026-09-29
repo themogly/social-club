@@ -107,7 +107,7 @@ class TillOpenScreenTest extends TestCase
 
         $component = Livewire::test(TillSession::class);
 
-        $this->assertSame('150,00', $component->get('floatInput'));
+        $this->assertSame('150.00', $component->get('floatInput'));
         $this->assertStringContainsString('data-float-default', $component->html());
     }
 
@@ -221,7 +221,7 @@ class TillOpenScreenTest extends TestCase
         Settings::set('multiple_tills_enabled', true, SettingType::BOOL, $this->location->id);
         $this->setDefaultFloat(20000);
 
-        $this->assertSame('200,00', Livewire::test(TillSession::class)->get('floatInput'));
+        $this->assertSame('200.00', Livewire::test(TillSession::class)->get('floatInput'));
     }
 
     // --- nothing else moved ------------------------------------------------------------------------------

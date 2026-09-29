@@ -159,7 +159,6 @@
                                  weight: @js(! $activeGenetic->isUnitType()),
                                  rateCents: @js($activeGeneticPriceCents),
                                  dailyRemainingCg: @js($limits?->dailyRemainingCg()),
-                                 decimal: @js(app()->getLocale() === 'es' ? ',' : '.'),
                              })"
                              @keydown.window="onKey($event)"
                              @counter-card-scan.window="undoSince($event.detail.startedAt)"
@@ -225,7 +224,7 @@
                             @foreach (['1','2','3','4','5','6','7','8','9'] as $digit)
                                 <button type="button" @click="push('{{ $digit }}')" class="h-14 rounded-xl border border-line bg-surface text-xl font-semibold text-ink transition hover:bg-surface-alt dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:hover:bg-slate-800">{{ $digit }}</button>
                             @endforeach
-                            <button type="button" @click="push(',')" class="h-14 rounded-xl border border-line bg-surface text-xl font-semibold text-ink transition hover:bg-surface-alt dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:hover:bg-slate-800">,</button>
+                            <button type="button" @click="push('.')" aria-label="{{ __('Punto decimal') }}" class="h-14 rounded-xl border border-line bg-surface text-xl font-semibold text-ink transition hover:bg-surface-alt dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:hover:bg-slate-800">.</button>
                             <button type="button" @click="push('0')" class="h-14 rounded-xl border border-line bg-surface text-xl font-semibold text-ink transition hover:bg-surface-alt dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:hover:bg-slate-800">0</button>
                             <button type="button" @click="back()" aria-label="{{ __('Retroceso') }}" class="h-14 rounded-xl border border-line bg-surface text-xl font-semibold text-ink-muted transition hover:bg-surface-alt dark:border-slate-700 dark:bg-slate-950 dark:text-slate-400 dark:hover:bg-slate-800">⌫</button>
                         </div>
@@ -530,8 +529,8 @@
                                         <span class="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px] leading-tight text-ink-muted dark:text-slate-400">
                                             <span class="font-semibold text-ink-muted dark:text-slate-300">{{ $g['product_type_label'] }}</span>
                                             @if ($g['strain_type_label'])<span class="font-semibold text-brand dark:text-slate-200">{{ $g['strain_type_label'] }}</span>@endif
-                                            <span>THC {{ number_format($g['thc_bp'] / 100, 1) }}%</span>
-                                            <span>CBD {{ number_format($g['cbd_bp'] / 100, 1) }}%</span>
+                                            <span>THC {{ \App\Support\NumberFormat::decimal($g['thc_bp'] / 100, 1) }}%</span>
+                                            <span>CBD {{ \App\Support\NumberFormat::decimal($g['cbd_bp'] / 100, 1) }}%</span>
                                             @if ($g['cultivation'])<span>{{ $g['cultivation'] }}</span>@endif
                                             @if ($g['price_label'])<span class="font-medium text-brand dark:text-slate-300">{{ $g['price_label'] }}</span>@endif
                                         </span>
@@ -874,7 +873,7 @@
                         @if ($member !== null && $walletCents > 0)
                         <div>
                             <label for="wallet" class="block text-xs font-medium text-ink-muted dark:text-slate-400">{{ __('Monedero (€)') }}</label>
-                            <input id="wallet" type="text" inputmode="decimal" wire:model.live.debounce.400ms="walletInput" @disabled($member === null) autocomplete="off" placeholder="0,00" class="mt-1 h-11 w-full rounded-xl border border-line bg-surface px-3 text-base text-ink placeholder:text-ink-muted focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/40 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100">
+                            <input id="wallet" type="text" inputmode="decimal" wire:model.live.debounce.400ms="walletInput" @disabled($member === null) autocomplete="off" placeholder="0.00" class="mt-1 h-11 w-full rounded-xl border border-line bg-surface px-3 text-base text-ink placeholder:text-ink-muted focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/40 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100">
                         </div>
                         @endif
 
@@ -893,7 +892,7 @@
                                 <button type="button" wire:click="quickCash(1000)" aria-label="{{ __('Añadir :money', ['money' => $this->money(1000)]) }}" class="h-11 rounded-xl border border-line bg-surface text-sm font-semibold text-ink transition hover:bg-surface-alt dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:hover:bg-slate-800">€10</button>
                                 <button type="button" wire:click="quickCash(2000)" aria-label="{{ __('Añadir :money', ['money' => $this->money(2000)]) }}" class="h-11 rounded-xl border border-line bg-surface text-sm font-semibold text-ink transition hover:bg-surface-alt dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:hover:bg-slate-800">€20</button>
                             </div>
-                            <input id="pos-cash-tendered" type="text" inputmode="decimal" wire:model.live.debounce.400ms="cashTendered" autocomplete="off" placeholder="0,00" class="mt-2 h-11 w-full rounded-xl border border-line bg-surface px-3 text-base text-ink placeholder:text-ink-muted focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/40 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100">
+                            <input id="pos-cash-tendered" type="text" inputmode="decimal" wire:model.live.debounce.400ms="cashTendered" autocomplete="off" placeholder="0.00" class="mt-2 h-11 w-full rounded-xl border border-line bg-surface px-3 text-base text-ink placeholder:text-ink-muted focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/40 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100">
                         </div>
 
                         {{-- Prompt 272 — slate-950, not 800, in dark (an inset well inside the slate-900 card): the dark success token

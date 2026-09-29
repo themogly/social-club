@@ -181,11 +181,11 @@ class BatchDescriptionsTest extends TestCase
         $this->assertSame('Amnesia Haze · Cosecha verano 2026', $named->displayName());
 
         app()->setLocale('es');
-        $this->assertSame('#1 · entrada 12 sep · 250,00 g', $batch->displaySubtitle());
-        $this->assertSame('#3 · entrada 3 dic 2025 · 250,00 g', $old->displaySubtitle());
+        $this->assertSame('#1 · entrada 12 sep · 250.00 g', $batch->displaySubtitle());
+        $this->assertSame('#3 · entrada 3 dic 2025 · 250.00 g', $old->displaySubtitle());
         $this->assertSame('#1 · entrada 3 oct · 40 uds', $units->displaySubtitle());
         $this->assertSame('#1 · 12 sep', $batch->displaySubtitle(short: true));
-        $this->assertSame('Amnesia Haze · #1 · entrada 12 sep · 250,00 g', $batch->displayName());
+        $this->assertSame('Amnesia Haze · #1 · entrada 12 sep · 250.00 g', $batch->displayName());
 
         app()->setLocale('en');
         $this->assertSame('#1 · received 12 Sep · 250.00 g', $batch->displaySubtitle());

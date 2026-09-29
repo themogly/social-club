@@ -177,8 +177,8 @@ class GeneticPricesRelationManager extends RelationManager
                 ->minValue(0)
                 ->required(),
             DecimalInput::make('price_per_eighth_eur')
-                ->label(__('Precio por octavo — 3,5 g (€)'))
-                ->helperText(__('Opcional. Si dos variedades comparten este precio, un octavo (3,5 g) repartido entre ellas se cobra a este precio.'))
+                ->label(__('Precio por octavo — 3.5 g (€)'))
+                ->helperText(__('Opcional. Si dos variedades comparten este precio, un octavo (3.5 g) repartido entre ellas se cobra a este precio.'))
                 ->numeric()
                 ->minValue(0)
                 ->visible(! $perUnit) // eighth pricing is WEIGHT-only
@@ -192,7 +192,7 @@ class GeneticPricesRelationManager extends RelationManager
                         $perGram = (float) (DecimalInput::number($get('price_eur')) ?? 0);
                         $maxEighth = round_half_up($perGram * ResolvePrice::EIGHTH_CG / 100 * 100) / 100; // 3.5 × per-gram, 2dp
                         if ($perGram > 0 && (float) (DecimalInput::number($value) ?? 0) > $maxEighth) {
-                            $fail(__('El precio por octavo no puede superar 3,5 × el precio por gramo (:max €).', [
+                            $fail(__('El precio por octavo no puede superar 3.5 × el precio por gramo (:max €).', [
                                 'max' => Money::fromEuros($maxEighth)->formatted(),
                             ]));
                         }

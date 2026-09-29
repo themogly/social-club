@@ -47,7 +47,7 @@ class DiscountForm
                 // percentage box would make such a row impossible to edit at all. EditDiscount
                 // round-trips its value untouched instead.
                 ->visible(fn (?Discount $record): bool => $record === null || $record->mode === DiscountMode::PERCENT)
-                ->helperText(__('Entre 0,01 y 100. Un descuento del 0 % no es un descuento.')),
+                ->helperText(__('Entre 0.01 y 100. Un descuento del 0 % no es un descuento.')),
 
             // "Se aplica a" is no longer asked either — the owner's instruction is that discounts apply
             // to flower. The COLUMN, the enum and both resolvers are untouched, so existing rows keep
