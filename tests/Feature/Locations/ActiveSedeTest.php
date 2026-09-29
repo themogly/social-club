@@ -129,7 +129,7 @@ class ActiveSedeTest extends TestCase
         // submit that names no sede is refused at validation, before any write. Still refused, still nothing
         // created; the refusal is now the field the owner must fill rather than a runtime error after the fact.
         Livewire::test(CreateBatch::class)
-            ->fillForm(['genetic_id' => $genetic->id, 'grams' => 100, 'cost_per_gram_eur' => 3])
+            ->fillForm(['product_type' => $genetic->product_type->value, 'genetic_id' => $genetic->id, 'grams' => 100, 'cost_per_gram_eur' => 3])
             ->call('create')
             ->assertHasFormErrors(['location_id' => 'required']);
 
@@ -146,7 +146,7 @@ class ActiveSedeTest extends TestCase
         $genetic = Genetic::factory()->create(['organisation_id' => $this->org->id]);
 
         Livewire::test(CreateBatch::class)
-            ->fillForm(['genetic_id' => $genetic->id, 'grams' => 100, 'cost_per_gram_eur' => 3, 'sale_price_eur' => 8])
+            ->fillForm(['product_type' => $genetic->product_type->value, 'genetic_id' => $genetic->id, 'grams' => 100, 'cost_per_gram_eur' => 3, 'sale_price_eur' => 8])
             ->call('create')
             ->assertHasNoFormErrors();
 

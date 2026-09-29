@@ -83,7 +83,7 @@ class SplitBatchIntakeTest extends TestCase
     public function test_a_split_makes_one_lote_with_a_part_at_each_sede(): void
     {
         Livewire::test(CreateBatch::class)
-            ->fillForm(['genetic_id' => $this->genetic->id, 'label' => 'Cosecha otoño', 'sale_price_eur' => '10'])
+            ->fillForm(['product_type' => $this->genetic->product_type->value, 'genetic_id' => $this->genetic->id, 'label' => 'Cosecha otoño', 'sale_price_eur' => '10'])
             ->set('data.location_id', [$this->centro->id, $this->store->id])
             ->fillForm(['grams_at' => [$this->centro->id => '500', $this->store->id => '500']])
             ->call('create')
@@ -115,7 +115,7 @@ class SplitBatchIntakeTest extends TestCase
         $this->assertSame([4, 3, 3], SplitQuantity::evenly(10, 3));
 
         $page = Livewire::test(CreateBatch::class)
-            ->fillForm(['genetic_id' => $this->genetic->id])
+            ->fillForm(['product_type' => $this->genetic->product_type->value, 'genetic_id' => $this->genetic->id])
             ->set('data.location_id', [$this->centro->id, $this->norte->id, $this->store->id])
             ->fillForm(['grams' => '1000.01'])
             ->call('splitEqually');
@@ -171,7 +171,7 @@ class SplitBatchIntakeTest extends TestCase
     public function test_a_single_sede_create_is_exactly_as_before(): void
     {
         Livewire::test(CreateBatch::class)
-            ->fillForm(['genetic_id' => $this->genetic->id, 'sale_price_eur' => '10', 'grams' => '250'])
+            ->fillForm(['product_type' => $this->genetic->product_type->value, 'genetic_id' => $this->genetic->id, 'sale_price_eur' => '10', 'grams' => '250'])
             ->set('data.location_id', [$this->centro->id])
             ->call('create')
             ->assertHasNoFormErrors();
@@ -223,7 +223,7 @@ class SplitBatchIntakeTest extends TestCase
     {
         app()->setLocale('es');
         Livewire::test(CreateBatch::class)
-            ->fillForm(['genetic_id' => $this->genetic->id, 'sale_price_eur' => '10'])
+            ->fillForm(['product_type' => $this->genetic->product_type->value, 'genetic_id' => $this->genetic->id, 'sale_price_eur' => '10'])
             ->set('data.location_id', [$this->centro->id, $this->store->id])
             ->fillForm(['grams_at' => [$this->centro->id => '500', $this->store->id => '0']])
             ->call('create')
@@ -233,7 +233,7 @@ class SplitBatchIntakeTest extends TestCase
 
         $prerolls = Genetic::factory()->create(['organisation_id' => $this->org->id, 'product_type' => ProductType::PREROLL, 'grams_per_unit_cg' => 100]);
         $page = Livewire::test(CreateBatch::class)
-            ->fillForm(['genetic_id' => $prerolls->id])
+            ->fillForm(['product_type' => $prerolls->product_type->value, 'genetic_id' => $prerolls->id])
             ->set('data.location_id', [$this->centro->id, $this->store->id])
             ->fillForm(['units' => '7'])
             ->call('splitEqually');

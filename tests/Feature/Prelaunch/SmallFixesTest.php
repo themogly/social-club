@@ -81,7 +81,7 @@ class SmallFixesTest extends TestCase
     {
         foreach (['1000,01', '1000.01', '1.000,01'] as $i => $typed) {
             Livewire::test(CreateBatch::class)
-                ->fillForm(['genetic_id' => $this->genetic->id, 'label' => "Lote {$i}", 'sale_price_eur' => '10,50', 'grams' => $typed])
+                ->fillForm(['product_type' => $this->genetic->product_type->value, 'genetic_id' => $this->genetic->id, 'label' => "Lote {$i}", 'sale_price_eur' => '10,50', 'grams' => $typed])
                 ->set('data.location_id', [$this->centro->id])
                 ->call('create')
                 ->assertHasNoFormErrors();
@@ -91,7 +91,7 @@ class SmallFixesTest extends TestCase
         }
 
         Livewire::test(CreateBatch::class)
-            ->fillForm(['genetic_id' => $this->genetic->id, 'sale_price_eur' => '10', 'grams' => 'abc'])
+            ->fillForm(['product_type' => $this->genetic->product_type->value, 'genetic_id' => $this->genetic->id, 'sale_price_eur' => '10', 'grams' => 'abc'])
             ->set('data.location_id', [$this->centro->id])
             ->call('create')
             ->assertHasFormErrors(['grams']);
@@ -99,7 +99,7 @@ class SmallFixesTest extends TestCase
 
     public function test_the_panel_decimal_field_is_a_text_input_that_asks_for_a_decimal_keyboard(): void
     {
-        $html = Livewire::test(CreateBatch::class)->fillForm(['genetic_id' => $this->genetic->id])->set('data.location_id', [$this->centro->id])->html();
+        $html = Livewire::test(CreateBatch::class)->fillForm(['product_type' => $this->genetic->product_type->value, 'genetic_id' => $this->genetic->id])->set('data.location_id', [$this->centro->id])->html();
 
         $this->assertSame(1, preg_match('/<input[^>]*id="form\.grams"[^>]*>/', $html, $input));
         $this->assertStringContainsString('type="text"', $input[0]);

@@ -101,7 +101,7 @@ class CatalogueCreatePagesTest extends TestCase
         $genetic = Genetic::factory()->create(['organisation_id' => $this->org->id]);
 
         Livewire::test(CreateBatch::class)
-            ->fillForm(['location_id' => $this->sede->id, 'genetic_id' => $genetic->id, 'grams' => '50', 'sale_price_eur' => '8'])
+            ->fillForm(['location_id' => $this->sede->id, 'product_type' => $genetic->product_type->value, 'genetic_id' => $genetic->id, 'grams' => '50', 'sale_price_eur' => '8'])
             ->call('create')
             ->assertHasNoFormErrors()
             ->assertRedirect(BatchResource::getUrl('index'));

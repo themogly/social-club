@@ -63,7 +63,7 @@ class BelowCostWarningTest extends TestCase
         $genetic = Genetic::query()->firstOrCreate(['organisation_id' => $this->org->id, 'name' => 'Amnesia Haze'], ['product_type' => 'FLOWER', 'active' => true]);
 
         return array_merge([
-            'location_id' => $this->sede->id, 'genetic_id' => $genetic->id, 'grams' => '100',
+            'location_id' => $this->sede->id, 'product_type' => $genetic->product_type->value, 'genetic_id' => $genetic->id, 'grams' => '100',
             'cost_per_gram_eur' => '9.50', 'sale_price_eur' => '8',
         ], $overrides);
     }
@@ -107,7 +107,7 @@ class BelowCostWarningTest extends TestCase
         $preroll = Genetic::factory()->create(['organisation_id' => $this->org->id, 'name' => 'Preroll', 'product_type' => 'PREROLL', 'grams_per_unit_cg' => 100]);
 
         Livewire::test(CreateBatch::class)
-            ->fillForm($this->batch(['genetic_id' => $preroll->id, 'grams' => null, 'units' => '10', 'cost_per_gram_eur' => '5', 'sale_price_eur' => '4.99']))
+            ->fillForm($this->batch(['product_type' => $preroll->product_type->value, 'genetic_id' => $preroll->id, 'grams' => null, 'units' => '10', 'cost_per_gram_eur' => '5', 'sale_price_eur' => '4.99']))
             ->call('create')
             ->assertActionMounted('belowCost');
     }
@@ -131,7 +131,7 @@ class BelowCostWarningTest extends TestCase
 
         $component = Livewire::test(CreateBatch::class)
             ->fillForm([
-                'location_id' => $this->sede->id, 'genetic_id' => $genetic->id, 'grams' => '50',
+                'location_id' => $this->sede->id, 'product_type' => $genetic->product_type->value, 'genetic_id' => $genetic->id, 'grams' => '50',
                 'cost_per_gram_eur' => '9.50', 'sale_price_eur' => '8', 'price_per_eighth_eur' => '30',
             ])
             ->call('create')

@@ -40,8 +40,10 @@ class CreateBatch extends CreateRecord
     protected function afterFill(): void
     {
         $id = (string) $this->preselectGenetic;
-        if ($id !== '' && Genetic::query()->whereKey($id)->exists()) {
-            $this->data['genetic_id'] = $id;
+        $genetic = $id !== '' ? Genetic::query()->find($id) : null;
+        if ($genetic instanceof Genetic) {
+            $this->data['product_type'] = $genetic->product_type->value; // prompt 323 — the type first, filled from the strain
+            $this->data['genetic_id'] = $genetic->id;
         }
     }
 

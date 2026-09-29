@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\Batches\Schemas;
 
+use App\Enums\ProductType;
 use App\Filament\Forms\CameraOrFile;
 use App\Filament\Forms\DecimalInput;
 use App\Filament\Resources\Articles\Schemas\ArticleForm;
@@ -25,10 +26,12 @@ use Filament\Schemas\Components\Actions;
 use Filament\Schemas\Components\Grid;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Components\Utilities\Get;
+use Filament\Schemas\Components\Utilities\Set;
 use Filament\Schemas\Schema;
 use Filament\Support\Enums\FontWeight;
 use Filament\Support\Enums\IconPosition;
 use Filament\Support\Icons\Heroicon;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\HtmlString;
 
 class BatchForm
@@ -68,15 +71,42 @@ class BatchForm
                                 ? __('Donde entra el stock. Después se puede trasladar con «Trasladar».')
                                 : null),
 
+                        // Prompt 323 (Ben) — "you should first select the type, as it's hard to know what you're adding to".
+                        // A FILTER for the strain below, never stored: the batch takes its type from its strain, as before.
+                        Select::make('product_type')
+                            ->label(__('Tipo de producto'))
+                            ->options(collect(ProductType::cases())->mapWithKeys(fn (ProductType $case): array => [$case->value => $case->label()])->all())
+                            ->required()
+                            ->live()
+                            ->dehydrated(false)
+                            ->afterStateUpdated(function (mixed $state, Get $get, Set $set): void {
+                                $chosen = filled($get('genetic_id')) ? Genetic::query()->find($get('genetic_id')) : null;
+                                if ($chosen !== null && $chosen->product_type->value !== $state) {
+                                    $set('genetic_id', null); // a strain of the old type no longer fits
+                                }
+                            })
+                            ->visible(fn (string $operation): bool => $operation === 'create'),
+
                         Select::make('genetic_id')
                             ->label(__('Genética'))
-                            ->relationship('genetic', 'name')
-                            ->searchable()
+                            // On create, only ACTIVE strains of the chosen type; on edit the strain is fixed and shown as is.
+                            ->relationship('genetic', 'name', modifyQueryUsing: fn (Builder $query, Get $get, string $operation): Builder => $operation === 'create'
+                                ? $query->where('active', true)->where('product_type', (string) $get('product_type'))
+                                : $query)
+                            ->getOptionLabelFromRecordUsing(fn (Genetic $record): string => $record->pickerLabel())
+                            ->searchable(['name'])
                             ->preload()
                             ->required()
                             ->live()
-                            // The strain is fixed at intake — never reassign an existing batch.
-                            ->disabled(fn (string $operation): bool => $operation !== 'create'),
+                            ->placeholder(fn (string $operation, Get $get): ?string => $operation === 'create' && blank($get('product_type')) ? __('Elige primero el tipo') : null)
+                            // A strain of another type (or a retired one) is refused, whatever the form was made to submit.
+                            ->rule(fn (string $operation, Get $get): \Closure => function (string $attribute, mixed $value, \Closure $fail) use ($operation, $get): void {
+                                if ($operation === 'create' && filled($value) && ! Genetic::query()->whereKey($value)->where('active', true)->where('product_type', (string) $get('product_type'))->exists()) {
+                                    $fail(__('Elige una genética del tipo seleccionado.'));
+                                }
+                            })
+                            // The strain is fixed at intake — never reassign an existing batch; and on create it waits for the type.
+                            ->disabled(fn (string $operation, Get $get): bool => $operation !== 'create' || blank($get('product_type'))),
 
                         // Prompt 282 — the club's own name for the batch. Free, not unique (one harvest across several
                         // strains shares it), editable at any time; a rename reaches every part of the lote. The lote

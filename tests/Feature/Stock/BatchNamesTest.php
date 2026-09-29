@@ -84,7 +84,7 @@ class BatchNamesTest extends TestCase
     {
         return [
             'location_id' => [$this->centro->id], // a choice of locations since 303
-            'genetic_id' => $this->amnesia->id,
+            'product_type' => $this->amnesia->product_type->value, 'genetic_id' => $this->amnesia->id,
             'label' => $label,
             'grams' => '50',
             'sale_price_eur' => '8',
