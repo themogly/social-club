@@ -4,6 +4,7 @@ namespace App\Filament\Resources\Batches\Schemas;
 
 use App\Filament\Forms\CameraOrFile;
 use App\Filament\Resources\Articles\Schemas\ArticleForm;
+use App\Filament\Resources\Batches\BatchResource;
 use App\Filament\Support\AllOption;
 use App\Models\Batch;
 use App\Models\Genetic;
@@ -27,6 +28,7 @@ use Filament\Schemas\Schema;
 use Filament\Support\Enums\FontWeight;
 use Filament\Support\Enums\IconPosition;
 use Filament\Support\Icons\Heroicon;
+use Illuminate\Support\HtmlString;
 
 class BatchForm
 {
@@ -101,6 +103,15 @@ class BatchForm
                             ->iconPosition(IconPosition::After)
                             ->tooltip(__('Copiar'))
                             ->weight(FontWeight::SemiBold)
+                            ->visible(fn (string $operation): bool => $operation !== 'create'),
+
+                        // Prompt 305 — every location holding a part of this lote, with what is left there and a link: after each
+                        // club visit the owner sees where the lote stands everywhere. Read-only.
+                        TextEntry::make('lote_parts')
+                            ->label(__('Partes del lote'))
+                            ->state(fn (?Batch $record): ?HtmlString => $record === null ? null : self::lotePartsList($record))
+                            ->html()
+                            ->columnSpanFull()
                             ->visible(fn (string $operation): bool => $operation !== 'create'),
 
                         // Prompt 302 — what is left here, so a move from this page (the header's *Asignar a sede / Trasladar*)
@@ -254,8 +265,18 @@ class BatchForm
     /** @return list<TextInput> one quantity per location ticked, in the strain's unit, each more than zero */
     private static function partFields(Get $get): array
     {
-        $unit = self::isUnitGenetic($get('genetic_id'));
-        $names = Location::query()->withoutGlobalScopes()->whereIn('id', self::chosenSedes($get))->pluck('name', 'id');
+        return self::partFieldsFor(self::chosenSedes($get), self::isUnitGenetic($get('genetic_id')));
+    }
+
+    /**
+     * One quantity per location — 303's boxes, shared with 305's *Añadir existencias en otra sede*.
+     *
+     * @param  list<string>  $locationIds
+     * @return list<TextInput>
+     */
+    public static function partFieldsFor(array $locationIds, bool $unit): array
+    {
+        $names = Location::query()->withoutGlobalScopes()->whereIn('id', $locationIds)->pluck('name', 'id');
 
         return array_map(fn (string $id): TextInput => TextInput::make(($unit ? 'units_at.' : 'grams_at.').$id)
             ->label(($unit ? __('Unidades en :sede', ['sede' => $names[$id] ?? '']) : __('Gramos en :sede', ['sede' => $names[$id] ?? ''])))
@@ -266,20 +287,39 @@ class BatchForm
             ->validationMessages([
                 'gt' => __('Cada sede necesita una cantidad mayor que cero; quita la sede que no recibe nada.'),
                 'required' => __('Cada sede necesita una cantidad mayor que cero; quita la sede que no recibe nada.'),
-            ]), self::chosenSedes($get));
+            ]), $locationIds);
     }
 
-    /** "1.000,00 g" / "40 uds" — the live sum of the parts. */
+    /** "1000,00 g" / "40 uds" — the live sum of the parts. */
     private static function splitTotal(Get $get): string
     {
-        $unit = self::isUnitGenetic($get('genetic_id'));
-        $values = array_intersect_key((array) ($get($unit ? 'units_at' : 'grams_at') ?? []), array_flip(self::chosenSedes($get)));
+        return self::splitTotalFor($get, self::chosenSedes($get), self::isUnitGenetic($get('genetic_id')));
+    }
+
+    /** @param  list<string>  $locationIds */
+    public static function splitTotalFor(Get $get, array $locationIds, bool $unit): string
+    {
+        $values = array_intersect_key((array) ($get($unit ? 'units_at' : 'grams_at') ?? []), array_flip($locationIds));
         if ($unit) {
             return __(':count uds', ['count' => array_sum(array_map(fn ($v): int => is_numeric($v) ? (int) $v : 0, $values))]);
         }
         $cg = array_sum(array_map(fn ($v): int => is_numeric($v) && (float) $v > 0 ? Weight::fromGrams((string) $v)->centigrams : 0, $values));
 
         return Weight::fromCentigrams($cg)->formatted();
+    }
+
+    /** Prompt 305 — the lote's parts, one line each: location, what is left, a link to that part. */
+    private static function lotePartsList(Batch $record): HtmlString
+    {
+        $parts = $record->lotePartsQuery()->with('location')->get()->sortBy(fn (Batch $b): string => (string) $b->location?->name);
+        $items = $parts->map(fn (Batch $b): string => sprintf(
+            '<li data-lote-part class="flex items-center justify-between gap-3 py-1"><a href="%s" class="font-medium text-primary-600 hover:underline dark:text-primary-400">%s</a><span class="tabular-nums">%s</span></li>',
+            e(BatchResource::getUrl('edit', ['record' => $b])),
+            e((string) $b->location?->name).($b->is($record) ? ' · '.e(__('este')) : ''),
+            e($b->isUnitType() ? __(':count uds', ['count' => (int) $b->remaining_units]) : $b->remaining_cg->formatted()),
+        ))->implode('');
+
+        return new HtmlString('<ul class="divide-y divide-gray-200 text-sm dark:divide-white/10">'.$items.'</ul>');
     }
 
     /** One sede in the org: nothing to choose, so the field is pre-filled and locked. */

@@ -16350,3 +16350,60 @@ Club report (photo, Sede Deadpool, portrait, grid, a socio chosen): "In stock" r
   - That check failed on the old markup in portrait ("18,46 g ● ≈58 días" spilling) and passes now.
   - `tests/Feature/Dispensing/GeneticTileFitTest.php` pins the markup, and was red without the fix.
 - **Tablet (Shane):** a photo of the same screen — pending.
+
+## Prompt 305 — add stock of an existing lote at another location later, and a weigh-up *Recuento* per batch
+
+The owner starts entering real stock the day after this lands. They split a lote on day 1 and then find more of it at a
+sede that had no part yet. Separately, a part on the scale reads 196,5 g where the system says 200 g.
+
+- **Añadir existencias en otra sede** (row menu and batch page header, `BatchActions::addParts()`):
+  - it offers only the sedes that hold no part of this lote (`remainingSedes`, stores included) and has *Todas las
+    sedes restantes*;
+  - it uses one quantity box per sede (303's `BatchForm::partFieldsFor`), a live total and a *Motivo* defaulting to
+    *Recuento inicial*;
+  - it is hidden when every sede already holds a part, or when the strain is deleted.
+- **Adding a part is not a transfer.** The stock was already physically there, so nothing leaves another part. It is an
+  INTAKE per new part (`IntakeBatch::addParts`) that copies the lote's identity (strain, `lote_seq`, `batch_no`, name,
+  dates, cost, price, lab report) so the new part joins the same lote. `handleParts` and `addParts` now share one
+  `createPart`.
+  - A sede that already holds a part is refused ("usa «Recuento»"), so a lote never gets two parts at one sede.
+  - The per-sede stock ceiling is checked for every new part. As with 303, one manager override covers all breaches
+    at once, and the refusal names each one.
+  - It is audited as `batch.part_added` with the parts.
+- **Recuento** (row menu before *Ajuste*, batch page header, `RecountBatch`):
+  - the operator types what the scale says; the form shows "En sistema: …" and a live *Diferencia* (red for a loss,
+    green for a gain);
+  - the difference is computed against the quantity **locked inside the transaction**, not the figure shown when the
+    form opened. If a dispensation lands meanwhile, the part still ends at the counted figure, and the notification
+    says the figure changed while the form was open;
+  - the write is one ADJUSTMENT through `RecordStockMovement`, and there is no movement when the count matches
+    ("Sin diferencia");
+  - a negative count is refused.
+  - *Ajuste* (a signed delta) stays for the cases where the operator knows the delta rather than the total.
+- **Permissions:** adding a part needs `stock.manage`, like intake: it is checked on the button, and the batch
+  resource is gated on it too. *Recuento* needs `stock.take`, like the stock take, and `RecountBatch` refuses without
+  it as well.
+- **Partes del lote** on the batch page (edit only): every part with its sede (linked, "· este" on the current one) and
+  its remaining quantity.
+- **251 stays open.** Whether a repeat *delivery* tops up an existing part is still undecided. *Recuento* covers the
+  day-1 weigh-up without deciding it, because a count sets the figure rather than receiving goods.
+- **Tests:** `tests/Feature/Stock/AddPartsAndRecountTest.php` has 8 tests:
+  - the added parts join the same lote: only the free sedes are offered, the identity is copied, there is one INTAKE
+    per part in centigrams, and one audit entry;
+  - a BLOCK ceiling is refused and then overridden once;
+  - a lote at every sede hides the action and refuses a second part at a sede;
+  - recall and rename reach the added parts;
+  - *Recuento* sets the figure (212,40 g counted as 208,10 g writes one −430 cg ADJUSTMENT; a second identical count
+    writes nothing; a count of 0 empties the part);
+  - a sale between opening the form and saving is not counted twice;
+  - the permission denials;
+  - *Partes del lote* on the batch page.
+  - Filament's `callTableAction` fills a multi-select one element at a time, and its `afterStateUpdated` then sees
+    `["all", id]`. The test mounts the action and `set()`s the whole array instead.
+  - `stock.manage` also gates the batch list, so the denial half checks the action's visibility on the record.
+- **Verified in a browser** (`tests/Browser/prove-305-staged-stock.mjs`, throwaway DB, 1440×900 and 820×1180):
+  - the day-1 lote is split across Storage house (800 g) and Central (200 g);
+  - adding a part offers only North Branch, and 150 g there shows "Añadido a North Branch";
+  - *Recuento* on the Central part shows "En sistema: 200,00 g", and a count of 196,5 shows *Diferencia* −3,50 g;
+  - the part now reads 196,50 g;
+  - *Partes del lote* lists all three parts.
