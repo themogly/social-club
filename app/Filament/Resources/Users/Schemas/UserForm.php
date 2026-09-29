@@ -4,6 +4,7 @@ namespace App\Filament\Resources\Users\Schemas;
 
 use App\Actions\ResolveLocale;
 use App\Enums\Role;
+use App\Filament\Forms\PinInput;
 use App\Models\User;
 use App\Support\Email;
 use App\Support\PinCollisionGuard;
@@ -91,18 +92,14 @@ class UserForm
                     ->dehydrated(false)
                     ->visible(fn (string $operation): bool => $operation === 'edit'),
 
-                // Same treatment: the PIN is a password-type input on the same form and carries the same
-                // autofill exposure. A silently rewritten PIN means an operator who cannot identify at the
-                // till, and every transaction they take is attributed to nobody.
-                TextInput::make('pin')
+                // Prompt 322 — the PIN is NOT a password field any more (see PinInput): on live a Mac's password manager
+                // filled the masked `new-password` PIN with something that was not the PIN that was typed. It is typed
+                // twice, and the save says where it will work. The intent toggle and the dehydration guard above still
+                // apply: an untouched field never persists.
+                PinInput::make('pin')
                     ->label(__('PIN de mostrador'))
-                    ->password()
-                    ->revealable()
-                    ->autocomplete('new-password')
-                    ->numeric()
-                    ->minLength(4)
-                    ->maxLength(8)
                     ->helperText(__('4–8 dígitos. Identifica al operador en el mostrador.'))
+                    ->live(onBlur: true) // on create, the repeat appears once a PIN is typed
                     // Prompt 270 — a PIN is a sign-in, so it must name exactly one person.
                     // Post-296 audit — and the "taken" answer is throttled and audited (PinCollisionGuard), so the form is no
                     // longer a way to find somebody else's PIN.
@@ -116,6 +113,14 @@ class UserForm
                     ->required(fn (string $operation, Get $get): bool => $operation === 'edit' && (bool) $get('set_pin'))
                     ->dehydrated(fn (?string $state, string $operation, Get $get): bool => filled($state)
                         && ($operation === 'create' || (bool) $get('set_pin'))),
+
+                PinInput::make('pin_confirmation')
+                    ->label(__('Repite el PIN'))
+                    ->same('pin')
+                    ->validationMessages(['same' => __('Los PIN no coinciden.')])
+                    ->visible(fn (string $operation, Get $get): bool => self::settingPin($operation, $get))
+                    ->required(fn (string $operation, Get $get): bool => self::settingPin($operation, $get))
+                    ->dehydrated(false),
 
                 // Prompt 270 — only an owner hands out (or takes away) the owner role, and nobody but an owner edits their
                 // own roles: `staff.manage` granted to a manager used to let them promote themselves to OWNER. The
@@ -144,6 +149,12 @@ class UserForm
                     ->label(__('Activo'))
                     ->default(true),
             ]);
+    }
+
+    /** A PIN is being set: typed on create, or asked for on edit (*Establecer un PIN nuevo*). */
+    private static function settingPin(string $operation, Get $get): bool
+    {
+        return $operation === 'create' ? filled($get('pin')) : (bool) $get('set_pin');
     }
 
     private static function actorIsOwner(): bool

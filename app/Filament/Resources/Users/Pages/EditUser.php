@@ -4,11 +4,17 @@ namespace App\Filament\Resources\Users\Pages;
 
 use App\Actions\RecordAuditLog;
 use App\Actions\Users\EnsureRoleChangeIsAllowed;
+use App\Actions\Users\TestUserPin;
+use App\Filament\Forms\PinInput;
 use App\Filament\Resources\Users\UserResource;
 use App\Models\User;
+use App\Support\PinSavedNotice;
+use Filament\Actions\Action;
 use Filament\Actions\DeleteAction;
 use Filament\Actions\RestoreAction;
+use Filament\Notifications\Notification;
 use Filament\Resources\Pages\EditRecord;
+use Filament\Support\Icons\Heroicon;
 use Illuminate\Support\Facades\Auth;
 
 class EditUser extends EditRecord
@@ -26,9 +32,34 @@ class EditUser extends EditRecord
     protected function getHeaderActions(): array
     {
         return [
+            $this->testPinAction(),
             DeleteAction::make(),
             RestoreAction::make(),
         ];
+    }
+
+    /** Prompt 322 — does this PIN open the counter as this person? Yes or no, for this person only (see TestUserPin). */
+    public function testPinAction(): Action
+    {
+        return Action::make('testPin')->label(__('Probar PIN'))->icon(Heroicon::OutlinedKey)->color('gray')
+            ->visible(fn (): bool => Auth::user()?->can('update', $this->getRecord()) ?? false)
+            ->modalHeading(fn (): string => __('Probar el PIN de :name', ['name' => (string) $this->getRecord()->getAttribute('name')]))
+            ->modalDescription(__('Escribe un PIN para comprobar si es el de esta persona. Solo responde «Coincide» o «No coincide».'))
+            ->modalSubmitActionLabel(__('Probar'))
+            ->schema([PinInput::make('pin')->label(__('PIN'))->required()])
+            ->action(function (array $data): void {
+                /** @var User $actor */
+                $actor = Auth::user();
+                /** @var User $user */
+                $user = $this->getRecord();
+                $matched = (new TestUserPin)->handle($actor, $user, (string) $data['pin']);
+
+                match ($matched) {
+                    true => Notification::make()->success()->title(__('Coincide'))->send(),
+                    false => Notification::make()->danger()->title(__('No coincide'))->send(),
+                    null => Notification::make()->warning()->title(__('Demasiados intentos. Espera una hora antes de volver a probar un PIN.'))->send(),
+                };
+            });
     }
 
     // Role/permission changes are audited (prompt 48) — who holds which role leaves a trace. The diff
@@ -70,6 +101,9 @@ class EditUser extends EditRecord
 
         if ($fresh?->getRawOriginal('pin').'|'.$fresh?->getRawOriginal('pin_lookup') !== $this->pinBefore) {
             (new RecordAuditLog)->handle('user.pin.updated', $user);
+            if ($fresh instanceof User && $fresh->hasPin()) {
+                PinSavedNotice::send($fresh); // prompt 322 — where to try it, or that it won't work
+            }
         }
 
         // Prompt 315 — someone else's language changed: the old and new values, nothing else about them.

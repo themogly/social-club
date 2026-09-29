@@ -92,11 +92,14 @@ class UserCredentialAutofillTest extends TestCase
 
     // --- the browser-level defence -------------------------------------------------------------
 
-    public function test_both_credential_inputs_declare_autocomplete_new_password(): void
+    public function test_the_password_declares_new_password_and_the_pin_is_not_a_password_field(): void
     {
         // "off" is ignored by Chrome on a password field; "new-password" is the hint it honours.
         $this->assertSame('new-password', $this->field('password')->getAutocomplete());
-        $this->assertSame('new-password', $this->field('pin')->getAutocomplete());
+        // Prompt 322 — the PIN is no longer a password field at all: `new-password` INVITED the password manager's
+        // suggestion. It is a text input with autocomplete off and the managers' ignore hints (PinFieldTest).
+        $this->assertSame('off', $this->field('pin')->getAutocomplete());
+        $this->assertFalse($this->field('pin')->isPassword());
     }
 
     public function test_the_attribute_reaches_the_rendered_create_form(): void
@@ -141,7 +144,7 @@ class UserCredentialAutofillTest extends TestCase
         $before = $this->admin->getRawOriginal('password');
 
         Livewire::test(EditUser::class, ['record' => $this->admin->getKey()])
-            ->fillForm(['set_pin' => true, 'pin' => '5678', 'password' => $this->adminPassword])
+            ->fillForm(['set_pin' => true, 'pin' => '5678', 'pin_confirmation' => '5678', 'password' => $this->adminPassword])
             ->call('save')
             ->assertHasNoFormErrors();
 

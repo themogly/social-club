@@ -303,7 +303,7 @@ class OperatorUnlockTest extends TestCase
         // Tests\Feature\Auth\UserCredentialAutofillTest.
         $this->actingAs($this->owner());
         Livewire::test(EditUser::class, ['record' => $fresh->getRouteKey()])
-            ->fillForm(['set_pin' => true, 'pin' => '5678'])
+            ->fillForm(['set_pin' => true, 'pin' => '5678', 'pin_confirmation' => '5678'])
             ->call('save')
             ->assertHasNoFormErrors();
 
