@@ -304,6 +304,30 @@
             @endunless
         </x-filament::section>
 
+        {{-- Prompt 311 — owner alerts: is Telegram set up, when did the 15-minute evaluation last run, and did any alert
+             message fail for good this week. --}}
+        <x-filament::section :heading="__('Avisos')" icon="heroicon-o-bell-alert">
+            <div style="display:flex;align-items:center;gap:.5rem;margin-bottom:.5rem;">
+                <x-filament::badge :color="$alerts['last_evaluation']['stale'] ? 'danger' : ($alerts['failed_last_7_days'] > 0 ? 'warning' : 'success')">
+                    {{ $alerts['last_evaluation']['stale'] ? __('Sin evaluación reciente') : ($alerts['failed_last_7_days'] > 0 ? __('Revisar') : __('Funcionando')) }}
+                </x-filament::badge>
+            </div>
+            <dl style="font-size:.875rem;display:grid;gap:.35rem;">
+                <div style="display:flex;justify-content:space-between;gap:1rem;">
+                    <dt style="opacity:.65;">{{ __('Telegram configurado') }}</dt>
+                    <dd data-alerts-telegram>{{ $alerts['telegram'] ? __('Sí') : __('No') }}</dd>
+                </div>
+                <div style="display:flex;justify-content:space-between;gap:1rem;">
+                    <dt style="opacity:.65;">{{ __('Última evaluación') }}</dt>
+                    <dd>{{ $alerts['last_evaluation']['last_at']?->translatedFormat('j M H:i') ?? '—' }}</dd>
+                </div>
+                <div style="display:flex;justify-content:space-between;gap:1rem;">
+                    <dt style="opacity:.65;">{{ __('Avisos fallidos (7 días)') }}</dt>
+                    <dd>{{ $alerts['failed_last_7_days'] }}</dd>
+                </div>
+            </dl>
+        </x-filament::section>
+
         {{-- Prompt 180 — a statement of fact, not a status.
 
              This section used to report "Última copia — Sin configurar / Pendiente de conectar una

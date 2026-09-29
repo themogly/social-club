@@ -2,6 +2,8 @@
 
 namespace App\Support;
 
+use App\Enums\AlertType;
+use App\Mail\AlertSummaryMail;
 use App\Mail\ApplicationApprovedMail;
 use App\Mail\ApplicationInviteMail;
 use App\Mail\ApplicationRejectedMail;
@@ -12,9 +14,13 @@ use App\Mail\LockdownReactivationMail;
 use App\Mail\MemberCardMail;
 use App\Mail\MemberLoginLinkMail;
 use App\Mail\MembershipReminderMail;
+use App\Mail\TelegramDisconnectedMail;
+use App\Models\Location;
 use App\Models\Member;
 use App\Models\OrganisationLockdown;
+use App\Models\OwnerAlertState;
 use App\Models\User;
+use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Illuminate\Mail\Mailable;
 
 /**
@@ -60,6 +66,16 @@ class DevMail
                 noticeDays: 15,
                 quorumRequired: 42,
             ),
+            // Prompt 311 — the owner alerts' two emails (unsaved states: a preview, no rows written).
+            'alert-summary' => new AlertSummaryMail(new EloquentCollection([
+                (new OwnerAlertState(['type' => AlertType::RESTOCK_FROM_STORE, 'subject' => 'genetic:preview', 'detail' => [
+                    'name' => 'Amnesia Haze', 'unit' => false, 'on_hand' => 3800, 'days' => 2.4, 'out' => false,
+                    'store' => ['quantity' => 85000, 'names' => ['Almacén'], 'location_id' => 'preview'],
+                ]]))->setRelation('location', new Location(['name' => 'Sede Centro'])),
+                (new OwnerAlertState(['type' => AlertType::PRODUCTS_LOW, 'subject' => 'article:preview', 'detail' => ['name' => 'Papel', 'stock' => 3, 'threshold' => 10]]))
+                    ->setRelation('location', new Location(['name' => 'Sede Centro'])),
+            ])),
+            'telegram-disconnected' => new TelegramDisconnectedMail('Ana Ruiz'),
             'lockdown-reactivation' => new LockdownReactivationMail(
                 new User(['name' => 'Ana Ruiz']),
                 new OrganisationLockdown(['is_drill' => false]),

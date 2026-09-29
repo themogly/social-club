@@ -115,6 +115,17 @@ Everything used in code/config appears in `.env.example`. Highlights:
   callable array rather than a closure so `config:cache` still works — a closure there makes step 6 of the
   deploy fail, or silently drops the protection.
 - **Security:** `APP_DEBUG=false` by default (flip on for local dev), `SESSION_SECURE_COOKIE=true` in prod.
+- **Owner alerts by Telegram (prompt 311):** `TELEGRAM_BOT_TOKEN`, `TELEGRAM_BOT_USERNAME`, `TELEGRAM_WEBHOOK_SECRET`.
+  All empty = Telegram is off (the option is hidden on the profile); the morning email summary still goes. To switch
+  it on:
+  1. In Telegram, talk to **@BotFather** → `/newbot` → copy the **token** and the bot's **username**.
+  2. Set the three values in `.env` (the secret is any long random string, e.g. `openssl rand -hex 32`), then
+     `php artisan config:cache`.
+  3. `php artisan telegram:set-webhook` — registers `https://<your domain>/telegram/webhook` with the secret.
+  4. Each person: *Perfil → Avisos → Conectar Telegram*, scan the code with the phone, tap *Start*. The bot answers
+     "Conectado. Te avisaré aquí."
+  5. Check: put a test product at its low-stock threshold and wait up to 15 minutes; ONE message arrives.
+  Why not WhatsApp: see DECISIONS (prompt 311) — Meta's business policy prohibits it for this use.
 
 ## Deploy sequence (order matters — wrong order causes silent bugs)
 
@@ -156,6 +167,7 @@ Scheduled commands (`routes/console.php`):
 | `checkins:auto-checkout` | daily 06:00 | close forgotten check-ins |
 | `expenses:materialise-recurring` | daily 05:30 | post recurring overheads |
 | `system:heartbeat` | every 5 min | stamp the scheduler-liveness the health panel reads |
+| `alerts:evaluate` | every 15 min | owner alerts: announce what newly crossed the line (Telegram), send due morning emails |
 
 **Locally / during testing** the cron is NOT running, so "nothing happened overnight" is expected and
 does not mean the feature is broken. To exercise it during development:

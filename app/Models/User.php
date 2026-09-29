@@ -3,8 +3,9 @@
 namespace App\Models;
 
 use App\Casts\NormalisedEmail;
-use App\Enums\Role;
+use App\Enums\AlertType;
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
+use App\Enums\Role;
 use App\Support\PinLookup;
 use Database\Factories\UserFactory;
 use Filament\Auth\MultiFactor\App\Contracts\HasAppAuthentication;
@@ -26,7 +27,7 @@ use SensitiveParameter;
 use Spatie\Permission\Traits\HasRoles;
 
 #[Fillable(['name', 'email', 'password', 'pin', 'active', 'locale'])]
-#[Hidden(['password', 'remember_token', 'pin', 'pin_lookup', 'mfa_secret', 'mfa_recovery_codes'])]
+#[Hidden(['password', 'remember_token', 'pin', 'pin_lookup', 'mfa_secret', 'mfa_recovery_codes', 'telegram_chat_id', 'telegram_chat_hash'])]
 class User extends Authenticatable implements FilamentUser, HasAppAuthentication, HasAppAuthenticationRecovery, HasLocalePreference
 {
     /** @use HasFactory<UserFactory> */
@@ -190,6 +191,54 @@ class User extends Authenticatable implements FilamentUser, HasAppAuthentication
         $this->save();
     }
 
+    // --- Owner alerts (prompt 311) ------------------------------------------------------------------------------
+
+    /** Link this person's Telegram chat: the id encrypted, plus a keyed hash so `/stop` can find it again. */
+    public function linkTelegram(string $chatId): void
+    {
+        $this->forceFill(['telegram_chat_id' => $chatId, 'telegram_chat_hash' => self::telegramChatHash($chatId)])->save();
+    }
+
+    public function unlinkTelegram(): void
+    {
+        $this->forceFill(['telegram_chat_id' => null, 'telegram_chat_hash' => null])->save();
+    }
+
+    public static function findByTelegramChat(string $chatId): ?self
+    {
+        return self::query()->where('telegram_chat_hash', self::telegramChatHash($chatId))->first();
+    }
+
+    private static function telegramChatHash(string $chatId): string
+    {
+        return hash_hmac('sha256', $chatId, (string) config('app.key'));
+    }
+
+    /** @return list<string> 'telegram' and/or 'email' — both unless the person chose otherwise */
+    public function alertChannels(): array
+    {
+        $channels = data_get($this->alert_preferences, 'channels');
+
+        return is_array($channels) ? array_values(array_intersect(['telegram', 'email'], $channels)) : ['telegram', 'email'];
+    }
+
+    /** @return list<string> the alert types this person takes — all six unless they chose otherwise */
+    public function alertTypes(): array
+    {
+        $types = data_get($this->alert_preferences, 'types');
+        $all = array_map(fn (AlertType $type): string => $type->value, AlertType::cases());
+
+        return is_array($types) ? array_values(array_intersect($all, $types)) : $all;
+    }
+
+    /** @return list<string>|null the sedes chosen, or null for every sede they are assigned to */
+    public function alertLocationIds(): ?array
+    {
+        $ids = data_get($this->alert_preferences, 'location_ids');
+
+        return is_array($ids) && $ids !== [] ? array_values(array_map('strval', $ids)) : null;
+    }
+
     /**
      * Get the attributes that should be cast.
      *
@@ -205,6 +254,9 @@ class User extends Authenticatable implements FilamentUser, HasAppAuthentication
             'mfa_confirmed_at' => 'datetime',
             'mfa_recovery_codes' => 'encrypted:array',
             'active' => 'boolean',
+            'telegram_chat_id' => 'encrypted', // prompt 311 — the only personal data Telegram delivery needs, encrypted
+            'alert_preferences' => 'array',
+            'alert_summary_sent_on' => 'date',
         ];
     }
 }

@@ -203,6 +203,21 @@ class Rat
                 'transfers' => $noTransfer,
                 'retention' => __('4 años como mínimo (también tras la baja de la persona); un barrido programado elimina los registros a los :years años.', ['years' => PruneStaffClockEvents::years()]),
             ],
+            [
+                // Prompt 311 — owner alerts by Telegram and email. The only personal data is the recipient's own chat id.
+                'ref' => 'RAT-09',
+                'name' => __('Avisos operativos al personal'),
+                'purpose' => __('Enviar a las personas del club que lo eligen avisos operativos (stock bajo, lotes que caducan, una caja abierta demasiado tiempo, fallos del sistema) por Telegram y en un correo por la mañana.'),
+                'legal_basis' => __('Interés legítimo en la gestión diaria de la asociación; cada persona elige recibirlos y puede desconectarlos cuando quiera.'),
+                'data_categories' => [
+                    __('Identificativos (nombre y correo de la persona que recibe los avisos)'),
+                    __('Identificador de chat de Telegram de esa persona (guardado cifrado)'),
+                ],
+                'article_9' => false,
+                'recipients' => __('Telegram (Telegram Messenger Inc.) como destinatario/encargado del identificador de chat y del texto del aviso, que solo contiene nombres de productos, cantidades, sedes y horas: ningún dato de socios.').' '.$emailProcessor,
+                'transfers' => __('Telegram puede tratar los datos fuera del Espacio Económico Europeo; revisar sus garantías con la gestoría.'),
+                'retention' => __('Mientras la persona tenga Telegram conectado; al desconectarlo (o bloquear el bot) el identificador se borra.'),
+            ],
         ];
     }
 

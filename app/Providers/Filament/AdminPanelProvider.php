@@ -2,6 +2,7 @@
 
 namespace App\Providers\Filament;
 
+use App\Filament\Pages\Auth\EditProfile;
 use App\Filament\Pages\Auth\Login;
 use App\Filament\Pages\Auth\RequestPasswordReset;
 use App\Http\Middleware\ConfirmIdentityForPinSessions;
@@ -55,7 +56,7 @@ class AdminPanelProvider extends PanelProvider
             // deliberately NOT faked now — `User` is staff-only by construction (see
             // DECISIONS prompt 02), so nothing member-shaped can reach this panel yet.
             ->passwordReset(RequestPasswordReset::class)   // normalises the email (prompt 146)
-            ->profile()
+            ->profile(EditProfile::class) // prompt 311 — with the Avisos section
             // TOTP app authentication, available (not required) on any account, with
             // recovery codes. Setup + challenge UI are Filament's; the secret/recovery
             // codes persist on the User (encrypted).

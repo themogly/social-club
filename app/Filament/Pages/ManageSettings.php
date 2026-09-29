@@ -76,6 +76,8 @@ class ManageSettings extends Page
         'message_retention_days' => SettingType::INT,
         'application_retention_days' => SettingType::INT,
         'staff_clock_retention_years' => SettingType::INT,
+        'alerts_expiry_days' => SettingType::INT,
+        'alerts_till_open_hours' => SettingType::INT,
         'signed_url_ttl_seconds' => SettingType::INT,
         'qr_scan_max_failures_per_minute' => SettingType::INT,
         'counter_hero' => SettingType::STRING,
@@ -304,6 +306,14 @@ class ManageSettings extends Page
                         TextInput::make('qr_scan_max_failures_per_minute')->label(__('Máx. escaneos fallidos por minuto'))->numeric()->minValue(1)->required()
                             ->helperText(__('Tras tantos escaneos de tarjeta fallidos por operador en un minuto, se bloquea temporalmente (anti fuerza bruta).')),
                     ])->columns(3),
+
+                // Prompt 311 — the two alert thresholds that are the owner's (the stock ones live on each price row).
+                Section::make(__('Avisos'))
+                    ->description(__('Cuándo se avisa por Telegram y en el correo de la mañana.'))
+                    ->schema([
+                        TextInput::make('alerts_expiry_days')->label(__('Avisar de un lote que caduca en (días)'))->integer()->minValue(1)->maxValue(120)->required(),
+                        TextInput::make('alerts_till_open_hours')->label(__('Avisar de una caja abierta más de (horas)'))->integer()->minValue(1)->maxValue(72)->required(),
+                    ])->columns(2),
 
                 // Prompt 273 — the two counter choices used to sit under "Privacidad y datos".
                 Section::make(__('Mostrador'))

@@ -178,6 +178,9 @@ class Settings
         'audit_retention_days' => 3650,     // MINIMUM retention only — the audit log is append-only and
         // never auto-purged (the model refuses deletes). Prompt 58.
         'message_retention_days' => 730,    // member↔club message bodies redacted after this (2 years; prompt 136)
+        // Prompt 311 — owner alerts: a batch with stock left expiring within N days; a till open longer than N hours.
+        'alerts_expiry_days' => 14,
+        'alerts_till_open_hours' => 16,
         'staff_clock_retention_years' => 5, // registro de jornada: kept ≥ 4 years (art. 34.9 ET), then deleted (post-296 audit)
         'application_retention_days' => 180, // rejected/abandoned member applications anonymised + their ID photo
         //                                      deleted after this (6 months; security-audit finding on prompt 157)

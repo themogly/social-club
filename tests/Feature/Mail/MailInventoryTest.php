@@ -108,6 +108,7 @@ class MailInventoryTest extends TestCase
             'Cerrará el club entero de inmediato. Solo se reactiva desde el enlace enviado a los propietarios, por el plazo automático o por línea de comandos.' => 'InitiateLockdown (LockdownReactivationMail)',
             'Se reactiva desde el enlace enviado a los propietarios, por el plazo automático o por línea de comandos. No desde aquí.' => 'InitiateLockdown (LockdownReactivationMail)',
             'Tu número de socio/a es :no. Recibirás tu carné con el código QR en un correo aparte.' => 'ApproveApplication (MemberCardMail, after ApplicationApprovedMail)',
+            'Telegram ya no entrega los avisos a tu cuenta (el bot se ha bloqueado o eliminado). A partir de ahora te llegarán en el correo de la mañana. Puedes volver a conectar Telegram desde tu perfil, en Avisos.' => 'SendMorningSummaries (AlertSummaryMail)',
             '¡Gracias! Hemos recibido tu solicitud. La asociación la revisará y, si se aprueba, recibirás por correo tu tarjeta de socio/a con un código QR para identificarte. La revisión puede tardar unos días.' => 'ApproveApplication (MemberCardMail)',
             'Qué ocurre después: la asociación revisará tu solicitud. Si se aprueba, recibirás por correo tu tarjeta de socio/a con un código QR para identificarte en la sede. La revisión puede tardar unos días.' => 'ApproveApplication (MemberCardMail)',
         ];
