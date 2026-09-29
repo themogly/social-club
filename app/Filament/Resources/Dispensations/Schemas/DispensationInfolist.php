@@ -88,6 +88,7 @@ class DispensationInfolist
                 Section::make(__('Líneas'))
                     ->schema([
                         TextEntry::make('lines')
+                            ->label(__('Líneas'))
                             ->hiddenLabel()
                             ->state(fn (Dispensation $record): array => $record->lines()->get()
                                 ->map(fn (DispensationLine $line): string => sprintf(

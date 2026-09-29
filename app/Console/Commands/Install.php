@@ -6,6 +6,7 @@ use App\Enums\Role;
 use App\Models\Organisation;
 use App\Models\User;
 use App\Support\Email;
+use App\Support\NextSteps;
 use Database\Seeders\ExpenseCategorySeeder;
 use Database\Seeders\RolePermissionSeeder;
 use Illuminate\Console\Command;
@@ -106,7 +107,10 @@ class Install extends Command
         });
 
         $this->info("Installed. Organisation '{$data['name']}' created with owner {$owner->email}.");
-        $this->line('Next: log in to the admin panel, create your sede(s), then price every genetic at each sede.');
+        $this->line(__('Siguientes pasos:'));
+        foreach (NextSteps::setUp() as $i => $step) {
+            $this->line(($i + 1).'. '.$step);
+        }
 
         return self::SUCCESS;
     }

@@ -2,6 +2,7 @@
 
 namespace App\Filament\Concerns;
 
+use App\Filament\Forms\DecimalInput;
 use App\Filament\Support\ReturnFocus;
 use App\Support\Money;
 use Filament\Actions\Action;
@@ -92,6 +93,6 @@ trait WarnsBelowCost
     /** A euro amount typed into the form, in cents — or null when the field is empty. */
     protected static function typedCents(mixed $euros): ?int
     {
-        return filled($euros) && is_numeric($euros) ? Money::fromEuros((string) $euros)->cents : null;
+        return ($number = DecimalInput::number($euros)) !== null ? Money::fromEuros($number)->cents : null;
     }
 }

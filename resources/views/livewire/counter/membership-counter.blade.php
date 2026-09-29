@@ -235,12 +235,11 @@
                             @php
                                 $pct = $limits->monthlyPercent();
                                 $gaugeBar = match ($limits->gaugeState()) { 'alert' => 'bg-error', 'warning' => 'bg-warning', default => 'bg-success' };
-                                $gaugeText = match ($limits->gaugeState()) { 'alert' => 'text-error', 'warning' => 'text-warning', default => 'text-success' };
                             @endphp
                             <div data-member-allowance class="rounded-xl border border-line p-3 dark:border-slate-700">
                                 <div class="flex items-baseline justify-between gap-2">
                                     <span class="text-xs font-medium text-ink-muted dark:text-slate-400">{{ __('Restante hoy') }}</span>
-                                    <span class="text-base font-bold {{ $gaugeText }}">{{ $this->grams($limits->dailyRemainingCg()) }}</span>
+                                    <span data-daily-remaining="{{ $limits->dailyRemainingState() }}" class="text-base font-bold {{ \App\Support\LimitSnapshot::dailyStateText($limits->dailyRemainingState()) }}">{{ $this->grams($limits->dailyRemainingCg()) }}</span>
                                 </div>
                                 <div class="mt-1.5 h-2 w-full overflow-hidden rounded-full bg-slate-200 dark:bg-slate-700">
                                     <div class="h-full rounded-full {{ $gaugeBar }}" style="width: {{ min($pct, 100) }}%"></div>

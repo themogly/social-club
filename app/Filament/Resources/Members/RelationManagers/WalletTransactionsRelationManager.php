@@ -6,6 +6,7 @@ use App\Actions\Wallet\RecordWalletTransaction;
 use App\Actions\Wallet\TransferCredit;
 use App\Enums\WalletTransactionType;
 use App\Exceptions\DebtLimitExceededException;
+use App\Filament\Forms\DecimalInput;
 use App\Models\Location;
 use App\Models\Member;
 use App\Models\Scopes\LocationScope;
@@ -14,7 +15,6 @@ use App\Support\Wallet;
 use Filament\Actions\Action;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
-use Filament\Forms\Components\TextInput;
 use Filament\Notifications\Notification;
 use Filament\Resources\RelationManagers\RelationManager;
 use Filament\Support\Icons\Heroicon;
@@ -72,7 +72,7 @@ class WalletTransactionsRelationManager extends RelationManager
             ->color('success')
             ->schema([
                 $this->locationField(),
-                TextInput::make('amount_eur')
+                DecimalInput::make('amount_eur')
                     ->label(__('Importe (€)'))
                     ->numeric()
                     ->minValue(0.01)
@@ -101,7 +101,7 @@ class WalletTransactionsRelationManager extends RelationManager
             ->color('warning')
             ->schema([
                 $this->locationField(),
-                TextInput::make('amount_eur')
+                DecimalInput::make('amount_eur')
                     ->label(__('Importe (€)'))
                     ->numeric()
                     ->minValue(0.01)
@@ -136,7 +136,7 @@ class WalletTransactionsRelationManager extends RelationManager
             ->requiresConfirmation()   // a signed correction can subtract a member's balance — confirm first
             ->schema([
                 $this->locationField(),
-                TextInput::make('amount_eur')
+                DecimalInput::make('amount_eur')
                     ->label(__('Importe (€)'))
                     ->numeric()
                     ->required()
@@ -186,7 +186,7 @@ class WalletTransactionsRelationManager extends RelationManager
                     ->options(fn (): array => Location::assignableOptions())
                     ->different('from_location_id')
                     ->required(),
-                TextInput::make('amount_eur')
+                DecimalInput::make('amount_eur')
                     ->label(__('Importe (€)'))
                     ->numeric()
                     ->minValue(0.01)

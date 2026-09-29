@@ -3,6 +3,7 @@
 namespace App\Filament\Resources\Purchases\Schemas;
 
 use App\Filament\Forms\CameraOrFile;
+use App\Filament\Forms\DecimalInput;
 use App\Models\Batch;
 use App\Models\Location;
 use App\Support\DocumentUpload;
@@ -10,7 +11,6 @@ use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\FileUpload;
 use Filament\Forms\Components\KeyValue;
 use Filament\Forms\Components\Select;
-use Filament\Forms\Components\TextInput;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Schema;
 use Illuminate\Database\Eloquent\Builder;
@@ -42,13 +42,13 @@ class PurchaseForm
                             ->searchable()
                             ->preload(),
 
-                        TextInput::make('amount_eur')
+                        DecimalInput::make('amount_eur')
                             ->label(__('Importe (€)'))
                             ->numeric()
                             ->minValue(0)
                             ->required(),
 
-                        TextInput::make('paid_eur')
+                        DecimalInput::make('paid_eur')
                             ->label(__('Pagado (€)'))
                             ->numeric()
                             ->minValue(0)
@@ -89,7 +89,7 @@ class PurchaseForm
                             ->searchable(['label', 'batch_no'])
                             ->preload(),
 
-                        TextInput::make('intake_grams')
+                        DecimalInput::make('intake_grams')
                             ->label(__('Cantidad de entrada (g)'))
                             ->numeric()
                             ->minValue(0)

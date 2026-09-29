@@ -8,6 +8,7 @@ use App\Enums\CultivationType;
 use App\Enums\ProductType;
 use App\Enums\StrainType;
 use App\Filament\Forms\CameraOrFile;
+use App\Filament\Forms\DecimalInput;
 use App\Filament\Resources\Genetics\GeneticResource;
 use App\Models\Category;
 use App\Models\Genetic;
@@ -101,7 +102,7 @@ class GeneticForm
                             ->visible(fn (Get $get): bool => $get('product_type') === ProductType::CONCENTRATE->value),
 
                         // Entered as grams (2 dp); the page converts to grams_per_unit_cg. Required for units.
-                        TextInput::make('grams_per_unit_g')
+                        DecimalInput::make('grams_per_unit_g')
                             ->label(__('Gramos por unidad (g)'))
                             ->helperText(__('Contenido en gramos de cada unidad.'))
                             ->numeric()
@@ -127,7 +128,7 @@ class GeneticForm
                     ->schema([
                         // Stored as basis points (thc_bp / cbd_bp). The Create/Edit pages
                         // convert percent ↔ basis points (pct = bp / 100, bp = round(pct * 100)).
-                        TextInput::make('thc_pct')
+                        DecimalInput::make('thc_pct')
                             ->label(__('THC (%)'))
                             ->numeric()
                             ->minValue(0)
@@ -135,7 +136,7 @@ class GeneticForm
                             ->step(0.01)
                             ->suffix('%'),
 
-                        TextInput::make('cbd_pct')
+                        DecimalInput::make('cbd_pct')
                             ->label(__('CBD (%)'))
                             ->numeric()
                             ->minValue(0)

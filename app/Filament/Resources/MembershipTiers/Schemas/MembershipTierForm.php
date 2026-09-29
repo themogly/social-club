@@ -3,6 +3,7 @@
 namespace App\Filament\Resources\MembershipTiers\Schemas;
 
 use App\Enums\MembershipPeriod;
+use App\Filament\Forms\DecimalInput;
 use App\Support\Settings;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
@@ -24,7 +25,7 @@ class MembershipTierForm
                 // Virtual euro field: the model stores integer cents in
                 // default_fee_cents. The Create/Edit pages convert euros ↔ cents
                 // (mutateFormDataBeforeCreate/Save and mutateFormDataBeforeFill).
-                TextInput::make('default_fee_eur')
+                DecimalInput::make('default_fee_eur')
                     ->label(__('Cuota (€)'))
                     ->numeric()
                     ->minValue(0)
@@ -40,7 +41,7 @@ class MembershipTierForm
                 // Virtual gram fields: the model stores integer centigrams in
                 // daily_limit_cg / monthly_limit_cg (nullable per-tier overrides of the
                 // organisation limits). The Create/Edit pages convert grams ↔ centigrams.
-                TextInput::make('daily_limit_g')
+                DecimalInput::make('daily_limit_g')
                     ->hint(fn (): ?string => Settings::limitsEnabled() ? null : __('Límites desactivados en Ajustes')) // kept, not cleared (296)
                     ->label(__('Límite diario (g)'))
                     ->helperText(__('Opcional. Sustituye el límite diario de la organización.'))
@@ -48,7 +49,7 @@ class MembershipTierForm
                     ->minValue(0)
                     ->step(0.01),
 
-                TextInput::make('monthly_limit_g')
+                DecimalInput::make('monthly_limit_g')
                     ->hint(fn (): ?string => Settings::limitsEnabled() ? null : __('Límites desactivados en Ajustes')) // kept, not cleared (296)
                     ->label(__('Techo mensual (g)'))
                     ->helperText(__('Opcional. Sustituye el techo mensual de la organización.'))
@@ -58,7 +59,7 @@ class MembershipTierForm
 
                 // Prompt 278 (owner decision 1a) — prices live on the batch, so a tier's price is a % DISCOUNT on any
                 // batch. It competes with the member's other discounts; the best single one applies.
-                TextInput::make('discount_pct')
+                DecimalInput::make('discount_pct')
                     ->label(__('Descuento de la tarifa (%)'))
                     ->helperText(__('Opcional. Se descuenta del precio de cualquier lote a los socios de esta tarifa; si tienen otro descuento, se aplica el mejor.'))
                     ->numeric()

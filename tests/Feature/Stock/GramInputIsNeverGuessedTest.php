@@ -113,7 +113,9 @@ class GramInputIsNeverGuessedTest extends TestCase
 
     public function test_ambiguous_strings_throw_rather_than_round_to_a_plausible_wrong_answer(): void
     {
-        foreach (['1.000', '1,000', '1.000,00', '1,000.00', '1 000', '1.2.3', '0,125', '', 'abc', '-5'] as $typed) {
+        // Prompt 306 — the FULLY written "1.000,00" / "1,000.00" can only mean one number and is now read (see
+        // test_the_fully_written_forms_are_read); a lone thousands separator is still refused.
+        foreach (['1.000', '1,000', '1.00,00', '1,00.00', '1 000', '1.2.3', '0,125', '', 'abc', '-5'] as $typed) {
             try {
                 Weight::fromGrams($typed);
                 $this->fail("'{$typed}' was parsed instead of refused.");
@@ -122,8 +124,15 @@ class GramInputIsNeverGuessedTest extends TestCase
             }
         }
 
-        $this->createStrain('1.000,00')->assertHasFormErrors(['grams']);
+        $this->createStrain('1.000')->assertHasFormErrors(['grams']);
         $this->assertSame(0, Batch::query()->withoutGlobalScopes()->count());
+    }
+
+    public function test_the_fully_written_forms_are_read(): void
+    {
+        $this->assertSame(100000, Weight::fromGrams('1.000,00')->centigrams);
+        $this->assertSame(100001, Weight::fromGrams('1.000,01')->centigrams);
+        $this->assertSame(100001, Weight::fromGrams('1,000.01')->centigrams);
     }
 
     // --- 4. The POS pad is untouched --------------------------------------------------------------------------

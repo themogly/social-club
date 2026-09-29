@@ -7,6 +7,7 @@ use App\Actions\Memberships\RenewMembership;
 use App\Actions\Memberships\TransferMembership;
 use App\Enums\MembershipStatus;
 use App\Enums\TillSessionStatus;
+use App\Filament\Forms\DecimalInput;
 use App\Models\Location;
 use App\Models\Member;
 use App\Models\Membership;
@@ -91,7 +92,7 @@ class MembershipsRelationManager extends RelationManager
                     ->label(__('Tarifa'))
                     ->options(fn () => MembershipTier::query()->where('active', true)->orderBy('name')->pluck('name', 'id'))
                     ->required(),
-                TextInput::make('fee_eur')
+                DecimalInput::make('fee_eur')
                     ->label(__('Cuota (€)'))
                     ->numeric()
                     ->minValue(0)

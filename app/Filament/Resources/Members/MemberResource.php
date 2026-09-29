@@ -15,6 +15,7 @@ use App\Actions\Members\WaiveCarencia;
 use App\Enums\DataRequestType;
 use App\Enums\MemberDocumentType;
 use App\Enums\MemberStatus;
+use App\Filament\Forms\DecimalInput;
 use App\Filament\Resources\DataRequests\DataRequestResource;
 use App\Filament\Resources\Members\Pages\CreateMember;
 use App\Filament\Resources\Members\Pages\EditMember;
@@ -243,12 +244,12 @@ class MemberResource extends Resource
                 'monthly_limit_g' => $record->monthly_limit_cg !== null ? $record->monthly_limit_cg / 100 : null,
             ])
             ->schema([
-                TextInput::make('daily_limit_g')
+                DecimalInput::make('daily_limit_g')
                     ->label(__('Límite diario (g)'))
                     ->hint(fn (): ?string => Settings::limitsEnabled() ? null : __('Límites desactivados en Ajustes')) // kept, not cleared (296)
                     ->numeric()->minValue(0)->step('0.01')
                     ->helperText(__('Vacío = usar el límite de la cuota, la sede o la organización.')),
-                TextInput::make('monthly_limit_g')
+                DecimalInput::make('monthly_limit_g')
                     ->label(__('Límite mensual (g)'))
                     ->hint(fn (): ?string => Settings::limitsEnabled() ? null : __('Límites desactivados en Ajustes')) // kept, not cleared (296)
                     ->numeric()->minValue(0)->step('0.01'),
@@ -296,7 +297,7 @@ class MemberResource extends Resource
                 'debt_limit_eur' => $record->debt_limit_cents !== null ? sprintf('%d.%02d', intdiv((int) $record->debt_limit_cents, 100), (int) $record->debt_limit_cents % 100) : null, // integer-only (273)
             ])
             ->schema([
-                TextInput::make('debt_limit_eur')
+                DecimalInput::make('debt_limit_eur')
                     ->label(__('Límite de cuenta (€)'))
                     ->numeric()->minValue(0)->step('0.01')
                     ->helperText(__('Hasta cuánto puede deber el socio en total, sumando todas las sedes. Vacío o 0 = sin cuenta. Bajarlo no reclama la deuda existente: solo impide añadir más.')),
@@ -399,7 +400,7 @@ class MemberResource extends Resource
             ->color('primary')
             ->visible(fn (Member $record): bool => Auth::user()?->can('update', $record) ?? false)
             ->schema([
-                TextInput::make('declared_monthly_g')
+                DecimalInput::make('declared_monthly_g')
                     ->label(__('Previsión mensual (g)'))
                     ->numeric()
                     ->rule(new GramAmount)
@@ -408,6 +409,7 @@ class MemberResource extends Resource
                     ->suffix(__('g'))
                     ->required()
                     ->default(fn (Member $record): ?string => filled($record->declared_monthly_cg)
+                        // A form field's VALUE (machine-readable; the decimal field reads either separator) — not display.
                         ? number_format((int) $record->declared_monthly_cg / 100, 2, '.', '')
                         : null)
                     ->helperText(__('Al cambiarla, una declaración firmada existente quedará desactualizada y deberá regenerarse y volver a firmarse.')),

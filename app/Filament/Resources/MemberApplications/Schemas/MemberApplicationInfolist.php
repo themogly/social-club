@@ -58,6 +58,7 @@ class MemberApplicationInfolist
                         // invite actions gate on isInviteLive), and the operator is told the path back — a fresh
                         // invitation from the list — rather than an "extend expiry" capability the invite never had.
                         TextEntry::make('expired_note')
+                            ->label(__('Enlace caducado'))
                             ->hiddenLabel()
                             ->visible(fn (MemberApplication $record): bool => $record->isInviteExpired() && ! $record->isInviteRevoked())
                             ->state(__('El enlace ha caducado y ya no puede usarse. Genera una nueva invitación desde la lista para volver a invitar a esta persona.'))

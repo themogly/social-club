@@ -9,7 +9,9 @@ use App\Filament\Resources\Genetics\GeneticDeletion;
 use App\Models\Genetic;
 use App\Models\Location;
 use App\Support\ActiveScope;
+use App\Support\Percent;
 use App\Support\StockCover;
+use App\Support\Weight;
 use Filament\Actions\ActionGroup;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\EditAction;
@@ -52,10 +54,10 @@ class GeneticsTable
                 TextColumn::make('category.name')->label(__('Categoría'))->sortable()->toggleable(),
                 TextColumn::make('thc_bp')
                     ->label(__('THC'))
-                    ->state(fn (Genetic $record): string => number_format(((int) $record->thc_bp) / 100, 2).'%'),
+                    ->state(fn (Genetic $record): string => Percent::formatted(((int) $record->thc_bp) / 100)),
                 TextColumn::make('cbd_bp')
                     ->label(__('CBD'))
-                    ->state(fn (Genetic $record): string => number_format(((int) $record->cbd_bp) / 100, 2).'%'),
+                    ->state(fn (Genetic $record): string => Percent::formatted(((int) $record->cbd_bp) / 100)),
                 TextColumn::make('cultivation_type')
                     ->label(__('Cultivo'))
                     ->badge()
@@ -69,10 +71,10 @@ class GeneticsTable
                         if ($record->isUnitType()) {
                             $units = (int) $open->sum('remaining_units');
 
-                            return $units.' '.__('uds').' ('.number_format($units * (int) $record->grams_per_unit_cg / 100, 2).' g)';
+                            return $units.' '.__('uds').' ('.Weight::fromCentigrams($units * (int) $record->grams_per_unit_cg)->formatted().')';
                         }
 
-                        return number_format((float) $open->sum('remaining_cg') / 100, 2).' g';
+                        return Weight::fromCentigrams((int) $open->sum('remaining_cg'))->formatted();
                     }),
                 IconColumn::make('published')->label(__('Publicada'))->boolean(),
                 IconColumn::make('active')->label(__('Activa'))->boolean(),

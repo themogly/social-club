@@ -10,6 +10,7 @@ use App\Enums\StrainType;
 use App\Enums\UnitType;
 use App\Filament\Concerns\WarnsBelowCost;
 use App\Filament\Forms\CameraOrFile;
+use App\Filament\Forms\DecimalInput;
 use App\Filament\Resources\Genetics\GeneticResource;
 use App\Filament\Resources\Genetics\Schemas\GeneticForm;
 use App\Models\Genetic;
@@ -65,8 +66,8 @@ class CreateGenetic extends CreateRecord
                     Select::make('strain_type')->label(__('Variedad'))
                         ->options(collect(StrainType::cases())->mapWithKeys(fn (StrainType $case): array => [$case->value => $case->label()])->all())
                         ->placeholder(__('Sin especificar')),
-                    TextInput::make('thc_pct')->label(__('THC (%)'))->numeric()->minValue(0)->maxValue(100)->step(0.01)->suffix('%'),
-                    TextInput::make('cbd_pct')->label(__('CBD (%)'))->numeric()->minValue(0)->maxValue(100)->step(0.01)->suffix('%'),
+                    DecimalInput::make('thc_pct')->label(__('THC (%)'))->numeric()->minValue(0)->maxValue(100)->step(0.01)->suffix('%'),
+                    DecimalInput::make('cbd_pct')->label(__('CBD (%)'))->numeric()->minValue(0)->maxValue(100)->step(0.01)->suffix('%'),
                     Select::make('cultivation_type')->label(__('Tipo de cultivo'))
                         ->options(collect(CultivationType::cases())->mapWithKeys(fn (CultivationType $case): array => [$case->value => $case->label()])->all()),
                 ])->columns(2),
@@ -84,7 +85,7 @@ class CreateGenetic extends CreateRecord
                     Select::make('concentrate_subtype')->label(__('Subtipo de extracto'))
                         ->options(collect(ConcentrateSubtype::cases())->mapWithKeys(fn (ConcentrateSubtype $case): array => [$case->value => $case->label()])->all())
                         ->visible(fn (Get $get): bool => $get('product_type') === ProductType::CONCENTRATE->value),
-                    TextInput::make('grams_per_unit_g')->label(__('Gramos por unidad (g)'))
+                    DecimalInput::make('grams_per_unit_g')->label(__('Gramos por unidad (g)'))
                         ->numeric()->rule(new GramAmount)->minValue(0)->step(0.01)->suffix('g')
                         ->visible(fn (Get $get): bool => self::isUnit($get('product_type')))
                         ->required(fn (Get $get): bool => self::isUnit($get('product_type'))),
@@ -94,13 +95,13 @@ class CreateGenetic extends CreateRecord
                 ->description(__('Cuánto stock entra'))
                 ->schema([
                     // The first batch, in the genetic's own unit — 238's intake fields, no more.
-                    TextInput::make('grams')->label(__('Cantidad (g)'))->numeric()->minValue(0)->rule(new GramAmount)
+                    DecimalInput::make('grams')->label(__('Cantidad (g)'))->numeric()->minValue(0)->rule(new GramAmount)
                         ->visible(fn (Get $get): bool => ! self::isUnit($get('product_type')))
                         ->required(fn (Get $get): bool => ! self::isUnit($get('product_type'))),
                     TextInput::make('units')->label(__('Cantidad (uds)'))->numeric()->minValue(1)->step(1)
                         ->visible(fn (Get $get): bool => self::isUnit($get('product_type')))
                         ->required(fn (Get $get): bool => self::isUnit($get('product_type'))),
-                    TextInput::make('cost_per_gram_eur')->label(__('Coste por gramo (€)'))->numeric()->minValue(0),
+                    DecimalInput::make('cost_per_gram_eur')->label(__('Coste por gramo (€)'))->numeric()->minValue(0),
                     // Prompt 298 — the grow's own lote number, or empty for a generated one.
                     TextInput::make('batch_no')->label(__('Nº de lote propio'))->maxLength(40)
                         ->helperText(__('El número del cultivo o del proveedor, si lo tiene. Si lo dejas vacío, se genera uno.')),
@@ -127,10 +128,10 @@ class CreateGenetic extends CreateRecord
                 // Prompt 295 — the cost came two steps earlier, so leaving this step is where a price below it is caught.
                 ->afterValidation(fn () => $this->askIfBelowCost(self::PRICE_STEP))
                 ->schema([
-                    TextInput::make('price_per_gram_eur')->label(__('Precio por gramo (€)'))->numeric()->minValue(0)->required()
+                    DecimalInput::make('price_per_gram_eur')->label(__('Precio por gramo (€)'))->numeric()->minValue(0)->required()
                         ->visible(fn (Get $get): bool => ! self::isUnit($get('product_type')))
                         ->required(fn (Get $get): bool => ! self::isUnit($get('product_type'))),
-                    TextInput::make('price_per_unit_eur')->label(__('Precio por unidad (€)'))->numeric()->minValue(0)
+                    DecimalInput::make('price_per_unit_eur')->label(__('Precio por unidad (€)'))->numeric()->minValue(0)
                         ->visible(fn (Get $get): bool => self::isUnit($get('product_type')))
                         ->required(fn (Get $get): bool => self::isUnit($get('product_type'))),
                 ]),
@@ -155,8 +156,8 @@ class CreateGenetic extends CreateRecord
             $unit ? null : self::typedCents($this->data['price_per_gram_eur'] ?? null),
             $unit ? self::typedCents($this->data['price_per_unit_eur'] ?? null) : null,
             null,
-            $unit && filled($this->data['grams_per_unit_g'] ?? null) && is_numeric($this->data['grams_per_unit_g'])
-                ? Weight::fromGrams($this->data['grams_per_unit_g'])->centigrams : null,
+            $unit && ($perUnit = DecimalInput::number($this->data['grams_per_unit_g'] ?? null)) !== null
+                ? Weight::fromGrams($perUnit)->centigrams : null,
         );
     }
 

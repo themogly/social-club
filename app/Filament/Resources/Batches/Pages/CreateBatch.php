@@ -5,6 +5,7 @@ namespace App\Filament\Resources\Batches\Pages;
 use App\Actions\Stock\IntakeBatch;
 use App\Exceptions\StockCeilingExceededException;
 use App\Filament\Concerns\WarnsBelowCost;
+use App\Filament\Forms\DecimalInput;
 use App\Filament\Resources\Batches\BatchResource;
 use App\Filament\Support\AllOption;
 use App\Models\Genetic;
@@ -162,7 +163,7 @@ class CreateBatch extends CreateRecord
             return;
         }
 
-        $total = is_numeric($this->data['grams'] ?? null) ? Weight::fromGrams((string) $this->data['grams'])->centigrams : 0;
+        $total = ($grams = DecimalInput::number($this->data['grams'] ?? null)) !== null ? Weight::fromGrams($grams)->centigrams : 0;
         $shares = SplitQuantity::evenly(max(0, $total), count($ids));
         $this->data['grams_at'] = array_combine($ids, array_map(fn (int $cg): string => intdiv($cg, 100).'.'.str_pad((string) ($cg % 100), 2, '0', STR_PAD_LEFT), $shares));
     }

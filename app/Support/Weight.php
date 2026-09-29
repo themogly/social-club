@@ -55,11 +55,7 @@ final class Weight
      */
     public static function canonicalGrams(string $typed): ?string
     {
-        if (preg_match('/^(\d+)(?:[.,](\d{1,2}))?$/', trim($typed), $m) !== 1) {
-            return null;
-        }
-
-        return isset($m[2]) ? $m[1].'.'.$m[2] : $m[1];
+        return TypedNumber::canonical($typed); // one rule for panel and counter (prompt 306 added "1.000,01")
     }
 
     public function grams(): float

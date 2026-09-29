@@ -7,6 +7,7 @@ use App\Actions\Stock\RecordStockMovement;
 use App\Enums\BatchStatus;
 use App\Enums\ProductType;
 use App\Enums\StockMovementType;
+use App\Filament\Forms\DecimalInput;
 use App\Filament\Resources\Batches\BatchActions;
 use App\Filament\Resources\Batches\Pages\ListBatches;
 use App\Filament\Support\ReturnFocus;
@@ -26,7 +27,6 @@ use Filament\Actions\DeleteBulkAction;
 use Filament\Actions\EditAction;
 use Filament\Actions\RestoreBulkAction;
 use Filament\Forms\Components\Textarea;
-use Filament\Forms\Components\TextInput;
 use Filament\Notifications\Notification;
 use Filament\Support\Enums\FontWeight;
 use Filament\Support\Enums\Size;
@@ -84,10 +84,10 @@ class BatchesTable
                         if ($record->isUnitType()) {
                             $units = (int) ($record->remaining_units ?? 0);
 
-                            return $units.' '.__('uds').' ('.number_format($record->onHandCg() / 100, 2).' g)';
+                            return $units.' '.__('uds').' ('.Weight::fromCentigrams($record->onHandCg())->formatted().')';
                         }
 
-                        return number_format($record->remaining_cg->centigrams / 100, 2).' g';
+                        return $record->remaining_cg->formatted(); // the one formatter: "300,01 g" in Spanish (prompt 306)
                     }),
                 // Prompt 278 — the batch's own sale price ("—" = none yet: the strain's sede price applies, if any).
                 TextColumn::make('sale_price')
@@ -250,10 +250,10 @@ class BatchesTable
                 'eighth_eur' => $record->price_per_eighth_cents !== null ? Money::fromCents((int) $record->price_per_eighth_cents)->euros() : null,
             ])
             ->schema([
-                TextInput::make('rate_eur')
+                DecimalInput::make('rate_eur')
                     ->label(fn (Batch $record): string => $record->isUnitType() ? __('Precio por unidad (€)') : __('Precio por gramo (€)'))
                     ->numeric()->minValue(0)->required(),
-                TextInput::make('eighth_eur')
+                DecimalInput::make('eighth_eur')
                     ->label(__('Precio por octavo — 3,5 g (€)'))
                     ->helperText(__('Opcional.'))
                     ->numeric()->minValue(0)
@@ -328,7 +328,7 @@ class BatchesTable
             ->label(__('Ajuste'))
             ->icon(Heroicon::OutlinedAdjustmentsHorizontal)
             ->schema([
-                TextInput::make('quantity')
+                DecimalInput::make('quantity')
                     ->label(fn (Batch $record): string => $record->isUnitType() ? __('Ajuste (uds)') : __('Ajuste (g)'))
                     ->numeric()
                     ->required()
@@ -363,7 +363,7 @@ class BatchesTable
             ->visible(fn (): bool => Auth::user()?->can('stock.merma') ?? false)
             ->requiresConfirmation()   // a loss mutates compliance-relevant stock — confirm first
             ->schema([
-                TextInput::make('quantity')
+                DecimalInput::make('quantity')
                     ->label(fn (Batch $record): string => $record->isUnitType() ? __('Merma (uds)') : __('Merma (g)'))
                     ->numeric()
                     ->minValue(0)

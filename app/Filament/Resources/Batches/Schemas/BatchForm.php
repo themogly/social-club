@@ -3,6 +3,7 @@
 namespace App\Filament\Resources\Batches\Schemas;
 
 use App\Filament\Forms\CameraOrFile;
+use App\Filament\Forms\DecimalInput;
 use App\Filament\Resources\Articles\Schemas\ArticleForm;
 use App\Filament\Resources\Batches\BatchResource;
 use App\Filament\Support\AllOption;
@@ -129,7 +130,7 @@ class BatchForm
                         // thereafter moves solely through the ledger (Ajuste / Merma), never a free edit.
                         // With several locations ticked (303) this is the TOTAL to share out with *Repartir a partes iguales*;
                         // what is saved is each location's own quantity below.
-                        TextInput::make('grams')
+                        DecimalInput::make('grams')
                             ->label(fn (Get $get): string => self::isSplit($get) ? __('Cantidad total (g)') : __('Cantidad (g)'))
                             ->numeric()
                             ->rule(new GramAmount)
@@ -162,7 +163,7 @@ class BatchForm
                             ->state(fn (Get $get): string => self::splitTotal($get))
                             ->visible(fn (string $operation, Get $get): bool => $operation === 'create' && self::isSplit($get)),
 
-                        TextInput::make('cost_per_gram_eur')
+                        DecimalInput::make('cost_per_gram_eur')
                             ->label(__('Coste por gramo (€)'))
                             ->numeric()
                             ->minValue(0)
@@ -170,14 +171,14 @@ class BatchForm
 
                         // Prompt 278 (Ben's 271) — the SALE price is the batch's: required at intake, so no batch is ever
                         // received unpriced. Changed later only through the audited "Precio" action (prices.manage).
-                        TextInput::make('sale_price_eur')
+                        DecimalInput::make('sale_price_eur')
                             ->label(fn (Get $get): string => self::isUnitGenetic($get('genetic_id')) ? __('Precio por unidad (€)') : __('Precio por gramo (€)'))
                             ->numeric()
                             ->minValue(0)
                             ->required()
                             ->visible(fn (string $operation): bool => $operation === 'create'),
 
-                        TextInput::make('price_per_eighth_eur')
+                        DecimalInput::make('price_per_eighth_eur')
                             ->label(__('Precio por octavo — 3,5 g (€)'))
                             ->helperText(__('Opcional.'))
                             ->numeric()
@@ -278,7 +279,7 @@ class BatchForm
     {
         $names = Location::query()->withoutGlobalScopes()->whereIn('id', $locationIds)->pluck('name', 'id');
 
-        return array_map(fn (string $id): TextInput => TextInput::make(($unit ? 'units_at.' : 'grams_at.').$id)
+        return array_map(fn (string $id): TextInput => DecimalInput::make(($unit ? 'units_at.' : 'grams_at.').$id)
             ->label(($unit ? __('Unidades en :sede', ['sede' => $names[$id] ?? '']) : __('Gramos en :sede', ['sede' => $names[$id] ?? ''])))
             ->numeric()
             ->required()
@@ -301,9 +302,9 @@ class BatchForm
     {
         $values = array_intersect_key((array) ($get($unit ? 'units_at' : 'grams_at') ?? []), array_flip($locationIds));
         if ($unit) {
-            return __(':count uds', ['count' => array_sum(array_map(fn ($v): int => is_numeric($v) ? (int) $v : 0, $values))]);
+            return __(':count uds', ['count' => array_sum(array_map(fn ($v): int => (int) (DecimalInput::number($v) ?? 0), $values))]);
         }
-        $cg = array_sum(array_map(fn ($v): int => is_numeric($v) && (float) $v > 0 ? Weight::fromGrams((string) $v)->centigrams : 0, $values));
+        $cg = array_sum(array_map(fn ($v): int => ($n = DecimalInput::number($v)) !== null ? Weight::fromGrams($n)->centigrams : 0, $values));
 
         return Weight::fromCentigrams($cg)->formatted();
     }

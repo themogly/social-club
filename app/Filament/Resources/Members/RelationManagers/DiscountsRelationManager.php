@@ -14,6 +14,7 @@ use App\Models\Member;
 use App\Models\MemberDiscount;
 use App\Models\User;
 use App\Support\Money;
+use App\Support\Percent;
 use Filament\Actions\Action;
 use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\Select;
@@ -221,7 +222,7 @@ class DiscountsRelationManager extends RelationManager
     private function discountLabel(Discount $discount): string
     {
         $value = $discount->mode === DiscountMode::PERCENT
-            ? number_format((int) $discount->value_bp / 100, 0).' %'
+            ? Percent::formatted((int) $discount->value_bp / 100, 0)
             : Money::fromCents((int) $discount->value_cents?->cents)->formatted();
 
         $scope = match ($discount->applies_to) {
@@ -240,13 +241,13 @@ class DiscountsRelationManager extends RelationManager
             $discount = $record->discount;
 
             return $discount->mode === DiscountMode::PERCENT && $discount->value_bp !== null
-                ? '−'.number_format($discount->value_bp / 100, 2).'%'
+                ? '−'.Percent::formatted($discount->value_bp / 100)
                 : ($discount->value_cents !== null ? '−'.Money::fromCents((int) $discount->value_cents->cents)->formatted() : '—');
         }
 
         // Legacy inline value (plain int cents on MemberDiscount).
         if ($record->mode === DiscountMode::PERCENT && $record->value_bp !== null) {
-            return '−'.number_format($record->value_bp / 100, 2).'%';
+            return '−'.Percent::formatted($record->value_bp / 100);
         }
 
         if ($record->value_cents !== null) {

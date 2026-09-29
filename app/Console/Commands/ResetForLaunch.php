@@ -6,6 +6,7 @@ use App\Actions\RecordAuditLog;
 use App\Models\Organisation;
 use App\Models\OrganisationLockdown;
 use App\Support\ActiveScope;
+use App\Support\NextSteps;
 use App\Support\Reset\DatabaseDump;
 use App\Support\Reset\RedisPurger;
 use Illuminate\Console\Command;
@@ -137,7 +138,7 @@ class ResetForLaunch extends Command
             'php artisan config:cache',
             'php artisan horizon:terminate',
             __('Vuelve a registrar cada tablet (los registros anteriores se han borrado).'),
-            __('Configura las sedes, el almacén, el personal con sus PIN y el catálogo; después importa los socios.'),
+            ...NextSteps::setUp(),
             __('Ejecuta `php artisan csc:launch` el día en que se atienda al primer socio real.'),
             __('Borra la copia (:file) cuando estés seguro.', ['file' => basename($dump)]),
         ] as $i => $step) {
