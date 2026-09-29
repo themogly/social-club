@@ -123,7 +123,7 @@ class BatchDescriptionsTest extends TestCase
 
         Livewire::test(CreateBatch::class)
             ->assertFormFieldExists('batch_no')
-            ->fillForm(['genetic_id' => $this->amnesia->id, 'location_id' => $this->sede->id, 'grams' => '10', 'batch_no' => 'GROW-17', 'sale_price_eur' => '9'])
+            ->fillForm(['genetic_id' => $this->amnesia->id, 'location_id' => [$this->sede->id], 'grams' => '10', 'batch_no' => 'GROW-17', 'sale_price_eur' => '9'])
             ->call('create')
             ->assertHasFormErrors(['batch_no']);
 

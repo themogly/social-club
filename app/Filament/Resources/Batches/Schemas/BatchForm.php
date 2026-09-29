@@ -3,18 +3,24 @@
 namespace App\Filament\Resources\Batches\Schemas;
 
 use App\Filament\Forms\CameraOrFile;
+use App\Filament\Resources\Articles\Schemas\ArticleForm;
+use App\Filament\Support\AllOption;
 use App\Models\Batch;
 use App\Models\Genetic;
 use App\Models\Location;
 use App\Rules\GramAmount;
 use App\Support\ActiveScope;
 use App\Support\DocumentUpload;
+use App\Support\Weight;
+use Filament\Actions\Action;
 use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\FileUpload;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
 use Filament\Infolists\Components\TextEntry;
+use Filament\Schemas\Components\Actions;
+use Filament\Schemas\Components\Grid;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Schema;
@@ -36,12 +42,22 @@ class BatchForm
                         // the "all sedes" rollup so an owner picks deliberately (never a guessed first row,
                         // prompt 148); disabled and pre-filled when the club has a single sede, where there is
                         // nothing to choose. Fixed at intake, like the genetic — disabled once the batch exists.
+                        // Prompt 303 — on CREATE with more than one location, a multi-choice (*Sedes*, stores included), "all"
+                        // first, exactly like 297's products: one lote, a part at each location ticked, each with its own
+                        // quantity. On edit a batch is one part at one location; moving stock later is *Trasladar* (302).
                         Select::make('location_id')
-                            ->label(__('Sede'))
-                            ->options(fn (): array => Location::assignableOptions(includeStores: true)) // stock may be received at the store (277)
-                            ->default(fn (): ?string => app(ActiveScope::class)->locationId())
+                            ->label(fn (string $operation): string => self::choosesSedes($operation) ? __('Sedes') : __('Sede'))
+                            ->multiple(fn (string $operation): bool => self::choosesSedes($operation))
+                            ->options(fn (string $operation): array => self::choosesSedes($operation) ? self::sedeChoices() : Location::assignableOptions(includeStores: true)) // stock may be received at the store (277)
+                            ->default(fn (string $operation): string|array|null => self::defaultSede($operation))
                             ->required()
                             ->searchable()
+                            ->live()
+                            ->afterStateUpdated(function (Select $component, mixed $state, mixed $old, string $operation): void {
+                                if (self::choosesSedes($operation)) {
+                                    $component->state(AllOption::sync((array) $state, (array) $old, array_keys(Location::assignableOptions(includeStores: true))));
+                                }
+                            })
                             ->disabled(fn (string $operation): bool => $operation !== 'create' || self::singleSede())
                             // A disabled field is not submitted by default; the single-sede value still must be.
                             ->dehydrated()
@@ -100,21 +116,40 @@ class BatchForm
                         // Intake quantity — only at creation, and in the genetic's own unit:
                         // grams for a WEIGHT genetic, whole units for a UNIT genetic. Stock
                         // thereafter moves solely through the ledger (Ajuste / Merma), never a free edit.
+                        // With several locations ticked (303) this is the TOTAL to share out with *Repartir a partes iguales*;
+                        // what is saved is each location's own quantity below.
                         TextInput::make('grams')
-                            ->label(__('Cantidad (g)'))
+                            ->label(fn (Get $get): string => self::isSplit($get) ? __('Cantidad total (g)') : __('Cantidad (g)'))
                             ->numeric()
                             ->rule(new GramAmount)
                             ->minValue(0)
-                            ->required(fn (Get $get): bool => ! self::isUnitGenetic($get('genetic_id')))
+                            ->required(fn (Get $get): bool => ! self::isUnitGenetic($get('genetic_id')) && ! self::isSplit($get))
                             ->visible(fn (string $operation, Get $get): bool => $operation === 'create' && ! self::isUnitGenetic($get('genetic_id'))),
 
                         TextInput::make('units')
-                            ->label(__('Cantidad (uds)'))
+                            ->label(fn (Get $get): string => self::isSplit($get) ? __('Cantidad total (uds)') : __('Cantidad (uds)'))
                             ->numeric()
                             ->minValue(1)
                             ->step(1)
-                            ->required(fn (Get $get): bool => self::isUnitGenetic($get('genetic_id')))
+                            ->required(fn (Get $get): bool => self::isUnitGenetic($get('genetic_id')) && ! self::isSplit($get))
                             ->visible(fn (string $operation, Get $get): bool => $operation === 'create' && self::isUnitGenetic($get('genetic_id'))),
+
+                        // Prompt 303 — *Repartir a partes iguales* shares the total above over the locations ticked; then one
+                        // quantity per location, and their live total.
+                        Actions::make([
+                            Action::make('splitEqually')
+                                ->label(__('Repartir a partes iguales'))
+                                ->icon(Heroicon::OutlinedScale)
+                                ->color('gray')
+                                ->action(fn ($livewire) => $livewire->splitEqually()),
+                        ])->visible(fn (string $operation, Get $get): bool => $operation === 'create' && self::isSplit($get)),
+                        Grid::make(['default' => 1, 'sm' => 2])->columnSpanFull()
+                            ->schema(fn (Get $get): array => self::partFields($get))
+                            ->visible(fn (string $operation, Get $get): bool => $operation === 'create' && self::isSplit($get)),
+                        TextEntry::make('split_total')
+                            ->label(__('Total'))
+                            ->state(fn (Get $get): string => self::splitTotal($get))
+                            ->visible(fn (string $operation, Get $get): bool => $operation === 'create' && self::isSplit($get)),
 
                         TextInput::make('cost_per_gram_eur')
                             ->label(__('Coste por gramo (€)'))
@@ -178,6 +213,73 @@ class BatchForm
     private static function isUnitGenetic(?string $geneticId): bool
     {
         return $geneticId !== null && (Genetic::query()->find($geneticId)?->isUnitType() ?? false);
+    }
+
+    /** On create with more than one location to choose from, the location is a multi-choice (303). */
+    private static function choosesSedes(string $operation): bool
+    {
+        return $operation === 'create' && ! self::singleSede();
+    }
+
+    /** @return array<string, string> "all" (the owner's *Todas las sedes*, a manager's *Tus sedes*) + each location */
+    private static function sedeChoices(): array
+    {
+        $sedes = Location::assignableOptions(includeStores: true);
+
+        return count($sedes) > 1 ? [AllOption::KEY => ArticleForm::allLabel()] + $sedes : $sedes;
+    }
+
+    /** @return string|list<string>|null */
+    private static function defaultSede(string $operation): string|array|null
+    {
+        $active = app(ActiveScope::class)->locationId();
+        if (! self::choosesSedes($operation)) {
+            return $active;
+        }
+
+        return $active !== null && array_key_exists($active, Location::assignableOptions(includeStores: true)) ? [$active] : [];
+    }
+
+    /** @return list<string> the locations ticked (without "all") */
+    public static function chosenSedes(Get $get): array
+    {
+        return AllOption::chosen($get('location_id'));
+    }
+
+    private static function isSplit(Get $get): bool
+    {
+        return count(self::chosenSedes($get)) > 1;
+    }
+
+    /** @return list<TextInput> one quantity per location ticked, in the strain's unit, each more than zero */
+    private static function partFields(Get $get): array
+    {
+        $unit = self::isUnitGenetic($get('genetic_id'));
+        $names = Location::query()->withoutGlobalScopes()->whereIn('id', self::chosenSedes($get))->pluck('name', 'id');
+
+        return array_map(fn (string $id): TextInput => TextInput::make(($unit ? 'units_at.' : 'grams_at.').$id)
+            ->label(($unit ? __('Unidades en :sede', ['sede' => $names[$id] ?? '']) : __('Gramos en :sede', ['sede' => $names[$id] ?? ''])))
+            ->numeric()
+            ->required()
+            ->live(onBlur: true)
+            ->rules($unit ? ['integer', 'gt:0'] : ['gt:0', new GramAmount])
+            ->validationMessages([
+                'gt' => __('Cada sede necesita una cantidad mayor que cero; quita la sede que no recibe nada.'),
+                'required' => __('Cada sede necesita una cantidad mayor que cero; quita la sede que no recibe nada.'),
+            ]), self::chosenSedes($get));
+    }
+
+    /** "1.000,00 g" / "40 uds" — the live sum of the parts. */
+    private static function splitTotal(Get $get): string
+    {
+        $unit = self::isUnitGenetic($get('genetic_id'));
+        $values = array_intersect_key((array) ($get($unit ? 'units_at' : 'grams_at') ?? []), array_flip(self::chosenSedes($get)));
+        if ($unit) {
+            return __(':count uds', ['count' => array_sum(array_map(fn ($v): int => is_numeric($v) ? (int) $v : 0, $values))]);
+        }
+        $cg = array_sum(array_map(fn ($v): int => is_numeric($v) && (float) $v > 0 ? Weight::fromGrams((string) $v)->centigrams : 0, $values));
+
+        return Weight::fromCentigrams($cg)->formatted();
     }
 
     /** One sede in the org: nothing to choose, so the field is pre-filled and locked. */
