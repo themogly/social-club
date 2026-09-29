@@ -8,6 +8,7 @@ use App\Actions\Staff\ClockOut;
 use App\Actions\Till\OpenTill;
 use App\Actions\UnlockOperator;
 use App\Enums\Role;
+use App\Enums\SettingType;
 use App\Enums\StaffClockSource;
 use App\Enums\StaffClockType;
 use App\Filament\Pages\RegistroJornada;
@@ -21,6 +22,7 @@ use App\Models\User;
 use App\Support\ActiveScope;
 use App\Support\CounterOperator;
 use App\Support\Permissions;
+use App\Support\Settings;
 use App\Support\WorkedHours;
 use App\ViewModels\Rat;
 use Carbon\CarbonImmutable;
@@ -276,6 +278,8 @@ class RegistroDeJornadaTest extends TestCase
 
     public function test_closing_the_till_offers_clock_out_and_yes_writes_till_close(): void
     {
+        // Prompt 312 — the question is now the per-sede *Preguntar* choice (the default clocks the closer out automatically).
+        Settings::set('till_close_clock_out', 'ask', SettingType::STRING, $this->centro->id);
         (new ClockIn)->handle($this->owner, $this->centro, $this->owner);
         $this->actingAs($this->owner);
         session(['counter.location_id' => $this->centro->id]);

@@ -87,6 +87,7 @@ class LocationForm
     public const SETTING_STRINGS = [
         'bar_layout_default',
         'dispensary_batch_selection',
+        'till_close_clock_out', // prompt 312
     ];
 
     /**
@@ -336,6 +337,14 @@ class LocationForm
                             ->label(__('Terminales (cajas)'))
                             ->helperText(__('Nombres de las cajas de esta sede, p. ej. «Caja 1», «Barra».'))
                             ->placeholder(__('Añadir terminal')),
+
+                        // Prompt 312 — clocking the closer out is automatic by default (with a 2-minute *Deshacer*); a sede
+                        // that prefers the old question keeps it.
+                        Select::make('till_close_clock_out')
+                            ->label(__('Fichar salida al cerrar la caja'))
+                            ->options(['auto' => __('Automático'), 'ask' => __('Preguntar')])
+                            ->selectablePlaceholder(false)
+                            ->helperText(__('Automático: quien cierra la caja queda con la salida fichada, y puede deshacerlo durante 2 minutos. A las demás personas se les muestra y fichan con su propio PIN.')),
                     ])
                     ->columns(2),
 

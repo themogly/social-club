@@ -5,6 +5,7 @@ namespace App\Livewire\Counter;
 use App\Actions\Counter\SignInOperator;
 use App\Actions\Expenses\RecordTillExpense;
 use App\Actions\Staff\ClockOut;
+use App\Actions\Staff\UndoTillCloseClockOut;
 use App\Actions\Stock\CommitStockTake;
 use App\Actions\Till\CloseTill;
 use App\Actions\Till\HandOverTill;
@@ -25,6 +26,7 @@ use App\Livewire\Counter\Concerns\ResolvesCounterLocation;
 use App\Models\Batch;
 use App\Models\ExpenseCategory;
 use App\Models\Location;
+use App\Models\StaffClockEvent;
 use App\Models\StockTake;
 use App\Models\StockTakeLine;
 use App\Models\TillSession as TillSessionModel;
@@ -42,6 +44,7 @@ use DomainException;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Str;
 use InvalidArgumentException;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Locked;
@@ -109,6 +112,16 @@ class TillSession extends Component
 
     /** Prompt 281 — after closing the till, offer the closer "¿Fichar salida ahora?" when they have an open period. */
     public bool $clockOutOffer = false;
+
+    /** Prompt 312 — the closer's automatic clock-out time ("23:04") while *Deshacer* is offered; null otherwise. */
+    public ?string $clockedOutAt = null;
+
+    /** Prompt 312 — the colleague whose PIN is being asked for, and that PIN (never kept past the check). */
+    public ?string $clockOutOtherId = null;
+
+    public string $otherPin = '';
+
+    public ?string $otherFeedback = null;
 
     /** The close required a note (variance beyond tolerance) — re-prompt without revealing. */
     public bool $needsNote = false;
@@ -892,8 +905,126 @@ class TillSession extends Component
         $this->expected = $closed->expected_cents?->cents;
         $this->variance = $closed->variance_cents?->cents;
         $this->flash(__('Caja cerrada.'), 'success');
-        // The close was just authorised by this person, so the offer needs no second PIN (Fichar salida from the menu does).
-        $this->clockOutOffer = WorkedHours::openPeriodFor($user) !== null;
+        $this->clockOutCloser($user, $closed);
+    }
+
+    /**
+     * Prompt 312 — the CLOSER, if clocked in, is clocked out at the close's own time: source TILL_CLOSE, no question (their
+     * PIN just closed the till, so it is still their own act), with a 2-minute *Deshacer*. A sede on *Preguntar* keeps
+     * 281's question. Nobody else is ever clocked out here — they are listed and use their own PIN. A failure leaves the
+     * period open (the forgotten-clock-out flow catches it) and never touches the close.
+     */
+    private function clockOutCloser(User $user, TillSessionModel $closed): void
+    {
+        $this->clockOutOffer = false;
+        $this->clockedOutAt = null;
+
+        if (WorkedHours::openPeriodFor($user) === null) {
+            return;
+        }
+        if (Settings::get('till_close_clock_out', 'auto', $this->locationId) === 'ask') {
+            $this->clockOutOffer = true;
+
+            return;
+        }
+
+        try {
+            $out = (new ClockOut)->handle($user, $user, StaffClockSource::TILL_CLOSE, $closed->closed_at);
+        } catch (AuthorizationException|DomainException|InvalidArgumentException) {
+            return;
+        }
+        session([CounterOperator::CLOCK_UNDO => $out->id]);
+        $this->clockedOutAt = local_datetime($out->occurred_at, 'H:i', $this->resolveLocation());
+        $this->dispatch('counter-clock-state', open: false);
+    }
+
+    /** *Deshacer* — the closer takes their automatic clock-out back (an ANNUL; the period is open again). */
+    public function undoClockOut(): void
+    {
+        $operator = CounterOperator::current();
+        $this->clockedOutAt = null;
+
+        try {
+            if ($operator === null) {
+                throw new DomainException(__('Ya no se puede deshacer la salida. Si hace falta, corrígela desde el registro de jornada.'));
+            }
+            (new UndoTillCloseClockOut)->handle($operator);
+            $this->dispatch('counter-clock-state', open: true);
+            $this->flash(__('Salida deshecha: sigues con la jornada abierta.'), 'success');
+        } catch (DomainException $e) {
+            $this->flash($e->getMessage(), 'warning');
+        }
+    }
+
+    /**
+     * Prompt 312 — the others still clocked in at this sede, for the close screen: first name and since when, nothing
+     * else about them (no hours).
+     *
+     * @return list<array{id: string, name: string, since: string}>
+     */
+    public function stillClockedIn(): array
+    {
+        $location = $this->resolveLocation();
+        if ($location === null) {
+            return [];
+        }
+
+        return array_map(fn (StaffClockEvent $in): array => [
+            'id' => (string) $in->user_id,
+            'name' => Str::before(trim((string) $in->user?->name), ' '),
+            'since' => local_datetime($in->occurred_at, 'H:i', $location),
+        ], WorkedHours::openPeriodsAt($location, CounterOperator::current()));
+    }
+
+    /** *Fichar salida* beside a colleague's name: their PIN is asked for next. */
+    public function startClockOutFor(string $userId): void
+    {
+        $this->otherPin = '';
+        $this->otherFeedback = null;
+        $this->clockOutOtherId = in_array($userId, array_column($this->stillClockedIn(), 'id'), true) ? $userId : null;
+    }
+
+    public function cancelClockOutFor(): void
+    {
+        $this->clockOutOtherId = null;
+        $this->otherPin = '';
+        $this->otherFeedback = null;
+    }
+
+    /**
+     * Their OWN PIN clocks them out — the same pad rule and throttle as 281's *Fichar salida* — and it must be the PIN of
+     * the person on that row. It never signs them in at the counter: the closer stays the operator.
+     */
+    public function confirmClockOutFor(): void
+    {
+        $location = $this->resolveLocation();
+        $pin = trim($this->otherPin);
+        $this->otherPin = '';
+        if ($location === null || $this->clockOutOtherId === null || $pin === '') {
+            return;
+        }
+
+        $matched = (new UnlockOperator)->handle($location, $pin, $this->operatorThrottleKey());
+        if ($matched === null) {
+            $this->otherFeedback = $this->pinFailureMessage();
+
+            return;
+        }
+        if ((string) $matched->getKey() !== $this->clockOutOtherId) {
+            $this->otherFeedback = __('Ese PIN no es de esta persona: cada persona ficha su propia salida.');
+
+            return;
+        }
+
+        try {
+            (new ClockOut)->handle($matched, $matched, StaffClockSource::PIN);
+        } catch (AuthorizationException|DomainException|InvalidArgumentException $e) {
+            $this->otherFeedback = $e->getMessage();
+
+            return;
+        }
+        $this->flash(__('Salida fichada: :name.', ['name' => Str::before(trim((string) $matched->name), ' ')]), 'success');
+        $this->cancelClockOutFor();
     }
 
     /**
@@ -1057,6 +1188,11 @@ class TillSession extends Component
         $this->reweighDone = false;
         $this->reweighCounts = [];
         $this->reweighResult = null;
+        $this->clockOutOffer = false;
+        $this->clockedOutAt = null;
+        $this->clockOutOtherId = null;
+        $this->otherPin = '';
+        $this->otherFeedback = null;
     }
 
     /** Whether this operator may bank cash (cash.bank) — the view hides the BANK option otherwise (prompt 81). */

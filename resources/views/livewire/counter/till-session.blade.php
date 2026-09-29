@@ -29,6 +29,49 @@
             @include('livewire.counter.partials.counter-flash', ['anchor' => 'data-commit-feedback', 'spacing' => '', 'nonce' => $flashSeq])
         @endif
 
+        @if ($countSubmitted && $clockedOutAt !== null)
+            {{-- Prompt 312 — the closer was clocked out automatically (TILL_CLOSE, their own PIN closed the till). Two minutes
+                 to take it back; after that — or once the counter is locked or someone else signs in — the server refuses. --}}
+            <section data-clock-out-done class="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-success/30 bg-success/10 p-4 dark:border-slate-700 dark:bg-slate-900"
+                     x-data="{ left: {{ \App\Actions\Staff\UndoTillCloseClockOut::WINDOW_SECONDS }} }" x-init="const t = setInterval(() => { if (--left <= 0) clearInterval(t) }, 1000)">
+                <p class="text-sm font-semibold">{{ __('Salida fichada a las :time.', ['time' => $clockedOutAt]) }}</p>
+                <x-button type="button" variant="secondary" wire:click="undoClockOut" data-clock-out-undo x-show="left > 0" class="min-h-[2.75rem]">{{ __('Deshacer') }}</x-button>
+            </section>
+        @endif
+
+        @if ($countSubmitted)
+            @php $others = $this->stillClockedIn(); @endphp
+            @if ($others !== [])
+                {{-- Prompt 312 — everyone else still clocked in HERE is shown, never clocked out for them: each uses their own
+                     PIN (the registro de jornada is personal). Names and clock-in times only. --}}
+                <section data-still-clocked-in class="mb-4 rounded-2xl border border-line bg-surface p-4 dark:border-slate-800 dark:bg-slate-900">
+                    <p class="text-sm font-semibold">{{ __('Aún con jornada abierta') }}</p>
+                    <ul class="mt-2 divide-y divide-line dark:divide-slate-800">
+                        @foreach ($others as $other)
+                            <li wire:key="still-{{ $other['id'] }}" class="flex flex-wrap items-center justify-between gap-2 py-2 text-sm">
+                                <span>{{ __(':name (desde :since)', ['name' => $other['name'], 'since' => $other['since']]) }}</span>
+                                @if ($clockOutOtherId === $other['id'])
+                                    <span class="flex flex-wrap items-center gap-2">
+                                        <label for="other-pin" class="sr-only">{{ __('PIN de :name', ['name' => $other['name']]) }}</label>
+                                        <input id="other-pin" type="password" inputmode="numeric" autocomplete="off" maxlength="8" wire:model="otherPin"
+                                               placeholder="{{ __('Su PIN') }}" data-other-pin
+                                               class="min-h-[2.75rem] w-28 rounded-lg border border-line bg-surface px-3 tracking-[0.4em] dark:border-slate-700 dark:bg-slate-950">
+                                        <x-button type="button" wire:click="confirmClockOutFor" data-other-pin-confirm class="min-h-[2.75rem]">{{ __('Fichar salida') }}</x-button>
+                                        <x-button type="button" variant="secondary" wire:click="cancelClockOutFor" class="min-h-[2.75rem]">{{ __('Cancelar') }}</x-button>
+                                    </span>
+                                @else
+                                    <x-button type="button" variant="secondary" wire:click="startClockOutFor('{{ $other['id'] }}')" data-clock-out-other="{{ $other['id'] }}" class="min-h-[2.75rem]">{{ __('Fichar salida') }}</x-button>
+                                @endif
+                            </li>
+                        @endforeach
+                    </ul>
+                    @if ($otherFeedback !== null)
+                        <p role="alert" data-other-pin-feedback class="mt-2 rounded-lg bg-error/10 px-3 py-2 text-sm font-medium text-error">{{ $otherFeedback }}</p>
+                    @endif
+                </section>
+            @endif
+        @endif
+
         @if ($countSubmitted && $clockOutOffer)
             {{-- Prompt 281 — the closer is still clocked in: offer the clock-out right here (no second PIN — the close was theirs). --}}
             <section data-clock-out-offer class="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-brand/30 bg-brand-tint p-4 dark:border-slate-700 dark:bg-slate-900">

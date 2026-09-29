@@ -140,6 +140,8 @@ class Settings
         // drawer, so opening a caja asks only for the float and uses the sede's single terminal. Turn on for a
         // multi-terminal sede, and the operator picks which configured terminal to open.
         'multiple_tills_enabled' => false,
+        // Prompt 312 — per sede: closing the till clocks the CLOSER out ('auto', the owner's ask) or asks first ('ask').
+        'till_close_clock_out' => 'auto',
 
         // Counter scanning (per location) — opt-in camera QR at the door + POS. OFF by default:
         // camera access is a deliberate per-premises choice; the keyboard-wedge scanner + name
