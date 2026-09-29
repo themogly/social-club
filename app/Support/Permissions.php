@@ -32,6 +32,7 @@ class Permissions
         // DEFAULT fee — a new one or a lapsed one restored. Moving a membership between sedes is a different
         // act with another sede's register in it and stays at 'members.transfer'.
         'membership.enrol', 'membership.fee.override', 'membership.fee.collect', 'membership.fee.waive',
+        'membership.manage', // prompt 325 — the four audited corrections (a manager: at their sedes)
         'carencia.waive',
         // Attendance
         'checkin.manage', 'checkin.override',
@@ -78,6 +79,7 @@ class Permissions
         'staff.hours.view', 'staff.hours.manage', // prompt 281 — the registro de jornada at their sedes
         'terminals.manage', // prompt 289 — register / revoke the counter tablets at their sedes
         'membership.enrol', 'membership.fee.override', 'membership.fee.collect', 'membership.fee.waive',
+        'membership.manage', // prompt 325 — the four audited corrections (a manager: at their sedes)
         'carencia.waive',
         'checkin.manage', 'checkin.override',
         'pos.use', 'pos.bar', 'dispensation.void', 'order.void', 'limits.override', 'dispensation.price.override',
@@ -234,7 +236,7 @@ class Permissions
             __('Informes') => ['reports.view', 'reports.view.all', 'reports.export'],
             __('Socios') => ['members.view', 'members.create', 'members.edit', 'members.transfer', 'members.import',
                 'member.limits.set', 'member.discount.assign', 'member.documents.view', 'member.sanction', 'applications.review'],
-            __('Membresías y cuotas') => ['membership.enrol', 'membership.fee.override', 'membership.fee.collect', 'membership.fee.waive', 'carencia.waive'],
+            __('Membresías y cuotas') => ['membership.enrol', 'membership.fee.override', 'membership.fee.collect', 'membership.fee.waive', 'membership.manage', 'carencia.waive'],
             __('Recepción') => ['checkin.manage', 'checkin.override'],
             __('Mostrador') => ['pos.use', 'pos.bar', 'dispensation.void', 'order.void', 'limits.override', 'dispensation.price.override'],
             __('Catálogo y stock') => ['genetics.manage', 'prices.manage', 'stock.manage', 'stock.merma', 'stock.transfer', 'stock.take', 'articles.manage', 'discounts.manage'],
@@ -275,6 +277,7 @@ class Permissions
             'membership.fee.override' => __('Cambiar el importe de una cuota'),
             'membership.fee.collect' => __('Cobrar cuotas'),
             'membership.fee.waive' => __('Eximir de una cuota (con motivo)'),
+            'membership.manage' => __('Corregir membresías'),
             'carencia.waive' => __('Eximir del periodo de carencia'),
             'checkin.manage' => __('Registrar entradas y salidas'),
             'checkin.override' => __('Autorizar una entrada bloqueada'),
