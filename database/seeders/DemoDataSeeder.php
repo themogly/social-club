@@ -201,6 +201,11 @@ class DemoDataSeeder extends Seeder
             'thc_mg_per_unit' => 10, 'active' => true, 'published' => true]); // counts as 0.07 g (EdibleEquivalence)
         (new IntakeBatch)->handle($gummy, $centro, ['units' => 30, 'price_per_unit_cents' => 400, 'operator_id' => $staff['manager']->id]);
 
+        // Prompt 328 — a vape: per cartridge, 0.5 g of oil each.
+        $vape = Genetic::create(['organisation_id' => $orgId, 'name' => 'Vapeador de prueba', 'product_type' => ProductType::VAPE,
+            'grams_per_unit_cg' => 50, 'thc_bp' => 8000, 'active' => true, 'published' => true]);
+        (new IntakeBatch)->handle($vape, $centro, ['units' => 20, 'price_per_unit_cents' => 1500, 'operator_id' => $staff['manager']->id]);
+
         $preroll = Genetic::create(['organisation_id' => $orgId, 'name' => 'Porro de prueba', 'product_type' => ProductType::PREROLL,
             'grams_per_unit_cg' => 100, 'active' => true, 'published' => true]);
         (new IntakeBatch)->handle($preroll, $centro, ['units' => 20, 'price_per_unit_cents' => 800, 'operator_id' => $staff['manager']->id]);

@@ -17835,3 +17835,51 @@ one tap away after every bar sale.
   - `APP_ENV=production` refused: "Staging (or local) only. This environment is “production”: nothing was touched."
   - **Side effect in the sandbox:** the verify run's `--fresh` emptied THIS checkout's `storage/app/public` (1 file; only
     its `.gitignore` is left). That is the command doing its job on the machine it ran on.
+
+## Prompt 328 — *Vapeador* (*Vape*) becomes a product type, alongside flower and hash
+
+- **Why:** Ben — "We need to add vapes to the category, along with hash and flower."
+- **The type:** `ProductType::VAPE`, labelled **Vapeador** / *Vape*.
+  - Dispensed **per unit** (a cartridge or disposable), counted by its **oil weight** (`grams_per_unit_cg`), exactly like a
+    pre-roll: that is what counts against limits and the stock ceiling. 326's THC-mg conversion stays for edibles only.
+    THC % and CBD % remain information, as for extracts.
+  - **OVERNIGHT-DEFAULT — CONFIRM with the owner:** some clubs dispense vape oil by weight. That is the one line in
+    `ProductType::unitType()` moving VAPE to WEIGHT.
+  - No schema change (`product_type` is a plain string).
+- **The strain form:** a vape shows **Peso por unidad (g)** (required) with its own help, "Contenido de aceite de cada
+  cartucho o desechable. Es lo que cuenta para límites y existencias.", and no THC-mg field. The rule is
+  `GeneticForm::BY_WEIGHT_PER_UNIT` (pre-rolls and vapes type their weight per unit; an edible's is worked out).
+- **Everywhere else it comes for free**, because those places derive from `ProductType::cases()` / `label()` (checked, no
+  edit needed):
+  - the strains and batches tables' type filter and badge;
+  - *Crear lote*'s *Tipo de producto* (323), with units for a unit strain;
+  - the counter's type chips (built from the catalogue's own types) and the unit stepper (every UNIT strain);
+  - the consumption and stock reports' "Tipo" (`label()`); *Inventario*'s groups (318, the type label);
+  - the stock ceiling (every UNIT strain counts units × `grams_per_unit_cg`).
+  - **The member menu has no grouping by type** (the prompt assumed one): it lists each strain with its THC/CBD. A vape
+    shows there like any strain (pinned).
+- **Every `match` over `ProductType` is exhaustive.** Two exist (`unitType()`, `label()`), both with a VAPE arm; Larastan fails
+  a non-exhaustive enum match, and the test runs every case through both.
+- **Files changed:**
+  - `app/Enums/ProductType.php` (the case, `unitType()`, `label()`) and `app/Enums/UnitType.php` (its doc list);
+  - `app/Filament/Resources/Genetics/Schemas/GeneticForm.php` (weight per unit for vapes, their help);
+  - `database/factories/GeneticFactory.php` (`vape()`);
+  - `database/seeders/DemoDataSeeder.php` (327's demo gets "Vapeador de prueba", 0.5 g, 20 units);
+  - `lang/es.json`, `lang/en.json`;
+  - `tests/Feature/Products/VapeProductTypeTest.php`;
+  - `tests/Browser/prove-328-vapes.mjs`.
+  - Grepped `ProductType::`, `PREROLL` and `product_type` across app, resources, factories and seeders: every other hit is
+    type-specific to another type (EDIBLE's THC, CONCENTRATE's subtype) or generic over `cases()`/`label()`.
+- **Unchanged:** the existing types and their maths, 326's edible conversion, past dispensations.
+- **Tests:** `tests/Feature/Products/VapeProductTypeTest.php` (5), all red first:
+  - the type (label es/en, UNIT, every case through both matches);
+  - the strain form (weight required, saved as cg, no THC mg);
+  - *Crear lote* (only vapes, in units);
+  - the counter (2 × 0.5 g → a 100 cg line and 1.00 g against the day, its own *Vapeador* chip and card type, and the member
+    menu lists it);
+  - the consumption and stock reports read *Vapeador*.
+- **Verified in a browser** (`tests/Browser/prove-328-vapes.mjs`, throwaway DB), 8/8 PASS:
+  - a vape at 1.0 g saved as VAPE / UNIT / 100 cg;
+  - *Crear lote* took 20 units;
+  - at the counter the *Vapeador* filter showed only it, and one unit took **1.00 g** off *Restante hoy* (3.50 → 2.50);
+  - the stock report lists it under *Vapeador* (19 units = 19.00 g).

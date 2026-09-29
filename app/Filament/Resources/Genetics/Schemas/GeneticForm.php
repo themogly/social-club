@@ -32,6 +32,9 @@ use Illuminate\Support\HtmlString;
 
 class GeneticForm
 {
+    /** Unit products whose weight per unit is TYPED (pre-rolls, vapes — 328); an edible's is worked out from its THC (326). */
+    private const BY_WEIGHT_PER_UNIT = ['PREROLL', 'VAPE'];
+
     /**
      * The strain's name — the SAME field on create and edit (prompt 308; one form since 320): unique in the club,
      * deleted strains included, and when the name belongs to a deleted strain, a link to bring that one back instead.
@@ -106,16 +109,19 @@ class GeneticForm
 
                         // Pre-rolls only (prompt 326): weighed plant material, entered as grams (2 dp); the page converts to
                         // grams_per_unit_cg. An edible's grams are never typed — they are worked out from its THC below.
+                        // Prompt 328 — a vape the same way: its oil content per cartridge or disposable.
                         DecimalInput::make('grams_per_unit_g')
                             ->label(__('Peso por unidad (g)'))
-                            ->helperText(__('Lo que cuenta para límites y existencias.'))
+                            ->helperText(fn (Get $get): string => $get('product_type') === ProductType::VAPE->value
+                                ? __('Contenido de aceite de cada cartucho o desechable. Es lo que cuenta para límites y existencias.')
+                                : __('Lo que cuenta para límites y existencias.'))
                             ->numeric()
                             ->rule(new GramAmount)
                             ->minValue(0)
                             ->step(0.01)
                             ->suffix('g')
-                            ->visible(fn (Get $get): bool => $get('product_type') === ProductType::PREROLL->value)
-                            ->required(fn (Get $get): bool => $get('product_type') === ProductType::PREROLL->value),
+                            ->visible(fn (Get $get): bool => in_array($get('product_type'), self::BY_WEIGHT_PER_UNIT, true))
+                            ->required(fn (Get $get): bool => in_array($get('product_type'), self::BY_WEIGHT_PER_UNIT, true)),
 
                         // Edibles (prompt 326): the THC per unit is THE figure; what one unit counts as is worked out from it
                         // through the club's equivalence (EdibleEquivalence) and shown beside it, live.

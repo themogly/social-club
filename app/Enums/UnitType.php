@@ -11,7 +11,7 @@ use Filament\Support\Contracts\HasLabel;
  * not on product_type** — two paths, not four:
  *
  *  - WEIGHT → dispensed in grams (stored as integer centigrams). FLOWER, CONCENTRATE.
- *  - UNIT   → dispensed in whole units (a fixed gram content each). PREROLL, EDIBLE.
+ *  - UNIT   → dispensed in whole units (a fixed gram content each). PREROLL, EDIBLE, VAPE (328).
  */
 enum UnitType: string implements HasLabel
 {
