@@ -30,7 +30,7 @@ use Illuminate\Support\HtmlString;
 class GeneticForm
 {
     /**
-     * The strain's name — the SAME field in the add-strain wizard and the edit form (prompt 308): unique in the club,
+     * The strain's name — the SAME field on create and edit (prompt 308; one form since 320): unique in the club,
      * deleted strains included, and when the name belongs to a deleted strain, a link to bring that one back instead.
      */
     public static function nameField(): TextInput

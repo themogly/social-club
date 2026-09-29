@@ -21,12 +21,29 @@ use Filament\Resources\Pages\CreateRecord;
 use Filament\Support\Exceptions\Halt;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Validation\ValidationException;
+use Livewire\Attributes\Url;
 
 class CreateBatch extends CreateRecord
 {
     use WarnsBelowCost;
 
     protected static string $resource = BatchResource::class;
+
+    /**
+     * Prompt 320 — *Crear lote* opened from the "Genética creada" notification arrives with `?genetic=<id>` and starts
+     * with that strain chosen. Only a strain this person can see (the organisation scope; not deleted) is taken; any
+     * other value is ignored and the field stays empty.
+     */
+    #[Url(as: 'genetic')]
+    public ?string $preselectGenetic = null;
+
+    protected function afterFill(): void
+    {
+        $id = (string) $this->preselectGenetic;
+        if ($id !== '' && Genetic::query()->whereKey($id)->exists()) {
+            $this->data['genetic_id'] = $id;
+        }
+    }
 
     private Genetic $intakeGenetic;
 

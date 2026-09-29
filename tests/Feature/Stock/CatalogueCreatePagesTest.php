@@ -85,18 +85,15 @@ class CatalogueCreatePagesTest extends TestCase
 
     // --- 3. Back to the list ------------------------------------------------------------------------------------------
 
-    public function test_adding_a_strain_lands_on_the_strains_list_with_its_summary(): void
+    public function test_adding_a_strain_lands_on_the_strains_list_pointing_to_crear_lote(): void
     {
+        // Prompt 320 — the strain only; the notification's next step is «Crear lote».
         Livewire::test(CreateGenetic::class)
-            ->fillForm([
-                'name' => 'Amnesia Haze', 'product_type' => 'FLOWER', 'grams' => 250, 'cost_per_gram_eur' => 4,
-                'location_id' => $this->sede->id, 'price_per_gram_eur' => 8,
-            ])
+            ->fillForm(['name' => 'Amnesia Haze', 'product_type' => 'FLOWER'])
             ->call('create')
             ->assertHasNoFormErrors()
-            ->assertRedirect(GeneticResource::getUrl('index'));
-
-        $this->assertStringContainsString('Amnesia Haze', (string) collect(session('filament.notifications'))->pluck('body')->implode(' '), 'the summary did not survive the redirect');
+            ->assertRedirect(GeneticResource::getUrl('index'))
+            ->assertNotified(__('Genética creada. Añade existencias con «Crear lote».'));
     }
 
     public function test_adding_stock_lands_on_the_batches_list(): void

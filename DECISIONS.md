@@ -17333,3 +17333,58 @@ one tap away after every bar sale.
     applying without one is refused; with Merma + a note it applies;
   - the sold batch ends at 195.00 g (counted 200.00 g − 5 g). Three adjustments; the not-counted product untouched;
   - list, review and PDF downloaded; review in dark mode at 1440 and 820.
+
+## Prompt 320 — creating a strain is just the strain: no batch, quantity, sede or price
+
+- **Why:** Ben — "When creating a genetic, no need to add a batch on creation or a price." Stock and its price have
+  their own tools now: *Crear lote* with its split (303), *Añadir existencias en otra sede* and *Recuento* (305), and the
+  batch *Precio* action. The six-step add-strain wizard (247 / 278 / 295) duplicated them and forced every new strain to
+  have stock and a price at birth. This reverses 247's "one flow to a sellable strain": a strain alone is an ordinary
+  state again (93's derived completeness).
+- ***Genéticas → Crear* is `GeneticForm`**, the same form as *Editar*: Datos, Tipo de producto, Cannabinoides y cultivo,
+  Imágenes (the strain's own photos, with the 295 camera/file buttons), Publicación. 308's name rule is the same field
+  (case, accents and deleted strains, with the offer to restore). The percent / grams conversion is shared as
+  `EditGenetic::toStored()`.
+- **Removed:**
+  - quantity, cost, own lote number, lab report, sede, price per gram or per unit, and the batch photo;
+  - the wizard's `IntakeBatch` call, its below-cost step, and its created summary and gap messages;
+  - twelve translation keys only it used, from both files. `lang:sync` adds keys but never removes them, so they were
+    found by diffing the old file's strings against the codebase.
+  - **Kept:** `IntakeBatch`, `BelowCost` and `WarnsBelowCost`, which *Crear lote* and the batch *Precio* action still use.
+- **The hand-off:**
+  - after saving, back to the strains list (295), with the notification **"Genética creada. Añade existencias con «Crear
+    lote»."** and a **Crear lote** button to `/batches/create?genetic=<id>`;
+  - `CreateBatch` reads it as a `#[Url(as: 'genetic')]` property, and in `afterFill()` chooses the strain only if it
+    exists under the organisation scope and isn't deleted;
+  - a foreign, unknown or malformed id is ignored and the field stays empty.
+- **A strain with no batch, everywhere:**
+  - the strains list reads **Sin existencias** in *Estado* (not "Sin precio": the price now comes with the batch), with a
+    tooltip pointing to «Crear lote», and in *Stock* (not "0.00 g");
+  - the counter catalogue and the member menu already leave it out through `sellableAt` (95/278), confirmed again;
+  - the stock, consumption and discounts reports render.
+- **Help:** the *Poner una variedad a la venta* guide still described the pre-278 order (a price per sede, then a
+  batch). It now reads strain → «Crear lote» with the price → check. The *Genéticas* empty state and page help say
+  the same.
+- **Tests:** `tests/Feature/Genetics/CreateStrainOnlyTest.php` (6).
+  - Red first: no batch fields and only the strain; the list plus the «Crear lote» button and pre-selection; the
+    strain's photos; a strain with no batch everywhere.
+  - Green from the start by nature: the foreign/invalid id guard (nothing pre-selected yet) and the 308 duplicate-name pin.
+- **Wizard tests** were removed or retargeted, none skipped:
+  - `AddAStrainFlowTest` deleted: all four cases tested the wizard itself;
+  - `BelowCostWarningTest`'s wizard cases now ask *Crear lote* (go back saves nothing; a unit batch compares the unit
+    cost; equal, none or zero cost doesn't ask). The wizard's step-leaving case went with the wizard;
+  - `GramInputIsNeverGuessedTest` types the grams on *Crear lote*;
+  - `HashProductTypeTest` creates the strain, then its batch through *Crear lote*;
+  - `GuidedFlowsTest` now pins "the strain alone, not sellable until a batch";
+  - `CatalogueCreatePagesTest` pins the new notification;
+  - `StrainGuardsTest` calls *Crear* instead of the wizard's next step;
+  - `CameraOrFileTest` drops the wizard's two upload sites.
+- **Unchanged (pins):** *Crear lote* with its split, *Añadir existencias en otra sede*, the batch *Precio* action and its
+  below-cost check (`BelowCostWarningTest`), batch photos, 308's delete guard and name rule.
+- **Verified in a browser** (`tests/Browser/prove-320-strain-only.mjs`, throwaway DB), 10/10 PASS:
+  - *Crear* has no batch, sede or price field and is one form;
+  - "Prueba 320" created with its details, landing on the list with the notification and **Sin existencias**;
+  - «Crear lote» opens `/batches/create?genetic=…` with the strain chosen;
+  - a split batch (Central + North, 100 g at 9 €/g) is created (50 g each at 900 c, checked in the DB);
+  - the strain appears at the Central Branch counter;
+  - screenshots of the form at 820 light and 1440 dark.

@@ -62,6 +62,18 @@ class EditGenetic extends EditRecord
      */
     protected function mutateFormDataBeforeSave(array $data): array
     {
+        return self::toStored($data);
+    }
+
+    /**
+     * The form's percent / grams → the stored basis points / centigrams. Shared with {@see CreateGenetic} (prompt 320),
+     * which now uses the same form.
+     *
+     * @param  array<string, mixed>  $data
+     * @return array<string, mixed>
+     */
+    public static function toStored(array $data): array
+    {
         $data['thc_bp'] = filled($data['thc_pct'] ?? null) ? (int) round_half_up(((float) $data['thc_pct']) * 100) : null;
         $data['cbd_bp'] = filled($data['cbd_pct'] ?? null) ? (int) round_half_up(((float) $data['cbd_pct']) * 100) : null;
         $data['grams_per_unit_cg'] = filled($data['grams_per_unit_g'] ?? null) ? Weight::fromGrams($data['grams_per_unit_g'])->centigrams : null;

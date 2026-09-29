@@ -82,7 +82,7 @@ class Help
         MemberApplication::class => ['heading' => 'Sin solicitudes', 'description' => 'Las solicitudes de alta que envían los aspirantes aparecen aquí para su revisión y aprobación.'],
         MemberDocument::class => ['heading' => 'Sin documentos', 'description' => 'La documentación de cada socio (identidad, consentimientos, certificados) se guarda cifrada y se consulta desde su ficha.'],
         MembershipTier::class => ['heading' => 'Sin cuotas de socio', 'description' => 'Una cuota (tarifa) define el importe y periodicidad de la aportación de socio. Crea la primera para poder enrolar socios.'],
-        Genetic::class => ['heading' => 'Sin genéticas', 'description' => 'Una genética es la definición de una variedad. Para dispensarla necesitará además un precio por sede y un lote con stock.'],
+        Genetic::class => ['heading' => 'Sin genéticas', 'description' => 'Una genética es la definición de una variedad. Para dispensarla necesita además un lote con existencias y su precio («Crear lote»).'],
         Batch::class => ['heading' => 'Sin lotes', 'description' => 'Un lote es stock real de una genética en una sede, con su número, fecha y peso. Registra una compra o una entrada para crear el primero.'],
         Article::class => ['heading' => 'Sin productos', 'description' => 'Los productos de barra y tienda son bebidas, comida y merch, contados por unidades. Crea el primero para venderlo en la barra.'],
         Discount::class => ['heading' => 'Sin descuentos', 'description' => 'Los descuentos reducen la aportación de determinados socios (p. ej. terapéuticos). Se aplican en el mostrador automáticamente.'],
@@ -145,7 +145,7 @@ class Help
 
         // — Catálogo y stock —
         Genetic::class => ['permission' => 'genetics.manage', 'title' => 'Genéticas', 'body' => [
-            'Define las variedades. Una genética por sí sola NO aparece en el mostrador: necesita además un precio por sede (por gramo, y opcionalmente por octavo) y un lote con stock.',
+            'Define las variedades. Una genética por sí sola NO aparece en el mostrador: necesita además un lote con existencias en la sede, con su precio (por gramo, y opcionalmente por octavo). Se crea con «Crear lote».',
             'El tipo (flor por peso, o unidades como prerolls) determina cómo se dispensa.',
         ]],
         Batch::class => ['permission' => 'stock.manage', 'title' => 'Lotes', 'body' => [
@@ -450,20 +450,17 @@ class Help
         'add-product' => [
             'permission' => 'genetics.manage',
             'title' => 'Poner una variedad a la venta',
-            'intro' => 'Para que una variedad aparezca en el mostrador hacen falta tres cosas juntas —genética, precio y lote—; con una que falte, no aparece, y no da error.',
+            'intro' => 'Para que una variedad aparezca en el mostrador hacen falta dos cosas: la genética y un lote con existencias y precio en la sede. Sin lote, no aparece, y no da error.',
             'steps' => [
                 ['title' => 'Crea la genética', 'body' => [
-                    'Da de alta la variedad y su tipo: flor por peso, o unidades como prerolls o comestibles. El tipo decide cómo se dispensa.',
+                    'Genéticas → Crear: solo la variedad (nombre, tipo, cannabinoides, fotos). El tipo decide cómo se dispensa: flor por peso, o unidades como prerolls o comestibles.',
                 ]],
-                ['title' => 'Ponle precio en la sede', 'body' => [
-                    'Añade el precio por gramo en la sede y, si usas descuento por cantidad, el precio del octavo. El precio es por sede: repítelo en cada sede donde se dispense.',
+                ['title' => 'Crea su lote, con el precio', 'body' => [
+                    'Al guardar, el aviso tiene un botón «Crear lote» que abre el lote con la genética ya elegida. Indica la sede (o reparte entre varias), la cantidad, el coste y el precio de este lote.',
                     'Para las unidades (prerolls, comestibles) el precio es por unidad, no por gramo.',
                 ]],
-                ['title' => 'Registra un lote con stock', 'body' => [
-                    'Crea un lote y elige la sede a la que entra el stock — un lote siempre pertenece a una sede. El mostrador elige luego el lote apto más antiguo (no caducado).',
-                ]],
                 ['title' => 'Comprueba que aparece en el mostrador', 'body' => [
-                    'Una genética Activa y Publicada pero SIN precio en la sede no aparece en el mostrador. Al dar de alta un lote en una sede sin precio la app te avisa en el momento, con un enlace para ponerlo; el indicador de su ficha también te dice qué falta: precio o stock.',
+                    'En la lista de genéticas, «Sin existencias» indica que aún no tiene lote. El mostrador elige luego el lote apto más antiguo (no caducado).',
                 ]],
             ],
         ],

@@ -26,7 +26,6 @@ class CameraOrFileTest extends TestCase
 
     /** Panel `FileUpload` fields, by file and field → the camera they open (`null`: file-only, not a photo). */
     private const PANEL = [
-        'app/Filament/Resources/Genetics/Pages/CreateGenetic.php' => ['lab_report_path' => 'environment', 'images' => 'environment'],
         'app/Filament/Resources/Genetics/Schemas/GeneticForm.php' => ['images' => 'environment'],
         'app/Filament/Resources/Batches/Schemas/BatchForm.php' => ['lab_report_path' => 'environment', 'images' => 'environment'],
         'app/Filament/Resources/Articles/Schemas/ArticleForm.php' => ['images' => 'environment'],

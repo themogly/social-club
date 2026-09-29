@@ -2,269 +2,44 @@
 
 namespace App\Filament\Resources\Genetics\Pages;
 
-use App\Actions\Stock\IntakeBatch;
-use App\Enums\ConcentrateSubtype;
-use App\Enums\CultivationType;
-use App\Enums\ProductType;
-use App\Enums\StrainType;
-use App\Enums\UnitType;
-use App\Filament\Concerns\WarnsBelowCost;
-use App\Filament\Forms\CameraOrFile;
-use App\Filament\Forms\DecimalInput;
+use App\Filament\Resources\Batches\BatchResource;
 use App\Filament\Resources\Genetics\GeneticResource;
-use App\Filament\Resources\Genetics\Schemas\GeneticForm;
-use App\Models\Genetic;
-use App\Models\Location;
-use App\Rules\GramAmount;
-use App\Support\ActiveScope;
-use App\Support\BelowCost;
-use App\Support\DocumentUpload;
-use App\Support\Money;
-use App\Support\Weight;
-use Filament\Forms\Components\FileUpload;
-use Filament\Forms\Components\Select;
-use Filament\Forms\Components\TextInput;
+use Filament\Actions\Action;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\CreateRecord;
-use Filament\Resources\Pages\CreateRecord\Concerns\HasWizard;
-use Filament\Schemas\Components\Utilities\Get;
-use Filament\Schemas\Components\Wizard\Step;
-use Illuminate\Database\Eloquent\Model;
-use Illuminate\Support\Facades\DB;
 
 /**
- * Prompt 247 — adding a strain is ONE flow, in the tester's order: what strain, what type, how much, which
- * sede, price, photo — and it is SELLABLE when you finish.
- *
- * On `main` this was three separate forms — the genetic, a price per sede, a batch — and a genetic saved from
- * the first was invisible at every counter until the other two were filled, with nothing saying so
- * (`sellableAt` needs active + a base price + stock; prompt 95). This is a Filament Wizard whose FINISH writes
- * all three THROUGH THE EXISTING SINGLE WRITERS, in one transaction: the genetic (active), the batch via
- * `IntakeBatch` (238's intake, the INTAKE movement, the ceiling checks), with the price on that batch (278). No
- * rule is reimplemented — the flow composes them. All or nothing: a failure in any step rolls back the whole
- * strain, so a half-created genetic with no price never exists.
- *
- * The full `GeneticForm` stays the EDIT path (`EditGenetic`) with every section; this is the create path.
+ * Prompt 320 (Ben) — creating a strain is the strain only: the same `GeneticForm` as *Editar*, no quantity, sede, price
+ * or batch photo. Stock and its price have their own tools now (*Crear lote* with its split, 303; *Añadir existencias en
+ * otra sede*, 305; the batch *Precio*), so the old add-strain wizard (247) only duplicated them and forced every new
+ * strain to have stock at birth. After saving, the list (295) and a notification whose button opens *Crear lote* with
+ * this strain chosen (`?genetic=`, {@see CreateBatch}).
  */
 class CreateGenetic extends CreateRecord
 {
-    use HasWizard, WarnsBelowCost;
-
-    /** The *Precio* step's index: leaving it asks about a price below cost (295). */
-    private const PRICE_STEP = 4;
-
     protected static string $resource = GeneticResource::class;
 
-    /** @return array<int, Step> */
-    public function getSteps(): array
-    {
-        return [
-            Step::make(__('Variedad'))
-                ->description(__('Qué variedad es'))
-                ->schema([
-                    GeneticForm::nameField(), // prompt 308 — the same unique-name field as the edit form
-                    Select::make('strain_type')->label(__('Variedad'))
-                        ->options(collect(StrainType::cases())->mapWithKeys(fn (StrainType $case): array => [$case->value => $case->label()])->all())
-                        ->placeholder(__('Sin especificar')),
-                    DecimalInput::make('thc_pct')->label(__('THC (%)'))->numeric()->minValue(0)->maxValue(100)->step(0.01)->suffix('%'),
-                    DecimalInput::make('cbd_pct')->label(__('CBD (%)'))->numeric()->minValue(0)->maxValue(100)->step(0.01)->suffix('%'),
-                    Select::make('cultivation_type')->label(__('Tipo de cultivo'))
-                        ->options(collect(CultivationType::cases())->mapWithKeys(fn (CultivationType $case): array => [$case->value => $case->label()])->all()),
-                ])->columns(2),
-
-            Step::make(__('Tipo'))
-                ->description(__('Cómo se dispensa'))
-                ->schema([
-                    // Hachís is its own product type (prompt 280, Ben's call on 276) — first-level, by weight.
-                    Select::make('product_type')->label(__('Tipo de producto'))
-                        ->options(collect(ProductType::cases())->mapWithKeys(fn (ProductType $case): array => [$case->value => $case->label()])->all())
-                        ->default(ProductType::FLOWER->value)->required()->live()
-                        ->helperText(fn (Get $get): string => __('Se dispensa: :modo', [
-                            'modo' => (ProductType::tryFrom((string) $get('product_type')) ?? ProductType::FLOWER)->unitType()->label(),
-                        ])),
-                    Select::make('concentrate_subtype')->label(__('Subtipo de extracto'))
-                        ->options(collect(ConcentrateSubtype::cases())->mapWithKeys(fn (ConcentrateSubtype $case): array => [$case->value => $case->label()])->all())
-                        ->visible(fn (Get $get): bool => $get('product_type') === ProductType::CONCENTRATE->value),
-                    DecimalInput::make('grams_per_unit_g')->label(__('Gramos por unidad (g)'))
-                        ->numeric()->rule(new GramAmount)->minValue(0)->step(0.01)->suffix('g')
-                        ->visible(fn (Get $get): bool => self::isUnit($get('product_type')))
-                        ->required(fn (Get $get): bool => self::isUnit($get('product_type'))),
-                ])->columns(2),
-
-            Step::make(__('Cantidad'))
-                ->description(__('Cuánto stock entra'))
-                ->schema([
-                    // The first batch, in the genetic's own unit — 238's intake fields, no more.
-                    DecimalInput::make('grams')->label(__('Cantidad (g)'))->numeric()->minValue(0)->rule(new GramAmount)
-                        ->visible(fn (Get $get): bool => ! self::isUnit($get('product_type')))
-                        ->required(fn (Get $get): bool => ! self::isUnit($get('product_type'))),
-                    TextInput::make('units')->label(__('Cantidad (uds)'))->numeric()->minValue(1)->step(1)
-                        ->visible(fn (Get $get): bool => self::isUnit($get('product_type')))
-                        ->required(fn (Get $get): bool => self::isUnit($get('product_type'))),
-                    DecimalInput::make('cost_per_gram_eur')->label(__('Coste por gramo (€)'))->numeric()->minValue(0),
-                    // Prompt 298 — the grow's own lote number, or empty for a generated one.
-                    TextInput::make('batch_no')->label(__('Nº de lote propio'))->maxLength(40)
-                        ->helperText(__('El número del cultivo o del proveedor, si lo tiene. Si lo dejas vacío, se genera uno.')),
-                    CameraOrFile::field(FileUpload::make('lab_report_path')->label(__('Informe de laboratorio'))
-                        ->disk('documents')->getUploadedFileUsing(DocumentUpload::withoutDirectUrl())
-                        ->visibility('private')->maxSize(DocumentUpload::maxKilobytes())
-                        ->helperText(DocumentUpload::helperText()), camera: 'environment', accept: 'image/*,application/pdf'),
-                ])->columns(2),
-
-            Step::make(__('Sede'))
-                ->description(__('En qué sede entra'))
-                ->schema([
-                    // 238's rule exactly: default to the scope, required, blank in the rollup, locked single-sede.
-                    Select::make('location_id')->label(__('Sede'))
-                        ->options(fn (): array => Location::assignableOptions(includeStores: true)) // stock may be received at the store (277)
-                        ->default(fn (): ?string => app(ActiveScope::class)->locationId())
-                        ->disabled(fn (): bool => count(Location::assignableOptions(includeStores: true)) === 1)
-                        ->dehydrated()
-                        ->required(),
-                ]),
-
-            Step::make(__('Precio'))
-                ->description(__('El precio de este lote'))
-                // Prompt 295 — the cost came two steps earlier, so leaving this step is where a price below it is caught.
-                ->afterValidation(fn () => $this->askIfBelowCost(self::PRICE_STEP))
-                ->schema([
-                    DecimalInput::make('price_per_gram_eur')->label(__('Precio por gramo (€)'))->numeric()->minValue(0)->required()
-                        ->visible(fn (Get $get): bool => ! self::isUnit($get('product_type')))
-                        ->required(fn (Get $get): bool => ! self::isUnit($get('product_type'))),
-                    DecimalInput::make('price_per_unit_eur')->label(__('Precio por unidad (€)'))->numeric()->minValue(0)
-                        ->visible(fn (Get $get): bool => self::isUnit($get('product_type')))
-                        ->required(fn (Get $get): bool => self::isUnit($get('product_type'))),
-                ]),
-
-            Step::make(__('Foto'))
-                ->description(__('Una foto (opcional)'))
-                ->schema([
-                    // Hacer foto (the back camera) or Elegir archivo (295); no photo means no image (193).
-                    CameraOrFile::field(FileUpload::make('images')->label(__('Foto'))->image()->disk('public')->directory('batches')->multiple()
-                        ->imageResizeMode('contain')->imageResizeTargetWidth('1200')->imageResizeTargetHeight('1200'), camera: 'environment'),
-                ]),
-        ];
-    }
-
-    /** @return list<array{field: string, price_cents: int, cost_cents: int, line: string}> */
-    protected function belowCostOffences(): array
-    {
-        $unit = self::isUnit($this->data['product_type'] ?? null);
-
-        return BelowCost::offences(
-            self::typedCents($this->data['cost_per_gram_eur'] ?? null),
-            $unit ? null : self::typedCents($this->data['price_per_gram_eur'] ?? null),
-            $unit ? self::typedCents($this->data['price_per_unit_eur'] ?? null) : null,
-            null,
-            $unit && ($perUnit = DecimalInput::number($this->data['grams_per_unit_g'] ?? null)) !== null
-                ? Weight::fromGrams($perUnit)->centigrams : null,
-        );
-    }
-
-    protected function belowCostField(string $offence): string
-    {
-        return $offence === 'per_unit' ? 'price_per_unit_eur' : 'price_per_gram_eur';
-    }
-
     /**
-     * The finish — three writes, one transaction, all or nothing. The genetic first (its observer derives
-     * unit_type from product_type), then the batch — carrying its own price and photo (278) — through `IntakeBatch`.
-     * If the batch write throws, the genetic rolls back with it.
-     *
      * @param  array<string, mixed>  $data
+     * @return array<string, mixed>
      */
-    protected function handleRecordCreation(array $data): Model
+    protected function mutateFormDataBeforeCreate(array $data): array
     {
-        return DB::transaction(function () use ($data): Genetic {
-            $genetic = Genetic::create([
-                'name' => $data['name'],
-                'product_type' => $data['product_type'],
-                'strain_type' => $data['strain_type'] ?? null,
-                'concentrate_subtype' => $data['concentrate_subtype'] ?? null,
-                'cultivation_type' => $data['cultivation_type'] ?? null,
-                'thc_bp' => filled($data['thc_pct'] ?? null) ? (int) round_half_up(((float) $data['thc_pct']) * 100) : null,
-                'cbd_bp' => filled($data['cbd_pct'] ?? null) ? (int) round_half_up(((float) $data['cbd_pct']) * 100) : null,
-                'grams_per_unit_cg' => filled($data['grams_per_unit_g'] ?? null) ? Weight::fromGrams($data['grams_per_unit_g'])->centigrams : null,
-                'active' => true,
-                'published' => true,
-            ]);
-
-            /** @var Location $location */
-            $location = Location::query()->findOrFail($data['location_id']);
-
-            // Prompt 278 (Ben's 271) — the price and the photo belong to THIS opening batch, not to the strain.
-            $priceCents = Money::fromEuros((string) ($genetic->isUnitType() ? ($data['price_per_unit_eur'] ?? 0) : ($data['price_per_gram_eur'] ?? 0)))->cents;
-            $intake = [
-                'batch_no' => $data['batch_no'] ?? null,
-                'cost_per_gram_cents' => Money::fromEuros((string) ($data['cost_per_gram_eur'] ?? 0))->cents, // the one conversion (273)
-                'lab_report_path' => $data['lab_report_path'] ?? null,
-                'price_per_gram_cents' => $genetic->isUnitType() ? null : $priceCents,
-                'price_per_unit_cents' => $genetic->isUnitType() ? $priceCents : null,
-                'images' => array_values((array) ($data['images'] ?? [])),
-            ];
-            $genetic->isUnitType()
-                ? $intake['units'] = (int) ($data['units'] ?? 0)
-                : $intake['grams'] = $data['grams'];
-
-            (new IntakeBatch)->handle($genetic, $location, $intake);
-
-            $this->createdSummary = $this->summarise($genetic, $location, $data);
-
-            return $genetic;
-        });
+        return EditGenetic::toStored($data);
     }
 
-    private string $createdSummary = '';
-
-    /** Back to the strains list (prompt 295, Shane) — the created notification carries the summary there. */
     protected function getRedirectUrl(): string
     {
         return GeneticResource::getUrl('index');
     }
 
-    /** The outcome the tester was missing: what is in stock, at what price, and that it is visible NOW. */
     protected function getCreatedNotification(): ?Notification
     {
-        $genetic = $this->getRecord();
-        $reason = $genetic instanceof Genetic ? $genetic->completenessReason() : null;
-
-        return $reason === null
-            ? Notification::make()->success()->title(__('Variedad dada de alta'))->body($this->createdSummary)
-            : Notification::make()->warning()->title(__('Variedad creada, pero aún no se dispensa'))
-                ->body($this->summariseGap($reason));
-    }
-
-    /** @param array<string, mixed> $data */
-    private function summarise(Genetic $genetic, Location $location, array $data): string
-    {
-        $stock = $genetic->isUnitType()
-            ? trans_choice(':count unidad|:count unidades', (int) ($data['units'] ?? 0), ['count' => (int) ($data['units'] ?? 0)])
-            : Weight::fromGrams((string) ($data['grams'] ?? '0'))->formatted(); // the one formatter (271) — rtrim read 250 as "25 g"
-        $priceEur = $genetic->isUnitType() ? ($data['price_per_unit_eur'] ?? 0) : ($data['price_per_gram_eur'] ?? 0);
-        $unit = $genetic->isUnitType() ? __('/ud') : __('/g');
-
-        return __(':genetic dada de alta en :sede: :stock en stock, :price :unit — ya visible en el mostrador.', [
-            'genetic' => $genetic->name,
-            'sede' => $location->name,
-            'stock' => $stock,
-            'price' => Money::fromEuros((string) $priceEur)->formatted(),
-            'unit' => $unit,
-        ]);
-    }
-
-    private function summariseGap(string $reason): string
-    {
-        return match ($reason) {
-            'no_price' => __('Falta un precio en esta sede.'),
-            'no_stock' => __('Falta stock en esta sede.'),
-            default => __('Aún no se puede dispensar en el mostrador.'),
-        };
-    }
-
-    private static function isUnit(mixed $productType): bool
-    {
-        $type = ProductType::tryFrom((string) $productType);
-
-        return $type !== null && $type->unitType() === UnitType::UNIT;
+        return Notification::make()->success()
+            ->title(__('Genética creada. Añade existencias con «Crear lote».'))
+            ->actions([
+                Action::make('createBatch')->label(__('Crear lote'))->button()
+                    ->url(BatchResource::getUrl('create', ['genetic' => $this->getRecord()->getKey()])),
+            ]);
     }
 }
