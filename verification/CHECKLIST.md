@@ -101,6 +101,9 @@ its real S3 bucket. Write down every failure as a numbered-prompt fix — never 
       the *Lotes* list afterwards: each row reads *strain* / *#n · entrada …*.
 
 ## I-bis. Go-live tasks from the post-296 round (owner / Shane)
+- [ ] Before the first real member: `php artisan csc:reset-for-launch --purge-documents` to wipe the test club (SETUP.md →
+      *Reinicio antes del lanzamiento*), then set the real club up. Delete the dump file once sure.
+- [ ] **`csc:launch` run on the day of the first real member** — the one-way latch (*Salud del sistema* → *En marcha desde…*).
 - [ ] Register each club tablet once with **Este dispositivo** (counter top bar), as a manager or the owner (289).
 - [ ] Everyone sets a **fresh, distinct PIN** in the panel; after the first busy evening run
       `php artisan csc:pin-upgrade-status` (270/286).

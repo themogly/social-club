@@ -35,6 +35,13 @@ class Install extends Command
 
     public function handle(): int
     {
+        // Prompt 304 — a launched club never gets a second organisation by accident: not even with --force.
+        if (Organisation::launched() !== null) {
+            $this->error(__('Este club ya está en marcha. No se puede instalar otra organización.'));
+
+            return self::FAILURE;
+        }
+
         if (Organisation::query()->exists() && ! $this->option('force')) {
             $this->error('An organisation already exists — the club is already installed. Pass --force only to add another deliberately.');
 

@@ -3,6 +3,7 @@
 namespace App\ViewModels;
 
 use App\Models\HeartbeatLog;
+use App\Models\Organisation;
 use App\Support\PermissionDrift;
 use App\Support\Settings;
 use Carbon\CarbonInterface;
@@ -259,6 +260,19 @@ class SystemHealth
         $report = PermissionDrift::report();
 
         return ['in_sync' => $report['in_sync'], 'lines' => PermissionDrift::lines(), 'overrides' => PermissionDrift::overrideLines()];
+    }
+
+    /**
+     * Prompt 304 — has the club gone live (`csc:launch`)? Until then the pre-launch reset may wipe the test data; after,
+     * it never can.
+     *
+     * @return array{launched: bool, since: ?string}
+     */
+    public function launch(): array
+    {
+        $org = Organisation::launched();
+
+        return ['launched' => $org !== null, 'since' => $org?->launched_at?->format('d/m/Y')];
     }
 
     /**

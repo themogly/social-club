@@ -169,6 +169,36 @@ php artisan memberships:sweep    # run the expiry sweep once, right now
 del sistema** shows the sweep's last-run time and turns **red if it has not run in ~26 h — even when
 the generic scheduler heartbeat is green.** A silently-broken sweep is therefore visible, not silent.
 
+## Reinicio antes del lanzamiento (pre-launch reset, prompt 304)
+
+A live site that has only ever held **test data** gets a clean start ONCE, before the first real member:
+
+```bash
+php artisan csc:reset-for-launch --purge-documents   # interactive: type the association's name, then confirm
+# … set the real club up (the command runs csc:install for you unless --no-install) …
+php artisan csc:launch                               # the day the first real member is served
+```
+
+What it does, stopping at the first failure:
+1. Refuses if the club is **launched** (no flag overrides that), if a lockdown is active, or unless you type the
+   association's exact name AND answer yes.
+2. `down`, then a **gzipped, 0600 dump of the whole database** to `storage/app/backups/pre-launch-reset-….sql.gz`
+   (mysqldump on MySQL). No dump, no wipe — the site comes back up. The dump holds all the test data in plain form:
+   **delete it once you are sure.**
+3. `migrate:fresh`; this app's Redis keys only (by `REDIS_PREFIX` and Horizon's prefix — never FLUSHALL);
+   `storage/app/public`, `storage/app/member-imports` and, with `DOCUMENTS_DRIVER=local`, the documents root (the
+   directories and their `.gitignore` are kept).
+4. Remote documents (`DOCUMENTS_DRIVER=s3`, the R2 bucket): deleted only with `--purge-documents` and their own
+   confirmation, never the bucket itself; without the flag it prints how many objects are left.
+5. `csc:install` + `csc:sync-permissions`, one `system.reset_for_launch` audit entry (counts only), `up`, and the
+   next steps: `config:cache`, `horizon:terminate`, re-register the tablets, set up sedes / store / staff PINs /
+   catalogue, import members, `csc:launch`, delete the dump.
+
+It never touches `.env` or `APP_KEY`, anything outside `storage/app`, or the bucket's settings.
+
+**`csc:launch`** is the one-way latch: it stamps the organisation as live, *Salud del sistema* then reads *En marcha
+desde…*, and from then on `csc:reset-for-launch` **and** `csc:install --force` refuse — for good.
+
 ## The in-browser MRZ reader (prompt 179)
 
 `npm run build` copies the reader's runtime out of `node_modules` into `public/ocr/` (see
