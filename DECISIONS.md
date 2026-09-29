@@ -17388,3 +17388,50 @@ one tap away after every bar sale.
   - a split batch (Central + North, 100 g at 9 €/g) is created (50 g each at 900 c, checked in the DB);
   - the strain appears at the Central Branch counter;
   - screenshots of the form at 820 light and 1440 dark.
+
+## Prompt 321 — a row's ⋮ menu isn't hidden under the next row in panel tables
+
+- **Cause (a stacking context):**
+  - below 1280 px, theme rule 1 (the tablet fix, 170/272) pins every row's last cell with `position: sticky; z-index: 1`
+    and an opaque background;
+  - `sticky` with a `z-index` makes **each pinned cell its own stacking context at the same level**;
+  - the row's ⋮ panel is rendered inside its own cell (Filament's `ActionGroup`), so it can never paint above the
+    **next** row's pinned cell, which comes later in the page at the same z-index.
+
+  Reproduced before the fix: at 1180×820 and 1024×768, light and dark, "Añadir existencias en otra sede" on the first
+  *Lotes* row is covered by the next row's cell (`elementFromPoint` hits the `TD`). The two-item menus on *Genéticas* and
+  *Socios* fit inside their own row, so they passed.
+- **Fix, `:has()` on Filament's own open state:**
+
+  ```css
+  td:last-child:has(.fi-dropdown-trigger [aria-expanded='true']) { z-index: 20; }
+  ```
+
+  - Checked in the markup: Filament v5's `dropdown.js` writes `aria-expanded` onto the real trigger button from
+    `panel.style.display === 'block'`. A MutationObserver keeps it right for click, click-away, Escape and a Livewire
+    morph, so the rule tracks the menu with no JS of ours.
+  - `z-index: 20` is Filament's own dropdown layer, still under the topbar (30).
+  - The header cell goes to `z-index: 2`, so it stays above the body rows.
+  - Both themes keep the panel's own background and shadow (unchanged).
+- **Why not the alternatives:**
+  - a `data-menu-open` Alpine hook would duplicate state Filament already publishes;
+  - `ActionGroup::dropdownTeleport()` exists, but moving a panel of `wire:click` actions outside the Livewire
+    component's DOM is a wider change than a z-index;
+  - `:has()` is supported by every browser the club uses (Safari 15.4+, Chrome 105+).
+- **Productos has no ⋮:** its row actions are inline. The ⋮ tables are *Lotes*, *Genéticas* and *Socios*, so the test
+  covers those three.
+- **Wider check** (1024×768, sampled with `elementFromPoint`):
+  - the filters dropdown on *Lotes*: on top;
+  - the column manager on *Genéticas*: on top. It is taller than a 768 px screen and runs below the fold as Filament's
+    always has; nothing paints over it;
+  - the bulk-actions menu on *Socios* after selecting a row: on top;
+  - relation managers (the member's Membresías, Descuentos, Documentos, Consentimientos) use inline row actions, with no
+    dropdown inside a pinned cell. Their tables get the same rule anyway, since it is global to `.fi-ta-table`.
+- **Tests:**
+  - `tests/Browser/prove-321-row-menu-on-top.mjs`, 31/31 PASS: first and last row on the three ⋮ tables at 1180×820 and
+    1024×768 (and dark at 1180); every item fully on screen and topmost at its centre; the 1440 pin; 272's pin (at 820 the
+    action column is sticky and on screen with the table scrolled fully left); the wider check. Run against the old CSS,
+    it fails exactly on the three *Lotes* first-row cases.
+  - `PanelTabletLayoutTest::test_an_open_row_menu_raises_its_pinned_cell_above_the_next_rows` pins the rule in CI, and
+    pins Filament's `aria-expanded` behaviour it depends on. Red without the rule.
+  - The harness signs in once per run: a sign-in per width tripped the login throttle and showed an empty page.
