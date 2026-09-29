@@ -63,6 +63,8 @@ class Permissions
         // room); manage = run/observe drills, read the runbook, end a drill. A REAL lockdown is never
         // reactivated in-app (off-premises paths only), so there is no "reactivate" permission by design.
         'lockdown.initiate', 'lockdown.manage',
+        // Prompt 311 — owner alerts (low stock, expiry, a till left open, the system) by Telegram and a morning email.
+        'alerts.receive',
     ];
 
     /** MANAGER — per assigned location. Broad operational power, minus org-wide compliance/privacy. */
@@ -87,6 +89,7 @@ class Permissions
         'lockdown.initiate', 'lockdown.manage',
         'panel.access', // prompt 262 — managers use the admin panel by default
         'panel.members', 'panel.applications', 'panel.tills', 'panel.member_documents', 'panel.security', // 309 — as before
+        'alerts.receive', // 311 — managers hear about their sedes' stock and tills
     ];
 
     /** STAFF — per assigned location. Counter + door + basic member intake only. */
@@ -177,6 +180,8 @@ class Permissions
         'panel.tills' => ['panel.access'],
         'panel.member_documents' => ['panel.access'],
         'panel.security' => ['panel.access'],
+        // Prompt 311 — who gets alerts is chosen on the person's own profile, a panel page.
+        'alerts.receive' => ['panel.access'],
     ];
 
     /** Why `$permission` needs `$needs`, in the words the roles page shows the owner (prompt 265). */
@@ -234,6 +239,7 @@ class Permissions
             __('Privacidad') => ['data.request.handle', 'data.erase'],
             __('Sistema') => ['locations.manage', 'staff.manage', 'staff.hours.view', 'staff.hours.manage', 'terminals.manage', 'settings.manage', 'settings.manage.location', 'settings.consent', 'audit.view'],
             __('Seguridad') => ['lockdown.initiate', 'lockdown.manage'],
+            __('Avisos') => ['alerts.receive'],
         ];
     }
 
@@ -308,6 +314,7 @@ class Permissions
             'audit.view' => __('Ver el registro de auditoría'),
             'lockdown.initiate' => __('Activar el botón de pánico'),
             'lockdown.manage' => __('Gestionar simulacros de bloqueo'),
+            'alerts.receive' => __('Recibir avisos'),
             default => $permission,
         };
     }

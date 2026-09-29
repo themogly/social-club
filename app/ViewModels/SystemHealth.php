@@ -2,10 +2,12 @@
 
 namespace App\ViewModels;
 
+use App\Models\AuditLog;
 use App\Models\HeartbeatLog;
 use App\Models\Organisation;
 use App\Support\PermissionDrift;
 use App\Support\Settings;
+use App\Support\Telegram;
 use Carbon\CarbonInterface;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
@@ -212,6 +214,39 @@ class SystemHealth
     public function importStagingSweep(): array
     {
         return $this->component('import-staging-sweep', self::HOURLY_STALE_SECONDS);
+    }
+
+    /**
+     * Every heartbeat the page grades, by component — prompt 311's System alert fires when one goes red, reading exactly
+     * what the page reads. The temporary-member sweep only counts when that feature is on (idle by design otherwise).
+     *
+     * @return array<string, array{last_at: ?CarbonInterface, age_seconds: ?int, stale: bool, threshold_seconds: int}>
+     */
+    public function heartbeats(): array
+    {
+        return array_filter([
+            'scheduler' => $this->scheduler(),
+            'memberships-sweep' => $this->expirySweep(),
+            'temporary-sweep' => (bool) Settings::get('temporary_members_enabled', false) ? $this->temporarySweep() : null,
+            'audit-retention-sweep' => $this->auditRetentionSweep(),
+            'message-retention-sweep' => $this->messageRetentionSweep(),
+            'import-staging-sweep' => $this->importStagingSweep(),
+        ]);
+    }
+
+    /**
+     * Prompt 311 — the *Avisos* row: Telegram configured, when alerts were last evaluated (its own heartbeat, every 15
+     * minutes), and the alert messages that failed for good in the last 7 days.
+     *
+     * @return array{telegram: bool, last_evaluation: array{last_at: ?CarbonInterface, age_seconds: ?int, stale: bool, threshold_seconds: int}, failed_last_7_days: int}
+     */
+    public function alerts(): array
+    {
+        return [
+            'telegram' => Telegram::configured(),
+            'last_evaluation' => $this->component('alerts', 3 * 900),
+            'failed_last_7_days' => AuditLog::query()->withoutGlobalScopes()->where('action', 'alert.failed')->where('created_at', '>=', now()->subDays(7))->count(),
+        ];
     }
 
     /**

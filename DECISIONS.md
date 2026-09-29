@@ -16740,3 +16740,128 @@ request.
   Each now gives its user a sede (`TestCase::giveASede()`), and every one of those pages still refuses on its own
   permission, so no hidden authorisation bug was behind them. `PanelAccessTest`'s no-sede test now asserts the redirect
   to `/sin-sede`.
+
+## Prompt 311 — owner alerts: low stock and a few operational problems, by Telegram, with a morning email summary
+
+The owner asked for stock-running-low notices, "ideally by WhatsApp… he uses iPhone, maybe Telegram?", and for "low at
+a club but there's stuff at storage" to read differently from "running out".
+
+- **Why not WhatsApp:** Meta's WhatsApp Business policy prohibits using WhatsApp for Business to facilitate the
+  exchange of **drugs, "whether prescription, recreational, or otherwise"**.
+  - Automated stock messages from a cannabis association are very likely to be refused, or to get the number banned.
+  - Unofficial WhatsApp bridges break WhatsApp's terms too.
+  - **Telegram** has an open Bot API: plain HTTPS, no business verification, and it works on iPhone. The messages are
+    internal and operational, with no member data.
+  - Email (288) is the backup.
+- **What is alerted** (`App\Support\Alerts\CurrentAlerts`, which reads existing helpers and adds no second formula for
+  "low"):
+  - strains: `StockCover::attentionAt()` per **sede**;
+  - products: `Article::lowStock()`, active ones;
+  - batches with stock left expiring within `alerts_expiry_days` (14). The date is part of the alert's subject, so
+    changing it clears the alert;
+  - tills open longer than `alerts_till_open_hours` (16);
+  - the system: any heartbeat that *Salud del sistema* grades red (`SystemHealth::heartbeats()`, the page's own list).
+- **The two strain alerts:**
+  - **Reponer desde el almacén** fires when a store holds **movable** stock of the strain. "Movable" is one rule,
+    `Batch::scopeMovable()` / `isMovable()`: OPEN with something left, lifted out of the *Trasladar* button (302),
+    which now uses it too. The message names the store quantity and links to the strain's batches filtered to the store
+    (`?search=…&filters[location_id]…`), where *Asignar a sede* is.
+  - Otherwise **Se acaba: sin reserva en el almacén**, which is the buy-or-harvest job and the more urgent one.
+  - They are different alert types for the same strain and sede, so switching from one to the other clears the old
+    one and fires the new one once.
+  - **Stores never raise "low" themselves:** nothing is dispensed there, so cover days don't apply. Their levels appear
+    in the messages and on *Lotes*.
+  - **Empty counts as needing attention.** `StockCover`'s verdict calls zero stock "not low" (`basis: empty`), which is
+    right for a counter badge. For an alert that would mean *Se acaba* clears at the moment the sede runs out.
+    `attentionAt()` therefore takes `low` **or** `basis: empty` for a strain still sellable at the sede. It reads the
+    same verdict and adds no new threshold.
+- **Fire once, clear on recovery** (`owner_alert_states`: type, subject, sede, `detail`, `active_since`, `notified_at`,
+  `cleared_at`; `EvaluateAlerts`):
+  - a condition that is new opens a state and is announced;
+  - one still holding is left alone, with its figures refreshed;
+  - one gone is cleared;
+  - an item low for three days is one message, and it fires again only after recovering and dropping again.
+- **One grouped message per person per run** (`NotifyAlerts`):
+  - one Telegram message per recipient holding only what they take, with sections in `AlertType` order: restock, then
+    running out, then products, expiry, till, system;
+  - in their own language (`ResolveLocale`: the person's, else the club's default);
+  - queued (`SendTelegramMessage`, `tries 4`, backoff 30/120/600 like 288's mail);
+  - a final failure is audited as `alert.failed` with neither chat id nor text;
+  - a **403** (bot blocked) clears the chat id and sends **one** `TelegramDisconnectedMail`, with no retry.
+- **`alerts:evaluate`**, every 15 minutes, with `withoutOverlapping`:
+  - evaluate, then notify, then send the morning emails that are due;
+  - its own heartbeat, `alerts`, is shown on *Salud del sistema*.
+- **The morning email** (`SendMorningSummaries`, `AlertSummaryMail` extending `ClubMail`, queued with the recipient's
+  `->locale()`):
+  - from 08:00 in the person's sede timezone (their first sede alphabetically, else the app's), once a day through
+    `users.alert_summary_sent_on`;
+  - lists every alert still active for their sedes, grouped by sede;
+  - **nothing is sent when nothing is active**;
+  - it runs inside `alerts:evaluate`, so it needs neither Telegram nor its own schedule, and with no bot token the
+    email still goes.
+- **Telegram linking:**
+  - `IssueTelegramLink` makes a one-time `https://t.me/<bot>?start=<code>`. The code is random, stored **only as its
+    SHA-256**, valid for 10 minutes, and single use (`telegram_link_codes`). A new link retires any unused one;
+  - the webhook `POST /telegram/webhook` (outside the web group like `csp-report`: no session, no CSRF, `throttle:60,1`)
+    **refuses anything without the matching `X-Telegram-Bot-Api-Secret-Token`** (`hash_equals`);
+  - `/start <code>` links the chat, and `/stop` unlinks it;
+  - the chat id is stored **encrypted** (`encrypted` cast), plus an HMAC so `/stop` can find it;
+  - `php artisan telegram:set-webhook` registers the webhook with the secret;
+  - `TELEGRAM_API_URL` (optional, default Telegram's) lets a self-hosted Bot API server, or a sandbox stub, stand in.
+- **Who gets what:**
+  - new permission `alerts.receive`, *Recibir avisos*, for OWNER and MANAGER by default, in its own *Avisos* group,
+    depending on `panel.access` (the choices live on the profile);
+  - the profile (`App\Filament\Pages\Auth\EditProfile`) gains **Avisos**: channels (Telegram, only when configured,
+    and/or the morning email), the six types (all on by default), and sedes (only the person's own; all of them is
+    stored as "all", so a new sede is included). It also has *Conectar Telegram* (the link as a button and a QR code,
+    in a modal) and *Desconectar*;
+  - owner settings on *Ajustes → Avisos*: the expiry window in days and the till-open hours.
+- **No member data in any alert:** only strain and product names, grams or units, sede names and times. This is tested
+  against a fixture with members, over both the Telegram texts and the email.
+- **RAT-09**, *Avisos operativos al personal*: legitimate interest, chosen per person. The data is the recipient's name
+  and email and their Telegram chat id (encrypted). The recipients are Telegram, as recipient/processor of the chat id
+  and the alert text, plus the email processor. It notes possible processing outside the EEA, to review with the
+  gestoría. The id is kept while connected and deleted on disconnect or block.
+- ***Salud del sistema*** gains an **Avisos** card: Telegram configured yes/no, the last evaluation (red when stale), and
+  alert failures in the last 7 days.
+- **Tests** (`tests/Feature/Alerts`, 18 tests, all red first, `Http::fake` for Telegram, `Mail::fake`):
+  - fire once, clear and fire again;
+  - one message per person per run, restock before running out;
+  - expiry, till and heartbeat fire and clear;
+  - the two strain alerts switching (store emptied → *Se acaba* once; delivery → back; sede restocked → cleared);
+    nothing anywhere → only *Se acaba*;
+  - sede and permission scoping; restock-only preferences;
+  - a blocked bot → chat cleared and one email;
+  - the morning email: not before 08:00, once, grouped by sede, nothing when nothing is active;
+  - no token → no Telegram, and the email still goes;
+  - no member data;
+  - linking: valid code encrypted with a reply; wrong or missing secret refused; expired or reused code refused;
+    `/stop`;
+  - the profile section: saves choices, shows the one-time link, is hidden without a token and without the permission.
+  - `MailInventoryTest` lists the disconnected mail's "te llegarán…" line with its sender.
+  - `/dev/mail` has previews of both mails.
+- **Verified in a sandbox** (throwaway DB copy, the app served, `TELEGRAM_API_URL` pointed at a local stub that records
+  every call, `MAIL_MAILER=log`):
+  - `IssueTelegramLink` for the owner; a wrong secret gets **403**; the right one → `{"ok":true}`;
+  - the stub received the "Conectado" reply, and the chat id is stored as an encrypted payload;
+  - a product dropped to 4 with threshold 10 → `alerts:evaluate` → **one** message: *Reponer desde el almacén — North
+    Branch* (Amnesia Haze 3,20 g · 500,00 g en Storage house, plus the *Trasladar* link), then *Existencias bajas:
+    productos — Central Branch* (Coffee 4 uds, umbral 10);
+  - a second run sent nothing;
+  - the morning email (13:15 Madrid time) went to the owner and the manager, grouped by sede.
+  - The sandbox caught a bug: the bot's reply used the raw `users.locale`, which was empty, and came out in English
+    while the alerts were in Spanish. It now uses `ResolveLocale`, and the re-check replied in Spanish.
+- **On live, with Ben:** create the bot with @BotFather; set the three `.env` values and run `config:cache`; run
+  `telegram:set-webhook`; the owner opens *Avisos → Conectar Telegram* on the iPhone and taps *Start*; put a test
+  product at its threshold, and one message arrives within 15 minutes. (SETUP.md has the steps.)
+- **Gates, and an intermittent failure to chase.**
+  - Pint and Larastan pass.
+  - The full suite passed in its third run (2563 passed, 3 skipped).
+  - The first two runs (one Spanish, one English) each failed a **different** `TemporaryMemberTest` method with its
+    own diagnostic: "the member was created as STANDARD… `temporary_members_enabled` at assert time=true", which
+    prompt 197 describes.
+  - The file passes on its own every time (3/3), and the whole `tests/Feature/Members` suite passes (182).
+  - Nothing in 311 touches member enrolment or that setting. It is order-dependent in the full suite, and it was not
+    seen in the 308–310 full runs.
+  - It is left **open**, not skipped. The next step is to bisect the suite order in front of it (`--order-by=defects`,
+    then halving) to find the test leaking state.

@@ -296,6 +296,24 @@ class Batch extends Model
     }
 
     /**
+     * What can be MOVED to another location (prompt 311 lifted it out of the *Trasladar* button, prompt 302): an OPEN batch
+     * with something left. The button and the owner alerts' "how much is in the store" both read this — one rule.
+     *
+     * @param  Builder<static>  $query
+     * @return Builder<static>
+     */
+    public function scopeMovable(Builder $query): Builder
+    {
+        return $query->where('batches.status', BatchStatus::OPEN)->inStock();
+    }
+
+    public function isMovable(): bool
+    {
+        return $this->status === BatchStatus::OPEN
+            && ($this->isUnitType() ? (int) $this->remaining_units : $this->remaining_cg->centigrams) > 0;
+    }
+
+    /**
      * Nothing left — the complement of {@see self::scopeInStock()} (a null count reads as nothing left).
      *
      * @param  Builder<static>  $query

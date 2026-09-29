@@ -5,7 +5,6 @@ namespace App\Filament\Resources\Batches;
 use App\Actions\Stock\IntakeBatch;
 use App\Actions\Stock\RecountBatch;
 use App\Actions\Stock\TransferBatch;
-use App\Enums\BatchStatus;
 use App\Exceptions\StockCeilingExceededException;
 use App\Filament\Resources\Batches\Schemas\BatchForm;
 use App\Filament\Support\AllOption;
@@ -55,9 +54,7 @@ final class BatchActions
             ->label(fn (Batch $record): string => self::transferLabel($record))
             ->icon(Heroicon::OutlinedArrowsRightLeft)
             // Hidden, never greyed: only with the permission, stock left, and an OPEN batch.
-            ->visible(fn (Batch $record): bool => (Auth::user()?->can('stock.transfer') ?? false)
-                && $record->status === BatchStatus::OPEN
-                && ($record->isUnitType() ? (int) $record->remaining_units : $record->remaining_cg->centigrams) > 0)
+            ->visible(fn (Batch $record): bool => (Auth::user()?->can('stock.transfer') ?? false) && $record->isMovable())
             ->modalHeading(fn (Batch $record): string => __('Trasladar :batch', ['batch' => $record->displayName()]))
             ->schema([
                 Select::make('to_location_id')

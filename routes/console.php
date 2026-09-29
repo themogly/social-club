@@ -64,6 +64,10 @@ Schedule::command('wallet:settle-cross-location')->dailyAt('03:30');
 // makes that silence visible (a stale heartbeat) instead of unnoticed.
 Schedule::command('system:heartbeat')->everyFiveMinutes();
 
+// Prompt 311 — owner alerts: evaluate every 15 minutes (announce what is new, send due morning emails). Beats its own
+// heartbeat; an overlapping run is skipped rather than doubled.
+Schedule::command('alerts:evaluate')->everyFifteenMinutes()->withoutOverlapping();
+
 // The panic-lockdown safety net (prompt 121): reactivate any org locked longer than its configured delay, so a
 // locked-out club always regains access to its own statutory register without depending on us.
 Schedule::command('lockdown:auto-reactivate')->everyFiveMinutes();

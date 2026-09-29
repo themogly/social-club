@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\CspReportController;
+use App\Http\Controllers\TelegramWebhookController;
 use App\Http\Middleware\EndInactiveSessions;
 use App\Http\Middleware\EnforceCounterHandover;
 use App\Http\Middleware\EnforceOrgLockdown;
@@ -30,6 +31,10 @@ return Application::configure(basePath: dirname(__DIR__))
             // so it sits OUTSIDE the web group (post-296 audit A·7 — inside it every report started a session row).
             // Throttled per IP; TRUSTED_PROXIES must not be '*' in production or that key is spoofable.
             Route::post('csp-report', CspReportController::class)->middleware('throttle:60,1')->name('csp.report');
+
+            // Prompt 311 — the owner-alerts bot's webhook: Telegram posts with its secret header, no session and no CSRF
+            // token, so it sits outside the web group too. Throttled per IP.
+            Route::post('telegram/webhook', TelegramWebhookController::class)->middleware('throttle:60,1')->name('telegram.webhook');
         },
     )
     ->withMiddleware(function (Middleware $middleware): void {

@@ -200,6 +200,32 @@ class StockCover
     }
 
     /**
+     * Prompt 311 — the strains at a sede that need attention: low by {@see self::verdictWith()} (the same verdict the
+     * dashboard alert and *Stock bajo* use), OR sellable here with nothing left (`basis: empty`, which the badge treats as
+     * "not low" — for an alert, running out is worse than low, not recovered). With the figures the message quotes.
+     *
+     * @param  Collection<int, Genetic>  $genetics  with `prices` eager-loaded for this sede
+     * @return array<string, array{on_hand_cg: int, days: ?float, out: bool}>
+     */
+    public static function attentionAt(Collection $genetics, string $locationId): array
+    {
+        $ids = $genetics->modelKeys();
+        $onHand = self::onHandCgFor($genetics->values()->all(), $locationId);
+        $trailing = self::trailingCgFor($ids, $locationId);
+        $firstDispensed = self::firstDispensedAtFor($ids, $locationId);
+
+        $attention = [];
+        foreach ($genetics as $genetic) {
+            $verdict = self::verdictWith($genetic, $locationId, $onHand[$genetic->id] ?? 0, $trailing[$genetic->id] ?? 0, $firstDispensed[$genetic->id] ?? null);
+            if ($verdict['low'] || $verdict['basis'] === 'empty') {
+                $attention[$genetic->id] = ['on_hand_cg' => $onHand[$genetic->id] ?? 0, 'days' => $verdict['days'], 'out' => $verdict['basis'] === 'empty'];
+            }
+        }
+
+        return $attention;
+    }
+
+    /**
      * The genetics low at any of these sedes (the active sede, or every sede of an owner's rollup).
      *
      * @param  iterable<Location>  $locations
