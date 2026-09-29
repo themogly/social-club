@@ -22,9 +22,11 @@ use App\Enums\DispensationStatus;
 use App\Enums\ExpenseKind;
 use App\Enums\FeePaymentMethod;
 use App\Enums\IdDocumentType;
+use App\Enums\LocationKind;
 use App\Enums\MemberKind;
 use App\Enums\MembershipPeriod;
 use App\Enums\MemberStatus;
+use App\Enums\ProductType;
 use App\Enums\SanctionType;
 use App\Enums\SettingType;
 use App\Enums\StockMovementType;
@@ -53,6 +55,7 @@ use App\Models\User;
 use App\Support\ActiveScope;
 use App\Support\MemberNumber;
 use App\Support\Settings;
+use App\Support\StagingSeed;
 use App\Support\StockCeiling;
 use App\Support\TillSummary;
 use App\Support\Weight;
@@ -88,7 +91,8 @@ class DemoDataSeeder extends Seeder
 
     public function run(): void
     {
-        if (! app()->environment('local')) {
+        // Prompt 327 — local, or staging through csc:seed-staging only; never production.
+        if (! StagingSeed::allowed()) {
             return;
         }
 
@@ -165,6 +169,46 @@ class DemoDataSeeder extends Seeder
         [$batchesByLocation, $priceByBatch] = $this->seedCatalogue($org->id, $locations, $geneticCategories, $catBar, $staff, $strings);
 
         $this->seedFortnight($org->id, $locations, $staff, $batchesByLocation, $priceByBatch, $membersByLocation, $pettyCashCat);
+
+        $this->seedRecentFeatures($org->id, $centro, $staff, $strings['store']);
+    }
+
+    /**
+     * Prompt 327 — what the recent prompts added, so a staging club shows it: a store with a batch split between it and
+     * a sede (303); an edible by its THC (326) and a pre-roll by weight; one EMPTY batch for the Existencias filter to
+     * hide (308). All through the real writers (IntakeBatch, RecordStockMovement). The member with a fee owed is in
+     * seedFeatureMembers. The ounce price (319) is not in, so it is not seeded.
+     *
+     * @param  array{owner: User, manager: User, staff: User}  $staff
+     */
+    private function seedRecentFeatures(string $orgId, Location $centro, array $staff, string $storeName): void
+    {
+        $store = Location::create([
+            'organisation_id' => $orgId, 'name' => $storeName, 'kind' => LocationKind::ALMACEN, 'address' => 'Polígono de Ejemplo 7, 28500 Madrid',
+            'timezone' => 'UTC', 'business_day_cutoff' => '00:00', 'active' => true,
+        ]);
+        $staff['owner']->locations()->syncWithoutDetaching([$store->id]);
+        $this->scope->setLocation($centro->id);
+
+        $harvest = Genetic::create(['organisation_id' => $orgId, 'name' => 'Cosecha de Almacén', 'product_type' => ProductType::FLOWER,
+            'strain_type' => StrainType::HYBRID, 'thc_bp' => 1800, 'active' => true, 'published' => true]);
+        (new IntakeBatch)->handleParts($harvest, [
+            ['location' => $store, 'grams' => '400'],
+            ['location' => $centro, 'grams' => '20'],
+        ], ['label' => 'Cosecha de prueba', 'cost_per_gram_cents' => 300, 'price_per_gram_cents' => 900, 'operator_id' => $staff['manager']->id]);
+
+        $gummy = Genetic::create(['organisation_id' => $orgId, 'name' => 'Gominola de prueba', 'product_type' => ProductType::EDIBLE,
+            'thc_mg_per_unit' => 10, 'active' => true, 'published' => true]); // counts as 0.07 g (EdibleEquivalence)
+        (new IntakeBatch)->handle($gummy, $centro, ['units' => 30, 'price_per_unit_cents' => 400, 'operator_id' => $staff['manager']->id]);
+
+        $preroll = Genetic::create(['organisation_id' => $orgId, 'name' => 'Porro de prueba', 'product_type' => ProductType::PREROLL,
+            'grams_per_unit_cg' => 100, 'active' => true, 'published' => true]);
+        (new IntakeBatch)->handle($preroll, $centro, ['units' => 20, 'price_per_unit_cents' => 800, 'operator_id' => $staff['manager']->id]);
+
+        // One batch taken to zero, so the list's Existencias filter has something to hide.
+        $spent = Genetic::create(['organisation_id' => $orgId, 'name' => 'Lote agotado de prueba', 'product_type' => ProductType::FLOWER, 'active' => true, 'published' => true]);
+        $empty = (new IntakeBatch)->handle($spent, $centro, ['grams' => '5', 'price_per_gram_cents' => 900, 'operator_id' => $staff['manager']->id]);
+        (new RecordStockMovement)->handle($empty, StockMovementType::ADJUSTMENT, -500, ['reason' => 'Agotado (demo)', 'operator_id' => $staff['manager']->id]);
     }
 
     /**
@@ -172,7 +216,7 @@ class DemoDataSeeder extends Seeder
      * not UI rendered per request, so it deliberately does not go through lang/ files. Strain names stay
      * as-is everywhere — they are proper nouns, identical in every language.
      *
-     * @return array{faker: string, locations: array{0: string, 1: string}, grades: array{premium: string, standard: string}, bar_category: string, tiers: array{standard: string, therapeutic: string}, discounts: array{staff: string, therapeutic: string}, articles: array<string, int>, opening_stock: string, opening_balance: string, seed_debt: string}
+     * @return array{faker: string, locations: array{0: string, 1: string}, store: string, grades: array{premium: string, standard: string}, bar_category: string, tiers: array{standard: string, therapeutic: string}, discounts: array{staff: string, therapeutic: string}, articles: array<string, int>, opening_stock: string, opening_balance: string, seed_debt: string}
      */
     private function localeStrings(string $locale): array
     {
@@ -180,6 +224,7 @@ class DemoDataSeeder extends Seeder
             'es' => [
                 'faker' => 'es_ES',
                 'locations' => ['Sede Centro', 'Sede Norte'],
+                'store' => 'Almacén',
                 'grades' => ['premium' => 'Premium', 'standard' => 'Estándar'],
                 'bar_category' => 'Bar',
                 'tiers' => ['standard' => 'Socio', 'therapeutic' => 'Terapéutico'],
@@ -192,6 +237,7 @@ class DemoDataSeeder extends Seeder
             'en' => [
                 'faker' => 'en_GB',
                 'locations' => ['Central Branch', 'North Branch'],
+                'store' => 'Store',
                 'grades' => ['premium' => 'Premium', 'standard' => 'Standard'],
                 'bar_category' => 'Bar',
                 'tiers' => ['standard' => 'Member', 'therapeutic' => 'Therapeutic'],
@@ -267,7 +313,7 @@ class DemoDataSeeder extends Seeder
      * @param  array<int, Location>  $locations
      * @param  array<string, Category>  $geneticCategories
      * @param  array{owner: User, manager: User, staff: User}  $staff
-     * @param  array{faker: string, locations: array{0: string, 1: string}, grades: array{premium: string, standard: string}, bar_category: string, tiers: array{standard: string, therapeutic: string}, discounts: array{staff: string, therapeutic: string}, articles: array<string, int>, opening_stock: string, opening_balance: string, seed_debt: string}  $strings
+     * @param  array{faker: string, locations: array{0: string, 1: string}, store: string, grades: array{premium: string, standard: string}, bar_category: string, tiers: array{standard: string, therapeutic: string}, discounts: array{staff: string, therapeutic: string}, articles: array<string, int>, opening_stock: string, opening_balance: string, seed_debt: string}  $strings
      * @return array{0: array<string, array<int, Batch>>, 1: array<string, int>}
      */
     private function seedCatalogue(string $orgId, array $locations, array $geneticCategories, Category $catBar, array $staff, array $strings): array
@@ -362,7 +408,7 @@ class DemoDataSeeder extends Seeder
     /**
      * @param  array<int, Location>  $locations
      * @param  array{owner: User, manager: User, staff: User}  $staff
-     * @param  array{faker: string, locations: array{0: string, 1: string}, grades: array{premium: string, standard: string}, bar_category: string, tiers: array{standard: string, therapeutic: string}, discounts: array{staff: string, therapeutic: string}, articles: array<string, int>, opening_stock: string, opening_balance: string, seed_debt: string}  $strings
+     * @param  array{faker: string, locations: array{0: string, 1: string}, store: string, grades: array{premium: string, standard: string}, bar_category: string, tiers: array{standard: string, therapeutic: string}, discounts: array{staff: string, therapeutic: string}, articles: array<string, int>, opening_stock: string, opening_balance: string, seed_debt: string}  $strings
      * @return array<string, array<int, array{member: Member, balance: int}>>
      */
     private function seedMembers(string $orgId, array $locations, MembershipTier $tierSocio, MembershipTier $tierTera, array $staff, array $strings): array
@@ -412,7 +458,7 @@ class DemoDataSeeder extends Seeder
 
     /**
      * @param  array{owner: User, manager: User, staff: User}  $staff
-     * @param  array{faker: string, locations: array{0: string, 1: string}, grades: array{premium: string, standard: string}, bar_category: string, tiers: array{standard: string, therapeutic: string}, discounts: array{staff: string, therapeutic: string}, articles: array<string, int>, opening_stock: string, opening_balance: string, seed_debt: string}  $strings
+     * @param  array{faker: string, locations: array{0: string, 1: string}, store: string, grades: array{premium: string, standard: string}, bar_category: string, tiers: array{standard: string, therapeutic: string}, discounts: array{staff: string, therapeutic: string}, articles: array<string, int>, opening_stock: string, opening_balance: string, seed_debt: string}  $strings
      */
     private function seedFeatureMembers(string $orgId, Location $location, MembershipTier $tier, array $staff, array $strings, int $number): void
     {
@@ -458,6 +504,11 @@ class DemoDataSeeder extends Seeder
         $expMembership = $enrol($expiring);
         $expMembership->update(['expires_at' => now()->addDays(5)]);
 
+        // Prompt 327 — a membership with its fee still OWED (every other demo enrolment pays), so the outstanding-fee
+        // badge, the counter's fee block and 325's Cobrar / Condonar cuota have an example.
+        $owing = $this->makeMember($orgId, $number++, MemberStatus::ACTIVE, false);
+        (new EnrolMembership)->handle($owing, $location, $tier, ['starts_at' => now()->subWeek(), 'actor' => $staff['owner']]);
+
         // Active member carrying a warning sanction — so prompt 51's sanctions tab is not empty.
         $sanctioned = $this->makeMember($orgId, $number++, MemberStatus::ACTIVE, false);
         $enrol($sanctioned);
@@ -484,7 +535,8 @@ class DemoDataSeeder extends Seeder
             'date_of_birth' => $this->faker->dateTimeBetween('-60 years', '-21 years'),
             'address' => $this->faker->streetAddress(),
             'document_type' => IdDocumentType::DNI,
-            'document_number' => $this->faker->numerify('########').'Z',
+            // Prompt 327 — obviously fictional, never a real-looking DNI (8 digits + a letter could be someone's).
+            'document_number' => sprintf('PRUEBA-%05d', $number),
             'status' => $status,
             'is_therapeutic' => $therapeutic,
             'joined_at' => $status === MemberStatus::APPLICANT ? null : now()->subMonths(random_int(1, 18)),

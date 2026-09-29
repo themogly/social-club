@@ -17772,3 +17772,66 @@ one tap away after every bar sale.
   - *Anular* cancelled the Central one as a duplicate (paid → kept);
   - the audit log has all three corrections with their reasons;
   - a Central tablet now says "Sin membresía activa en esta sede" for M-00001.
+
+## Prompt 327 — `csc:seed-staging`: fill a staging site with realistic fake data, and never touch live
+
+- **Why:** Ben's staging site (`formacion.padron.app`, Ploi, branch `main`) needs a believable club to try every change
+  on before live. It must **never** get a copy of live: members' personal and Article 9 data stay where they are, and
+  staging has its own APP_KEY. The last attempt ran a `TrainingSeeder` that doesn't exist. Now one command,
+  `php artisan csc:seed-staging {--fresh}`, seeds a wholly **fictional** club.
+- **The refusals** (checked in this order, each naming itself, nothing touched):
+  1. an environment other than `staging` (or `local`, for the sandbox): never `production`;
+  2. a club that has launched (`Organisation::launched()`, 304's latch);
+  3. `--fresh` without the operator typing **staging**.
+
+  And, without `--fresh`, data already there: "Ya hay datos. Usa --fresh para empezar de cero."
+- **What it does:**
+  - with `--fresh`: 304's wipe without its dump (nothing real to keep): `migrate:fresh --force`, this app's Redis keys by
+    prefix (`RedisPurger`, never FLUSHALL; if Redis can't be reached it says so and carries on), and the local
+    `storage/app/public` and `member-imports` folders emptied;
+  - then `RolePermissionSeeder`, `DevAdminSeeder`, `DemoDataSeeder` and `csc:sync-permissions`;
+  - it prints the three logins (password `password`, PINs 1234 / 2345 / 3456) and the next steps.
+  - The folder-emptying helper moved out of `ResetForLaunch` into `App\Support\Reset\LocalStorageWiper`, so both commands
+    share it (304's tests unchanged and green).
+- **The demo seeders run on staging only through the command.** `App\Support\StagingSeed::allowed()`: `local` yes; `staging`
+  only when the container flag `csc.seeding_staging` is set, which the command sets after its refusals and clears
+  afterwards; anything else (production) never, whatever is set. A plain `db:seed` on staging still skips them (pinned,
+  with the flag forced on for production too).
+- **The demo data, brought up to date** (all through the real writers, per the fixture rule):
+  - a store (**Almacén**) with a batch split between it and a sede (`IntakeBatch::handleParts`, 303);
+  - an edible by its THC (10 mg, counts as 0.07 g, 326) and a pre-roll at 1 g;
+  - a member whose fee is still **owed** (every other demo enrolment pays);
+  - one batch taken to zero (`RecordStockMovement`), so *Existencias* has something to hide (308);
+  - no ounce price (319 isn't in);
+  - **no real-looking DNIs:** document numbers are now `PRUEBA-00001` etc. (they were 8 random digits plus a letter).
+    Names are invented (Faker).
+  - The store is named per the seed's locale (*Almacén* / *Store*). `DemoSeedProfileTest` looked at "every location" and "the
+    first location by name" as if all were sedes; it now looks at sedes (the store has no members, counter or ceiling),
+    and its location lists include the store.
+- **The staging marker:** on `APP_ENV=staging` (a fixed fact of the deploy), every page shows a thin **teal** strip, "ENTORNO
+  DE PRUEBAS — no es el club real": on the counter above its top bar (the layout), and in the panel (a BODY_START hook).
+  - **Teal is deliberately outside the palette,** as Ben asked: it must not read as training mode's striped amber (324, the
+    REAL club) nor as the brand blue. Inline styles, so it renders the same under both stylesheets.
+  - The tab title is prefixed "[Pruebas]": server-side on the counter; in the panel by a one-line script in HEAD_END,
+    because Filament builds its `<title>` from each page and there's no server-side hook for a prefix.
+  - Hidden on production and local.
+- **The safety net:** on staging, *Salud del sistema* shows a red "Staging no debe enviar nada real." section listing what
+  could reach the real world: a mailer other than log/array, a Telegram token, documents on S3. It reads the
+  configuration only.
+- **Tests:** `tests/Feature/Ops/SeedStagingTest.php` (8), all red first:
+  - production refuses and touches nothing;
+  - a launched club refuses;
+  - `--fresh` without «staging» refuses;
+  - existing data without `--fresh` refuses;
+  - staging `--fresh` wipes (DB, files, Redis purge recorded), seeds the store and split batch, edible, pre-roll, fee owed,
+    empty batch, no real-looking DNI, the three accounts with their PINs, and prints the logins;
+  - plain `db:seed` skips the demo seeders on staging and production;
+  - the strip and title on staging (panel and counter), not on production;
+  - the health section goes red with a real mailer or a Telegram token, and not when clean.
+- **Verified in the sandbox** (a throwaway database):
+  - `APP_ENV=staging php artisan csc:seed-staging --fresh`, typing «staging», seeded the club and printed the logins;
+  - served as staging, `tests/Browser/prove-327-staging.mjs` 7/7 PASS: owner sees the teal strip and a "[Pruebas]" tab in
+    the panel; the counter shows the strip above its top bar and "[Pruebas]"; a visit is served with the staff PIN 3456;
+  - `APP_ENV=production` refused: "Staging (or local) only. This environment is “production”: nothing was touched."
+  - **Side effect in the sandbox:** the verify run's `--fresh` emptied THIS checkout's `storage/app/public` (1 file; only
+    its `.gitignore` is left). That is the command doing its job on the machine it ran on.

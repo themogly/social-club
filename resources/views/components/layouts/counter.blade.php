@@ -52,7 +52,7 @@
              tab, the heading and the strip can never disagree. All six screens used to fall through to
              "Mostrador" — six identical titles and six identical h1s (a11y audit, WCAG 2.4.2). --}}
         @php($screenTitle = $title ?? \App\Support\CounterScreens::currentLabel())
-        <title>{{ $screenTitle ?? __('Mostrador') }} · {{ config('app.name') }}</title>
+        <title>@if (app()->environment('staging')){{ __('[Pruebas]') }} @endif{{ $screenTitle ?? __('Mostrador') }} · {{ config('app.name') }}</title>
 
         {{-- Assets only when built (or the Vite dev server is hot); guarded so a
              full-page GET never 500s before `npm run build`, and tests stay quiet. --}}
@@ -145,6 +145,7 @@
         'min-h-full bg-surface-alt text-ink antialiased dark:bg-slate-950 dark:text-slate-100',
         'md:overflow-hidden' => $fills,
     ])>
+        @include('partials.staging-strip')
         {{-- Prompt 196 — THE COUNTER SHELL IS AN ALPINE SCOPE, and that is the whole fix.
 
              Alpine 3 does not walk the document on start: it queries its root selectors and calls initTree
