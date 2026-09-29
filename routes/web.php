@@ -6,6 +6,7 @@ use App\Http\Controllers\Counter\MemberPhotoController;
 use App\Http\Controllers\CounterLocationController;
 use App\Http\Controllers\CounterManifestController;
 use App\Http\Controllers\CounterPanicController;
+use App\Http\Controllers\CounterTrainingController;
 use App\Http\Controllers\DispensationReceiptController;
 use App\Http\Controllers\LockdownReactivationController;
 use App\Http\Controllers\Member\AnnouncementController;
@@ -136,6 +137,13 @@ Route::middleware(['web', 'auth'])
 Route::middleware(['web', 'throttle:10,1'])
     ->get('/reactivar/{token}', [LockdownReactivationController::class, 'reactivate'])
     ->name('lockdown.reactivate');
+
+// Prompt 324 — *Modo formación*: enter (refused mid-visit, or where the sede doesn't allow it) and leave. Training ALSO
+// ends by itself on a lock, a switch of operator or sede, sign-out, the panel and the panic button (RunCounterTraining).
+Route::middleware(['web', 'auth'])->group(function (): void {
+    Route::post('/counter/formacion', [CounterTrainingController::class, 'start'])->name('counter.training.start');
+    Route::post('/counter/formacion/salir', [CounterTrainingController::class, 'leave'])->name('counter.training.leave');
+});
 
 // Switch the counter's working sede (prompt 89). The ONLY writer of `counter.location_id`, gated by
 // LocationSwitcher's server-side assignment check — never a raw setLocation from client input, and it

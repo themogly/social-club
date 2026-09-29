@@ -28,6 +28,11 @@ class DocumentVault
     /** Encrypt $contents and write them to $path on the private disk. */
     public static function put(string $path, string $contents): void
     {
+        // Prompt 324 — a practice request's rows are rolled back; a file written for them would not be. Nothing is written.
+        if (TrainingMode::running()) {
+            return;
+        }
+
         self::disk()->put($path, Crypt::encryptString($contents));
     }
 

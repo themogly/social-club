@@ -10,12 +10,15 @@ use App\Support\CounterHandoverConfinement;
 use App\Support\CounterLockConfinement;
 use App\Support\CounterRequest;
 use App\Support\Help;
+use App\Support\TrainingMode;
 use Filament\Actions\DeleteBulkAction;
 use Filament\Actions\ForceDeleteBulkAction;
 use Filament\Actions\RestoreBulkAction;
 use Filament\Auth\Http\Responses\Contracts\LoginResponse;
 use Filament\Schemas\Components\Form;
 use Filament\Tables\Table;
+use Illuminate\Auth\Events\Logout;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\ServiceProvider;
 use Livewire\Livewire;
 
@@ -38,6 +41,10 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        // Prompt 324 — signing out ends *Modo formación* (audited as ended, like a lock or a switch).
+        Event::listen(Logout::class, function (): void {
+            TrainingMode::end('sign_out');
+        });
 
         // Prompt 289 — a counter screen's Livewire updates are held to the same gate as its page (a person or a
         // registered counter), as Laravel's `auth` already is by default.

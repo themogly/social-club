@@ -10,6 +10,7 @@ use App\Http\Middleware\EnforceCounterHandover;
 use App\Http\Middleware\EnsureActiveLocation;
 use App\Http\Middleware\RecogniseCounterTerminal;
 use App\Http\Middleware\RedirectCounterOnlyAccounts;
+use App\Http\Middleware\RunCounterTraining;
 use App\Http\Middleware\SetDisplayTimezone;
 use App\Http\Middleware\SetLocale;
 use App\Livewire\LocaleSwitcher;
@@ -198,6 +199,8 @@ class AdminPanelProvider extends PanelProvider
                 // PIN pad, never the password form. After StartSession (it reads the session).
                 RecogniseCounterTerminal::class,
                 EnforceCounterHandover::class,
+                // Prompt 324 — the panel is never practice: arriving here from *Modo formación* ends it first.
+                RunCounterTraining::class,
                 // Prompt 262 — a counter-only account (no panel.access) asking for a panel URL goes to the counter.
                 // HERE, before ShareErrorsFromSession: Laravel's middleware priority hoists Filament's Authenticate
                 // to just after it, and Authenticate would answer 403 before a later entry could redirect.

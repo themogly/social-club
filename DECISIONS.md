@@ -17543,3 +17543,103 @@ one tap away after every bar sale.
   - choosing it, then switching to Hachís, clears it;
   - a new strain "Cali Nueva" (Hachís) → «Crear lote» opens with Hachís and Cali Nueva filled;
   - screenshots at 820 and 1440 dark.
+
+## Prompt 324 — *Modo formación*: staff practise real visits on the live counter, and nothing is saved
+
+(Sent as a second "323"; Ben numbered it 324 and put the *Crear lote* type filter first.)
+
+- **One mechanism (`App\Support\TrainingMode::run()`, applied by `App\Http\Middleware\RunCounterTraining`):**
+  - while training is on, every counter request runs inside a database transaction that is **always rolled back**;
+  - the middleware is in the web group right after `RecogniseCounterTerminal` (after StartSession, before the counter
+    guards), so it wraps the guards and the route: every write, including any nobody listed;
+  - this replaces a wrapper per entry point. The prompt's list is covered and cannot drift: dispensation, bar and
+    combined *Cobrar visita* commits, tender, wallet and tab, void/refund, till open/close/movements/expenses, the
+    reweigh, fee collect and waive, alta and application approval, check-in/out, clock in/out.
+  - The action runs for real (validation, limits, prices, stock allocation, idempotency), renders its real result, and
+    is then discarded.
+  - The session is saved after the rollback (StartSession sits outside the wrapper), so the training flag and a
+    practice basket survive between steps; no club table does.
+- **Ben's decision (324): single steps on real state.**
+  - Each step is rolled back on its own, and the next request starts from the real database, so practice runs on the
+    real state around it: the real open till, a real checked-in member.
+  - A step that needs an earlier **practice** write gets the real refusal, with nothing saved either way. Examples:
+    voiding a practice sale, serving a practice alta, selling after a practice till opening.
+  - The till screen says so in training: "la caja no se abre ni se cierra de verdad… usa la caja real ya abierta".
+  - Rejected: replaying the session per request (slower each step, fragile with time and ids); a separate practice
+    database (a copy of Article 9 member data, plus new infrastructure).
+- **Side effects a rollback can't undo, and how each is stopped:**
+  - **Queue:** `queue.default` becomes the new `training` connection (`driver: null`) for the request, so mail, push and
+    Telegram jobs go nowhere. No job in the app names its own connection (checked). The test uses the REAL database queue
+    and asserts `jobs` stays empty: `Queue::fake()` records a push on any connection, so it cannot see the null connection.
+  - **Mail:** the default mailer becomes `array` for the request.
+  - **Cache and rate limiters:** the default cache store becomes `array` for the request, and the `RateLimiter` is
+    re-resolved on it. Nothing a practice visit caches or throttles reaches the real store, so it cannot affect a real
+    visit afterwards. This is the "skip writing them" option; reads miss the cache and go to the database, which is live.
+  - **Files:**
+    - `DocumentVault::put()` writes nothing inside a training request (a dispensation's signature, an alta's document);
+    - uploads are refused outright: the counter photo route and Livewire's `upload-file` answer 403;
+    - the counter's file fields and the member-photo control show "No disponible en modo formación" instead of
+      *Hacer foto / Elegir archivo*.
+  - **Outgoing HTTP:** `Telegram::sendMessage()` returns a 503 without sending (the queue is off too; this is the
+    backstop). The counter makes no other outgoing calls.
+  - **The receipt:**
+    - its rows are gone after the rollback, so `TrainingMode::run()` notes each dispensation the request created (a
+      `created` listener registered once per event dispatcher) and renders its receipt **before** the rollback;
+    - it is kept in the session (last five), and `DispensationReceiptController` serves the kept copy;
+    - it carries a watermark and a banner, **COMPROBANTE DE PRÁCTICA — SIN VALIDEZ**;
+    - *Enviar por email* is hidden and refused.
+  - **Found by the test:** the dispatcher guard started as a static bool, which silently stopped keeping receipts after
+    the first app instance (a second test, or a long-lived worker).
+- **The panic button is never practice:** a `counter.panic` request ends training and runs for real. Pinned, and red
+  without the bypass (a practice press was rolled back).
+- **Reads are real** (members, catalogue, stock, limits), so practice looks exactly like the real thing. Staff see this
+  information at the counter anyway.
+- **Entering** (a top-bar button, then an in-page sheet: "Nada de lo que hagas se guardará. Úsalo solo para practicar."):
+  - needs a PIN-identified operator and a sede with **Permitir modo formación** on (*Sedes → Seguridad del mostrador*,
+    per sede, **on by default**, `counter_training_enabled`);
+  - refused mid-visit, when the dispensary or bar basket has items or holds a socio. `PersistsBasket` now also records
+    the socio held on the screen (`CounterBasket::putVisit`), so this is checked on the server;
+  - audited `counter.training.started`.
+- **While on:**
+  - a striped amber banner, sticky at the top of every counter screen and edge to edge, reading **MODO FORMACIÓN — nada
+    de esto cuenta**; its only control is *Salir del modo formación*. It renders outside the handover guard;
+  - every write button reads *(práctica)*: CSS keyed on the write methods' `wire:click`/`wire:submit` names
+    (`TrainingMode::WRITE_METHODS`), one place, not an edit to every button;
+  - success messages and the last-sale line say *(práctica)* too.
+- **Leaving:**
+  - *Salir*, or by itself on a lock or idle lock (`CounterOperator::clear`), another operator (`CounterOperator::set`), a
+    sede change, sign-out (a `Logout` listener), the panel (the middleware is also on the panel's own stack), or any
+    non-counter request;
+  - the practice basket and visit markers are discarded (`CounterBasket::forgetAll`);
+  - audited `counter.training.ended`, with the reason and minutes, **after** the rollback so the entry survives.
+- **Stored in the session only:** the key is `counter_training_mode`, deliberately NOT under `counter.`. A refusal flash
+  named `counter.training.refused` nested inside `counter.training` and read as "training on"; the test caught it.
+- **Tests:** `tests/Feature/Counter/TrainingModeTest.php` (8), all over real HTTP, because the wrapper is middleware and
+  `Livewire::test()` skips it.
+  1. **The guarantee:** a whole practice session, step by step as the tablet sends it (check-in; a combined visit of
+     flower + bar in cash; a tab sale; the void; a fee collected and a waiver; an alta typed at the counter and the
+     approval of a waiting application; clock in and out; a till movement; the reweigh and the close). Every club table's
+     row count and checksum are unchanged, `jobs` is empty, no files, no HTTP, and only the two training entries are
+     written.
+  2. **The pin:** the SAME script outside training writes to check-ins, dispensations, orders, cash movements, fee
+     payments, applications, members, clock events, stock takes and till sessions. This proves the guarantee's steps
+     really write.
+  3. A practice commit shows *(práctica)* and the same figures as the same real commit.
+  4. Entering is refused with a basket or where the sede disallows it.
+  5. Lock, operator switch, sede switch and the panel end it and drop the basket.
+  6. The banner is on all six screens.
+  7. Uploads are refused, the photo control is disabled, and the receipt is watermarked with no email.
+  8. Panic.
+
+  Red first: 1–7 (no routes). Tests 7's upload lines and 8 came after the code; 8 was shown red without the panic bypass.
+  `RequireOpenTillTest` classifies the two new routes (allowed without a till: practising a till opening needs none).
+- **Verified in a browser** (`tests/Browser/prove-324-training-mode.mjs`, throwaway DB, real till open), 14/14 PASS:
+  - entering asks first; the banner is at the top, edge to edge, with no sideways scroll and one control;
+  - a practice visit (M-00027, 1 g, cash, signature): the button read " (práctica)", the success "Dispensación
+    registrada. (práctica)", the last-sale line "(práctica)", no email option, the receipt watermarked;
+  - the banner is on all five other screens at 1180×820 and 820×1180; the till note is shown;
+  - after *Salir*, dispensations, lines, orders, check-ins, cash and stock movements, till sessions, wallet
+    transactions, members, clock events and the batches' stock are identical, and only `counter.training.started` and
+    `.ended` were written.
+- **For Shane on the club tablet:** the prompt's check (Lotes, Cajas, the member's history, the registro and the audit
+  log after a practice visit).

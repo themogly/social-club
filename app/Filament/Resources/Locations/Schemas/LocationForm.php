@@ -38,6 +38,7 @@ class LocationForm
         'card_readers_enabled',
         'bar_attach_socio_enabled',
         'bar_ticket_reference_enabled',
+        'counter_training_enabled', // prompt 324 — on by default
     ];
 
     /**
@@ -365,6 +366,12 @@ class LocationForm
                         Toggle::make('camera_scan_enabled')
                             ->label(__('Escaneo con cámara'))
                             ->helperText(__('Permite leer la tarjeta QR del socio con la cámara de la tableta.')),
+
+                        // Prompt 324 — practice on the real counter, nothing kept.
+                        Toggle::make('counter_training_enabled')
+                            ->label(__('Permitir modo formación'))
+                            ->default(true)
+                            ->helperText(__('El personal puede practicar en el mostrador real: nada de lo que haga en modo formación se guarda.')),
 
                         // Idle lock (prompt 120): minutes of no real operator input before a counter screen auto-locks
                         // (signs the operator out, obscures member data). Per-location; 0 disables it.

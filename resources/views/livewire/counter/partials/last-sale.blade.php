@@ -23,7 +23,7 @@
     <p data-last-sale-summary title="{{ $summary }}" class="flex min-w-0 items-center gap-1 whitespace-nowrap text-sm leading-tight text-ink dark:text-slate-100">
         <span aria-hidden="true" class="shrink-0 font-bold text-success">✓</span>
         {{-- One source line, one space between the parts: the line's text reads exactly "Última: … · … · 14:02". --}}
-        <span class="min-w-0 truncate font-semibold">{{ implode(' · ', $parts) }}</span>@if ($time !== null) <span class="shrink-0 font-semibold">· {{ $time }}</span>@endif
+        <span class="min-w-0 truncate font-semibold">{{ implode(' · ', $parts) }}</span>@if ($time !== null) <span class="shrink-0 font-semibold">· {{ $time }}</span>@endif@if (\App\Support\TrainingMode::active()) <strong class="shrink-0 text-warning" data-practice-suffix>{{ __('(práctica)') }}</strong>@endif
     </p>
 
     {{-- Prompt 317 — a menu with nothing in it is not shown (the bar ticket switched off, no void, no email). --}}
@@ -44,7 +44,7 @@
                     class="inline-flex h-11 items-center rounded-xl px-4 text-left text-sm font-semibold text-ink transition hover:bg-surface-alt dark:text-slate-100 dark:hover:bg-slate-800">{{ $receiptLabel }}</button>
             @endif
 
-            @if ($emailable)
+            @if ($emailable && ! \App\Support\TrainingMode::active()) {{-- prompt 324: a practice receipt is never emailed --}}
                 <button type="button" role="menuitem" data-last-sale-email wire:click="emailReceipt" @click="menu = false" wire:loading.attr="disabled" wire:target="emailReceipt"
                         class="inline-flex h-11 items-center rounded-xl px-4 text-left text-sm font-semibold text-ink transition hover:bg-surface-alt disabled:opacity-50 dark:text-slate-100 dark:hover:bg-slate-800">{{ __('Enviar por email') }}</button>
             @endif
