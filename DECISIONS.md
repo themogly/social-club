@@ -16261,3 +16261,67 @@ Club request: "assign, say, half to one location and half to the other when you 
   - saved as two parts with the same #n;
   - 1 g dispensed from the Central part at the counter;
   - the recall opened from the STORE part lists that member.
+
+## Prompt 304 — `csc:reset-for-launch`: wipe the test club and install the real one, safely, once
+
+Ben: "is there an artisan command to reset and create a new owner?" The live site holds only test data. Failing-first
+tests: `tests/Feature/Ops/ResetForLaunchTest.php`.
+
+- **The one-way latch.** `organisations.launched_at` is set by `php artisan csc:launch`:
+  - it confirms, stamps the date, audits `system.launched`, and prints that the reset can no longer be used;
+  - a second run reports the date and changes nothing;
+  - *Salud del sistema* has a *Lanzamiento* panel: *En marcha desde {fecha}*, or *Sin lanzar — datos de prueba
+    permitidos*.
+
+  **No command or flag clears it.** After launch, `csc:reset-for-launch` refuses for good, and so does `csc:install
+  --force`: a launched club never gets a second organisation by accident.
+- **The reset** (`csc:reset-for-launch {--purge-documents} {--no-install}`) is interactive by design; passwords are
+  asked by `csc:install`, never passed.
+  - **Refusals, before anything is touched:**
+    - the club is launched;
+    - there is no club;
+    - a lockdown is active;
+    - the typed name is not EXACTLY the association's;
+    - the second question is not answered yes;
+    - **Redis cannot be reached.** This pre-flight was added after the sandbox run found it the hard way: with
+      predis, Redis was unreachable AFTER `migrate:fresh` had run.
+  - **Then, stopping at the first failure:**
+    1. `down`;
+    2. **the dump, always first** (`App\Support\Reset\DatabaseDump`): `mysqldump` on MySQL, with the password in
+       the environment and not on the command line, or plain SQL on SQLite. It is gzipped to
+       `storage/app/backups/pre-launch-reset-{Y-m-d-His}.sql.gz`, 0600, and checked to be non-empty. **No dump, no
+       wipe**: the site comes back up and nothing is touched. The command prints the path and warns that the file
+       holds all the test data in plain form;
+    3. `migrate:fresh --force`;
+    4. **only this app's Redis keys** (`App\Support\Reset\RedisPurger`), by `REDIS_PREFIX` and Horizon's prefix, on
+       the default and cache connections. Never FLUSHALL, because other apps may share the server. It uses a raw
+       client WITHOUT the app prefix (`PredisKeyStore`, since the project runs predis; `PhpRedisKeyStore` for
+       phpredis) so it matches and deletes exact raw names. An empty prefix is skipped, never treated as "everything";
+    5. local files: `storage/app/public`, `storage/app/member-imports` and, with `DOCUMENTS_DRIVER=local`, the
+       documents root. The directories and a top-level `.gitignore` are kept, and anything whose real path is not
+       under `storage/app` is refused;
+    6. remote documents (`DOCUMENTS_DRIVER=s3`): deleted only with `--purge-documents`, after their own confirmation
+       showing the count, and never the bucket. Without the flag it prints the count and the Cloudflare steps;
+    7. `csc:install` + `csc:sync-permissions`, unless `--no-install`;
+    8. one `system.reset_for_launch` entry in the NEW database: the dump's name and the file, object and key counts,
+       no personal data;
+    9. `up`, and the next steps.
+  - **It never touches** `.env`, `APP_KEY` (so nothing depends on a key change), anything outside `storage/app`, or
+    the bucket itself.
+- **The tests never touch the real storage or a real Redis.**
+  - The storage path points at a temporary folder.
+  - Redis is replaced by a recording purger plus an in-memory `ArrayKeyStore`; it passes with Redis unreachable.
+  - The dump is swapped to prove "no dump, no wipe".
+  - The class migrates in `setUp` instead of using `RefreshDatabase`, because SQLite's `migrate:fresh` VACUUM cannot
+    run inside the test's transaction. `DatabaseMigrations`' rollback trips an old migration's `down()` on SQLite.
+- **Verified in the sandbox** (throwaway DB, `LARAVEL_STORAGE_PATH` pointed at a scratch tree, sandbox-only Redis
+  prefixes, the real local Redis):
+  - demo data with a photo, an ID scan and a staged CSV;
+  - a wrong name → refused, nothing touched;
+  - the right answers → a 0600, 48 KB dump holding the old club; one new organisation and owner; the photo, scan and
+    CSV gone (the public `.gitignore` kept); every sandbox key gone from both Redis databases, while an unrelated
+    `otherapp-keep:*` key survived;
+  - signed in as the new owner, with *Sin lanzar* showing;
+  - `csc:launch` → *En marcha desde…*; the reset and `csc:install --force` both refuse.
+- **Docs:** SETUP.md *Reinicio antes del lanzamiento*; the go-live checklist gains the reset and "`csc:launch` run on
+  the day of the first real member".

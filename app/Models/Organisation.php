@@ -23,10 +23,17 @@ class Organisation extends Model
         'contact_email', 'contact_phone', 'member_no_sequence',
     ];
 
+    /** Prompt 304 — has this deployment's club gone live? Then nothing may wipe it or install a second club. */
+    public static function launched(): ?self
+    {
+        return static::query()->whereNotNull('launched_at')->first();
+    }
+
     protected function casts(): array
     {
         return [
             'member_no_sequence' => 'integer',
+            'launched_at' => 'datetime', // prompt 304 — the one-way launch latch (set by csc:launch only)
         ];
     }
 

@@ -249,6 +249,13 @@
              It failed silently. The only symptom was an operator refused something the code grants them,
              which reads as an application bug — and that is exactly how it was reported: an OWNER told
              *"ask a manager"*. This panel is the half that reaches somebody who never sees a deploy log. --}}
+        {{-- Prompt 304 — the launch latch: until `csc:launch`, the pre-launch reset may wipe the test data; after, never. --}}
+        <x-filament::section :heading="__('Lanzamiento')" icon="heroicon-o-rocket-launch">
+            <x-filament::badge :color="$launch['launched'] ? 'success' : 'warning'" data-launch-state="{{ $launch['launched'] ? 'launched' : 'not-launched' }}">
+                {{ $launch['launched'] ? __('En marcha desde :date', ['date' => $launch['since']]) : __('Sin lanzar — datos de prueba permitidos') }}
+            </x-filament::badge>
+        </x-filament::section>
+
         <x-filament::section :heading="__('Permisos')" icon="heroicon-o-key">
             <div style="display:flex;align-items:center;gap:.5rem;margin-bottom:.5rem;">
                 <x-filament::badge :color="$permissions['in_sync'] ? 'success' : 'danger'" data-permission-drift="{{ $permissions['in_sync'] ? 'in-sync' : 'drift' }}">

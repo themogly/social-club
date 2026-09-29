@@ -75,6 +75,7 @@ class SystemHealth extends Page
             'queue' => $health->queue(),
             'cache' => $health->cache(),
             'permissions' => $health->permissions(),
+            'launch' => $health->launch(),
             'mailer' => $health->mailer(),
             'documentsDisk' => $health->documentsDisk(),
             'auditRetentionDays' => $health->auditRetentionDays(),
