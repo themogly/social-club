@@ -86,3 +86,25 @@ the gallery or files:
 **On a desktop with no camera:** only *Elegir archivo* shows.
 
 **Answer:** _(pending)_
+
+## 313 — Back in the installed, pinned *Mostrador* app
+
+**Who:** Shane, on the club's Android tablet, with the counter installed as an app (290) and **app pinning on**.
+
+**Before the fix** (an older build), if still possible: reproduce the loop exactly as reported. Press Back straight
+after launch, or several times, and watch for the launch screen and the *"to unpin…"* toast flashing.
+
+**After the fix,** with pinning on:
+
+- Press Back straight after launch, then ten times quickly. The counter stays put, and the first press shows *"El botón
+  Atrás no sale del mostrador."* once.
+- Open and close the receipt, the camera scan and *Nuevo socio/a* (alta): Back closes each one, and the next Back stays
+  on the counter.
+- Close each of those with its own button, then press Back: it stays on the counter.
+- The app never shows its launch screen or the unpin toast.
+- In a **normal Chrome tab** (not the installed app), Back still leaves the counter as usual.
+
+**Record:** the Android version, the Chrome version, whether the tablet is a registered counter (289), and a short
+screen recording.
+
+**Answer:** _(pending)_

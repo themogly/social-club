@@ -198,6 +198,13 @@
             </main>
         </div>
 
+        {{-- Prompt 313 — in the installed app, the first Back swallowed at the start of the history (rootBackGuard, app.js)
+             says why, once a session. A status line, never a dialog: a dialog would itself need Back to close. --}}
+        <div x-data="{ show: false }" x-on:csc-back-swallowed.window="show = true; setTimeout(() => show = false, 3500)"
+             x-show="show" x-cloak role="status" data-back-hint
+             class="pointer-events-none fixed inset-x-0 bottom-6 z-50 mx-auto w-fit rounded-xl bg-ink px-4 py-2 text-sm font-medium text-white shadow-lg dark:bg-slate-800">
+            {{ __('El botón Atrás no sale del mostrador.') }}
+        </div>
         @livewireScripts
     </body>
 </html>

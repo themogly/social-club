@@ -16865,3 +16865,65 @@ a club but there's stuff at storage" to read differently from "running out".
     seen in the 308–310 full runs.
   - It is left **open**, not skipped. The next step is to bisect the suite order in front of it (`--order-by=defects`,
     then halving) to find the test leaking state.
+
+## Prompt 313 — in the installed app, Back at the start of the counter does nothing, so app pinning can't loop
+
+Club report: in the installed *Mostrador* app with Android app pinning on, pressing Back straight after launch, or
+too many times, "sits on its launch screen, with the prompt about how to unpin the app flashing up".
+
+- **Cause (from Android's behaviour and the code; the device reproduction is pending, see *Verify*):**
+  - in a standalone app, Back at the first history entry closes the activity;
+  - pinning refuses to leave, shows the unpin toast and restarts the app on its splash, and every Back repeats it;
+  - the counter handled Back for its overlays (272) but never protected the **start** of its history.
+- **The guard, `rootBackGuard` (`app.js`):**
+  - it runs on every counter page load, **only** when `display-mode: standalone` or `fullscreen` matches;
+  - it marks the page's entry `cscRoot` (`replaceState`, keeping any existing state) and pushes a `cscGuard` entry
+    above it;
+  - a `popstate` onto `cscRoot` pushes the guard again and does nothing else: no navigation, no reload, no request.
+- **Never in a normal browser tab:** trapping Back there would be hostile, and Back there leaves the site as it always
+  has. That is pinned by the browser test: `history.length` is untouched, and Back leaves.
+- **Leaving the counter** is the top bar's job (tabs, *Administración*, sign out), never Back.
+- **The hint:** the first swallowed Back in a session shows *"El botón Atrás no sale del mostrador."*, a status line in
+  the counter's style, via `csc-back-swallowed` in the counter layout. It is never a dialog, because a dialog would
+  itself need Back to close.
+- **With `overlayHistory`:**
+  - overlays push their entries **above** the guard, so Back closes the overlay first and the next Back is swallowed;
+  - `overlayHistory.pop()`'s `history.back()` (an overlay closed any other way) lands on the guard entry, not the root,
+    so it never trips the root handler;
+  - the top bar's links are full page loads (`wire:navigate.ignore`), so each screen installs its own guard, and Back
+    after moving between screens stays on the current screen.
+- **The listener clean-up** (wider check: every `pushState`, `popstate` and `history.back()` in the counter's views and
+  `app.js`):
+  - **terminal dialog, *Mis horas*** (`counter-surface.blade.php`): these used a `{ once: true }` listener added in
+    `x-init`, which stayed behind when the dialog closed by its button and fired on a later, unrelated Back. They now
+    use a new shared Alpine component, `historyDialog(name, onBack)`, built on `overlayHistory`: the listener is added
+    on open and removed in `destroy()` (the dialog is `@if`, so it leaves the page on close), and the dialog takes back
+    its own entry when closed any other way.
+  - **receipt sheet, document sheet:** one listener each, guarded by the open state, and `history.back()` only when the
+    current state is theirs. They were fine as they were.
+    - **A real bug found here:** each sheet navigated ONE long-lived `<iframe>` (`about:blank` → the receipt → back to
+      `about:blank`). Every navigation of a frame adds a joint session-history entry, so Back stepped the **frame**
+      back instead of closing the sheet, and `history.length` grew on every open.
+    - The iframe is now created fresh per opening (`<template x-if>` around the iframe only; the sheet itself stays
+      `x-show`, per 245), and a new frame's first load adds no entry.
+    - `ReceiptSheetTest` is updated to allow exactly that one template.
+  - **`x-counter.sheet`**, the alta modal, the bar's misc sheet, the camera and photo overlays: each adds its listener
+    on open or init, removes it on close or destroy, and calls `history.back()` only for its own state. Unchanged.
+- **Tests:**
+  - `tests/Browser/prove-313-back-guard.mjs` (standalone emulated by overriding `matchMedia` in an init script;
+    Playwright's `emulateMedia` has no display-mode):
+    - each tab loads `about:blank` first, so "Back leaves" is observable;
+    - on all six counter screens, Back ×1 and ×5 keeps the URL with no request and no reload;
+    - a browser tab has `history.length` 2 and Back leaves;
+    - Back after moving between screens stays inside the counter;
+    - alta modal, terminal dialog, *Mis horas* and receipt sheet each close on Back, the next Back stays, and after
+      closing with their own button Back stays with no stale `cancelTerminal`/`closeMyHours` call;
+    - red before the change (every standalone check left for `about:blank`), green after;
+    - the camera overlay was **skipped**: this headless Chromium has no `BarcodeDetector`, so its trigger hides
+      itself. It is left to the tablet check.
+  - `tests/Feature/Design/CounterBackHistoryTest.php` keeps the three structural points on every commit: the guard
+    bails out outside the installed app, no `{ once: true }` `popstate` listener anywhere, and the sheets create a
+    fresh frame per opening.
+- **Device result: pending.** Shane checks on the pinned tablet (Android and Chrome versions, registered or not, a
+  recording); the steps are in `verification/real-device-checks.md` (313).
+- **For the club now:** if the loop starts, hold Back and Recents together to unpin; the app reopens normally.
