@@ -17702,3 +17702,73 @@ one tap away after every bar sale.
   - after *Crear lote*, the counter card reads "10 mg THC", and dispensing 2 takes **0.14 g** off *Restante hoy* (3.50 →
     3.36), line 14 cg;
   - the setting (default 150) changed to 100 → the edible counts 0.10 g, its form says so, and the past line keeps 14 cg.
+
+## Prompt 325 — a membership can be corrected after it's created: tier, dates, fee, cancel
+
+(First issued as 322; re-issued as 325 because 322 went to the PIN-field fix.)
+
+- **Why specific corrections, not an *Editar* form:** a membership decides who may be dispensed to (eligibility reads
+  ACTIVE memberships), and it carries money (the fee). A free edit could make someone servable, or erase a debt,
+  without a trace. So there are four corrections on *Socios → Membresías*, each through ONE writer, each with a required
+  reason, each audited with the old and new values:
+  - **Cambiar tarifa** → `App\Actions\Memberships\ChangeMembershipTier`;
+  - **Corregir fechas** → `CorrectMembershipDates`;
+  - **Cobrar cuota / Condonar cuota** → the counter's own `RecordFeePayment` (payment, or `WAIVED` with its reason);
+  - **Anular** → `App\Actions\Memberships\CancelMembership`. Not to be confused with `App\Actions\Members\CancelMembership`,
+    the member's baja (every membership, plus the departure).
+- **Permission `membership.manage`** (*Corregir membresías*, group *Membresías y cuotas* on *Roles y permisos*): OWNER and
+  MANAGER by default. `App\Support\MembershipCorrections` adds the sede rule, so a manager corrects only memberships at a
+  sede they may work at; it is asked for the action's visibility AND again in every writer. Collect and waive use their
+  existing permissions (`membership.fee.collect` / `.waive`) under the same sede rule.
+- **The corrections sit in one ⋮ menu** (*Corregir*) beside *Renovar* and *Transferir*: seven inline buttons pushed the
+  table sideways (seen in the browser). A cancelled membership offers no corrections.
+- **Cambiar tarifa, and the fee:**
+  - while any of it is still owed, what is owed becomes the new tier's fee, or a typed amount with
+    `membership.fee.override`, as enrolment does, and never below what has already been paid;
+  - once it is settled (paid or waived), the fee stays; the tier changes and the difference is only reported: "La cuota
+    ya está pagada; cobra o devuelve la diferencia desde la caja si corresponde." No money moves;
+  - audited `membership.tier.changed`. The tier's limits and discounts apply from now on; nothing dispensed changes.
+- **Corregir fechas:**
+  - expiry must be after start;
+  - before saving, the form says "Con estas fechas la membresía no estará activa hoy." when that is so;
+  - **the status comes from the nightly sweep's own rule.** That rule was inline SQL in `SweepMembershipExpiry`; it is now
+    `App\Support\MembershipExpiry` (LAPSED / EXPIRING_SOON / ACTIVE by expiry and `expiring_soon_days`). The sweep and the
+    "vence pronto" scope draw their lines from it too. A pin test runs the sweep across six expiries and asserts it
+    agrees with `statusOn()`;
+  - dispensations under the old dates are untouched. Audited `membership.dates.corrected`.
+- **Cobrar / Condonar cuota** (shown only while a fee is owed):
+  - the SAME writer and rules as the counter, with no second fee writer: collecting refuses more than is owed; cash needs
+    the sede's open till, and otherwise says "Abre la caja de :sede para cobrar en efectivo, o cobra desde el monedero."
+    with the existing *Ir a la caja* hand-off; the wallet needs no till;
+  - waiving uses the counter's reasons, now shared as `App\Support\FeeWaiverReasons` (the counter's `waiveReasonOptions`
+    / `resolvedWaiveReason` call it; behaviour unchanged). It records the same `WAIVED` row and `membership.fee.waived`
+    audit (219).
+- **Anular:**
+  - status CANCELLED with a required reason; the row stays, shown as *Cancelada*, never deleted;
+  - a cancelled membership no longer lets the socio be served at that sede ("Sin membresía activa en esta sede"), because
+    eligibility reads ACTIVE only; no rule was added for it;
+  - **a paid fee is never cancelled silently.** Ben's decision (325): **there is no fee refund yet**, and none existed
+    (the prompt's "existing refund path" covers dispensations only). So a membership with money taken for its fee
+    (payments, not waivers) is cancelled only with **Mantener la cuota pagada (:amount). No se devuelve dinero.** ticked.
+    No money moves;
+  - **dispensation guard:** completed dispensations to the socio at that sede in the last 30 days refuse it, naming how
+    many, unless confirmed. Dispensations carry no membership id, so "under this membership" is the socio at its sede;
+  - audited `membership.cancelled` with the reason, whether a paid fee was kept, and the recent-dispensation count.
+- **Unchanged:** enrolment, *Renovar*, *Transferir*, the counter's collection and waiver (same writer, same reasons), the
+  nightly sweep's behaviour, and the eligibility rules.
+- **Tests:** `tests/Feature/Members/MembershipCorrectionsTest.php` (10), all red first:
+  - tier while owed; tier after payment;
+  - dates (the status, the warning shown and not shown, expiry before start refused);
+  - the sweep agrees with `statusOn`;
+  - collect (no till refused with the hand-off; open till → the same CASH row);
+  - waive (the same WAIVED row and audit);
+  - cancel unpaid (row kept, blocks serving); cancel paid (only keeping); recent dispensations (refused until confirmed);
+  - permissions (staff see none; a manager only at their sede).
+- **Verified in a browser** (`tests/Browser/prove-325-membership-corrections.mjs`, throwaway DB), 8/8 PASS. On M-00001
+  (paid at Central), a second membership added at North, as in Ben's photo:
+  - *Cambiar tarifa* Member → Therapeutic, and what is owed followed it (€10);
+  - *Corregir fechas* moved its expiry;
+  - *Cobrar cuota* took the €10 in cash into North's open till;
+  - *Anular* cancelled the Central one as a duplicate (paid → kept);
+  - the audit log has all three corrections with their reasons;
+  - a Central tablet now says "Sin membresía activa en esta sede" for M-00001.

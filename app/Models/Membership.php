@@ -6,7 +6,7 @@ use App\Casts\MoneyCast;
 use App\Enums\MembershipStatus;
 use App\Models\Concerns\BelongsToOrganisation;
 use App\Models\Concerns\ScopedToLocation;
-use App\Support\Settings;
+use App\Support\MembershipExpiry;
 use Database\Factories\MembershipFactory;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
@@ -93,11 +93,21 @@ class Membership extends Model
      */
     public function scopeExpiringSoon(Builder $query): Builder
     {
-        $days = (int) Settings::get('expiring_soon_days', 30);
-
         return $query
             ->whereIn('status', [MembershipStatus::ACTIVE->value, MembershipStatus::EXPIRING_SOON->value])
             ->whereNotNull('expires_at')
-            ->whereBetween('expires_at', [now(), now()->addDays($days)]);
+            ->whereBetween('expires_at', [now(), MembershipExpiry::windowEnd(now())]);
+    }
+
+    /** What is still owed on the fee: the fee less every payment and waiver recorded against it, never negative. */
+    public function owedCents(): int
+    {
+        return max(0, $this->fee_cents->cents - (int) MembershipFeePayment::query()->where('membership_id', $this->id)->sum('amount_cents'));
+    }
+
+    /** Has anything been paid (or waived) against the fee? */
+    public function hasFeePayments(): bool
+    {
+        return MembershipFeePayment::query()->where('membership_id', $this->id)->exists();
     }
 }

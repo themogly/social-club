@@ -4,7 +4,6 @@ namespace App\Livewire\Counter\Concerns;
 
 use App\Actions\Memberships\RecordFeePayment;
 use App\Enums\FeePaymentMethod;
-use App\Enums\MembershipStatus;
 use App\Exceptions\DebtLimitExceededException;
 use App\Models\Location;
 use App\Models\Member;
@@ -13,6 +12,7 @@ use App\Models\MembershipFeePayment;
 use App\Models\TillSession;
 use App\Models\User;
 use App\Support\CounterOperator;
+use App\Support\FeeWaiverReasons;
 use App\Support\Money;
 
 /**
@@ -229,19 +229,7 @@ trait CollectsMembershipFees
     /** The reason as it will be stored, or null when the operator has not given one. */
     private function resolvedWaiveReason(): ?string
     {
-        $option = collect($this->waiveReasonOptions())->firstWhere('value', $this->waiveReason);
-
-        if ($option === null) {
-            return null;
-        }
-
-        if ($option['value'] !== 'OTHER') {
-            return (string) $option['label'];
-        }
-
-        $text = trim($this->waiveReasonText);
-
-        return $text !== '' ? $text : null;
+        return FeeWaiverReasons::resolve($this->waiveReasonOptions(), $this->waiveReason, $this->waiveReasonText);
     }
 
     /**
@@ -281,28 +269,8 @@ trait CollectsMembershipFees
     public function waiveReasonOptions(): array
     {
         $subjectId = $this->feeSubjectId();
-        $member = $subjectId !== null ? Member::query()->find($subjectId) : null;
-        $location = $this->resolveLocation();
 
-        $therapeutic = (bool) ($member?->is_therapeutic);
-        $elsewhere = $member !== null && $location !== null && $member->memberships()->withoutGlobalScopes()
-            ->where('location_id', '!=', $location->id)
-            ->where('status', MembershipStatus::ACTIVE->value)
-            ->exists();
-
-        $options = [];
-
-        if ($therapeutic) {
-            $options[] = ['value' => 'THERAPEUTIC', 'label' => __('Terapéutico'), 'suggested' => true];
-        }
-
-        if ($elsewhere) {
-            $options[] = ['value' => 'OTHER_SEDE', 'label' => __('Socio en otra sede'), 'suggested' => true];
-        }
-
-        $options[] = ['value' => 'OTHER', 'label' => __('Otro motivo'), 'suggested' => false];
-
-        return $options;
+        return FeeWaiverReasons::options($subjectId !== null ? Member::query()->find($subjectId) : null, $this->resolveLocation());
     }
 
     /** Open the waiver, pre-selecting the record-backed reason when there is exactly one obvious candidate. */

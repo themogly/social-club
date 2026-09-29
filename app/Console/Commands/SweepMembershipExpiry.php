@@ -8,6 +8,7 @@ use App\Mail\MembershipReminderMail;
 use App\Models\HeartbeatLog;
 use App\Models\Membership;
 use App\Notifications\MembershipExpiringNotification;
+use App\Support\MembershipExpiry;
 use App\Support\Settings;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Mail;
@@ -27,7 +28,7 @@ class SweepMembershipExpiry extends Command
     public function handle(): int
     {
         $now = now();
-        $expiringWindow = (int) Settings::get('expiring_soon_days', 30);
+        // Prompt 325 — the lines come from MembershipExpiry, the one rule *Corregir fechas* also uses.
         $reminderLead = (int) Settings::get('renewal_reminder_lead_days', 7);
 
         // 1) Lapse memberships whose expiry has passed.
@@ -40,7 +41,7 @@ class SweepMembershipExpiry extends Command
         // 2) Flag memberships entering the expiring-soon window.
         Membership::query()->withoutGlobalScopes()
             ->whereNotNull('expires_at')
-            ->whereBetween('expires_at', [$now, $now->copy()->addDays($expiringWindow)])
+            ->whereBetween('expires_at', [$now, MembershipExpiry::windowEnd($now)])
             ->where('status', MembershipStatus::ACTIVE->value)
             ->update(['status' => MembershipStatus::EXPIRING_SOON->value]);
 
