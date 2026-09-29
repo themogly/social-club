@@ -56,6 +56,7 @@ use App\Support\PriceResult;
 use App\Support\Settings;
 use App\Support\SettledOutcome;
 use App\Support\StockCover;
+use App\Support\TrainingMode;
 use App\Support\VaultUrl;
 use App\Support\Wallet;
 use App\Support\Weight;
@@ -1322,6 +1323,11 @@ class DispensaryPos extends Component
     /** Email the just-committed receipt to the socio (prompt 56) — worded as an aportación. */
     public function emailReceipt(): void
     {
+        if (TrainingMode::active()) { // prompt 324 — a practice receipt is never emailed
+            $this->flash(__('No disponible en modo formación'), 'error');
+
+            return;
+        }
         if ($this->lastDispensationId === null) {
             return;
         }

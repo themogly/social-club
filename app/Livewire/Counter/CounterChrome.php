@@ -3,6 +3,8 @@
 namespace App\Livewire\Counter;
 
 use App\Support\CounterHandover;
+use App\Support\Settings;
+use App\Support\TrainingMode;
 use Illuminate\Contracts\View\View;
 use Livewire\Attributes\On;
 use Livewire\Component;
@@ -64,6 +66,9 @@ class CounterChrome extends Component
             // holds the tablet there is no element to find, no link to follow and nothing for a keyboard to
             // reach — absent from the DOM, never hidden by CSS.
             'handedOver' => CounterHandover::active(),
+            // Prompt 324 — *Modo formación*: the banner (on every screen, even handed over) and the practice suffix.
+            'training' => TrainingMode::active(),
+            'trainingAllowed' => (bool) Settings::get('counter_training_enabled', true, session('counter.location_id')),
         ]);
     }
 }

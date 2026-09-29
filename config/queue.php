@@ -35,6 +35,12 @@ return [
             'driver' => 'sync',
         ],
 
+        // Prompt 324 — *Modo formación*: a practice request's jobs go nowhere (a null connection), so no mail, push or
+        // Telegram message can leave for something that was rolled back. Set per request by TrainingMode.
+        'training' => [
+            'driver' => 'null',
+        ],
+
         'database' => [
             'driver' => 'database',
             'connection' => env('DB_QUEUE_CONNECTION'),

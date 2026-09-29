@@ -31,6 +31,8 @@ trait PersistsBasket
     public function dehydratePersistsBasket(): void
     {
         CounterBasket::put($this->basketScreen(), $this->locationId, $this->basket);
+        // Prompt 324 — a socio held here is a visit under way, even with nothing in the basket yet.
+        CounterBasket::putVisit($this->basketScreen(), $this->locationId, $this->memberId);
     }
 
     /**

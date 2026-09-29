@@ -69,6 +69,8 @@ class RequireOpenTill
         'reactivar/*',              // lifting a lockdown
         'counter/pos/receipt/*',    // reads of a committed contribution
         'counter/bar/receipt/*',    // reads of a committed sale
+        'counter/formacion',        // prompt 324 — entering *Modo formación* (practising a till opening needs no till)
+        'counter/formacion/salir',  // prompt 324 — leaving it
         'filament/*',               // Filament's own auth (log out) and asset routes
         'up',                       // health check
     ];

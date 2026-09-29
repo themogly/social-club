@@ -2,6 +2,7 @@
 
 namespace App\Support;
 
+use GuzzleHttp\Psr7\Response as Psr7Response;
 use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\Http;
 
@@ -19,6 +20,11 @@ final class Telegram
 
     public static function sendMessage(string $chatId, string $text): Response
     {
+        // Prompt 324 — nothing leaves for something done in *Modo formación* (the queue is off too; this is the backstop).
+        if (TrainingMode::running()) {
+            return new Response(new Psr7Response(503));
+        }
+
         return Http::asJson()->timeout(10)
             ->post(self::endpoint('sendMessage'), ['chat_id' => $chatId, 'text' => $text, 'disable_web_page_preview' => true]);
     }

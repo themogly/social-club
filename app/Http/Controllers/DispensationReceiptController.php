@@ -3,7 +3,8 @@
 namespace App\Http\Controllers;
 
 use App\Models\Dispensation;
-use Illuminate\Contracts\View\View;
+use App\Support\TrainingMode;
+use Illuminate\Http\Response;
 use Illuminate\Support\Facades\Gate;
 
 /**
@@ -17,14 +18,26 @@ use Illuminate\Support\Facades\Gate;
  */
 class DispensationReceiptController extends Controller
 {
-    public function show(string $dispensation): View
+    public function show(string $dispensation): Response
     {
+        // Prompt 324 — a practice receipt: rendered before its request was rolled back (TrainingMode), watermarked.
+        $practice = TrainingMode::active() ? TrainingMode::keptReceipt('dispensation', $dispensation) : null;
+        if ($practice !== null) {
+            return response($practice);
+        }
+
         $model = Dispensation::query()->withoutGlobalScopes()->findOrFail($dispensation);
 
+        return response(self::html($model));
+    }
+
+    /** The receipt's HTML (authorised). Also rendered by TrainingMode for a practice commit, before its rollback. */
+    public static function html(Dispensation $model): string
+    {
         Gate::authorize('view', $model);
 
         $model->load(['lines', 'member', 'location', 'organisation']);
 
-        return view('receipts.receipt', ['dispensation' => $model]);
+        return view('receipts.receipt', ['dispensation' => $model])->render();
     }
 }

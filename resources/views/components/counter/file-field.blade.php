@@ -25,6 +25,10 @@
 @php($model = $attributes->wire('model')->value() ?: $attributes->get('name'))
 <div x-data="{ fileName: '' }">
     <p id="{{ $id }}-label" class="block text-sm font-medium text-ink-muted dark:text-slate-400">{{ $label }}</p>
+    {{-- Prompt 324 — a file on disk is not something a practice rollback can take back: no upload in *Modo formación*. --}}
+    @if (\App\Support\TrainingMode::active())
+    <p data-training-no-upload class="mt-1 text-sm font-medium text-warning">{{ __('No disponible en modo formación') }}</p>
+    @else
     <div class="mt-1 flex min-w-0 flex-wrap items-center gap-2">
         @if ($camera)
             <x-button as="label" variant="secondary" size="sm" class="min-h-11 shrink-0" data-camera-button>
@@ -45,6 +49,7 @@
         </x-button>
         <span data-file-name class="min-w-0 truncate text-sm text-ink-muted dark:text-slate-400" x-text="fileName || @js(__('Ningún archivo'))">{{ __('Ningún archivo') }}</span>
     </div>
+    @endif
     @if ($hint)
         <p class="mt-0.5 text-[11px] leading-tight text-ink-muted dark:text-slate-400">{{ $hint }}</p>
     @endif

@@ -39,6 +39,10 @@
         .row { display: flex; justify-content: space-between; font-size: 13px; padding: 3px 0; }
         .total { display: flex; justify-content: space-between; font-size: 16px; font-weight: 700; border-top: 2px solid #0f172a; margin-top: 8px; padding-top: 8px; }
         .foot { font-size: 11px; color: #475569; margin-top: 20px; line-height: 1.5; }
+        /* Prompt 324 — a practice receipt can never pass for a real one: a watermark across the page and a banner. */
+        .practice-mark { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; pointer-events: none; z-index: 10; }
+        .practice-mark span { transform: rotate(-30deg); font-size: 34px; font-weight: 800; letter-spacing: .08em; color: rgba(217, 119, 6, .35); text-align: center; }
+        .practice-head { background: #d97706; color: #0f172a; font-weight: 800; text-align: center; padding: 8px; border-radius: 8px; margin-bottom: 12px; }
         .badge { display: inline-block; background: #dc2626; color: #fff; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; padding: 4px 10px; border-radius: 999px; margin-bottom: 12px; }
         .actions { max-width: 380px; margin: 16px auto 0; text-align: center; }
         button {
@@ -55,6 +59,10 @@
     </style>
 </head>
 <body>
+@if (\App\Support\TrainingMode::active())
+    <div class="practice-mark" data-practice-receipt aria-hidden="true"><span>{{ __('COMPROBANTE DE PRÁCTICA — SIN VALIDEZ') }}</span></div>
+    <p class="practice-head" role="note">{{ __('COMPROBANTE DE PRÁCTICA — SIN VALIDEZ') }}</p>
+@endif
     @if ($showWayBack)
         <div class="wayback" data-way-back>
             <a href="{{ route('counter.home') }}">&larr; {{ __('Volver al mostrador') }}</a>

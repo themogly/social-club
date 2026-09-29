@@ -95,6 +95,39 @@ class CounterBasket
     }
 
     /**
+     * Prompt 324 — which socio this screen is serving, if any (a visit under way even before the first line). Kept
+     * beside the basket so *Modo formación* can refuse to start mid-visit; the member id alone, nothing else.
+     */
+    public static function putVisit(string $screen, ?string $locationId, ?string $memberId): void
+    {
+        $key = self::key($screen, $locationId);
+        if ($key === null) {
+            return;
+        }
+
+        $memberId === null ? Session::forget('counter.visit'.substr($key, strlen('counter.basket'))) : Session::put('counter.visit'.substr($key, strlen('counter.basket')), $memberId);
+    }
+
+    /** Prompt 324 — is a visit under way on either basket screen at this sede (items, or a socio held)? */
+    public static function inProgress(?string $locationId): bool
+    {
+        foreach (['pos', 'bar'] as $screen) {
+            $key = self::key($screen, $locationId);
+            if ($key !== null && (self::get($screen, $locationId) !== [] || Session::has('counter.visit'.substr($key, strlen('counter.basket'))))) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /** Prompt 324 — every stashed basket and visit, all screens, sedes and operators: leaving *Modo formación*. */
+    public static function forgetAll(): void
+    {
+        Session::forget(['counter.basket', 'counter.visit']);
+    }
+
+    /**
      * `counter.basket.<screen>.<sede>.<operator>` — null when there is no sede or no identified operator,
      * in which case there is nothing to stash against and nothing to restore.
      */

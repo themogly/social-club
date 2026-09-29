@@ -7,6 +7,7 @@ use App\Http\Middleware\EnforceCounterHandover;
 use App\Http\Middleware\EnforceOrgLockdown;
 use App\Http\Middleware\RecogniseCounterTerminal;
 use App\Http\Middleware\RequireOpenTill;
+use App\Http\Middleware\RunCounterTraining;
 use App\Http\Middleware\SecurityHeaders;
 use App\Http\Middleware\SetLocale;
 use Illuminate\Foundation\Application;
@@ -72,6 +73,9 @@ return Application::configure(basePath: dirname(__DIR__))
             EndInactiveSessions::class,
             // Prompt 289 — a registered counter opens on the PIN pad; reads the session, so AFTER StartSession.
             RecogniseCounterTerminal::class,
+            // Prompt 324 — *Modo formación*: wraps everything after it (the guards and the route) in a transaction
+            // that is always rolled back. Reads the session (so after StartSession, which then saves it for real).
+            RunCounterTraining::class,
             EnforceCounterHandover::class,
             RequireOpenTill::class,
             SetLocale::class,

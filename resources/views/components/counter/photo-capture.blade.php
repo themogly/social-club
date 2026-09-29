@@ -43,6 +43,10 @@
          demand its natural width, so at 266px they stack into two full-width rows and the nag goes back to
          150px. Letting "Subir archivo" take two lines inside its own box costs 10px in portrait and keeps
          the row to one line of text plus one line of controls, which is the shape 225 promised. --}}
+    {{-- Prompt 324 — no photo in *Modo formación*: a file on disk is not something a practice rollback can take back. --}}
+    @if (\App\Support\TrainingMode::active())
+    <p data-training-no-upload class="text-sm font-medium text-warning">{{ __('No disponible en modo formación') }}</p>
+    @else
     <div class="flex flex-wrap items-center gap-2">
         <x-button variant="secondary" size="sm" x-show="supported" x-cloak x-on:click="open()" data-camera-button class="min-h-11 flex-1 basis-0 gap-2 whitespace-nowrap px-3">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" class="h-5 w-5" aria-hidden="true">
@@ -58,6 +62,7 @@
             {{ __('Elegir archivo') }}
         </label>
     </div>
+    @endif
 
     <p x-show="error" x-cloak x-text="error" role="alert" class="mt-2 rounded-lg bg-error/10 px-3 py-1.5 text-sm font-medium text-error"></p>
 

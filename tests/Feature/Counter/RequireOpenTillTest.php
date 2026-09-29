@@ -75,6 +75,8 @@ class RequireOpenTillTest extends TestCase
         'counter/members/{member}/photo' => 'allow',     // identity-photo write (XHR, mid-serve)
         'counter/pos/receipt/{dispensation}' => 'allow', // read of a committed contribution
         'counter/bar/receipt/{order}' => 'allow',        // read of a committed sale
+        'counter/formacion' => 'allow',                  // prompt 324 — enter *Modo formación* (POST)
+        'counter/formacion/salir' => 'allow',            // prompt 324 — leave it (POST)
     ];
 
     private Organisation $org;

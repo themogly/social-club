@@ -57,7 +57,8 @@
         ])
     >
         <div class="min-w-0 flex-1">
-            <span>{{ $flashMessage }}</span>
+            {{-- Prompt 324 — in *Modo formación* a success says it was practice: "Visita liquidada … (práctica)". --}}
+            <span>{{ $flashMessage }}@if ($flashType === 'success' && \App\Support\TrainingMode::active()) <strong data-practice-suffix>{{ __('(práctica)') }}</strong>@endif</span>
             {{-- The outcome rides INSIDE this live region, so a successful commit is announced once, as one
                  message, with the figures (prompt 202 on top of 199's one-region rule). --}}
             @include('livewire.counter.partials.settled-outcome')

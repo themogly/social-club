@@ -22,6 +22,10 @@ class CounterOperator
 
     public static function set(User $operator): void
     {
+        // Prompt 324 — another person at the PIN ends *Modo formación*: practice belongs to whoever started it.
+        if (TrainingMode::state() !== null && TrainingMode::state()['operator_id'] !== $operator->id) {
+            TrainingMode::end('operator');
+        }
         session()->forget(self::CLOCK_UNDO);
         session([self::KEY => $operator->id]);
         request()->attributes->remove(self::MEMO);
@@ -58,6 +62,7 @@ class CounterOperator
 
     public static function clear(): void
     {
+        TrainingMode::end('lock'); // prompt 324 — a lock (or idle lock) ends *Modo formación*
         session()->forget([self::KEY, self::CLOCK_UNDO]);
         request()->attributes->remove(self::MEMO);
     }

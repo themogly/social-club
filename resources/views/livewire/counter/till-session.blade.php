@@ -25,6 +25,12 @@
              committed, the drawer opened or already closed) and anything raised outside a form. A form's own
              result renders INSIDE its card, beside its button (prompt 279) — at iPad landscape the operator has
              scrolled down to the form, and an answer up here landed 300–600px above the viewport. --}}
+        {{-- Prompt 324 — in *Modo formación* each step is discarded at once: the till is never really opened or closed. --}}
+        @if (\App\Support\TrainingMode::active())
+            <p data-training-till-note class="mb-4 rounded-xl border border-warning/30 bg-warning/10 px-4 py-3 text-sm font-medium text-warning">
+                {{ __('En modo formación la caja no se abre ni se cierra de verdad: cada paso se descarta. Para practicar ventas, usa la caja real ya abierta.') }}
+            </p>
+        @endif
         @if ($flashSlot === null)
             @include('livewire.counter.partials.counter-flash', ['anchor' => 'data-commit-feedback', 'spacing' => '', 'nonce' => $flashSeq])
         @endif
