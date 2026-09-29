@@ -242,7 +242,7 @@
                             </div>
                             <div>
                                 <label for="misc-amount" class="block text-xs font-medium text-ink-muted dark:text-slate-400">{{ __('Importe (€)') }}</label>
-                                <input id="misc-amount" type="text" inputmode="decimal" wire:model="miscAmount" autocomplete="off" placeholder="0,00" class="mt-1 h-11 w-full rounded-xl border border-line bg-surface px-3 text-base text-ink placeholder:text-ink-muted focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/40 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100">
+                                <input id="misc-amount" type="text" inputmode="decimal" wire:model="miscAmount" autocomplete="off" placeholder="0.00" class="mt-1 h-11 w-full rounded-xl border border-line bg-surface px-3 text-base text-ink placeholder:text-ink-muted focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/40 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100">
                             </div>
                             <div>
                                 <label for="misc-ref" class="block text-xs font-medium text-ink-muted dark:text-slate-400">{{ __('Motivo') }}</label>
@@ -381,7 +381,7 @@
                                 wire:model.live.debounce.400ms="walletInput"
                                 @disabled($member === null)
                                 autocomplete="off"
-                                placeholder="0,00"
+                                placeholder="0.00"
                                 class="mt-1 h-11 w-full rounded-xl border border-line bg-surface px-3 text-base text-ink placeholder:text-ink-muted focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/40 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
                             >
                         </div>
@@ -407,7 +407,7 @@
                                 inputmode="decimal"
                                 wire:model.live.debounce.400ms="cashTendered"
                                 autocomplete="off"
-                                placeholder="0,00"
+                                placeholder="0.00"
                                 class="mt-2 h-11 w-full rounded-xl border border-line bg-surface px-3 text-base text-ink placeholder:text-ink-muted focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/40 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
                             >
                         </div>

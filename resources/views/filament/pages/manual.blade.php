@@ -50,7 +50,7 @@
                                                 <td class="px-3 py-2 text-right tabular-nums text-gray-950 dark:text-white">{{ \App\Support\Money::fromCents($ex['base_per_gram_cents'])->formatted() }}</td>
                                             </tr>
                                             <tr>
-                                                <td class="px-3 py-2 text-gray-600 dark:text-gray-300">{{ __('Precio del octavo (3,5 g)') }}</td>
+                                                <td class="px-3 py-2 text-gray-600 dark:text-gray-300">{{ __('Precio del octavo (3.5 g)') }}</td>
                                                 <td class="px-3 py-2 text-right tabular-nums text-gray-950 dark:text-white">{{ \App\Support\Money::fromCents($ex['base_eighth_cents'])->formatted() }}</td>
                                             </tr>
                                             <tr>
@@ -66,7 +66,7 @@
                                                 <td class="px-3 py-2 text-right tabular-nums text-gray-950 dark:text-white">{{ \App\Support\Money::fromCents($ex['eff_eighth_cents'])->formatted() }}</td>
                                             </tr>
                                             <tr>
-                                                <td class="px-3 py-2 text-gray-600 dark:text-gray-300">{{ __('3,5 g sumando por gramo') }}</td>
+                                                <td class="px-3 py-2 text-gray-600 dark:text-gray-300">{{ __('3.5 g sumando por gramo') }}</td>
                                                 <td class="px-3 py-2 text-right tabular-nums text-gray-500 line-through dark:text-gray-400">{{ \App\Support\Money::fromCents($ex['per_gram_total_cents'])->formatted() }}</td>
                                             </tr>
                                             <tr class="bg-primary-50/60 dark:bg-primary-500/5">

@@ -169,7 +169,7 @@ class BelowCostWarningTest extends TestCase
             ->assertActionMounted('belowCost');
 
         // Both prices, each with its own cost: 3,5 g at €9,50 is €33,25.
-        $component->assertMountedActionModalSee([__('Precio por gramo'), __('Coste de 3,5 g'), Money::fromCents(3325)->formatted()]);
+        $component->assertMountedActionModalSee([__('Precio por gramo'), __('Coste de 3.5 g'), Money::fromCents(3325)->formatted()]);
         $this->assertSame(0, Batch::query()->withoutGlobalScopes()->count());
 
         $component->callMountedAction()->assertHasNoFormErrors();

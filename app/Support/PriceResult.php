@@ -117,7 +117,7 @@ final class PriceResult
     {
         $discount = $this->discount;
         $suffix = $discount['mode'] === DiscountMode::PERCENT
-            ? '−'.number_format((int) $discount['value_bp'] / 100, 2).'%'
+            ? '−'.Percent::formatted((int) $discount['value_bp'] / 100)
             : '−'.Money::fromCents((int) $discount['value_cents'])->formatted();
 
         return $discount['label'].' '.$suffix;

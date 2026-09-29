@@ -179,7 +179,7 @@ class BatchForm
                             ->visible(fn (string $operation): bool => $operation === 'create'),
 
                         DecimalInput::make('price_per_eighth_eur')
-                            ->label(__('Precio por octavo — 3,5 g (€)'))
+                            ->label(__('Precio por octavo — 3.5 g (€)'))
                             ->helperText(__('Opcional.'))
                             ->numeric()
                             ->minValue(0)

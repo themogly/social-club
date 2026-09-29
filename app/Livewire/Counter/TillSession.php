@@ -35,6 +35,7 @@ use App\Support\BusinessDay;
 use App\Support\CounterOperator;
 use App\Support\CounterScreens;
 use App\Support\Money;
+use App\Support\NumberFormat;
 use App\Support\Settings;
 use App\Support\TerminalName;
 use App\Support\TillSummary;
@@ -248,7 +249,7 @@ class TillSession extends Component
         $cents = $this->defaultFloatCents();
 
         if ($cents !== null && $this->floatInput === '') {
-            $this->floatInput = number_format($cents / 100, 2, ',', '');
+            $this->floatInput = NumberFormat::decimal($cents / 100, 2); // a point, like every figure (prompt 316)
         }
     }
 

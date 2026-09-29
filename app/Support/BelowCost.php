@@ -47,7 +47,7 @@ final class BelowCost
 
         $check('per_gram', $perGramCents, 100, __('Precio por gramo'), __('Coste por gramo'));
         $check('per_unit', $perUnitCents, (int) $gramsPerUnitCg, __('Precio por unidad'), __('Coste por unidad'));
-        $check('per_eighth', $perEighthCents, 350, __('Precio por octavo (3,5 g)'), __('Coste de 3,5 g'));
+        $check('per_eighth', $perEighthCents, 350, __('Precio por octavo (3.5 g)'), __('Coste de 3.5 g'));
 
         return $found;
     }

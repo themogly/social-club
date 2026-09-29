@@ -191,7 +191,7 @@
                             inputmode="decimal"
                             wire:model="floatInput"
                             autocomplete="off"
-                            placeholder="0,00"
+                            placeholder="0.00"
                             class="mt-2 h-12 w-full rounded-xl border border-line bg-surface px-4 text-base text-ink placeholder:text-ink-muted focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/40 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
                         >
                         {{-- The first-ever open has no default and no previous session. That must not be an
@@ -270,7 +270,7 @@
                                         inputmode="decimal"
                                         wire:model="reweighCounts.{{ $batch->id }}"
                                         autocomplete="off"
-                                        placeholder="0,00"
+                                        placeholder="0.00"
                                         class="h-14 w-full rounded-xl border border-line bg-surface px-4 text-lg text-ink placeholder:text-ink-muted focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/40 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
                                     >
                                     <span class="text-sm text-ink-muted dark:text-slate-400">{{ __('g') }}</span>
@@ -331,7 +331,7 @@
                             wire:model="countInput"
                             autofocus
                             autocomplete="off"
-                            placeholder="0,00"
+                            placeholder="0.00"
                             class="mt-2 h-14 w-full rounded-xl border border-line bg-surface px-4 text-lg text-ink placeholder:text-ink-muted focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/40 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
                         >
                     </div>
@@ -513,7 +513,7 @@
                             inputmode="decimal"
                             wire:model="movementAmount"
                             autocomplete="off"
-                            placeholder="0,00"
+                            placeholder="0.00"
                             class="mt-2 h-12 w-full rounded-xl border border-line bg-surface px-4 text-base text-ink placeholder:text-ink-muted focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/40 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
                         >
                     </div>
@@ -574,7 +574,7 @@
                                 inputmode="decimal"
                                 wire:model="expenseAmount"
                                 autocomplete="off"
-                                placeholder="0,00"
+                                placeholder="0.00"
                                 class="mt-2 h-12 w-full rounded-xl border border-line bg-surface px-4 text-base text-ink placeholder:text-ink-muted focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/40 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
                             >
                         </div>
@@ -666,7 +666,7 @@
                                     inputmode="decimal"
                                     wire:model="handoverCounted"
                                     autocomplete="off"
-                                    placeholder="0,00"
+                                    placeholder="0.00"
                                     class="mt-2 h-12 w-full rounded-xl border border-line bg-surface px-4 text-base text-ink placeholder:text-ink-muted focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/40 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
                                 >
                                 {{-- Blind, exactly like the arqueo: the expected figure is not on this screen. --}}

@@ -4,6 +4,7 @@ namespace App\ViewModels\Reports;
 
 use App\Support\Duration;
 use App\Support\Money;
+use App\Support\NumberFormat;
 use App\Support\Period;
 use App\Support\Weight;
 use Carbon\CarbonImmutable;
@@ -106,8 +107,9 @@ class ReportColumn
         return match ($this->type) {
             self::MONEY => Money::fromCents((int) $raw)->formatted(),
             self::WEIGHT => Weight::fromCentigrams((int) $raw)->formatted(),
-            self::NUMBER => number_format((int) $raw, 0, ',', app()->getLocale() === 'es' ? '.' : ','),
-            self::PERCENT => number_format((int) $raw, 0, ',', '').' %',
+            // Prompt 316 — the one display rule: no grouping, a point (see NumberFormat).
+            self::NUMBER => NumberFormat::decimal((int) $raw, 0),
+            self::PERCENT => NumberFormat::decimal((int) $raw, 0).' %',
             self::HOURS => Duration::hours((int) $raw),
             self::DURATION => Duration::format((int) $raw),
             self::DATE => $this->carbon($raw)->translatedFormat('d/m/Y'),

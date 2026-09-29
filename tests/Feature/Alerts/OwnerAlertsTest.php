@@ -200,7 +200,7 @@ class OwnerAlertsTest extends TestCase
 
         $this->evaluate();
         $this->assertSame([1, 0], [$this->active(AlertType::RESTOCK_FROM_STORE), $this->active(AlertType::RUNNING_OUT)]);
-        $this->assertStringContainsString('850,00 g', $this->sent()[0]['text']);
+        $this->assertStringContainsString('850.00 g', $this->sent()[0]['text']);
         $this->assertStringContainsString('Almacén', $this->sent()[0]['text']);
 
         // The store runs out → the restock alert clears and "nothing in the store" fires, once.

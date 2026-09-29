@@ -9,6 +9,7 @@ use App\Models\Location;
 use App\Support\Money;
 use App\Support\OrganisationIdentity;
 use App\Support\Period;
+use App\Support\Spreadsheet\ReportExport;
 use App\Support\Weight;
 use App\ViewModels\Reports\AbstractReport;
 use App\ViewModels\Reports\ConsumptionReport;
@@ -112,7 +113,7 @@ class RegistroDispensacion extends ReportPage
 
     public function exportCsv(): StreamedResponse
     {
-        [$delimiter, $decimal] = app()->getLocale() === 'es' ? [';', ','] : [',', '.'];
+        [$delimiter, $decimal] = ReportExport::localeCsvFormat(); // the spreadsheet rule (prompt 316), not the display one
         $number = fn (int $value, int $divideBy): string => number_format($value / $divideBy, 2, $decimal, '');
 
         $writer = Writer::createFromString();

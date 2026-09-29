@@ -224,7 +224,7 @@ class BatchPriceAndPhotosTest extends TestCase
 
         $this->genetic->forceFill(['thc_bp' => 2250, 'cbd_bp' => 50])->save();
         $this->batch(800, 5000, '2026-01-01');
-        $menu()->assertSee('THC 22,5%')->assertSee('CBD 0,5%'); // it read "—%" for every strain
+        $menu()->assertSee('THC 22.5%')->assertSee('CBD 0.5%'); // it read "—%" for every strain
         $menu()->assertSeeHtml('data-menu-photo-placeholder')->assertDontSee('loading="lazy" class="h-full w-full object-cover"', false);
 
         $this->genetic->forceFill(['images' => ['genetics/strain.jpg']])->save();

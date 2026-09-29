@@ -104,7 +104,7 @@ class ReportExport
     /**
      * @return array{0: string, 1: string} [delimiter, decimal separator]
      */
-    private static function localeCsvFormat(): array
+    public static function localeCsvFormat(): array
     {
         return app()->getLocale() === 'es' ? [';', ','] : [',', '.'];
     }

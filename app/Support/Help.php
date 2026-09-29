@@ -363,7 +363,7 @@ class Help
         'Convocatoria' => 'La citación formal a una asamblea, con su orden del día y notificación a los socios.',
         'Libro de socios' => 'El registro oficial de socios de la asociación, con altas y bajas.',
         'Baja' => 'La salida de un socio de la asociación. El libro de socios conserva a quienes se han dado de baja.',
-        'Octavo' => 'Un octavo de onza (3,5 g), unidad habitual con posible precio propio como descuento por cantidad.',
+        'Octavo' => 'Un octavo de onza (3.5 g), unidad habitual con posible precio propio como descuento por cantidad.',
         'Barra y tienda' => 'El ingreso auxiliar no cannábico (bebidas, comida, merch), en un libro separado para no mezclarlo con la contabilidad de la asociación.',
         'Superávit' => 'El excedente de ingresos sobre gastos de la asociación (no un "beneficio": el CSC es sin ánimo de lucro).',
     ];
@@ -462,11 +462,11 @@ class Help
         'eighth-pricing' => [
             'permission' => 'pos.use',
             'title' => 'Cómo se cobra un octavo',
-            'intro' => 'Cómo se cobra un octavo (3,5 g) cuando el socio tiene descuento, y por qué el mostrador nunca cobra de más.',
+            'intro' => 'Cómo se cobra un octavo (3.5 g) cuando el socio tiene descuento, y por qué el mostrador nunca cobra de más.',
             'example' => 'eighth',
             'steps' => [
                 ['title' => 'El octavo es un descuento por cantidad', 'body' => [
-                    'Además del precio por gramo, una genética puede tener un precio de octavo (3,5 g) más barato. Al reunir un octavo en la cesta, el mostrador cobra el octavo en lugar de la suma por gramo.',
+                    'Además del precio por gramo, una genética puede tener un precio de octavo (3.5 g) más barato. Al reunir un octavo en la cesta, el mostrador cobra el octavo en lugar de la suma por gramo.',
                 ]],
                 ['title' => 'El descuento del socio se aplica encima', 'body' => [
                     'Si el socio tiene descuento, se aplica tanto al precio por gramo como al del octavo. La comparación es descuento contra descuento.',
