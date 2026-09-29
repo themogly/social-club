@@ -17071,3 +17071,45 @@ caught it the next day, as a *declared* time.
   - *Registro de jornada* shows both clock-outs, and the undone one as *Anulado*;
   - the record's sources: staff OUT `TILL_CLOSE`, ANNUL, OUT `TILL_CLOSE`; manager OUT `PIN`.
   - `counter-session.mjs` gained `accountPin()`, so the credentials stay in the one harness file.
+
+## Prompt 315 — every person has a language saved: new staff get the club's default, and it's editable in the profile and the user form
+
+Ben found a linked Telegram account with `users.locale = null`. It had never tapped ES/EN, so its messages followed
+whatever `ResolveLocale` fell back to. `users.locale` was only ever written by the top-bar switcher.
+
+- **Filled at creation, in ONE place:** a `creating` hook on `User` fills `locale` when it is empty, with the club's
+  current default resolved the one way (`ResolveLocale` with no subject: the club's `default_locale`, then the app's,
+  then `en`). That covers `csc:install`'s owner, *Usuarios → Crear*, `User::create` anywhere, factories and any future
+  path. An explicit locale is kept.
+- **The backfill** (`2026_09_29_400000_backfill_user_locales`): one-time; every user with a null or empty locale gets
+  the club default resolved at migration time; accounts with a language are untouched; it logs the count. On a copy of
+  the demo database it set **3 of 3** accounts to `es` and left **0** empty. On live, after the deploy, check with
+  `php artisan tinker --execute='dump(App\Models\User::whereNull("locale")->count());'`, which should print `0`.
+- **A saved choice always wins.** Changing the club default later moves nobody who has a language; it seeds new people
+  only. *Ajustes → Idioma por defecto* now says so: *"Se aplica a las personas nuevas. Cada persona puede cambiar el
+  suyo en su perfil."*
+- **The fields:**
+  - **Profile → Idioma:** the club's enabled languages by their own names (`ResolveLocale::options()`, from
+    `ResolveLocale::NAMES`, which *Ajustes* now reuses). Required. Saving writes `users.locale`, mirrors it into the
+    session and reloads, exactly as the top-bar switch does, so the panel switches at once. The switch and the field
+    are therefore the same value.
+  - **User form → Idioma** (create and edit): defaults to the club default on create, gated like the rest of the form.
+    Changing someone else's language is audited as `user.locale.changed` with only `{locale: old}` → `{locale: new}`.
+- **Unchanged:** the ES/EN switch, `ResolveLocale`'s order, each mail's pinned locale (288) and Telegram per person
+  (311). The counter follows the PIN person's saved language, which is now always set, so it no longer depends on who
+  last used the tablet.
+- **Tests:** `tests/Feature/Localization/SavedLanguageTest.php` (8 tests):
+  - `User::create`, *Usuarios → Crear* and `csc:install` get the default, and an explicit locale is kept;
+  - the backfill fills empty ones and leaves saved ones;
+  - the profile saves the language, sets the session and the panel renders in it;
+  - the user form sets someone else's language and audits it;
+  - changing the club default moves nobody, while new people take the new default;
+  - the switcher and the profile stay in step;
+  - an alert renders in the person's saved language (a pin).
+
+  All were red first except the pin.
+- **Verified in a browser** (`tests/Browser/prove-315-saved-language.mjs`, throwaway DB after the backfill):
+  - *Usuarios → Crear* shows *Idioma: Español* (the club default);
+  - the new staff member's PIN at the counter gives `<html lang="es">`;
+  - the owner's profile set to English → the panel is `lang="en"` and the top bar shows EN;
+  - rows: owner `en`, manager `es`, staff `es`, the new person `es`, none empty.

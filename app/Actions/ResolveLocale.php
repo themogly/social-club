@@ -33,6 +33,19 @@ class ResolveLocale
         return in_array($system, $enabled, true) ? $system : ($enabled[0] ?? $system);
     }
 
+    /** Every language the software ships, by its own name (never translated: a person looks for their own language). */
+    public const NAMES = ['es' => 'Español', 'en' => 'English'];
+
+    /**
+     * The club's ENABLED languages, for a person's *Idioma* (prompt 315).
+     *
+     * @return array<string, string>
+     */
+    public function options(): array
+    {
+        return array_intersect_key(self::NAMES, array_flip($this->enabled()));
+    }
+
     /** @return list<string> */
     private function enabled(): array
     {

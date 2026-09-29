@@ -4,6 +4,7 @@ namespace App\Filament\Pages\Auth;
 
 use App\Actions\Alerts\IssueTelegramLink;
 use App\Actions\RecordAuditLog;
+use App\Actions\ResolveLocale;
 use App\Enums\AlertType;
 use App\Models\User;
 use App\Support\LocationSwitcher;
@@ -12,6 +13,7 @@ use App\Support\Telegram;
 use Filament\Actions\Action;
 use Filament\Auth\Pages\EditProfile as BaseEditProfile;
 use Filament\Forms\Components\CheckboxList;
+use Filament\Forms\Components\Select;
 use Filament\Notifications\Notification;
 use Filament\Schemas\Components\Actions;
 use Filament\Schemas\Components\Section;
@@ -42,6 +44,34 @@ class EditProfile extends BaseEditProfile
                 'types' => $user->alertTypes(),
                 'location_ids' => $user->alertLocationIds() ?? array_keys($this->sedeOptions($user)),
             ];
+        }
+    }
+
+    /** The profile's own fields, plus *Idioma* (prompt 315) — the same value as the top-bar ES/EN switch. */
+    public function form(Schema $schema): Schema
+    {
+        return $schema->components([
+            $this->getNameFormComponent(),
+            $this->getEmailFormComponent(),
+            Select::make('locale')
+                ->label(__('Idioma'))
+                ->options(fn (): array => (new ResolveLocale)->options())
+                ->required()
+                ->selectablePlaceholder(false)
+                ->helperText(__('Idioma del panel, del mostrador, de tus correos y de tus avisos de Telegram.')),
+            $this->getPasswordFormComponent(),
+            $this->getPasswordConfirmationFormComponent(),
+            $this->getCurrentPasswordFormComponent(),
+        ]);
+    }
+
+    /** Saved → the panel switches at once, exactly as the top-bar switch does (the session carries it to the next request). */
+    protected function afterSave(): void
+    {
+        $locale = Auth::user()?->getAttribute('locale');
+        if (is_string($locale) && $locale !== session('locale')) {
+            session(['locale' => $locale]);
+            $this->redirect(static::getUrl(), navigate: false);
         }
     }
 

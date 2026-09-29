@@ -3,6 +3,7 @@
 namespace App\Filament\Pages;
 
 use App\Actions\RecordAuditLog;
+use App\Actions\ResolveLocale;
 use App\Actions\Settings\SetConsumptionLimits;
 use App\Console\Commands\PruneStaffClockEvents;
 use App\Enums\SettingType;
@@ -90,7 +91,7 @@ class ManageSettings extends Page
     ];
 
     /** The locales the platform ships translations for (prompt 19). */
-    private const LOCALE_OPTIONS = ['es' => 'Español', 'en' => 'English'];
+    private const LOCALE_OPTIONS = ResolveLocale::NAMES;
 
     public static function getNavigationLabel(): string
     {
@@ -138,7 +139,9 @@ class ManageSettings extends Page
                         Select::make('default_locale')
                             ->label(__('Idioma por defecto'))
                             ->options(self::LOCALE_OPTIONS)
-                            ->required(),
+                            ->required()
+                            // Prompt 315 — a person's saved language always wins; this only seeds new people.
+                            ->helperText(__('Se aplica a las personas nuevas. Cada persona puede cambiar el suyo en su perfil.')),
                         CheckboxList::make('enabled_locales')
                             ->label(__('Idiomas disponibles'))
                             ->options(self::LOCALE_OPTIONS)

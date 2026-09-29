@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\Users\Schemas;
 
+use App\Actions\ResolveLocale;
 use App\Enums\Role;
 use App\Models\User;
 use App\Support\Email;
@@ -35,6 +36,16 @@ class UserForm
                     // form regardless of driver (prompt 146).
                     ->live(onBlur: true)
                     ->afterStateUpdated(fn (?string $state, callable $set) => $set('email', Email::normalise($state))),
+
+                // Prompt 315 — the person's saved language: the club default on a new person, editable here like the rest of
+                // the form. The person changes their own on their profile (the same value as the top-bar ES/EN switch).
+                Select::make('locale')
+                    ->label(__('Idioma'))
+                    ->options(fn (): array => (new ResolveLocale)->options())
+                    ->default(fn (): string => (new ResolveLocale)->handle())
+                    ->required()
+                    ->selectablePlaceholder(false)
+                    ->helperText(__('Idioma del panel, del mostrador, de sus correos y de sus avisos de Telegram.')),
 
                 // Credentials (prompt 163). A browser password manager fills ANY password input on a domain
                 // it holds credentials for, so an owner editing SOMEONE ELSE'S row had their own password
