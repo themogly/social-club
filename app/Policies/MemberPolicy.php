@@ -19,7 +19,9 @@ class MemberPolicy
 {
     public function viewAny(User $user): bool
     {
-        return $user->can('members.view');
+        // The panel's Socios LIST (prompt 309): the section switch AND the permission. The counter's member lookup
+        // checks `members.view` itself and never comes through here.
+        return $user->can('panel.members') && $user->can('members.view');
     }
 
     public function view(User $user, Member $model): bool

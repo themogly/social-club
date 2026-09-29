@@ -140,7 +140,9 @@ class MemberImportAndDuplicatesTest extends TestCase
         $this->actingAs($this->actor(Role::MANAGER));
         Livewire::test(ListMembers::class)->assertActionVisible('import');
 
-        $this->actingAs($this->actor(Role::STAFF));
+        $staff = $this->actor(Role::STAFF);
+        $staff->givePermissionTo('panel.members'); // 309 — into the Socios list, still without members.import
+        $this->actingAs($staff);
         Livewire::test(ListMembers::class)->assertActionHidden('import');
     }
 }

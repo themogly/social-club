@@ -112,7 +112,7 @@ class InvitationViewPageTest extends TestCase
     public function test_a_user_without_members_create_can_resend_but_not_manage_the_invite(): void
     {
         $reviewerOnly = User::factory()->create();
-        $reviewerOnly->givePermissionTo('applications.review'); // can issue invitations (174), so can re-send one (287)
+        $reviewerOnly->givePermissionTo(['applications.review', 'panel.applications']); // can issue invitations (174), so can re-send one (287); 309's section
 
         $this->viewPage($reviewerOnly, $this->invitation())
             ->assertActionHidden('copyLink')

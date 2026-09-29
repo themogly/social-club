@@ -17,7 +17,9 @@ class MemberDocumentPolicy
 {
     public function viewAny(User $user): bool
     {
-        return $user->can('member.documents.view');
+        // The vault of EVERY member's generated documents (prompt 309). One member's document, opened from the counter,
+        // goes through view() below and needs only `member.documents.view`.
+        return $user->can('panel.member_documents') && $user->can('member.documents.view');
     }
 
     public function view(User $user, MemberDocument $model): bool

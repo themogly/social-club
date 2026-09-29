@@ -167,6 +167,7 @@ class NonOwnerScopeAndBulkActionsTest extends TestCase
         $viewer->assignRole(Role::STAFF->value);
         $viewer->locations()->sync([$this->sedeA->id]);
         $this->setRolePermission(Role::STAFF, 'panel.access', true);
+        $this->setRolePermission(Role::STAFF, 'panel.members', true); // 309 — the Socios section
         $member = Member::factory()->create(['organisation_id' => $this->org->id, 'status' => MemberStatus::ACTIVE]);
         app(ActiveScope::class)->setLocation($this->sedeA->id);
 

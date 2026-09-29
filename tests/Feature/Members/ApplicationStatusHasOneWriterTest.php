@@ -60,6 +60,7 @@ class ApplicationStatusHasOneWriterTest extends TestCase
     {
         $user = User::factory()->create();
         $user->assignRole(Role::STAFF->value); // holds applications.review, NOT members.create
+        $user->givePermissionTo('panel.applications'); // 309 — the panel's Solicitudes is its own switch
         $user->locations()->sync([$this->location->id]);
         $this->actingAs($user);
         app(ActiveScope::class)->setLocation($this->location->id);

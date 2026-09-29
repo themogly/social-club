@@ -15,13 +15,15 @@ use App\Models\User;
  */
 class TillSessionPolicy
 {
+    // Prompt 309 — the till HISTORY (every session's cash and Z report) is its own switch. Opening and closing the drawer
+    // at the counter checks `till.open` / `till.close` there and never comes through this policy.
     public function viewAny(User $user): bool
     {
-        return $user->can('till.open') || $user->can('till.close');
+        return $user->can('panel.tills');
     }
 
     public function view(User $user, TillSession $model): bool
     {
-        return $user->can('till.open') || $user->can('till.close');
+        return $user->can('panel.tills');
     }
 }

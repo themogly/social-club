@@ -15,7 +15,8 @@ class MemberApplicationPolicy
 {
     public function viewAny(User $user): bool
     {
-        return $user->can('applications.review');
+        // The panel's Solicitudes (prompt 309). Reviewing a sign-up at the counter checks `applications.review` itself.
+        return $user->can('panel.applications') && $user->can('applications.review');
     }
 
     public function view(User $user, MemberApplication $model): bool
