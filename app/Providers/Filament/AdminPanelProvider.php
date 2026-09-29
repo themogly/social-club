@@ -85,6 +85,10 @@ class AdminPanelProvider extends PanelProvider
             // Custom location switcher in the topbar (we do not use Filament tenancy —
             // the owner rollup + org-wide member search must cross locations). The owner
             // additionally gets an "All locations" rollup option (App\Support\LocationSwitcher).
+            // Prompt 310 — a refused button press goes where the refusal says (never Livewire's bare "403" box), and a PIN
+            // session's confirmation offers to renew in its last minutes.
+            ->renderHook(PanelsRenderHook::SCRIPTS_AFTER, fn (): string => Blade::render("@include('filament.panel-refusal-hook')"))
+            ->renderHook(PanelsRenderHook::BODY_START, fn (): string => Blade::render("@include('filament.confirmation-renew-banner')"))
             ->renderHook(
                 PanelsRenderHook::TOPBAR_START,
                 fn (): string => Blade::render('@livewire($component)', ['component' => LocationSwitcher::class]),
@@ -211,6 +215,9 @@ class AdminPanelProvider extends PanelProvider
             ->middleware([EnsureActiveLocation::class], isPersistent: true)
             // Post-296 audit — a PIN session gives its password (and MFA code) once a shift before the panel opens.
             ->middleware([ConfirmIdentityForPinSessions::class], isPersistent: true)
+            // Prompt 310 — the counter-only redirect also holds a button press on a page left open (Authenticate would bare-403 it), in its
+            // place above (marked persistent without being added twice).
+            ->persistentMiddleware([RedirectCounterOnlyAccounts::class])
             ->authMiddleware([
                 Authenticate::class,
             ]);

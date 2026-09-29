@@ -37,7 +37,7 @@ class CounterLockConfinement
                     after: ['component' => $component->getName()],
                 );
 
-                abort(403);
+                PanelRefusal::refuse('counter', route('counter.home')); // prompt 310 — and the panel's hook goes there
             }
         });
     }

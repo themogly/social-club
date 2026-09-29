@@ -306,7 +306,7 @@ class DiscountFormTest extends TestCase
 
         $staff = User::factory()->create();
         $staff->assignRole(Role::STAFF->value);
-        $this->actingAs($staff);
+        $this->actingAs($this->giveASede($staff)); // 310 — at a sede, so the PAGE's gate answers
 
         $this->get(DiscountResource::getUrl('create'))->assertForbidden();
     }

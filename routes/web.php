@@ -58,6 +58,10 @@ Route::middleware(['web', 'auth', 'signed'])
 // Local-only developer routes (e.g. /dev/mail) live in routes/dev.php, loaded only
 // in the local environment from bootstrap/app.php.
 
+// Prompt 310 — where a panel request goes when its person has no sede to work at (EnsureActiveLocation): a page that says
+// so, with the way back to the counter and sign out. Outside the panel, so the check that sent them here does not loop.
+Route::view('/sin-sede', 'errors.no-location')->middleware(['web', 'auth'])->name('panel.no-location');
+
 // Prompt 290 — the counter's installable-app manifest ("Mostrador"), in the club's name and language. Behind the counter's
 // gate (never a public page) and fetched with credentials; only the counter layout links it.
 Route::middleware(['web', AuthenticateCounter::class])

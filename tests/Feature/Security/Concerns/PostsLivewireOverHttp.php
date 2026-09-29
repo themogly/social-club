@@ -40,9 +40,15 @@ trait PostsLivewireOverHttp
      *
      * @param  array<string, mixed>  $updates
      * @param  list<array{0: string, 1?: list<mixed>}>  $calls  [method, params]
+     * @param  array<string, string>  $headers  e.g. the `Referer` a browser sends (the page the component is on)
      */
-    protected function livewirePost(string $snapshot, array $updates = [], array $calls = []): TestResponse
+    protected function livewirePost(string $snapshot, array $updates = [], array $calls = [], array $headers = []): TestResponse
     {
+        // Each browser request is a fresh PHP process; a test's requests share one. Livewire remembers the routes it has
+        // run persistent middleware for until `flush-state`, so without this a SECOND post from the same page skipped
+        // them all (prompt 310 found it: a refused press passed in the test). Flush, as a new request would.
+        app('livewire')->flushState();
+
         return $this->postJson(app('livewire')->getUpdateUri(), [
             'components' => [[
                 'snapshot' => $snapshot,
@@ -53,6 +59,6 @@ trait PostsLivewireOverHttp
                     'metadata' => (object) [],
                 ], $calls),
             ]],
-        ], ['X-Livewire' => '1']);
+        ], ['X-Livewire' => '1', ...$headers]);
     }
 }

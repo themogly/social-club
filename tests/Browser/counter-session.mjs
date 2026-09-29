@@ -32,6 +32,11 @@ export const DEV_ACCOUNTS = {
     staff: { email: 'staff@club.test', password: 'password', pin: '3456' },
 };
 
+/** An account's password — for a harness that must type it again, e.g. on *Confirma tu identidad* (prompt 310). */
+export function accountPassword(account = null) {
+    return credentials(account).password;
+}
+
 function credentials(account) {
     return account ? DEV_ACCOUNTS[account] : { email: EMAIL, password: PASSWORD, pin: PIN };
 }
@@ -85,25 +90,36 @@ export async function signInToCounter(page, url = '/counter/members', { sede = n
         await page.waitForLoadState('networkidle');
     }
 
-    // The PIN pad, when the counter surface is up (prompt 173).
-    const pad = await page.$('[data-counter-surface-unlock]');
-    if (pad) {
-        for (const digit of credentials(account).pin.split('')) {
-            await page.click(`[data-counter-surface] button:has-text("${digit}")`).catch(() => {});
-        }
-        await pad.click();
-        await page.waitForTimeout(1200);
-
-        // Prompt 281 — with no open period the surface asks the registro de jornada question. The harnesses are
-        // about their own screens, not the time clock, so they answer "Solo identificarme" (writes no event).
-        const skip = await page.$('[data-clock-skip]');
-        if (skip && await skip.isVisible()) {
-            await skip.click();
-            await page.waitForTimeout(800);
-        }
-    }
+    await enterPin(page, { account });
 
     return !! await page.$('[data-counter-topbar]');
+}
+
+/**
+ * Type `account`'s PIN on the counter's pad, when the pad is up (prompt 173) — also how a harness puts SOMEONE ELSE's PIN
+ * on a counter already signed in (prompt 310: the session becomes theirs, a PIN session).
+ *
+ * @param {import('playwright').Page} page
+ * @param {{ account?: string|null }} options
+ */
+export async function enterPin(page, { account = null } = {}) {
+    const pad = await page.$('[data-counter-surface-unlock]');
+    if (! pad) {
+        return;
+    }
+    for (const digit of credentials(account).pin.split('')) {
+        await page.click(`[data-counter-surface] button:has-text("${digit}")`).catch(() => {});
+    }
+    await pad.click();
+    await page.waitForTimeout(1200);
+
+    // Prompt 281 — with no open period the surface asks the registro de jornada question. The harnesses are
+    // about their own screens, not the time clock, so they answer "Solo identificarme" (writes no event).
+    const skip = await page.$('[data-clock-skip]');
+    if (skip && await skip.isVisible()) {
+        await skip.click();
+        await page.waitForTimeout(800);
+    }
 }
 
 /** Open the sign-up modal and enter the staff wizard, leaving it on step 1 (prompts 221/223). */

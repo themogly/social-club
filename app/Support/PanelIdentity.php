@@ -4,6 +4,7 @@ namespace App\Support;
 
 use App\Models\User;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Log;
 use Throwable;
 
 /**
@@ -13,7 +14,14 @@ use Throwable;
  */
 final class PanelIdentity
 {
+    /**
+     * How long one confirmation lasts: a working shift. Long enough that nobody is asked twice in an evening; short
+     * enough that a tablet left signed in overnight asks again the next day (prompt 310: the banner offers to renew in
+     * the last {@see self::RENEW_WINDOW_MINUTES} minutes, so it does not run out mid-task).
+     */
     public const SHIFT_HOURS = 12;
+
+    public const RENEW_WINDOW_MINUTES = 15;
 
     public static function mustConfirm(User $user): bool
     {
@@ -24,13 +32,58 @@ final class PanelIdentity
         try {
             return ! Cache::has(self::key($user));
         } catch (Throwable) {
+            self::cacheUnavailable();
+
             return true; // fail closed: when in doubt, ask for the password
         }
     }
 
     public static function confirmed(User $user): void
     {
-        Cache::put(self::key($user), true, now()->addHours(self::SHIFT_HOURS));
+        $until = now()->addHours(self::SHIFT_HOURS);
+        // The expiry as the value (a timestamp), so the banner can tell when it is about to run out. Read back with a
+        // cast: Redis hands numbers back as strings (prompt 307).
+        Cache::put(self::key($user), $until->getTimestamp(), $until);
+    }
+
+    /** Minutes left on this PIN session's confirmation, or null when there is none to renew (or no PIN session). */
+    public static function minutesLeft(User $user): ?int
+    {
+        if (session('auth.via_pin') !== true) {
+            return null;
+        }
+
+        try {
+            $until = Cache::get(self::key($user));
+        } catch (Throwable) {
+            return null;
+        }
+
+        return is_numeric($until) ? max(0, (int) ceil(((int) $until - now()->getTimestamp()) / 60)) : null;
+    }
+
+    /** Is the confirmation in its last minutes — time for the *Renovar* banner (prompt 310)? */
+    public static function expiresSoon(User $user): bool
+    {
+        $left = self::minutesLeft($user);
+
+        return $left !== null && $left <= self::RENEW_WINDOW_MINUTES;
+    }
+
+    /**
+     * Prompt 310 — failing closed stays, but visibly: one warning per request (no personal data), and the confirmation
+     * page says why the password is being asked for again.
+     */
+    private static function cacheUnavailable(): void
+    {
+        $request = request();
+        if ($request->attributes->get('panel_identity.cache_warned') === true) {
+            return;
+        }
+        $request->attributes->set('panel_identity.cache_warned', true);
+
+        Log::warning('Panel identity confirmation could not be checked: the cache is unavailable, so the password is asked for again.');
+        session()->flash('panel_identity.cache_unavailable', true);
     }
 
     /** Per person, per tablet: someone else on the same tablet — or the same person on another — is asked for theirs. */

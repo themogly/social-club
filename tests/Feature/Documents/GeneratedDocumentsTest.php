@@ -96,7 +96,7 @@ class GeneratedDocumentsTest extends TestCase
         // permission, not open the sensitive artefacts. Since prompt 262 managers hold it by default (the owner's
         // decision), so the club that revokes it is the case proven here.
         $this->setRolePermission(Role::MANAGER, 'member.documents.view', false);
-        $manager = $this->user(Role::MANAGER);
+        $manager = $this->giveASede($this->user(Role::MANAGER)); // 310 — at a sede, so the PAGE's gate answers
         $this->assertTrue($manager->can('documents.generate'));
         $this->assertFalse($manager->can('member.documents.view'));
 
