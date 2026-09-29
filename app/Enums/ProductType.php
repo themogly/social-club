@@ -16,6 +16,7 @@ use Filament\Support\Contracts\HasLabel;
  *  | CONCENTRATE  | WEIGHT    | grams (rosin/shatter/etc. — one type + concentrate_subtype) |
  *  | PREROLL      | UNIT      | units (fixed gram content each)                     |
  *  | EDIBLE       | UNIT      | units (fixed gram-equivalent + thc_mg_per_unit)     |
+ *  | VAPE         | UNIT      | units (oil weight per cartridge, prompt 328)        |
  */
 enum ProductType: string implements HasLabel
 {
@@ -24,13 +25,17 @@ enum ProductType: string implements HasLabel
     case CONCENTRATE = 'CONCENTRATE';
     case PREROLL = 'PREROLL';
     case EDIBLE = 'EDIBLE';
+    // Prompt 328 — a cartridge or disposable: dispensed per UNIT, counted by its oil weight (grams_per_unit_cg), like a
+    // pre-roll. OVERNIGHT-DEFAULT — CONFIRM with the owner: some clubs dispense vape oil by weight; that is this one line
+    // in unitType() moving VAPE to WEIGHT.
+    case VAPE = 'VAPE';
 
     /** The stored unit_type this product type implies. Weight for flower/concentrate; units otherwise. */
     public function unitType(): UnitType
     {
         return match ($this) {
             self::FLOWER, self::HASH, self::CONCENTRATE => UnitType::WEIGHT,
-            self::PREROLL, self::EDIBLE => UnitType::UNIT,
+            self::PREROLL, self::EDIBLE, self::VAPE => UnitType::UNIT,
         };
     }
 
@@ -42,6 +47,7 @@ enum ProductType: string implements HasLabel
             self::CONCENTRATE => __('Extracto'),
             self::PREROLL => __('Preliado'),
             self::EDIBLE => __('Comestible'),
+            self::VAPE => __('Vapeador'),
         };
     }
 

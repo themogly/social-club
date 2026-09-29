@@ -65,4 +65,14 @@ class GeneticFactory extends Factory
             'grams_per_unit_cg' => EdibleEquivalence::gramsCg($thcMgPerUnit), // the observer derives it too
         ]);
     }
+
+    /** A vape (prompt 328) — per cartridge, counted by its oil weight like a pre-roll. */
+    public function vape(int $gramsPerUnitCg = 50): static
+    {
+        return $this->state(fn (): array => [
+            'product_type' => ProductType::VAPE,
+            'grams_per_unit_cg' => $gramsPerUnitCg,
+            'thc_bp' => 8000,
+        ]);
+    }
 }
