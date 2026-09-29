@@ -4,6 +4,7 @@ namespace App\Filament\Resources\Discounts\Tables;
 
 use App\Enums\DiscountMode;
 use App\Models\Discount;
+use App\Support\Percent;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteBulkAction;
 use Filament\Actions\EditAction;
@@ -24,7 +25,7 @@ class DiscountsTable
                 TextColumn::make('mode')->label(__('Modo'))->badge(),
                 TextColumn::make('value')->label(__('Valor'))
                     ->state(fn (Discount $d): string => $d->mode === DiscountMode::PERCENT
-                        ? number_format((int) $d->value_bp / 100, 2).'%'
+                        ? Percent::formatted((int) $d->value_bp / 100)
                         : ($d->value_cents?->formatted() ?? '—')),
                 TextColumn::make('applies_to')->label(__('Aplica a'))->badge(),
                 IconColumn::make('active')->label(__('Activo'))->boolean(),

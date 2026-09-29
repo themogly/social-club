@@ -54,6 +54,7 @@ class ConvocatoriaInfolist
             Section::make(__('Orden del día'))
                 ->schema([
                     TextEntry::make('agenda')
+                        ->label(__('Orden del día'))
                         ->hiddenLabel()
                         ->listWithLineBreaks()
                         ->bulleted()
@@ -62,7 +63,7 @@ class ConvocatoriaInfolist
 
             Section::make(__('Texto de la convocatoria'))
                 ->schema([
-                    TextEntry::make('body')->hiddenLabel()->prose()->placeholder(__('Sin texto')),
+                    TextEntry::make('body')->label(__('Texto de la convocatoria'))->hiddenLabel()->prose()->placeholder(__('Sin texto')),
                 ]),
         ]);
     }

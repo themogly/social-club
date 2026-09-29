@@ -256,14 +256,14 @@
                                         @php $remainingAfter = $limits->dailyRemainingCg() - $activeEntryGramsCg; @endphp
                                         <div class="mt-1 flex items-center justify-between text-xs">
                                             <span class="text-ink-muted dark:text-slate-400">{{ __('Restante hoy tras esta entrada') }}</span>
-                                            <span class="font-medium {{ $remainingAfter < 0 ? 'text-error' : 'text-success' }}">{{ $this->grams(max(0, $remainingAfter)) }}</span>
+                                            <span class="font-medium {{ \App\Support\LimitSnapshot::dailyStateText($limits->dailyRemainingState($remainingAfter)) }}">{{ $this->grams(max(0, $remainingAfter)) }}</span>
                                         </div>
                                     @endif
                                 </div>
                             @endif
                         @else
                             @php $serverRemainingAfter = ($limits && $activeEntryGramsCg !== null) ? $limits->dailyRemainingCg() - $activeEntryGramsCg : null; @endphp
-                            <div data-entry-preview data-entry-grams="{{ $activeEntryGramsCg ?? '' }}" data-remaining-after="{{ $serverRemainingAfter ?? '' }}"
+                            <div data-entry-preview data-entry-grams="{{ $activeEntryGramsCg ?? '' }}" data-remaining-after="{{ $serverRemainingAfter ?? '' }}" data-daily-limit="{{ $limits?->dailyLimitCg ?? '' }}"
                                  x-show="enteredCg !== null && enteredCg > 0" x-cloak
                                  class="mt-3 rounded-xl border border-line bg-surface px-4 py-2.5 text-sm dark:border-slate-700 dark:bg-slate-950">
                                 <div class="flex items-center justify-between">
@@ -273,7 +273,7 @@
                                 @if ($limits) {{-- none at all while limits are switched off (296) --}}
                                 <div class="mt-1 flex items-center justify-between text-xs" x-show="remainingAfter !== null">
                                     <span class="text-ink-muted dark:text-slate-400">{{ __('Restante hoy tras esta entrada') }}</span>
-                                    <span data-entry-preview-remaining class="font-medium" x-bind:class="remainingAfter < 0 ? 'text-error' : 'text-success'" x-text="remainingAfter !== null ? grams(remainingAfter) : ''"></span>
+                                    <span data-entry-preview-remaining class="font-medium" x-bind:class="remainingAfter <= 0 ? 'text-error' : (($el.closest('[data-daily-limit]')?.dataset.dailyLimit ?? 0) > 0 && remainingAfter * 4 <= $el.closest('[data-daily-limit]').dataset.dailyLimit ? 'text-warning' : 'text-success')" x-text="remainingAfter !== null ? grams(remainingAfter) : ''"></span>
                                 </div>
                                 @endif
                             </div>

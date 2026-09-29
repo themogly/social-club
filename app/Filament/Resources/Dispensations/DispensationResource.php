@@ -7,6 +7,7 @@ use App\Enums\DispensationStatus;
 use App\Enums\RefundDestination;
 use App\Enums\RefundMethod;
 use App\Enums\TillSessionStatus;
+use App\Filament\Forms\DecimalInput;
 use App\Filament\Resources\Dispensations\Pages\ListDispensations;
 use App\Filament\Resources\Dispensations\Pages\ViewDispensation;
 use App\Filament\Resources\Dispensations\Schemas\DispensationInfolist;
@@ -21,7 +22,6 @@ use BackedEnum;
 use Filament\Actions\Action;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
-use Filament\Forms\Components\TextInput;
 use Filament\Notifications\Notification;
 use Filament\Resources\Resource;
 use Filament\Schemas\Components\Utilities\Get;
@@ -112,13 +112,13 @@ class DispensationResource extends Resource
                 'weight' => Weight::fromCentigrams($record->remainingRefundableGramsCg())->formatted(),
             ]))
             ->schema([
-                TextInput::make('amount_eur')
+                DecimalInput::make('amount_eur')
                     ->label(__('Importe a reembolsar (€)'))
                     ->numeric()->minValue(0)->step(0.01)->required()
                     ->helperText(fn (Dispensation $record): string => __('Máximo :money', [
                         'money' => Money::fromCents($record->remainingRefundableCents())->formatted(),
                     ])),
-                TextInput::make('weight_g')
+                DecimalInput::make('weight_g')
                     ->label(__('Peso a devolver (g)'))
                     ->numeric()->minValue(0)->step(0.01)->default('0')->required()->rule(new GramAmount)
                     ->helperText(fn (Dispensation $record): string => __('Máximo :weight', [
@@ -128,7 +128,7 @@ class DispensationResource extends Resource
                     ->label(__('Destino del producto'))
                     ->options(self::destinationOptions())
                     ->required()
-                    ->visible(fn (Get $get): bool => (float) ($get('weight_g') ?? 0) > 0)
+                    ->visible(fn (Get $get): bool => (float) (DecimalInput::number($get('weight_g')) ?? 0) > 0)
                     ->helperText(__('El producto vuelto en buen estado se puede vender; el no vendible se registra como merma. Elección obligatoria.')),
                 Select::make('method')
                     ->label(__('Método'))

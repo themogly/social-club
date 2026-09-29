@@ -6,6 +6,7 @@ use App\Actions\Stock\IntakeBatch;
 use App\Actions\Stock\RecountBatch;
 use App\Actions\Stock\TransferBatch;
 use App\Exceptions\StockCeilingExceededException;
+use App\Filament\Forms\DecimalInput;
 use App\Filament\Resources\Batches\Schemas\BatchForm;
 use App\Filament\Support\AllOption;
 use App\Models\Batch;
@@ -22,6 +23,7 @@ use Filament\Infolists\Components\TextEntry;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\EditRecord;
 use Filament\Schemas\Components\Grid;
+use Filament\Schemas\Components\Text;
 use Filament\Schemas\Components\Utilities\Get;
 use Filament\Support\Icons\Heroicon;
 use Illuminate\Auth\Access\AuthorizationException;
@@ -185,10 +187,10 @@ final class BatchActions
             ->visible(fn (): bool => Auth::user()?->can('stock.take') ?? false)
             ->modalHeading(fn (Batch $record): string => __('Recuento de :batch', ['batch' => $record->displayName()]))
             ->schema(fn (Batch $record): array => [
-                TextEntry::make('in_system')
-                    ->hiddenLabel()
-                    ->state(fn (): string => __('En sistema: :qty', ['qty' => self::quantityLabel($record, self::current($record))])),
-                TextInput::make('counted')
+                // Plain text, no field label (prompt 306): a hidden label that was never set was GENERATED from the key and
+                // read out in English ("In system") before the Spanish sentence.
+                Text::make(fn (): string => __('En sistema: :qty', ['qty' => self::quantityLabel($record, self::current($record))])),
+                DecimalInput::make('counted')
                     ->label(fn (): string => $record->isUnitType() ? __('Cantidad contada (uds)') : __('Cantidad contada (g)'))
                     ->numeric()
                     ->minValue(0)
@@ -197,11 +199,11 @@ final class BatchActions
                     ->live(onBlur: true),
                 TextEntry::make('difference')
                     ->label(__('Diferencia'))
-                    ->state(fn (Get $get): ?string => is_numeric($get('counted'))
-                        ? self::signedLabel($record, self::countedAmount($record, (string) $get('counted')) - self::current($record)) : null)
-                    ->color(fn (Get $get): string => ! is_numeric($get('counted')) ? 'gray'
-                        : (self::countedAmount($record, (string) $get('counted')) < self::current($record) ? 'danger' : 'success'))
-                    ->visible(fn (Get $get): bool => is_numeric($get('counted'))),
+                    ->state(fn (Get $get): ?string => ($counted = DecimalInput::number($get('counted'))) !== null
+                        ? self::signedLabel($record, self::countedAmount($record, $counted) - self::current($record)) : null)
+                    ->color(fn (Get $get): string => ($counted = DecimalInput::number($get('counted'))) === null ? 'gray'
+                        : (self::countedAmount($record, $counted) < self::current($record) ? 'danger' : 'success'))
+                    ->visible(fn (Get $get): bool => DecimalInput::number($get('counted')) !== null),
                 TextInput::make('reason')
                     ->label(__('Motivo'))
                     ->default(__('Recuento'))

@@ -5,6 +5,7 @@ namespace App\Filament\Resources\Articles\Schemas;
 use App\Actions\Stock\MoveArticleToLocation;
 use App\Enums\Role;
 use App\Filament\Forms\CameraOrFile;
+use App\Filament\Forms\DecimalInput;
 use App\Filament\Support\AllOption;
 use App\Models\Article;
 use App\Models\Location;
@@ -70,7 +71,7 @@ class ArticleForm
 
                         // The model stores integer cents in price_cents; the pages
                         // convert euros ↔ cents (mutate hooks on Create/Edit).
-                        TextInput::make('price_eur')
+                        DecimalInput::make('price_eur')
                             ->label(__('Precio (€)'))
                             ->numeric()
                             ->minValue(0)

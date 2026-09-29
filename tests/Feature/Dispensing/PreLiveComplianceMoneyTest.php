@@ -203,10 +203,12 @@ class PreLiveComplianceMoneyTest extends TestCase
 
     public function test_typed_euros_are_read_one_unambiguous_way(): void
     {
-        foreach (['1250' => 125000, '1250,5' => 125050, '1250.50' => 125050, '0,05' => 5, ' 20 ' => 2000] as $typed => $cents) {
+        // Prompt 306 — the FULLY written "1.250,00" / "1,250.00" can only mean one number, so it is read; a lone "1.250"
+        // (a thousand, or one?) is still refused.
+        foreach (['1250' => 125000, '1250,5' => 125050, '1250.50' => 125050, '0,05' => 5, ' 20 ' => 2000, '1.250,00' => 125000, '1,250.00' => 125000] as $typed => $cents) {
             $this->assertSame($cents, Money::parseTyped((string) $typed), "'{$typed}'");
         }
-        foreach (['1.250', '1.250,00', '12,345', '-5', 'abc', '', '€5'] as $typed) {
+        foreach (['1.250', '1,250', '12,345', '1.25,00', '-5', 'abc', '', '€5'] as $typed) {
             $this->assertNull(Money::parseTyped($typed), "'{$typed}' was accepted");
         }
     }

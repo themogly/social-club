@@ -59,6 +59,7 @@ class OrderInfolist
                         // Each item snapshot is a plain array (name/qty/line_total_cents are plain ints);
                         // format one readable line per item — cents to euros at the display edge only.
                         TextEntry::make('lines')
+                            ->label(__('Líneas'))
                             ->hiddenLabel()
                             ->state(fn (Order $record): array => collect($record->items ?? [])
                                 ->map(fn (mixed $line): string => sprintf(

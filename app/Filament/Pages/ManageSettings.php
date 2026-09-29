@@ -6,6 +6,7 @@ use App\Actions\RecordAuditLog;
 use App\Actions\Settings\SetConsumptionLimits;
 use App\Console\Commands\PruneStaffClockEvents;
 use App\Enums\SettingType;
+use App\Filament\Forms\DecimalInput;
 use App\Models\User;
 use App\Support\CounterScreens;
 use App\Support\Settings;
@@ -142,11 +143,11 @@ class ManageSettings extends Page
                             ->label(__('Idiomas disponibles'))
                             ->options(self::LOCALE_OPTIONS)
                             ->required(),
-                        TextInput::make('minute_quorum_fraction_pct')
+                        DecimalInput::make('minute_quorum_fraction_pct')
                             ->label(__('Quórum de actas (%)'))
                             ->numeric()->minValue(1)->maxValue(100)->required()
                             ->helperText(__('% de socios activos necesario para el quórum de una asamblea.')),
-                        TextInput::make('assembly_second_call_quorum_pct')
+                        DecimalInput::make('assembly_second_call_quorum_pct')
                             ->label(__('Quórum en segunda convocatoria (%)'))
                             ->numeric()->minValue(0)->maxValue(100)->required()
                             ->helperText(__('% para el quórum en segunda convocatoria. 0 = queda constituida sea cual sea la asistencia.')),
@@ -175,11 +176,11 @@ class ManageSettings extends Page
                             ->helperText(__('Edad mínima para ser socio. Se bloquea la dispensación por debajo.')),
                         TextInput::make('carencia_days')->label(__('Días de carencia'))->integer()->minValue(0)->maxValue(365)->required()
                             ->helperText(__('Espera obligatoria desde el alta antes de la primera dispensación.')),
-                        TextInput::make('daily_limit_g')->label(__('Límite diario (g)'))->numeric()->minValue(0.01)->maxValue(1000)->required()
+                        DecimalInput::make('daily_limit_g')->label(__('Límite diario (g)'))->numeric()->minValue(0.01)->maxValue(1000)->required()
                             ->helperText(fn (): string => Settings::limitsEnabled()
                                 ? __('Límite por defecto por socio y día; una tarifa o un límite personal lo sustituye (y puede ser mayor). Se bloquea en el mostrador al superarlo.')
                                 : __('Se sigue usando para calcular el techo legal de existencias.')),
-                        TextInput::make('monthly_limit_g')->label(__('Techo mensual (g)'))->numeric()->minValue(0.01)->maxValue(10000)->gte('daily_limit_g')->required()
+                        DecimalInput::make('monthly_limit_g')->label(__('Techo mensual (g)'))->numeric()->minValue(0.01)->maxValue(10000)->gte('daily_limit_g')->required()
                             ->helperText(__('Límite por defecto por socio y mes; una tarifa o un límite personal lo sustituye.')),
                         Select::make('monthly_window')->label(__('Ventana mensual'))
                             ->options(['calendar' => __('Mes natural'), 'rolling30' => __('30 días móviles')])->required(),
@@ -223,11 +224,11 @@ class ManageSettings extends Page
                     ->schema([
                         Toggle::make('wallet_debt_allowed')->label(__('Permitir deuda'))
                             ->helperText(__('Si se desactiva, ninguna aportación puede dejar el monedero en negativo. Si se activa, solo pueden deber los socios con una «Cuenta del socio» aprobada, hasta su límite.')),
-                        TextInput::make('wallet_debt_limit_eur')->label(__('Límite de deuda (€)'))->numeric()->minValue(0)->required()
+                        DecimalInput::make('wallet_debt_limit_eur')->label(__('Límite de deuda (€)'))->numeric()->minValue(0)->required()
                             ->helperText(__('Tope del club (0 = sin tope): ningún socio puede deber más de esta cifra en esta sede, aunque su cuenta aprobada sea mayor.')),
-                        TextInput::make('wallet_door_debt_threshold_eur')->label(__('Umbral de deuda en la puerta (€)'))->numeric()->minValue(0)->required()
+                        DecimalInput::make('wallet_door_debt_threshold_eur')->label(__('Umbral de deuda en la puerta (€)'))->numeric()->minValue(0)->required()
                             ->helperText(__('Independiente del tope: la puerta reacciona (avisa/bloquea según la matriz) cuando la deuda supera esta cifra (0 = cualquier deuda), aunque esté dentro de su cuenta aprobada.')),
-                        TextInput::make('low_balance_threshold_eur')->label(__('Aviso de saldo bajo (€)'))->numeric()->minValue(0)->required()
+                        DecimalInput::make('low_balance_threshold_eur')->label(__('Aviso de saldo bajo (€)'))->numeric()->minValue(0)->required()
                             ->helperText(__('Cuando una aportación deja el saldo por debajo de esta cifra, se envía un aviso push al socio.')),
                     ])->columns(3),
 
@@ -271,7 +272,7 @@ class ManageSettings extends Page
                         TextInput::make('stock_cover_low_days')->label(__('Avisar por debajo de (días de stock)'))->numeric()->minValue(1)->required()
                             ->helperText(__('«Stock bajo» se mide contra la demanda: cuántos días duraría al ritmo actual. Un aviso que llega el día que te quedas sin existencias no es un aviso.')),
                         // Prompt 273 — read by every variety's low-stock rule and editable nowhere; empty = the automatic rule.
-                        TextInput::make('low_stock_threshold_g')->label(__('Aviso fijo de stock bajo para todas las variedades (g)'))->numeric()->minValue(0)
+                        DecimalInput::make('low_stock_threshold_g')->label(__('Aviso fijo de stock bajo para todas las variedades (g)'))->numeric()->minValue(0)
                             ->helperText(__('Opcional. Vacío = aviso automático por días de cobertura. Una cifra puesta en el precio de una variedad en su sede manda sobre esta.')),
                         Toggle::make('discounts_stack')->label(__('Los descuentos se acumulan'))
                             ->helperText(__('Si se desactiva, se aplica solo el mejor descuento de cada socio; si se activa, se suman.')),
@@ -279,11 +280,11 @@ class ManageSettings extends Page
 
                 Section::make(__('Caja'))
                     ->schema([
-                        TextInput::make('till_default_float_eur')->label(__('Fondo de caja por defecto (€)'))->numeric()->minValue(0)->required()
+                        DecimalInput::make('till_default_float_eur')->label(__('Fondo de caja por defecto (€)'))->numeric()->minValue(0)->required()
                             ->helperText(__('Se propone al abrir la caja cada mañana. El operador siempre puede cambiarlo. 0 = sin fondo por defecto.')),
-                        TextInput::make('arqueo_variance_tolerance_eur')->label(__('Tolerancia de descuadre (€)'))->numeric()->minValue(0)->required()
+                        DecimalInput::make('arqueo_variance_tolerance_eur')->label(__('Tolerancia de descuadre (€)'))->numeric()->minValue(0)->required()
                             ->helperText(__('Un arqueo que se desvía más de esta cifra exige una nota al cerrar la caja.')),
-                        TextInput::make('expense_approval_threshold_eur')->label(__('Umbral de aprobación de gasto (€)'))->numeric()->minValue(0)->required()
+                        DecimalInput::make('expense_approval_threshold_eur')->label(__('Umbral de aprobación de gasto (€)'))->numeric()->minValue(0)->required()
                             ->helperText(__('Los gastos por encima de esta cifra quedan pendientes hasta que alguien con permiso para aprobar gastos los apruebe.')),
                     ])->columns(2),
 
@@ -351,8 +352,8 @@ class ManageSettings extends Page
             ])
             ->schema([
                 // Validated exactly as the Cumplimiento fields are.
-                TextInput::make('daily_limit_g')->label(__('Límite diario por defecto (g)'))->numeric()->minValue(0.01)->maxValue(1000)->required(),
-                TextInput::make('monthly_limit_g')->label(__('Límite mensual por defecto (g)'))->numeric()->minValue(0.01)->maxValue(10000)->gte('daily_limit_g')->required(),
+                DecimalInput::make('daily_limit_g')->label(__('Límite diario por defecto (g)'))->numeric()->minValue(0.01)->maxValue(1000)->required(),
+                DecimalInput::make('monthly_limit_g')->label(__('Límite mensual por defecto (g)'))->numeric()->minValue(0.01)->maxValue(10000)->gte('daily_limit_g')->required(),
             ])
             ->modalSubmitActionLabel(__('Activar'))
             ->action(function (array $data): void {

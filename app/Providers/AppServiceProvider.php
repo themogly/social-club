@@ -38,6 +38,7 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+
         // Prompt 289 — a counter screen's Livewire updates are held to the same gate as its page (a person or a
         // registered counter), as Laravel's `auth` already is by default.
         Livewire::addPersistentMiddleware([AuthenticateCounter::class]);

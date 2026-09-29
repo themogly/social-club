@@ -16927,3 +16927,87 @@ too many times, "sits on its launch screen, with the prompt about how to unpin t
 - **Device result: pending.** Shane checks on the pinned tablet (Android and Chrome versions, registered or not, a
   recording); the steps are in `verification/real-device-checks.md` (313).
 - **For the club now:** if the loop starts, hold Back and Recents together to unpin; the app reopens normally.
+
+## Prompt 306 — small fixes from the pre-launch browser pass
+
+Six rough edges the owner would meet in week one, found by browser-testing a freshly reset club.
+
+1. **Weights in panel tables use the locale's decimal separator.**
+   - *Restante* on *Lotes* showed `300.01 g` beside `10,00 €/g`.
+   - Every weight or percentage a person reads in `app/Filament` now goes through the app's formatters:
+     - `Weight::formatted()` for the *Lotes* and *Genéticas* stock columns;
+     - a new `App\Support\Percent::formatted()`, the twin of the weight formatter, for THC/CBD and discount
+       percentages;
+     - `Money::formatted()` for the octavo-price cap message, which had a hard-coded Spanish `number_format`.
+   - Two `number_format` calls stay, deliberately:
+     - `MemberResource`'s declared-forecast field **value** (a machine-readable form value; the decimal field reads
+       either separator);
+     - `RegistroDispensacion`'s CSV export, which already picks its separator by locale.
+2. **No generated English label.**
+   - *Recuento* read "In system En sistema: …": a `hiddenLabel()` with no label is still rendered for screen readers,
+     under a label Filament generated from the key.
+   - `in_system` is now a plain `Text` component, so "En sistema" isn't read twice.
+   - Wider check: every other `hiddenLabel()` in `app/Filament` without a `->label(__(…))` got one:
+     - the expired-invite note;
+     - the acta's agenda, resolutions, attendees and body;
+     - dispensation and order lines;
+     - the audit diff;
+     - the convocatoria's agenda and body.
+3. **Decimal commas in panel number fields.**
+   - `<input type="number">` only takes the browser locale's separator, so a UK/US laptop couldn't type `1000,01`.
+   - There is now ONE panel field, `App\Filament\Forms\DecimalInput` (a `TextInput` subclass, used as
+     `DecimalInput::make(…)`):
+     - `type="text"`, `inputmode="decimal"`;
+     - the typed value is read through one rule both for validation (`mutateStateForValidationUsing`) and for the
+       saved value (`dehydrateStateUsing`);
+     - its `numeric()` keeps only the rule: Filament's own number cast turned `1000,01` into `1000` before anything
+       else saw it.
+   - It is used on **57 fields**: every panel field that takes grams, euros or a percentage, across batches (303's
+     per-sede boxes, *Recuento*, *Ajuste*, *Merma*, prices), products, the strain wizard, strain form and prices,
+     members, tiers, the wallet, purchases, expenses, refunds, discounts and settings. Whole-number fields (days,
+     counts, units, minutes, PIN) keep `type="number"`, which has no separator problem.
+   - Closures that read a decimal field **live** (`$get()`, `$this->data`) go through `DecimalInput::number()`, because
+     `is_numeric('196,5')` is false and `(float) '10,50'` is 10. That covers the *Recuento* difference, the refund
+     destination, the octavo cap, below-cost warnings, the split total, *Repartir* and the wizard's per-unit grams.
+   - **The one typed-number rule, `App\Support\TypedNumber`**, is now read by `Weight::canonicalGrams()` (hence
+     `fromGrams()` and `GramAmount`) **and** `Money::parseTyped()`, so the panel and the counter cannot disagree.
+     - It accepts, as before, digits with one separator and up to two decimals.
+     - **New:** it accepts the fully written forms `1.000,01` (Spanish) and `1,000.01` (English). With both separators
+       present, it can only mean one number.
+     - A lone `1.000` or `1,000` is **still refused**: that is 257's case, a thousand or one.
+     - The two tests that pinned `1.000,00` / `1.250,00` as refused now pin them as read, and still pin the lone
+       separator as refused.
+   - The counter keypads are unaffected.
+4. **The last-sale line stays on one line.**
+   - The time, always the last part, never shrinks.
+   - The amount and grams truncate first.
+   - The full summary is the line's `title`.
+   - This applies to the dispensary and the bar alike, as they share the partial.
+5. **A zero daily allowance is not green.** `LimitSnapshot::dailyRemainingState()` gives:
+   - `ok` (green) above 25 % of the daily limit;
+   - `low` (amber) above 0;
+   - `empty` (red) at 0.
+
+   It applies to *Restante hoy* on the POS cart and on *Socios*, and to the dispensary's "after this entry" lines (the
+   Alpine one reads the limit from `data-daily-limit`). The monthly bar keeps its own gauge. Hidden when limits are off
+   (296), unchanged.
+6. **`csc:install`'s closing advice.**
+   - It said "price every genetic at each sede", which predates 278.
+   - Install and `csc:reset-for-launch` now print the same list, `App\Support\NextSteps::setUp()`: create the sedes and
+     the store; give each person a PIN; add stock with *Crear lote* (the price goes on each batch); then import the
+     members.
+- **Tests:**
+  - `tests/Feature/Prelaunch/SmallFixesTest.php` (7 tests, all red first):
+    - `300,01 g` on the list in Spanish;
+    - no "In system" in the *Recuento* modal;
+    - `1000,01`, `1000.01` and `1.000,01` all saving as 1000,01 g (with a `10,50` price → 1050 cents), and `abc`
+      refused;
+    - the field is `type="text"` with `inputmode="decimal"`;
+    - the parser's accepted and refused forms;
+    - the allowance colours;
+    - the shared next steps.
+  - Browser: `tests/Browser/prove-306-small-fixes.mjs` (throwaway DB):
+    - the last-sale line is one line box for the dispensary and the bar at 1180×820 and 820×1180;
+    - 0,50 g left of 3,50 g reads amber;
+    - desktop Chrome with an en-GB locale keeps a typed `1000,01`, and the batch reads `1000,01 g` on the list;
+    - the *Recuento* dialog shows "En sistema" and no "In system".

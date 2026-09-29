@@ -13,11 +13,17 @@
      @var bool   $canVoid
      @var string $voidHeading  @var string $voidReasonId --}}
 <div data-last-sale class="flex min-h-11 items-center justify-between gap-2 rounded-xl border border-line bg-surface-alt px-3 py-1 dark:border-slate-700 dark:bg-slate-800/50">
-    {{-- Wraps rather than truncates: in the portrait cart column (820×1180) a truncated line lost the grams and the time. --}}
-    <p class="min-w-0 text-sm leading-tight text-ink dark:text-slate-100">
-        <span aria-hidden="true" class="font-bold text-success">✓</span>
-        {{-- Each part stays whole ("1,00 g" never splits); a wrap falls between parts. --}}
-        <span class="font-semibold">{!! collect(explode(' · ', $summary))->map(fn (string $part): string => '<span class="whitespace-nowrap">'.e($part).'</span>')->implode(' · ') !!}</span>
+    {{-- Prompt 306 — ONE line. Wrapping left the time alone on a second line beside *Opciones*; truncating the whole line
+         (the 300 attempt) lost the time. So the time — always the last part — never shrinks, the amount and grams truncate
+         first, and the full summary is the line's title. --}}
+    @php
+        $parts = explode(' · ', $summary);
+        $time = count($parts) > 1 ? array_pop($parts) : null;
+    @endphp
+    <p data-last-sale-summary title="{{ $summary }}" class="flex min-w-0 items-center gap-1 whitespace-nowrap text-sm leading-tight text-ink dark:text-slate-100">
+        <span aria-hidden="true" class="shrink-0 font-bold text-success">✓</span>
+        {{-- One source line, one space between the parts: the line's text reads exactly "Última: … · … · 14:02". --}}
+        <span class="min-w-0 truncate font-semibold">{{ implode(' · ', $parts) }}</span>@if ($time !== null) <span class="shrink-0 font-semibold">· {{ $time }}</span>@endif
     </p>
 
     <div class="relative shrink-0" x-data="{ menu: false }" @keydown.escape.window="menu = false">

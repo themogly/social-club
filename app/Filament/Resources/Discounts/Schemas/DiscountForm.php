@@ -6,6 +6,7 @@ use App\Enums\CategoryAppliesTo;
 use App\Enums\DiscountAppliesTo;
 use App\Enums\DiscountKind;
 use App\Enums\DiscountMode;
+use App\Filament\Forms\DecimalInput;
 use App\Models\Discount;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
@@ -32,7 +33,7 @@ class DiscountForm
             // 10 g / €100 order and the member was charged €7 more. A one-option dropdown would be
             // the same mistake as showing two money fields at once, so there is no dropdown at all —
             // the mode is set by CreateDiscount.
-            TextInput::make('value_pct')
+            DecimalInput::make('value_pct')
                 ->label(__('Porcentaje (%)'))
                 ->numeric()
                 // A discount worth nothing is not a discount. One used to be creatable by leaving this

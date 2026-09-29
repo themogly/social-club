@@ -4,6 +4,7 @@ namespace App\Filament\Resources\Genetics\RelationManagers;
 
 use App\Actions\Pricing\ResolvePrice;
 use App\Actions\Pricing\SaveGeneticPrice;
+use App\Filament\Forms\DecimalInput;
 use App\Models\Genetic;
 use App\Models\GeneticPrice;
 use App\Models\Location;
@@ -14,7 +15,6 @@ use App\Support\Weight;
 use Filament\Actions\Action;
 use Filament\Actions\DeleteAction;
 use Filament\Forms\Components\Select;
-use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
 use Filament\Notifications\Notification;
 use Filament\Resources\RelationManagers\RelationManager;
@@ -171,12 +171,12 @@ class GeneticPricesRelationManager extends RelationManager
                 ->placeholder(__('Base (sin tarifa)'))
                 ->helperText(__('Vacío = precio base. Una tarifa concreta tiene prioridad sobre la base para sus socios.'))
                 ->disabled($edit),
-            TextInput::make('price_eur')
+            DecimalInput::make('price_eur')
                 ->label($perUnit ? __('Precio por unidad (€)') : __('Precio por gramo (€)'))
                 ->numeric()
                 ->minValue(0)
                 ->required(),
-            TextInput::make('price_per_eighth_eur')
+            DecimalInput::make('price_per_eighth_eur')
                 ->label(__('Precio por octavo — 3,5 g (€)'))
                 ->helperText(__('Opcional. Si dos variedades comparten este precio, un octavo (3,5 g) repartido entre ellas se cobra a este precio.'))
                 ->numeric()
@@ -189,16 +189,16 @@ class GeneticPricesRelationManager extends RelationManager
                         if (blank($value)) {
                             return;
                         }
-                        $perGram = (float) ($get('price_eur') ?? 0);
+                        $perGram = (float) (DecimalInput::number($get('price_eur')) ?? 0);
                         $maxEighth = round_half_up($perGram * ResolvePrice::EIGHTH_CG / 100 * 100) / 100; // 3.5 × per-gram, 2dp
-                        if ($perGram > 0 && (float) $value > $maxEighth) {
+                        if ($perGram > 0 && (float) (DecimalInput::number($value) ?? 0) > $maxEighth) {
                             $fail(__('El precio por octavo no puede superar 3,5 × el precio por gramo (:max €).', [
-                                'max' => number_format($maxEighth, 2, ',', '.'),
+                                'max' => Money::fromEuros($maxEighth)->formatted(),
                             ]));
                         }
                     };
                 }),
-            TextInput::make('low_stock_threshold_g')
+            DecimalInput::make('low_stock_threshold_g')
                 ->label(__('Aviso de stock bajo (g)'))
                 // Prompt 273 — say how it actually works (269): one figure per variety and SEDE, not per tarifa.
                 ->helperText($perUnit

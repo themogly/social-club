@@ -51,6 +51,7 @@ class MinuteInfolist
                 Section::make(__('Orden del día'))
                     ->schema([
                         TextEntry::make('agenda')
+                            ->label(__('Orden del día'))
                             ->hiddenLabel()
                             ->listWithLineBreaks()
                             ->bulleted()
@@ -60,6 +61,7 @@ class MinuteInfolist
                 Section::make(__('Acuerdos'))
                     ->schema([
                         TextEntry::make('resolutions')
+                            ->label(__('Acuerdos'))
                             ->hiddenLabel()
                             ->listWithLineBreaks()
                             ->bulleted()
@@ -75,6 +77,7 @@ class MinuteInfolist
                 Section::make(__('Asistentes'))
                     ->schema([
                         TextEntry::make('attendees')
+                            ->label(__('Asistentes'))
                             ->hiddenLabel()
                             ->listWithLineBreaks()
                             ->bulleted()
@@ -85,6 +88,7 @@ class MinuteInfolist
                 Section::make(__('Desarrollo de la sesión'))
                     ->schema([
                         TextEntry::make('body')
+                            ->label(__('Desarrollo de la sesión'))
                             ->hiddenLabel()
                             ->prose()
                             ->placeholder(__('Sin contenido')),

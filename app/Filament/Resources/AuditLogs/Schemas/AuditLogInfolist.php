@@ -40,6 +40,7 @@ class AuditLogInfolist
                 Section::make(__('Cambios'))
                     ->schema([
                         TextEntry::make('diff')
+                            ->label(__('Cambios'))
                             ->hiddenLabel()
                             ->state(fn (AuditLog $record): string => self::diffHtml($record))
                             ->html()

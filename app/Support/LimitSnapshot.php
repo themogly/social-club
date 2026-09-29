@@ -42,6 +42,32 @@ final class LimitSnapshot
         return ! $this->wouldBreachDaily($gramsCg) && ! $this->wouldBreachMonthly($gramsCg);
     }
 
+    /**
+     * Prompt 306 — what is LEFT today, as a colour state: `ok` (green) above a quarter of the daily limit, `low` (amber)
+     * above nothing, `empty` (red) at nothing. A zero allowance used to show in green, which says "fine" when nothing is
+     * left. `$remainingCg` overrides the figure (the dispensary's "after this entry"); a negative one is `empty`.
+     */
+    public function dailyRemainingState(?int $remainingCg = null): string
+    {
+        $left = $remainingCg ?? $this->dailyRemainingCg();
+
+        return match (true) {
+            $left <= 0 => 'empty',
+            $this->dailyLimitCg > 0 && $left * 4 <= $this->dailyLimitCg => 'low',
+            default => 'ok',
+        };
+    }
+
+    /** The counter's text colour for {@see self::dailyRemainingState()} — its existing tokens. */
+    public static function dailyStateText(string $state): string
+    {
+        return match ($state) {
+            'empty' => 'text-error',
+            'low' => 'text-warning',
+            default => 'text-success',
+        };
+    }
+
     /** Percent of the monthly allowance used (for the gauge). */
     public function monthlyPercent(): int
     {

@@ -4,6 +4,7 @@ namespace App\Filament\Resources\Expenses\Schemas;
 
 use App\Enums\ExpensePaidFrom;
 use App\Filament\Forms\CameraOrFile;
+use App\Filament\Forms\DecimalInput;
 use App\Models\Location;
 use App\Support\DocumentUpload;
 use Filament\Forms\Components\DatePicker;
@@ -11,7 +12,6 @@ use Filament\Forms\Components\FileUpload;
 use Filament\Forms\Components\Placeholder;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
-use Filament\Forms\Components\TextInput;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Schema;
 use Illuminate\Database\Eloquent\Builder;
@@ -53,7 +53,7 @@ class ExpenseForm
                             ->default(ExpensePaidFrom::CASH->value) // the club's normal case is cash (owner)
                             ->required(),
 
-                        TextInput::make('amount_eur')
+                        DecimalInput::make('amount_eur')
                             ->label(__('Importe (€)'))
                             ->numeric()
                             ->minValue(0)
