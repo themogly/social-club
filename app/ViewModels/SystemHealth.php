@@ -9,6 +9,7 @@ use App\Support\Settings;
 use Carbon\CarbonInterface;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 
 /**
  * The operational health snapshot — because the failure mode of a broken cron or queue is
@@ -288,14 +289,18 @@ class SystemHealth
     {
         $store = (string) config('cache.default');
 
+        // A random STRING token: Redis hands a numeric value back as a string, so an integer probe never matched there
+        // (prompt 307). A string survives every store unchanged.
         try {
-            Cache::store($store)->put('csc.health.probe', 1, 10);
-            $reachable = Cache::store($store)->get('csc.health.probe') === 1;
+            $token = Str::random(16);
+            Cache::store($store)->put('csc.health.probe', $token, 10);
+            $reachable = Cache::store($store)->get('csc.health.probe') === $token;
+            Cache::store($store)->forget('csc.health.probe');
         } catch (\Throwable) {
             $reachable = false;
         }
 
-        return ['store' => $store, 'reachable' => $reachable];
+        return ['store' => $store, 'reachable' => $reachable, 'queue_on_redis' => config('queue.default') === 'redis'];
     }
 
     public function auditRetentionDays(): int

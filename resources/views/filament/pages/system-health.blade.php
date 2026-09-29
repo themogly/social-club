@@ -300,7 +300,7 @@
                 </div>
             </dl>
             @unless ($cache['reachable'])
-                <p style="margin-top:.6rem;font-size:.8rem;opacity:.75;">{{ __('La caché no responde. El mostrador y la autorización siguen funcionando (permisos en base de datos); las colas están detenidas hasta que se restablezca.') }}</p>
+                <p style="margin-top:.6rem;font-size:.8rem;opacity:.75;">{{ __('La caché no responde. El mostrador y la autorización siguen funcionando (permisos en base de datos).') }}@if ($cache['queue_on_redis']) {{ __('Si Redis no responde, las colas tampoco procesan.') }}@endif</p>
             @endunless
         </x-filament::section>
 
