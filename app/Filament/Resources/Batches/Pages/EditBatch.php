@@ -32,6 +32,9 @@ class EditBatch extends EditRecord
         return [
             // Prompt 302 — moving the stock is the page's main job for a store batch: the primary button, the list's action.
             BatchActions::transfer(),
+            // Prompt 305 — staged stock entry: the lote at another location, and a weigh-up count of this part.
+            BatchActions::addParts()->color('gray'),
+            BatchActions::recount()->color('gray'),
             DeleteAction::make(),
             RestoreAction::make(),
         ];

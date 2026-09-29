@@ -123,8 +123,11 @@ class BatchesTable
                     ->extraAttributes(['class' => 'min-h-11 min-w-11'])
                     ->tooltip(fn (Batch $record): string => BatchActions::transferLabel($record)),
                 ActionGroup::make([
+                    // Prompt 305 — the same lote at more locations, first in the menu beside the *Trasladar* button.
+                    BatchActions::addParts(),
                     self::recallAction(),
                     self::priceAction(),
+                    BatchActions::recount(), // prompt 305 — set the part to what the scale says (beside Ajuste)
                     self::adjustAction(),
                     self::mermaAction(),
                     EditAction::make(),

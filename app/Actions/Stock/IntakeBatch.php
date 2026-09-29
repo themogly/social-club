@@ -95,46 +95,22 @@ class IntakeBatch
             // of this intake are not duplicates of each other.
             $batchNo = $this->loteNumber($genetic, $data['batch_no'] ?? null, $receivedOn, $loteSeq);
 
-            $batches = collect($parts)->map(function (array $part) use ($genetic, $data, $isUnit, $loteSeq, $batchNo, $receivedOn): Batch {
-                $batch = Batch::create([
-                    'organisation_id' => $genetic->organisation_id,
-                    'genetic_id' => $genetic->id,
-                    'location_id' => $part['location']->id,
-                    'batch_no' => $batchNo,
-                    'lote_seq' => $loteSeq,
-                    'label' => $data['label'] ?? null, // the club's own name (prompt 282); trimmed/nulled by the model
-                    'acquired_or_harvested_on' => $data['acquired_or_harvested_on'] ?? $receivedOn->toDateString(),
-                    'expires_on' => $data['expires_on'] ?? null,
-                    'initial_cg' => $part['cg'],
-                    'remaining_cg' => $part['cg'],
-                    'initial_units' => $part['units'],
-                    'remaining_units' => $part['units'],
-                    'cost_per_gram_cents' => $data['cost_per_gram_cents'] ?? 0,
-                    // The SALE price and photos of this batch (prompt 278). One price column per kind; the eighth is weight only.
-                    'price_per_gram_cents' => $isUnit ? null : ($data['price_per_gram_cents'] ?? null),
-                    'price_per_unit_cents' => $isUnit ? ($data['price_per_unit_cents'] ?? null) : null,
-                    'price_per_eighth_cents' => $isUnit ? null : ($data['price_per_eighth_cents'] ?? null),
-                    'images' => $data['images'] ?? null,
-                    'lab_report_path' => $data['lab_report_path'] ?? null,
-                    'notes' => $data['notes'] ?? null,
-                    'status' => BatchStatus::OPEN,
-                ]);
-
-                StockMovement::create([
-                    'organisation_id' => $batch->organisation_id,
-                    'location_id' => $part['location']->id,
-                    'stockable_type' => Batch::class,
-                    'stockable_id' => $batch->id,
-                    'qty_cg' => $part['cg'],
-                    'qty_units' => $part['units'],
-                    'type' => StockMovementType::INTAKE,
-                    'reason' => 'Alta de lote',
-                    'operator_id' => $data['operator_id'] ?? Auth::id(),
-                    'reference' => $batch->batch_no,
-                ]);
-
-                return $batch;
-            });
+            $identity = [
+                'batch_no' => $batchNo,
+                'lote_seq' => $loteSeq,
+                'label' => $data['label'] ?? null, // the club's own name (prompt 282); trimmed/nulled by the model
+                'acquired_or_harvested_on' => $data['acquired_or_harvested_on'] ?? $receivedOn->toDateString(),
+                'expires_on' => $data['expires_on'] ?? null,
+                'cost_per_gram_cents' => $data['cost_per_gram_cents'] ?? 0,
+                // The SALE price and photos of this batch (prompt 278). One price column per kind; the eighth is weight only.
+                'price_per_gram_cents' => $isUnit ? null : ($data['price_per_gram_cents'] ?? null),
+                'price_per_unit_cents' => $isUnit ? ($data['price_per_unit_cents'] ?? null) : null,
+                'price_per_eighth_cents' => $isUnit ? null : ($data['price_per_eighth_cents'] ?? null),
+                'images' => $data['images'] ?? null,
+                'lab_report_path' => $data['lab_report_path'] ?? null,
+                'notes' => $data['notes'] ?? null,
+            ];
+            $batches = collect($parts)->map(fn (array $part): Batch => $this->createPart($genetic, $part, $identity, 'Alta de lote', $data['operator_id'] ?? null));
 
             $first = $batches->first();
             (new RecordAuditLog)->handle('batch.intake', $first, null, array_filter([
@@ -160,6 +136,105 @@ class IntakeBatch
 
             return $batches;
         });
+    }
+
+    /**
+     * Prompt 305 — the SAME lote turning up at more locations, as each is visited and weighed: real stock goes in in
+     * stages. A sibling part per location, reusing the lote's identity (strain, `batch_no`, `lote_seq`, label, prices,
+     * cost, photos, dates, lab report), `parent_batch_id` null — nothing was transferred, the stock was already there —
+     * each with its own quantity and INTAKE movement (the reason, default "Recuento inicial"), the same per-location
+     * ceiling check and single override as {@see self::handleParts()}, one `batch.part_added` entry. A location that
+     * already holds a part of the lote is refused: there the tool is *Recuento* (251's same-location top-up stays open).
+     *
+     * @param  list<array{location: Location, grams?: int|float|string, units?: int|string}>  $parts
+     * @param  array{reason?: ?string, operator_id?: ?string, override?: bool, override_by?: ?User, override_reason?: ?string}  $data
+     * @return Collection<int, Batch>
+     *
+     * @throws DomainException a location that already holds a part, or no location at all
+     * @throws StockCeilingExceededException a part over a BLOCK ceiling with no valid override
+     */
+    public function addParts(Batch $lote, array $parts, array $data): Collection
+    {
+        /** @var Genetic $genetic */
+        $genetic = Genetic::query()->withoutGlobalScopes()->findOrFail($lote->genetic_id);
+        $isUnit = $genetic->isUnitType();
+        $parts = array_map(fn (array $part): array => [
+            'location' => $part['location'],
+            'units' => $isUnit ? (int) ($part['units'] ?? 0) : null,
+            'cg' => $isUnit ? null : Weight::fromGrams($part['grams'] ?? 0)->centigrams,
+        ], $parts);
+        if ($parts === []) {
+            throw new DomainException(__('Elige al menos una sede.'));
+        }
+
+        $held = $lote->lotePartsQuery()->pluck('location_id')->all();
+        foreach ($parts as $part) {
+            if (in_array($part['location']->id, $held, true)) {
+                throw new DomainException(__('Este lote ya tiene existencias en :sede; usa «Recuento».', ['sede' => $part['location']->name]));
+            }
+        }
+
+        $breaches = array_values(array_filter(array_map(fn (array $part): ?array => $this->ceilingBreach($genetic, $part['location'], $part['cg'], $part['units']), $parts)));
+        $ceilingOverride = $this->authoriseOverride($breaches, $data);
+
+        return DB::transaction(function () use ($genetic, $lote, $parts, $data, $ceilingOverride): Collection {
+            $identity = $lote->only([
+                'batch_no', 'lote_seq', 'label', 'acquired_or_harvested_on', 'expires_on', 'cost_per_gram_cents',
+                'price_per_gram_cents', 'price_per_unit_cents', 'price_per_eighth_cents', 'images', 'lab_report_path', 'notes',
+            ]);
+            $reason = trim((string) ($data['reason'] ?? '')) ?: __('Recuento inicial');
+            $batches = collect($parts)->map(fn (array $part): Batch => $this->createPart($genetic, $part, $identity, $reason, $data['operator_id'] ?? null));
+
+            (new RecordAuditLog)->handle('batch.part_added', $lote, null, [
+                'batch_no' => $lote->batch_no,
+                'reason' => $reason,
+                'parts' => $batches->map(fn (Batch $b): array => [
+                    'batch_id' => $b->id, 'location_id' => $b->location_id,
+                    'initial_cg' => $b->initial_cg?->centigrams, 'initial_units' => $b->initial_units,
+                ])->all(),
+            ]);
+            if ($ceilingOverride !== null) {
+                (new RecordAuditLog)->handle('stock.ceiling.overridden', $batches->first(), null, $ceilingOverride);
+            }
+
+            return $batches;
+        });
+    }
+
+    /**
+     * One part of a lote at one location, and its opening INTAKE movement — shared by a new intake ({@see
+     * self::handleParts()}) and a part added later ({@see self::addParts()}).
+     *
+     * @param  array{location: Location, cg: ?int, units: ?int}  $part
+     * @param  array<string, mixed>  $identity  the lote's shared columns (batch_no, lote_seq, label, prices, dates…)
+     */
+    private function createPart(Genetic $genetic, array $part, array $identity, string $reason, ?string $operatorId): Batch
+    {
+        $batch = Batch::create(array_merge($identity, [
+            'organisation_id' => $genetic->organisation_id,
+            'genetic_id' => $genetic->id,
+            'location_id' => $part['location']->id,
+            'initial_cg' => $part['cg'],
+            'remaining_cg' => $part['cg'],
+            'initial_units' => $part['units'],
+            'remaining_units' => $part['units'],
+            'status' => BatchStatus::OPEN,
+        ]));
+
+        StockMovement::create([
+            'organisation_id' => $batch->organisation_id,
+            'location_id' => $part['location']->id,
+            'stockable_type' => Batch::class,
+            'stockable_id' => $batch->id,
+            'qty_cg' => $part['cg'],
+            'qty_units' => $part['units'],
+            'type' => StockMovementType::INTAKE,
+            'reason' => $reason,
+            'operator_id' => $operatorId ?? Auth::id(),
+            'reference' => $batch->batch_no,
+        ]);
+
+        return $batch;
     }
 
     /**
