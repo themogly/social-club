@@ -4,6 +4,7 @@ namespace Database\Seeders;
 
 use App\Enums\Role;
 use App\Models\User;
+use App\Support\StagingSeed;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\Hash;
 
@@ -20,8 +21,9 @@ class DevAdminSeeder extends Seeder
 {
     public function run(): void
     {
-        if (! app()->environment('local')) {
-            $this->command?->warn('DevAdminSeeder skipped — not the local environment.');
+        // Prompt 327 — local, or staging through csc:seed-staging only; never production.
+        if (! StagingSeed::allowed()) {
+            $this->command?->warn('DevAdminSeeder skipped — only local, or staging through csc:seed-staging.');
 
             return;
         }

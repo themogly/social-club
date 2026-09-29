@@ -5,6 +5,7 @@ namespace Tests\Feature\Seeders;
 use App\Actions\Attendance\ResolveMemberEligibility;
 use App\Actions\Dispensing\CommitDispensation;
 use App\Enums\DispensationStatus;
+use App\Enums\LocationKind;
 use App\Enums\MemberKind;
 use App\Enums\MemberStatus;
 use App\Models\Article;
@@ -88,7 +89,8 @@ class DemoSeedProfileTest extends TestCase
     {
         $this->seedDemo('es');
         $org = Organisation::firstOrFail();
-        $locations = Location::query()->where('organisation_id', $org->id)->get();
+        // The sedes: the store (327) has no members and no counter, so no ceiling of its own.
+        $locations = Location::query()->where('organisation_id', $org->id)->where('kind', LocationKind::SEDE->value)->get();
 
         // Per-sede arithmetic (prompt 110): each sede computes its OWN active-member count, not the org total.
         foreach ($locations as $location) {
@@ -128,7 +130,7 @@ class DemoSeedProfileTest extends TestCase
     {
         $this->seedDemo('en');
 
-        $this->assertEqualsCanonicalizing(['Central Branch', 'North Branch'], Location::pluck('name')->all());
+        $this->assertEqualsCanonicalizing(['Central Branch', 'North Branch', 'Store'], Location::pluck('name')->all()); // + the store (327)
         $this->assertEqualsCanonicalizing(['Member', 'Therapeutic'], MembershipTier::pluck('name')->all());
         $this->assertTrue(ExpenseCategory::where('name', 'Consumables')->exists());
         $this->assertFalse(ExpenseCategory::where('name', 'Consumibles')->exists());
@@ -142,7 +144,7 @@ class DemoSeedProfileTest extends TestCase
     {
         $this->seedDemo('es');
 
-        $this->assertEqualsCanonicalizing(['Sede Centro', 'Sede Norte'], Location::pluck('name')->all());
+        $this->assertEqualsCanonicalizing(['Sede Centro', 'Sede Norte', 'Almacén'], Location::pluck('name')->all()); // + the store (327)
         $this->assertEqualsCanonicalizing(['Socio', 'Terapéutico'], MembershipTier::pluck('name')->all());
         $this->assertTrue(ExpenseCategory::where('name', 'Consumibles')->exists());
         $this->assertFalse(ExpenseCategory::where('name', 'Consumables')->exists());
@@ -173,7 +175,7 @@ class DemoSeedProfileTest extends TestCase
     public function test_every_enabled_feature_has_supporting_data(): void
     {
         $this->seedDemo('en');
-        $loc = Location::query()->orderBy('name')->firstOrFail()->id;
+        $loc = Location::query()->where('kind', LocationKind::SEDE->value)->orderBy('name')->firstOrFail()->id; // a sede, not the store (327)
 
         // Wallet debt on → a member in debt within the cap AND one near it.
         $debts = Member::all()
@@ -197,7 +199,7 @@ class DemoSeedProfileTest extends TestCase
     public function test_a_seeded_member_can_be_dispensed_to_with_no_unpaid_fee_block(): void
     {
         $this->seedDemo('en');
-        $location = Location::query()->orderBy('name')->firstOrFail();
+        $location = Location::query()->where('kind', LocationKind::SEDE->value)->orderBy('name')->firstOrFail(); // a sede, not the store (327)
         app(ActiveScope::class)->setLocation($location->id); // seeding left the scope on the last location
 
         // A plain active member: fee paid, no debt, carencia passed (the feature debtors/carencia member

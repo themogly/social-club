@@ -269,6 +269,25 @@ class SystemHealth
     }
 
     /**
+     * Prompt 327 — on a STAGING site, anything that could reach the real world: a real mailer, a Telegram bot token, the
+     * documents on S3. Read from the configuration only; nothing is changed. Null when this is not staging.
+     *
+     * @return list<string>|null the reasons (empty = staging is safe)
+     */
+    public function stagingLeaks(): ?array
+    {
+        if (! app()->environment('staging')) {
+            return null;
+        }
+
+        return array_values(array_filter([
+            in_array((string) config('mail.default'), ['log', 'array'], true) ? null : __('El correo sale por «:mailer» (debe ser log o array).', ['mailer' => (string) config('mail.default')]),
+            filled(config('services.telegram.token')) ? __('Hay un token de Telegram configurado.') : null,
+            config('filesystems.disks.documents.driver') === 's3' ? __('Los documentos están en S3.') : null,
+        ]));
+    }
+
+    /**
      * Prompt 326 — edibles made before they were counted by THC, still with no THC figure: they keep the grams typed for
      * them until someone gives them one (their edit form requires it).
      *

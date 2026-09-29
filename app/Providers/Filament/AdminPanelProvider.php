@@ -91,6 +91,12 @@ class AdminPanelProvider extends PanelProvider
             // session's confirmation offers to renew in its last minutes.
             ->renderHook(PanelsRenderHook::SCRIPTS_AFTER, fn (): string => Blade::render("@include('filament.panel-refusal-hook')"))
             ->renderHook(PanelsRenderHook::BODY_START, fn (): string => Blade::render("@include('filament.confirmation-renew-banner')"))
+            // Prompt 327 — a staging site says so on every page, and in its tab title (Filament builds the <title> from
+            // each page, so the prefix is set here, right after it).
+            ->renderHook(PanelsRenderHook::BODY_START, fn (): string => Blade::render("@include('partials.staging-strip')"))
+            ->renderHook(PanelsRenderHook::HEAD_END, fn (): string => app()->environment('staging')
+                ? '<script data-staging-title>document.title = '.json_encode(__('[Pruebas]').' ', JSON_UNESCAPED_UNICODE).' + document.title;</script>'
+                : '')
             ->renderHook(
                 PanelsRenderHook::TOPBAR_START,
                 fn (): string => Blade::render('@livewire($component)', ['component' => LocationSwitcher::class]),

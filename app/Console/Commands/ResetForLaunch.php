@@ -8,6 +8,7 @@ use App\Models\OrganisationLockdown;
 use App\Support\ActiveScope;
 use App\Support\NextSteps;
 use App\Support\Reset\DatabaseDump;
+use App\Support\Reset\LocalStorageWiper;
 use App\Support\Reset\RedisPurger;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\File;
@@ -151,27 +152,11 @@ class ResetForLaunch extends Command
     /** Delete everything inside `$dir` except a top-level .gitignore; keep the directory. Only ever under storage/app. */
     private function emptyDirectory(string $dir): int
     {
-        $base = realpath(storage_path('app'));
-        $real = realpath($dir);
-        if ($real === false) {
-            return 0;
-        }
-        if ($base === false || ! str_starts_with($real.DIRECTORY_SEPARATOR, $base.DIRECTORY_SEPARATOR) || $real === $base) {
+        $removed = LocalStorageWiper::empty($dir);
+        if ($removed === null) {
             $this->warn(__('No se toca :dir: está fuera de storage/app.', ['dir' => $dir]));
 
             return 0;
-        }
-
-        $removed = 0;
-        foreach (File::allFiles($real, true) as $file) {
-            if ($file->getFilename() === '.gitignore' && $file->getPath() === $real) {
-                continue;
-            }
-            File::delete($file->getPathname());
-            $removed++;
-        }
-        foreach (File::directories($real) as $sub) {
-            File::deleteDirectory($sub);
         }
 
         return $removed;

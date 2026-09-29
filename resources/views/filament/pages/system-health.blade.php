@@ -29,6 +29,17 @@
     @endif
 
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:1rem;">
+        {{-- Prompt 327 — a staging site must not send anything real: red when it could. --}}
+        @if (! empty($stagingLeaks))
+            <x-filament::section :heading="__('Staging no debe enviar nada real.')" icon="heroicon-o-x-circle" icon-color="danger" data-staging-leaks>
+                <ul class="list-disc ps-5 text-sm text-danger-600 dark:text-danger-400">
+                    @foreach ($stagingLeaks as $leak)
+                        <li>{{ $leak }}</li>
+                    @endforeach
+                </ul>
+            </x-filament::section>
+        @endif
+
         {{-- Prompt 326 — edibles still counted by typed grams (no THC figure yet). Only shown when there are any. --}}
         @if ($ediblesWithoutThc !== [])
             <x-filament::section :heading="__('Comestibles sin cifra de THC')" icon="heroicon-o-exclamation-triangle" data-edibles-without-thc>
