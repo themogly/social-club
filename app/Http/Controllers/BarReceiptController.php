@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Order;
+use App\Support\Settings;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Facades\Gate;
 
@@ -21,6 +22,9 @@ class BarReceiptController extends Controller
     public function show(string $order): View
     {
         $model = Order::query()->withoutGlobalScopes()->findOrFail($order);
+
+        // Prompt 317 — off unless the order's sede offers the bar ticket. The route refuses; hiding the link is not the gate.
+        abort_unless((bool) Settings::get('bar_receipt_enabled', false, $model->location_id), 404);
 
         Gate::authorize('view', $model);
 

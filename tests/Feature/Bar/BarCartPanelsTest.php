@@ -126,6 +126,7 @@ class BarCartPanelsTest extends TestCase
 
     public function test_a_socio_and_reference_recorded_earlier_still_render_with_the_flags_off(): void
     {
+        Settings::set('bar_receipt_enabled', true, SettingType::BOOL, $this->location->id); // 317: the ticket is off unless a sede offers it
         $member = Member::factory()->create(['organisation_id' => $this->org->id, 'first_name' => 'Ana', 'last_name' => 'Real']);
         $article = $this->article();
         $till = TillSession::query()->withoutGlobalScopes()->where('location_id', $this->location->id)->first();

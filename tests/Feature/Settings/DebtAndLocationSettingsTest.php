@@ -184,7 +184,7 @@ class DebtAndLocationSettingsTest extends TestCase
             // check-in / signature requirements (prompt 44 — now genuinely per-location) + camera QR (prompt 35).
             'restrict_pos_to_checked_in', 'signature_on_dispensation', 'dispensary_calculator_enabled', 'camera_scan_enabled',
             // Per-location toggles reconciled to Setting rows (prompt 59/102), edited on LocationForm.
-            'bar_enabled', 'ring_fenced', 'multiple_tills_enabled', 'till_close_clock_out', 'managers_can_approve_debt',
+            'bar_enabled', 'bar_receipt_enabled', 'ring_fenced', 'multiple_tills_enabled', 'till_close_clock_out', 'managers_can_approve_debt',
             // Per-location bar cart panels (prompt 193): attaching a socio and the ticket reference are
             // per-sede input toggles on LocationForm, not org thresholds.
             'bar_attach_socio_enabled', 'bar_ticket_reference_enabled',

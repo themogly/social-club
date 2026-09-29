@@ -7,6 +7,7 @@ use App\Actions\Till\OpenTill;
 use App\Actions\Wallet\RecordWalletTransaction;
 use App\Enums\OrderStatus;
 use App\Enums\Role;
+use App\Enums\SettingType;
 use App\Enums\WalletTransactionType;
 use App\Livewire\Counter\BarPos;
 use App\Models\Article;
@@ -18,6 +19,7 @@ use App\Models\Organisation;
 use App\Models\User;
 use App\Support\ActiveScope;
 use App\Support\CounterOperator;
+use App\Support\Settings;
 use Database\Seeders\RolePermissionSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
@@ -280,6 +282,7 @@ class BarPosScreenTest extends TestCase
 
     public function test_a_successful_charge_shows_a_colocated_confirmation_and_receipt_link(): void
     {
+        Settings::set('bar_receipt_enabled', true, SettingType::BOOL, $this->location->id); // 317: the ticket is off unless a sede offers it
         // Prompt 41: the state survives commit (candidate #2 ruled out) AND the success flash renders
         // colocated in the basket column, not only in the page-top banner an operator scrolled past.
         $this->openTill();
@@ -338,6 +341,7 @@ class BarPosScreenTest extends TestCase
 
     public function test_the_bar_ticket_renders_with_sale_wording_and_never_contribution_wording(): void
     {
+        Settings::set('bar_receipt_enabled', true, SettingType::BOOL, $this->location->id); // 317: the ticket is off unless a sede offers it
         $this->openTill();
         $operator = $this->operator();
         $a = $this->article('Tortilla', 350, 10);
@@ -363,6 +367,7 @@ class BarPosScreenTest extends TestCase
 
     public function test_the_bar_ticket_is_denied_to_a_user_without_permission(): void
     {
+        Settings::set('bar_receipt_enabled', true, SettingType::BOOL, $this->location->id); // 317: the ticket is off unless a sede offers it
         $this->openTill();
         $operator = $this->operator();
         $a = $this->article('Chicle', 100, 10);
@@ -378,6 +383,7 @@ class BarPosScreenTest extends TestCase
 
     public function test_the_bar_ticket_is_denied_to_an_operator_at_another_location(): void
     {
+        Settings::set('bar_receipt_enabled', true, SettingType::BOOL, $this->location->id); // 317: the ticket is off unless a sede offers it
         $this->openTill();
         $operator = $this->operator();
         $a = $this->article('Patatas', 200, 10);

@@ -17191,3 +17191,48 @@ weights follow the Spanish convention because the prices did).
   - the registro de dispensación.
 
   Every figure uses a point, and none reads with a comma. The Telegram alert text is asserted in `DecimalPointTest`.
+
+## Prompt 317 — the bar ticket is off by default, with a per-sede switch
+
+Ben: *"Just hide it for now. Did we not put an option in the admin panel for receipts?"* No receipt setting existed.
+The bar/shop ticket, still titled *"Ticket de venta"* (the one document in the system that reads like an invoice), was
+one tap away after every bar sale.
+
+- **The setting:** per-sede `bar_receipt_enabled`, **default `false`**, beside *Bar activado* in *Sedes → Barra*:
+  **Ofrecer ticket de barra**, *"Permite ver e imprimir un ticket tras una venta de barra. Desactivado por defecto."* The
+  default does it, so every existing sede is off after the deploy with no data migration.
+- **When it's off:**
+  - **Counter:** the bar's *Opciones* has no *Ver / imprimir ticket*, and the receipt sheet isn't rendered. *Anular…*
+    stays when allowed. When *Opciones* would be empty (no ticket, no void, no email), the button isn't shown at all,
+    only the summary line. That is in the shared `last-sale` partial: `receiptUrl` may now be null.
+  - **The route refuses:** `/counter/bar/receipt/{order}` answers **404** when the setting is off for the ORDER's sede,
+    before the policy, so hiding the link isn't the gate (false-green §4). The setting is read per sede, so Sede Norte
+    switched on doesn't open Sede Centro's tickets.
+- **When it's on:** exactly as before, with the permission and other-sede denials unchanged (403).
+- **Places checked (wider check):**
+  - `bar-pos.blade.php`'s last-sale line is the only link;
+  - `BarReceiptController` is the only render;
+  - the dispensary (including the combined visit, 263) links only the dispensation receipt;
+  - no email renders the bar ticket (`DispensationReceiptMail` is the dispensation's);
+  - the member area has no ticket;
+  - the panel's *Pedidos* has no ticket action (only comments mention "tickets").
+  - `RequireOpenTill`'s allowlist of `counter/bar/receipt/*` is only a path classifier and is left as is.
+- **Unchanged:** the **dispensation receipt** is still offered, with its "no es una factura" wording (pinned).
+- **If the switch is ever turned on:** reword the ticket first to *Comprobante de consumo* with a *"no es una factura"*
+  footer, pending the gestor (see `claude/nota-fiscal-verifactu.md`). The wording is out of scope here.
+- **Tests:**
+  - `tests/Feature/Bar/BarTicketSwitchTest.php` (5 tests):
+    - by default no ticket in *Opciones* and a 404;
+    - with nothing left in the menu, only the summary line;
+    - switched on at the sede, the ticket is back and the route renders it;
+    - per sede, Norte on doesn't open Centro;
+    - the dispensation receipt is unaffected (a pin).
+
+    The first, second and fourth were red first.
+  - Six older tests that exercise the ticket as it works now switch it on for their sede (AfterSaleLine,
+    BarCartPanels, BarPosScreen ×4, including the two 403 denials).
+  - The settings-coverage test lists `bar_receipt_enabled` with the other per-location toggles.
+- **Verified in a browser** (`tests/Browser/prove-317-bar-ticket-switch.mjs`, 1180×820, throwaway DB):
+  - a bar sale shows *Opciones* with only *Anular…*, and the ticket URL answers 404;
+  - *Sedes → Central Branch → Ofrecer ticket de barra* (off) switched on and saved;
+  - the next bar sale shows *Ver / imprimir ticket* again.

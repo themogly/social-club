@@ -7,7 +7,7 @@
      thing that happens (a line added, a member changed).
 
      @var string $summary      "Última: 15,00 € · 1,00 g · 14:02"
-     @var string $receiptUrl   the unchanged receipt / ticket route
+     @var ?string $receiptUrl  the unchanged receipt / ticket route; null = no receipt offered (317's bar switch)
      @var string $receiptLabel @var string $receiptHeading
      @var bool   $emailable    the dispensary, and only when the member has an address
      @var bool   $canVoid
@@ -26,6 +26,8 @@
         <span class="min-w-0 truncate font-semibold">{{ implode(' · ', $parts) }}</span>@if ($time !== null) <span class="shrink-0 font-semibold">· {{ $time }}</span>@endif
     </p>
 
+    {{-- Prompt 317 — a menu with nothing in it is not shown (the bar ticket switched off, no void, no email). --}}
+    @if ($receiptUrl !== null || $emailable || $canVoid)
     <div class="relative shrink-0" x-data="{ menu: false }" @keydown.escape.window="menu = false">
         <button type="button" data-last-sale-options @click="menu = ! menu" :aria-expanded="menu" aria-haspopup="menu"
                 class="inline-flex h-11 items-center gap-1 rounded-lg px-3 text-sm font-semibold text-ink-muted transition hover:bg-black/5 dark:text-slate-300 dark:hover:bg-white/5">
@@ -37,8 +39,10 @@
              and opens its sheet (below) by event. --}}
         <div x-show="menu" x-cloak @click.outside="menu = false" role="menu"
              class="absolute bottom-full right-0 z-30 mb-2 flex w-60 flex-col gap-1 rounded-xl border border-line bg-surface p-2 shadow-xl dark:border-slate-700 dark:bg-slate-900">
+            @if ($receiptUrl !== null)
             <button type="button" role="menuitem" data-receipt-open @click="menu = false; $dispatch('counter-receipt-open')"
                     class="inline-flex h-11 items-center rounded-xl px-4 text-left text-sm font-semibold text-ink transition hover:bg-surface-alt dark:text-slate-100 dark:hover:bg-slate-800">{{ $receiptLabel }}</button>
+            @endif
 
             @if ($emailable)
                 <button type="button" role="menuitem" data-last-sale-email wire:click="emailReceipt" @click="menu = false" wire:loading.attr="disabled" wire:target="emailReceipt"
@@ -51,11 +55,14 @@
             @endif
         </div>
     </div>
+    @endif
 </div>
 
 {{-- The sheets live HERE, in the column's flow where 252's receipt sheet always sat, and the menu items open them by
      event. Nested inside the popover they were trapped under the product list (measured in the browser). --}}
-<x-counter.receipt-sheet :url="$receiptUrl" :label="$receiptLabel" :heading="$receiptHeading" :trigger="false" />
+@if ($receiptUrl !== null)
+    <x-counter.receipt-sheet :url="$receiptUrl" :label="$receiptLabel" :heading="$receiptHeading" :trigger="false" />
+@endif
 @if ($canVoid)
     <x-counter.sheet name="void" :heading="$voidHeading">
         <div x-data="{ reason: '' }">

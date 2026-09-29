@@ -10,6 +10,7 @@ use App\Enums\MembershipStatus;
 use App\Enums\MemberStatus;
 use App\Enums\OrderStatus;
 use App\Enums\Role;
+use App\Enums\SettingType;
 use App\Livewire\Counter\BarPos;
 use App\Livewire\Counter\DispensaryPos;
 use App\Models\Article;
@@ -27,6 +28,7 @@ use App\Models\User;
 use App\Support\ActiveScope;
 use App\Support\CounterOperator;
 use App\Support\Money;
+use App\Support\Settings;
 use App\Support\Weight;
 use Database\Seeders\RolePermissionSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -174,6 +176,7 @@ class AfterSaleLineTest extends TestCase
 
     public function test_the_bar_has_the_same_line_options_sheet_and_clearing(): void
     {
+        Settings::set('bar_receipt_enabled', true, SettingType::BOOL, $this->sede->id); // 317: the ticket is off unless a sede offers it
         $bar = $this->sold();
         $id = $bar->get('lastOrderId');
         $this->assertNotNull($id);
