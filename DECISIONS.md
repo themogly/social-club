@@ -16407,3 +16407,48 @@ sede that had no part yet. Separately, a part on the scale reads 196,5 g where t
   - *Recuento* on the Central part shows "En sistema: 200,00 g", and a count of 196,5 shows *Diferencia* −3,50 g;
   - the part now reads 196,50 g;
   - *Partes del lote* lists all three parts.
+
+## Prompt 307 — *Salud del sistema* no longer says the cache is unreachable when Redis is working
+
+Live (`dg.padron.app`) showed the Caché card as *No accesible*, store `redis`, and told the owner the queues were paused.
+At the same time Redis answered PONG, `Cache::put`/`get` worked, and Horizon was running with no failed jobs.
+
+- **Cause, confirmed:** `SystemHealth::cache()` wrote the integer `1` and compared the read-back with `=== 1`.
+  Laravel's `RedisStore` stores a numeric value unserialised and hands it back as a **string**, so on Redis the
+  comparison was always false and the card was red for as long as production has used Redis. The suite ran on the
+  `array` store, where the integer comes back intact: a false green, because the test's store was not production's. The
+  bug was reproduced against the local Redis (the old code gives `reachable: false` with Redis up). The dev `.env` also
+  uses `CACHE_STORE=redis`, so the local card was just as wrong.
+- **The fix:**
+  - the probe writes a random 16-character string token, reads it back and compares it as a string. A string survives
+    every store unchanged, so nothing is cast.
+  - it then `forget()`s the key;
+  - the `try/catch` stays, so a Redis that is really down still reads *No accesible*.
+- **The queue sentence:** the card checks the cache **store**, while the queue uses its own **connection**. The old copy
+  said "las colas están detenidas" whatever the queue ran on. The explanation is now *"La caché no responde. El mostrador
+  y la autorización siguen funcionando (permisos en base de datos)."* It is followed by *"Si Redis no responde, las colas
+  tampoco procesan."* (*"If Redis is not responding, the queues aren't processing either."*) only when
+  `queue.default` is `redis`. `cache()` returns a `queue_on_redis` flag for that.
+- **Wider check** (every cache/Redis read in `app/`): **no other instance.**
+  - `UnlockOperator` casts every attempts, strikes and lockout read with `(int)`;
+  - `PanelIdentity` uses `has()`;
+  - every rate limit goes through Laravel's `RateLimiter`, which does its own casting;
+  - `Settings` does not cache;
+  - the scheduler heartbeat is a database row (`HeartbeatLog`);
+  - the reset key stores already compare the SCAN cursor as a string.
+- **Tests:**
+  - `tests/Feature/System/CacheHealthProbeTest.php`:
+    - a store double that hands numbers back as strings, exactly as `RedisStore::unserialize()` does, must read
+      reachable. This was red before the fix.
+    - the probe key is gone after the check. This was red before the fix.
+    - a store whose `put` throws reads unreachable. This was already green, because the `try/catch` existed; it is kept
+      as a guard.
+    - the real Redis store is reachable when a Redis is running. It skips where none is, so CI without Redis stays
+      honest through the double. It was red before the fix against the local Redis.
+  - `RedisDegradationTest` now checks that the queue sentence appears only when the queue runs on Redis. It was red
+    before the copy change. Its assertions go through `__()`, so they hold in either locale.
+- **Verified in the sandbox** (`tests/Browser/prove-307-cache-health.mjs`): two throwaway servers on one DB copy, both
+  `CACHE_STORE=redis` with a sandbox prefix, one on the real local Redis and one on a closed port. The card reads
+  *Accesible* with Redis up and *No accesible* with the new sentence when it is down, at 1440×900 light and 390×844
+  dark. The local Redis was not stopped; a closed port gives the same connection refusal.
+- **On live after deploy:** Ben reloads *Salud del sistema*; the Caché card should be green.

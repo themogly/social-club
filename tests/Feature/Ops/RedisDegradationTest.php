@@ -92,6 +92,16 @@ class RedisDegradationTest extends TestCase
         $this->get(\App\Filament\Pages\SystemHealth::getUrl())
             ->assertOk()
             ->assertSee(__('No accesible'));
+
+        // Prompt 307 — the queue sentence says what is true: it follows the QUEUE connection, not the cache store.
+        config(['queue.default' => 'redis']);
+        $this->get(\App\Filament\Pages\SystemHealth::getUrl())
+            ->assertSee(__('Si Redis no responde, las colas tampoco procesan.'));
+        config(['queue.default' => 'database']);
+        $this->get(\App\Filament\Pages\SystemHealth::getUrl())
+            ->assertOk()
+            ->assertSee(__('No accesible'))
+            ->assertDontSee(__('Si Redis no responde, las colas tampoco procesan.'));
     }
 
     // --- Login says something true (not a silent bounce) -----------------------------
