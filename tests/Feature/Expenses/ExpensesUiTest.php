@@ -70,7 +70,7 @@ class ExpensesUiTest extends TestCase
         $createUrl = route('filament.admin.resources.expenses.create');
 
         foreach ([Role::MANAGER, Role::STAFF] as $role) {
-            $actor = $this->user($role);
+            $actor = $this->giveASede($this->user($role)); // 310 — at a sede, so the PAGE's gate answers
 
             $this->actingAs($actor)->get($createUrl)->assertForbidden();
             $this->assertFalse($actor->can('expenses.overheads')); // the ability the page requires
@@ -86,7 +86,7 @@ class ExpensesUiTest extends TestCase
         $this->giveStaffThePanel();
 
         // STAFF hold expenses.record (petty cash) but NOT purchases.manage.
-        $this->actingAs($this->user(Role::STAFF));
+        $this->actingAs($this->giveASede($this->user(Role::STAFF))); // 310 — at a sede, so the PAGE's gate answers
 
         $this->get(route('filament.admin.resources.suppliers.index'))->assertForbidden();
         $this->get(route('filament.admin.resources.purchases.index'))->assertForbidden();

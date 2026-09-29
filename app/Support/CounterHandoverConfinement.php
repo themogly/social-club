@@ -120,6 +120,8 @@ class CounterHandoverConfinement
             after: ['component' => $component->getName(), 'method' => $what],
         );
 
-        abort(403);
+        // Prompt 310 — with where to go (the applicant's screen, as EnforceCounterHandover sends page loads), for the
+        // panel's refusal hook; everywhere else it is the same 403 as before.
+        PanelRefusal::refuse('handover', CounterHandover::returnUrl() ?? route('counter.checkin'));
     }
 }

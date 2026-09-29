@@ -68,7 +68,7 @@ class AsambleaPageTest extends TestCase
         $staff = User::factory()->create();
         $staff->assignRole(Role::STAFF->value);
 
-        $this->actingAs($staff)->get(Asamblea::getUrl())->assertForbidden();
+        $this->actingAs($this->giveASede($staff))->get(Asamblea::getUrl())->assertForbidden();
     }
 
     public function test_a_governance_user_can_open_the_page(): void

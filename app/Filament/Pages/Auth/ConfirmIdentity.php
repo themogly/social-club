@@ -45,8 +45,20 @@ class ConfirmIdentity extends Page
     /** @var array<string, mixed>|null */
     public ?array $data = [];
 
+    /** Prompt 310 — asked again because the cache could not be read, not because anything expired: say so. */
+    public bool $cacheUnavailable = false;
+
     public function mount(): void
     {
+        $this->cacheUnavailable = session('panel_identity.cache_unavailable') === true;
+
+        // *Renovar* (prompt 310) comes here from a page with `?return=` — back to that page afterwards, this app's own only.
+        $return = request()->query('return');
+        $root = rtrim(url('/'), '/');
+        if (is_string($return) && ($return === $root || str_starts_with($return, $root.'/'))) {
+            session()->put('url.intended', $return);
+        }
+
         $this->form->fill();
     }
 
@@ -72,6 +84,10 @@ class ConfirmIdentity extends Page
 
     public function getSubheading(): string|Htmlable|null
     {
+        if ($this->cacheUnavailable) {
+            return __('No se ha podido comprobar la confirmación (caché no disponible). Vuelve a introducir tu contraseña.');
+        }
+
         return __('Has entrado con tu PIN. Para abrir la administración, escribe tu contraseña. Solo se pide una vez por turno.');
     }
 

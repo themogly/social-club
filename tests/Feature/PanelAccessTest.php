@@ -49,7 +49,7 @@ class PanelAccessTest extends TestCase
         $user = User::factory()->create();
         $user->assignRole(Role::STAFF->value);
 
-        $this->actingAs($user)->get('/')->assertForbidden();
+        $this->actingAs($user)->get('/')->assertRedirect(route('panel.no-location')); // 310 — to the page that says so
     }
 
     /** Denial: the panel gate blocks an account with no role. */

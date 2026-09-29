@@ -16634,3 +16634,109 @@ The tests reproduced exactly those five for STAFF with `panel.access` added.
   - at the counter, staff open the till and look a member up at the door.
   - Closing the till as staff is covered by the pin test. STAFF don't hold `till.close` by default, so the browser run
     didn't close.
+
+## Prompt 310 — a panel button never shows a bare "403"; it takes you to *Confirma tu identidad*
+
+Ben: *"I got a 403 error when you go to Bar and restock. It only happened once."* *Productos → Reponer* is a Livewire
+request.
+
+- **Diagnosis, reproduced in tests over the real HTTP endpoint:**
+  - A PIN session with no current confirmation had its *Reponer* answered by `ConfirmIdentityForPinSessions` with a
+    **bare 403**, which Livewire shows as its raw error box. That happened when the confirmation was never given,
+    when it had expired, or when someone else's PIN was entered in another tab. A reload redirected properly, hence
+    "only once".
+  - **By elimination this is the only path that fits the owner:**
+    - `EnsureActiveLocation` exempts the owner;
+    - the restock's own gate is `ArticlePolicy`, `articles.manage`, which the owner holds;
+    - `CounterLockConfinement` and `CounterHandoverConfinement` need a locked or handed-over counter, which would
+      have shown on the tablet.
+  - The owner's own PIN after a password login is **not** a PIN session (fix 3 follow-up). So the likely trigger is
+    an expired confirmation on a tablet session, or another person's PIN in a second tab.
+  - The live log wasn't available; if Ben sends it, check the time of the report against
+    `counter.panel.identity_confirmed`.
+- **The Livewire-refusal pattern** (`App\Support\PanelRefusal`):
+  - a page load is still redirected;
+  - a Livewire request gets a 403 carrying `X-Csc-Reason` and `X-Csc-Location`;
+  - where coming back makes sense, the page it came from (the Referer, this app's own pages only) is stored as
+    `url.intended`;
+  - the refusal is **thrown**, never returned. Livewire runs persistent middleware itself and silently **drops** any
+    returned response that isn't a redirect, so a returned 403 would have let the press through;
+  - one panel hook, `filament.panel-refusal-hook` (`Livewire.hook('request')`, rendered at `SCRIPTS_AFTER` in the
+    panel only), reads the header and navigates there instead of Livewire's error box;
+  - the refused request never reaches the component, so nothing happens. This is tested: no INTAKE, stock unchanged,
+    and pressing again after confirming records it once.
+- **Converted** (wider check over `app/Http/Middleware` for `abort(`, `abort_if`, `abort_unless`, `X-Livewire`, and
+  over the global Livewire hooks):
+  - `ConfirmIdentityForPinSessions`: reason `confirm-identity` → *Confirma tu identidad*, back to the page;
+  - `EnsureActiveLocation`: reason `no-location` → a new `/sin-sede` page (`panel.no-location`, outside the panel so
+    it can't loop) that explains, with *Volver al mostrador* and *Cerrar sesión*. A page load goes there too, instead
+    of a bare 403;
+  - `RedirectCounterOnlyAccounts`: reason `counter` → the counter. It is now also **persistent** (`->persistentMiddleware`,
+    in the same place in the stack), so a counter-only account's button press is sent to the counter. Before, Filament's
+    Authenticate answered that press with a bare 403;
+  - `CounterLockConfinement` (a locked counter's panel press, 270): still refused and audited, now with reason
+    `counter` → the counter. The middleware leaves Livewire presses to it, so the audit entry is kept;
+  - `CounterHandoverConfinement`: still refused and audited, now with reason `handover` → the applicant's screen (as
+    `EnforceCounterHandover` sends page loads);
+  - not converted, deliberately:
+    - `RecogniseCounterTerminal` only redirects GETs of `/` and `/login` with nobody signed in;
+    - `EnforceCounterHandover` and `RequireOpenTill` are page loads (their Livewire side is the confinement above);
+    - `EndInactiveSessions` answers 401, which Livewire already handles as an expired session;
+    - `EnsureLocalEnvironment` returns 404 for dev routes.
+- **The cache stays fail-closed, but visibly:**
+  - `PanelIdentity::mustConfirm()` still returns true when the cache throws;
+  - it logs **one** warning per request, with no personal data;
+  - it flashes a flag, so *Confirma tu identidad* says *"No se ha podido comprobar la confirmación (caché no
+    disponible). Vuelve a introducir tu contraseña."* The check is not weakened.
+- **The expiry banner:**
+  - the confirmation now stores its expiry timestamp as the cached value, read back with an `(int)` cast because Redis
+    returns numbers as strings (307). A pre-310 `true` value simply shows no banner;
+  - with **15 minutes or fewer** left (`RENEW_WINDOW_MINUTES`), panel pages show *"Tu confirmación caduca pronto.
+    Renovar"* at `BODY_START`;
+  - *Renovar* opens the confirmation with `?return=` (this app's own URLs only) and comes back to the same page;
+  - `SHIFT_HOURS` (12) is commented: long enough not to ask twice in an evening, short enough that a tablet left
+    signed in overnight asks again the next day.
+- **A harness fix that found a false green:** the shared `PostsLivewireOverHttp::livewirePost` now calls Livewire's
+  `flushState()` before each post.
+  - Livewire remembers the routes it has already run persistent middleware for until `flush-state`. A browser request
+    is a fresh process, but a test's requests share one, so a **second** post from the same page skipped every
+    persistent middleware.
+  - This test's refused press was recorded until the flush was added. The existing refusal tests passed only because
+    they posted once.
+  - The whole Security and Counter suites stay green with it.
+- **Tests:** `tests/Feature/Security/PanelRefusalsLeadSomewhereTest.php` (8 tests):
+  - someone else's PIN → `confirm-identity`, nothing restocked, `url.intended` = *Productos*;
+  - expired confirmation → the same, then confirm → back to *Productos* → the restock records once;
+  - a cache that throws → still asked, one warning, and the message;
+  - a locked counter or a counter-only account → `counter`;
+  - no sede → `no-location` and the page;
+  - a password session is never asked (a pin test);
+  - the hook is on every panel page;
+  - the renew banner, and the return to the page.
+
+  The password-session pin was green from the start. All the others were red first.
+- **Verified in a browser** (`tests/Browser/prove-310-refused-restock.mjs`, throwaway DB, 1180×820, one browser with
+  two tabs):
+  - the owner at the counter and *Productos* in the other tab;
+  - the manager's PIN on the counter, then *Reponer* → *Confirma tu identidad*, with no Livewire error box;
+  - confirming → back on *Productos*, with stock unchanged;
+  - *Reponer* → "Stock repuesto".
+  - `counter-session.mjs` gained `enterPin()` and `accountPassword()`, so the credentials stay in the one harness file.
+- **For Ben now:** the restock that showed the 403 wasn't saved. Check that product's stock and do it again.
+- **A dozen false greens, surfaced by `/sin-sede`.** Eleven "is forbidden to staff/manager" tests created their user
+  **with no sede**, so `EnsureActiveLocation` answered 403 before the page's own permission was ever asked, despite
+  their comment "so this still tests the PAGE's own gate". The affected tests:
+  - PermissionMatrix;
+  - DiscountForm;
+  - AccountingExportPage;
+  - ActasResource;
+  - GeneratedDocuments;
+  - LibroSociosPage;
+  - ExpensesUi ×2;
+  - AsambleaPage;
+  - ConvocatoriaResource;
+  - TemporaryStatusConversion.
+
+  Each now gives its user a sede (`TestCase::giveASede()`), and every one of those pages still refuses on its own
+  permission, so no hidden authorisation bug was behind them. `PanelAccessTest`'s no-sede test now asserts the redirect
+  to `/sin-sede`.

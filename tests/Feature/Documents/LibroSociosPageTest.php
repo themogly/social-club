@@ -99,7 +99,7 @@ class LibroSociosPageTest extends TestCase
         $this->giveStaffThePanel();
 
         $owner = $this->user(Role::OWNER);
-        $staff = $this->user(Role::STAFF);
+        $staff = $this->giveASede($this->user(Role::STAFF)); // 310 — at a sede, so the PAGE's gate answers
 
         $this->actingAs($owner);
         $this->assertTrue(LibroSocios::canAccess());

@@ -5,6 +5,7 @@ namespace App\Http\Middleware;
 use App\Enums\Role;
 use App\Models\User;
 use App\Support\LocationSwitcher;
+use App\Support\PanelRefusal;
 use Closure;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -25,11 +26,10 @@ class EnsureActiveLocation
             $switcher = app(LocationSwitcher::class);
             $switcher->enforce($user);
 
-            abort_if(
-                $switcher->current() === null && ! $user->hasRole(Role::OWNER->value),
-                403,
-                __('No tienes ninguna sede asignada. Pide a un responsable que te asigne una.'),
-            );
+            // Prompt 310 — to a page that says so (with the way back to the counter), for a page load or a button press.
+            if ($switcher->current() === null && ! $user->hasRole(Role::OWNER->value)) {
+                return PanelRefusal::to($request, 'no-location', route('panel.no-location'));
+            }
         }
 
         return $next($request);

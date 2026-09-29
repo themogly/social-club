@@ -287,7 +287,7 @@ class TemporaryStatusConversionTest extends TestCase
         // A club that lets staff into the panel (the pre-262 default) — so this still tests the PAGE's own gate.
         $this->giveStaffThePanel();
 
-        $staff = $this->actor(Role::STAFF);
+        $staff = $this->giveASede($this->actor(Role::STAFF)); // 310 — at a sede, so the PAGE's gate answers
         $this->assertFalse($staff->can('members.create'), 'members.create is the gate the action reads.');
 
         // Denied a step earlier than the action: staff cannot reach the member edit page at all, so

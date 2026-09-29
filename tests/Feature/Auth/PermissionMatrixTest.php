@@ -57,7 +57,7 @@ class PermissionMatrixTest extends TestCase
 
         $indexUrl = route('filament.admin.resources.users.index');
 
-        $this->actingAs($this->user(Role::STAFF))->get($indexUrl)->assertForbidden();
+        $this->actingAs($this->giveASede($this->user(Role::STAFF)))->get($indexUrl)->assertForbidden();
         $this->actingAs($this->user(Role::OWNER))->get($indexUrl)->assertOk();
     }
 }

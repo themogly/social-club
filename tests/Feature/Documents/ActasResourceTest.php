@@ -108,7 +108,7 @@ class ActasResourceTest extends TestCase
         // A club that lets staff into the panel (the pre-262 default) — so this still tests the PAGE's own gate.
         $this->giveStaffThePanel();
 
-        $staff = $this->user(Role::STAFF);
+        $staff = $this->giveASede($this->user(Role::STAFF)); // 310 — at a sede, so the PAGE's gate answers
         $this->assertFalse($staff->can('minutes.manage'));
 
         $this->actingAs($staff)
