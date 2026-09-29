@@ -107,3 +107,17 @@
 .dark .fi-in-placeholder {
     color: var(--fi-color-gray-400, #90a1b9);
 }
+
+/* Prompt 322 — the counter PIN is typed into a TEXT input (a password field invited the browser's password manager to
+   fill it with something that was not the PIN), so it is masked visually instead. Engines without text-security show
+   the digits — acceptable for an owner setting a PIN at their desk; a silently replaced PIN was not. The eye (the
+   field's suffix button) reveals it. */
+.csc-pin-mask {
+    -webkit-text-security: disc;
+    text-security: disc;
+}
+
+.csc-pin-mask.csc-pin-shown {
+    -webkit-text-security: none;
+    text-security: none;
+}

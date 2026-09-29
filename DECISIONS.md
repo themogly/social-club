@@ -17435,3 +17435,63 @@ one tap away after every bar sale.
   - `PanelTabletLayoutTest::test_an_open_row_menu_raises_its_pinned_cell_above_the_next_rows` pins the rule in CI, and
     pins Filament's `aria-expanded` behaviour it depends on. Red without the rule.
   - The harness signs in once per run: a sign-in per width tripped the login throttle and showed an empty page.
+
+## Prompt 322 — setting a PIN in the panel: no autofill, type it twice, and confirmation it was saved
+
+- **What happened on live:** Nick's PIN, set in the panel, matched no one at the counter; setting the same PIN from
+  the server fixed it at once. Both panel paths save exactly what they're sent, so what was sent wasn't what Nick typed.
+  *PIN de mostrador* was a masked `type="password"` input with `autocomplete="new-password"` in an account form. That is
+  exactly what iCloud Keychain and the Safari and Chrome password managers fill with a saved password, or a suggested
+  strong one. Masked, nobody could see it; a numeric saved password or a mistyped PIN passed the 4–8 digit rule.
+- **The field is no longer a password field.** It is `App\Filament\Forms\PinInput`, one field used everywhere a PIN
+  is typed in the panel:
+  - a `type="text"` input with `inputmode="numeric"`, `pattern="[0-9]*"` and `autocomplete="off"`, plus the managers'
+    ignore hints `data-1p-ignore`, `data-lpignore="true"`, `data-bwignore` and `data-form-type="other"`;
+  - masked **visually** by `.csc-pin-mask` (`-webkit-text-security: disc`) in the panel theme, with an eye (a suffix
+    button) that reveals it. Engines without text-security show the digits; that's accepted, because a silently
+    replaced PIN is the worse failure;
+  - Filament's Alpine `mask('99999999')` drops anything that isn't a digit as it's typed; the server keeps
+    `digits_between:4,8`.
+  - The account password stays a password field with `new-password`: that one is meant to be a password.
+    `UserCredentialAutofillTest` now pins the difference.
+- **Typed twice:** *Repite el PIN* (`pin_confirmation`, the same field, not saved) must be the same (*"Los PIN no
+  coinciden."*). It is shown and required on create once *PIN de mostrador* has a value (the PIN field is
+  `live(onBlur)`), and on edit when *Establecer un PIN nuevo* is on. 163's intent toggle and dehydration guard are
+  unchanged.
+- **Where it works (`App\Support\PinSavedNotice`):**
+  - after a save that set a PIN (create, or an edit whose PIN columns changed), a notification: **"PIN guardado para Nick.
+    Pruébalo en el mostrador de Dream Green."**;
+  - the sedes come from `UnlockOperator`'s own rule: the person is active and assigned to the sede; only SEDE locations
+    count (a store has no counter) and only active ones;
+  - no sede: *"El PIN no funcionará: esta persona no tiene ninguna sede asignada."*;
+  - **judgment call:** an inactive person gets *"El PIN no funcionará: esta persona está desactivada."*, since it's the
+    same rule.
+- ***Probar PIN*** (a header action on the user's edit page, `App\Actions\Users\TestUserPin`):
+  - uses the same `PinInput`, and answers only **Coincide** or **No coincide** for **this** person;
+  - someone else's PIN is just "No coincide", never whose it is;
+  - checks the lookup, or a legacy hash not yet upgraded;
+  - throttled like `PinCollisionGuard` (five tries an hour per person testing), after which it answers only "Demasiados
+    intentos…";
+  - every try is audited `user.pin.tested` with `matched` (or `throttled`), never the PIN;
+  - gated on `update` for that person (the policy that edits them), in the action's visibility and again in the Action.
+- **Every place a PIN is set:** only the user form, on create and on edit.
+  - The profile page (`EditProfile`) doesn't set a PIN.
+  - `csc:install` asks for the owner's email and password but no PIN.
+  - Counter code only verifies PINs; `UnlockOperator`'s upgrade of a legacy hash writes the lookup of the PIN just
+    typed at the keypad.
+  - So there was nothing else to change.
+- **Tests:** `tests/Feature/Users/PinFieldTest.php` (8). Six were red first: the rendered input (not password, with
+  the hints), mismatched repeats on create and edit, the notification (sedes / none), and *Probar PIN* (answers, no
+  names, throttle, audit without the PIN, and its permission). Two were green by nature: the server refusing non-digits,
+  and 286's storage (clears a legacy hash, writes only `pin_lookup`). Three older tests now type the repeat
+  (`UserCredentialAutofillTest` ×2, `OperatorUnlockTest`).
+- **Verified in a browser** (`tests/Browser/prove-322-pin-field.mjs`, throwaway DB, Chromium), 14/14 PASS:
+  - on Club Staff's edit page, the PIN input is not rendered until *Establecer un PIN nuevo*; then it is type text,
+    autocomplete off, numeric, with the hints, and masked (`disc`);
+  - typing `48ab2x6` leaves `4826`, and the eye reveals it;
+  - *Repite el PIN* appears; a mismatch is refused, and a match saves with "PIN guardado para Club Staff. Pruébalo en el
+    mostrador de Central Branch.";
+  - *Probar PIN* says Coincide for 4826 and No coincide for 9999;
+  - 4826 opens the Central Branch counter as Club Staff (the audit's `counter.operator.signed_in` names Club Staff).
+- **Still for Ben:** the Mac check with saved passwords for `dg.padron.app` in Safari and Chrome (no autofill, no
+  strong-password suggestion). There's no WebKit locally, so that part can only be seen on the real device.
