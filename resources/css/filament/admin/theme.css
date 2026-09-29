@@ -53,6 +53,19 @@
         background-color: var(--fi-color-gray-900, #0f172a);
         box-shadow: -1px 0 0 0 var(--fi-color-gray-700, #334155);
     }
+
+    /* Prompt 321 — sticky + z-index makes EVERY pinned cell a stacking context at the same level, and the row's ⋮
+       panel is rendered inside its own cell, so the NEXT row's cell (later in the page, same z-index) painted over an
+       open menu. The cell whose dropdown is open is raised to Filament's own dropdown layer (20; the topbar is 30).
+       Keyed on `aria-expanded="true"`, which Filament's dropdown.js keeps on the real trigger exactly while the panel
+       is displayed (click, click-away, Escape, morph). The header stays above the body rows. */
+    .fi-ta-table > thead > tr > th:last-child {
+        z-index: 2;
+    }
+
+    .fi-ta-table > tbody > tr > td:last-child:has(.fi-dropdown-trigger [aria-expanded='true']) {
+        z-index: 20;
+    }
 }
 
 /* 2. Make the horizontal scroll DISCOVERABLE. iOS shows no persistent scrollbar, so a table that scrolls

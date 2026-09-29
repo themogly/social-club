@@ -120,6 +120,26 @@ class PanelTabletLayoutTest extends TestCase
             'The pinned cell needs an opaque dark-mode background too, or scrolled-under columns show through it.');
     }
 
+    /**
+     * Prompt 321 — the pinned cells are each a stacking context at the same z-index, so a row's open ⋮ menu was painted
+     * over by the next row's pinned cell. The cell whose dropdown is open is raised, keyed on the `aria-expanded` that
+     * Filament's dropdown.js keeps on the trigger. Pinned here AND on Filament's side, so an upgrade that stops writing
+     * the attribute fails CI instead of silently bringing the overlap back. (The geometry is proven in the browser:
+     * `tests/Browser/prove-321-row-menu-on-top.mjs`.)
+     */
+    public function test_an_open_row_menu_raises_its_pinned_cell_above_the_next_rows(): void
+    {
+        $css = (string) file_get_contents(base_path(self::THEME));
+        $mobile = substr($css, (int) strpos($css, '@media (max-width: 1279px)'));
+
+        $this->assertMatchesRegularExpression("/td:last-child:has\\(\\.fi-dropdown-trigger \\[aria-expanded='true'\\]\\)\\s*\\{\\s*z-index: 20;/", $mobile);
+        $this->assertMatchesRegularExpression('/thead > tr > th:last-child\s*\{\s*z-index: 2;/', $mobile, 'the header must stay above the body rows');
+
+        $dropdown = (string) file_get_contents(base_path('vendor/filament/support/resources/js/components/dropdown.js'));
+        $this->assertStringContainsString("'aria-expanded',", $dropdown);
+        $this->assertStringContainsString("panel.style.display === 'block' ? 'true' : 'false'", $dropdown, 'Filament no longer marks the open trigger the way the theme rule expects');
+    }
+
     public function test_the_horizontal_scroll_is_made_discoverable(): void
     {
         // iOS shows no persistent scrollbar, so a table that scrolls sideways is indistinguishable from
