@@ -538,17 +538,22 @@
                                     </span>
 
                                     {{-- RIGHT: price over stock. 216's cover badge and the stock FIGURE — "≈2 días" is the
-                                         information the word "bajo" is not. --}}
-                                    <span class="flex shrink-0 items-center gap-3 text-xs as-list:sm:flex-col as-list:sm:items-end as-list:sm:gap-0.5 as-grid:justify-between">
+                                         information the word "bajo" is not.
+                                         Prompt 301 — in GRID view the price and the stock are two left-aligned lines inside the
+                                         tile: on one line that could not wrap, "499,00 g ● Con lote" ran past a portrait tile's
+                                         edge. The figure and the dot never shrink; the status word truncates as a last resort
+                                         and keeps its full text in `title`. List view is unchanged. --}}
+                                    @php($statusWord = $g['has_batch'] && $g['low_stock'] ? ($g['cover_label'] ?? __('Stock bajo')) : ($g['has_batch'] ? __('Con lote') : __('Sin lote')))
+                                    <span class="flex shrink-0 items-center gap-3 text-xs as-list:sm:flex-col as-list:sm:items-end as-list:sm:gap-0.5 as-grid:w-full as-grid:min-w-0 as-grid:shrink as-grid:flex-col as-grid:items-start as-grid:gap-0.5">
                                         <span class="text-sm font-semibold text-brand tabular-nums dark:text-slate-100">{{ $this->money($g['rate_cents']) }}/{{ $g['is_unit'] ? __('ud') : 'g' }}</span>
-                                        <span class="flex items-center gap-1.5 whitespace-nowrap text-ink-muted dark:text-slate-400">
-                                            <span class="tabular-nums">{{ $g['is_unit'] ? $g['remaining_units'].' '.__('uds') : $this->grams($g['remaining_cg']) }}</span>
+                                        <span data-genetic-stock class="flex min-w-0 max-w-full items-center gap-1.5 whitespace-nowrap text-ink-muted dark:text-slate-400">
+                                            <span class="shrink-0 tabular-nums">{{ $g['is_unit'] ? $g['remaining_units'].' '.__('uds') : $this->grams($g['remaining_cg']) }}</span>
                                             @if ($g['has_batch'] && $g['low_stock'])
-                                                <span data-stock-cover="{{ $g['cover']['basis'] }}" class="inline-flex items-center gap-1 text-warning"><span class="h-2 w-2 rounded-full bg-warning"></span>{{ $g['cover_label'] ?? __('Stock bajo') }}</span>
+                                                <span data-stock-cover="{{ $g['cover']['basis'] }}" title="{{ $statusWord }}" class="inline-flex min-w-0 items-center gap-1 text-warning"><span class="h-2 w-2 shrink-0 rounded-full bg-warning"></span><span class="truncate">{{ $statusWord }}</span></span>
                                             @elseif ($g['has_batch'])
-                                                <span class="inline-flex items-center gap-1 text-success"><span class="h-2 w-2 rounded-full bg-success"></span>{{ __('Con lote') }}</span>
+                                                <span title="{{ $statusWord }}" class="inline-flex min-w-0 items-center gap-1 text-success"><span class="h-2 w-2 shrink-0 rounded-full bg-success"></span><span class="truncate">{{ $statusWord }}</span></span>
                                             @else
-                                                <span class="inline-flex items-center gap-1"><span class="h-2 w-2 rounded-full bg-slate-400"></span>{{ __('Sin lote') }}</span>
+                                                <span title="{{ $statusWord }}" class="inline-flex min-w-0 items-center gap-1"><span class="h-2 w-2 shrink-0 rounded-full bg-slate-400"></span><span class="truncate">{{ $statusWord }}</span></span>
                                             @endif
                                         </span>
                                     </span>
