@@ -11,6 +11,7 @@ use App\Enums\UnitType;
 use App\Filament\Concerns\WarnsBelowCost;
 use App\Filament\Forms\CameraOrFile;
 use App\Filament\Resources\Genetics\GeneticResource;
+use App\Filament\Resources\Genetics\Schemas\GeneticForm;
 use App\Models\Genetic;
 use App\Models\Location;
 use App\Rules\GramAmount;
@@ -60,7 +61,7 @@ class CreateGenetic extends CreateRecord
             Step::make(__('Variedad'))
                 ->description(__('Qué variedad es'))
                 ->schema([
-                    TextInput::make('name')->label(__('Nombre'))->required()->maxLength(255),
+                    GeneticForm::nameField(), // prompt 308 — the same unique-name field as the edit form
                     Select::make('strain_type')->label(__('Variedad'))
                         ->options(collect(StrainType::cases())->mapWithKeys(fn (StrainType $case): array => [$case->value => $case->label()])->all())
                         ->placeholder(__('Sin especificar')),

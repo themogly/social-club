@@ -13,6 +13,7 @@ use App\Observers\GeneticObserver;
 use App\Support\ActiveScope;
 use App\Support\Settings;
 use App\Support\StockCover;
+use App\Support\Weight;
 use Database\Factories\GeneticFactory;
 use Illuminate\Database\Eloquent\Attributes\ObservedBy;
 use Illuminate\Database\Eloquent\Builder;
@@ -22,6 +23,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Support\Str;
 
 /**
  * Org-wide strain definition. Holds no price — prices are per location (GeneticPrice).
@@ -84,6 +86,52 @@ class Genetic extends Model
     public function batches(): HasMany
     {
         return $this->hasMany(Batch::class);
+    }
+
+    /**
+     * Where this strain still has stock, across EVERY sede of the club, the store included (prompt 308): one
+     * "150,00 g en Demo" per sede, by sede name. Empty while nothing is left — the only state in which it may be
+     * deleted ({@see GeneticObserver::deleting()}).
+     *
+     * @return list<string>
+     */
+    public function stockLeft(): array
+    {
+        return Batch::query()->withoutGlobalScopes()
+            ->where('batches.organisation_id', $this->organisation_id)
+            ->where('batches.genetic_id', $this->getKey())
+            ->whereNull('batches.deleted_at')
+            ->inStock()
+            ->join('locations', 'locations.id', '=', 'batches.location_id')
+            ->groupBy('locations.name')
+            ->orderBy('locations.name')
+            ->selectRaw('locations.name as sede, SUM(COALESCE(batches.remaining_cg, 0)) as cg, SUM(COALESCE(batches.remaining_units, 0)) as units')
+            ->toBase()->get()
+            ->map(fn (object $row): string => __(':amount en :sede', [
+                'amount' => $this->isUnitType() ? ((int) $row->units).' '.__('uds') : Weight::fromCentigrams((int) $row->cg)->formatted(),
+                'sede' => $row->sede,
+            ]))->values()->all();
+    }
+
+    /** A strain name as compared for sameness (prompt 308): case, accents and spacing ignored. */
+    public static function comparableName(string $name): string
+    {
+        return Str::of($name)->ascii()->lower()->squish()->toString();
+    }
+
+    /**
+     * The OTHER strain of this club already called `$name` — a deleted one included (prompt 308) — or null.
+     * Compared in PHP through {@see self::comparableName()}, so SQLite and MySQL collations cannot disagree.
+     */
+    public static function sameNameAs(string $name, ?string $ignoreId = null): ?self
+    {
+        $wanted = self::comparableName($name);
+
+        return self::query()->withTrashed()
+            ->when($ignoreId !== null, fn (Builder $q): Builder => $q->whereKeyNot($ignoreId))
+            ->orderByRaw('deleted_at IS NULL DESC')
+            ->get(['id', 'name', 'deleted_at'])
+            ->first(fn (self $genetic): bool => self::comparableName((string) $genetic->name) === $wanted);
     }
 
     /**

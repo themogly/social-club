@@ -284,6 +284,30 @@ class Batch extends Model
     }
 
     /**
+     * Anything left, whatever the status (prompt 308): a quarantined or closed batch holding stock is still stock. The
+     * other column is null by the one-of-two invariant, so this resolves per type without a join.
+     *
+     * @param  Builder<static>  $query
+     * @return Builder<static>
+     */
+    public function scopeInStock(Builder $query): Builder
+    {
+        return $query->where(fn (Builder $q): Builder => $q->where('batches.remaining_cg', '>', 0)->orWhere('batches.remaining_units', '>', 0));
+    }
+
+    /**
+     * Nothing left — the complement of {@see self::scopeInStock()} (a null count reads as nothing left).
+     *
+     * @param  Builder<static>  $query
+     * @return Builder<static>
+     */
+    public function scopeEmpty(Builder $query): Builder
+    {
+        return $query->where(fn (Builder $q): Builder => $q->where(fn (Builder $c): Builder => $c->whereNull('batches.remaining_cg')->orWhere('batches.remaining_cg', '<=', 0))
+            ->where(fn (Builder $u): Builder => $u->whereNull('batches.remaining_units')->orWhere('batches.remaining_units', '<=', 0)));
+    }
+
+    /**
      * Dispensable right now: OPEN, in stock, and not past expiry. "In stock" keys off
      * whichever unit the genetic uses — the other column is null by the one-of-two
      * invariant, so `remaining_cg > 0 OR remaining_units > 0` resolves per type without

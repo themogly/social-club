@@ -125,7 +125,7 @@ class DashboardExpenseScopeTest extends TestCase
             'organisation_id' => $this->org->id, 'genetic_id' => $genetic->id,
             'location_id' => $this->location->id, 'remaining_cg' => 5000,
         ]);
-        $genetic->delete(); // soft-delete the PARENT, keep the batch
+        $genetic->deleteQuietly(); // soft-delete the PARENT, keep the batch — a pre-308 state (308 refuses it now) that live still holds
 
         $report = new StockReport($this->org->id, null, Period::today());
         $names = collect($report->tables()[0]->rows)->pluck('genetica')->all();
