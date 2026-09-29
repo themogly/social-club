@@ -5,7 +5,9 @@ namespace App\Filament\Pages;
 use App\Actions\RecordAuditLog;
 use App\Actions\ResolveLocale;
 use App\Actions\Settings\SetConsumptionLimits;
+use App\Actions\Stock\RecalculateEdibleGrams;
 use App\Console\Commands\PruneStaffClockEvents;
+use App\Enums\Role;
 use App\Enums\SettingType;
 use App\Filament\Forms\DecimalInput;
 use App\Models\User;
@@ -53,6 +55,7 @@ class ManageSettings extends Page
         'monthly_window' => SettingType::STRING,
         'active_member_cap' => SettingType::INT,
         'stock_ceiling_days' => SettingType::INT,
+        'edible_thc_mg_per_gram' => SettingType::INT, // prompt 326 — owner only, recalculates the edibles
         'gauge_warning_pct' => SettingType::INT,
         'discount_alert_threshold_pct' => SettingType::INT, // prompt 291
         'gauge_alert_pct' => SettingType::INT,
@@ -191,6 +194,11 @@ class ManageSettings extends Page
                             ->helperText(__('Límite por defecto por socio y mes; una tarifa o un límite personal lo sustituye.')),
                         Select::make('monthly_window')->label(__('Ventana mensual'))
                             ->options(['calendar' => __('Mes natural'), 'rolling30' => __('30 días móviles')])->required(),
+                        // Prompt 326 — owner only: it changes what every edible counts as, from now on.
+                        TextInput::make('edible_thc_mg_per_gram')->label(__('Equivalencia de comestibles: mg de THC por gramo'))
+                            ->integer()->minValue(1)->maxValue(1000)->required()
+                            ->disabled(fn (): bool => ! (Auth::user()?->hasRole(Role::OWNER->value) ?? false))
+                            ->helperText(__('Cada comestible cuenta como (mg de THC ÷ este valor) gramos en los límites y el techo de existencias. Consúltalo con vuestro gestor. Solo afecta a las dispensaciones a partir de ahora.')),
                         TextInput::make('active_member_cap')->label(__('Tope de socios activos'))->integer()->minValue(1)->required()
                             ->helperText(__('Aviso en el panel al acercarse a este número.')),
                         TextInput::make('stock_ceiling_days')->label(__('Días para techo de stock'))->integer()->minValue(1)->maxValue(365)->required()
@@ -419,6 +427,12 @@ class ManageSettings extends Page
         $state = $this->form->getState();          // validates
         $before = $this->currentValues();
 
+        // Prompt 326 — only the owner changes the edible equivalence (the field is disabled for anyone else; this holds
+        // the line against a crafted payload too).
+        if (! (Auth::user()?->hasRole(Role::OWNER->value) ?? false)) {
+            unset($state['edible_thc_mg_per_gram']);
+        }
+
         foreach (self::SCALARS as $key => $type) {
             if (array_key_exists($key, $state)) {
                 Settings::set($key, $state[$key], $type);
@@ -446,6 +460,12 @@ class ManageSettings extends Page
         (new RecordAuditLog)->handle('settings.updated', null, $before, $this->currentValues());
 
         Notification::make()->title(__('Ajustes guardados'))->success()->send();
+
+        // Prompt 326 — a new equivalence re-counts every edible now; past dispensations keep their grams.
+        if ((int) ($before['edible_thc_mg_per_gram'] ?? 0) !== (int) Settings::get('edible_thc_mg_per_gram')) {
+            $changed = (new RecalculateEdibleGrams)->handle((int) Settings::get('edible_thc_mg_per_gram'));
+            Notification::make()->title(__('Comestibles recalculados: :count. Solo afecta a las dispensaciones a partir de ahora.', ['count' => count($changed)]))->info()->send();
+        }
     }
 
     /**

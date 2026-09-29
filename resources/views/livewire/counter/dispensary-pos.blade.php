@@ -529,8 +529,12 @@
                                         <span class="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px] leading-tight text-ink-muted dark:text-slate-400">
                                             <span class="font-semibold text-ink-muted dark:text-slate-300">{{ $g['product_type_label'] }}</span>
                                             @if ($g['strain_type_label'])<span class="font-semibold text-brand dark:text-slate-200">{{ $g['strain_type_label'] }}</span>@endif
-                                            <span>THC {{ \App\Support\NumberFormat::decimal($g['thc_bp'] / 100, 1) }}%</span>
-                                            <span>CBD {{ \App\Support\NumberFormat::decimal($g['cbd_bp'] / 100, 1) }}%</span>
+                                            @if (($g['thc_mg'] ?? null) !== null){{-- prompt 326 — an edible reads by mg --}}
+                                                <span data-edible-thc>{{ __(':mg mg THC', ['mg' => $g['thc_mg']]) }}</span>
+                                            @else
+                                                <span>THC {{ \App\Support\NumberFormat::decimal($g['thc_bp'] / 100, 1) }}%</span>
+                                                <span>CBD {{ \App\Support\NumberFormat::decimal($g['cbd_bp'] / 100, 1) }}%</span>
+                                            @endif
                                             @if ($g['cultivation'])<span>{{ $g['cultivation'] }}</span>@endif
                                             @if ($g['price_label'])<span class="font-medium text-brand dark:text-slate-300">{{ $g['price_label'] }}</span>@endif
                                         </span>

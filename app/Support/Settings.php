@@ -49,6 +49,9 @@ class Settings
         // (with at least €50 of takings). OVERNIGHT-DEFAULT — CONFIRM.
         'discount_alert_threshold_pct' => 10,
         'stock_ceiling_days' => 5,
+        // Prompt 326 — what one edible counts as: its THC mg ÷ this. 150 ≈ flower at 15 % THC. OVERNIGHT-DEFAULT — CONFIRM
+        // WITH THE GESTOR: how edibles count against a gram limit is a policy and legal question.
+        'edible_thc_mg_per_gram' => 150,
 
         // Consumption gauge thresholds (percent of monthly allowance)
         'gauge_warning_pct' => 70,
