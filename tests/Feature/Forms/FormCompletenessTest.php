@@ -24,7 +24,6 @@ use App\Filament\Resources\Minutes\MinuteResource;
 use App\Filament\Resources\Orders\OrderResource;
 use App\Filament\Resources\Purchases\PurchaseResource;
 use App\Filament\Resources\TillSessions\TillSessionResource;
-use App\Filament\Resources\Users\UserResource;
 use Filament\Forms\Components\Field;
 use Filament\Resources\Resource;
 use Filament\Schemas\Components\Component as SchemaComponent;
@@ -183,9 +182,6 @@ class FormCompletenessTest extends TestCase
             'amount_cents' => 'entered as euros via amount_eur.',
             'paid_cents' => 'entered as euros via paid_eur.',
             'batch_id' => 'linked by the RecordPurchase action at stock intake.',
-        ],
-        UserResource::class => [
-            'locale' => 'per-user self-service preference (topbar switcher); null follows the org default.',
         ],
     ];
 

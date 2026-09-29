@@ -33,6 +33,8 @@ class EditUser extends EditRecord
 
     // Role/permission changes are audited (prompt 48) — who holds which role leaves a trace. The diff
     // names roles added/removed; no credential material (password/MFA) ever enters it.
+    private ?string $localeBefore = null;
+
     protected function beforeSave(): void
     {
         /** @var User $user */
@@ -43,6 +45,7 @@ class EditUser extends EditRecord
         $this->rolesBefore = $user->getRoleNames()->sort()->values()->all();
         $this->passwordBefore = $user->getRawOriginal('password');
         $this->pinBefore = $user->getRawOriginal('pin').'|'.$user->getRawOriginal('pin_lookup'); // prompt 286: either column
+        $this->localeBefore = $user->getRawOriginal('locale');
     }
 
     protected function afterSave(): void
@@ -67,6 +70,11 @@ class EditUser extends EditRecord
 
         if ($fresh?->getRawOriginal('pin').'|'.$fresh?->getRawOriginal('pin_lookup') !== $this->pinBefore) {
             (new RecordAuditLog)->handle('user.pin.updated', $user);
+        }
+
+        // Prompt 315 — someone else's language changed: the old and new values, nothing else about them.
+        if ($fresh?->getRawOriginal('locale') !== $this->localeBefore) {
+            (new RecordAuditLog)->handle('user.locale.changed', $user, ['locale' => $this->localeBefore], ['locale' => $fresh?->getRawOriginal('locale')]);
         }
     }
 }

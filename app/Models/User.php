@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Actions\ResolveLocale;
 use App\Casts\NormalisedEmail;
 use App\Enums\AlertType;
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
@@ -61,6 +62,14 @@ class User extends Authenticatable implements FilamentUser, HasAppAuthentication
 
     protected static function booted(): void
     {
+        // Prompt 315 — every person has a language SAVED: a new account takes the club's current default (resolved the one
+        // way, ResolveLocale with no subject) unless it was given one. ONE place, so no creation path can forget it.
+        static::creating(function (User $user): void {
+            if (blank($user->locale)) {
+                $user->locale = (new ResolveLocale)->handle();
+            }
+        });
+
         // Prompt 281 — the registro de jornada is kept at least 4 years, also after the person leaves (a soft delete keeps
         // it; the FK restricts). A force-delete of someone with recent clock events is refused, saying why.
         static::forceDeleting(function (User $user): void {
