@@ -56,7 +56,10 @@ class ReceiptSheetTest extends TestCase
         // The overlay is present but toggled by x-show (closed on arrival), never x-if (prompt 245).
         $this->assertStringContainsString('data-receipt-sheet', $html);
         $this->assertStringContainsString('x-show="isOpen"', $html);
-        $this->assertStringNotContainsString('<template', $html, 'the sheet uses x-if — it must use x-show');
+        // Prompt 313 — the one <template x-if> is the IFRAME inside the sheet (a fresh frame per opening adds no history
+        // entry), never the sheet itself.
+        $this->assertSame(1, substr_count($html, '<template'), 'the sheet uses x-if — it must use x-show');
+        $this->assertMatchesRegularExpression('/<template x-if="isOpen">\s*<iframe/', $html);
 
         // The trigger, the print and the close are all present and labelled.
         $this->assertStringContainsString('data-receipt-open', $html);

@@ -29,11 +29,45 @@ const overlayHistory = {
     push(name) {
         history.pushState({ counterOverlay: name }, '');
     },
-    // Take back our own entry when the overlay closes by any route OTHER than Back.
+    // Take back our own entry when the overlay closes by any route OTHER than Back. With the root guard below, that
+    // lands on the guard entry — never the root — so it can never trip the root handler.
     pop(name) {
         if (history.state?.counterOverlay === name) history.back();
     },
 };
+
+// Prompt 313 — in the INSTALLED app (display-mode standalone/fullscreen, 290), Back at the start of the history means
+// "leave the app"; with Android app pinning on, the app is refused leave and restarts on its launch screen — in a loop,
+// with the "to unpin" toast flashing. So the start is guarded: the page's own entry is marked as the root and a guard
+// entry sits above it; Back onto the root pushes the guard again and does nothing else (no navigation, no reload).
+// Overlays keep their own entries ABOVE the guard, so Back still closes them first. NEVER in a normal browser tab:
+// trapping Back there would be hostile — leaving the counter is the top bar's job (tabs, Administración, sign out).
+const rootBackGuard = {
+    standalone() {
+        return ['standalone', 'fullscreen'].some((mode) => window.matchMedia?.(`(display-mode: ${mode})`)?.matches);
+    },
+    install() {
+        if (! this.standalone() || history.state?.cscGuard) return;
+        history.replaceState({ ...(history.state ?? {}), cscRoot: true }, '');
+        history.pushState({ cscGuard: true }, '');
+        window.addEventListener('popstate', (event) => {
+            if (! event.state?.cscRoot) return;
+            history.pushState({ cscGuard: true }, '');
+            this.hint();
+        });
+    },
+    // Once a session, a quiet line so a swallowed Back is not a mystery. Never a dialog (that would need Back to close).
+    hint() {
+        try {
+            if (sessionStorage.getItem('cscBackHinted')) return;
+            sessionStorage.setItem('cscBackHinted', '1');
+        } catch {
+            return;
+        }
+        window.dispatchEvent(new CustomEvent('csc-back-swallowed'));
+    },
+};
+rootBackGuard.install();
 
 // Prompt 286 — every PIN entry behaves the same while its answer is on the way. The owner: "if the PIN is correct, say
 // so straight away and don't let them keep retrying". The pad used to empty its dots and look idle for the whole
@@ -269,6 +303,28 @@ window.counterPinCheck = () => ({
 });
 
 document.addEventListener('alpine:init', () => {
+    // Prompt 313 — a counter dialog rendered with @if (the terminal dialog, Mis horas): its history entry and its Back
+    // listener live exactly as long as the dialog does. `onBack` runs when Back closes it; closed any other way, the
+    // dialog leaves the page, `destroy()` removes the listener and takes back its own entry — so a later, unrelated
+    // Back can never call its close again (the `{ once: true }` listeners it replaces stayed behind).
+    window.Alpine.data('historyDialog', (name, onBack) => ({
+        init() {
+            this.poppedByBack = false;
+            this.onPopState = () => {
+                if (history.state?.counterOverlay === name) return;
+                this.poppedByBack = true;
+                window.removeEventListener('popstate', this.onPopState);
+                onBack();
+            };
+            overlayHistory.push(name);
+            window.addEventListener('popstate', this.onPopState);
+        },
+        destroy() {
+            window.removeEventListener('popstate', this.onPopState);
+            if (! this.poppedByBack) overlayHistory.pop(name);
+        },
+    }));
+
     // Which catalogue source the dispensary is browsing (prompt 293) — the cart reads it to show the bar section.
     window.Alpine.store('counterCatalogue', { source: 'genetics' });
 

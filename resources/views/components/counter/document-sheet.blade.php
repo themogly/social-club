@@ -36,7 +36,10 @@
                 <h2 class="text-base font-semibold">{{ __('Documento de identidad') }}</h2>
                 <button type="button" data-document-close x-ref="closeButton" @click="close()" class="inline-flex h-10 items-center justify-center rounded-lg border border-line px-4 text-sm font-semibold text-ink-muted transition hover:bg-surface-alt dark:border-slate-700 dark:text-slate-300">{{ __('Cerrar') }}</button>
             </div>
-            <iframe x-bind:src="url || 'about:blank'" title="{{ __('Documento de identidad') }}" class="h-[70svh] w-full flex-1 bg-white"></iframe>
+            {{-- Prompt 313 — a fresh frame per document (x-if), so opening one adds no history entry of its own. --}}
+            <template x-if="url">
+                <iframe x-bind:src="url" title="{{ __('Documento de identidad') }}" class="h-[70svh] w-full flex-1 bg-white"></iframe>
+            </template>
             <p class="border-t border-line px-4 py-2 text-[11px] text-ink-muted dark:border-slate-800 dark:text-slate-400">{{ __('Cada consulta queda registrada con tu nombre.') }}</p>
         </div>
     </div>

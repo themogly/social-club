@@ -87,7 +87,9 @@ class PreLiveA11yFixesTest extends TestCase
 
         $this->assertStringContainsString("overlayHistory.push('camera')", $js);
         $this->assertStringContainsString("overlayHistory.push('photo')", $js);
-        $this->assertSame(2, substr_count($js, "window.addEventListener('popstate', this.onPopState)"));
+        // Camera, photo, and (prompt 313) `historyDialog` — each removes its listener in destroy().
+        $this->assertSame(3, substr_count($js, "window.addEventListener('popstate', this.onPopState)"));
+        $this->assertSame(3, substr_count($js, "window.removeEventListener('popstate', this.onPopState)") - 1, 'each listener is removed (historyDialog also removes it when Back fires)');
     }
 
     // --- The staff wizard's errors are tied to their fields ---------------------------------------------------

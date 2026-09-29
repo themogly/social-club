@@ -312,7 +312,7 @@
 @if ($terminalDialog !== null)
     @php($thisTerminal = \App\Support\CounterTerminals::current())
     <div data-terminal-dialog role="dialog" aria-modal="true" aria-label="{{ __('Este dispositivo') }}"
-         x-data x-init="history.pushState({ terminalDialog: true }, ''); window.addEventListener('popstate', () => $wire.cancelTerminal(), { once: true })"
+         x-data="historyDialog('terminalDialog', () => $wire.cancelTerminal())"
          class="fixed inset-0 z-50 flex items-end justify-center bg-ink/40 p-0 sm:items-center sm:p-4">
         <div class="max-h-[90svh] w-full max-w-md overflow-y-auto rounded-t-2xl border border-line bg-surface p-5 shadow-xl dark:border-slate-800 dark:bg-slate-900 sm:rounded-2xl">
             @if ($terminalDialog === 'forget' && $thisTerminal !== null)
@@ -354,7 +354,7 @@
 @if ($myHoursOpen)
     @php($mine = $this->myHours())
     <div data-my-hours role="dialog" aria-modal="true" aria-label="{{ __('Mis horas') }}"
-         x-data x-init="history.pushState({ myHours: true }, ''); window.addEventListener('popstate', () => $wire.closeMyHours(), { once: true })"
+         x-data="historyDialog('myHours', () => $wire.closeMyHours())"
          class="fixed inset-0 z-50 flex items-end justify-center bg-ink/40 p-0 sm:items-center sm:p-4">
         <div class="max-h-[90svh] w-full max-w-lg overflow-y-auto rounded-t-2xl border border-line bg-surface p-5 shadow-xl dark:border-slate-800 dark:bg-slate-900 sm:rounded-2xl">
             <div class="flex items-center justify-between gap-3">

@@ -85,15 +85,18 @@
                 </div>
             </div>
 
-            {{-- The unchanged receipt route, shown in place. `about:blank` until opened, so nothing loads (and no
-                 access is logged) until the operator asks for it. --}}
-            <iframe
-                data-receipt-frame
-                x-ref="frame"
-                x-bind:src="src"
-                title="{{ $heading }}"
-                class="h-[70svh] w-full flex-1 border-0 bg-white"
-            ></iframe>
+            {{-- The unchanged receipt route, shown in place. Nothing loads (and no access is logged) until the operator asks.
+                 Prompt 313 — a FRESH frame per opening (x-if): navigating one long-lived frame added a joint history entry
+                 on every open and close, so Back stepped the frame back instead of closing the sheet. --}}
+            <template x-if="isOpen">
+                <iframe
+                    data-receipt-frame
+                    x-ref="frame"
+                    x-bind:src="src"
+                    title="{{ $heading }}"
+                    class="h-[70svh] w-full flex-1 border-0 bg-white"
+                ></iframe>
+            </template>
         </div>
     </div>
 </div>
