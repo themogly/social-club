@@ -87,6 +87,16 @@ class BatchForm
                             ->weight(FontWeight::SemiBold)
                             ->visible(fn (string $operation): bool => $operation !== 'create'),
 
+                        // Prompt 302 — what is left here, so a move from this page (the header's *Asignar a sede / Trasladar*)
+                        // shows its effect at once. Read-only: stock moves only through the ledger.
+                        TextEntry::make('remaining_display')
+                            ->label(__('Restante'))
+                            ->state(fn (?Batch $record): ?string => $record === null ? null : ($record->isUnitType()
+                                ? __(':count uds', ['count' => (int) $record->remaining_units])
+                                : $record->remaining_cg->formatted()))
+                            ->extraAttributes(['data-batch-remaining' => ''])
+                            ->visible(fn (string $operation): bool => $operation !== 'create'),
+
                         // Intake quantity — only at creation, and in the genetic's own unit:
                         // grams for a WEIGHT genetic, whole units for a UNIT genetic. Stock
                         // thereafter moves solely through the ledger (Ajuste / Merma), never a free edit.

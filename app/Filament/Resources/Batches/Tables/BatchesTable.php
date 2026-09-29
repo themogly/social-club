@@ -4,9 +4,10 @@ namespace App\Filament\Resources\Batches\Tables;
 
 use App\Actions\Pricing\SetBatchPrice;
 use App\Actions\Stock\RecordStockMovement;
-use App\Actions\Stock\TransferBatch;
 use App\Enums\BatchStatus;
+use App\Enums\ProductType;
 use App\Enums\StockMovementType;
+use App\Filament\Resources\Batches\BatchActions;
 use App\Filament\Support\ReturnFocus;
 use App\Models\Batch;
 use App\Models\Genetic;
@@ -23,23 +24,19 @@ use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteBulkAction;
 use Filament\Actions\EditAction;
 use Filament\Actions\RestoreBulkAction;
-use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
-use Filament\Forms\Components\Toggle;
 use Filament\Notifications\Notification;
-use Filament\Schemas\Components\Utilities\Get;
 use Filament\Support\Enums\FontWeight;
+use Filament\Support\Enums\Size;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Filters\TrashedFilter;
 use Filament\Tables\Table;
-use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\HtmlString;
-use InvalidArgumentException;
 use RuntimeException;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
@@ -67,7 +64,10 @@ class BatchesTable
                 // The lote number is traceability, not how people find a batch: there when switched on.
                 TextColumn::make('batch_no')->label(__('Nº lote'))->sortable()->copyable()
                     ->toggleable(isToggledHiddenByDefault: true),
-                TextColumn::make('genetic.product_type')->label(__('Tipo'))->badge()->toggleable(),
+                // Through the batch's strain, a deleted one included (302): a dotted `genetic.product_type` column makes
+                // Filament eager-load the relation WITHOUT deleted strains, and the badge went blank.
+                TextColumn::make('product_type')->label(__('Tipo'))->badge()->toggleable()
+                    ->state(fn (Batch $record): ?ProductType => $record->strain()?->product_type),
                 // Where the stock IS (prompt 148). Shown only when the org has more than one active sede — a
                 // column that reads the same on every row in a single-sede club is noise; it is essential the
                 // moment there are two.
@@ -118,9 +118,12 @@ class BatchesTable
             // table. Retirada, Ajuste and Merma are all destructive or rare, which is exactly what
             // belongs behind a trigger (prompt 170).
             ->recordActions([
+                // Prompt 302 — moving stock is a store batch's MAIN job, not a rare one: its own button, before the ⋮.
+                BatchActions::transfer()->button()->outlined()->size(Size::Small)->labeledFrom('lg')
+                    ->extraAttributes(['class' => 'min-h-11 min-w-11'])
+                    ->tooltip(fn (Batch $record): string => BatchActions::transferLabel($record)),
                 ActionGroup::make([
                     self::recallAction(),
-                    self::transferAction(),
                     self::priceAction(),
                     self::adjustAction(),
                     self::mermaAction(),
@@ -177,55 +180,6 @@ class BatchesTable
             'range' => $range,
             'status' => $batch->status->label(),
         ]);
-    }
-
-    /** Ajuste — a signed correction recorded through the stock ledger, in the batch's own unit. */
-    /**
-     * Trasladar / Asignar a sede (prompt 277, Ben's 270) — move some or all of this batch to another location through
-     * the one writer, `TransferBatch`. On a batch at the grow / central store it reads "Asignar a sede". Gated on
-     * `stock.transfer`; the destinations are the locations this person may write to (stores included).
-     */
-    protected static function transferAction(): Action
-    {
-        return Action::make('transfer')
-            ->label(fn (Batch $record): string => $record->location?->isStore() ? __('Asignar a sede') : __('Trasladar'))
-            ->icon(Heroicon::OutlinedArrowsRightLeft)
-            ->visible(fn (): bool => Auth::user()?->can('stock.transfer') ?? false)
-            ->modalHeading(fn (Batch $record): string => __('Trasladar :batch', ['batch' => $record->displayName()]))
-            ->schema([
-                Select::make('to_location_id')
-                    ->label(__('Destino'))
-                    ->options(fn (Batch $record): array => array_diff_key(Location::assignableOptions(includeStores: true), [$record->location_id => true]))
-                    ->required(),
-                Toggle::make('all')
-                    ->label(__('Todo lo que queda'))
-                    ->live(),
-                TextInput::make('quantity')
-                    ->label(fn (Batch $record): string => $record->isUnitType() ? __('Cantidad (uds)') : __('Cantidad (g)'))
-                    ->helperText(fn (Batch $record): string => __('Quedan :left.', ['left' => $record->isUnitType()
-                        ? (int) $record->remaining_units.' '.__('uds')
-                        : $record->remaining_cg->formatted()]))
-                    ->required(fn (Get $get): bool => ! $get('all'))
-                    ->hidden(fn (Get $get): bool => (bool) $get('all')),
-            ])
-            ->modalSubmitActionLabel(__('Trasladar'))
-            ->action(function (Batch $record, array $data): void {
-                $actor = Auth::user();
-                $to = Location::query()->withoutGlobalScopes()->find($data['to_location_id'] ?? null);
-
-                try {
-                    abort_unless($actor instanceof User && $to instanceof Location, 403);
-                    $quantity = ! empty($data['all'])
-                        ? ($record->isUnitType() ? (int) $record->remaining_units : $record->remaining_cg->centigrams)
-                        : ($record->isUnitType() ? (int) $data['quantity'] : Weight::fromGrams((string) $data['quantity'])->centigrams);
-
-                    (new TransferBatch)->handle($record, $to, $quantity, $actor);
-
-                    Notification::make()->title(__('Stock trasladado a :to', ['to' => $to->name]))->success()->send();
-                } catch (InvalidArgumentException|RuntimeException|AuthorizationException $e) {
-                    Notification::make()->title(__('No se pudo trasladar'))->body($e->getMessage())->danger()->send();
-                }
-            });
     }
 
     /** Precio (prompt 278) — change THIS batch's sale price; audited, gated on prices.manage, future sales only. */
@@ -312,6 +266,7 @@ class BatchesTable
         Notification::make()->title(__('Precio actualizado'))->success()->send();
     }
 
+    /** Ajuste — a signed correction recorded through the stock ledger, in the batch's own unit. */
     protected static function adjustAction(): Action
     {
         return Action::make('adjust')

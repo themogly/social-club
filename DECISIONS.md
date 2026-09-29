@@ -16151,3 +16151,61 @@ button, a full-width email button and an OPEN void form. Failing-first tests: `t
   - a new contribution, then adding a line, removes it again;
   - no page errors.
 - **Tablet (Shane):** a photo straight after a contribution — pending.
+
+## Prompt 302 — moving stock is a visible button, on the batch list and on the batch page
+
+Club report (photo of *Lotes* at the *Storage house* store): "make move stock more obvious, and a link in the edit
+batch page". The same photo showed a blank first row. Failing-first tests:
+`tests/Feature/Stock/MoveStockButtonTest.php`.
+
+- **Promoted out of the ⋮.** *Asignar a sede* (at a store) / *Trasladar* (elsewhere) is its own row button before the
+  ⋮. The ⋮ keeps *Retirada, Precio, Ajuste, Merma, Editar*: 170's rule ("rare or destructive behind a trigger") is
+  right for those, but moving stock out of the store is a store batch's MAIN job, the opposite of rare.
+  - The button is outlined and small; below `lg` it is icon only, with the label as its tooltip. It is a 44 px target
+    (measured 44×44 at 820 px, 139×44 at 1440).
+  - It is hidden, never greyed, unless the user has `stock.transfer`, the batch has stock left, and it is OPEN.
+  - `TransferBatch` itself has no status rule, so hiding it for quarantined or closed batches is UI only. Whether the
+    server should also refuse is an open question for the owner, not answered here.
+- **One definition.** `App\Filament\Resources\Batches\BatchActions::transfer()` is used by the table (as a row button)
+  and by `EditBatch` (as the primary header button, before *Borrar*). The same form, rules and `TransferBatch`; a
+  static test pins that neither place has its own copy.
+  - On the page, a successful move refreshes the record and the Sede field. A part transfer stays on this batch; the
+    notification names the destination, and a new read-only *Restante* line shows what is left. A whole transfer
+    shows the batch at its new location.
+- **Open question (not built):** whether *Precio, Ajuste* and *Retirada* should also be on the batch page. They stay
+  in the list's ⋮.
+- **The blank row: a batch of a DELETED strain.**
+  - **Diagnosis.** It could not be confirmed on live from here: I have no access to the live server. The mechanism is
+    proven in a test. With `genetic` eager-loaded, a soft-deleted strain loads as null, so the title and the *Tipo*
+    badge render blank. Nothing else can blank it: `Genetic` has only the organisation scope and `SoftDeletes`, and
+    the foreign key cascades hard deletes.
+  - **The fix.**
+    - The table eager-loads the strain `withTrashed`.
+    - `Batch::resolveGenetic()` falls back to a lookup including deleted strains, so every display of a batch has
+      the name: the recall, the transfer modal and the page title.
+    - `displayTitle()` reads "{name} (eliminada)".
+    - *Tipo* reads through a new `Batch::strain()`, because a dotted `genetic.product_type` column made Filament add
+      its own eager load WITHOUT deleted strains, and the badge stayed blank.
+  - Nothing is undeleted and no stock moves.
+  - **The counter** never shows a deleted strain's stock, so there is nothing blank there. The dispensary catalogue
+    lists only active strains, and the closing recount's `whereHas('genetic')` leaves out deleted ones. That means a
+    deleted strain's touched flower is NOT reweighed at close. This is recorded for the owner rather than changed.
+  - **On the sandbox seed** there are no such batches (the dev database and the seed have no deleted strain and no
+    store). The browser check planted one.
+  - **For Ben on live** (read-only):
+
+    ```sql
+    SELECT b.batch_no, l.name AS location, b.remaining_cg / 100.0 AS grams, b.remaining_units, g.name AS strain, g.deleted_at
+    FROM batches b JOIN genetics g ON g.id = b.genetic_id JOIN locations l ON l.id = b.location_id
+    WHERE g.deleted_at IS NOT NULL AND b.deleted_at IS NULL;
+    ```
+- **Tidy:** the transfer's docblock moved with it, and *Ajuste*'s orphaned docblock is back on `adjustAction`.
+- **Verified in the browser** (throwaway DB with a store holding an Amnesia Haze batch and a deleted strain's batch,
+  `tests/Browser/prove-302-move-stock.mjs`; 1440×900 and 820×1180, light and dark; 10 checks each run):
+  - the deleted strain reads *Storage weed (eliminada)*, with *Flor*;
+  - the row button is labelled at desktop and icon only at tablet, 44 px;
+  - the row button moves 100 g (500 → 400);
+  - the page shows *Restante 400,00 g*, with *Asignar a sede* in the header;
+  - *Todo lo que queda* from the header shows the batch at Central Branch;
+  - no page errors.
+- **Tablet (Shane):** a photo of the same list — pending.
