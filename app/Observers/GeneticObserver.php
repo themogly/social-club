@@ -5,6 +5,7 @@ namespace App\Observers;
 use App\Enums\ProductType;
 use App\Enums\UnitType;
 use App\Models\Genetic;
+use DomainException;
 use InvalidArgumentException;
 
 /**
@@ -41,6 +42,22 @@ class GeneticObserver
             throw new InvalidArgumentException(
                 'A per-unit product ('.$productType->value.') requires a positive grams_per_unit_cg.'
             );
+        }
+    }
+
+    /**
+     * Prompt 308 — a strain with stock left anywhere (the store included) is never deleted: its batches would carry on
+     * under a hidden strain, read "(eliminada)" on the batch list, and a new strain would take its name. THE one guard —
+     * the page's delete, the list's bulk delete and any forged request all end in `delete()`, which fires this.
+     */
+    public function deleting(Genetic $genetic): void
+    {
+        $left = $genetic->stockLeft();
+        if ($left !== []) {
+            $last = array_pop($left);
+            throw new DomainException(__('No se puede borrar: quedan :where. Ponlos a cero con Merma o Recuento, o trasládalos, primero.', [
+                'where' => $left === [] ? $last : implode(', ', $left).' '.__('y').' '.$last,
+            ]));
         }
     }
 }

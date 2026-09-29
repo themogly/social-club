@@ -113,7 +113,7 @@ class MemberMenuCrashTest extends TestCase
     {
         $member = $this->memberAt($this->a);
         $this->priceAndStock($g = $this->genetic('Deleted Strain'), $this->a);
-        $g->delete(); // soft delete — used to still 500 / still be advertised
+        $g->deleteQuietly(); // soft delete — used to still 500 / still be advertised. Deleted WITH stock: a pre-308 state live still holds
 
         $this->actingAs($member, 'member')->get(route('socio.menu'))
             ->assertOk()

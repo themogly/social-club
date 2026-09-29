@@ -3,10 +3,10 @@
 namespace App\Filament\Resources\Genetics\Pages;
 
 use App\Filament\Concerns\AuditsResourceChanges;
+use App\Filament\Resources\Genetics\GeneticDeletion;
 use App\Filament\Resources\Genetics\GeneticResource;
 use App\Models\Genetic;
 use App\Support\Weight;
-use Filament\Actions\DeleteAction;
 use Filament\Actions\RestoreAction;
 use Filament\Resources\Pages\EditRecord;
 
@@ -19,7 +19,7 @@ class EditGenetic extends EditRecord
     protected function getHeaderActions(): array
     {
         return [
-            DeleteAction::make(),
+            GeneticDeletion::action(), // prompt 308 — refused while stock is left, saying where
             RestoreAction::make(),
         ];
     }

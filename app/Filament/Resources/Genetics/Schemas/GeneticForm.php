@@ -8,8 +8,11 @@ use App\Enums\CultivationType;
 use App\Enums\ProductType;
 use App\Enums\StrainType;
 use App\Filament\Forms\CameraOrFile;
+use App\Filament\Resources\Genetics\GeneticResource;
 use App\Models\Category;
+use App\Models\Genetic;
 use App\Rules\GramAmount;
+use App\Rules\UniqueGeneticName;
 use Filament\Forms\Components\FileUpload;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TagsInput;
@@ -20,19 +23,43 @@ use Filament\Schemas\Components\Section;
 use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Schema;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Facades\Blade;
+use Illuminate\Support\HtmlString;
 
 class GeneticForm
 {
+    /**
+     * The strain's name — the SAME field in the add-strain wizard and the edit form (prompt 308): unique in the club,
+     * deleted strains included, and when the name belongs to a deleted strain, a link to bring that one back instead.
+     */
+    public static function nameField(): TextInput
+    {
+        return TextInput::make('name')
+            ->label(__('Nombre'))
+            ->required()
+            ->maxLength(255)
+            ->live(onBlur: true)
+            ->rule(fn (?Genetic $record): UniqueGeneticName => new UniqueGeneticName($record))
+            ->belowContent(function (?string $state, ?Genetic $record): ?HtmlString {
+                $match = filled($state) ? Genetic::sameNameAs($state, $record?->getKey()) : null;
+                if ($match === null || ! $match->trashed()) {
+                    return null;
+                }
+
+                return new HtmlString(Blade::render('<x-filament::link :href="$href" data-restore-genetic>{{ $label }}</x-filament::link>', [
+                    'href' => GeneticResource::getUrl('edit', ['record' => $match]),
+                    'label' => __('Abrir «:name» para restaurarla', ['name' => $match->name]),
+                ]));
+            });
+    }
+
     public static function configure(Schema $schema): Schema
     {
         return $schema
             ->components([
                 Section::make(__('Datos'))
                     ->schema([
-                        TextInput::make('name')
-                            ->label(__('Nombre'))
-                            ->required()
-                            ->maxLength(255),
+                        self::nameField(),
 
                         Textarea::make('description')
                             ->label(__('Descripción'))

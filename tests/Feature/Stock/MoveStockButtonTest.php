@@ -93,6 +93,7 @@ class MoveStockButtonTest extends TestCase
         $closed->forceFill(['status' => BatchStatus::CLOSED])->save();
 
         Livewire::test(ListBatches::class)
+            ->filterTable('stock', 'all') // an empty batch is off the default list since 308
             ->assertTableActionHidden('transfer', $empty)
             ->assertTableActionHidden('transfer', $quarantined)
             ->assertTableActionHidden('transfer', $closed);
@@ -140,7 +141,7 @@ class MoveStockButtonTest extends TestCase
     public function test_a_batch_of_a_deleted_strain_shows_its_name_marked_deleted_and_its_type(): void
     {
         $batch = $this->batchAt($this->store);
-        $this->genetic->delete();
+        $this->genetic->deleteQuietly(); // pre-308 state: deleted while its batch held stock (308 refuses that now; live still has such strains)
 
         $html = (string) Livewire::test(ListBatches::class)->assertCanSeeTableRecords([$batch])->html();
 

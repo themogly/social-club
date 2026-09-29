@@ -5,13 +5,13 @@ namespace App\Filament\Resources\Genetics\Tables;
 use App\Enums\BatchStatus;
 use App\Enums\ProductType;
 use App\Enums\StrainType;
+use App\Filament\Resources\Genetics\GeneticDeletion;
 use App\Models\Genetic;
 use App\Models\Location;
 use App\Support\ActiveScope;
 use App\Support\StockCover;
 use Filament\Actions\ActionGroup;
 use Filament\Actions\BulkActionGroup;
-use Filament\Actions\DeleteBulkAction;
 use Filament\Actions\EditAction;
 use Filament\Actions\RestoreBulkAction;
 use Filament\Actions\ViewAction;
@@ -105,7 +105,7 @@ class GeneticsTable
             ])
             ->toolbarActions([
                 BulkActionGroup::make([
-                    DeleteBulkAction::make(),
+                    GeneticDeletion::bulkAction(), // prompt 308 — deletes what it can, reports the rest
                     RestoreBulkAction::make(),
                 ]),
             ])

@@ -16452,3 +16452,73 @@ At the same time Redis answered PONG, `Cache::put`/`get` worked, and Horizon was
   *Accesible* with Redis up and *No accesible* with the new sentence when it is down, at 1440×900 light and 390×844
   dark. The local Redis was not stopped; a closed port gives the same connection refusal.
 - **On live after deploy:** Ben reloads *Salud del sistema*; the Caché card should be green.
+
+## Prompt 308 — the batch list shows what's in stock, newest first; strains with stock can't be deleted, or duplicated by name
+
+Club report: *Lotes* listed every batch ever received, empty ones included, oldest first. Batches read "Lemon haze
+(eliminada)" while *Genéticas* showed no deleted strains and did show an active *Bubble gum*.
+
+- **"(eliminada)" was true, not a bug.** The strains list hides deleted strains by default. Lemon haze and Stardog had
+  been deleted while their batches still held stock, and a second *Bubble gum* had been created with the deleted one's
+  name. Two gaps allowed that, and both are closed below.
+- **The batch list** (`BatchesTable`):
+  - **Existencias** filter: *Con existencias* (the default), *Vacíos*, *Todos*.
+    - "Empty" means nothing left: `remaining_cg` 0 for weight, or `remaining_units` 0 for units
+      (`Batch::scopeInStock` / `scopeEmpty`).
+    - **Quarantined and closed batches with stock count as in stock.** A status is not a quantity, and hiding stock
+      that is physically there is the wrong way round: it would drop out of the owner's view and the stock take.
+  - **Newest received first:** `COALESCE(acquired_or_harvested_on, created_at) DESC`, then `created_at DESC`. A batch
+    with no received date counts from when it was entered, instead of sinking to the bottom. Column headers still sort.
+  - The filter and the sort **stick for the session** (`persistFiltersInSession` / `persistSortInSession`).
+  - While the default filter hides anything, the table header says **"Se ocultan N lotes vacíos · Ver todos"**
+    (`trans_choice`, counted within the chosen sede). *Ver todos* switches the filter to *Todos*.
+  - *Partes del lote* (305) and recalls are unchanged and still list every part, empty ones included: they are a lote's
+    full history, not the working list.
+- **A strain with stock can't be deleted. The one place is `GeneticObserver::deleting()`.**
+  - It refuses while `Genetic::stockLeft()` finds stock in any batch at any sede, the store included. The message names
+    each sede and amount: *"No se puede borrar: quedan 150,00 g en Demo y 700,00 g en Sede Norte. Ponlos a cero con
+    Merma o Recuento, o trasládalos, primero."*
+  - The page's delete, the list's bulk delete, and any forged request all end in `delete()`, so all of them hit it.
+  - `GeneticDeletion` only turns the refusal into words. The page shows it as a notification. The bulk delete deletes
+    what it can and lists each skipped strain with its reason, in one notification.
+  - Deleting a strain whose batches are all empty still works, and restoring still works.
+  - Two older tests model the pre-308 state that live still holds (a strain deleted with stock). They now use
+    `deleteQuietly()` to build it.
+- **One name, one strain** (`App\Rules\UniqueGeneticName`, through ONE shared field, `GeneticForm::nameField()`, used
+  by both the add-strain wizard and the edit form):
+  - no other strain in the club may have the name, **a deleted one included**;
+  - names are compared through `Genetic::comparableName()`: ASCII-folded, lower-cased and whitespace-squished, so
+    "Lemon haze", "Lemon Haze", "lemon  haze" and "Lémon Haze" are the same. The comparison runs in PHP, so SQLite and
+    MySQL collations can't disagree;
+  - when the match is deleted, the error is *"Ya existe una genética borrada con este nombre. Restáurala en lugar de
+    crear otra."*, and a link under the field opens that strain, where *Restaurar* is. When the match is active, the
+    error is *"Ya existe una genética con este nombre."*;
+  - **a strain keeping its own name (or re-cased) passes.** This keeps pre-308 duplicates editable.
+  - There is no strain importer, so there is nothing else to cover.
+  - **No database unique index:** existing duplicates would break it, and accent-insensitivity is not portable.
+- **Existing duplicates are untouched.** There is no migration, nothing renames or merges, and a test pins that a
+  duplicate is still editable. To list them on live (read-only, same rule as the form):
+
+  ```
+  php artisan tinker --execute='App\Models\Genetic::withoutGlobalScopes()->withTrashed()->get()->groupBy(fn ($g) => $g->organisation_id."|".App\Models\Genetic::comparableName($g->name))->filter(fn ($c) => $c->count() > 1)->each(fn ($c) => print($c->map(fn ($g) => "«".$g->name."»".($g->trashed() ? " (borrada)" : "")." ".$g->id)->implode(" · ").PHP_EOL));'
+  ```
+
+  Each line is one group of duplicates, with each strain's name, whether it is deleted, and its id. Tidy them by hand,
+  or with `csc:reset-for-launch` before going live. It was verified on a throwaway copy: it matched «Lemon Test» with
+  « LÉMON  test».
+- **Tests:**
+  - `tests/Feature/Stock/BatchListStockFilterTest.php` (4 tests: default list, order, hint and filters; undated
+    batches; the hint's switch; session persistence). All four were red first.
+  - `tests/Feature/Genetics/StrainGuardsTest.php` (6 tests: the refusal names sedes and amounts, including a forged
+    `delete()`, and deleting and restoring work after zeroing; bulk delete; duplicate names by case, accent and spacing;
+    a deleted match offered back; renaming; existing duplicates untouched). The first five were red.
+    - The last one was green from the start, because nothing touched existing rows before. It pins that the rule only
+      fires when a name actually changes.
+  - `MoveStockButtonTest` looks at an empty batch through *Todos*.
+- **Verified in a browser** (`tests/Browser/prove-308-batches-and-strains.mjs`, throwaway DB, 1440×900 light and
+  820×1180 dark):
+  - "Se ocultan 4 lotes vacíos", no empty batch on the default list, and *Ver todos* going from 12 to 16;
+  - deleting Amnesia Haze refused with "quedan 500,00 g en Storage house";
+  - "amnesia  haze" refused;
+  - "lemon test" offering the deleted Lemon Test back;
+  - *Solo registros eliminados* → Lemon Test → *Restaurar*.

@@ -8,6 +8,7 @@ use App\Enums\BatchStatus;
 use App\Enums\ProductType;
 use App\Enums\StockMovementType;
 use App\Filament\Resources\Batches\BatchActions;
+use App\Filament\Resources\Batches\Pages\ListBatches;
 use App\Filament\Support\ReturnFocus;
 use App\Models\Batch;
 use App\Models\Genetic;
@@ -36,6 +37,7 @@ use Filament\Tables\Filters\TrashedFilter;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Blade;
 use Illuminate\Support\HtmlString;
 use RuntimeException;
 use Symfony\Component\HttpFoundation\StreamedResponse;
@@ -112,8 +114,23 @@ class BatchesTable
                     ->label(__('Sede'))
                     ->options(fn (): array => Location::query()->orderBy('name')->pluck('name', 'id')->all())
                     ->visible(fn (): bool => Location::query()->count() > 1),
+                // Prompt 308 — the working list is what is IN stock; empty batches are one choice away, never gone.
+                SelectFilter::make('stock')
+                    ->label(__('Existencias'))
+                    ->options(['in_stock' => __('Con existencias'), 'empty' => __('Vacíos'), 'all' => __('Todos')])
+                    ->default('in_stock')
+                    ->selectablePlaceholder(false)
+                    ->query(self::byStock(...)),
                 TrashedFilter::make(),
             ])
+            // Newest received first (prompt 308); a batch with no date counts from when it was entered. Any column
+            // header still sorts by that column, and the choice — like the filters — sticks for the session.
+            ->defaultSort(fn (Builder $query): Builder => $query
+                ->orderByRaw('COALESCE(batches.acquired_or_harvested_on, batches.created_at) DESC')
+                ->orderByDesc('batches.created_at'))
+            ->persistFiltersInSession()
+            ->persistSortInSession()
+            ->description(fn (ListBatches $livewire): ?HtmlString => self::hiddenEmptyHint($livewire))
             // The worst offender: four labelled buttons, a 335px actions column — a third of the whole
             // table. Retirada, Ajuste and Merma are all destructive or rare, which is exactly what
             // belongs behind a trigger (prompt 170).
@@ -144,6 +161,41 @@ class BatchesTable
             // what to do first.
             ->emptyStateHeading(__('Sin lotes'))
             ->emptyStateDescription(__('Un lote es stock real de una genética en una sede. Registra una compra o una cosecha para tener algo que dispensar.'));
+    }
+
+    /**
+     * The *Existencias* filter (prompt 308) — through the model's scopes, the one meaning of "in stock".
+     *
+     * @param  Builder<Batch>  $query
+     * @param  array<string, mixed>  $data
+     * @return Builder<Batch>
+     */
+    protected static function byStock(Builder $query, array $data): Builder
+    {
+        return match ($data['value'] ?? 'in_stock') {
+            'empty' => $query->empty(),
+            'all' => $query,
+            default => $query->inStock(),
+        };
+    }
+
+    /**
+     * "12 empty batches hidden — show all" while the default filter hides any (prompt 308), so nobody thinks a batch
+     * vanished. Counts within the chosen sede, as the list does.
+     */
+    private static function hiddenEmptyHint(ListBatches $livewire): ?HtmlString
+    {
+        if (($livewire->tableFilters['stock']['value'] ?? 'in_stock') !== 'in_stock') {
+            return null;
+        }
+        $sede = $livewire->tableFilters['location_id']['value'] ?? null;
+        $hidden = Batch::query()->empty()->when(filled($sede), fn (Builder $q): Builder => $q->where('batches.location_id', $sede))->count();
+        if ($hidden === 0) {
+            return null;
+        }
+
+        return new HtmlString(e(trans_choice('Se oculta :count lote vacío|Se ocultan :count lotes vacíos', $hidden, ['count' => $hidden])).' · '
+            .Blade::render('<x-filament::link tag="button" data-show-empty-batches wire:click="$set(\'tableFilters.stock.value\', \'all\')">{{ $label }}</x-filament::link>', ['label' => __('Ver todos')]));
     }
 
     /**
