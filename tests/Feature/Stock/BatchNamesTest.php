@@ -83,7 +83,7 @@ class BatchNamesTest extends TestCase
     private function createForm(string $label): array
     {
         return [
-            'location_id' => $this->centro->id,
+            'location_id' => [$this->centro->id], // a choice of locations since 303
             'genetic_id' => $this->amnesia->id,
             'label' => $label,
             'grams' => '50',

@@ -83,7 +83,7 @@ class BatchNamesItsSedeTest extends TestCase
 
         Livewire::actingAs($this->owner)
             ->test(CreateBatch::class)
-            ->assertFormSet(['location_id' => $this->centro->id]);
+            ->assertFormSet(['location_id' => [$this->centro->id]]); // a choice of locations since 303
     }
 
     public function test_the_sede_is_blank_in_the_all_sedes_rollup(): void
@@ -93,7 +93,7 @@ class BatchNamesItsSedeTest extends TestCase
 
         Livewire::actingAs($this->owner)
             ->test(CreateBatch::class)
-            ->assertFormSet(['location_id' => null]);
+            ->assertFormSet(['location_id' => []]);
     }
 
     public function test_a_single_sede_locks_the_field_and_prefills_it(): void
@@ -118,7 +118,7 @@ class BatchNamesItsSedeTest extends TestCase
         Livewire::actingAs($this->owner)
             ->test(CreateBatch::class)
             ->fillForm([
-                'location_id' => $norte->id,
+                'location_id' => [$norte->id], // a choice of locations since 303
                 'genetic_id' => $genetic->id,
                 'grams' => 100,
                 'sale_price_eur' => '10',
@@ -158,12 +158,12 @@ class BatchNamesItsSedeTest extends TestCase
         $genetic = $this->genetic('Sin Precio'); // no sede price row at Centro
 
         Livewire::actingAs($this->owner)->test(CreateBatch::class)
-            ->fillForm(['location_id' => $this->centro->id, 'genetic_id' => $genetic->id, 'grams' => 50])
+            ->fillForm(['location_id' => [$this->centro->id], 'genetic_id' => $genetic->id, 'grams' => 50])
             ->call('create')
             ->assertHasFormErrors(['sale_price_eur' => 'required']);
 
         Livewire::actingAs($this->owner)->test(CreateBatch::class)
-            ->fillForm(['location_id' => $this->centro->id, 'genetic_id' => $genetic->id, 'grams' => 50, 'sale_price_eur' => '9.50'])
+            ->fillForm(['location_id' => [$this->centro->id], 'genetic_id' => $genetic->id, 'grams' => 50, 'sale_price_eur' => '9.50'])
             ->call('create')
             ->assertHasNoFormErrors()
             ->assertNotified(__('Lote añadido'));
@@ -190,7 +190,7 @@ class BatchNamesItsSedeTest extends TestCase
 
         Livewire::actingAs($this->owner)
             ->test(CreateBatch::class)
-            ->fillForm(['location_id' => $this->centro->id, 'genetic_id' => $genetic->id, 'grams' => 50, 'sale_price_eur' => '10'])
+            ->fillForm(['location_id' => [$this->centro->id], 'genetic_id' => $genetic->id, 'grams' => 50, 'sale_price_eur' => '10'])
             ->call('create')
             ->assertHasNoFormErrors()
             ->assertNotified(__('Lote añadido'));

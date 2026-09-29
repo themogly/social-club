@@ -16209,3 +16209,55 @@ batch page". The same photo showed a blank first row. Failing-first tests:
   - *Todo lo que queda* from the header shows the batch at Central Branch;
   - no page errors.
 - **Tablet (Shane):** a photo of the same list — pending.
+
+## Prompt 303 — a new batch can be split across locations when it is created
+
+Club request: "assign, say, half to one location and half to the other when you create the batch". Failing-first tests:
+`tests/Feature/Stock/SplitBatchIntakeTest.php`.
+
+- **The form mirrors 297's products.** On create, *Sede* becomes the multi-choice *Sedes*:
+  - stores included (277), with *Todas las sedes* / *Tus sedes* first, kept in step (`AllOption`);
+  - the default is the top-bar location, or empty in the rollup;
+  - with a single location it is the single locked field, as before.
+
+  With two or more ticked:
+  - *Cantidad (g)* becomes *Cantidad total (g)*, which is optional and only used by *Repartir a partes iguales*;
+  - each location gets its own box (*Gramos en {sede}* / *Unidades en {sede}*), required and more than zero;
+  - the zero message says to untick the location instead;
+  - a live *Total* sits underneath;
+  - what is saved is the boxes.
+- **Repartir a partes iguales** (`CreateBatch::splitEqually()`, via `App\Support\SplitQuantity::evenly`) splits in
+  centigrams or whole units and never loses any: the leftover goes to the first location. 1.000,01 g over three is
+  333,35 + 333,33 + 333,33.
+- **One lote, sibling parts, no parent.** `IntakeBatch::handleParts()` is the one intake path; `handle()` delegates to
+  it with a single part, and a single-location intake is exactly as before, audit fields included (a pin test).
+  - In one transaction it creates a batch per location sharing the strain, `batch_no`, `lote_seq`, label, prices,
+    cost, photos and dates, each with its own quantity and INTAKE movement.
+  - `parent_batch_id` stays null, because nothing was transferred: the stock arrived split. `lotePartsQuery()` already
+    treats same-strain, same-number batches as one lote, so a rename (282) reaches every part.
+  - There is one `batch.intake` entry, listing the parts.
+- **The own number.** One `lote_seq` and one `batch_no` per intake. The 298 duplicate check runs once, against
+  EXISTING lotes, so the parts of this intake are not duplicates of each other; a later separate intake with the same
+  number for the strain is still refused.
+- **The ceiling, per location, one override.** Each part is checked against its own location's legal ceiling with its
+  own quantity (the store has none, as before).
+  - Any BLOCK breach refuses the WHOLE intake, and nothing is created, unless a `limits.override` holder authorised it
+    with a reason.
+  - One override covers the intake, audited once with `breaches` naming each location. A single-location override
+    keeps its old fields and gains the list.
+  - The refusal now names the location in Spanish and shows on the Sede field. The page used to let the exception
+    through.
+  - WARN locations proceed, surfaced by the dashboard as before; no override UI was added on the page.
+- **The recall is of the lote.** `BatchRecall` now reads dispensation lines from EVERY part of the lote. It read only
+  the batch it was opened from, so a split's (or a 277 part transfer's) sibling was missed. A health recall of a
+  lote must reach everyone served from it.
+- **Not done:** the prompt's "Total: 1.000,00 g" shows as *1000,00 g*, because the one weight formatter
+  (`Weight::formatted`) has no thousands separator anywhere. Changing it would ripple through every screen.
+- **Tests adjusted:** four older tests submitted `location_id` as one value in a multi-location club (now a list),
+  as 297's did for products.
+- **Verified in the browser** (throwaway DB with a store, `tests/Browser/prove-303-split-intake.mjs`; 1440×900 and
+  820×1180, light and dark):
+  - Amnesia Haze, Storage house + Central Branch, 1000 g, *Repartir* → 500,00 each, total 1000,00 g;
+  - saved as two parts with the same #n;
+  - 1 g dispensed from the Central part at the counter;
+  - the recall opened from the STORE part lists that member.

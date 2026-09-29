@@ -32,16 +32,20 @@ class BatchRecall
      */
     public function rows(): array
     {
+        // Prompt 303 — a recall is of the LOTE: every part of it (a split intake's siblings, a part transfer's child and
+        // parent), not only the row it was opened from. Same strain, same lote number ({@see Batch::lotePartsQuery()}).
+        $parts = $this->batch->lotePartsQuery()->pluck('id')->push($this->batch->id)->unique()->all();
+
         $refundedMemberIds = DB::table('refunds')
             ->join('dispensations', 'dispensations.id', '=', 'refunds.dispensation_id')
             ->join('dispensation_lines', 'dispensation_lines.dispensation_id', '=', 'dispensations.id')
-            ->where('dispensation_lines.batch_id', $this->batch->id)
+            ->whereIn('dispensation_lines.batch_id', $parts)
             ->distinct()->pluck('dispensations.member_id')->all();
 
         return DB::table('dispensation_lines')
             ->join('dispensations', 'dispensations.id', '=', 'dispensation_lines.dispensation_id')
             ->join('members', 'members.id', '=', 'dispensations.member_id')
-            ->where('dispensation_lines.batch_id', $this->batch->id)
+            ->whereIn('dispensation_lines.batch_id', $parts)
             ->groupBy('members.id', 'members.member_no', 'members.first_name', 'members.last_name', 'members.email', 'members.phone')
             ->orderByRaw('SUM(dispensation_lines.grams_cg) DESC')
             ->get([
