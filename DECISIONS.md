@@ -16522,3 +16522,115 @@ Club report: *Lotes* listed every batch ever received, empty ones included, olde
   - "amnesia  haze" refused;
   - "lemon test" offering the deleted Lemon Test back;
   - *Solo registros eliminados* → Lemon Test → *Restaurar*.
+
+## Prompt 309 — panel pages get their own switches; a counter permission never opens an admin page by itself
+
+Club photo: a **staff** account given the panel saw *Socios, Solicitudes, Cajas, Documentos generados, Seguridad*.
+The tests reproduced exactly those five for STAFF with `panel.access` added.
+
+- **Cause:** each of those pages was gated by a **counter** permission:
+  - `members.view` (the member lookup);
+  - `applications.review` (a sign-up at the counter, 174);
+  - `till.open`/`till.close` (the drawer);
+  - `member.documents.view` (one member's documents, 262);
+  - `lockdown.initiate` (the panic button).
+
+  Granting the panel therefore opened **every** till's cash and Z reports and **every** member's generated documents,
+  and the owner had no switch that did not also break the counter.
+- **Five section permissions** in the *Panel de administración* group on *Roles y permisos* (which replaces the old
+  one-line *Acceso* group). Each depends on `panel.access` in `DEPENDENCIES`:
+  - `panel.members` *Ver socios en el panel*;
+  - `panel.applications` *Ver solicitudes en el panel*;
+  - `panel.tills` *Ver historial de cajas*;
+  - `panel.member_documents` *Ver documentos generados de todos los socios*;
+  - `panel.security` *Ver la página de seguridad*.
+- **Each gate is now the section AND the action permission:**
+  - `MemberPolicy::viewAny`: `panel.members` + `members.view`;
+  - `MemberApplicationPolicy::viewAny`: `panel.applications` + `applications.review`;
+  - `TillSessionPolicy::viewAny`/`view`: `panel.tills` (the history is its own thing, so a bookkeeper can be given
+    it without a drawer);
+  - `MemberDocumentPolicy::viewAny`, the vault: `panel.member_documents` + `member.documents.view`.
+    `MemberDocumentPolicy::view`, one document, is **unchanged**, because the counter's document viewer uses it;
+  - `Seguridad::canAccess`: `panel.security` + (`lockdown.manage` or `lockdown.initiate`).
+
+  Filament authorises a resource's every page through `viewAny` first, so a record URL is closed too, not just the
+  list. Relation managers live inside their parent's record page, so they inherit its gate.
+- **The counter is untouched.** No counter screen calls these `viewAny`/`view` methods. Every counter check is the
+  action permission itself (`userCan`/`operatorCan`/`deviceCan`, the panic route, `Gate::authorize('view', $document)`),
+  so no counter check needed rerouting. This is pinned by `CounterWorksWithoutPanelSectionsTest`: as STAFF with no
+  `panel.*` at all:
+  - door lookup;
+  - opening one member's document;
+  - opening and closing a till (with the counter's `till.close` and `stock.take` granted);
+  - panic;
+  - opening an application for review.
+
+  The approval itself, as STAFF, is `CounterAltaWizardTest`, which after 309 also runs without any `panel.*`.
+- **Defaults:**
+  - OWNER holds everything (ALL);
+  - MANAGER gets all five, so both panels are exactly as before (pinned item by item);
+  - **STAFF gets none.** Staff given only `panel.access` see *Panel, Mostrador, Manual, Glosario*. *Mostrador* is the
+    labelled way back to the counter (CLAUDE.md design rule), not a section.
+  - `csc:sync-permissions` converges on `Permissions::for()`, which layers the owner's `role_permission_overrides` on
+    the defaults, so **existing overrides are kept**. This is tested: a STAFF grant of `panel.tills` and a MANAGER
+    revoke of `panel.security` both survive a sync. A sync of a copy of the demo DB granted the five to OWNER and
+    MANAGER and nothing to STAFF.
+- **The gate inventory** (wider check, every panel resource and page). **(S)** marks the five sections paired here.
+  - Resources:
+    - Announcements, Events, MessageThreads: `comms.manage`;
+    - Articles: `articles.manage`;
+    - AuditLogs: `audit.view`;
+    - Batches: `stock.manage`;
+    - BreachLogs: OWNER role;
+    - Convocatorias, Minutes: `minutes.manage`;
+    - DataRequests: `data.request.handle`;
+    - Discounts: `discounts.manage`;
+    - Dispensations, Orders: `reports.view`;
+    - DocumentTemplates: `documents.generate`;
+    - ExpenseCategories: `expenses.categories`;
+    - Expenses: `expenses.overheads` or `expenses.approve`;
+    - Genetics: `genetics.manage`;
+    - Locations: `settings.manage.location`;
+    - **(S)** MemberApplications, MemberDocuments, Members, TillSessions;
+    - MembershipTiers: `settings.manage`;
+    - Purchases, Suppliers: `purchases.manage`;
+    - Users: `staff.manage`.
+  - Pages:
+    - Asamblea: `minutes.manage`;
+    - CounterTerminals: `terminals.manage`;
+    - ExportacionContable: `reports.export`;
+    - FailedJobs, RolesPermissions, SystemHealth: OWNER;
+    - LibroSocios: `register.view`;
+    - ManageConsentText: `settings.consent`;
+    - ManageEnforcement, ManageOrganisationIdentity, ManageSettings: `settings.manage`;
+    - Rat: `audit.view`;
+    - RegistroJornada, StaffHoursReportPage: `staff.hours.view`;
+    - every ReportPage, including RegistroDispensacion: `reports.view` or, org-wide, `reports.view.all`;
+    - **(S)** Seguridad;
+    - Dashboard, Manual, Glosario: open to anyone with the panel;
+    - ConfirmIdentity: the panel's own identity check.
+- **Two counter-checked permissions are deliberately not paired**, because their panel page **is** the same job and
+  both are manager grants that no STAFF holds by default:
+  - `terminals.manage`: registering a tablet at the counter and revoking it on *Mostradores registrados* are one job;
+  - `settings.manage.location`: choosing a counter's sede and managing that sede on *Sedes* are one authority.
+
+  `reports.view` is not a counter-only permission. Its job **is** the panel's reports, and the counter hub only links
+  there. None of the other gates above is a counter permission.
+- **The guard** (`test_the_panel_plus_every_counter_permission_opens_only_the_home_and_the_help`):
+  - a user with `panel.access` plus every counter permission and no `panel.*` sees only the four always-there items,
+    and **every** resource index and page URL answers them 403;
+  - the counter permission set is **read from the counter's own code** (`app/Livewire/Counter`, the counter views,
+    `app/Http/Controllers`, `CounterScreens`) plus the STAFF defaults, so a check added tomorrow joins the guard
+    automatically, minus the two same-job exceptions above;
+  - **proven by a planted removal:** putting `TillSessionPolicy::viewAny` back to `till.open || till.close` failed the
+    guard, and restoring it passed.
+- **Older tests** that drove *Socios* or *Solicitudes* as a staff user now switch on the section they use, the way an
+  owner would. `ApproveRequiresSubmissionTest` now asserts both halves: refused without the section, allowed with it.
+- **Verified in a browser** (`tests/Browser/prove-309-panel-sections.mjs`, throwaway DB):
+  - owner ticks *Acceso al panel* for STAFF → staff see exactly *Panel, Mostrador, Manual, Glosario* and get 403 on
+    `/till-sessions`;
+  - owner ticks *Ver historial de cajas* → staff see *Cajas* and nothing more;
+  - owner (56 items) and manager (41) are unchanged;
+  - at the counter, staff open the till and look a member up at the door.
+  - Closing the till as staff is covered by the pin test. STAFF don't hold `till.close` by default, so the browser run
+    didn't close.

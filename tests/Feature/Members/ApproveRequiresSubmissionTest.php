@@ -150,7 +150,12 @@ class ApproveRequiresSubmissionTest extends TestCase
         $staff->assignRole(Role::STAFF->value);
         $staff->locations()->sync([$this->location->id]);
 
+        // Since 309 the panel's queue also needs its section switch (the counter's review does not — pinned in
+        // CounterWorksWithoutPanelSectionsTest).
         $this->actingAs($staff);
+        $this->assertFalse(MemberApplicationResource::canViewAny());
+        $staff->givePermissionTo('panel.applications');
+        $this->actingAs($staff->fresh());
         $this->assertTrue(MemberApplicationResource::canViewAny());
 
         // …but STAFF still cannot conjure a member out of nothing. Staff admit somebody who APPLIED, through

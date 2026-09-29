@@ -86,7 +86,7 @@ class SendApplicationInviteTest extends TestCase
 
         $staff = User::factory()->create();
         $staff->assignRole(Role::STAFF->value);
-        $staff->givePermissionTo('panel.access');
+        $staff->givePermissionTo(['panel.access', 'panel.applications']); // 309 — the Solicitudes section
         $staff->locations()->attach($this->location->id);
         $this->actingAs($staff);
         app(ActiveScope::class)->setLocation($this->location->id);

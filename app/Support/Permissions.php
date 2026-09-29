@@ -55,6 +55,10 @@ class Permissions
         // Prompt 262 — may this role open the admin panel at all? Off => a counter-only login: it signs in at
         // /login and lands on the counter, and any panel URL sends it back there.
         'panel.access',
+        // Prompt 309 — each panel SECTION whose gate used to be a counter permission has its own switch, so granting
+        // the panel no longer opens every till's Z reports or every member's documents by itself. The page needs the
+        // section AND the action permission; the counter never checks these.
+        'panel.members', 'panel.applications', 'panel.tills', 'panel.member_documents', 'panel.security',
         // Security (prompt 121): initiate = trip the panic lockdown (staff hold it — they are the ones in the
         // room); manage = run/observe drills, read the runbook, end a drill. A REAL lockdown is never
         // reactivated in-app (off-premises paths only), so there is no "reactivate" permission by design.
@@ -82,6 +86,7 @@ class Permissions
         'settings.manage.location',
         'lockdown.initiate', 'lockdown.manage',
         'panel.access', // prompt 262 — managers use the admin panel by default
+        'panel.members', 'panel.applications', 'panel.tills', 'panel.member_documents', 'panel.security', // 309 — as before
     ];
 
     /** STAFF — per assigned location. Counter + door + basic member intake only. */
@@ -166,6 +171,12 @@ class Permissions
         // Prompt 281 — the Registro de jornada is a panel page (seeing your OWN hours at the counter needs neither).
         'staff.hours.view' => ['panel.access'],
         'staff.hours.manage' => ['panel.access'],
+        // Prompt 309 — the panel sections: a section switch without the panel does nothing.
+        'panel.members' => ['panel.access'],
+        'panel.applications' => ['panel.access'],
+        'panel.tills' => ['panel.access'],
+        'panel.member_documents' => ['panel.access'],
+        'panel.security' => ['panel.access'],
     ];
 
     /** Why `$permission` needs `$needs`, in the words the roles page shows the owner (prompt 265). */
@@ -210,7 +221,7 @@ class Permissions
     public static function groups(): array
     {
         return [
-            __('Acceso') => ['panel.access'],
+            __('Panel de administración') => ['panel.access', 'panel.members', 'panel.applications', 'panel.tills', 'panel.member_documents', 'panel.security'],
             __('Informes') => ['reports.view', 'reports.view.all', 'reports.export'],
             __('Socios') => ['members.view', 'members.create', 'members.edit', 'members.transfer', 'members.import',
                 'member.limits.set', 'member.discount.assign', 'member.documents.view', 'member.sanction', 'applications.review'],
@@ -231,6 +242,11 @@ class Permissions
     {
         return match ($permission) {
             'panel.access' => __('Acceso al panel de administración'),
+            'panel.members' => __('Ver socios en el panel'),
+            'panel.applications' => __('Ver solicitudes en el panel'),
+            'panel.tills' => __('Ver historial de cajas'),
+            'panel.member_documents' => __('Ver documentos generados de todos los socios'),
+            'panel.security' => __('Ver la página de seguridad'),
             'reports.view' => __('Ver informes de su sede'),
             'reports.view.all' => __('Ver informes de todas las sedes'),
             'reports.export' => __('Exportar informes'),

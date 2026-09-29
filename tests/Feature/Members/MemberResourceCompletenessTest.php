@@ -90,7 +90,9 @@ class MemberResourceCompletenessTest extends TestCase
     public function test_waive_carencia_is_hidden_without_the_permission(): void
     {
         $member = $this->member();
-        $this->actingAs($this->actor(Role::STAFF)); // no carencia.waive
+        $staff = $this->actor(Role::STAFF); // no carencia.waive
+        $staff->givePermissionTo('panel.members'); // 309 — the Socios section, so the page opens at all
+        $this->actingAs($staff);
 
         Livewire::test(ViewMember::class, ['record' => $member->getKey()])
             ->assertActionHidden('waiveCarencia');

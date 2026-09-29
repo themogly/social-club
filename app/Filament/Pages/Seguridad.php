@@ -35,7 +35,9 @@ class Seguridad extends Page
     {
         $user = auth()->user();
 
-        return $user instanceof User && ($user->can('lockdown.manage') || $user->can('lockdown.initiate'));
+        // Prompt 309 — the page (history, drills) is its own switch; the counter's panic button checks
+        // `lockdown.initiate` itself and never comes through here.
+        return $user instanceof User && $user->can('panel.security') && ($user->can('lockdown.manage') || $user->can('lockdown.initiate'));
     }
 
     public static function getNavigationLabel(): string
