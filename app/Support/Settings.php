@@ -183,6 +183,12 @@ class Settings
         // never auto-purged (the model refuses deletes). Prompt 58.
         'message_retention_days' => 730,    // member↔club message bodies redacted after this (2 years; prompt 136)
         // Prompt 311 — owner alerts: a batch with stock left expiring within N days; a till open longer than N hours.
+        // Prompt 318 — Inventario: blind by default (weigh, don't confirm a number); a difference needs a reason above
+        // 5 % or 2 g, whichever is larger (OVERNIGHT-DEFAULT — CONFIRM).
+        'stock_count_show_expected' => false,
+        'stock_count_tolerance_pct' => 5,
+        'stock_count_tolerance_g' => 2,
+        'stock_count_tolerance_units' => 2, // products and unit batches: the same two, in units
         'alerts_expiry_days' => 14,
         'alerts_till_open_hours' => 16,
         'staff_clock_retention_years' => 5, // registro de jornada: kept ≥ 4 years (art. 34.9 ET), then deleted (post-296 audit)

@@ -8,6 +8,7 @@ use App\Filament\Pages\CounterTerminals;
 use App\Filament\Pages\Dashboard;
 use App\Filament\Pages\ExportacionContable;
 use App\Filament\Pages\FailedJobs;
+use App\Filament\Pages\Inventario;
 use App\Filament\Pages\LibroSocios;
 use App\Filament\Pages\ManageConsentText;
 use App\Filament\Pages\ManageEnforcement;
@@ -250,6 +251,13 @@ class Help
             'Si alguien se olvida de fichar la salida, la próxima vez que fiche la entrada se le pregunta a qué hora terminó (con un motivo): queda como «Hora declarada». Nada cierra una jornada solo.',
             'Avisos: «Sin fichar salida» (jornada abierta de un día anterior), «Hora declarada», «Corregido por…», «Anulado» (tachado, nunca oculto) y «Actividad sin fichar» (se identificó en el mostrador ese día sin fichar).',
             'Corregir no edita nada: «Añadir jornada», «Añadir salida» o «Anular» escriben un fichaje nuevo con su motivo y quién lo hizo, y el original se conserva. La hoja mensual en PDF es la que pedirá la gestoría.',
+        ]],
+        // Prompt 318 — the full stock count.
+        Inventario::class => ['permission' => 'stock.take', 'title' => 'Inventario', 'body' => [
+            'Un inventario cuenta todo lo que hay en una sede (o en el almacén): cada lote con existencias y cada producto activo. Solo puede haber uno abierto por sede, y se puede hacer en varias veces.',
+            'Se cuenta a ciegas por defecto: se pesa y se escribe lo que hay, sin ver la cifra del sistema (se puede cambiar en Ajustes → Inventario). Lo que no se pueda contar se marca «No contado» con su motivo y no se toca.',
+            'La barra y el dispensario siguen funcionando mientras se cuenta. Cada línea guarda lo que había en el sistema en el momento de contarla, así que una venta posterior no se cuenta dos veces.',
+            'Al revisar, las diferencias salen de mayor a menor. Por encima de la tolerancia (por defecto 5 % o 2 g, lo que sea mayor; se ajusta en Ajustes → Inventario) hace falta un motivo y una nota. «Aplicar ajustes» registra un ajuste por línea con su motivo; «Cancelar inventario» lo descarta sin tocar nada.',
         ]],
         Seguridad::class => ['permission' => 'lockdown.manage', 'title' => 'Seguridad', 'body' => [
             'Desde aquí se activa el bloqueo de seguridad ante una amenaza, se ensaya con un simulacro y se consulta el historial de activaciones.',

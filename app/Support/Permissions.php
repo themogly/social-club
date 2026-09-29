@@ -59,6 +59,8 @@ class Permissions
         // the panel no longer opens every till's Z reports or every member's documents by itself. The page needs the
         // section AND the action permission; the counter never checks these.
         'panel.members', 'panel.applications', 'panel.tills', 'panel.member_documents', 'panel.security',
+        // Prompt 318 — *Inventario*, the full stock count (with `stock.take`).
+        'panel.stock_count',
         // Security (prompt 121): initiate = trip the panic lockdown (staff hold it — they are the ones in the
         // room); manage = run/observe drills, read the runbook, end a drill. A REAL lockdown is never
         // reactivated in-app (off-premises paths only), so there is no "reactivate" permission by design.
@@ -89,6 +91,7 @@ class Permissions
         'lockdown.initiate', 'lockdown.manage',
         'panel.access', // prompt 262 — managers use the admin panel by default
         'panel.members', 'panel.applications', 'panel.tills', 'panel.member_documents', 'panel.security', // 309 — as before
+        'panel.stock_count', // 318 — managers count their sedes
         'alerts.receive', // 311 — managers hear about their sedes' stock and tills
     ];
 
@@ -180,6 +183,7 @@ class Permissions
         'panel.tills' => ['panel.access'],
         'panel.member_documents' => ['panel.access'],
         'panel.security' => ['panel.access'],
+        'panel.stock_count' => ['panel.access'],
         // Prompt 311 — who gets alerts is chosen on the person's own profile, a panel page.
         'alerts.receive' => ['panel.access'],
     ];
@@ -226,7 +230,7 @@ class Permissions
     public static function groups(): array
     {
         return [
-            __('Panel de administración') => ['panel.access', 'panel.members', 'panel.applications', 'panel.tills', 'panel.member_documents', 'panel.security'],
+            __('Panel de administración') => ['panel.access', 'panel.members', 'panel.applications', 'panel.tills', 'panel.member_documents', 'panel.security', 'panel.stock_count'],
             __('Informes') => ['reports.view', 'reports.view.all', 'reports.export'],
             __('Socios') => ['members.view', 'members.create', 'members.edit', 'members.transfer', 'members.import',
                 'member.limits.set', 'member.discount.assign', 'member.documents.view', 'member.sanction', 'applications.review'],
@@ -253,6 +257,7 @@ class Permissions
             'panel.tills' => __('Ver historial de cajas'),
             'panel.member_documents' => __('Ver documentos generados de todos los socios'),
             'panel.security' => __('Ver la página de seguridad'),
+            'panel.stock_count' => __('Hacer inventarios en el panel'),
             'reports.view' => __('Ver informes de su sede'),
             'reports.view.all' => __('Ver informes de todas las sedes'),
             'reports.export' => __('Exportar informes'),

@@ -17236,3 +17236,100 @@ one tap away after every bar sale.
   - a bar sale shows *Opciones* with only *Anular…*, and the ticket URL answers 404;
   - *Sedes → Central Branch → Ofrecer ticket de barra* (off) switched on and saved;
   - the next bar sale shows *Ver / imprimir ticket* again.
+
+## Prompt 318 — *Inventario*: a full stock count per sede, reviewed, then applied
+
+- **One model, one adjustment path.** Built on the existing `stock_takes` / `stock_take_lines` and on `CommitStockTake`,
+  not on a second count model:
+  - a new `kind` column separates a full count (`inventory`) from the till's closing recount. Its default is
+    `till_recount`, so every existing row and every recount the till opens keeps its kind without touching `TillSession`;
+  - `CommitStockTake::handle()` (the till's blind recount, 305/91) is **unchanged**, down to its audit key
+    `stocktake.committed`;
+  - the count is applied by a new `applyCount()` in the same class, through `RecordStockMovement` (the one writer).
+- **The one rule that matters: each line snapshots the system figure when it is counted.**
+  - `RecordStockCountLine` locks the batch or product row (`lockForUpdate`), stores `expected_*` from it, with `counted_*`,
+    `counted_by` and `counted_at`;
+  - the adjustment is `counted − expected-at-count-time`. Example: 100 g counted at 98 g, then 5 g sold, gives −2 g and
+    the batch ends at 93 g. It is not −7 g (the sale counted twice) and not 98 g (the sale undone);
+  - recounting overwrites both figures;
+  - nothing locks the counter during a count; the bar and dispensary keep trading.
+- **Starting.** *Nuevo inventario* for one sede or store (`StartStockCount`):
+  - one line per batch **with stock** (308's `inStock` rule) and per **active** product;
+  - a store gets no products (294/297);
+  - only one open count per sede: a second start opens the existing one (under a lock);
+  - a cancelled count is never reopened.
+- **Counting screen** (tablet-first, 820×1180):
+  - lines grouped by type (the strain's product type, then *Productos*), with a search and *Solo pendientes*;
+  - each line saves on its own, so a count can be left and resumed;
+  - **blind by default**: setting `stock_count_show_expected` (*Ajustes → Inventario → Mostrar cantidad del sistema al
+    contar*), off.
+  - **Judgment call:** a batch's line name uses the SHORT subtitle (strain · #lote · day), plus the lote reference. The
+    long subtitle carries the intake quantity, and a blind count shows no quantity at all. Caught by looking; now pinned
+    in the test.
+  - Grams accept either decimal separator (`TypedNumber`, 316); units must be whole numbers.
+  - *No contado* uses the existing `not_counted` + reason columns and never touches the ledger.
+  - **Judgment call:** the filter property is named `lineFilter`, not `search`. It is a catalogue filter, and
+    `OneMemberLookupTest` rightly flags any `search` binding as a possible second member search.
+- **Review.**
+  - Totals: lines counted, lines with a difference, net g, net units, net €.
+  - Differences are sorted largest first, by € and then by grams.
+  - **Value is at the contribution rate** (the batch's per-gram or per-unit rate, or the product's price). Cost isn't
+    recorded for products and is often empty on batches, and a mixed basis would be worse. The page labels it
+    *Valor (a la aportación)* (never "venta"/"precio de venta").
+  - A reason and note typed in the review are saved on the line as they are entered (`adjustment_reason`,
+    `adjustment_note`), so a review can be left too.
+- **Tolerance (OVERNIGHT-DEFAULT — CONFIRM):**
+  - a difference needs a reason (Merma / Error de registro / Robo o pérdida / Otro) **and** a note when it exceeds 5 % of
+    the expected quantity or 2 g, whichever is larger;
+  - **judgment call:** products and unit batches use the same idea in units, 5 % or **2 units**. A third setting,
+    `stock_count_tolerance_units`, is needed because grams don't apply to a can of drink;
+  - all three are Settings under *Ajustes → Inventario*, read at the count's sede.
+- ***Aplicar ajustes*** (`CommitStockTake::applyCount`):
+  - one transaction; refused while any line is unsettled, or while a difference above the tolerance lacks a reason or note;
+  - one ADJUSTMENT per non-zero line, with `stock_take_id` and the reason (`Inventario — Merma: nota`);
+  - *No contado* lines are untouched;
+  - the take is COMMITTED with who and when, and audited `stock_take.committed` with totals (lines, adjusted,
+    not_counted, net_cg, net_units, net_value_cents).
+- ***Cancelar inventario*** (`CancelStockCount`) sets the new `CANCELLED` status with who and when, audited
+  `stock_take.cancelled`. The ledger is untouched.
+- **Permissions.**
+  - The page needs `stock.take` **and** the new `panel.stock_count` (OWNER and MANAGER by default; depends on
+    `panel.access`; on the roles page under *Panel de administración*).
+  - A count is reachable only at a sede the viewer may switch to (`LocationSwitcher::canAccess`); another sede's count
+    gives 403, including its PDF.
+  - **Deploy:** `php artisan csc:sync-permissions` grants the new permission on an existing database (confirmed on the
+    throwaway copy: before it, the owner got 403).
+- **Navigation (judgment call):** there is no *Stock* group, so *Inventario* sits under *Dispensario*, right after
+  *Lotes* (sort 25). The owner and manager navigation pins now include it.
+- **List and report.**
+  - The list shows status, sede, date, lines settled and net difference, newest first, at the viewer's sedes. Only
+    `inventory` takes are listed, never the till's recounts.
+  - The PDF (`documents/inventario.blade.php`, via the static `Inventario::reportView()`) lists every line with system,
+    counted, difference, value, reason and who and when, plus the totals.
+  - **One source for all three:** screen, review and PDF all read `App\ViewModels\StockCountSheet`.
+- **Unchanged:** the till's blind recount, *Recuento* (305), and the rule that stock moves only through
+  `RecordStockMovement`.
+- **Tests:** `tests/Feature/Stock/InventarioTest.php` (13 tests). The first 10 were written red first:
+  - coverage, and opening once;
+  - a store count has no products;
+  - blind by default (including no intake quantity);
+  - who, when and the locked snapshot;
+  - a sale between counting and applying is not counted twice;
+  - a recount replaces count and snapshot;
+  - applying is refused while lines are unsettled or reasons are missing, then applies with the reason;
+  - cancel leaves the ledger untouched;
+  - the report and download;
+  - staff get 403, and a manager only sees their own sedes (403 on another's count).
+
+  Then three page-level tests: typed `98,5` → 9850 cg end to end, a reason kept from the review, and till recounts kept
+  off the list. Also updated: the panel-section and navigation pins, a help topic (`Help::PAGE_TOPICS`), and the settings
+  on *Ajustes*.
+- **Verified in a browser** (`tests/Browser/prove-318-inventario.mjs`, throwaway DB, `DBFILE` read with sqlite3 because
+  the count is blind), 15/15 PASS:
+  - desktop 1440: *Nuevo inventario* for Central Branch (12 lines);
+  - tablet 820×1180: every batch counted in a first sitting, then left;
+  - at the counter, 5 g dispensed from a counted batch (the socio's daily limit needed the manager override, with a reason);
+  - back on the tablet: products counted, one *No contado*; the review asks for a reason above the tolerance, and
+    applying without one is refused; with Merma + a note it applies;
+  - the sold batch ends at 195.00 g (counted 200.00 g − 5 g). Three adjustments; the not-counted product untouched;
+  - list, review and PDF downloaded; review in dark mode at 1440 and 820.
