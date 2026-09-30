@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\MembershipTiers\Pages;
 
+use App\Filament\Concerns\ReturnsToList;
 use App\Filament\Resources\MembershipTiers\MembershipTierResource;
 use App\Models\MembershipTier;
 use Filament\Actions\DeleteAction;
@@ -10,6 +11,8 @@ use Filament\Resources\Pages\EditRecord;
 
 class EditMembershipTier extends EditRecord
 {
+    use ReturnsToList;
+
     protected static string $resource = MembershipTierResource::class;
 
     protected function getHeaderActions(): array

@@ -3,6 +3,7 @@
 namespace App\Filament\Resources\Discounts\Pages;
 
 use App\Enums\DiscountMode;
+use App\Filament\Concerns\ReturnsToList;
 use App\Filament\Resources\Discounts\DiscountResource;
 use App\Models\Discount;
 use Filament\Actions\DeleteAction;
@@ -11,6 +12,8 @@ use Filament\Resources\Pages\EditRecord;
 
 class EditDiscount extends EditRecord
 {
+    use ReturnsToList;
+
     protected static string $resource = DiscountResource::class;
 
     protected function getHeaderActions(): array

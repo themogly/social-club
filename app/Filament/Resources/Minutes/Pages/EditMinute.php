@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\Minutes\Pages;
 
+use App\Filament\Concerns\ReturnsToList;
 use App\Filament\Resources\Minutes\MinuteResource;
 use Filament\Actions\DeleteAction;
 use Filament\Resources\Pages\EditRecord;
@@ -13,6 +14,8 @@ use Filament\Resources\Pages\EditRecord;
  */
 class EditMinute extends EditRecord
 {
+    use ReturnsToList;
+
     protected static string $resource = MinuteResource::class;
 
     protected function getHeaderActions(): array

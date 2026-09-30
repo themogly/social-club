@@ -4,6 +4,7 @@ namespace App\Filament\Resources\Minutes\Pages;
 
 use App\Actions\Documents\CreateMinute as CreateMinuteAction;
 use App\Enums\MinuteBook;
+use App\Filament\Concerns\ReturnsToList;
 use App\Filament\Resources\Minutes\MinuteResource;
 use App\Models\Organisation;
 use App\Models\User;
@@ -19,6 +20,8 @@ use Illuminate\Support\Facades\Auth;
  */
 class CreateMinute extends CreateRecord
 {
+    use ReturnsToList;
+
     protected static string $resource = MinuteResource::class;
 
     /**

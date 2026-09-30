@@ -2,11 +2,14 @@
 
 namespace App\Filament\Resources\MembershipTiers\Pages;
 
+use App\Filament\Concerns\ReturnsToList;
 use App\Filament\Resources\MembershipTiers\MembershipTierResource;
 use Filament\Resources\Pages\CreateRecord;
 
 class CreateMembershipTier extends CreateRecord
 {
+    use ReturnsToList;
+
     protected static string $resource = MembershipTierResource::class;
 
     /**

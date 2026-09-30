@@ -4,6 +4,7 @@ namespace App\Filament\Resources\Articles\Pages;
 
 use App\Actions\Stock\UpdateArticleAcrossSedes;
 use App\Filament\Concerns\AuditsResourceChanges;
+use App\Filament\Concerns\ReturnsToList;
 use App\Filament\Resources\Articles\Actions\AddToSedesAction;
 use App\Filament\Resources\Articles\ArticleResource;
 use App\Filament\Support\AllOption;
@@ -20,6 +21,7 @@ use Illuminate\Validation\ValidationException;
 class EditArticle extends EditRecord
 {
     use AuditsResourceChanges;
+    use ReturnsToList;
 
     protected static string $resource = ArticleResource::class;
 

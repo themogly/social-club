@@ -4,6 +4,7 @@ namespace App\Filament\Resources\Batches\Pages;
 
 use App\Actions\Stock\IntakeBatch;
 use App\Exceptions\StockCeilingExceededException;
+use App\Filament\Concerns\ReturnsToList;
 use App\Filament\Concerns\WarnsBelowCost;
 use App\Filament\Forms\DecimalInput;
 use App\Filament\Resources\Batches\BatchResource;
@@ -25,6 +26,7 @@ use Livewire\Attributes\Url;
 
 class CreateBatch extends CreateRecord
 {
+    use ReturnsToList;
     use WarnsBelowCost;
 
     protected static string $resource = BatchResource::class;
@@ -225,11 +227,5 @@ class CreateBatch extends CreateRecord
     protected function belowCostField(string $offence): string
     {
         return $offence === 'per_eighth' ? 'price_per_eighth_eur' : 'sale_price_eur';
-    }
-
-    /** Back to the list (prompt 295, Shane's note on the catalogue's create pages). */
-    protected function getRedirectUrl(): string
-    {
-        return $this->getResource()::getUrl('index');
     }
 }

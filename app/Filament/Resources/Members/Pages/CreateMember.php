@@ -7,6 +7,7 @@ use App\Actions\Members\RecordMemberConsent;
 use App\Actions\Members\SendMemberCard;
 use App\Actions\Members\SyncMemberScanDocuments;
 use App\Enums\MemberKind;
+use App\Filament\Concerns\ReturnsToList;
 use App\Filament\Resources\Members\MemberResource;
 use App\Models\Member;
 use App\Models\User;
@@ -21,6 +22,8 @@ use RuntimeException;
 
 class CreateMember extends CreateRecord
 {
+    use ReturnsToList;
+
     protected static string $resource = MemberResource::class;
 
     /**

@@ -2,11 +2,14 @@
 
 namespace App\Filament\Resources\Dispensations\Pages;
 
+use App\Filament\Concerns\ReturnsToList;
 use App\Filament\Resources\Dispensations\DispensationResource;
 use Filament\Resources\Pages\ViewRecord;
 
 class ViewDispensation extends ViewRecord
 {
+    use ReturnsToList;
+
     protected static string $resource = DispensationResource::class;
 
     /**

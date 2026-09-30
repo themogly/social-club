@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\Expenses\Pages;
 
+use App\Filament\Concerns\ReturnsToList;
 use App\Filament\Resources\Expenses\ExpenseResource;
 use App\Models\Expense;
 use App\Support\Money;
@@ -15,6 +16,8 @@ use Filament\Resources\Pages\EditRecord;
  */
 class EditExpense extends EditRecord
 {
+    use ReturnsToList;
+
     protected static string $resource = ExpenseResource::class;
 
     protected function getHeaderActions(): array

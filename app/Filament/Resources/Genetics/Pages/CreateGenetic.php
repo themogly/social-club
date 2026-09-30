@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\Genetics\Pages;
 
+use App\Filament\Concerns\ReturnsToList;
 use App\Filament\Resources\Batches\BatchResource;
 use App\Filament\Resources\Genetics\GeneticResource;
 use Filament\Actions\Action;
@@ -17,6 +18,8 @@ use Filament\Resources\Pages\CreateRecord;
  */
 class CreateGenetic extends CreateRecord
 {
+    use ReturnsToList;
+
     protected static string $resource = GeneticResource::class;
 
     /**
@@ -26,11 +29,6 @@ class CreateGenetic extends CreateRecord
     protected function mutateFormDataBeforeCreate(array $data): array
     {
         return EditGenetic::toStored($data);
-    }
-
-    protected function getRedirectUrl(): string
-    {
-        return GeneticResource::getUrl('index');
     }
 
     protected function getCreatedNotification(): ?Notification

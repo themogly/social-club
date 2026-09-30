@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\Announcements\Pages;
 
+use App\Filament\Concerns\ReturnsToList;
 use App\Filament\Resources\Announcements\AnnouncementResource;
 use App\Models\Announcement;
 use App\Notifications\NewAnnouncementNotification;
@@ -10,6 +11,8 @@ use Filament\Resources\Pages\EditRecord;
 
 class EditAnnouncement extends EditRecord
 {
+    use ReturnsToList;
+
     protected static string $resource = AnnouncementResource::class;
 
     protected function getHeaderActions(): array

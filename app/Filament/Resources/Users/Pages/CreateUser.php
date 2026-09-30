@@ -3,6 +3,7 @@
 namespace App\Filament\Resources\Users\Pages;
 
 use App\Actions\Users\EnsureRoleChangeIsAllowed;
+use App\Filament\Concerns\ReturnsToList;
 use App\Filament\Resources\Users\UserResource;
 use App\Models\User;
 use App\Support\PinSavedNotice;
@@ -11,6 +12,8 @@ use Illuminate\Support\Facades\Auth;
 
 class CreateUser extends CreateRecord
 {
+    use ReturnsToList;
+
     protected static string $resource = UserResource::class;
 
     /** Prompt 270 — only an owner creates an owner, whatever the form was made to submit. */

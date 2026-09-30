@@ -3,6 +3,7 @@
 namespace App\Filament\Resources\Genetics\Pages;
 
 use App\Filament\Concerns\AuditsResourceChanges;
+use App\Filament\Concerns\ReturnsToList;
 use App\Filament\Resources\Genetics\GeneticDeletion;
 use App\Filament\Resources\Genetics\GeneticResource;
 use App\Models\Genetic;
@@ -13,6 +14,7 @@ use Filament\Resources\Pages\EditRecord;
 class EditGenetic extends EditRecord
 {
     use AuditsResourceChanges;
+    use ReturnsToList;
 
     protected static string $resource = GeneticResource::class;
 

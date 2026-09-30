@@ -2,12 +2,15 @@
 
 namespace App\Filament\Resources\Convocatorias\Pages;
 
+use App\Filament\Concerns\ReturnsToList;
 use App\Filament\Resources\Convocatorias\ConvocatoriaResource;
 use Filament\Resources\Pages\CreateRecord;
 use Illuminate\Support\Facades\Auth;
 
 class CreateConvocatoria extends CreateRecord
 {
+    use ReturnsToList;
+
     protected static string $resource = ConvocatoriaResource::class;
 
     /**

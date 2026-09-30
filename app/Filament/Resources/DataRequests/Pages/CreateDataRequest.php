@@ -2,12 +2,15 @@
 
 namespace App\Filament\Resources\DataRequests\Pages;
 
+use App\Filament\Concerns\ReturnsToList;
 use App\Filament\Resources\DataRequests\DataRequestResource;
 use App\Support\ActiveScope;
 use Filament\Resources\Pages\CreateRecord;
 
 class CreateDataRequest extends CreateRecord
 {
+    use ReturnsToList;
+
     protected static string $resource = DataRequestResource::class;
 
     /** Stamp the active organisation (this model carries no auto-fill scope trait). */

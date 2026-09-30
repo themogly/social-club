@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\Purchases\Pages;
 
+use App\Filament\Concerns\ReturnsToList;
 use App\Filament\Resources\Purchases\PurchaseResource;
 use App\Models\Purchase;
 use App\Support\Money;
@@ -14,6 +15,8 @@ use Filament\Resources\Pages\EditRecord;
  */
 class EditPurchase extends EditRecord
 {
+    use ReturnsToList;
+
     protected static string $resource = PurchaseResource::class;
 
     protected function getHeaderActions(): array
