@@ -147,6 +147,7 @@ class Settings
         // multi-terminal sede, and the operator picks which configured terminal to open.
         'multiple_tills_enabled' => false,
         // Prompt 312 — per sede: closing the till clocks the CLOSER out ('auto', the owner's ask) or asks first ('ask').
+        // Prompt 338 — the same key now also governs OPENING: the opener clocked in ('auto') or asked ('ask'). Key kept.
         'till_close_clock_out' => 'auto',
 
         // Counter scanning (per location) — opt-in camera QR at the door + POS. OFF by default:

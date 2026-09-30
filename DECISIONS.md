@@ -18381,3 +18381,56 @@ one tap away after every bar sale.
   - M-00002, never checked in, is served;
   - Central Branch has Recepción and its figures, and no extra tile;
   - no page errors.
+
+## Prompt 338 — opening a till clocks the opener in (the top bar's *Fichar entrada* moved to 341)
+
+- **Why:** Ben: "A check-in button at the top for the staff. It just allowed me to close and then open a till, and didn't
+  ask me to check in." After 312's close (which clocks the closer out) and a new open, the person worked unclocked and
+  nothing asked.
+- **Scope, as revised:** the top-bar *Fichar entrada* and its clock status belong to 341's top-bar redesign, so the bar
+  changes once.
+  - It had already been built on this branch: a PIN clock-in (`beginClockIn` / `confirmClockIn` sharing the clock-out's
+    PIN check), an `in-pin` mode on the shared pad, and an amber button in *Fichar salida*'s slot.
+  - It was **taken out before merging** and kept as a patch for 341 (in the session scratchpad,
+    `341-topbar-clock-in-from-338.patch`).
+  - This prompt emits the existing `counter-clock-state` event on every clock change it makes. Today's *Fichar salida*
+    already follows it, and 341's chip will.
+- **`StaffClockSource::TILL_OPEN`** (*Al abrir la caja*):
+  - It is a personal source: `ClockRules` treats every source except a manager's correction as the person's own act, so
+    it is accepted only for the opener's own clock-in (pinned, with the refusal for anyone else).
+  - It is not "declared", so the hours report shows its periods as ordinary clocked time, with no flag (pinned).
+  - The column is a string, so no migration is needed.
+- **Opening a till** (`TillSession::open()` → `clockInOpener()`), when the opener has no open period:
+  - **Automático:** a `TILL_OPEN` clock-in at the till's own `opened_at`.
+  - **Preguntar:** "¿Fichar entrada ahora?" *Sí* writes the `TILL_OPEN` clock-in at now; *No* writes nothing.
+  - **Already clocked in:** nothing (pinned).
+  - Opening moves on to the next screen (236), so the notice ("Entrada fichada a las 18:02. [Deshacer]") and the
+    question live in the **counter chrome**, which follows every redirect. They are session-backed: the undo's window, or
+    the offer for this person.
+  - *Deshacer* works for 2 minutes, for the same person on the same counter session. Other people are never clocked in.
+- **One undo for both ends:** 312's `UndoTillCloseClockOut` is now `UndoTillClockEvent`. It undoes the till's own OUT
+  (`TILL_CLOSE`) or IN (`TILL_OPEN`) with an append-only ANNUL, with the same window and rules (`CounterOperator::CLOCK_UNDO`,
+  forgotten on a lock or a new PIN). 312's tests are unchanged and green.
+- **One setting for both ends:** 312's `till_close_clock_out` now governs opening too.
+  - **The key is kept, with no data migration**, so every sede keeps its value (`auto` by default, or `ask`).
+  - The label is now *Fichar al abrir y cerrar la caja*, and the help text describes both ends.
+- **Unchanged:**
+  - 281's question at the PIN;
+  - 312's close and its undo;
+  - the hours report;
+  - the rule that clocking isn't a counter blocker.
+- **Tests:** `tests/Feature/Staff/TillOpenClockInTest.php` (5), 4 red first:
+  - *Automático* after a close: `TILL_OPEN` at the open time, the notice, and the undo writing an ANNUL and emitting
+    `counter-clock-state` false;
+  - *Preguntar*: *No* writes nothing, *Sí* writes it;
+  - already clocked in: none (green by nature);
+  - `TILL_OPEN` is personal;
+  - the report shows it plainly.
+- **Verified in a browser** (`tests/Browser/prove-338-clock-in.mjs`, 1180×820, a freshly seeded demo DB, as the manager,
+  PIN 2345; staff don't hold `till.close` by default):
+  - closing clocked them out (`TILL_CLOSE`), and *Fichar salida* left the bar;
+  - opening clocked them in (`TILL_OPEN`): the next screen said "Entrada fichada a las HH:MM." with *Deshacer*, and
+    *Fichar salida* came back;
+  - *Deshacer* wrote the ANNUL and *Fichar salida* left again;
+  - lock, then PIN, then 281's *Fichar entrada* wrote a `PIN` clock-in;
+  - *Mis horas* listed the periods.

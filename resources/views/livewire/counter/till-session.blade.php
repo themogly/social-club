@@ -39,7 +39,7 @@
             {{-- Prompt 312 — the closer was clocked out automatically (TILL_CLOSE, their own PIN closed the till). Two minutes
                  to take it back; after that — or once the counter is locked or someone else signs in — the server refuses. --}}
             <section data-clock-out-done class="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-success/30 bg-success/10 p-4 dark:border-slate-700 dark:bg-slate-900"
-                     x-data="{ left: {{ \App\Actions\Staff\UndoTillCloseClockOut::WINDOW_SECONDS }} }" x-init="const t = setInterval(() => { if (--left <= 0) clearInterval(t) }, 1000)">
+                     x-data="{ left: {{ \App\Actions\Staff\UndoTillClockEvent::WINDOW_SECONDS }} }" x-init="const t = setInterval(() => { if (--left <= 0) clearInterval(t) }, 1000)">
                 <p class="text-sm font-semibold">{{ __('Salida fichada a las :time.', ['time' => $clockedOutAt]) }}</p>
                 <x-button type="button" variant="secondary" wire:click="undoClockOut" data-clock-out-undo x-show="left > 0" class="min-h-[2.75rem]">{{ __('Deshacer') }}</x-button>
             </section>

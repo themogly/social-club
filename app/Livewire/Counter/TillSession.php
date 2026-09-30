@@ -4,8 +4,9 @@ namespace App\Livewire\Counter;
 
 use App\Actions\Counter\SignInOperator;
 use App\Actions\Expenses\RecordTillExpense;
+use App\Actions\Staff\ClockIn;
 use App\Actions\Staff\ClockOut;
-use App\Actions\Staff\UndoTillCloseClockOut;
+use App\Actions\Staff\UndoTillClockEvent;
 use App\Actions\Stock\CommitStockTake;
 use App\Actions\Till\CloseTill;
 use App\Actions\Till\HandOverTill;
@@ -66,6 +67,9 @@ use RuntimeException;
 #[Layout('components.layouts.counter')]
 class TillSession extends Component
 {
+    /** Prompt 338 — *Preguntar*: the opener to ask «¿Fichar entrada ahora?» on the screen they land on. */
+    public const CLOCK_IN_OFFER = 'counter_clock_in_offer';
+
     use IdentifiesOperator, ResolvesCounterLocation;
 
     /** The active location id, resolved in mount(). #[Locked] (prompt 75): the client can never retarget the counter's sede. */
@@ -412,7 +416,7 @@ class TillSession extends Component
         }
 
         try {
-            (new OpenTill)->handle($location, $terminal, $floatCents);
+            $opened = (new OpenTill)->handle($location, $terminal, $floatCents);
         } catch (TillAlreadyOpenException) {
             // Two devices, one drawer (prompt 236): another terminal opened this sede's till between the
             // redirect and this tap. The precondition is now MET, so this is not an error to correct — follow
@@ -424,10 +428,40 @@ class TillSession extends Component
 
         $this->terminal = $terminal;
         $this->floatInput = '';
+        $this->clockInOpener($opened);
 
         // Prompt 236 — land the operator on the screen they were sent here from, or the sede's configured
         // landing. Same consumer as the two-device continue below, so the round trip is written once.
         $this->continueToIntended();
+    }
+
+    /**
+     * Prompt 338 — the OPENER, if not clocked in, is clocked in at the open's own time: source TILL_OPEN (their PIN just
+     * opened the till, so it is their own act, as 312's close). *Automático*: at once, with a 2-minute *Deshacer*;
+     * *Preguntar*: "¿Fichar entrada ahora?". The screen they land on shows either (the counter chrome, which follows every
+     * redirect). Nobody else is ever clocked in. A failure leaves them unclocked and never touches the open.
+     */
+    private function clockInOpener(TillSessionModel $opened): void
+    {
+        $operator = CounterOperator::current();
+        $location = $this->resolveLocation();
+        if ($operator === null || $location === null || WorkedHours::openPeriodFor($operator) !== null) {
+            return;
+        }
+
+        if (Settings::get('till_close_clock_out', 'auto', $this->locationId) === 'ask') {
+            session([self::CLOCK_IN_OFFER => $operator->id]);
+
+            return;
+        }
+
+        try {
+            $in = (new ClockIn)->handle($operator, $location, $operator, StaffClockSource::TILL_OPEN, $opened->opened_at);
+        } catch (AuthorizationException|DomainException|InvalidArgumentException) {
+            return;
+        }
+        session([CounterOperator::CLOCK_UNDO => $in->id]);
+        $this->dispatch('counter-clock-state', open: true);
     }
 
     /**
@@ -949,7 +983,7 @@ class TillSession extends Component
             if ($operator === null) {
                 throw new DomainException(__('Ya no se puede deshacer la salida. Si hace falta, corrígela desde el registro de jornada.'));
             }
-            (new UndoTillCloseClockOut)->handle($operator);
+            (new UndoTillClockEvent)->handle($operator);
             $this->dispatch('counter-clock-state', open: true);
             $this->flash(__('Salida deshecha: sigues con la jornada abierta.'), 'success');
         } catch (DomainException $e) {
