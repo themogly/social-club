@@ -397,6 +397,13 @@
                                 placeholder="{{ __('Buscar producto…') }}"
                                 class="h-11 w-full rounded-xl border border-line bg-surface px-4 text-sm text-ink placeholder:text-ink-muted focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/40 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 sm:w-56"
                             >
+                            {{-- Prompt 331 — the Bar screen's manual line, on the BARRA tab only: a bar/shop line, never cannabis
+                                 (a dispensation names a batch and grams). Opens the shared modal; no request until it adds. --}}
+                            <button type="button" x-show="source === 'bar'" x-cloak @click="$dispatch('manual-line-open')" data-misc-open
+                                    title="{{ __('Línea manual de barra') }}"
+                                    class="inline-flex h-11 shrink-0 items-center gap-1 rounded-xl border border-brand/40 bg-brand-tint/40 px-3 text-sm font-semibold text-brand transition hover:bg-brand-tint dark:border-brand/40 dark:bg-slate-800 dark:text-slate-100 dark:hover:bg-slate-700">
+                                <span aria-hidden="true">＋</span>{{ __('Línea manual') }}
+                            </button>
                         @endif
                     </div>
 
@@ -487,6 +494,12 @@
                         </div>
                     @endif
                     @endisland
+
+                    {{-- Prompt 331 — the manual bar line's modal: the Bar screen's own partial, outside every island so adding a
+                         line renders the cart. --}}
+                    @if ($barEnabled)
+                        @include('livewire.counter.partials.manual-line-modal', ['heading' => __('Línea manual de barra')])
+                    @endif
 
                     @island('catalogue-genetics', always: $this->islandChanged('genetics'))
                     @php $gen = $this->islandView('genetics'); @endphp
@@ -775,10 +788,16 @@
                             @if (! empty($barLines))
                                 <ul class="mt-2 divide-y divide-line dark:divide-slate-800">
                                     @foreach ($barLines as $line)
-                                        <li class="flex items-center justify-between gap-2 py-1.5 text-sm">
-                                            <span>{{ $line['qty'] }}× {{ $line['name'] }}</span>
+                                        <li class="flex items-center justify-between gap-2 py-1.5 text-sm" @if ($line['manual']) data-bar-line-manual @endif>
+                                            @if ($line['manual'])
+                                                {{-- Prompt 331 — "Descripción · importe", tagged: not a catalogue article. --}}
+                                                <span class="min-w-0">{{ $line['name'] }} · {{ $this->money($line['line_total_cents']) }}
+                                                    <span class="ml-1 rounded-full border border-line px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-ink-muted dark:border-slate-700 dark:text-slate-400">{{ __('manual') }}</span></span>
+                                            @else
+                                                <span>{{ $line['qty'] }}× {{ $line['name'] }}</span>
+                                            @endif
                                             <span class="flex items-center gap-2 tabular-nums">
-                                                {{ $this->money($line['line_total_cents']) }}
+                                                @unless ($line['manual']){{ $this->money($line['line_total_cents']) }}@endunless
                                                 <button type="button" wire:click="removeBarItem({{ $line['index'] }})" aria-label="{{ __('Quitar') }}" class="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-md text-ink-muted hover:bg-black/5 dark:text-slate-400 dark:hover:bg-white/5">✕</button>
                                             </span>
                                         </li>

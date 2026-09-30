@@ -18006,3 +18006,62 @@ one tap away after every bar sale.
   - Also checked by hand, with screenshots: two arrivals ("2 nuevas solicitudes") at 1180 and 390, and dark mode; a member
     selected with the banner showing (member, cart and commit all visible); *Luego* on one screen still hidden on the
     next with the badge kept; the bell tap landing on Socios' pending card.
+
+## Prompt 331 — the Dispensario's *Barra* tab can add a manual line, like the Bar screen
+
+- **Why:** Ben: "Can't add manual amounts on the dispensary like you can on the bar." The combined visit's bar side
+  (`DispensaryPos::$barBasket`, 263) held catalogue articles only; the Bar screen had a manual line since 126.
+- **One modal, one set of rules. Nothing copied:**
+  - The modal moved out of `bar-pos.blade.php` into `livewire/counter/partials/manual-line-modal.blade.php`, used by both
+    screens. It has the same fields, the same one-tap reasons (126) and the same Spanish and English strings.
+  - It keeps 272's focus handling: focus into the description, back to the trigger, Back closes it.
+  - It opens on a `manual-line-open` event, so a trigger can sit anywhere (the Bar's catalogue header, the Dispensario's
+    *Barra* tab). It closes only on success (`misc-added`).
+  - A `heading` parameter names it. The Bar keeps "Importe manual"; the Dispensario says "Línea manual de barra".
+  - `PreLiveA11yFixesTest`'s pin now asserts the event trigger and the shared scope, with the same pushState, focus and
+    popstate.
+  - The rules are one concern, `App\Livewire\Counter\Concerns\AddsManualBarLines::takeManualLine()`, lifted verbatim
+    from `BarPos::addMiscLine()`: `pos.bar` for the PIN operator (266), a non-empty description, an amount above 0, a
+    required reason. Same messages.
+  - Each screen's `addMiscLine()` only puts the returned line in its own basket. `BarPos`'s basket entry is
+    byte-for-byte the same as before (pinned).
+- **On the visit:** a manual line is `{description, unit_price_cents, reference, qty: 1}` in `$barBasket`, with no
+  `article_id`, beside article lines.
+  - `barBasketTotalCents()` adds its own amount, **never member-discounted**, as `BarPos::basketView()` does
+    ("manual lines are never member-discounted").
+  - `barOrderLines()` hands it to `CommitOrder` in exactly the Bar screen's shape, on both paths (the combined settle and
+    the bar-only settle).
+  - In the cart it reads "Mechero · 1,50 €" with a small *manual* tag and the ✕. The right-hand amount is left out for
+    these rows, so the amount isn't shown twice.
+- **Where it lands:** every figure below reads the order `CommitOrder` writes, so no writer or report changed. Tested at
+  each:
+  - the order's items (no `article_id`, the description, 150, the reason);
+  - the bar ticket (*Ticket de venta*, where the sede offers it, 317);
+  - the till's `bar_cash`, and so the Z report;
+  - 291's *Descuentos y ajustes*, under *Líneas manuales* ("1 línea · 1,50 €").
+- **No manual amounts for cannabis:** a dispensation must name a batch and grams. That is what the registro de
+  dispensación records, what the stock ceiling and the gram limits count, and what FEFO draws from. A free amount would
+  be an aportación with no product behind it. So the button exists **only on the *Barra* tab** (hidden on the
+  Dispensario tab, checked in the browser), the modal is headed "Línea manual de barra", and the line goes to the bar
+  ledger.
+- **Tests:** `tests/Feature/Counter/DispensaryManualBarLineTest.php` (6), all red first:
+  - adding "Mechero" €1.50 "Sin código" to the bar basket, shown as manual and removable;
+  - the combined visit (1 g + the line): dispensation and order, item shape, Z report `bar_cash`, and the ticket;
+  - the four refusals with the Bar's messages, on both screens;
+  - no `pos.bar` → refused;
+  - both screens include the one partial, `id="misc-desc"` exists in exactly one view, and the Bar's own line is
+    unchanged;
+  - 291's report counts it.
+- **Verified in a browser** (`tests/Browser/prove-331-manual-bar-line.mjs`, 1180×820, a freshly seeded demo DB), 11/11
+  PASS:
+  - a member and 1 g;
+  - no button on the Dispensario tab; on *Barra*, «Línea manual» opens the shared modal headed «Línea manual de barra»
+    with focus in the description;
+  - €1.50 «Mechero», «Sin código» → in the cart, tagged manual;
+  - quick cash → commit;
+  - the order's item has no `article_id`, 150 and the reason, next to the dispensation;
+  - the ticket shows «Mechero · Sin código · 1.50 €», and the till's Z report shows «Barra y tienda en efectivo 1.50 €»;
+  - the Bar screen still opens the same modal, headed «Importe manual»;
+  - no page errors.
+
+  The demo owner's UI formats money as "1.50 €"; the check accepts either separator.

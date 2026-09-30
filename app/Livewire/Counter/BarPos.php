@@ -8,6 +8,7 @@ use App\Actions\Pricing\ResolveArticleDiscount;
 use App\Actions\Till\SelectTillSession;
 use App\Enums\TillSessionStatus;
 use App\Exceptions\TillClosedException;
+use App\Livewire\Counter\Concerns\AddsManualBarLines;
 use App\Livewire\Counter\Concerns\FindsMembers;
 use App\Livewire\Counter\Concerns\HandlesTender;
 use App\Livewire\Counter\Concerns\IdentifiesOperator;
@@ -65,7 +66,7 @@ use Throwable;
 #[Layout('components.layouts.counter', ['fullHeight' => true])] // prompt 176: the page must not scroll; the selection pane does
 class BarPos extends Component
 {
-    use FindsMembers, HandlesTender, IdentifiesOperator, PersistsBasket, RendersIslandsOnChange, ResolvesCounterLocation, ShowsSettledOutcome;
+    use AddsManualBarLines, FindsMembers, HandlesTender, IdentifiesOperator, PersistsBasket, RendersIslandsOnChange, ResolvesCounterLocation, ShowsSettledOutcome;
 
     // --- Identity / scope -------------------------------------------------------
     // The ONE lookup field ($lookup) lives in FindsMembers (prompt 194). The bar used to offer a name box with
@@ -132,15 +133,8 @@ class BarPos extends Component
     /** Optional order-level free-text reference (guests / rollout / event). */
     public string $reference = '';
 
-    // --- Miscellaneous (quick amount) line entry --------------------------------
-
-    public string $miscDescription = '';
-
-    /** Euros at the edge; parsed to integer cents before it ever leaves the component. */
-    public string $miscAmount = '';
-
-    /** A miscellaneous line REQUIRES a reference (CommitOrder enforces it; so do we). */
-    public string $miscReference = '';
+    // --- Miscellaneous (quick amount) line entry: $miscDescription / $miscAmount / $miscReference and the rules live in
+    // AddsManualBarLines, shared with the Dispensario's Barra tab (prompt 331).
 
     // Tender state ($walletInput, $cashTendered) + the split/change/quick-cash logic live in HandlesTender.
 
@@ -275,52 +269,17 @@ class BarPos extends Component
 
     public function addMiscLine(): void
     {
-        // Prompt 266 — selling at the bar is the PIN operator's permission (255), checked where it runs.
-        if ($this->hasOperator() && ! $this->userCan('pos.bar')) {
-            $this->flash(__('Tu usuario no puede vender en la barra.'), 'error');
-
+        $line = $this->takeManualLine();
+        if ($line === null) {
             return;
         }
 
-        $description = trim($this->miscDescription);
-        $reference = trim($this->miscReference);
-        $cents = $this->parseCents($this->miscAmount);
+        $this->basket[] = ['type' => 'misc', 'description' => $line['description'], 'unit_price_cents' => $line['unit_price_cents'],
+            'qty' => 1, 'reference' => $line['reference']];
 
-        if ($description === '') {
-            $this->flash(__('Indica una descripción para la línea manual.'), 'error');
-
-            return;
-        }
-
-        if ($cents === null || $cents <= 0) {
-            $this->flash(__('Introduce un importe válido.'), 'error');
-
-            return;
-        }
-
-        // A miscellaneous line is NOT in the catalogue, so a reason is still required — but the modal makes it
-        // one tap (prompt 126), so satisfying it no longer pushes staff to type "x" or take cash off book.
-        if ($reference === '') {
-            $this->flash(__('Indica un motivo para la línea manual.'), 'error');
-
-            return;
-        }
-
-        $this->basket[] = [
-            'type' => 'misc',
-            'description' => $description,
-            'unit_price_cents' => $cents,
-            'qty' => 1,
-            'reference' => $reference,
-        ];
-
-        $this->reset(['miscDescription', 'miscAmount', 'miscReference']);
         $this->forgetLastSale();
         $this->ensureIdempotencyKey();
         $this->dismissOutcome();
-        // Tell the blade's modal to close — but only now, on SUCCESS, so a validation refusal keeps it open with
-        // the operator's input intact.
-        $this->dispatch('misc-added');
     }
 
     public function incrementLine(int $index): void
