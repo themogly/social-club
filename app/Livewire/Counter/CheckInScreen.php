@@ -23,6 +23,7 @@ use App\Models\TillSession;
 use App\Models\User;
 use App\Support\BusinessDay;
 use App\Support\CounterOperator;
+use App\Support\CounterScreens;
 use App\Support\Money;
 use App\Support\VaultUrl;
 use App\Support\Wallet;
@@ -94,6 +95,14 @@ class CheckInScreen extends Component
 
     public function mount(): void
     {
+        // Prompt 337 — Recepción switched off at this sede: to the hub, saying why (bookmarks exist; not a 404).
+        if (! CounterScreens::receptionEnabled()) {
+            session()->flash('counterNotice', __('Recepción está desactivada en esta sede.'));
+            $this->redirect(route('counter.home'));
+
+            return;
+        }
+
         abort_unless($this->deviceCan('checkin.manage'), 403);
 
         // Resolve the counter's OWN working sede (session key counter.location_id) — never the panel

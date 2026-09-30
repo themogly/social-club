@@ -126,6 +126,9 @@ class Settings
         // resolves the active location first, so a location override wins, else org, else this default.
         // (Replaces the org-wide pos_require_checked_in / pos_signature_required, which no UI ever wrote.)
         'restrict_pos_to_checked_in' => false,  // only dispense to members checked in at the door
+        // Prompt 337 — does this sede record entries at the door? Off: no Recepción, no check-in figures, and the gate above
+        // cannot hold (CounterScreens::receptionEnabled). On by default, so every sede is unchanged until turned off.
+        'reception_enabled' => true,
         'signature_on_dispensation' => false,   // capture an on-screen signature per withdrawal (acta-grade)
         // Prompt 292 — the dispensary's € calculator (type euros, get grams). The owner chose OFF by default: every sede,
         // new or existing, has it off until switched on in Sedes → Dispensario.

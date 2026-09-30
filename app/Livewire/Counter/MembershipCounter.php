@@ -182,6 +182,15 @@ class MembershipCounter extends Component
         // Prompt 249 — arriving from the handover PIN with ?alta=<id>: open that application's review. Only for
         // a reviewer, and only when the id resolves WITHIN this counter's organisation (the scoping lives in
         // altaApplication()); a foreign or unknown id opens nothing.
+        // Prompt 337 — ?alta=nuevo (the hub's *Nuevo socio* tile where Recepción is off): the sign-up itself, open, with
+        // its pending list and 329's review — the ONE sign-up flow, never a second.
+        if ($this->altaReview === 'nuevo') {
+            $this->altaReview = null;
+            if ($this->userCan('applications.review') && ! $this->altaOpen) {
+                $this->toggleAlta();
+            }
+        }
+
         if ($this->altaReview !== null && $this->userCan('applications.review')) {
             $this->reviewAltaApplication($this->altaReview);
 

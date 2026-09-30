@@ -18311,3 +18311,73 @@ one tap away after every bar sale.
     - 333's pin: adjusted to 5 with Enter, the button and *Justo* / *Exact* follow;
     - red before the change on every layout check (for example 226/116 px, and 118 px per field).
   - `PriceAdjustmentAndManagerReasonsTest` follows the shorter label ("(opcional)" for a holder, none for staff).
+
+## Prompt 337 — Recepción can be switched off per sede, and a *Nuevo socio* tile takes its place
+
+- **Why:** Ben, about Green Indoor's hub: "Can we make a way to hide Reception? … put it in the location settings to turn
+  it off." Nothing hid it; the only lever was the club-wide `checkin.manage` permission.
+- **The switch:** `reception_enabled`, per sede, **on by default**, so every sede is unchanged until someone turns it off.
+  - It sits in *Sedes → Seguridad del mostrador*, next to the check-in gate: **Mostrar Recepción en el mostrador**, "Desactívalo si esta sede no registra entradas en la puerta."
+  - It is a sede setting, so only those who edit sedes change it.
+  - Read by `CounterScreens::receptionEnabled()` for the **counter's own sede** (`counter.location_id`), never the panel's
+    scope.
+- **Off at the counter's sede:**
+  - `CounterScreens::forUser` doesn't grant `counter.checkin`, so there is no hub tile and `landingRouteFor()` skips it,
+    even with `counter_landing = screen`. The tab strip has been gone since 205; the hub is the menu.
+  - `/counter/checkin` sends to the hub with "Recepción está desactivada en esta sede." (bookmarks exist; not a 404).
+    The hub now shows that through the shared flash block, the same as the five working screens, and
+    `ConfirmationCarriesTheOutcomeTest`'s inventory now lists it.
+  - The hub hides its check-in figures: the *En el local* card and the *Entradas* row in *Hoy*.
+    - `WhosInside` and its 15 s poll only ever lived on the Recepción screen, not the hub, so it never renders with the
+      route gone.
+    - No hub alert depends on check-ins (`DashboardAlert` has no aforo alert).
+  - The handovers' fallback destination (`CounterHandoverConfinement`, `EnforceCounterHandover`) is now
+    `CounterScreens::frontDoorRoute()`: Recepción, or the hub where it's off.
+- **The *Nuevo socio* tile:** where Recepción is off, it leads the hub's secondary tiles, the same size and place.
+  - It reads *Nuevo socio*, "Alta y solicitudes pendientes", with a person-plus icon, and carries 330's amber count when
+    applications wait.
+  - It opens `/counter/members?alta=nuevo`: 249's `?alta=` parameter with a reserved value. Socios' `mount()` opens the
+    existing sign-up (`toggleAlta()`, including its till check), with its pending list and 329's review. There is no
+    second sign-up flow.
+  - It is only for operators with `applications.review`, the gate of Socios' own *Nuevo socio*. STAFF hold it since 174,
+    so staff see it too. Without it the space closes up and the link opens nothing (pinned with the permission taken
+    away).
+  - With Recepción on, there's no extra tile.
+- **The gate can't be on at the same time:**
+  - In the sede form, turning Recepción off turns *Solo dispensar a socios que han entrado* off. It is then disabled, with
+    "Requiere Recepción.", and a disabled field isn't sent, so it saves off.
+  - On the server, `DispensaryPos::checkedInRequired()` is false wherever Recepción is off, whatever is stored (pinned
+    with a stored `true`).
+- **Check-in consumers checked** (`CheckIn`, `checkin.manage`, `WhosInside`, `counter.checkin`):
+  - `CounterScreens` (tile, landing);
+  - `CheckInScreen` (redirect);
+  - `WhosInside` (only on that screen);
+  - `CounterHome` (figures, tile);
+  - `DispensaryPos` (gate, at hold and at commit through the same method);
+  - `CounterHandoverConfinement` and `EnforceCounterHandover` (fallback);
+  - `AdminPanelProvider` (its counter link falls back to `counter.checkin` only when no screen at all is reachable,
+    unchanged);
+  - `MemberPolicy` (a `checkin.manage`-or-`pos.use` read gate, unrelated);
+  - `checkins:auto-checkout` (runs cleanly with nothing open, pinned);
+  - card readers and QR (332) on the other screens, unaffected;
+  - the panel's *Visitas* history, kept as history.
+
+  Stored check-ins are never touched; turning it back on restores everything exactly.
+- **Tests:** `tests/Feature/Counter/ReceptionPerSedeTest.php` (7):
+  - off: no tile, card or row, the redirect with its notice, no `WhosInside`;
+  - on at the other sede: everything as before (green by nature);
+  - the gate can't hold where it's off, and still holds where it's on;
+  - the sede form disables it and saves it off;
+  - the *Nuevo socio* tile first, its count, the sign-up opening, and no tile or opening without the permission;
+  - the landing;
+  - the auto-checkout (green by nature).
+- **Verified in a browser** (`tests/Browser/prove-337-reception-per-sede.mjs`, a freshly seeded demo DB, as the owner),
+  10/10 PASS:
+  - in the panel, North Branch's gate on, then *Mostrar Recepción* off: the gate turns off, disabled with "Requiere
+    Recepción.", and both save off;
+  - North's hub has no Recepción, *En el local* or *Entradas*, and *Nuevo socio* first; it opens Socios with the
+    sign-up;
+  - `/counter/checkin` goes to the hub with the notice;
+  - M-00002, never checked in, is served;
+  - Central Branch has Recepción and its figures, and no extra tile;
+  - no page errors.

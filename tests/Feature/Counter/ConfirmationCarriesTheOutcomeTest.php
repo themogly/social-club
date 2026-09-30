@@ -359,9 +359,10 @@ class ConfirmationCarriesTheOutcomeTest extends TestCase
         }
 
         $this->assertSame(
-            ['bar-pos.blade.php', 'check-in-screen.blade.php', 'dispensary-pos.blade.php', 'membership-counter.blade.php', 'till-session.blade.php'],
+            // Prompt 337 — the hub joins them for its one notice (sent from a switched-off Recepción).
+            ['bar-pos.blade.php', 'check-in-screen.blade.php', 'counter-home.blade.php', 'dispensary-pos.blade.php', 'membership-counter.blade.php', 'till-session.blade.php'],
             collect(array_keys($hosts))->sort()->values()->all(),
-            'the five commit surfaces, all on the same block',
+            'the five commit surfaces and the hub, all on the same block',
         );
     }
 

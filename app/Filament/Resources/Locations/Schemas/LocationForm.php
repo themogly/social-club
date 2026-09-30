@@ -15,6 +15,7 @@ use Filament\Forms\Components\TimePicker;
 use Filament\Forms\Components\Toggle;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Components\Utilities\Get;
+use Filament\Schemas\Components\Utilities\Set;
 use Filament\Schemas\Schema;
 use Illuminate\Support\Facades\Auth;
 
@@ -40,6 +41,7 @@ class LocationForm
         'bar_ticket_reference_enabled',
         'counter_training_enabled', // prompt 324 — on by default
         'applications_chime_enabled', // prompt 330 — off by default
+        'reception_enabled', // prompt 337 — on by default
     ];
 
     /**
@@ -360,9 +362,21 @@ class LocationForm
                 Section::make(__('Seguridad del mostrador'))
                     ->visible(fn (Get $get): bool => $get('kind') !== LocationKind::ALMACEN->value) // no counter at the store (277)
                     ->schema([
+                        // Prompt 337 — a sede that does not record entries at the door: no Recepción on its counter.
+                        Toggle::make('reception_enabled')
+                            ->label(__('Mostrar Recepción en el mostrador'))
+                            ->default(true)
+                            ->live()
+                            ->afterStateUpdated(fn (bool $state, Set $set) => $state ? null : $set('restrict_pos_to_checked_in', false))
+                            ->helperText(__('Desactívalo si esta sede no registra entradas en la puerta.')),
+
+                        // Disabled — and so not saved, which stores it OFF — while Recepción is off: nobody could be served.
                         Toggle::make('restrict_pos_to_checked_in')
                             ->label(__('Solo dispensar a socios que han entrado'))
-                            ->helperText(__('El dispensario solo acepta socios con la entrada registrada en recepción.')),
+                            ->disabled(fn (Get $get): bool => ! (bool) $get('reception_enabled'))
+                            ->helperText(fn (Get $get): string => (bool) $get('reception_enabled')
+                                ? __('El dispensario solo acepta socios con la entrada registrada en recepción.')
+                                : __('Requiere Recepción.')),
 
                         Toggle::make('camera_scan_enabled')
                             ->label(__('Escaneo con cámara'))
