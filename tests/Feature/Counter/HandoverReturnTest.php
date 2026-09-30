@@ -272,8 +272,8 @@ class HandoverReturnTest extends TestCase
             ->assertSet('altaApplicationId', null);
 
         // An own-org submitted application DOES open, with the applicant's name.
-        $own = MemberApplication::factory()->create([
-            'organisation_id' => $this->org->id, 'status' => ApplicationStatus::PENDING,
+        $own = MemberApplication::factory()->create([ // at this sede, as a real one is (329: a review opens only at its own sede)
+            'organisation_id' => $this->org->id, 'location_id' => $this->location->id, 'status' => ApplicationStatus::PENDING,
             'submitted_at' => now(), 'payload' => ['first_name' => 'Propia', 'last_name' => 'Socia'],
         ]);
         $ownReview = Livewire::actingAs($this->operator)->withQueryParams(['alta' => $own->id])->test(MembershipCounter::class)

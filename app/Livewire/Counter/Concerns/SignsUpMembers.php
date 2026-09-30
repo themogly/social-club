@@ -748,6 +748,16 @@ trait SignsUpMembers
             return;
         }
 
+        // Prompt 329 — now reachable from the search, the Socios card and `?solicitud=`: only a still-PENDING application
+        // of THIS sede opens (a crafted id for another sede, or one already decided, opens nothing). Not "submitted": the
+        // staff-typed and handover routes land on their own review, and approving an unsent invite is refused there.
+        if (! MemberApplication::query()->withoutGlobalScopes()->where('location_id', $this->locationId)
+            ->where('status', ApplicationStatus::PENDING->value)->whereKey($applicationId)->exists()) {
+            $this->flash(__('Esta solicitud ya no está pendiente en esta sede.'), 'error');
+
+            return;
+        }
+
         $this->altaApplicationId = $applicationId;
         $this->altaTierId = null;
         $this->altaDuplicateBlocked = false;

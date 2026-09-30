@@ -4,10 +4,14 @@ namespace App\Livewire\Counter\Concerns;
 
 use App\Actions\Members\ResolveMemberByToken;
 use App\Exceptions\ScanRateLimitedException;
+use App\Livewire\Counter\MembershipCounter;
+use App\Models\Location;
 use App\Models\Member;
+use App\Models\MemberApplication;
 use App\Support\Settings;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Str;
 
 /**
  * THE member lookup — one field, used by every counter screen that identifies a socio (prompt 194).
@@ -202,6 +206,97 @@ trait FindsMembers
             ->orderBy('last_name')
             ->limit(10)
             ->get();
+    }
+
+    /**
+     * Prompt 329 — this sede's applications awaiting review that match the search: staff couldn't find someone who had
+     * signed up ("Sin resultados"), because the search looked at members only. Same gates as the member search (an
+     * operator at the PIN, 2+ characters, not a scan being typed), and ONLY this sede and only awaiting review.
+     *
+     * Matched in PHP, ignoring case and accents, over the name, email, phone and the invite's reference: the details
+     * live in the application's JSON payload, which compares case-sensitively on MySQL, and a sede's pending list is
+     * small. Returns what the result row shows — the name and when it was sent — never the document or photo.
+     *
+     * @return list<array{id: string, name: string, sent: string}>
+     */
+    protected function lookupApplicants(): array
+    {
+        if (! $this->hasOperator() || $this->locationId === null) {
+            return [];
+        }
+
+        $term = trim($this->lookup);
+        if (mb_strlen($term) < 2 || (self::looksLikeAScan($term) && ! $this->lookupSearched)) {
+            return [];
+        }
+
+        $needle = Str::lower(Str::ascii($term));
+        $location = Location::query()->withoutGlobalScopes()->find($this->locationId);
+
+        return MemberApplication::query()->withoutGlobalScopes()->where('location_id', $this->locationId)->awaitingReview()
+            ->latest('submitted_at')->limit(200)->get()
+            ->filter(function (MemberApplication $application) use ($needle): bool {
+                $p = (array) $application->payload;
+                $haystack = implode(' ', array_filter([
+                    $p['first_name'] ?? null, $p['last_name'] ?? null, $p['email'] ?? null, $p['phone'] ?? null,
+                    $application->applicant_email, $application->applicant_reference,
+                ], fn (mixed $v): bool => is_string($v) && $v !== ''));
+
+                return str_contains(Str::lower(Str::ascii($haystack)), $needle);
+            })
+            ->take(10)
+            ->map(fn (MemberApplication $application): array => self::applicantRow($application, $location))->values()->all();
+    }
+
+    /** @return array{id: string, name: string, sent: string} */
+    private static function applicantRow(MemberApplication $application, ?Location $location): array
+    {
+        $p = (array) $application->payload;
+        $name = trim(trim((string) ($p['first_name'] ?? '')).' '.trim((string) ($p['last_name'] ?? '')));
+
+        return [
+            'id' => (string) $application->id,
+            'name' => $name !== '' ? $name : (string) ($application->applicant_email ?? __('Solicitud')),
+            'sent' => local_datetime($application->submitted_at, 'd/m H:i', $location),
+        ];
+    }
+
+    /** May the operator review applications (open one from the search, the Socios card or the hub)? */
+    public function canReviewApplications(): bool
+    {
+        return $this->hasOperator() && $this->userCan('applications.review');
+    }
+
+    /**
+     * Prompt 329 — an applicant tapped in the search (or the Socios card): the ONE review flow, on Socios. On Socios it
+     * opens there; elsewhere it goes to Socios with the application in the URL (`?solicitud=`). Only a reviewer, and only
+     * an application awaiting review at THIS sede — a crafted call with anything else opens nothing.
+     */
+    public function openApplication(string $applicationId): void
+    {
+        if (! $this->canReviewApplications()) {
+            $this->flash(__('No tienes permiso para revisar solicitudes.'), 'error');
+
+            return;
+        }
+
+        $application = MemberApplication::query()->withoutGlobalScopes()->where('location_id', $this->locationId)->awaitingReview()->find($applicationId);
+        if ($application === null) {
+            $this->flash(__('Esta solicitud ya no está pendiente en esta sede.'), 'error');
+
+            return;
+        }
+
+        if ($this instanceof MembershipCounter) { // Socios: open it here
+            $this->lookup = '';
+            $this->lookupSearched = false;
+            $this->reviewAltaApplication($application->id);
+            $this->altaOpen = true;
+
+            return;
+        }
+
+        $this->redirect(route('counter.members', ['solicitud' => $application->id]));
     }
 
     /**

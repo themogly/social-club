@@ -86,6 +86,12 @@
 
 
         <div data-member-column class="mt-5 min-w-0">
+        {{-- Prompt 329 — people who have signed up and are waiting, without anyone having to search for them. --}}
+        @if ($this->canReviewApplications() && ($pendingCount = $this->pendingAltaApplications()->count()) > 0)
+            <section data-socios-pending-applications class="mb-4 rounded-2xl border border-warning/30 bg-warning/10 p-4">
+                @include('livewire.counter.partials.alta-pending-list', ['pendingAction' => 'openApplication', 'pendingHeading' => __('Solicitudes pendientes (:count)', ['count' => $pendingCount])])
+            </section>
+        @endif
         @if ($worklist !== null)
             <div class="mb-4">
                 <section data-alert-worklist="{{ $alert }}" class="rounded-2xl border border-brand/30 bg-brand-tint p-4 dark:border-slate-700 dark:bg-slate-800">

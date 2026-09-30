@@ -32,6 +32,7 @@
     byte-identical to before.
 --}}
 @php($results = $this->lookupResults())
+@php($applicants = $results !== null ? $this->lookupApplicants() : [])
 
 <div
     x-data="{
@@ -153,13 +154,41 @@
                     </button>
                 </li>
             @empty
+                @if ($applicants === [])
                 {{-- An empty result is a search MISS, not a scan failure — nothing here has touched the
                      failed-scan throttle (prompt 58). Thirty of these in a shift lock nothing.
 
                      `role="presentation"` and a live region, not an option: there is nothing to select, and
                      a screen reader hears the miss instead of silently finding a one-item list (prompt 204). --}}
                 <li role="presentation" data-member-lookup-empty aria-live="polite" class="bg-surface px-4 py-3 text-sm text-ink-muted dark:bg-slate-900 dark:text-slate-400">{{ __('Sin resultados.') }}</li>
+                @endif
             @endforelse
+
+            {{-- Prompt 329 — this sede's applications awaiting review that match: the name, when it was sent, a badge.
+                 Never the document or the photo (those are inside the review). A reviewer opens the ONE review flow. --}}
+            @if ($applicants !== [])
+                <li role="presentation" data-lookup-applicants-heading class="bg-surface-alt px-4 py-2 text-xs font-semibold uppercase tracking-wide text-ink-muted dark:bg-slate-800 dark:text-slate-400">{{ __('Solicitudes pendientes') }}</li>
+                @foreach ($applicants as $applicant)
+                    <li role="presentation" wire:key="lookup-applicant-{{ $applicant['id'] }}">
+                        @if ($this->canReviewApplications())
+                            <button type="button" id="member-lookup-applicant-{{ $loop->index }}" role="option" aria-selected="false" tabindex="-1"
+                                    wire:click="openApplication('{{ $applicant['id'] }}')" data-member-lookup-result data-lookup-applicant
+                                    class="flex min-h-[2.75rem] w-full flex-wrap items-center justify-between gap-x-3 gap-y-1 bg-surface px-4 py-3 text-left transition hover:bg-surface-alt aria-selected:bg-brand-tint dark:bg-slate-900 dark:hover:bg-slate-800">
+                                <span class="font-medium">{{ $applicant['name'] }}</span>
+                                <span class="flex items-center gap-2 text-sm text-ink-muted dark:text-slate-400">
+                                    <span class="rounded-full bg-warning/15 px-2 py-0.5 text-xs font-semibold text-warning">{{ __('Pendiente de aprobar') }}</span>
+                                    {{ __('Enviada el :date', ['date' => $applicant['sent']]) }}
+                                </span>
+                            </button>
+                        @else
+                            <div data-lookup-applicant class="flex min-h-[2.75rem] flex-wrap items-center justify-between gap-x-3 gap-y-1 bg-surface px-4 py-3 dark:bg-slate-900">
+                                <span class="font-medium">{{ $applicant['name'] }}</span>
+                                <span class="text-sm text-warning">{{ __('Solicitud pendiente — pide a un responsable que la apruebe') }}</span>
+                            </div>
+                        @endif
+                    </li>
+                @endforeach
+            @endif
         @endif
     </ul>
 </div>
