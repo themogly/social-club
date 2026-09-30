@@ -179,7 +179,7 @@ class PriceAdjustmentAndManagerReasonsTest extends TestCase
     {
         foreach ([ManagerApproval::reason(), ''] as $reason) {
             $manager = $this->person(Role::MANAGER);
-            $pos = $this->twentyEuroBasket($manager)->assertSee(__('Motivo del ajuste (opcional)'))->assertSeeHtml('data-reason-optional="true"');
+            $pos = $this->twentyEuroBasket($manager)->assertSeeHtml('<span class="font-normal">'.e(__('(opcional)')).'</span>')->assertSeeHtml('data-reason-optional="true"');
             $pos->set('priceOverrideEuros', '15')->set('priceOverrideReason', $reason)->call('quickCash')->call('commitDispensation');
 
             $d = Dispensation::query()->latest('dispensed_at')->latest('id')->first();
@@ -211,7 +211,7 @@ class PriceAdjustmentAndManagerReasonsTest extends TestCase
         $this->setRolePermission(Role::STAFF, 'dispensation.price.override', true);
         $staff = $this->person(Role::STAFF);
 
-        $this->twentyEuroBasket($staff)->assertSee(__('Motivo del ajuste'))->assertDontSee(__('Motivo del ajuste (opcional)'))
+        $this->twentyEuroBasket($staff)->assertSeeHtml('data-reason-optional="false"')->assertDontSeeHtml('<span class="font-normal">'.e(__('(opcional)')).'</span>')
             ->set('priceOverrideEuros', '15')->call('quickCash')->call('commitDispensation')
             ->assertSet('flashMessage', __('Indica el motivo del ajuste de precio (queda registrado).'));
         $this->assertSame(0, Dispensation::query()->count());

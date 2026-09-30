@@ -18281,3 +18281,33 @@ one tap away after every bar sale.
   - back at Central with no question; its till still open, and closed normally through the day's flower recount (318)
     and the blind count;
   - no page errors.
+
+## Prompt 336 — *Ajustar precio*: the two fields use the full width of the basket column
+
+- **Why:** Ben's photo from the tablet: the reason field showed "Manager apı" (333's "Aprobado por responsable", cut off),
+  with its label wrapping onto three lines. "Make the field bigger."
+- **Cause:** the two fields sat in `grid sm:grid-cols-2`. `sm:` is a **viewport** breakpoint (640 px and up), but they
+  live in the ~300 px basket column, so each got ~120 px. Measured: the text needed 226 px in a 116 px field.
+- **Fix:**
+  - The fields are **stacked**, each the column's full width (244 px at 820×1180, 276 px at 1180×820): *Nuevo total (€)*
+    first, the reason under it.
+  - No viewport breakpoint and no container query: stacking is the simple, preferred choice, and the column is never
+    wide enough for two useful fields side by side.
+  - The label is now **Motivo**, with a small "(opcional)" suffix only when 333's `reasons.optional` applies.
+  - Both inputs were already 44 px and 16 px; measured and pinned in the browser.
+- **The other basket-column blocks checked:**
+  - Measured: no button in the column clips its label at either size or in either language.
+  - The two-column rows there are short button pairs: *Efectivo/Monedero* and *Cobrar cuota/Condonar* in the inline fee,
+    *Seguir cobrando/Descartar* on the member card, and *Cancelar/Anular* in the last-sale void sheet. They fit and stay
+    as they are.
+  - The limit override (265) is a full-width textarea.
+  - The quick-cash row is four short buttons.
+  - 331's manual line is a modal, not inline.
+  - The inline fee's amount input was 14 px, which makes iOS zoom on focus. It's now 16 px (`text-base`).
+- **Tests:**
+  - `tests/Browser/prove-336-price-adjust-fields.mjs`, a freshly seeded demo DB, as the manager, 20/20 PASS:
+    - at 820×1180 and 1180×820, in Spanish and English: the reason reads «Aprobado por responsable» / «Manager approved»
+      in full (scrollWidth = clientWidth), both inputs 44 px and 16 px, stacked at the same width, and no clipped button;
+    - 333's pin: adjusted to 5 with Enter, the button and *Justo* / *Exact* follow;
+    - red before the change on every layout check (for example 226/116 px, and 118 px per field).
+  - `PriceAdjustmentAndManagerReasonsTest` follows the shorter label ("(opcional)" for a holder, none for staff).
