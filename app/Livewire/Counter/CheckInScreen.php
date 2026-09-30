@@ -24,7 +24,6 @@ use App\Models\User;
 use App\Support\BusinessDay;
 use App\Support\CounterOperator;
 use App\Support\Money;
-use App\Support\Settings;
 use App\Support\VaultUrl;
 use App\Support\Wallet;
 use App\Support\Weight;
@@ -316,7 +315,6 @@ class CheckInScreen extends Component
             'walletCents' => $walletCents,
             'photoUrl' => $member !== null ? $this->photoUrl($member) : null,
             'canOverride' => $this->userCan('checkin.override'),
-            'cameraScanEnabled' => (bool) Settings::get('camera_scan_enabled', false),
             // Inline fee (prompt 127): the action follows the unpaid-fee verdict. Owed>0 iff the door flags it.
             'canCollectFee' => $this->userCan('membership.fee.collect'),
             'feeOwedCents' => $membership !== null ? $this->owedCents($membership) : 0,

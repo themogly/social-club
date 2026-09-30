@@ -41,7 +41,7 @@
              question) and, when this sede scans by camera, the next card here. Their own row, so the name and the
              number always read in full in the narrow cart column (measured at 820×1180). --}}
         <div class="mt-2 flex items-center justify-end gap-1">
-            @if ($cameraScanEnabled ?? false)
+            @if ($this->cameraScanEnabled())
                 <x-counter.camera-scan compact :label="__('Escanear otro socio')" data-member-rescan="" />
             @endif
             <button
