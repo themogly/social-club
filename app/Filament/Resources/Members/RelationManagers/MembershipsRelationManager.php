@@ -23,6 +23,7 @@ use App\Models\Scopes\LocationScope;
 use App\Models\TillSession;
 use App\Models\User;
 use App\Support\FeeWaiverReasons;
+use App\Support\ManagerApproval;
 use App\Support\MembershipCorrections;
 use App\Support\Money;
 use App\Support\NumberFormat;
@@ -370,13 +371,14 @@ class MembershipsRelationManager extends RelationManager
             ->visible(fn (Membership $record): bool => $record->owedCents() > 0 && self::correctable($record, 'membership.fee.waive'))
             ->schema([
                 Select::make('waive_reason')->label(__('Motivo'))->required()->live()
-                    ->options(fn (Membership $record): array => collect(FeeWaiverReasons::options($record->member, $record->location))->pluck('label', 'value')->all()),
+                    ->options(fn (Membership $record): array => collect(FeeWaiverReasons::options($record->member, $record->location, ManagerApproval::allows(Auth::user())))->pluck('label', 'value')->all())
+                    ->default(fn (): ?string => ManagerApproval::allows(Auth::user()) ? 'MANAGER_APPROVED' : null), // prompt 333
                 TextInput::make('waive_reason_text')->label(__('Explica el motivo'))->maxLength(255)
                     ->visible(fn (Get $get): bool => $get('waive_reason') === 'OTHER')
                     ->required(fn (Get $get): bool => $get('waive_reason') === 'OTHER'),
             ])
             ->action(function (Membership $record, array $data): void {
-                $reason = FeeWaiverReasons::resolve(FeeWaiverReasons::options($record->member, $record->location), (string) $data['waive_reason'], (string) ($data['waive_reason_text'] ?? ''));
+                $reason = FeeWaiverReasons::resolve(FeeWaiverReasons::options($record->member, $record->location, ManagerApproval::allows(Auth::user())), (string) $data['waive_reason'], (string) ($data['waive_reason_text'] ?? ''));
                 if ($reason === null) {
                     self::refuse(new DomainException(__('Indica el motivo de la condonación.')));
                 }

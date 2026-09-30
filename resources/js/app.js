@@ -124,6 +124,24 @@ window.dispensaryPadMath = {
     },
 };
 
+// Prompt 333 — a strain tap brings the weight entry into view: scrolled to the top of its scrolling pane (the selection
+// pane at md+, the page below it) ONLY when it is not already fully visible, smoothly unless the operator asked for
+// reduced motion, and focused so the physical keyboard (292) types into the pad at once. No request: the panel mounts
+// with the render `chooseGenetic` already makes.
+window.bringIntoView = (el) => {
+    if (! el) return;
+    const pane = el.closest('[data-selection-pane]');
+    const box = el.getBoundingClientRect();
+    const frame = pane && pane.scrollHeight > pane.clientHeight ? pane.getBoundingClientRect() : { top: 0, bottom: window.innerHeight };
+    const top = Math.max(frame.top, 0);
+    const bottom = Math.min(frame.bottom, window.innerHeight);
+    if (box.top < top || box.bottom > bottom) {
+        const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+        el.scrollIntoView({ behavior: reduced ? 'auto' : 'smooth', block: 'start' });
+    }
+    el.focus({ preventScroll: true });
+};
+
 window.dispensaryPad = (config = {}) => ({
     value: config.value ?? '',
     calc: !! config.calc && !! config.calcEnabled,

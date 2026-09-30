@@ -162,7 +162,12 @@
                              })"
                              @keydown.window="onKey($event)"
                              @counter-card-scan.window="undoSince($event.detail.startedAt)"
-                             class="rounded-2xl border border-brand/40 bg-brand-tint/40 p-4 dark:border-brand/40 dark:bg-slate-900">
+                             {{-- Prompt 333 — a strain tap brings the pad into view and focus (window.bringIntoView): on
+                                  mount (a new strain) and on `weight-entry-opened` (the same strain tapped again). --}}
+                             data-weight-entry tabindex="-1"
+                             x-init="$nextTick(() => window.bringIntoView($el))"
+                             x-on:weight-entry-opened.window="$nextTick(() => window.bringIntoView($el))"
+                             class="scroll-mt-2 rounded-2xl border border-brand/40 bg-brand-tint/40 p-4 focus:outline-none dark:border-brand/40 dark:bg-slate-900">
                         <div class="flex items-start justify-between gap-3">
                             <div>
                                 <div class="flex flex-wrap items-center gap-2">
@@ -857,7 +862,7 @@
                         <div x-data="{ open: false }" class="mt-3">
                             <button
                                 type="button"
-                                x-on:click="open = ! open"
+                                x-on:click="open = ! open; @if ($reasonOptional) if (open && ! $wire.priceOverrideReason) $wire.priceOverrideReason = @js(\App\Support\ManagerApproval::reason()) @endif"
                                 x-bind:aria-expanded="open ? 'true' : 'false'"
                                 data-price-override-toggle
                                 class="inline-flex min-h-11 w-full items-center justify-between gap-2 rounded-xl border border-line px-4 text-sm font-medium text-ink-muted transition hover:bg-surface-alt dark:border-slate-700 dark:text-slate-400 dark:hover:bg-slate-800"
@@ -873,11 +878,18 @@
                             <div class="mt-1 grid gap-2 sm:grid-cols-2">
                                 <div>
                                 <label for="price-override-amount" class="block text-xs font-medium text-ink-muted dark:text-slate-400">{{ __('Nuevo total (€)') }}</label>
-                                <input id="price-override-amount" type="text" inputmode="decimal" wire:model.blur="priceOverrideEuros" autocomplete="off" class="mt-1 h-11 w-full rounded-xl border border-line bg-surface px-3 text-base text-ink placeholder:text-ink-muted focus:border-warning focus:outline-none focus:ring-2 focus:ring-warning/40 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100">
+                                <input id="price-override-amount" type="text" inputmode="decimal" wire:model.live.blur.enter="priceOverrideEuros" autocomplete="off" class="mt-1 h-11 w-full rounded-xl border border-line bg-surface px-3 text-base text-ink placeholder:text-ink-muted focus:border-warning focus:outline-none focus:ring-2 focus:ring-warning/40 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100">
+                                {{-- Prompt 333 — `.live.blur.enter`, not `.blur`: in Livewire 4 a modifier BEFORE `.live` only syncs
+                                     in the browser, so `.blur` sent nothing and the button, the header and "Falta" kept the old
+                                     total until the next tap (Ben: "it doesn't update the total at the bottom"). Now blur or Enter
+                                     re-renders them; the field says when the figure is not taken. --}}
+                                @if ($priceOverrideNotice)
+                                    <p data-price-override-notice role="alert" class="mt-1 text-xs font-medium text-warning">{{ $priceOverrideNotice }}</p>
+                                @endif
                                 </div>
                                 <div>
-                                <label for="price-override-reason" class="block text-xs font-medium text-ink-muted dark:text-slate-400">{{ __('Motivo del ajuste') }}</label>
-                                <input id="price-override-reason" type="text" wire:model.blur="priceOverrideReason" autocomplete="off" placeholder="{{ __('Motivo (p. ej. producto defectuoso)') }}" class="mt-1 h-11 w-full rounded-xl border border-line bg-surface px-3 text-base text-ink placeholder:text-ink-muted focus:border-warning focus:outline-none focus:ring-2 focus:ring-warning/40 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100">
+                                <label for="price-override-reason" class="block text-xs font-medium text-ink-muted dark:text-slate-400">{{ $reasonOptional ? __('Motivo del ajuste (opcional)') : __('Motivo del ajuste') }}</label>
+                                <input id="price-override-reason" type="text" wire:model.blur="priceOverrideReason" data-reason-optional="{{ $reasonOptional ? 'true' : 'false' }}" autocomplete="off" placeholder="{{ $reasonOptional ? \App\Support\ManagerApproval::reason() : __('Motivo (p. ej. producto defectuoso)') }}" class="mt-1 h-11 w-full rounded-xl border border-line bg-surface px-3 text-base text-ink placeholder:text-ink-muted focus:border-warning focus:outline-none focus:ring-2 focus:ring-warning/40 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100">
                                 </div>
                             </div>
                             <p class="mt-1 text-[11px] text-ink-muted dark:text-slate-400">{{ __('Deja el importe vacío para cobrar el precio normal. 0 € = gratis.') }}</p>

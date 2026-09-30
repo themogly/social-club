@@ -8,6 +8,8 @@ use App\Enums\FeePaymentMethod;
 use App\Enums\WalletTransactionType;
 use App\Models\Membership;
 use App\Models\MembershipFeePayment;
+use App\Models\User;
+use App\Support\ManagerApproval;
 use Illuminate\Support\Facades\Auth;
 use InvalidArgumentException;
 
@@ -77,6 +79,8 @@ class RecordFeePayment
                 'amount_cents' => $amountCents,
                 'reason' => $reason,
                 'operator_id' => $operatorId,
+                // Prompt 333 — the reason was the manager's approval, not typed: say which permission allowed it.
+                ...(ManagerApproval::applies($operatorId !== null ? User::query()->find($operatorId) : null, $reason) ? [ManagerApproval::AUDIT_KEY => ManagerApproval::PERMISSION] : []),
             ]);
         }
 
