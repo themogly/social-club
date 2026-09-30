@@ -2,12 +2,15 @@
 
 namespace App\Filament\Resources\Minutes\Pages;
 
+use App\Filament\Concerns\ReturnsToList;
 use App\Filament\Resources\Minutes\MinuteResource;
 use Filament\Actions\EditAction;
 use Filament\Resources\Pages\ViewRecord;
 
 class ViewMinute extends ViewRecord
 {
+    use ReturnsToList;
+
     protected static string $resource = MinuteResource::class;
 
     protected function getHeaderActions(): array

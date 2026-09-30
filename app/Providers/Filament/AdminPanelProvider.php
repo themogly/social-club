@@ -45,6 +45,8 @@ class AdminPanelProvider extends PanelProvider
         return $panel
             ->default()
             ->id('admin')
+            // Prompt 334 — a dirty create/edit form asks before the «← list» link (or anything else) leaves it.
+            ->unsavedChangesAlerts()
             ->path('')
             ->viteTheme('resources/css/filament/admin/theme.css')
             ->brandName(config('app.name'))

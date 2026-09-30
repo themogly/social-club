@@ -3,6 +3,7 @@
 namespace App\Filament\Resources\Batches\Pages;
 
 use App\Actions\Stock\RenameBatchLote;
+use App\Filament\Concerns\ReturnsToList;
 use App\Filament\Resources\Batches\BatchActions;
 use App\Filament\Resources\Batches\BatchResource;
 use App\Models\Batch;
@@ -25,6 +26,8 @@ use Illuminate\Database\Eloquent\Model;
  */
 class EditBatch extends EditRecord
 {
+    use ReturnsToList;
+
     protected static string $resource = BatchResource::class;
 
     protected function getHeaderActions(): array

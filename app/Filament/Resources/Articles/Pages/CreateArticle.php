@@ -3,6 +3,7 @@
 namespace App\Filament\Resources\Articles\Pages;
 
 use App\Actions\Stock\IntakeArticleAtLocations;
+use App\Filament\Concerns\ReturnsToList;
 use App\Filament\Resources\Articles\ArticleResource;
 use App\Filament\Support\AllOption;
 use DomainException;
@@ -13,6 +14,8 @@ use Illuminate\Validation\ValidationException;
 
 class CreateArticle extends CreateRecord
 {
+    use ReturnsToList;
+
     protected static string $resource = ArticleResource::class;
 
     /**
@@ -70,11 +73,5 @@ class CreateArticle extends CreateRecord
     protected function getCreatedNotificationTitle(): ?string
     {
         return $this->createdAt > 1 ? __('Producto creado en :count sedes', ['count' => $this->createdAt]) : parent::getCreatedNotificationTitle();
-    }
-
-    /** Back to the list (prompt 295, Shane's note on the catalogue's create pages). */
-    protected function getRedirectUrl(): string
-    {
-        return $this->getResource()::getUrl('index');
     }
 }

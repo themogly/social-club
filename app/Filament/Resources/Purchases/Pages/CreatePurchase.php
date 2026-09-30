@@ -3,6 +3,7 @@
 namespace App\Filament\Resources\Purchases\Pages;
 
 use App\Actions\Purchases\RecordPurchase;
+use App\Filament\Concerns\ReturnsToList;
 use App\Filament\Resources\Purchases\PurchaseResource;
 use App\Models\Supplier;
 use App\Support\Money;
@@ -11,6 +12,8 @@ use Illuminate\Database\Eloquent\Model;
 
 class CreatePurchase extends CreateRecord
 {
+    use ReturnsToList;
+
     protected static string $resource = PurchaseResource::class;
 
     /**

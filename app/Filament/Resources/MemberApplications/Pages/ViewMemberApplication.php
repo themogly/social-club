@@ -2,12 +2,15 @@
 
 namespace App\Filament\Resources\MemberApplications\Pages;
 
+use App\Filament\Concerns\ReturnsToList;
 use App\Filament\Resources\MemberApplications\MemberApplicationResource;
 use Filament\Actions\EditAction;
 use Filament\Resources\Pages\ViewRecord;
 
 class ViewMemberApplication extends ViewRecord
 {
+    use ReturnsToList;
+
     protected static string $resource = MemberApplicationResource::class;
 
     protected function getHeaderActions(): array

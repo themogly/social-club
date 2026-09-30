@@ -18179,3 +18179,59 @@ one tap away after every bar sale.
     written for.
   - `TheColumnSaysWhatTheScreenDoesNotTest`'s pre-selection for a manager is now `MANAGER_APPROVED`, as this prompt asks.
     The therapeutic reason is still asserted as offered.
+
+## Prompt 334 — saving an edit goes back to the list, and every record page has a way back to it
+
+- **Why:** Ben: "When you edit, like a tier or something, it stays on the edit page. There should be a link to view all,
+  and it should be on all pages."
+- **One concern, every record page:** `App\Filament\Concerns\ReturnsToList`, used by all 47 create, edit and view pages
+  under `app/Filament/Resources`. There are no per-page copies: the five pages that already returned to the list by hand
+  (`CreateArticle`, `CreateBatch`, `CreateExpense`, `CreateGenetic`, `EditDocumentTemplate`) lost their own
+  `getRedirectUrl()`.
+  - **Saving returns to the list**, after an edit and after a create, with Filament's own notification.
+    - *Crear y crear otro* still stays on a blank form.
+    - The list keeps its saved filters and sort: 308's `persistFiltersInSession`, pinned with *Existencias: Todos* on
+      batches surviving an edit and a save.
+  - **The hubs** are detected, not listed: an edit page whose resource has relation managers. Today that's
+    `EditMember`, `EditGenetic`, `EditConvocatoria` and `EditEvent`; `MessageThreadResource` has a view page only.
+    - They also get **Guardar y seguir editando**, which runs the same save and stays, so the memberships, discounts,
+      prices or invitees below are one step away.
+    - Filament's form actions are composed from its own named builders (`getSaveFormAction`, `getCreateFormAction`,
+      `getCreateAnotherFormAction`, `getCancelFormAction`). A view page has none, so the concern calls no `parent::`
+      that isn't there.
+  - **The way back:** a header action, **first** whatever the page declares (the concern extends
+    `cacheInteractsWithHeaderActions`).
+    - It is secondary, with the ← icon and the list's own name (Filament's title-case plural: "Tarifas", "Lotes",
+      "Socios", "Productos").
+    - It is `Size::Large` at `min-h-11` (measured 44 px), goes to the list's URL (which restores the saved filters), and
+      is shown only to someone who may see the list.
+  - **Unsaved changes:** the panel now has `unsavedChangesAlerts()`. A dirty create or edit form makes the browser ask
+    before leaving by any link, including this one. Checked in the browser: staying keeps the form.
+    - Browser scripts that navigate away from a dirty panel form now meet that prompt; the counter is not a Filament
+      page and is unaffected.
+- **Exceptions kept:**
+  - `CreateMinute` keeps its own target: a new acta opens on its view page to be completed and signed.
+  - 320's `CreateGenetic` still lands on the list with the *Crear lote* hand-off in its notification (pinned).
+  - A page that declares `getRedirectUrl()` wins over the concern.
+- **Custom pages:** *Inventario* (318) and *Registro de jornada* are top-level menu pages, not sub-pages opened from a
+  list, so they have no list to go back to. The menu is their way around; unchanged.
+- **The guard:** `ReturnsToListTest` walks `app/Filament/Resources/*/Pages/{Create,Edit,View}*` and refuses any page
+  without the concern. A planted edit page without it is caught.
+- **Tests:** `tests/Feature/Filament/ReturnsToListTest.php` (7), all but the pin red first:
+  - saving a tier, a batch, a product, a user or a sede returns to its list with the notification;
+  - create → list, and *Crear y crear otro* stays blank;
+  - the member hub: *Guardar* → the list, *Guardar y seguir editando* stays; a tier has no second button;
+  - the back link: first, labelled, linked, 44 px, and the panel's unsaved-changes alerts on;
+  - the batches filter survives;
+  - the deliberate redirects (pin);
+  - the guard with its planted page.
+- **Verified in a browser** (`tests/Browser/prove-334-back-to-list.mjs`, a freshly seeded demo DB, as the owner), 11/11
+  PASS at 1440×900 and 820×1180:
+  - «← Tarifas» at 44 px;
+  - a tier's *Guardar cambios* → `/membership-tiers`;
+  - «← Lotes» → `/batches`;
+  - a member's *Guardar y seguir editando* stays, and at 1440 a discount is assigned from the *Descuentos* tab right
+    after;
+  - a product with a changed name: «← Productos» brings the browser's leave-page prompt, and staying keeps the form.
+- **One existing test followed the new rule:** `BatchNamesTest` checked the renamed title on the page it stayed on after
+  saving. It now asserts the save returns to the batches list, and checks the title on a fresh render of the edit page.

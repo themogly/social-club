@@ -2,12 +2,15 @@
 
 namespace App\Filament\Resources\DocumentTemplates\Pages;
 
+use App\Filament\Concerns\ReturnsToList;
 use App\Filament\Resources\DocumentTemplates\DocumentTemplateResource;
 use Filament\Resources\Pages\CreateRecord;
 use Illuminate\Database\Eloquent\Model;
 
 class CreateDocumentTemplate extends CreateRecord
 {
+    use ReturnsToList;
+
     protected static string $resource = DocumentTemplateResource::class;
 
     /**

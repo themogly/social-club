@@ -5,6 +5,7 @@ namespace App\Filament\Resources\Users\Pages;
 use App\Actions\RecordAuditLog;
 use App\Actions\Users\EnsureRoleChangeIsAllowed;
 use App\Actions\Users\TestUserPin;
+use App\Filament\Concerns\ReturnsToList;
 use App\Filament\Forms\PinInput;
 use App\Filament\Resources\Users\UserResource;
 use App\Models\User;
@@ -19,6 +20,8 @@ use Illuminate\Support\Facades\Auth;
 
 class EditUser extends EditRecord
 {
+    use ReturnsToList;
+
     protected static string $resource = UserResource::class;
 
     /** @var list<string> the staff user's roles before the save */

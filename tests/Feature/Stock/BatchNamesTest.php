@@ -10,6 +10,7 @@ use App\Enums\LocationKind;
 use App\Enums\MembershipStatus;
 use App\Enums\Role;
 use App\Filament\Pages\RegistroDispensacion;
+use App\Filament\Resources\Batches\BatchResource;
 use App\Filament\Resources\Batches\Pages\CreateBatch;
 use App\Filament\Resources\Batches\Pages\EditBatch;
 use App\Filament\Resources\Batches\Pages\ListBatches;
@@ -152,6 +153,8 @@ class BatchNamesTest extends TestCase
             ->call('save')
             ->assertHasNoFormErrors()
             ->assertNotified()
+            ->assertRedirect(BatchResource::getUrl('index')); // prompt 334 — saving returns to the list
+        Livewire::test(EditBatch::class, ['record' => $child->getRouteKey()])
             ->assertSee('Amnesia · Cosecha verano 2026'); // the page is titled by the display name (strain first, 298)
 
         $this->assertSame('Cosecha verano 2026', $source->fresh()->label);

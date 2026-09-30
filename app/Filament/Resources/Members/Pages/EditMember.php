@@ -4,6 +4,7 @@ namespace App\Filament\Resources\Members\Pages;
 
 use App\Actions\Members\SyncMemberScanDocuments;
 use App\Filament\Concerns\AuditsResourceChanges;
+use App\Filament\Concerns\ReturnsToList;
 use App\Filament\Resources\Members\MemberResource;
 use App\Models\Member;
 use App\Models\User;
@@ -16,6 +17,7 @@ use Illuminate\Support\Facades\Auth;
 class EditMember extends EditRecord
 {
     use AuditsResourceChanges;
+    use ReturnsToList;
 
     protected static string $resource = MemberResource::class;
 

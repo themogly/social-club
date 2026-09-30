@@ -2,12 +2,15 @@
 
 namespace App\Filament\Resources\Discounts\Pages;
 
+use App\Filament\Concerns\ReturnsToList;
 use App\Filament\Resources\Discounts\DiscountResource;
 use App\Filament\Resources\Discounts\Schemas\DiscountForm;
 use Filament\Resources\Pages\CreateRecord;
 
 class CreateDiscount extends CreateRecord
 {
+    use ReturnsToList;
+
     protected static string $resource = DiscountResource::class;
 
     /**

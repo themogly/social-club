@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\DocumentTemplates\Pages;
 
+use App\Filament\Concerns\ReturnsToList;
 use App\Filament\Resources\DocumentTemplates\DocumentTemplateResource;
 use App\Models\DocumentTemplate;
 use Filament\Actions\DeleteAction;
@@ -14,6 +15,8 @@ use Illuminate\Database\Eloquent\Model;
  */
 class EditDocumentTemplate extends EditRecord
 {
+    use ReturnsToList;
+
     protected static string $resource = DocumentTemplateResource::class;
 
     protected function getHeaderActions(): array
@@ -34,10 +37,5 @@ class EditDocumentTemplate extends EditRecord
             (string) ($data['body'] ?? ''),
             (bool) ($data['active'] ?? true),
         );
-    }
-
-    protected function getRedirectUrl(): string
-    {
-        return $this->getResource()::getUrl('index');
     }
 }

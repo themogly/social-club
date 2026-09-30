@@ -2,12 +2,15 @@
 
 namespace App\Filament\Resources\BreachLogs\Pages;
 
+use App\Filament\Concerns\ReturnsToList;
 use App\Filament\Resources\BreachLogs\BreachLogResource;
 use App\Support\ActiveScope;
 use Filament\Resources\Pages\CreateRecord;
 
 class CreateBreachLog extends CreateRecord
 {
+    use ReturnsToList;
+
     protected static string $resource = BreachLogResource::class;
 
     /** Stamp the active organisation (this model carries no auto-fill scope trait). */

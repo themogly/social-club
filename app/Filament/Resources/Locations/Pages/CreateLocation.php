@@ -3,6 +3,7 @@
 namespace App\Filament\Resources\Locations\Pages;
 
 use App\Enums\SettingType;
+use App\Filament\Concerns\ReturnsToList;
 use App\Filament\Resources\Locations\LocationResource;
 use App\Filament\Resources\Locations\Schemas\LocationForm;
 use App\Support\Settings;
@@ -10,6 +11,8 @@ use Filament\Resources\Pages\CreateRecord;
 
 class CreateLocation extends CreateRecord
 {
+    use ReturnsToList;
+
     protected static string $resource = LocationResource::class;
 
     /** @var array<string, bool> the per-location toggles, stashed until the record exists */

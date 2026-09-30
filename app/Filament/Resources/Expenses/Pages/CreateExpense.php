@@ -4,6 +4,7 @@ namespace App\Filament\Resources\Expenses\Pages;
 
 use App\Actions\Expenses\RecordOverhead;
 use App\Enums\ExpensePaidFrom;
+use App\Filament\Concerns\ReturnsToList;
 use App\Filament\Resources\Expenses\ExpenseResource;
 use App\Models\ExpenseCategory;
 use App\Models\Organisation;
@@ -16,6 +17,8 @@ use Illuminate\Support\Facades\Auth;
 
 class CreateExpense extends CreateRecord
 {
+    use ReturnsToList;
+
     protected static string $resource = ExpenseResource::class;
 
     /**
@@ -59,11 +62,5 @@ class CreateExpense extends CreateRecord
             $actor,
             $options,
         );
-    }
-
-    /** A recurring template is not a concrete outgoing (excluded from the list) — land on the index. */
-    protected function getRedirectUrl(): string
-    {
-        return $this->getResource()::getUrl('index');
     }
 }
