@@ -13,6 +13,7 @@ use App\Models\TillSession;
 use App\Models\User;
 use App\Support\CounterOperator;
 use App\Support\FeeWaiverReasons;
+use App\Support\ManagerApproval;
 use App\Support\Money;
 
 /**
@@ -49,7 +50,7 @@ trait CollectsMembershipFees
      */
     public bool $waiveOpen = false;
 
-    /** `THERAPEUTIC` · `OTHER_SEDE` · `OTHER` — see {@see self::waiveReasonOptions()}. */
+    /** `MANAGER_APPROVED` (333) · `THERAPEUTIC` · `OTHER_SEDE` · `OTHER` — see {@see self::waiveReasonOptions()}. */
     public string $waiveReason = '';
 
     public string $waiveReasonText = '';
@@ -270,7 +271,9 @@ trait CollectsMembershipFees
     {
         $subjectId = $this->feeSubjectId();
 
-        return FeeWaiverReasons::options($subjectId !== null ? Member::query()->find($subjectId) : null, $this->resolveLocation());
+        // Prompt 333 — "Aprobado por responsable" first, for the PIN operator who may approve without a reason.
+        return FeeWaiverReasons::options($subjectId !== null ? Member::query()->find($subjectId) : null, $this->resolveLocation(),
+            ManagerApproval::allows(CounterOperator::current()));
     }
 
     /** Open the waiver, pre-selecting the record-backed reason when there is exactly one obvious candidate. */

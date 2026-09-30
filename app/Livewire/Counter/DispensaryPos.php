@@ -53,6 +53,7 @@ use App\Support\CounterOperator;
 use App\Support\DocumentVault;
 use App\Support\EligibilityVerdict;
 use App\Support\LimitSnapshot;
+use App\Support\ManagerApproval;
 use App\Support\Money;
 use App\Support\PriceResult;
 use App\Support\Settings;
@@ -410,6 +411,9 @@ class DispensaryPos extends Component
         $this->activeBatchId = ($location !== null && $genetic !== null && ! $this->automaticBatches())
             ? (new SelectBatch)->fefo($genetic, $location)?->id
             : null;
+
+        // Prompt 333 — the pad comes into view (client-side, window.bringIntoView), also for the same strain tapped again.
+        $this->dispatch('weight-entry-opened');
     }
 
     /**
@@ -917,17 +921,20 @@ class DispensaryPos extends Component
                 return;
             }
 
+            // Prompt 333 — a holder of `reasons.optional` (a manager, by default) may leave it: the reason stored is
+            // "Aprobado por responsable", and the dispensation and the audit still name them. Everyone else types one.
             if (trim($this->priceOverrideReason) === '') {
-                $this->flash(__('Indica el motivo del ajuste de precio (queda registrado).'), 'error');
+                if (! ManagerApproval::allows($user)) {
+                    $this->flash(__('Indica el motivo del ajuste de precio (queda registrado).'), 'error');
 
-                return;
+                    return;
+                }
+                $this->priceOverrideReason = ManagerApproval::reason();
             }
 
-            // Parse through the shared validating helper: a non-numeric entry returns null and is REJECTED,
-            // never silently coerced to 0 (which, permission + reason aside, would be a free dispensation).
-            $entered = $this->parseCents($this->priceOverrideEuros);
-
-            if ($entered === null) {
+            // Parse through the shared validating helper: a non-numeric entry is REJECTED, never silently coerced to
+            // 0 (which, permission + reason aside, would be a free dispensation). The same check the screen shows (333).
+            if ($this->priceOverrideEntered() === null) {
                 $this->flash(__('El precio ajustado no es válido.'), 'error');
 
                 return;
@@ -1465,7 +1472,8 @@ class DispensaryPos extends Component
         }
 
         $basketLines = $this->basketView($member, $location);
-        $total = $this->chargeableCents((int) array_sum(array_map(fn (array $l): int => (int) $l['total_cents'], $basketLines)));
+        $resolvedTotal = (int) array_sum(array_map(fn (array $l): int => (int) $l['total_cents'], $basketLines));
+        $total = $this->chargeableCents($resolvedTotal);
 
         // The tender preview is split over the COMBINED total (prompt 224). It used to split the dispensation
         // total alone while the combined settle split dispensation + bar, so with a bar line present the
@@ -1493,6 +1501,8 @@ class DispensaryPos extends Component
             'activeEntryGramsCg' => $this->activeEntryGramsCg(),
             'basketLines' => $basketLines,
             'basketTotalCents' => $total,
+            'priceOverrideNotice' => $this->priceOverrideNotice($resolvedTotal), // prompt 333
+            'reasonOptional' => ManagerApproval::allows(CounterOperator::current()), // prompt 333 — "Aprobado por responsable"
             'visitTotalCents' => $total + $barTotal, // prompt 263 — the ONE figure on the header, the tender and the button
             'cashPreviewCents' => $cashPreview,
             'walletPreviewCents' => $walletPreview,
@@ -1774,9 +1784,34 @@ class DispensaryPos extends Component
             return $resolvedTotal;
         }
 
-        $entered = $this->parseCents($this->priceOverrideEuros);
+        $entered = $this->priceOverrideEntered();
 
         return $entered === null ? $resolvedTotal : max(0, min($entered, $resolvedTotal));
+    }
+
+    /** The typed adjustment in cents, or null when blank or unparseable — the ONE reading of the field (333). */
+    private function priceOverrideEntered(): ?int
+    {
+        return trim($this->priceOverrideEuros) === '' ? null : $this->parseCents($this->priceOverrideEuros);
+    }
+
+    /**
+     * Prompt 333 — what the adjustment field says about itself, shown under it: an unparseable entry (the commit refuses
+     * it), or one above the resolved total (the adjustment only lowers, so the normal price stands). The totals meanwhile
+     * stay at the resolved figure, through {@see chargeableCents()}.
+     */
+    private function priceOverrideNotice(int $resolvedTotal): ?string
+    {
+        if (trim($this->priceOverrideEuros) === '') {
+            return null;
+        }
+        $entered = $this->priceOverrideEntered();
+
+        return match (true) {
+            $entered === null => __('El precio ajustado no es válido.'),
+            $entered > $resolvedTotal => __('El ajuste solo puede bajar el total: se cobra el precio normal.'),
+            default => null,
+        };
     }
 
     /** The live visit total the shared HandlesTender model splits/tenders against — price-override-aware (271). */

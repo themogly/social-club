@@ -19,10 +19,12 @@ use App\Models\TillSession;
 use App\Models\User;
 use App\Support\ActiveScope;
 use App\Support\CounterOperator;
+use App\Support\ManagerApproval;
 use Database\Seeders\RolePermissionSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Features\SupportTesting\Testable;
 use Livewire\Livewire;
+use Tests\Concerns\ChangesRolePermissions;
 use Tests\TestCase;
 
 /**
@@ -46,7 +48,7 @@ use Tests\TestCase;
  */
 class WaiverReasonsKnowTheirMemberTest extends TestCase
 {
-    use RefreshDatabase;
+    use ChangesRolePermissions, RefreshDatabase;
 
     private Organisation $org;
 
@@ -62,6 +64,9 @@ class WaiverReasonsKnowTheirMemberTest extends TestCase
         app(ActiveScope::class)->setOrganisation($this->org->id);
         $this->location = Location::factory()->create(['organisation_id' => $this->org->id]);
         $this->otherSede = Location::factory()->create(['organisation_id' => $this->org->id]);
+        // These pin the RECORD-BACKED reasons. A manager also gets prompt 333's "Aprobado por responsable" first and
+        // pre-selected (pinned in PriceAdjustmentAndManagerReasonsTest), so they run without `reasons.optional`.
+        $this->setRolePermission(Role::MANAGER, ManagerApproval::PERMISSION, false);
     }
 
     private function operator(Role $role = Role::MANAGER): User

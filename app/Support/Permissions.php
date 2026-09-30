@@ -38,6 +38,7 @@ class Permissions
         'checkin.manage', 'checkin.override',
         // Counter
         'pos.use', 'pos.bar', 'dispensation.void', 'order.void', 'limits.override', 'dispensation.price.override',
+        'reasons.optional', // prompt 333 — a price adjustment or a fee waiver without typing a reason ("Aprobado por responsable")
         // Catalogue & stock
         'genetics.manage', 'prices.manage', 'stock.manage', 'stock.merma', 'stock.transfer',
         'stock.take', 'articles.manage', 'discounts.manage',
@@ -83,6 +84,7 @@ class Permissions
         'carencia.waive',
         'checkin.manage', 'checkin.override',
         'pos.use', 'pos.bar', 'dispensation.void', 'order.void', 'limits.override', 'dispensation.price.override',
+        'reasons.optional', // prompt 333 — the owner: managers needn't type reasons for a price adjustment or a waiver
         'genetics.manage', 'prices.manage', 'stock.manage', 'stock.merma', 'stock.transfer',
         'stock.take', 'articles.manage', 'discounts.manage',
         'wallet.adjust', 'till.open', 'till.close', 'cash.bank', 'expenses.record',
@@ -238,7 +240,7 @@ class Permissions
                 'member.limits.set', 'member.discount.assign', 'member.documents.view', 'member.sanction', 'applications.review'],
             __('Membresías y cuotas') => ['membership.enrol', 'membership.fee.override', 'membership.fee.collect', 'membership.fee.waive', 'membership.manage', 'carencia.waive'],
             __('Recepción') => ['checkin.manage', 'checkin.override'],
-            __('Mostrador') => ['pos.use', 'pos.bar', 'dispensation.void', 'order.void', 'limits.override', 'dispensation.price.override'],
+            __('Mostrador') => ['pos.use', 'pos.bar', 'dispensation.void', 'order.void', 'limits.override', 'dispensation.price.override', 'reasons.optional'],
             __('Catálogo y stock') => ['genetics.manage', 'prices.manage', 'stock.manage', 'stock.merma', 'stock.transfer', 'stock.take', 'articles.manage', 'discounts.manage'],
             __('Dinero') => ['wallet.adjust', 'till.open', 'till.close', 'cash.bank', 'expenses.record', 'expenses.approve', 'expenses.overheads', 'expenses.categories', 'purchases.manage'],
             __('Gobierno') => ['documents.generate', 'minutes.manage', 'minute.sign', 'register.view', 'comms.manage'],
@@ -287,6 +289,7 @@ class Permissions
             'order.void' => __('Anular pedidos de barra'),
             'limits.override' => __('Autorizar superar un límite de consumo'),
             'dispensation.price.override' => __('Ajustar el precio de una dispensación'),
+            'reasons.optional' => __('Aprobar sin motivo'),
             'genetics.manage' => __('Gestionar genéticas'),
             'prices.manage' => __('Gestionar precios'),
             'stock.manage' => __('Gestionar stock'),

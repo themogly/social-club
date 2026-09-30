@@ -18109,3 +18109,73 @@ one tap away after every bar sale.
     panel (M-00001). Headless Chrome has no camera to point at a card.
   - **Still to check on the club tablet** (demo site): that the camera opens on Socios. Chrome asks for camera
     permission the first time.
+
+## Prompt 333 — Dispensario: the keypad comes into view on a strain tap, an adjusted price updates the total, managers needn't type reasons
+
+- **Why (Ben):**
+  - "When you click a strain in the dispensary it should go back to the calculator at the top of the page."
+  - "When you change the price of a sale it doesn't update the total at the bottom."
+  - "If they're managers, don't require reasons for adjusting a price or for waiving a fee, as a default setting.
+    Instead just put 'manager approved'."
+- **1. A strain tap brings the keypad into view** (`window.bringIntoView`, `resources/js/app.js`):
+  - The weight-entry panel (keyed per strain, so it mounts on each new strain) calls it on `x-init`. `chooseGenetic()`
+    also dispatches `weight-entry-opened`, for the same strain tapped again.
+  - It scrolls **only when the panel isn't fully visible** inside its scrolling pane (the selection pane at md+, the page
+    below). It aligns to the top, smoothly, or jumps under `prefers-reduced-motion`.
+  - It then focuses the panel (`tabindex="-1"`), so the physical keyboard types into the pad. 292's `onKey` ignores keys
+    while focus is in an input such as the strain search.
+  - No extra request: the panel arrives with the render the tap already makes; 293's budget test is green.
+  - The *Barra* tab's article tap adds straight to the cart and opens no entry, so there's nothing to bring into view.
+- **2. The total that didn't update — the real cause:**
+  - The prompt suspected a second copy of the override rule, but on `main` every figure already went through the ONE
+    `chargeableCents()`: the header, the button, `tenderableTotalCents()` (so *Justo*, *Falta*, change) and the commit.
+    Prompt 271 did that. The €20 → €15 tests passed before any change.
+  - The browser showed the actual bug. The field was `wire:model.blur`, and **in Livewire 4 a modifier before `.live` only
+    syncs in the browser**: the value was stored locally on blur and sent nowhere. So the button, the header and *Falta*
+    kept the old total until the next tap happened to carry it. Pinned: before, Enter left "28.38 €"; after, "15.00 €".
+  - The field is now `wire:model.live.blur.enter`, so blur or Enter re-renders every total.
+  - The one reading of the field is `priceOverrideEntered()`, used by `chargeableCents()` and the commit's validation.
+  - A field that won't be taken says so underneath (`priceOverrideNotice`): "El precio ajustado no es válido.", or, above
+    the resolved total, "El ajuste solo puede bajar el total: se cobra el precio normal.". The totals stay at the resolved
+    figure; the commit's validation is unchanged.
+  - The only other `wire:model.blur` on the counter is the Bar's order reference, which is only read at commit, so it
+    needs no network sync.
+- **3. `reasons.optional` — *Aprobar sin motivo*** (`App\Support\ManagerApproval`):
+  - OWNER and MANAGER by default, never STAFF, editable on *Roles y permisos* (the "default setting").
+    `csc:sync-permissions` grants it to the existing roles.
+  - **Price adjustment:** for a holder, the reason label reads "(opcional)" and the field is pre-filled "Aprobado por
+    responsable" when the panel opens. Left as it is, or emptied, that is the reason stored.
+  - **Fee waiver** (counter, and the panel's *Condonar cuota*): "Aprobado por responsable" is the first option and
+    pre-selected; no text needed. `FeeWaiverReasons::options(…, $managerApproved)` offers it only to a holder, so a
+    crafted value from anyone else resolves to nothing and is refused.
+  - **Never anonymous:** `price_override_by`, the waiver's `recorded_by` and the audit rows still name the person. The
+    writers (`CommitDispensation`, `RecordFeePayment`) add `reason_permission: reasons.optional` to the audit payload when
+    the reason is that text and the person holds the permission.
+  - Without it (staff): exactly as before — the reason is required, and the option isn't offered.
+- **Other places that force a reason, unchanged** (Ben asked about price and waivers only; possible follow-up):
+  - the limit override (265, "Autorizar con PIN");
+  - voids and corrections (300, dispensations and bar orders);
+  - stock *Recuento* beyond tolerance (318), *Ajuste* and *Merma*;
+  - the four membership corrections (325);
+  - the manual bar line (331);
+  - the photo override (157) and the door override.
+- **Tests:** `tests/Feature/Counter/PriceAdjustmentAndManagerReasonsTest.php` (10).
+  - Red first: the invalid-adjustment notice, the permission defaults, the manager's price adjustment, the manager's
+    waiver, and the roles-page removal.
+  - Green by nature, and kept as pins: the €15 / €18 totals through *Justo*, *Falta* and the commit (271 had them), and
+    staff still required.
+  - Added with the fixes: the keypad dispatch and hook, and the `.live.blur.enter` binding.
+- **Verified in a browser** (`tests/Browser/prove-333-counter.mjs`, a freshly seeded demo DB), 16/16 PASS:
+  - 820×1180, scrolled to the last flower: the tap brings the keypad fully into view, focused, and a typed "2" lands in the
+    pad.
+  - 1180×820, keypad on screen: another tap scrolls nothing.
+  - Adjusted to 15 with Enter: the button reads 15.00 €, *Justo* fills 15,00, *Falta* 5.00 € from 10; the commit stored
+    1500 cash with «Aprobado por responsable» by the manager.
+  - Staff: no option, and a reasonless waiver refused.
+  - Manager: the option first and pre-selected; the €20 fee waived with that reason, by them.
+- **Two existing waiver tests adjusted, not weakened:**
+  - `WaiverReasonsKnowTheirMemberTest` pins the RECORD-BACKED reasons as a manager, who now also gets "Aprobado por
+    responsable" first. It runs without `reasons.optional` (via the roles-page writer), so it keeps pinning what it was
+    written for.
+  - `TheColumnSaysWhatTheScreenDoesNotTest`'s pre-selection for a manager is now `MANAGER_APPROVED`, as this prompt asks.
+    The therapeutic reason is still asserted as offered.

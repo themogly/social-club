@@ -25,6 +25,7 @@ use App\Models\Member;
 use App\Models\TillSession;
 use App\Models\User;
 use App\Support\LimitSnapshot;
+use App\Support\ManagerApproval;
 use App\Support\MemberEligibility;
 use App\Support\Settings;
 use Illuminate\Auth\Access\AuthorizationException;
@@ -172,6 +173,8 @@ class CommitDispensation
                             'reason' => $overrideReason,
                             'authorised_by' => $overrideBy->id, // non-null here: set together with $originalTotal
                             'operator_id' => $options['operator_id'] ?? Auth::id(),
+                            // Prompt 333 — "Aprobado por responsable" via the permission, not a typed reason.
+                            ...(ManagerApproval::applies($overrideBy, $overrideReason) ? [ManagerApproval::AUDIT_KEY => ManagerApproval::PERMISSION] : []),
                         ]);
                 }
 

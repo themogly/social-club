@@ -381,9 +381,11 @@ class TheColumnSaysWhatTheScreenDoesNotTest extends TestCase
         $this->operator();
         $member = $this->member(['is_therapeutic' => true], feeCents: 2500);
 
+        // Prompt 333 — for a holder of `reasons.optional` "Aprobado por responsable" comes first and is pre-selected;
+        // the member's own reason is still offered beside it.
         $component = $this->pos($member)->call('toggleWaive');
 
-        $component->assertSet('waiveReason', 'THERAPEUTIC');
+        $component->assertSet('waiveReason', 'MANAGER_APPROVED');
         $this->assertStringContainsString('data-waive-reason="THERAPEUTIC"', $component->html());
         $this->assertStringContainsString('data-fee-waive-submit', $component->html());
     }
