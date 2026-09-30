@@ -17934,3 +17934,75 @@ one tap away after every bar sale.
   - back on Dispensario he is found as a member and selected, blocked only by his carencia (until 15/10).
   - The first run used an older throwaway database whose member-number counter predates post-296 D1, so the approval
     collided on M-00002. A freshly seeded database doesn't have that problem.
+
+## Prompt 330 — a new sign-up pops up on the counter, on every screen, within seconds
+
+- **Why:** Ben: "A notification at the top somewhere in the till so it's really obvious… they want it just to appear and
+  they can approve." 329 made applicants findable; this makes them noticed.
+- **A separate polling component** (`App\Livewire\Counter\PendingApplicationsBell`), embedded in the top bar
+  (`x-counter.top-bar`), not a part of each screen:
+  - `wire:poll.15s="check"` re-renders only the bell (under 5 KB, pinned), never the dispensary under it, so 293's budget
+    is untouched.
+  - It counts this sede's `awaitingReview()` applications: the same scope as the hub's alert and 329's search.
+  - Its sede is the counter's own (`counter.location_id`, as the bar reads it). It mounts inside a Livewire update when a
+    PIN unlocks the bar, where no screen has applied the request's scope yet. The browser caught that: the bell only
+    appeared after a reload. Pinned.
+  - It renders only with an operator at the PIN and no handover. The chrome already leaves the bar out on the lock surface
+    and in a handover; the bell checks again and renders nothing.
+- **The badge:** an amber count on a bell. Its accessible name is ":count solicitudes pendientes".
+  - **Hidden at zero**, not a plain icon: the bar is already full at 1180 (272), and an idle icon is one more thing to read
+    past all shift.
+  - For a reviewer, tapping the bell goes to Socios' pending card. For anyone else it is a plain indicator.
+- **The banner:** shown for each application this browser session hasn't announced yet.
+  - The session remembers what it has announced (`counter_applications_seen`, pruned to what is still pending), so a
+    second poll doesn't re-announce.
+  - Shape: "Nueva solicitud: Thomas P. — enviada hace 1 minuto" (Carbon's relative time in the UI's language). Several
+    arrivals show "N nuevas solicitudes" with *Revisar solicitudes*, which opens Socios' pending card.
+  - It shows the first name and last initial only. Never the email, phone, photo or document (pinned).
+  - `AlertsLandOnTheSubjectTest`'s "the hub names no one" now allows exactly that phrase and nothing else; the surname
+    stays forbidden. This is the owner's call in this prompt.
+  - **It sits in the page's flow under the bar**, teleported (`@teleport`) into a static, empty `#counter-notices` live
+    region in the counter layout (static, so 209's layout rule holds).
+    - The first build floated it at the top right. That cleared the commit button, but on Dispensario it covered the
+      selected member's name at the top of the cart.
+    - In the flow it covers nothing; the screen moves down one row when it arrives. On the full-height selling screens the
+      cart column shrinks and *Registrar aportación* stays at its foot (measured: no page scroll at 1180×820).
+  - Nothing in it takes focus (checked in the browser: the search kept focus). It stays until dismissed, or until the
+    application is no longer pending.
+- **Luego** clears the banner for the session; the badge stays. **Revisar y aprobar** goes to
+  `/counter/members?solicitud=<id>` (329's single review flow) and takes that one off the banner.
+- **The basket-safe jump:** with a basket or a socio held (`CounterBasket::inProgress`), the bell asks first: "Tienes una
+  cesta a medias: se guarda y la encontrarás al volver." with *Cancelar* / *Ir a revisar*. The basket is session-kept
+  (205), so going to Socios loses nothing, and the question only makes sure the operator isn't surprised. Pinned: the
+  basket is still there after the jump.
+- **The permission split:** badge and banner show to every operator, because someone should know. Only
+  `applications.review` gets the review buttons. Without it, the one button reads **Avisa a un responsable** and only
+  dismisses, and a crafted `review()` is refused (pinned). Approval itself is 329's unchanged, gated flow.
+- **The chime is off by default:** a per-sede toggle, *Sonido al recibir solicitudes* (Sedes → Seguridad del mostrador,
+  `applications_chime_enabled`). A counter is not a phone, and a sound in a quiet club is the club's choice.
+  - The arrival event carries `chime`, and `resources/js/applications-chime.js` plays two short WebAudio notes only when
+    it is true. There is no file to fetch.
+  - A browser that hasn't had a tap yet may refuse to play; the banner is the notice either way.
+- **Training mode:** the bell works normally. It only reads, and a review from it goes through the flows 324 already
+  isolates.
+- **Unchanged:** the review, approval and fee flow, the hub's alert, and 293's budget.
+- **Tests:** `tests/Feature/Counter/PendingApplicationsBellTest.php` (9), all red first:
+  - the count: 1, none, and 0 for another sede;
+  - nothing rendered without an operator or in a handover;
+  - the sede when mounted mid-update;
+  - an arrival within one poll, "Thomas P." without surname, email or phone, not re-announced, and the poll under 5 KB;
+  - its own component in the bar, not in the dispensary, with the notices slot;
+  - Revisar → Socios, and with a basket it asks first and keeps it;
+  - Luego hides the banner and the badge stays;
+  - without the permission, "Avisa a un responsable" and a refused call;
+  - the chime off by default and on only when set.
+- **Verified in a browser** (`tests/Browser/prove-330-applications-bell.mjs`, 1180×820, a freshly seeded DB), 12/12 PASS:
+  - the counter open on Dispensario with the search focused, no bell;
+  - an invitation filled in on a phone-sized browser;
+  - the banner arrived **9 s** later, reading "Nueva solicitud: Thomas P.", with the bell at 1. Focus stayed in the search,
+    and there was no sideways scroll at 390.
+  - *Revisar y aprobar* landed on Socios in the review; approved, fee collected; back on Dispensario, no bell and no
+    banner.
+  - Also checked by hand, with screenshots: two arrivals ("2 nuevas solicitudes") at 1180 and 390, and dark mode; a member
+    selected with the banner showing (member, cart and commit all visible); *Luego* on one screen still hidden on the
+    next with the badge kept; the bell tap landing on Socios' pending card.

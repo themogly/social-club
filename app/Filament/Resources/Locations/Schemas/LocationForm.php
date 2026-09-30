@@ -39,6 +39,7 @@ class LocationForm
         'bar_attach_socio_enabled',
         'bar_ticket_reference_enabled',
         'counter_training_enabled', // prompt 324 — on by default
+        'applications_chime_enabled', // prompt 330 — off by default
     ];
 
     /**
@@ -372,6 +373,11 @@ class LocationForm
                             ->label(__('Permitir modo formación'))
                             ->default(true)
                             ->helperText(__('El personal puede practicar en el mostrador real: nada de lo que haga en modo formación se guarda.')),
+
+                        // Prompt 330 — a short tone when a new sign-up arrives at the counter. Off: the banner is enough.
+                        Toggle::make('applications_chime_enabled')
+                            ->label(__('Sonido al recibir solicitudes'))
+                            ->helperText(__('Suena un aviso breve en el mostrador cuando llega una solicitud de alta nueva.')),
 
                         // Idle lock (prompt 120): minutes of no real operator input before a counter screen auto-locks
                         // (signs the operator out, obscures member data). Per-location; 0 disables it.

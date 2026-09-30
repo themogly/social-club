@@ -190,6 +190,9 @@
                  Deciding it inside a component puts the branch somewhere a Livewire response can reach. See
                  the rule this layout now obeys — and the test that enforces it — at the top of the file. --}}
             <livewire:counter.counter-chrome :title="$screenTitle ?? null" />
+            {{-- Prompt 330 — where the top bar's notices land (the new-application banner, teleported from its bell): in the
+                 flow under the bar, so a notice covers nothing on the screen. Empty and static; a live region. --}}
+            <div id="counter-notices" role="status"></div>
 
             <main id="counter-main" @class([
                 'flex-1 px-4 py-5 sm:px-6',

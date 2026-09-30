@@ -309,7 +309,9 @@ class AlertsLandOnTheSubjectTest extends TestCase
                 'payload' => ['first_name' => 'Ppoiuytr', 'last_name' => 'Lkjhgfds'],
             ]);
 
-            $html = (string) $this->get(route('counter.home'))->assertOk()->getContent();
+            // Prompt 330 — the one exception, the owner's: the top bar's banner names a NEW applicant by first name and last
+            // initial, on every screen. Only that phrase; never the surname, and nothing else names anyone on the hub.
+            $html = str_replace('Ppoiuytr L.', '', (string) $this->get(route('counter.home'))->assertOk()->getContent());
 
             foreach (['Zzqwertyx', 'Vbnmkjhg', 'Ppoiuytr', 'Lkjhgfds', (string) $member->member_no, $member->id] as $leak) {
                 $this->assertStringNotContainsString($leak, $html, "[{$role->value}] the hub leaked '{$leak}'");
