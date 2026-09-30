@@ -128,6 +128,13 @@ class MembershipCounter extends Component
     #[Url(as: 'alta', except: null)]
     public ?string $altaReview = null;
 
+    /**
+     * Prompt 329 — an applicant tapped in the search on another screen lands here with `?solicitud=<id>`: its review
+     * opens, for a reviewer, and only when it is awaiting review at this sede (reviewAltaApplication checks it).
+     */
+    #[Url(as: 'solicitud', except: null)]
+    public ?string $solicitud = null;
+
     /** Arrived from the alert with several pending applications: the modal leads with the list (prompt 264). */
     public bool $altaPendingFirst = false;
 
@@ -164,6 +171,12 @@ class MembershipCounter extends Component
             } elseif ($pending->count() > 1) {
                 $this->altaPendingFirst = true;
             }
+        }
+
+        // Prompt 329 — arriving from the search on another screen with ?solicitud=<id>.
+        if ($this->solicitud !== null && $this->userCan('applications.review')) {
+            $this->reviewAltaApplication($this->solicitud);
+            $this->altaOpen = $this->altaApplicationId !== null && $this->altaApplication() !== null;
         }
 
         // Prompt 249 — arriving from the handover PIN with ?alta=<id>: open that application's review. Only for

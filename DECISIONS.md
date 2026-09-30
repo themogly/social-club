@@ -17883,3 +17883,54 @@ one tap away after every bar sale.
   - *Crear lote* took 20 units;
   - at the counter the *Vapeador* filter showed only it, and one unit took **1.00 g** off *Restante hoy* (3.50 → 2.50);
   - the stock report lists it under *Vapeador* (19 units = 19.00 g).
+
+## Prompt 329 — staff can find someone who has signed up but isn't approved yet, right from the counter search
+
+- **Why:** Thomas Powney submitted his application, and searching "th" on Dispensario and on Socios said "Sin resultados".
+  The counter's search (`FindsMembers`, shared by Dispensario, Socios, Recepción and Barra) looked at members only, and an
+  applicant isn't a member until approved. Ben: "It's confusing them, as they can't find people who've signed up."
+- **The search finds applicants too** (`FindsMembers::lookupApplicants()`):
+  - this sede's applications **awaiting review** (the same `awaitingReview()` scope as the hub's alert), under the same
+    gates as the member search (an operator at the PIN, 2+ characters, not a scan being typed);
+  - matched over first and last name, email, phone and the invite's reference, ignoring case and accents. The match runs
+    in PHP over the sede's pending list (at most 200, newest first), because the details live in the application's JSON
+    payload, which compares case-sensitively on MySQL. A sede's pending list is small.
+  - Results are grouped: members first, as before, then **Solicitudes pendientes**. Each applicant shows the name, an
+    amber **Pendiente de aprobar** badge and "Enviada el 30/09 11:07" (the sede's time).
+  - **Never** the ID document, photo or consents (pinned: the document number is not in the result). Rejected, approved,
+    waiting-list and other sedes' applications are never returned.
+- **One review flow, three ways in:**
+  - `FindsMembers::openApplication()`: on Socios the existing review opens there; on any other screen it goes to Socios with
+    `?solicitud=<id>`;
+  - `MembershipCounter::$solicitud` opens that review on arrival;
+  - the new **Solicitudes pendientes (N)** card on Socios (above the search; the existing `alta-pending-list`, whose row
+    action and heading are now parameters, so the *Nuevo socio* modal keeps its copy);
+  - the hub's pending-application alert (207/264), unchanged, opens Socios on the application when there is one (pinned).
+  - Approval, the fee and the waiver go through the existing writers, unchanged (`ApproveApplication`, then the counter's
+    `RecordFeePayment` / waiver). After approval Socios lands on the new member with the fee panel (243's rule).
+- **Hardened:** `reviewAltaApplication()` now opens only a still-**PENDING** application of **this sede**. It used to open
+  any application in the organisation, and it is now reachable from more places. "Submitted" is not required there,
+  because the staff-typed and handover routes land on their own review, and approving an unsent invite is refused by
+  `ApproveApplication`. The search, the card and `?solicitud=` use the stricter "awaiting review". `HandoverReturnTest`'s
+  own-org fixture now has its sede, as a real application does.
+- **Without `applications.review`:** the row is plain text, "Solicitud pendiente — pide a un responsable que la apruebe",
+  and `openApplication` / `reviewAltaApplication` refuse a crafted call (pinned). The Socios card shows only to reviewers.
+- **A new member still has their *carencia*.** The prompt expected "served straight away" on Dispensario; the member is
+  found and selected there, but the counter blocks dispensing until the waiting period ends (a compliance setting, or
+  waived with `carencia.waive`). That is the eligibility rule doing its job, unchanged.
+- **Tests:** `tests/Feature/Counter/ApplicantsInCounterSearchTest.php` (6), 5 red first:
+  - found on Socios and Dispensario by "th", "powney", "POWNEY" and the email; never the others; no document;
+  - tapped on Socios → review → approved → the new member with the fee panel → the same fee row;
+  - tapped on Dispensario → Socios `?solicitud=`, with forged ids ignored (another sede, rejected, unknown);
+  - without the permission: plain text, and crafted calls refused;
+  - the Socios card, present and absent.
+
+  The hub alert pin was green by nature.
+- **Verified in a browser** (`tests/Browser/prove-329-applicant-search.mjs`, 1180×820, a freshly seeded demo DB), 8/8 PASS:
+  - an invitation filled in on a phone-sized browser (signature, details, consents);
+  - at the counter as staff, Dispensario's search for "Thom" showed him under *Solicitudes pendientes* with the badge and no
+    document;
+  - the tap landed on Socios in the review; approved on a tier, which created the member; the fee was collected;
+  - back on Dispensario he is found as a member and selected, blocked only by his carencia (until 15/10).
+  - The first run used an older throwaway database whose member-number counter predates post-296 D1, so the approval
+    collided on M-00002. A freshly seeded database doesn't have that problem.
