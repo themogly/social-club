@@ -24,6 +24,7 @@ use App\Exceptions\DispensationBlockedException;
 use App\Exceptions\LimitExceededException;
 use App\Exceptions\StockUnavailableException;
 use App\Exceptions\TillClosedException;
+use App\Livewire\Counter\Concerns\AddsManualBarLines;
 use App\Livewire\Counter\Concerns\CollectsMembershipFees;
 use App\Livewire\Counter\Concerns\FindsMembers;
 use App\Livewire\Counter\Concerns\HandlesTender;
@@ -94,7 +95,7 @@ use RuntimeException;
 #[Layout('components.layouts.counter', ['fullHeight' => true])] // prompt 176: the page must not scroll; the selection pane does
 class DispensaryPos extends Component
 {
-    use CollectsMembershipFees, FindsMembers, HandlesTender, IdentifiesOperator, OpensMemberships, PersistsBasket, RendersIslandsOnChange, ResolvesCounterLocation, ShowsSettledOutcome;
+    use AddsManualBarLines, CollectsMembershipFees, FindsMembers, HandlesTender, IdentifiesOperator, OpensMemberships, PersistsBasket, RendersIslandsOnChange, ResolvesCounterLocation, ShowsSettledOutcome;
 
     // --- Identity ---------------------------------------------------------------
     // The ONE lookup field ($lookup) and everything behind it live in FindsMembers (prompt 194). This screen
@@ -188,11 +189,12 @@ class DispensaryPos extends Component
     public ?string $idempotencyKey = null;
 
     /**
-     * The OPTIONAL bar/merch side of the same visit (prompt 118): a list of {article_id, qty}. When present at
-     * settle, the visit is committed through CommitCombinedSettle — one payment, but a Dispensation AND an
-     * Order on their separate ledgers. Empty (the common case) leaves the plain dispensation commit untouched.
+     * The OPTIONAL bar/merch side of the same visit (prompt 118): a list of {article_id, qty} — and, since prompt 331,
+     * manual bar lines {description, unit_price_cents, reference, qty} (no article_id). When present at settle, the
+     * visit is committed through CommitCombinedSettle — one payment, but a Dispensation AND an Order on their separate
+     * ledgers. Empty (the common case) leaves the plain dispensation commit untouched.
      *
-     * @var list<array{article_id: string, qty: int}>
+     * @var list<array{article_id: string, qty: int}|array{description: string, unit_price_cents: int, reference: string, qty: int}>
      */
     public array $barBasket = [];
 
@@ -1083,7 +1085,7 @@ class DispensaryPos extends Component
 
         $existing = null;
         foreach ($this->barBasket as $i => $line) {
-            if ($line['article_id'] === $articleId) {
+            if (isset($line['article_id']) && $line['article_id'] === $articleId) {
                 $existing = $i;
                 break;
             }
@@ -1117,6 +1119,22 @@ class DispensaryPos extends Component
     }
 
     /**
+     * Prompt 331 — the Bar screen's manual line on the visit's bar side: the same modal and the same rules
+     * ({@see AddsManualBarLines}). A bar/shop line only; cannabis always names a batch and grams.
+     */
+    public function addMiscLine(): void
+    {
+        $line = $this->takeManualLine();
+        if ($line === null) {
+            return;
+        }
+
+        $this->barBasket[] = $line;
+        $this->forgetLastSale();
+        $this->dismissOutcome();
+    }
+
+    /**
      * Write a dispensation AND its bar order in one atomic settle (prompt 118's `CommitCombinedSettle`, two
      * ledgers), reached from {@see attemptCommit()} after every dispensation gate has passed — the price override
      * and the limit override ride in the dispensation's own options.
@@ -1126,7 +1144,7 @@ class DispensaryPos extends Component
      */
     private function commitVisit(Member $member, Location $location, array $lines, array $dispOptions, int $barTotal, int $barWallet): void
     {
-        $orderLines = array_map(fn (array $l): array => ['article_id' => (string) $l['article_id'], 'qty' => (int) $l['qty']], $this->barBasket);
+        $orderLines = $this->barOrderLines();
 
         try {
             $result = (new CommitCombinedSettle)->handle($member, $location, $lines, $orderLines, [
@@ -1208,7 +1226,7 @@ class DispensaryPos extends Component
             return;
         }
 
-        $orderLines = array_map(fn (array $l): array => ['article_id' => (string) $l['article_id'], 'qty' => (int) $l['qty']], $this->barBasket);
+        $orderLines = $this->barOrderLines();
 
         try {
             $order = (new CommitOrder)->handle($location, $orderLines, [
@@ -1255,6 +1273,11 @@ class DispensaryPos extends Component
         $total = 0;
 
         foreach ($this->barBasket as $line) {
+            if (! isset($line['article_id'])) { // a manual line: its own amount, never member-discounted (as on the Bar)
+                $total += (int) $line['unit_price_cents'] * max(1, (int) $line['qty']);
+
+                continue;
+            }
             $article = Article::query()->where('location_id', $location->id)->find($line['article_id']);
             if ($article === null) {
                 continue;
@@ -1264,6 +1287,20 @@ class DispensaryPos extends Component
         }
 
         return $total;
+    }
+
+    /**
+     * The bar basket in `CommitOrder`'s line shapes — catalogue lines, and manual lines exactly as the Bar screen sends
+     * them (prompt 331).
+     *
+     * @return list<array{article_id?: string, description?: string, unit_price_cents?: int, qty: int, reference?: string}>
+     */
+    private function barOrderLines(): array
+    {
+        return array_map(fn (array $l): array => isset($l['article_id'])
+            ? ['article_id' => (string) $l['article_id'], 'qty' => (int) $l['qty']]
+            : ['description' => (string) $l['description'], 'unit_price_cents' => (int) $l['unit_price_cents'], 'qty' => (int) $l['qty'], 'reference' => (string) $l['reference']],
+            $this->barBasket);
     }
 
     // --- Void -------------------------------------------------------------------
@@ -1615,7 +1652,7 @@ class DispensaryPos extends Component
     /**
      * The in-progress bar basket resolved for display (name + qty + line total, live-priced).
      *
-     * @return list<array{index: int, name: string, qty: int, line_total_cents: int}>
+     * @return list<array{index: int, name: string, qty: int, line_total_cents: int, manual: bool}>
      */
     private function barBasketView(?Location $location): array
     {
@@ -1625,12 +1662,18 @@ class DispensaryPos extends Component
 
         $rows = [];
         foreach ($this->barBasket as $index => $line) {
+            if (! isset($line['article_id'])) { // prompt 331 — a manual line
+                $rows[] = ['index' => $index, 'name' => (string) $line['description'], 'qty' => max(1, (int) $line['qty']),
+                    'line_total_cents' => (int) $line['unit_price_cents'] * max(1, (int) $line['qty']), 'manual' => true];
+
+                continue;
+            }
             $article = Article::query()->where('location_id', $location->id)->find($line['article_id']);
             if ($article === null) {
                 continue;
             }
             $qty = max(1, (int) $line['qty']);
-            $rows[] = ['index' => $index, 'name' => $article->name, 'qty' => $qty, 'line_total_cents' => $article->price_cents->cents * $qty];
+            $rows[] = ['index' => $index, 'name' => $article->name, 'qty' => $qty, 'line_total_cents' => $article->price_cents->cents * $qty, 'manual' => false];
         }
 
         return $rows;

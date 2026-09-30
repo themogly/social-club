@@ -74,7 +74,10 @@ class PreLiveA11yFixesTest extends TestCase
     {
         $html = Livewire::test(BarPos::class)->html();
 
-        $this->assertStringContainsString('@click="openMisc()"', $html);
+        // Prompt 331 — the modal is one shared partial; the trigger asks it to open, and it keeps its trigger for focus.
+        $this->assertStringContainsString("@click=\"\$dispatch('manual-line-open')\"", $html);
+        $this->assertStringContainsString('x-on:manual-line-open.window="openMisc()"', $html);
+        $this->assertStringContainsString('this.miscTrigger = document.activeElement', $html);
         $this->assertStringContainsString("history.pushState({ barMisc: true }, '')", $html);
         $this->assertStringContainsString("document.getElementById('misc-desc')?.focus()", $html);
         $this->assertStringContainsString('x-on:popstate.window="if (showMisc)', $html);
