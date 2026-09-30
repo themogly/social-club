@@ -65,7 +65,7 @@ class CounterScreens
             [
                 'route' => 'counter.checkin',
                 'label' => __('Recepción'),
-                'granted' => $terminal || (bool) $user?->can('checkin.manage'),
+                'granted' => ($terminal || (bool) $user?->can('checkin.manage')) && self::receptionEnabled(), // 337 — per sede
                 'icon' => 'M15.75 6a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0ZM4.501 20.118a7.5 7.5 0 0 1 14.998 0A17.933 17.933 0 0 1 12 21.75c-2.676 0-5.216-.584-7.499-1.632Z',
             ],
             [
@@ -93,6 +93,24 @@ class CounterScreens
                 'icon' => 'M2.25 8.25h19.5M2.25 9h19.5m-16.5 5.25h6m-6 2.25h3m-3.75 3h15a2.25 2.25 0 0 0 2.25-2.25V6.75A2.25 2.25 0 0 0 19.5 4.5h-15a2.25 2.25 0 0 0-2.25 2.25v10.5A2.25 2.25 0 0 0 4.5 19.5Z',
             ],
         ];
+    }
+
+    /**
+     * Prompt 337 — does the COUNTER's sede record entries at the door? Read for the counter's own sede (the session's
+     * `counter.location_id`, or the one given), never the panel's scope. Off: Recepción is not a destination (no tile,
+     * no landing, its route sends to the hub), the hub shows no check-in figures, and the check-in gate cannot hold.
+     */
+    public static function receptionEnabled(?string $locationId = null): bool
+    {
+        $sede = $locationId ?? session('counter.location_id');
+
+        return (bool) Settings::get('reception_enabled', true, is_string($sede) ? $sede : null);
+    }
+
+    /** Where the counter's front door is when no other place is known (a handover's fallback): Recepción, or the hub. */
+    public static function frontDoorRoute(): string
+    {
+        return self::receptionEnabled() ? 'counter.checkin' : 'counter.home';
     }
 
     /**

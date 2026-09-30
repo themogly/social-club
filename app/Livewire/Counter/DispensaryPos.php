@@ -50,6 +50,7 @@ use App\Models\User;
 use App\Support\ArticleImage;
 use App\Support\BusinessDay;
 use App\Support\CounterOperator;
+use App\Support\CounterScreens;
 use App\Support\DocumentVault;
 use App\Support\EligibilityVerdict;
 use App\Support\LimitSnapshot;
@@ -2375,8 +2376,9 @@ class DispensaryPos extends Component
 
     private function checkedInRequired(): bool
     {
-        // Per-location (prompt 44): the LocationForm's "Restringir TPV a socios con check-in" toggle.
-        return (bool) Settings::get('restrict_pos_to_checked_in', false);
+        // Per-location (prompt 44): the LocationForm's "Restringir TPV a socios con check-in" toggle. Prompt 337 — never
+        // where the sede does not record entries (Recepción off), whatever is stored: nobody could be served.
+        return CounterScreens::receptionEnabled($this->locationId) && (bool) Settings::get('restrict_pos_to_checked_in', false);
     }
 
     /**

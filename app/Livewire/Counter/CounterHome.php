@@ -6,6 +6,7 @@ use App\Enums\DashboardAlert;
 use App\Livewire\Counter\Concerns\IdentifiesOperator;
 use App\Livewire\Counter\Concerns\ResolvesCounterLocation;
 use App\Models\Location;
+use App\Models\MemberApplication;
 use App\Models\User;
 use App\Support\CounterScreens;
 use App\Support\CounterTerminals;
@@ -61,6 +62,17 @@ class CounterHome extends Component
         // its own. Someone with no counter permission at all has nothing to choose from and is refused.
         abort_unless(CounterScreens::reachableByAny($this->deviceUser()), 403);
         $this->resolveCounterLocation();
+
+        // Prompt 337 — sent here from a switched-off Recepción: say why.
+        if (is_string($notice = session('counterNotice'))) {
+            $this->flash($notice, 'warning');
+        }
+    }
+
+    /** Prompt 337 — does this sede record entries at the door? Off: no presence card, no «Entradas», and the tile below. */
+    public function receptionEnabled(): bool
+    {
+        return CounterScreens::receptionEnabled($this->locationId);
     }
 
     /**
@@ -124,23 +136,43 @@ class CounterHome extends Component
      * @return list<array{route: string, label: string, granted: bool, icon: string}>
      */
     /**
-     * Every other reachable destination, in `CounterScreens` order.
+     * Every other reachable destination, in `CounterScreens` order (337: led by *Nuevo socio* where Recepción is off).
      *
      * Filtered by ROUTE rather than by position since prompt 208: the hero is no longer necessarily the first
      * entry, so slicing the head off would have promoted the dispensary and then left Recepción out of the
      * grid entirely. Every reachable destination still renders exactly once — the hero is one of them
      * promoted, never a sixth tile.
      *
-     * @return list<array{route: string, label: string, granted: bool, icon: string}>
+     * @return list<array{route: string, label: string, granted: bool, icon: string, key?: string, href?: string, purpose?: string, badge?: int}>
      */
     public function secondaryTiles(): array
     {
         $hero = $this->heroTile();
 
-        return array_values(array_filter(
+        $tiles = array_values(array_filter(
             $this->tiles(),
             fn (array $tile): bool => $tile['route'] !== ($hero['route'] ?? null),
         ));
+
+        // Prompt 337 — where Recepción is off, *Nuevo socio* takes its place (first): Socios with the sign-up open
+        // (`?alta=nuevo`), its pending list and 329's review, and 330's count when applications wait. Only for an
+        // operator who may review — the gate of Socios' own *Nuevo socio*; for anyone else the space closes up.
+        if (! $this->receptionEnabled() && $this->userCan('applications.review')) {
+            array_unshift($tiles, [
+                'key' => 'new-member',
+                'route' => 'counter.members',
+                'href' => route('counter.members', ['alta' => 'nuevo']),
+                'label' => __('Nuevo socio'),
+                'purpose' => __('Alta y solicitudes pendientes'),
+                'granted' => true,
+                'icon' => 'M18 7.5v3m0 0v3m0-3h3m-3 0h-3m-2.25-4.125a3.375 3.375 0 1 1-6.75 0 3.375 3.375 0 0 1 6.75 0ZM3 19.235v-.11a6.375 6.375 0 0 1 12.75 0v.109A12.318 12.318 0 0 1 9.374 21c-2.331 0-4.512-.645-6.374-1.766Z',
+                'badge' => $this->locationId !== null
+                    ? MemberApplication::query()->withoutGlobalScopes()->where('location_id', $this->locationId)->awaitingReview()->count()
+                    : 0,
+            ]);
+        }
+
+        return $tiles;
     }
 
     /**

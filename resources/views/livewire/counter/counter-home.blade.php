@@ -58,6 +58,7 @@
                  cannot open the configured hero falls back to the first destination they can, so a till-only
                  operator's hero is still Caja and nobody ever gets a hole where their hero should be. --}}
             <div data-counter-home-tiles class="flex flex-col gap-4">
+                @include('livewire.counter.partials.counter-flash', ['anchor' => 'data-counter-home-notice', 'spacing' => ''])
                 @if ($hero)
                     <a
                         href="{{ route($hero['route']) }}"
@@ -83,18 +84,23 @@
                 <div class="grid gap-4 [grid-template-columns:repeat(auto-fit,minmax(11rem,1fr))]">
                     @foreach ($this->secondaryTiles() as $tile)
                         <a
-                            href="{{ route($tile['route']) }}"
-                            data-counter-home-tile="{{ $tile['route'] }}"
+                            href="{{ $tile['href'] ?? route($tile['route']) }}"
+                            @if (($tile['key'] ?? null) === 'new-member') data-counter-home-tile-new-member @else data-counter-home-tile="{{ $tile['route'] }}" @endif
                             wire:navigate.ignore
-                            class="flex min-h-[8rem] flex-col justify-between rounded-2xl border border-line bg-surface p-5 shadow-sm transition hover:border-brand hover:bg-brand-tint hover:text-brand focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand dark:border-slate-800 dark:bg-slate-900 dark:hover:border-brand dark:hover:bg-slate-800 dark:hover:text-white"
+                            class="relative flex min-h-[8rem] flex-col justify-between rounded-2xl border border-line bg-surface p-5 shadow-sm transition hover:border-brand hover:bg-brand-tint hover:text-brand focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand dark:border-slate-800 dark:bg-slate-900 dark:hover:border-brand dark:hover:bg-slate-800 dark:hover:text-white"
                         >
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" class="h-8 w-8" aria-hidden="true">
                                 <path stroke-linecap="round" stroke-linejoin="round" d="{{ $tile['icon'] }}"/>
                             </svg>
                             <span>
                                 <span class="block text-base font-semibold">{{ $tile['label'] }}</span>
-                                <span class="mt-0.5 block text-xs text-ink-muted dark:text-slate-400">{{ \App\Support\CounterScreens::purposeFor($tile['route']) }}</span>
+                                <span class="mt-0.5 block text-xs text-ink-muted dark:text-slate-400">{{ $tile['purpose'] ?? \App\Support\CounterScreens::purposeFor($tile['route']) }}</span>
                             </span>
+                            {{-- Prompt 337 — the waiting applications (330's amber count), so the tile is also the way to approvals. --}}
+                            @if (($tile['badge'] ?? 0) > 0)
+                                <span data-new-member-count aria-label="{{ trans_choice(':count solicitud pendiente|:count solicitudes pendientes', $tile['badge'], ['count' => $tile['badge']]) }}"
+                                      class="absolute right-4 top-4 min-w-6 rounded-full bg-warning-fill px-1.5 text-center text-sm font-bold leading-6 text-white">{{ $tile['badge'] }}</span>
+                            @endif
                         </a>
                     @endforeach
                 </div>
@@ -102,6 +108,8 @@
 
             {{-- ============ THE RAIL ============ Live, and every figure from Dashboard. --}}
             <aside data-counter-home-rail class="flex flex-col gap-4">
+                {{-- Prompt 337 — only where the sede records entries at the door. --}}
+                @if ($this->receptionEnabled())
                 <section data-panel="presence" class="rounded-2xl border border-line bg-surface p-5 dark:border-slate-800 dark:bg-slate-900">
                     <h2 class="text-xs font-semibold uppercase tracking-wide text-ink-muted dark:text-slate-400">{{ __('En el local') }}</h2>
                     {{-- "4 esperando" from the mockup does NOT exist: check-in records who is INSIDE, not who
@@ -110,14 +118,17 @@
                     <p data-figure="inside" class="mt-1 text-4xl font-bold tabular-nums">{{ $panels['inside'] }}</p>
                     <p class="mt-1 text-xs text-ink-muted dark:text-slate-400">{{ __('Socios dentro ahora') }}</p>
                 </section>
+                @endif
 
                 <section data-panel="today" class="rounded-2xl border border-line bg-surface p-5 dark:border-slate-800 dark:bg-slate-900">
                     <h2 class="text-xs font-semibold uppercase tracking-wide text-ink-muted dark:text-slate-400">{{ __('Hoy') }}</h2>
                     <dl class="mt-2 space-y-1.5 text-sm">
+                        @if ($this->receptionEnabled())
                         <div class="flex items-baseline justify-between gap-3">
                             <dt class="text-ink-muted dark:text-slate-400">{{ __('Entradas') }}</dt>
                             <dd data-figure="check_ins" class="font-semibold tabular-nums">{{ $panels['check_ins'] }}</dd>
                         </div>
+                        @endif
                         <div class="flex items-baseline justify-between gap-3">
                             <dt class="text-ink-muted dark:text-slate-400">{{ __('Operaciones') }}</dt>
                             <dd data-figure="transactions" class="font-semibold tabular-nums">{{ $panels['transactions'] }}</dd>

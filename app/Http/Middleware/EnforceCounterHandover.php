@@ -4,6 +4,7 @@ namespace App\Http\Middleware;
 
 use App\Support\CounterHandover;
 use App\Support\CounterHandoverConfinement;
+use App\Support\CounterScreens;
 use Closure;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
@@ -106,6 +107,6 @@ class EnforceCounterHandover
         // Back to where the applicant belongs. Once the form has been submitted returnUrl() is null (prompt
         // 249), so this falls through to the counter — safe, because during a handover every counter screen
         // renders the surface, never the counter, so a stray request can only land on the PIN pad.
-        return redirect()->to(CounterHandover::returnUrl() ?? route('counter.checkin'));
+        return redirect()->to(CounterHandover::returnUrl() ?? route(CounterScreens::frontDoorRoute()));
     }
 }
