@@ -40,6 +40,23 @@
         <a href="#counter-main"
            class="sr-only rounded-xl bg-brand text-sm font-semibold text-white focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-[60] focus:px-4 focus:py-2">{{ __('Saltar al contenido') }}</a>
         <x-counter.top-bar :title="$title" />
+        {{-- Prompt 338 — the till's opening and the hours record: clocked in (with Deshacer for 2 minutes), or asked. In the
+             chrome, because opening the till moves on to the next screen. --}}
+        @if ($clockInNotice !== null)
+            <div role="status" data-clock-in-notice class="mx-4 mt-3 flex flex-wrap items-center gap-3 rounded-xl border border-success/40 bg-success/10 px-4 py-2 text-sm text-ink dark:text-slate-100 sm:mx-6">
+                <span class="flex-1">{{ __('Entrada fichada a las :time.', ['time' => $clockInNotice]) }}</span>
+                <x-button size="sm" variant="secondary" wire:click="undoClockIn" data-clock-in-undo>{{ __('Deshacer') }}</x-button>
+            </div>
+        @elseif ($clockInOffer)
+            <div role="status" data-clock-in-offer class="mx-4 mt-3 flex flex-wrap items-center gap-3 rounded-xl border border-warning/50 bg-warning/10 px-4 py-2 text-sm text-ink dark:text-slate-100 sm:mx-6">
+                <span class="flex-1 font-semibold">{{ __('¿Fichar entrada ahora?') }}</span>
+                <x-button size="sm" variant="secondary" wire:click="declineClockIn" data-clock-in-no>{{ __('No') }}</x-button>
+                <x-button size="sm" wire:click="acceptClockIn" data-clock-in-yes>{{ __('Sí') }}</x-button>
+            </div>
+        @endif
+        @if ($clockMessage)
+            <p role="alert" class="mx-4 mt-2 rounded-lg bg-warning/10 px-3 py-2 text-sm font-medium text-warning sm:mx-6">{{ $clockMessage }}</p>
+        @endif
         {{-- Prompt 324 — entering asks first; the sheet lives here (opened by the top bar's button by name). --}}
         @if (! $training && $trainingAllowed)
             <x-counter.sheet name="training" :heading="__('Modo formación')">

@@ -7,6 +7,7 @@ enum StaffClockSource: string
 {
     case PIN = 'PIN';
     case TILL_CLOSE = 'TILL_CLOSE';
+    case TILL_OPEN = 'TILL_OPEN'; // prompt 338 — opening the till clocked the opener in (their own PIN, their own act)
     case SELF_DECLARED = 'SELF_DECLARED';
     case MANAGER_CORRECTION = 'MANAGER_CORRECTION';
 
@@ -15,6 +16,7 @@ enum StaffClockSource: string
         return match ($this) {
             self::PIN => __('Fichado con PIN'),
             self::TILL_CLOSE => __('Al cerrar la caja'),
+            self::TILL_OPEN => __('Al abrir la caja'),
             self::SELF_DECLARED => __('Hora declarada'),
             self::MANAGER_CORRECTION => __('Corrección'),
         };

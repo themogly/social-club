@@ -351,11 +351,12 @@ class LocationForm
 
                         // Prompt 312 — clocking the closer out is automatic by default (with a 2-minute *Deshacer*); a sede
                         // that prefers the old question keeps it.
+                        // Prompt 338 — the SAME setting now governs both ends of the till (key kept: no data migration).
                         Select::make('till_close_clock_out')
-                            ->label(__('Fichar salida al cerrar la caja'))
+                            ->label(__('Fichar al abrir y cerrar la caja'))
                             ->options(['auto' => __('Automático'), 'ask' => __('Preguntar')])
                             ->selectablePlaceholder(false)
-                            ->helperText(__('Automático: quien cierra la caja queda con la salida fichada, y puede deshacerlo durante 2 minutos. A las demás personas se les muestra y fichan con su propio PIN.')),
+                            ->helperText(__('Automático: quien abre la caja queda con la entrada fichada y quien la cierra con la salida fichada; cada uno puede deshacerlo durante 2 minutos. Preguntar: se le pregunta. A las demás personas nunca se les ficha: lo hacen con su propio PIN.')),
                     ])
                     ->columns(2),
 

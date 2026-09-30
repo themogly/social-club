@@ -2,10 +2,21 @@
 
 namespace App\Livewire\Counter;
 
+use App\Actions\Staff\ClockIn;
+use App\Actions\Staff\UndoTillClockEvent;
+use App\Enums\StaffClockSource;
+use App\Enums\StaffClockType;
+use App\Models\Location;
+use App\Models\StaffClockEvent;
 use App\Support\CounterHandover;
+use App\Support\CounterOperator;
 use App\Support\Settings;
 use App\Support\TrainingMode;
+use App\Support\WorkedHours;
+use DomainException;
+use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Contracts\View\View;
+use InvalidArgumentException;
 use Livewire\Attributes\On;
 use Livewire\Component;
 
@@ -59,6 +70,83 @@ class CounterChrome extends Component
     #[On('counter-lock')]
     public function refresh(): void {}
 
+    /** Prompt 338 — what an undo or a clock-in here had to say (a refusal, when the 2 minutes have gone). */
+    public ?string $clockMessage = null;
+
+    /** *Deshacer* on the clock-in the till's opening wrote (an ANNUL; the person is unclocked again). */
+    public function undoClockIn(): void
+    {
+        $operator = CounterOperator::current();
+        try {
+            if ($operator === null) {
+                throw new DomainException(__('Ya no se puede deshacer la entrada. Si hace falta, corrígela desde el registro de jornada.'));
+            }
+            (new UndoTillClockEvent)->handle($operator);
+            $this->clockMessage = null;
+            $this->dispatch('counter-clock-state', open: false);
+        } catch (DomainException $e) {
+            $this->clockMessage = $e->getMessage();
+        }
+    }
+
+    /** *Preguntar* → «Sí»: clock in now, TILL_OPEN — the open itself was just authorised by them. */
+    public function acceptClockIn(): void
+    {
+        $operator = CounterOperator::current();
+        $location = $this->counterLocation();
+        session()->forget(TillSession::CLOCK_IN_OFFER);
+        if ($operator === null || $location === null) {
+            return;
+        }
+
+        try {
+            (new ClockIn)->handle($operator, $location, $operator, StaffClockSource::TILL_OPEN);
+            $this->clockMessage = null;
+            $this->dispatch('counter-clock-state', open: true);
+        } catch (AuthorizationException|DomainException|InvalidArgumentException $e) {
+            $this->clockMessage = $e->getMessage();
+        }
+    }
+
+    /** «No» — nothing is written. */
+    public function declineClockIn(): void
+    {
+        session()->forget(TillSession::CLOCK_IN_OFFER);
+    }
+
+    /**
+     * The till-open clock-in still undoable by the person at the PIN: 338's automatic TILL_OPEN IN, theirs, within
+     * UndoTillClockEvent's window and not yet annulled — its time, for «Entrada fichada a las 18:02. [Deshacer]».
+     */
+    private function clockInNotice(): ?string
+    {
+        $operator = CounterOperator::current();
+        $eventId = session(CounterOperator::CLOCK_UNDO);
+        $in = $operator !== null && is_string($eventId) ? StaffClockEvent::query()->withoutGlobalScopes()->find($eventId) : null;
+
+        if ($in === null || $in->user_id !== $operator->id || $in->type !== StaffClockType::IN || $in->source !== StaffClockSource::TILL_OPEN
+            || $in->recorded_at->lt(now()->subSeconds(UndoTillClockEvent::WINDOW_SECONDS))
+            || StaffClockEvent::query()->withoutGlobalScopes()->where('corrects_event_id', $in->id)->where('type', StaffClockType::ANNUL->value)->exists()) {
+            return null;
+        }
+
+        return local_datetime($in->occurred_at, 'H:i', $in->location);
+    }
+
+    private function clockInOffer(): bool
+    {
+        $operator = CounterOperator::current();
+
+        return $operator !== null && session(TillSession::CLOCK_IN_OFFER) === $operator->id && WorkedHours::openPeriodFor($operator) === null;
+    }
+
+    private function counterLocation(): ?Location
+    {
+        $sede = session('counter.location_id');
+
+        return is_string($sede) ? Location::query()->withoutGlobalScopes()->find($sede) : null;
+    }
+
     public function render(): View
     {
         return view('livewire.counter.counter-chrome', [
@@ -69,6 +157,9 @@ class CounterChrome extends Component
             // Prompt 324 — *Modo formación*: the banner (on every screen, even handed over) and the practice suffix.
             'training' => TrainingMode::active(),
             'trainingAllowed' => (bool) Settings::get('counter_training_enabled', true, session('counter.location_id')),
+            // Prompt 338 — the till's opening clocked this person in (with Deshacer), or asks whether to.
+            'clockInNotice' => $this->clockInNotice(),
+            'clockInOffer' => $this->clockInOffer(),
         ]);
     }
 }
