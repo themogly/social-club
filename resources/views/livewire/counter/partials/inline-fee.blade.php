@@ -13,7 +13,7 @@
                 type="text" inputmode="decimal" wire:model="feeAmount" autocomplete="off"
                 aria-label="{{ __('Importe (€)') }}"
                 placeholder="{{ \App\Support\NumberFormat::decimal($feeOwedCents / 100, 2) }}"
-                class="h-11 w-full rounded-lg border border-line bg-surface px-3 text-sm text-ink placeholder:text-ink-muted focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/40 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
+                class="h-11 w-full rounded-lg border border-line bg-surface px-3 text-base text-ink placeholder:text-ink-muted focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/40 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
             >
             <div class="grid grid-cols-2 gap-2">
                 <button type="button" wire:click="$set('feeMethod', 'CASH')" aria-pressed="{{ ($feeMethod === 'CASH') ? 'true' : 'false' }}" @class(['h-11 rounded-lg border text-sm font-semibold', 'border-brand bg-brand text-white' => $feeMethod === 'CASH', 'border-line text-ink dark:border-slate-700 dark:text-slate-100' => $feeMethod !== 'CASH'])>{{ __('Efectivo') }}</button>

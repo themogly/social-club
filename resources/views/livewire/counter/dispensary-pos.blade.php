@@ -875,7 +875,10 @@
                              family): Alpine-inserted DOM inside a morph target is owned by neither. --}}
                         <div data-price-override x-show="open" x-cloak class="mt-2 rounded-xl border border-warning/30 bg-warning/5 p-3">
                             <p class="block text-xs font-medium text-warning">{{ __('Ajustar precio (queda registrado)') }}</p>
-                            <div class="mt-1 grid gap-2 sm:grid-cols-2">
+                            {{-- Prompt 336 — STACKED, each the column's full width. `sm:grid-cols-2` keyed the split to the VIEWPORT, but this
+                                 sits in the ~300 px basket column, so each field got ~120 px and «Aprobado por responsable»
+                                 read "Manager apı". --}}
+                            <div class="mt-1 grid gap-2">
                                 <div>
                                 <label for="price-override-amount" class="block text-xs font-medium text-ink-muted dark:text-slate-400">{{ __('Nuevo total (€)') }}</label>
                                 <input id="price-override-amount" type="text" inputmode="decimal" wire:model.live.blur.enter="priceOverrideEuros" autocomplete="off" class="mt-1 h-11 w-full rounded-xl border border-line bg-surface px-3 text-base text-ink placeholder:text-ink-muted focus:border-warning focus:outline-none focus:ring-2 focus:ring-warning/40 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100">
@@ -888,7 +891,7 @@
                                 @endif
                                 </div>
                                 <div>
-                                <label for="price-override-reason" class="block text-xs font-medium text-ink-muted dark:text-slate-400">{{ $reasonOptional ? __('Motivo del ajuste (opcional)') : __('Motivo del ajuste') }}</label>
+                                <label for="price-override-reason" class="block text-xs font-medium text-ink-muted dark:text-slate-400">{{ __('Motivo') }}@if ($reasonOptional) <span class="font-normal">{{ __('(opcional)') }}</span>@endif</label>
                                 <input id="price-override-reason" type="text" wire:model.blur="priceOverrideReason" data-reason-optional="{{ $reasonOptional ? 'true' : 'false' }}" autocomplete="off" placeholder="{{ $reasonOptional ? \App\Support\ManagerApproval::reason() : __('Motivo (p. ej. producto defectuoso)') }}" class="mt-1 h-11 w-full rounded-xl border border-line bg-surface px-3 text-base text-ink placeholder:text-ink-muted focus:border-warning focus:outline-none focus:ring-2 focus:ring-warning/40 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100">
                                 </div>
                             </div>
