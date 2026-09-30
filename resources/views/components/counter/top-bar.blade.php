@@ -249,6 +249,11 @@
         {{-- WHO IS WORKING, and Switch — one control (prompt 173's rule: exactly ONE route to the pad, which
              is 173's own full-screen surface; this dispatches to it and does not draw a second one). --}}
         @if ($user !== null && \App\Support\CounterOperator::current() !== null)
+            {{-- Prompt 330 — sign-ups awaiting review at this sede: the bell (hidden at zero) and the banner under this bar
+                 (teleported to the layout's #counter-notices). Its own component with its own 15 s poll, so a poll never
+                 re-renders the screen; only with someone at the PIN (the chrome leaves this whole bar out during a handover). --}}
+            <livewire:counter.pending-applications-bell :key="'pending-applications-bell'" />
+
             <button
                 type="button"
                 data-operator-name-chip

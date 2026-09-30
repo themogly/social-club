@@ -158,6 +158,7 @@ class Settings
         // Prompt 317 — the bar/shop ticket ("Ticket de venta") is off unless a sede turns it on (Ben: "just hide it").
         'bar_receipt_enabled' => false,
         'counter_training_enabled' => true, // prompt 324 — *Permitir modo formación*, per sede
+        'applications_chime_enabled' => false, // prompt 330 — *Sonido al recibir solicitudes*, per sede; off: a counter is not a phone
         'ring_fenced' => false,
 
         // Prompt 259 — may a MANAGER at this sede approve a member's tab (set `debt_limit_cents`)? Owner-set,
