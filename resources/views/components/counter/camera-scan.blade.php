@@ -11,6 +11,7 @@
 {{-- Prompt 299 — `compact`: a 44×44 icon button (the member card's *Escanear otro socio*), the same scanner behind it. --}}
 @props(['compact' => false, 'label' => null])
 <div
+    data-camera-scan
     x-cloak
     x-data="cameraScan({ messages: {
         camera: @js(__('No se pudo acceder a la cámara. Revisa los permisos del navegador o usa el lector.')),

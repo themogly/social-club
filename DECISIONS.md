@@ -18065,3 +18065,47 @@ one tap away after every bar sale.
   - no page errors.
 
   The demo owner's UI formats money as "1.50 €"; the check accepts either separator.
+
+## Prompt 332 — *Escanear con cámara* on every counter member search, not just two
+
+- **Why:** Ben, on the club tablet, Socios → Cobro de cuotas: "Won't let me use the camera. In the dispensary section the
+  camera works."
+- **The cause:** the shared lookup (`partials/member-lookup`) showed the camera only when its host passed a
+  `cameraScanEnabled` view variable. Only `CheckInScreen` and `DispensaryPos` did, so `MembershipCounter` (Socios) and
+  `BarPos` (Barra's socio) never showed it, whatever the setting. The partial's `?? false` hid the omission.
+- **The camera flag moves into `FindsMembers`:** `cameraScanEnabled()` reads `camera_scan_enabled` for the **counter's own
+  sede** (`$this->locationId`), not the panel's active scope.
+  - The partial calls it directly, and so does 299's *Escanear otro socio* on the dispensary's member card
+    (`member-cart-summary`).
+  - The view variable is gone from `CheckInScreen` and `DispensaryPos`. There's one source, and a new screen that
+    includes the lookup gets the camera without remembering; the test proves it with a planted host.
+  - The camera component carries `data-camera-scan` so the tests can count it.
+- **Lookups checked** (every `@include('livewire.counter.partials.member-lookup'`):
+  - `check-in-screen` (Recepción) — before too;
+  - `membership-counter` (Socios) — **new**;
+  - `dispensary-pos` (Dispensario) — before too;
+  - `blocked-member` (the Dispensario's blocked card: the same component, the same method);
+  - `bar-pos` (Barra's socio, where the sede turns that panel on) — **new**.
+
+  The four hosts are exactly the classes that use `FindsMembers`.
+- **A scan behaves as everywhere else:** `submitCameraScan` → `ResolveMemberByToken` → the host's `onMemberFound`.
+  - On Socios the member's fee panel opens.
+  - On Barra the member is attached to the sale.
+  - At Recepción and the Dispensario, nothing changed.
+  - Applicants (329) have no card QR: the token is issued on approval. A QR that isn't a member's card falls through
+    to the search, which finds applicants by name as 329 made it.
+- **Tests:** `tests/Feature/Counter/CameraOnEveryLookupTest.php` (5):
+  - on → all four lookups render it (red: Socios, Barra — and the marker);
+  - off → none;
+  - per sede: Norte off, Centro on, with the panel scope pointed elsewhere (red);
+  - a scanned card opens Socios' fee panel and attaches at the Bar (green by nature — the scan path worked, only the
+    button was missing — kept as a pin);
+  - no host or view passes the flag, and a planted host gets the camera on and off by the sede (red).
+- **Verified in a browser** (`tests/Browser/prove-332-camera-everywhere.mjs`, 1180×820, a freshly seeded demo DB with
+  scanning on at Central Branch), 6/6 PASS:
+  - *Escanear con cámara* visible in the member search on Recepción, Socios, Dispensario and Barra (headless Chromium has
+    BarcodeDetector);
+  - a member's QR-card token handed to Socios' lookup exactly as the scanner does after decoding opened that member's fee
+    panel (M-00001). Headless Chrome has no camera to point at a card.
+  - **Still to check on the club tablet** (demo site): that the camera opens on Socios. Chrome asks for camera
+    permission the first time.

@@ -105,8 +105,7 @@ trait FindsMembers
      *
      * It lives here rather than on each host because `x-counter.camera-scan` calls `$wire.submitCameraScan`
      * by name: identical two-line copies on the door and the dispensary were the same near-duplicate this
-     * prompt exists to remove. A host renders the camera by passing `cameraScanEnabled` to the partial; the
-     * three screens that do not are unchanged, and turning it on for one of them is now that one variable.
+     * prompt exists to remove. Whether the camera shows is the lookup's own question ({@see cameraScanEnabled()}).
      */
     public function submitCameraScan(string $token): void
     {
@@ -297,6 +296,18 @@ trait FindsMembers
         }
 
         $this->redirect(route('counter.members', ['solicitud' => $application->id]));
+    }
+
+    /**
+     * Prompt 332 — may this lookup offer *Escanear con cámara*? The lookup asks for itself, for the COUNTER's sede, so
+     * every screen that includes it (Recepción, Socios, Dispensario, Barra's socio, the blocked-member card) shows the
+     * camera where the sede scans by camera, and a new screen gets it without remembering. It used to be a view variable
+     * only two hosts passed, so Socios and Barra never showed it. 299's *Escanear otro socio* on the member card reads it
+     * too. Off by default (35): camera access is a deliberate per-premises choice.
+     */
+    public function cameraScanEnabled(): bool
+    {
+        return (bool) Settings::get('camera_scan_enabled', false, $this->locationId);
     }
 
     /**

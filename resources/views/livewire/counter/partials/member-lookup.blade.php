@@ -118,8 +118,9 @@
     </form>
 
     {{-- Camera scan is the one part that IS feature-detectable, and the component already does it: it hides
-         itself where BarcodeDetector is missing, and needs a secure context. Per-sede, off by default. --}}
-    @if ($cameraScanEnabled ?? false)
+         itself where BarcodeDetector is missing, and needs a secure context. Per-sede, off by default — and the lookup
+         asks for itself (FindsMembers::cameraScanEnabled(), prompt 332), so no host can forget to pass it. --}}
+    @if ($this->cameraScanEnabled())
         <x-counter.camera-scan />
     @endif
 
