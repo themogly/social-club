@@ -39,6 +39,7 @@ class Permissions
         // Counter
         'pos.use', 'pos.bar', 'dispensation.void', 'order.void', 'limits.override', 'dispensation.price.override',
         'reasons.optional', // prompt 333 — a price adjustment or a fee waiver without typing a reason ("Aprobado por responsable")
+        'counter.switch_with_open_till', // prompt 335 — leave a sede for another with its till still open (after a confirmation)
         // Catalogue & stock
         'genetics.manage', 'prices.manage', 'stock.manage', 'stock.merma', 'stock.transfer',
         'stock.take', 'articles.manage', 'discounts.manage',
@@ -85,6 +86,7 @@ class Permissions
         'checkin.manage', 'checkin.override',
         'pos.use', 'pos.bar', 'dispensation.void', 'order.void', 'limits.override', 'dispensation.price.override',
         'reasons.optional', // prompt 333 — the owner: managers needn't type reasons for a price adjustment or a waiver
+        'counter.switch_with_open_till', // prompt 335 — the owner: "I want to be able to change location if I need to"
         'genetics.manage', 'prices.manage', 'stock.manage', 'stock.merma', 'stock.transfer',
         'stock.take', 'articles.manage', 'discounts.manage',
         'wallet.adjust', 'till.open', 'till.close', 'cash.bank', 'expenses.record',
@@ -190,6 +192,8 @@ class Permissions
         'panel.stock_count' => ['panel.access'],
         // Prompt 311 — who gets alerts is chosen on the person's own profile, a panel page.
         'alerts.receive' => ['panel.access'],
+        // Prompt 335 — leaving a sede with its till open is a sede change, which is settings.manage.location's (246).
+        'counter.switch_with_open_till' => ['settings.manage.location'],
     ];
 
     /** Why `$permission` needs `$needs`, in the words the roles page shows the owner (prompt 265). */
@@ -197,6 +201,7 @@ class Permissions
     {
         return match ($permission) {
             'till.close' => __('Para cerrar la caja al final del día también hace falta «:needs».', ['needs' => self::label($needs)]),
+            'counter.switch_with_open_till' => __('Solo quien puede cambiar de sede en el mostrador puede dejar una caja abierta al cambiar: hace falta «:needs».', ['needs' => self::label($needs)]),
             default => $needs === 'panel.access'
                 ? __('Este permiso solo se usa en el panel de administración: sin «:needs» no hace nada.', ['needs' => self::label($needs)])
                 : __('Sin «:needs», solo podrá trabajar cuando otra persona haya abierto la caja.', ['needs' => self::label($needs)]),
@@ -240,7 +245,7 @@ class Permissions
                 'member.limits.set', 'member.discount.assign', 'member.documents.view', 'member.sanction', 'applications.review'],
             __('Membresías y cuotas') => ['membership.enrol', 'membership.fee.override', 'membership.fee.collect', 'membership.fee.waive', 'membership.manage', 'carencia.waive'],
             __('Recepción') => ['checkin.manage', 'checkin.override'],
-            __('Mostrador') => ['pos.use', 'pos.bar', 'dispensation.void', 'order.void', 'limits.override', 'dispensation.price.override', 'reasons.optional'],
+            __('Mostrador') => ['pos.use', 'pos.bar', 'dispensation.void', 'order.void', 'limits.override', 'dispensation.price.override', 'reasons.optional', 'counter.switch_with_open_till'],
             __('Catálogo y stock') => ['genetics.manage', 'prices.manage', 'stock.manage', 'stock.merma', 'stock.transfer', 'stock.take', 'articles.manage', 'discounts.manage'],
             __('Dinero') => ['wallet.adjust', 'till.open', 'till.close', 'cash.bank', 'expenses.record', 'expenses.approve', 'expenses.overheads', 'expenses.categories', 'purchases.manage'],
             __('Gobierno') => ['documents.generate', 'minutes.manage', 'minute.sign', 'register.view', 'comms.manage'],
@@ -290,6 +295,7 @@ class Permissions
             'limits.override' => __('Autorizar superar un límite de consumo'),
             'dispensation.price.override' => __('Ajustar el precio de una dispensación'),
             'reasons.optional' => __('Aprobar sin motivo'),
+            'counter.switch_with_open_till' => __('Cambiar de sede con la caja abierta'),
             'genetics.manage' => __('Gestionar genéticas'),
             'prices.manage' => __('Gestionar precios'),
             'stock.manage' => __('Gestionar stock'),

@@ -18235,3 +18235,49 @@ one tap away after every bar sale.
   - a product with a changed name: «← Productos» brings the browser's leave-page prompt, and staying keeps the form.
 - **One existing test followed the new rule:** `BatchNamesTest` checked the renamed title on the page it stayed on after
   saving. It now asserts the save returns to the batches list, and checks the title on a fresh render of the edit page.
+
+## Prompt 335 — owners and managers can change sede on the counter while a till is still open
+
+- **Why:** Ben, refused with "Cierra la caja de esta sede antes de cambiar." at Dream Green: "I want to be able to change
+  location if I need to, if I'm admin."
+- **`counter.switch_with_open_till`** (*Cambiar de sede con la caja abierta*):
+  - OWNER and MANAGER by default, never STAFF, editable on *Roles y permisos*.
+  - It depends on `settings.manage.location` (246's sede change) in `Permissions::DEPENDENCIES`, so the roles page warns
+    when it's granted without it. `csc:sync-permissions` grants it to the existing roles.
+- **The switch** (`CounterLocationController`), when the PIN operator holds it and the current sede's till is open:
+  - It no longer refuses. It returns with `counterSedeSwitchConfirm`, and the top bar shows an in-page panel (no browser
+    dialog): "**La caja de Dream Green sigue abierta.** Se quedará abierta; podrás volver a cerrarla más tarde.
+    ¿Cambiar a Dream Green Greenhouse?" with *Cancelar* and *Cambiar de sede*.
+  - *Cambiar de sede* posts again with `confirm_open_till`, which switches the sede and writes the audit entry
+    `counter.sede.switched_with_open_till` (from sede, to sede, till session, operator).
+  - *Cancelar* closes the panel and nothing has changed.
+  - The confirming form keeps the switcher's unsaved-work question (263 / `counter.dirty`).
+  - Without the permission, the refusal is exactly as before.
+- **The till is left exactly as it was:** open, with the same float, movements and holder. Nothing is closed, moved or
+  counted (pinned).
+- **The tills stay strictly per sede.** Every till read goes by location (`SelectTillSession`), so the old till can never
+  serve the new sede: the new sede shows its own *Abrir caja* (236), and a sale there needs its own till (pinned). Coming
+  back finds the old till open and usable, and it closes normally.
+- **Still visible while away:**
+  - its own sede's hub alert ("1 caja sin cerrar");
+  - the owner's rollup across sedes (pinned);
+  - the panel's *Cajas*;
+  - 311's "caja abierta demasiado tiempo", which reads open sessions.
+
+  The new sede's hub counts its own tills: the counter hub is scoped to the counter's sede, as it always was.
+- **Tests:** `tests/Feature/Counter/SwitchSedeWithOpenTillTest.php` (5), all red first:
+  - asked, then confirmed: switched, the till untouched, the audit written; cancelling changes nothing;
+  - the new sede has no till and the old one never answers for it;
+  - without the permission (a manager without it, and staff) refused as today;
+  - coming back: the till open and visible (hub alert and rollup), and it closes normally;
+  - the permission's defaults, dependency and roles-page label.
+
+  246's `CounterLocationTest` is unchanged and green.
+- **Verified in a browser** (`tests/Browser/prove-335-switch-with-open-till.mjs`, 1180×820, a freshly seeded demo DB, as
+  the owner), 10/10 PASS:
+  - till opened at Central Branch with €50;
+  - switching to North Branch asked «La caja de Central Branch sigue abierta. … ¿Cambiar a North Branch?»;
+  - confirmed → North Branch, Central's till unchanged (same id and €50), North's own *Abrir caja*, the audit row;
+  - back at Central with no question; its till still open, and closed normally through the day's flower recount (318)
+    and the blind count;
+  - no page errors.

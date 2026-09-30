@@ -54,6 +54,8 @@
         || (\App\Support\CounterOperator::current()?->can('settings.manage.location') ?? false);
     $noSede = $availableSedes->isEmpty();
     $sedeSwitchError = session('counterLocationError');
+    // Prompt 335 — leaving a sede whose till is open, for someone who may: asked here, confirmed by a second POST.
+    $sedeSwitchConfirm = session('counterSedeSwitchConfirm');
 
     // Prompt 205: the destinations are NOT read here any more. The tab strip is gone — the hub is the menu,
     // and App\Support\CounterScreens is consumed by the hub's tiles. Every control now exists in exactly one
@@ -214,6 +216,24 @@
                             </form>
                         @endforeach
                     </div>
+                </div>
+            @endif
+
+            @if (is_array($sedeSwitchConfirm))
+                {{-- Prompt 335 — the old till stays exactly as it is (open, same float and movements); confirming only moves
+                     the counter. Cancel closes this and nothing has changed. --}}
+                <div x-data="{ open: true }" x-show="open" role="alertdialog" aria-labelledby="counter-sede-switch-title" data-counter-sede-switch-confirm
+                     class="absolute left-0 top-full z-40 mt-1 w-[min(24rem,calc(100vw-2rem))] rounded-xl border border-warning/50 bg-surface p-4 shadow-lg dark:bg-slate-900">
+                    <p id="counter-sede-switch-title" class="text-sm font-semibold text-ink dark:text-slate-100">{{ __('La caja de :sede sigue abierta.', ['sede' => $sedeSwitchConfirm['from'] ?? '']) }}</p>
+                    <p class="mt-1 text-sm text-ink-muted dark:text-slate-400">{{ __('Se quedará abierta; podrás volver a cerrarla más tarde. ¿Cambiar a :sede?', ['sede' => $sedeSwitchConfirm['to'] ?? '']) }}</p>
+                    <form method="POST" action="{{ route('counter.location') }}" class="mt-3 flex justify-end gap-2"
+                          @submit="($store.counter?.dirty && ! window.confirm(@js($confirmLeave))) && $event.preventDefault()">
+                        @csrf
+                        <input type="hidden" name="location_id" value="{{ $sedeSwitchConfirm['location_id'] ?? '' }}">
+                        <input type="hidden" name="confirm_open_till" value="1">
+                        <x-button type="button" size="sm" variant="secondary" x-on:click="open = false">{{ __('Cancelar') }}</x-button>
+                        <x-button type="submit" size="sm" data-counter-sede-switch-go>{{ __('Cambiar de sede') }}</x-button>
+                    </form>
                 </div>
             @endif
 
