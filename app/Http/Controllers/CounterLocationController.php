@@ -2,7 +2,9 @@
 
 namespace App\Http\Controllers;
 
+use App\Actions\RecordAuditLog;
 use App\Enums\TillSessionStatus;
+use App\Models\Location;
 use App\Models\TillSession;
 use App\Support\CounterOperator;
 use App\Support\LocationSwitcher;
@@ -44,10 +46,31 @@ class CounterLocationController extends Controller
                 return back()->with('counterLocationError', __('La sede la cambia un responsable'));
             }
 
-            // The till is the thing most likely to end up mis-scoped: refuse leaving a sede whose till is still
-            // open (close the blind arqueo first).
-            if ($this->tillOpenAt($current)) {
-                return back()->with('counterLocationError', __('Cierra la caja de esta sede antes de cambiar.'));
+            // The till is the thing most likely to end up mis-scoped, so leaving a sede whose till is open is refused —
+            // unless the operator may leave it open (prompt 335, `counter.switch_with_open_till`: OWNER + MANAGER by
+            // default). Then the counter ASKS first; confirmed, it switches and the till stays exactly as it was (open,
+            // same float, movements and holder). Every till read is per sede (`SelectTillSession` by location), so the
+            // old till can never serve the new sede, which shows its own «Abrir caja» (236).
+            $openTill = $this->openTillAt($current);
+            if ($openTill !== null) {
+                if (! $operator->can('counter.switch_with_open_till')) {
+                    return back()->with('counterLocationError', __('Cierra la caja de esta sede antes de cambiar.'));
+                }
+
+                if (! $request->boolean('confirm_open_till')) {
+                    return back()->with('counterSedeSwitchConfirm', [
+                        'location_id' => $locationId,
+                        'from' => (string) Location::query()->withoutGlobalScopes()->find($current)?->name,
+                        'to' => (string) Location::query()->withoutGlobalScopes()->find($locationId)?->name,
+                    ]);
+                }
+
+                (new RecordAuditLog)->handle('counter.sede.switched_with_open_till', $openTill, null, [
+                    'from_location_id' => $current,
+                    'to_location_id' => $locationId,
+                    'till_session_id' => $openTill->id,
+                    'operator_id' => $operator->id,
+                ]);
             }
         }
 
@@ -56,11 +79,11 @@ class CounterLocationController extends Controller
         return back();
     }
 
-    private function tillOpenAt(string $locationId): bool
+    private function openTillAt(string $locationId): ?TillSession
     {
         return TillSession::query()->withoutGlobalScopes()
             ->where('location_id', $locationId)
             ->where('status', TillSessionStatus::OPEN->value)
-            ->exists();
+            ->first();
     }
 }
