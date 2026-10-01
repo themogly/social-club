@@ -240,6 +240,8 @@ class Settings
         // Prompt 347 (Liam) — after Registrar aportación (and a Barra sale), per sede: back to the counter home (the
         // default), a new member in the dispensary, or stay with the member (the behaviour before 347).
         'after_recording' => 'home',
+        // Prompt 351 (Liam, Aaron) — per sede: the dispensary's strain order — price_desc (default), price_asc or alpha.
+        'dispensary_sort' => 'price_desc',
         // Prompt 348 — a new member is enrolled at every active sede but the store (one fee, the rest linked). ORG-level.
         'enrol_all_sedes' => true,
         // Prompt 348 — per sede: no photo on the record blocks dispensing until one is taken (the counter's Hacer foto).

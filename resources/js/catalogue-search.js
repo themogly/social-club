@@ -29,3 +29,14 @@ export function catalogueShows(item, state) {
     }
     return catalogueMatches(state.search?.[item.source] ?? '', item.search ?? []);
 }
+
+// Prompt 351 — the dispensary's strain order (€↓ / €↑ / A–Z), remembered on this tablet for the business day at this sede.
+// `stored` is what the tablet saved ({ sede, date, sort }); `scope` is where and when it is now ({ sede, date }). Another
+// sede, another business day, nothing saved or something unrecognised: the sede's default.
+export const SORTS = ['price_desc', 'price_asc', 'alpha'];
+
+export function rememberedSort(stored, scope, fallback) {
+    if (!stored || stored.sede !== scope?.sede || stored.date !== scope?.date || !SORTS.includes(stored.sort)) return fallback;
+
+    return stored.sort;
+}

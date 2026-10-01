@@ -186,7 +186,7 @@ class DebtAndLocationSettingsTest extends TestCase
             // check-in / signature requirements (prompt 44 — now genuinely per-location) + camera QR (prompt 35).
             'restrict_pos_to_checked_in', 'signature_on_dispensation', 'dispensary_calculator_enabled', 'camera_scan_enabled',
             // Per-location toggles reconciled to Setting rows (prompt 59/102), edited on LocationForm.
-            'bar_enabled', 'bar_receipt_enabled', 'counter_training_enabled', 'applications_chime_enabled', 'reception_enabled', 'after_recording', 'block_self_dispensation', 'require_photo_to_dispense', 'confirm_photo_on_scan', 'separate_cash_pots', 'count_bar_nightly', 'count_fees_nightly', 'ring_fenced', 'multiple_tills_enabled', 'till_close_clock_out', 'managers_can_approve_debt',
+            'bar_enabled', 'bar_receipt_enabled', 'counter_training_enabled', 'applications_chime_enabled', 'reception_enabled', 'after_recording', 'dispensary_sort', 'block_self_dispensation', 'require_photo_to_dispense', 'confirm_photo_on_scan', 'separate_cash_pots', 'count_bar_nightly', 'count_fees_nightly', 'ring_fenced', 'multiple_tills_enabled', 'till_close_clock_out', 'managers_can_approve_debt',
             // Per-location bar cart panels (prompt 193): attaching a socio and the ticket reference are
             // per-sede input toggles on LocationForm, not org thresholds.
             'bar_attach_socio_enabled', 'bar_ticket_reference_enabled',

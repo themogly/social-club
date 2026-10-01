@@ -6,6 +6,7 @@ use App\Actions\UnlockOperator;
 use App\Enums\LocationKind;
 use App\Enums\Role;
 use App\Models\Location;
+use App\Support\DispensarySort;
 use App\Support\Settings;
 use Filament\Forms\Components\ColorPicker;
 use Filament\Forms\Components\Select;
@@ -100,6 +101,7 @@ class LocationForm
         'dispensary_batch_selection',
         'till_close_clock_out', // prompt 312
         'after_recording', // prompt 347
+        'dispensary_sort', // prompt 351
     ];
 
     /**
@@ -314,6 +316,14 @@ class LocationForm
                                 'stay' => __('Quedarse con el socio'),
                             ])
                             ->default('home')
+                            ->selectablePlaceholder(false),
+
+                        // Prompt 351 — the order of the dispensary's strain list; the counter's €↓ / €↑ / A–Z switch starts here.
+                        Select::make('dispensary_sort')
+                            ->label(__('Orden de las genéticas en el dispensario'))
+                            ->helperText(__('El mostrador puede invertirlo; la elección se recuerda en esa tableta hasta el día siguiente.'))
+                            ->options(DispensarySort::options())
+                            ->default(DispensarySort::PRICE_DESC)
                             ->selectablePlaceholder(false),
 
                         Toggle::make('block_self_dispensation')

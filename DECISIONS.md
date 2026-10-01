@@ -19501,3 +19501,76 @@ to do this by hand.
   - committed at 17,00 € with −37 stored;
   - the receipt shows «Redondeo (incluido)»;
   - *Sin redondeo* gives the exact 17,37 € back, with no rounding line.
+
+## Prompt 351 — the counter's strain list sorts by price, with a per-sede default and a switch to reverse it
+
+### The per-sede default and the switch
+
+- ***Sedes → Mostrador → Orden de las genéticas en el dispensario*** (`dispensary_sort`, per sede, in
+  `LocationForm::SETTING_STRINGS`) has three options:
+  - *Precio: de mayor a menor* (`price_desc`), the default;
+  - *Precio: de menor a mayor* (`price_asc`);
+  - *Alfabético* (`alpha`).
+- **No migration.** Existing sedes read the code default (`Settings::DEFAULTS`), so every sede is *de mayor a menor* on
+  deploy until Ben sets Medicana and Famara to *de menor a mayor*. No sede name is hard-coded.
+- **The €↓ / €↑ / A–Z switch** sits beside the list/grid toggle in the same row, so the 820 portrait toolbar gains no
+  row.
+  - It is a 44 px segmented control, `data-view-only` (293), and shown on the *Dispensario* tab only.
+  - It starts on the sede's default. A tap changes only Alpine state: no request (the proof counts zero `/livewire`
+    requests).
+- **Remembered on the tablet for the business day at that sede.**
+  - localStorage key `csc.dispensarySort` stores `{sede, date, sort}`, where `date` is the sede's `BusinessDay::today()`.
+  - `rememberedSort()` in `catalogue-search.js` keeps the stored order only when both the sede and the business date
+    match. Another sede, the next business day, or anything unrecognised gives the sede's default.
+  - Storage access is wrapped in try/catch: in private mode the order still switches, it just isn't remembered.
+
+### One rule, ranked on the server
+
+- **`App\Support\DispensarySort::rank()` is the only copy of the rule.**
+  - It ranks every card in all three orders and returns the rows in the sede's default order, so the first paint is
+    already right with no JavaScript.
+  - Each card carries `data-rank-price_desc` / `data-rank-price_asc` / `data-rank-alpha`, and the switch sets the card's
+    CSS `order` from the chosen one.
+  - Cards are never moved in the DOM, so Livewire's island morph and 293's filters (`x-show`) are untouched. The list
+    and grid share one container, so the order is identical in both (tested and proved).
+  - There's no comparator in JavaScript to drift from the PHP one.
+  - Trade-off: keyboard tab order follows the DOM (the sede default) rather than the visual order after a switch.
+    That's acceptable on a touch counter, and the default order is the one the DOM has.
+- **Price** is the card's own `rate_cents`, from `ResolvePrice::forGenetic`. That is the sede price of the batch the
+  counter sells from first (FEFO, 278's display batch), before any member discount: per gram for weight products, per
+  unit for unit products. A strain with two batches sorts by the one sold first (tested: an older €13 batch puts it
+  first).
+- **Weight products** (flower, hash, concentrate) **come before unit products** (pre-rolls, edibles, vapes) in both
+  price orders. Each group is sorted by its own price, because €/g and €/ud aren't comparable. With a *Tipo* filter
+  applied, that type shows in the chosen order on its own (tested through the real catalogue module in node).
+- **Ties** keep the catalogue query's alphabetical order (stable sort).
+- **No stock (*Sin lote*) is last** in the price orders.
+  - Before 351 the list was plain `orderBy('name')`, with *Sin lote* strains mixed in alphabetically rather than last as
+    the prompt assumed.
+  - **A–Z keeps exactly that pre-351 order** (the prompt's pin test), so *Sin lote* is last only in the price orders.
+- **Unchanged:**
+  - *Su habitual* chips (the member's own history) and the filter chips (derived from the alphabetical rows before
+    ranking);
+  - the Barra tab, still alphabetical. A price order for bar products is a **possible follow-up**: Liam asked about the
+    weed only.
+
+### Tests and proof
+
+- **`tests/Feature/Counter/DispensarySortTest.php`** (8, all seen red before the implementation) covers:
+  - the €12 / €10,50 / €9 + €8/ud example, highest first, as the default for a new sede;
+  - lowest first, and A–Z as the pin;
+  - the setting on EditLocation;
+  - the first-sold batch's price, an alphabetical tie, and no stock last;
+  - ranks under the browser's filter (€↑, A–Z, a PREROLL filter, a FLOWER filter);
+  - the switch as `data-view-only`, starting on the sede default;
+  - the day-and-sede memory rule run in node.
+- **`ViewOnlyControlsTest`** counts the three sort controls on the dispensary and none on the bar.
+- **The browser proof** (`tests/Browser/prove-351-price-order.mjs`, freshly seeded demo DB, North Branch set to
+  *Alfabético*) passed 15/15 at 1180×820 and 820×1180:
+  - Central starts on €↓, with CBD Charlotte at €11,19 at the top, weight before units, and *Sin lote* last;
+  - €↑ reverses it with 0 requests;
+  - a reload keeps €↑, and the grid matches the list;
+  - A–Z is alphabetical;
+  - with the stored date moved back, it returns to €↓;
+  - switching to North Branch gives A–Z;
+  - no page errors.
