@@ -141,6 +141,7 @@ class CommitDispensation
                 $wallet = $options['wallet_cents'] ?? 0;
 
                 $dispensation = Dispensation::create([
+                    'self_dispensed' => $this->selfDispensed($member, $options),
                     'organisation_id' => $member->organisation_id,
                     'member_id' => $member->id,
                     'location_id' => $location->id,
@@ -240,6 +241,24 @@ class CommitDispensation
         if (Settings::photoEnforcement('counter') === 'OVERRIDE' && blank($member->photo_path)) {
             $this->authorisePhotoOverride($member, $location, $options);
         }
+
+        // Prompt 347 — a member of staff serving their OWN member record: allowed and flagged (`self_dispensed`) unless the
+        // sede says someone else must serve them. Blocked here, inside the commit, not just warned on the screen.
+        if ($this->selfDispensed($member, $options) && (bool) Settings::get('block_self_dispensation', false, (string) $location->getKey())) {
+            throw new DispensationBlockedException(__('Te estás atendiendo a ti mismo: en esta sede debe atenderte otra persona del personal.'));
+        }
+    }
+
+    /**
+     * Is the operator recording this the member being served (their staff account linked to this member record)?
+     *
+     * @param  CommitOptions  $options
+     */
+    private function selfDispensed(Member $member, array $options): bool
+    {
+        $operatorId = $options['operator_id'] ?? Auth::id();
+
+        return $operatorId !== null && User::query()->whereKey($operatorId)->value('member_id') === $member->getKey();
     }
 
     /**

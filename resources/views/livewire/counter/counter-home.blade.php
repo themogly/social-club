@@ -59,6 +59,22 @@
                  operator's hero is still Caja and nobody ever gets a hole where their hero should be. --}}
             <div data-counter-home-tiles class="flex flex-col gap-4">
                 @include('livewire.counter.partials.counter-flash', ['anchor' => 'data-counter-home-notice', 'spacing' => ''])
+                {{-- Prompt 347 — back home after a sale: its «Última: … · Opciones» line (300's) for two minutes, or until the
+                     next sale or a lock, so a mistake can still be voided straight away. --}}
+                @if ($hubSale = $this->hubLastSale())
+                    <div data-hub-last-sale>
+                        @include('livewire.counter.partials.last-sale', [
+                            'summary' => $hubSale['summary'],
+                            'receiptUrl' => $hubSale['receiptUrl'],
+                            'receiptLabel' => $hubSale['receiptLabel'],
+                            'receiptHeading' => $hubSale['receiptHeading'],
+                            'emailable' => false,
+                            'canVoid' => $hubSale['canVoid'],
+                            'voidHeading' => $hubSale['voidHeading'],
+                            'voidReasonId' => 'hub-void-reason',
+                        ])
+                    </div>
+                @endif
                 @if ($hero)
                     <a
                         href="{{ route($hero['route']) }}"

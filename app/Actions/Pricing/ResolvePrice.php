@@ -18,6 +18,7 @@ use App\Models\MemberDiscount;
 use App\Models\MembershipTier;
 use App\Support\PriceResult;
 use App\Support\Settings;
+use App\Support\StaffDiscount;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\Storage;
 use RuntimeException;
@@ -435,6 +436,17 @@ class ResolvePrice
                     'label' => __('Personalizado'),
                 ];
             }
+        }
+
+        // Prompt 347 — the club's staff discount, by itself, for a member linked to an active staff account: one more
+        // candidate, exactly like an assigned standard discount (best single wins unless stacking is on).
+        $key = 'staff|'.$member->id;
+        if (! array_key_exists($key, $this->memo)) {
+            $this->memo[$key] = StaffDiscount::for($member);
+        }
+        $staff = $this->memo[$key];
+        if ($staff instanceof Discount && $this->appliesToGenetic($staff, $genetic)) {
+            $candidates[] = $this->fromDiscount($staff);
         }
 
         return $candidates;

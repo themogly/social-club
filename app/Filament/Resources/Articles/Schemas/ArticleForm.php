@@ -6,10 +6,13 @@ use App\Actions\Stock\MoveArticleToLocation;
 use App\Enums\Role;
 use App\Filament\Forms\CameraOrFile;
 use App\Filament\Forms\DecimalInput;
+use App\Filament\Resources\Genetics\GeneticResource;
 use App\Filament\Support\AllOption;
 use App\Models\Article;
 use App\Models\Location;
 use App\Support\ActiveScope;
+use App\Support\VapeLikeName;
+use Filament\Forms\Components\Checkbox;
 use Filament\Forms\Components\CheckboxList;
 use Filament\Forms\Components\FileUpload;
 use Filament\Forms\Components\Select;
@@ -17,10 +20,13 @@ use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
 use Filament\Schemas\Components\Grid;
 use Filament\Schemas\Components\Section;
+use Filament\Schemas\Components\Text;
 use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Components\Utilities\Set;
 use Filament\Schemas\Schema;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Blade;
+use Illuminate\Support\HtmlString;
 
 class ArticleForm
 {
@@ -63,7 +69,28 @@ class ArticleForm
                         TextInput::make('name')
                             ->label(__('Nombre'))
                             ->required()
-                            ->maxLength(255),
+                            ->maxLength(255)
+                            ->live(onBlur: true),
+
+                        // Prompt 347 — a cannabis vape entered as a BAR product never reaches the registro de dispensación
+                        // or the limits. A name that looks like one gets the warning and a one-tap confirmation (an
+                        // accessory with no cannabis may match); saving stays allowed and the confirmation is audited.
+                        Text::make(fn (): HtmlString => new HtmlString(Blade::render(
+                            '<span data-vape-bar-warning class="text-sm font-medium text-warning-700 dark:text-warning-400">{{ $text }} <x-filament::link :href="$href">{{ $link }}</x-filament::link></span>',
+                            [
+                                'text' => __('Los vapeadores con cannabis no son productos de barra: añádelos como genética de tipo «Vapeador», para que cuenten en el registro y en los límites.'),
+                                'href' => GeneticResource::getUrl('create'),
+                                'link' => __('Genéticas → Nueva'),
+                            ],
+                        )))
+                            ->visible(fn (Get $get): bool => VapeLikeName::barProduct((string) $get('name')))
+                            ->columnSpanFull(),
+                        Checkbox::make('accessory_confirmed')
+                            ->label(__('Es un accesorio, no contiene cannabis'))
+                            ->accepted()
+                            ->dehydrated(false)
+                            ->visible(fn (Get $get): bool => VapeLikeName::barProduct((string) $get('name')))
+                            ->columnSpanFull(),
 
                         // No *Categoría* (prompt 295, Shane): nothing in the app can create a product category — only the demo
                         // seeder does — so on a live club the drop-down was always empty. The `category_id` column and any

@@ -260,7 +260,7 @@ class DiscountsReport extends AbstractReport
         $dispensations = DB::table('dispensations')
             ->whereIn('location_id', $ids)->where('status', DispensationStatus::COMPLETED->value)
             ->where('dispensed_at', '>=', $start)->where('dispensed_at', '<', $end)
-            ->get(['id', 'operator_id', 'price_override_by', 'total_cents', 'original_total_cents', 'price_override_reason', 'dispensed_at', 'location_id', 'member_id']);
+            ->get(['id', 'operator_id', 'price_override_by', 'total_cents', 'original_total_cents', 'price_override_reason', 'dispensed_at', 'location_id', 'member_id', 'self_dispensed']);
         $overrideIds = GivenAwayQueries::priceOverrides($ids, $start, $end)->pluck('dispensations.id')->flip();
 
         // 2. Their discounted lines, per sale and label (one query).
@@ -288,6 +288,12 @@ class DiscountsReport extends AbstractReport
                 $ops[$k]['descuentos_socio'] += $discountBySale[$d->id];
                 $totals['member_discounts'] += $discountBySale[$d->id];
                 $events[] = $this->event('descuento', __('Descuento de socio'), $d->dispensed_at, $d->location_id, $d->operator_id, $d->member_id, $discountBySale[$d->id], null, DispensationResource::getUrl('view', ['record' => $d->id]));
+            }
+
+            // Prompt 347 — a member of staff served their own member record: listed (the whole contribution), filterable
+            // in the detail as «Auto-dispensación». Not a discount in itself, so it adds to no discretionary total.
+            if ((bool) $d->self_dispensed) {
+                $events[] = $this->event('auto', __('Auto-dispensación'), $d->dispensed_at, $d->location_id, $d->operator_id, $d->member_id, (int) $d->total_cents, null, DispensationResource::getUrl('view', ['record' => $d->id]));
             }
 
             if ($overrideIds->has($d->id)) {

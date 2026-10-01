@@ -8,6 +8,7 @@ use App\Enums\DiscountMode;
 use App\Models\Discount;
 use App\Models\Location;
 use App\Models\Member;
+use App\Support\StaffDiscount;
 
 /**
  * THE single resolver for a member's bar/merch (article) discount (prompt 55) — the counterpart to
@@ -58,6 +59,15 @@ class ResolveArticleDiscount
                 && $discount->locations()->whereKey($location->id)->exists()) {
                 $best = max($best, (int) $discount->value_bp);
             }
+        }
+
+        // Prompt 347 — the club's staff discount, by itself, on the bar side too, under the same rules as an assigned one.
+        $staff = StaffDiscount::for($member);
+        if ($staff !== null
+            && $staff->mode === DiscountMode::PERCENT
+            && in_array($staff->applies_to, [DiscountAppliesTo::ARTICLE, DiscountAppliesTo::BOTH], true)
+            && $staff->locations()->whereKey($location->id)->exists()) {
+            $best = max($best, (int) $staff->value_bp);
         }
 
         return $best;

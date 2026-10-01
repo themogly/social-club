@@ -42,6 +42,7 @@ class LocationForm
         'counter_training_enabled', // prompt 324 — on by default
         'applications_chime_enabled', // prompt 330 — off by default
         'reception_enabled', // prompt 337 — on by default
+        'block_self_dispensation', // prompt 347 — off by default
     ];
 
     /**
@@ -93,6 +94,7 @@ class LocationForm
         'bar_layout_default',
         'dispensary_batch_selection',
         'till_close_clock_out', // prompt 312
+        'after_recording', // prompt 347
     ];
 
     /**
@@ -296,6 +298,22 @@ class LocationForm
                             ])
                             ->default('automatic')
                             ->selectablePlaceholder(false),
+
+                        // Prompt 347 — where the counter goes after a contribution (and a Barra sale) is recorded.
+                        Select::make('after_recording')
+                            ->label(__('Después de registrar'))
+                            ->helperText(__('Al volver al inicio, la última venta sigue a mano dos minutos (recibo y anular).'))
+                            ->options([
+                                'home' => __('Volver al inicio'),
+                                'new_member' => __('Nuevo socio en el dispensario'),
+                                'stay' => __('Quedarse con el socio'),
+                            ])
+                            ->default('home')
+                            ->selectablePlaceholder(false),
+
+                        Toggle::make('block_self_dispensation')
+                            ->label(__('Prohibir auto-dispensación'))
+                            ->helperText(__('Si está activado, un miembro del personal no puede atenderse a sí mismo: le atiende otra persona.')),
 
                         Toggle::make('signature_on_dispensation')
                             ->label(__('Firma en dispensación'))

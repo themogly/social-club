@@ -69,6 +69,8 @@ class EditUser extends EditRecord
     // names roles added/removed; no credential material (password/MFA) ever enters it.
     private ?string $localeBefore = null;
 
+    private ?string $memberBefore = null;
+
     protected function beforeSave(): void
     {
         /** @var User $user */
@@ -80,6 +82,7 @@ class EditUser extends EditRecord
         $this->passwordBefore = $user->getRawOriginal('password');
         $this->pinBefore = $user->getRawOriginal('pin').'|'.$user->getRawOriginal('pin_lookup'); // prompt 286: either column
         $this->localeBefore = $user->getRawOriginal('locale');
+        $this->memberBefore = $user->getRawOriginal('member_id');
     }
 
     protected function afterSave(): void
@@ -107,6 +110,12 @@ class EditUser extends EditRecord
             if ($fresh instanceof User && $fresh->hasPin()) {
                 PinSavedNotice::send($fresh); // prompt 322 — where to try it, or that it won't work
             }
+        }
+
+        // Prompt 347 — linking (or unlinking) a staff account to a member record decides who gets the staff discount.
+        if ($fresh?->getRawOriginal('member_id') !== $this->memberBefore) {
+            (new RecordAuditLog)->handle($fresh?->getRawOriginal('member_id') === null ? 'user.member_unlinked' : 'user.member_linked', $user,
+                ['member_id' => $this->memberBefore], ['member_id' => $fresh?->getRawOriginal('member_id')]);
         }
 
         // Prompt 315 — someone else's language changed: the old and new values, nothing else about them.

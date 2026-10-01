@@ -2,24 +2,34 @@
 
 namespace App\Livewire\Counter;
 
+use App\Actions\Bar\VoidOrder;
+use App\Actions\Dispensing\VoidDispensation;
 use App\Enums\DashboardAlert;
+use App\Enums\DispensationStatus;
+use App\Enums\OrderStatus;
 use App\Livewire\Counter\Concerns\IdentifiesOperator;
 use App\Livewire\Counter\Concerns\ResolvesCounterLocation;
+use App\Models\Dispensation;
 use App\Models\Location;
 use App\Models\MemberApplication;
+use App\Models\Order;
 use App\Models\User;
+use App\Support\CounterLastSale;
 use App\Support\CounterScreens;
 use App\Support\CounterTerminals;
 use App\Support\Money;
 use App\Support\Period;
 use App\Support\Settings;
+use App\Support\Weight;
 use App\ViewModels\Dashboard;
 use Filament\Facades\Filament;
+use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Collection;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Locked;
 use Livewire\Component;
+use RuntimeException;
 
 /**
  * The counter's front door (prompt 189) — one large tile per destination, sized for a finger on a tablet.
@@ -55,6 +65,9 @@ class CounterHome extends Component
     public ?string $flashMessage = null;
 
     public string $flashType = 'success';
+
+    /** Prompt 347 — the reason typed in the hub's void sheet (300's last-sale line). */
+    public string $voidReason = '';
 
     public function mount(): void
     {
@@ -312,6 +325,117 @@ class CounterHome extends Component
     private function resolveLocation(): ?Location
     {
         return $this->locationId !== null ? Location::query()->find($this->locationId) : null;
+    }
+
+    /**
+     * Prompt 347 — the sale just recorded, when the sede comes back here after recording ({@see CounterLastSale}).
+     *
+     * @return array{summary: string, receiptUrl: ?string, receiptLabel: string, receiptHeading: string, canVoid: bool, voidHeading: string}|null
+     */
+    public function hubLastSale(): ?array
+    {
+        $sale = CounterLastSale::current($this->locationId);
+        if ($sale === null) {
+            return null;
+        }
+        [$dispensation, $order] = $this->hubSaleRecords($sale);
+        if ($dispensation === null && $order === null) {
+            return null;
+        }
+        $location = $this->resolveLocation();
+        $actor = $this->hasOperator() ? $this->counterActor() : null;
+
+        if ($dispensation !== null) {
+            return [
+                'summary' => __('Última: :total · :grams · :time', [
+                    'total' => $dispensation->total_cents->formatted(),
+                    'grams' => Weight::fromCentigrams($dispensation->dispensedGramsCg())->formatted(),
+                    'time' => local_datetime($dispensation->created_at, 'H:i', $location),
+                ]),
+                'receiptUrl' => route('counter.pos.receipt', $dispensation->id),
+                'receiptLabel' => __('Ver / imprimir recibo'),
+                'receiptHeading' => __('Recibo'),
+                'canVoid' => $actor?->can('dispensation.void') ?? false,
+                'voidHeading' => __('Anular la dispensación'),
+            ];
+        }
+
+        return [
+            'summary' => __('Última venta: :total · :time', [
+                'total' => $order->total_cents->formatted(),
+                'time' => local_datetime($order->created_at, 'H:i', $location),
+            ]),
+            'receiptUrl' => (bool) Settings::get('bar_receipt_enabled', false, $this->locationId) ? route('counter.bar.receipt', $order->id) : null,
+            'receiptLabel' => __('Ver / imprimir ticket'),
+            'receiptHeading' => __('Ticket'),
+            'canVoid' => $actor?->can('order.void') ?? false,
+            'voidHeading' => __('Anular la venta'),
+        ];
+    }
+
+    /**
+     * The hub's void: the dispensation when the sale had one (a combined visit's bar part is voided from the panel, as
+     * from the dispensary's own line), else the bar order. The same writers and checks as the screens'.
+     */
+    public function voidLast(): void
+    {
+        $sale = CounterLastSale::current($this->locationId);
+        if ($sale === null || ! $this->requireOperator()) {
+            return;
+        }
+        [$dispensation, $order] = $this->hubSaleRecords($sale);
+        $user = $this->counterActor();
+        $reason = trim($this->voidReason);
+        if ($reason === '') {
+            $this->flash(__('Indica el motivo de la anulación (queda registrado).'), 'error');
+
+            return;
+        }
+
+        try {
+            if ($dispensation !== null) {
+                if ($user === null || ! $user->can('dispensation.void')) {
+                    throw new AuthorizationException;
+                }
+                (new VoidDispensation)->handle($dispensation, $user, $reason);
+                $this->flash(__('Dispensación anulada. Stock y monedero revertidos.'), 'success');
+            } elseif ($order !== null) {
+                if ($user === null || ! $user->can('order.void')) {
+                    throw new AuthorizationException;
+                }
+                (new VoidOrder)->handle($order, $user, $reason);
+                $this->flash(__('Pedido anulado. Stock y monedero revertidos.'), 'success');
+            }
+        } catch (AuthorizationException) {
+            $this->flash(__('No tienes permiso para anular.'), 'error');
+
+            return;
+        } catch (RuntimeException) {
+            $this->flash(__('No se pudo anular.'), 'error');
+
+            return;
+        }
+
+        $this->voidReason = '';
+        CounterLastSale::forget();
+    }
+
+    /**
+     * The records, at THIS sede only, still completed (a voided one shows nothing).
+     *
+     * @param  array{dispensation_id: ?string, order_id: ?string}  $sale
+     * @return array{0: ?Dispensation, 1: ?Order}
+     */
+    private function hubSaleRecords(array $sale): array
+    {
+        $dispensation = $sale['dispensation_id'] !== null
+            ? Dispensation::query()->withoutGlobalScopes()->where('location_id', $this->locationId)->where('status', DispensationStatus::COMPLETED)->find($sale['dispensation_id'])
+            : null;
+        $order = $sale['order_id'] !== null
+            ? Order::query()->withoutGlobalScopes()->where('location_id', $this->locationId)->where('status', OrderStatus::COMPLETED)->find($sale['order_id'])
+            : null;
+
+        return [$dispensation, $order];
     }
 
     protected function flash(string $message, string $type): void

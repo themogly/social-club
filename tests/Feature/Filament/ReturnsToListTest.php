@@ -159,7 +159,7 @@ class ReturnsToListTest extends TestCase
     public function test_the_deliberate_redirects_are_kept(): void
     {
         // 320 — the strain lands on the list with the «Crear lote» hand-off in its notification.
-        Livewire::test(CreateGenetic::class)->fillForm(['name' => 'Gelato'])->call('create')
+        Livewire::test(CreateGenetic::class)->fillForm(['name' => 'Gelato', 'product_type' => 'FLOWER'])->call('create')
             ->assertHasNoFormErrors()->assertRedirect(GeneticResource::getUrl('index'));
         $notification = collect(session('filament.notifications', []))->last();
         $this->assertStringContainsString(BatchResource::getUrl('create'), json_encode($notification, JSON_UNESCAPED_SLASHES) ?: '');

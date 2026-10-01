@@ -14,6 +14,7 @@ use App\Support\ActiveScope;
 use App\Support\BusinessDay;
 use App\Support\CounterBlocker;
 use App\Support\CounterHandover;
+use App\Support\CounterLastSale;
 use App\Support\CounterOperator;
 use App\Support\CounterTerminals;
 use App\Support\Period;
@@ -247,6 +248,7 @@ trait IdentifiesOperator
         }
 
         CounterOperator::clear();
+        CounterLastSale::forget(); // prompt 347 — a lock ends the hub's last-sale line
         $this->dispatch('counter-clock-state', open: false);
 
         // Prompt 289 — on a REGISTERED counter "locked" means nobody is signed in, not "whoever typed last": the person is

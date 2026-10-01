@@ -19048,3 +19048,140 @@ WebKit (chip y=12, ⋯ y=64; the chip "Club Owner Clocked in 07:14" with no comp
   - the front should show the "couldn't read" line;
   - a passport photo page should fill;
   - note roughly how many tries each needed.
+
+## Prompt 347 — Liam's feedback: strain type, vapes, strains by sede, auto-publish, back home after a sale, staff discount
+
+**For Ben — how the staff discount works today (no code needed):** the owner assigns the *Personal* discount to the
+staff member's own member record: *Socios → [the person] → Descuentos → Asignar descuento → Personal*, with a reason
+and an optional expiry. From then on it applies by itself whenever that member is served, by anyone, at the sedes the
+discount covers. The best single discount wins, unless stacking is on. The new link below removes the need to remember
+to do this by hand.
+
+### 1. The product type is chosen, so vapes are recorded as vapes
+
+- **No default.** *Tipo de producto* is now a required `Radio` with the six types and one line each, for example
+  *Vapeador — Cartucho o desechable — se dispensa por unidad*. Until a type is chosen, the helper text reads «Elige qué
+  es: flor, hachís, extracto, preliado, comestible o vapeador».
+  - It's the same field and the same values; `ProductType::choiceDescription()` holds the lines.
+  - It's a Radio, not a picture grid, because Filament gives large, labelled, described choices out of the box and the
+    six fit two columns. The icons the prompt suggested are left out: a radio label with an icon would mean a custom
+    view for little gain.
+- **The strain hint** (`App\Support\VapeLikeName::strain`): if the name has the word vape, vaper, vapeador, cartucho,
+  cartridge, pod, desechable, disposable or pen (whole words, plurals included) and the type isn't *Vapeador*, an amber
+  «¿Es un vapeador? Elige «Vapeador» para que se dispense por unidad.» appears. It's a hint only.
+- **Bar products** (`VapeLikeName::barProduct`: those words plus thc, cbd, cannabis, weed):
+  - the warning «Los vapeadores con cannabis no son productos de barra…» appears, with a link to *Genéticas → Nueva*;
+  - a required «Es un accesorio, no contiene cannabis» confirmation appears;
+  - saving is still allowed once it's ticked, and every save under such a name writes `article.accessory_confirmed` to
+    the audit log (create and edit).
+- **`php artisan csc:find-vape-like`** (read-only) lists:
+  - strains whose name looks like a vape but whose type isn't *Vapeador*;
+  - bar products that look like cannabis vapes;
+  - **No publicadas**, the unpublished strains.
+
+  It notes that moving a strain between weight and unit is restricted once it has stock or history. On the demo data
+  it finds 0 / 0 / 0. **Ben: run it once on the live server** to see what Liam had already entered. The unpublished
+  ones aren't knowable from here, and they were not changed.
+
+### 2. Strains by sede
+
+- **A *Sede* filter on Genéticas** («Con existencias en…», multi-choice, every sede and the store): it shows strains
+  with stock left there, using 308's rule (any status, anything left).
+- **With one sede chosen in the panel's top bar,** the filter starts on that sede as a removable chip. With *Todas las
+  sedes* there's no default.
+- **One deliberate addition:** a strain with **no stock anywhere** (just created, 320) stays in view under every sede.
+  Otherwise the strain you've just created would vanish behind the default chip. `CreateStrainOnlyTest` caught that.
+  A strain stocked only at another sede is filtered out, as asked.
+- **A *Sedes* column** (toggleable) lists where each strain is in stock, for example *Sede Centro · Sede Norte*.
+
+### 3. Strains publish themselves
+
+- The *Publicada* toggle is gone from the form. `Genetic::$attributes` sets `published = true` for every new strain,
+  whatever path creates it.
+- **Existing strains keep their value** (pinned). `csc:find-vape-like` lists the unpublished ones as *No publicadas*;
+  there are none in the demo data, and the live count is for Ben to see.
+- **Who reads `published`:** only the member app's menu (`PwaController`, `->published()`); the counter shows
+  everything, as before. The list's *Publicada* column stays, so the state is visible. *Activa* is still how a strain
+  stops being offered.
+
+### 4. After recording, back to the home screen
+
+- **A per-sede setting** in *Sedes → Dispensario*, *Después de registrar* (`after_recording`), applies to the
+  dispensary and the Barra alike:
+  - **home** (the default): *Volver al inicio*;
+  - **new_member**: *Nuevo socio en el dispensario*;
+  - **stay**: *Quedarse con el socio*, the behaviour before 347.
+- **home:** after any successful commit (a dispensation, a combined visit, a bar-only visit, a Barra sale) the
+  existing green confirmation shows, and ~1.5 s later the browser goes to the counter home
+  (`LandsAfterRecording::landAfterRecording`, using `$this->js(setTimeout…)`).
+  - The hub shows 300's own «Última: … · Opciones» partial: the receipt sheet and a working *Anular*, voided through
+    `VoidDispensation` / `VoidOrder` with the same permission and PIN-operator checks.
+  - It stays for **2 minutes**, or until the next sale or a lock (`CounterLastSale`, session-only ids and time,
+    cleared in `lockCounter`).
+  - For a combined visit, the hub's void voids the dispensation, as the dispensary's own line does.
+- **new_member:** the member is released (the Barra detaches the socio), and the confirmation and last-sale line
+  stay.
+- **The basket is cleared as after any commit;** nothing is lost.
+
+### 5. Staff discount and serving yourself
+
+- **The link:** `users.member_id` (nullable, unique, `nullOnDelete`), *Sistema → Personal → Ficha de socio*.
+  - It's a searchable member picker; "already linked" is refused with its own message.
+  - It's visible only to people who manage staff, since the form is `staff.manage`.
+  - Changes are audited: `user.member_linked` / `user.member_unlinked`, with the before and after ids.
+- **The automatic staff discount:** a club setting, *Ajustes → Descuentos y ajustes → Descuento del personal*
+  (`staff_discount_id`, default none).
+  - `App\Support\StaffDiscount::for($member)` returns that discount when the member is linked to an **active** staff
+    account and the discount is active.
+  - `ResolvePrice` adds it as one more candidate, exactly like an assigned standard discount (the best single one
+    wins, unless stacking is on). `ResolveArticleDiscount` does the same on the bar side.
+  - It shows in the line snapshot and the reports like any discount.
+  - **It stops when the account is deactivated** (tested). With no setting, nothing changes (tested).
+- **Serving yourself:** decided inside `CommitDispensation` from the operator who records it (their linked member
+  record is the member served), not from the screen.
+  - The dispensation is flagged `self_dispensed`.
+  - The dispensary shows «Te estás atendiendo a ti mismo» under the member.
+  - A per-sede *Prohibir auto-dispensación* (`block_self_dispensation`, off by default) refuses it in the same
+    transaction as the stock movement, with «… debe atenderte otra persona del personal»; another operator can serve
+    them (tested).
+  - *Informes → Descuentos y ajustes* gains *Auto-dispensación* in its detail filter: each self-served contribution,
+    added to no discretionary total.
+- **Erasure:** `AnonymiseMember` unlinks any staff account tied to the erased member record. The account stays; the
+  tie to the person, and the staff discount it carried, go. `users` is documented in `COVERED_MEMBER_TABLES`, which
+  `RgpdCompletenessTest` requires.
+- **The migration** (`2026_10_01_100000_link_staff_to_member_and_flag_self_dispensation`) is additive.
+  - It was run against a copy seeded before it existed: 70 dispensations, all `self_dispensed = 0`.
+  - Its first `down()` failed on SQLite (the unique index on a dropped column), so the index is dropped first now.
+    Migrate → rollback → migrate is clean.
+
+### Tests and proofs
+
+- **`tests/Feature/Products/LiamFeedbackTest.php`** (13, all red on the old code: 8 failures, 5 errors):
+  - no default type, and saving without one refused;
+  - the vape hint;
+  - the bar warning plus the audited confirmation;
+  - the command lists and changes nothing;
+  - the sede filter and the *Sedes* column;
+  - the default chip from the panel's sede;
+  - no toggle, a new strain published, an existing unpublished one kept;
+  - home after a commit, the hub line and its void;
+  - the two-minute expiry;
+  - *stay* and *new_member*;
+  - the staff discount (none set, active, deactivated);
+  - self-dispensation flagged, blocked, and served by a colleague;
+  - the link audited.
+- **Also changed:**
+  - `DebtAndLocationSettingsTest` documents the two new sede settings as per-location;
+  - `FormCompletenessTest` allowlists `published` (with its reason);
+  - `ReturnsToListTest`'s strain now chooses a type;
+  - a 14th test pins that erasure unlinks the account.
+- **The browser proof** (`tests/Browser/prove-347-liam.mjs`, a freshly seeded demo DB), 12/12 PASS:
+  - **panel (1440):**
+    - a new strain has no type chosen and saving without one is refused;
+    - «Lemon vape 1 ml» with *Flor* shows the hint;
+    - «THC vape 1 g» as a bar product shows the warning and the confirmation;
+    - Genéticas with Central Branch chosen shows the chip, and the *Sedes* column is there;
+  - **counter (1180):**
+    - a sale lands back on `/counter` with «Última: 10.52 € · 1.00 g · 17:27», whose *Opciones* hold *Anular*;
+    - the staff user linked to M-00001 (with the club's *Staff* discount set) serving M-00001 sees «Te estás atendiendo
+      a ti mismo» and a 10 % discount on the line.

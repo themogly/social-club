@@ -10,6 +10,7 @@
             <option value="condonacion">{{ __('Condonación') }}</option>
             <option value="manual">{{ __('Línea manual') }}</option>
             <option value="descuento">{{ __('Descuento de socio') }}</option>
+            <option value="auto">{{ __('Auto-dispensación') }}</option>
         </select>
     </label>
     <label class="text-sm">

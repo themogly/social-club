@@ -10,6 +10,7 @@ use App\Console\Commands\PruneStaffClockEvents;
 use App\Enums\Role;
 use App\Enums\SettingType;
 use App\Filament\Forms\DecimalInput;
+use App\Models\Discount;
 use App\Models\User;
 use App\Support\CounterScreens;
 use App\Support\Settings;
@@ -76,6 +77,7 @@ class ManageSettings extends Page
         'stock_cover_window_days' => SettingType::INT,
         'stock_cover_low_days' => SettingType::INT,
         'discounts_stack' => SettingType::BOOL,
+        'staff_discount_id' => SettingType::STRING, // prompt 347 — '' = none
         'stock_count_show_expected' => SettingType::BOOL, // prompt 318 — Inventario
         'stock_count_tolerance_pct' => SettingType::INT,
         'stock_count_tolerance_g' => SettingType::INT,
@@ -211,6 +213,12 @@ class ManageSettings extends Page
                         TextInput::make('discount_alert_threshold_pct')->label(__('Umbral de alerta de descuentos (%)'))
                             ->integer()->minValue(1)->maxValue(100)->required()
                             ->helperText(__('Avisa en el panel cuando los ajustes de precio y las cuotas condonadas de una persona superan este % de lo que ha recaudado en 7 días (con al menos 50 € recaudados).')),
+                        // Prompt 347 — applied by itself to any member linked to an active staff account (Personal → Ficha de
+                        // socio), exactly like an assigned discount. None = nothing changes.
+                        Select::make('staff_discount_id')->label(__('Descuento del personal'))
+                            ->options(fn (): array => Discount::query()->where('active', true)->orderBy('name')->pluck('name', 'id')->all())
+                            ->placeholder(__('Ninguno'))
+                            ->helperText(__('Se aplica solo a los socios vinculados a una cuenta del personal activa (Personal → Ficha de socio), como un descuento asignado: en sus sedes y gana el mejor.')),
                     ]),
 
                 Section::make(__('Indicador de consumo'))
