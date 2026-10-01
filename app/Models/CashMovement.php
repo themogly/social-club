@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Casts\MoneyCast;
 use App\Enums\CashMovementType;
+use App\Enums\CashPot;
 use Database\Factories\CashMovementFactory;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -17,6 +18,7 @@ class CashMovement extends Model
 
     protected $fillable = [
         'till_session_id', 'amount_cents', 'type', 'reason', 'operator_id',
+        'pot', // prompt 349 — which cash pot (DISPENSARY by default)
     ];
 
     protected function casts(): array
@@ -24,6 +26,7 @@ class CashMovement extends Model
         return [
             'amount_cents' => MoneyCast::class,
             'type' => CashMovementType::class,
+            'pot' => CashPot::class,
         ];
     }
 

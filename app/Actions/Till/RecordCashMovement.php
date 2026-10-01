@@ -3,6 +3,7 @@
 namespace App\Actions\Till;
 
 use App\Enums\CashMovementType;
+use App\Enums\CashPot;
 use App\Exceptions\TillClosedException;
 use App\Models\CashMovement;
 use App\Models\TillSession;
@@ -18,7 +19,7 @@ use Illuminate\Support\Facades\DB;
 class RecordCashMovement
 {
     /**
-     * @param  array{reason?: ?string, operator_id?: ?string}  $options
+     * @param  array{reason?: ?string, operator_id?: ?string, pot?: ?CashPot}  $options  `pot` (prompt 349): which cash pot, the dispensary's by default
      */
     public function handle(TillSession $session, CashMovementType $type, int $magnitude, array $options = []): CashMovement
     {
@@ -40,6 +41,7 @@ class RecordCashMovement
                 'type' => $type,
                 'reason' => $options['reason'] ?? null,
                 'operator_id' => $options['operator_id'] ?? CounterOperator::id() ?? Auth::id(),
+                'pot' => $options['pot'] ?? CashPot::DISPENSARY,
             ]);
         });
     }

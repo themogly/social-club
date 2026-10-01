@@ -22,6 +22,10 @@ class TillSession extends Model
     protected $fillable = [
         'organisation_id', 'location_id', 'terminal', 'opened_by', 'opened_at', 'float_cents',
         'closed_by', 'closed_at', 'counted_cents', 'expected_cents', 'variance_cents', 'status', 'notes',
+        // Prompt 349 — the bar and fees pots (the float/counted/expected/variance above are the dispensary pot's when on).
+        'separate_pots',
+        'bar_opening_cents', 'bar_counted_cents', 'bar_expected_cents', 'bar_variance_cents',
+        'fees_opening_cents', 'fees_counted_cents', 'fees_expected_cents', 'fees_variance_cents',
     ];
 
     protected function casts(): array
@@ -34,6 +38,15 @@ class TillSession extends Model
             'expected_cents' => MoneyCast::class,
             'variance_cents' => MoneyCast::class,
             'status' => TillSessionStatus::class,
+            'separate_pots' => 'boolean',
+            'bar_opening_cents' => MoneyCast::class,
+            'bar_counted_cents' => MoneyCast::class,
+            'bar_expected_cents' => MoneyCast::class,
+            'bar_variance_cents' => MoneyCast::class,
+            'fees_opening_cents' => MoneyCast::class,
+            'fees_counted_cents' => MoneyCast::class,
+            'fees_expected_cents' => MoneyCast::class,
+            'fees_variance_cents' => MoneyCast::class,
         ];
     }
 

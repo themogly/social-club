@@ -19322,3 +19322,107 @@ to do this by hand.
   - a member enrolled at Central gets Central (the fee) and North (covered, no fee), and none at the store.
 - **346 on the staff form:** its automatic read was proven at the counter in 346's own run (the scan still attached).
   It wasn't re-run here.
+
+## Prompt 349 — the till keeps three cash pots; the float and the cash-up are the dispensary's
+
+### The pots, and which source feeds which
+
+- **The setting.** *Botes de efectivo separados* (`separate_cash_pots`, per sede, in *Sedes → Cajas*).
+  - It's **off** in code, so today's single drawer is the default for any new club.
+  - **The 349 migration switches it ON for this club's existing sedes** (never the store).
+  - Each session **snapshots** it at opening (`till_sessions.separate_pots`), so a session's arithmetic never changes
+    under it. A till open at deploy keeps one drawer until it's closed.
+- **The pots** (`App\Enums\CashPot`):
+
+  | Pot | Fed by |
+  | --- | --- |
+  | Dispensario | the float, cash dispensations, wallet top-ups taken in cash, refunds paid out, its movements |
+  | Barra | its carried opening, bar & shop cash, its movements |
+  | Cuotas | its carried opening, membership fees in cash, its movements |
+
+- **No cash writer had to change for the sources.** Each source table already records its kind (dispensations,
+  orders, fee payments are separate ledgers), so the pot is decided in **one place**, `TillSummary::breakdownMany()`.
+  Expected cash is still derived from the ledger, never stored while open.
+- **Movements carry a pot:** `cash_movements.pot`, DISPENSARY by default, and every existing row is the dispensary's.
+  The *Registrar movimiento* form gains *Bote*, with «Para retirar el dinero de la barra o de las cuotas, elige su
+  bote.»
+- **Wallet movements** touch no pot, as before.
+- **With pots off,** the three pots add up to exactly the old single-drawer figure: the openings are 0 and all
+  movements are the dispensary's. The pin test proves it.
+
+### The change rule for a combined visit
+
+- **One rule, nothing clever:** each part's net cash belongs to its own pot. The dispensation's cash goes to
+  Dispensario and the order's to Barra, which the ledger already records apart.
+- **The visit is paid at the dispensary pot.** The note goes in and the change comes out there.
+- **So the operator is told, by amount,** what goes in the bar's: «Visita liquidada: dispensación y barra. Pon 3,40 € en
+  el bote de la barra.»
+- **No extra movement is written.** The pots' expected figures already split correctly; the instruction is what makes
+  the physical pots match them.
+
+### Counting per pot, and the carry-forward
+
+- **At close,** the blind count asks for **Dispensario** (required, labelled «Dispensario contado (€) — con el fondo de
+  caja»). **Barra** and **Cuotas** each offer *Contar ahora* (with an amount) or *No se cuenta hoy*.
+- **The defaults** come from per-sede *Contar la barra cada noche* / *Contar las cuotas cada noche*. Both are off,
+  which is this club's practice.
+- **Still blind:** no expected figure appears until the close is confirmed.
+- **`CloseTill` stores per pot:** `bar_/fees_expected_cents` always; `_counted_cents` and `_variance_cents` only when
+  counted. The tolerance note is asked for if any counted pot is beyond tolerance.
+- **The carry-forward.** The next session at that terminal opens each optional pot with what it held at the last close:
+  the count if it was counted, the expected if not (`OpenTill::carriedOpenings`).
+  - So a pot's expected keeps accumulating until someone counts it, and the difference is then against everything
+    since its last count (tested: €10 accumulated, €9.50 found, −€0.50).
+  - The Till screen shows «Barra: esperado 1,20 € · sin contar desde el 01/10» (`TillSummary::uncountedSince`).
+  - The open form says «Del bote del dispensario. La barra (1,20 €) y las cuotas (10,00 €) abren con lo que tenían.»
+- **Emptying the bar or fees pot** uses *Registrar movimiento* with *Bote: Barra/Cuotas*, *Salida* or *Ingreso en
+  banco*, and a reason. Nothing else was needed.
+
+### The float, the headline and every report's headline: the dispensary pot only
+
+| Place | What it shows now (pots on) |
+| --- | --- |
+| `OpenTill` | *Fondo de caja* is the dispensary pot's opening; bar and fees are never asked for a float (they open with their carried balance, 0 the first time) |
+| Sede default float, "carry the last close forward" | unchanged code, and they feed `float_cents`, which is the dispensary pot's |
+| `TillSummary` (`expected`) | the headline «Efectivo esperado en el cajón» = the **dispensary** pot; bar and fees on their own lines beneath, never added in; the breakdown's bar and fee rows carry a «Bote de la barra/cuotas» badge |
+| `HandOverTill` | compares *Efectivo contado* with the headline, so the **dispensary** pot only; the panel says «Solo el bote del dispensario (con el fondo de caja)» (tested: 120 → 0, 135 → +15) |
+| `CloseTill` | `counted/expected/variance_cents` = the dispensary pot's; bar/fees in their own columns |
+| `ZReport` | headline expected/counted/variance = dispensary (frozen at close); adds `bar_` and `fees_` `expected`, `counted` and `variance` |
+| Dashboard *Caja* card (`lastSessionVarianceCents`) | reads `variance_cents`, so the dispensary's |
+| *Informes → Cajas* (`TillReport`) | Esperado/Contado/Descuadre = dispensary; when any session keeps pots, adds *Barra* and *Cuotas* columns: expected, counted or «no contado», difference |
+| Panel *Cajas* list | the three columns are the dispensary's; a toggleable *Barra · Cuotas* column summarises them |
+
+### Notes
+
+- **Vocabulary.** The pot is the physical **bote de la barra**, so it's labelled *Barra* like the counter position
+  (prompt 42). The income figure in the breakdown stays «Barra y tienda en efectivo».
+- **The demo seed** runs its migrations before it creates sedes, so the demo sedes keep one drawer. The browser proof
+  switches Central Branch on, as the migration does for real sedes.
+
+### Tests and proofs
+
+- **`tests/Feature/Till/CashPotsTest.php`** (9, all red on the old code: 6 failures, 3 errors):
+  - each source feeds its pot;
+  - a combined visit splits, with the bar's share named;
+  - a €100 float makes the headline €120 (not €135), with bar €5 and fees €10 on their own lines on the Till screen;
+  - handover 120 → 0, 135 → +15;
+  - a dispensary-only close carries bar and fees; the next opening carries them; a later bar count is against the
+    accumulated; a counted pot opens with its count;
+  - a €300 fees exit reduces only fees;
+  - **pots off: the single drawer unchanged** (the pin);
+  - the Z report, the dashboard and *Informes → Cajas* use the dispensary, with bar and fees apart;
+  - the Till screen's close starts on each sede's *Contar cada noche* and stays blind.
+- **The migration** against a copy seeded before it: the setting is on for Central and North only (not the store),
+  sessions are untouched, and every movement is the dispensary's. Rollback and re-migrate are clean.
+- **The browser proof** (`tests/Browser/prove-349-cash-pots.mjs`, a freshly seeded demo DB, Central Branch with pots
+  on, 1180×820), 12/12 PASS:
+  1. open with €100 (the open form names the dispensary pot);
+  2. a visit of flower plus a drink in cash: two parts, the bar's share named; a fee in cash;
+  3. the headline is €100 + the flower cash (111,54 €), with Barra 1,20 € and Cuotas 10,00 € on their own lines;
+  4. the close asks per pot; counting only the dispensary gives 0,00 € difference, with bar and fees carried;
+  5. the next opening shows and takes the carried balances, with «sin contar desde el 01/10»;
+  6. counting the bar shows its difference (−0,50 €) against everything carried.
+- **A gate run that stalled.** Two `composer check` runs sat past 50 minutes in the test step, which normally takes
+  about 8. Every test folder then passed on its own (67 runs, all green), a streamed full run passed in 8 minutes, and
+  the next full `composer check` and English run passed at normal speed (511 s / 985 s). There were overlapping runs and
+  servers on the machine at the time. Recorded as environmental, not as a hang in this change.

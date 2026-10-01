@@ -2,6 +2,7 @@
 
 namespace App\Support;
 
+use App\Enums\CashPot;
 use App\Enums\DispensationStatus;
 use App\Enums\OrderStatus;
 use App\Enums\TillSessionStatus;
@@ -66,7 +67,20 @@ class ZReport
                 $postCloseAdjusted = $liveExpected !== $breakdown['expected'];
             }
 
-            $out[$id] = array_merge($breakdown, [
+            // Prompt 349 — the bar and fees pots: frozen at close like the headline (counted, or "no contado" with what it
+            // carried), live while open. The headline counted/expected/variance above are the DISPENSARY pot's then.
+            $potFigures = [];
+            foreach (CashPot::optional() as $pot) {
+                $col = $pot->column();
+                $closedExpected = $session->getRawOriginal("{$col}_expected_cents");
+                $potFigures["{$col}_expected"] = $session->status === TillSessionStatus::CLOSED && $closedExpected !== null
+                    ? (int) $closedExpected
+                    : $breakdown['pots'][$pot->value]['expected'];
+                $potFigures["{$col}_counted"] = $session->getRawOriginal("{$col}_counted_cents") !== null ? (int) $session->getRawOriginal("{$col}_counted_cents") : null;
+                $potFigures["{$col}_variance"] = $session->getRawOriginal("{$col}_variance_cents") !== null ? (int) $session->getRawOriginal("{$col}_variance_cents") : null;
+            }
+
+            $out[$id] = array_merge($breakdown, $potFigures, [
                 'counted' => $session->counted_cents?->cents,
                 'variance' => $session->variance_cents?->cents,
                 // The live recomputation, kept alongside the frozen figure so a post-close change is inspectable.

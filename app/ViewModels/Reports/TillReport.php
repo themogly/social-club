@@ -68,6 +68,7 @@ class TillReport extends AbstractReport
             ->get();
 
         $this->sessionCount = $sessions->count();
+        $anyPots = $sessions->contains(fn (TillSession $session): bool => (bool) $session->separate_pots); // prompt 349
 
         // One batched Z-report for the whole period — a fixed number of grouped queries, not ~12 per session
         // in this loop (prompt 108).
@@ -87,6 +88,13 @@ class TillReport extends AbstractReport
                 'counted' => $z['counted'],
                 'variance' => $z['variance'],
                 'tx' => (int) $z['transaction_count'],
+                // Prompt 349 — the bar and fees pots, their own columns (the three above are the dispensary pot's then).
+                'barra_esperado' => $z['separate_pots'] ? (int) $z['bar_expected'] : null,
+                'barra_contado' => $z['separate_pots'] ? ($z['bar_counted'] !== null ? Money::fromCents((int) $z['bar_counted'])->formatted() : __('no contado')) : '—',
+                'barra_descuadre' => $z['separate_pots'] ? $z['bar_variance'] : null,
+                'cuotas_esperado' => $z['separate_pots'] ? (int) $z['fees_expected'] : null,
+                'cuotas_contado' => $z['separate_pots'] ? ($z['fees_counted'] !== null ? Money::fromCents((int) $z['fees_counted'])->formatted() : __('no contado')) : '—',
+                'cuotas_descuadre' => $z['separate_pots'] ? $z['fees_variance'] : null,
                 'estado' => $session->status === TillSessionStatus::OPEN
                     ? __('Abierta')
                     // A closed session whose ledger moved after cierre (a post-close void) is flagged, so the
@@ -122,6 +130,14 @@ class TillReport extends AbstractReport
                 ReportColumn::money('counted', __('Contado')),
                 ReportColumn::money('variance', __('Descuadre')),
                 ReportColumn::number('tx', __('Tx')),
+                ...($anyPots ? [
+                    ReportColumn::money('barra_esperado', __('Barra: esperado')),
+                    ReportColumn::text('barra_contado', __('Barra: contado')),
+                    ReportColumn::money('barra_descuadre', __('Barra: descuadre')),
+                    ReportColumn::money('cuotas_esperado', __('Cuotas: esperado')),
+                    ReportColumn::text('cuotas_contado', __('Cuotas: contado')),
+                    ReportColumn::money('cuotas_descuadre', __('Cuotas: descuadre')),
+                ] : []),
                 ReportColumn::text('estado', __('Estado')),
             ],
             rows: $rows,

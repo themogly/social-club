@@ -8,6 +8,7 @@ use App\Models\Location;
 use App\Models\TillSession;
 use App\Models\User;
 use App\Support\CounterOperator;
+use App\Support\Settings;
 use App\Support\TerminalName;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -45,6 +46,12 @@ class OpenTill
             $located = Location::withoutGlobalScopes()->lockForUpdate()->findOrFail($location->id);
             $located->update(['terminals' => TerminalName::register($located->terminalNames(), $terminal)]);
 
+            // Prompt 349 — *Botes de efectivo separados*: snapshotted onto the session (so its arithmetic never changes
+            // under it). The float is the DISPENSARY pot's; the bar and fees pots open with what they held at this
+            // terminal's last close — the count if they were counted, the expected if not (it carries until someone counts).
+            $separate = (bool) Settings::get('separate_cash_pots', false, (string) $location->getKey());
+            $carried = $separate ? self::carriedOpenings($location, $key) : ['bar' => 0, 'fees' => 0];
+
             $session = TillSession::create([
                 'organisation_id' => $location->organisation_id,
                 'location_id' => $location->id,
@@ -54,6 +61,9 @@ class OpenTill
                 'float_cents' => $floatCents,
                 'status' => TillSessionStatus::OPEN,
                 'notes' => $options['notes'] ?? null,
+                'separate_pots' => $separate,
+                'bar_opening_cents' => $carried['bar'],
+                'fees_opening_cents' => $carried['fees'],
             ]);
 
             // Prompt 186 — the first shift, opened with the session. A single-operator day is then ONE shift
@@ -68,5 +78,26 @@ class OpenTill
 
             return $session;
         });
+    }
+
+    /**
+     * What the bar and fees pots held at this terminal's last close (prompt 349).
+     *
+     * @return array{bar: int, fees: int}
+     */
+    public static function carriedOpenings(Location $location, string $terminalKey): array
+    {
+        $last = TillSession::query()->withoutGlobalScopes()
+            ->where('location_id', $location->id)->where('status', TillSessionStatus::CLOSED->value)->where('separate_pots', true)
+            ->orderByDesc('closed_at')->orderByDesc('id')->get()
+            ->first(fn (TillSession $s): bool => TerminalName::key((string) $s->terminal) === $terminalKey);
+
+        if ($last === null) {
+            return ['bar' => 0, 'fees' => 0];
+        }
+
+        $held = fn (string $pot): int => (int) ($last->getRawOriginal("{$pot}_counted_cents") ?? $last->getRawOriginal("{$pot}_expected_cents") ?? 0);
+
+        return ['bar' => $held('bar'), 'fees' => $held('fees')];
     }
 }
