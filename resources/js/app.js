@@ -37,24 +37,52 @@ const overlayHistory = {
     },
 };
 
-// Prompt 313 — in the INSTALLED app (display-mode standalone/fullscreen, 290), Back at the start of the history means
-// "leave the app"; with Android app pinning on, the app is refused leave and restarts on its launch screen — in a loop,
-// with the "to unpin" toast flashing. So the start is guarded: the page's own entry is marked as the root and a guard
-// entry sits above it; Back onto the root pushes the guard again and does nothing else (no navigation, no reload).
-// Overlays keep their own entries ABOVE the guard, so Back still closes them first. NEVER in a normal browser tab:
-// trapping Back there would be hostile — leaving the counter is the top bar's job (tabs, Administración, sign out).
+// Prompt 313, made to hold by 339 — in the INSTALLED app (display-mode standalone/fullscreen, 290), Back at the start of
+// the history means "leave the app"; with Android app pinning on, the app is refused leave and restarts on its launch
+// screen — in a loop, with the "to unpin" toast. So the page's own entry is the ROOT and a stack of GUARD entries sits
+// above it: Back pops a guard (nothing happens), and Back onto the root pushes the stack again. Overlays keep their own
+// entries ABOVE the guards, so Back still closes them first. NEVER in a normal browser tab — leaving the counter is the
+// top bar's job (tabs, Administración, sign out); Android's Home and Recents, and unpinning, are the system's.
+//
+// Why 313 alone did not hold on the tablet:
+//   · it skipped its listener whenever a page loaded on its own guard entry — every reload, every Back into an earlier
+//     counter page — so those pages let Back straight through, and the walk reached the first entry;
+//   · Chrome's Back button SKIPS history entries a page created without a user gesture (the "history manipulation
+//     intervention"): a guard pushed at load, before any tap, does not stop the real Back button.
+// So: the listener is ALWAYS installed; the stack is topped up on every tap (entries pushed with a gesture are not
+// skipped), DEPTH deep so twenty quick Backs still land on guards; where the Navigation API can cancel a backward
+// traversal to an earlier page, it does; and the counter layout's <head> sets the root and guards up before this
+// module loads (the moment of launch). The head script and this must agree on the state shape: { cscRoot } / { cscGuard: n }.
 const rootBackGuard = {
+    DEPTH: 25,
     standalone() {
         return ['standalone', 'fullscreen'].some((mode) => window.matchMedia?.(`(display-mode: ${mode})`)?.matches);
     },
+    // Push guards up to DEPTH — only from the root or a guard, never on top of an overlay's own entry.
+    topUp() {
+        const state = history.state ?? {};
+        let depth = state.cscRoot ? 0 : Number(state.cscGuard) || (state.cscGuard === true ? 1 : -1);
+        if (depth < 0) return;
+        for (; depth < this.DEPTH; depth++) history.pushState({ cscGuard: depth + 1 }, '');
+    },
     install() {
-        if (! this.standalone() || history.state?.cscGuard) return;
-        history.replaceState({ ...(history.state ?? {}), cscRoot: true }, '');
-        history.pushState({ cscGuard: true }, '');
+        if (! this.standalone()) return;
+        const state = history.state ?? {};
+        if (! state.cscRoot && ! state.cscGuard) {
+            history.replaceState({ ...state, cscRoot: true }, '');
+        }
+        this.topUp();
         window.addEventListener('popstate', (event) => {
             if (! event.state?.cscRoot) return;
-            history.pushState({ cscGuard: true }, '');
+            this.topUp();
             this.hint();
+        });
+        ['pointerdown', 'keydown'].forEach((type) => window.addEventListener(type, () => this.topUp(), { capture: true, passive: true }));
+        // Where the browser lets a backward traversal to an EARLIER page be cancelled, cancel it: Back never leaves this
+        // counter page. Same-document traversals (guards, overlays) are left to popstate.
+        window.navigation?.addEventListener('navigate', (event) => {
+            if (event.navigationType !== 'traverse' || ! event.cancelable || event.destination?.sameDocument) return;
+            if ((event.destination?.index ?? 0) < (window.navigation.currentEntry?.index ?? 0)) event.preventDefault();
         });
     },
     // Once a session, a quiet line so a swallowed Back is not a mystery. Never a dialog (that would need Back to close).

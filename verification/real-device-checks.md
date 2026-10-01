@@ -108,3 +108,26 @@ after launch, or several times, and watch for the launch screen and the *"to unp
 screen recording.
 
 **Answer:** _(pending)_
+
+## 339 — Back can never walk out of the pinned app (313, made to hold)
+
+313 did not hold on the tablet. This can only be proved on the device: a test browser cannot press the real Back button,
+and Chrome's Back skips history entries a page made before anyone tapped it.
+
+1. **Confirm it is the installed app, not a Chrome shortcut.** In *Ajustes → Aplicaciones*, **Mostrador** must be listed,
+   and there must be no address bar when it is open. If it is a shortcut, reinstall it first (290 / 289 steps); the
+   guard only runs in the installed app.
+2. **With app pinning on:**
+   - Back straight after launch, before touching the screen;
+   - Back straight after launch, after one tap anywhere;
+   - Back 20 times quickly;
+   - Back after visiting four screens (hub, Dispensario, Barra, Caja);
+   - Back after a reload (pull to refresh, if available);
+   - Back with the receipt sheet open, then Back again.
+
+   The app must never show the launch screen or the "to unpin" toast. Record the screen.
+3. **Record:** Android version, Chrome version, installed app or shortcut, and the result of each step.
+
+| Date | Tablet | Android | Chrome | Installed? | Result |
+|---|---|---|---|---|---|
+| | | | | | pending (Shane) |
