@@ -69,6 +69,8 @@ class ApplicantFormHarnessTest extends TestCase
         );
 
         $this->assertStringContainsString('data-mrz-prefilled', $scanned, 'the post-scan state did not render');
-        $this->assertSame(4, substr_count($scanned, 'data-mrz-confirm='), 'expected a confirm chip per prefilled field');
+        // Prompt 346 — every field's chip is on the page (hidden until it applies, for the background read); the four
+        // prefilled ones are the ones shown.
+        $this->assertSame(4, preg_match_all('/data-mrz-prefilled="[a-z_]+"\s+class=/', $scanned), 'expected a shown confirm chip per prefilled field');
     }
 }

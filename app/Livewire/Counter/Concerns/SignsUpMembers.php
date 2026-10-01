@@ -20,6 +20,7 @@ use App\Models\MemberApplication;
 use App\Models\MembershipTier;
 use App\Models\User;
 use App\Support\ApplicationShape;
+use App\Support\Mrz\MrzDocument;
 use App\Support\Mrz\MrzParser;
 use App\Support\Settings;
 use Illuminate\Support\Collection;
@@ -139,6 +140,20 @@ trait SignsUpMembers
      * @var list<string>
      */
     public array $altaMrzFilled = [];
+
+    /**
+     * Prompt 346 — what the document says for a field the operator had already filled differently (field => value).
+     *
+     * @var array<string, string>
+     */
+    public array $altaMrzOffered = [];
+
+    /**
+     * The values a read put in the form (field => value), so a second photo can replace them but never a typed value.
+     *
+     * @var array<string, string>
+     */
+    public array $altaMrzRead = [];
 
     /**
      * WHERE each field of the shared application shape is asked (prompt 221).
@@ -384,6 +399,8 @@ trait SignsUpMembers
         $this->altaDocumentScan = null;
         $this->altaMedicalCert = null;
         $this->altaMrzFilled = [];
+        $this->altaMrzOffered = [];
+        $this->altaMrzRead = [];
         $this->altaSignaturePath = null;
         $this->altaStep = 1;
     }
@@ -423,37 +440,52 @@ trait SignsUpMembers
      * prefill a document number — 128 built the parser correct-or-invalid for exactly that. A failed or
      * absent read leaves the form untouched and usable, which is what makes an imperfect reader safe.
      */
-    public function applyMrz(string $raw): void
+    public function applyMrz(string $raw): bool
     {
-        $this->altaMrzFilled = [];
+        $this->altaMrzOffered = [];
 
         if ($raw === '' || mb_strlen($raw) > 200) {
-            return;
+            return false;
         }
 
         $parsed = (new MrzParser)->parse($raw);
 
+        // A failed read: the page says so in one line (prompt 346) and the scan stays attached.
         if ($parsed === null || $parsed['valid'] !== true) {
-            $this->flash(__('No se ha podido leer el documento. Escribe los datos a mano.'), 'warning');
+            return false;
+        }
 
+        // Prompt 346 — fill only EMPTY fields. A value the operator already typed that differs from the document is
+        // left alone and offered under its field («En el documento: … · Usar»); one that matches needs nothing.
+        $filled = [];
+        foreach (MrzDocument::fields($parsed) as $field => $value) {
+            $current = trim((string) ($this->altaForm[$field] ?? ''));
+            // Empty, or still exactly what an EARLIER read put there (a second photo replaces the first read's values).
+            if ($current === '' || $current === ($this->altaMrzRead[$field] ?? null)) {
+                $this->altaForm[$field] = $value;
+                $this->altaMrzRead[$field] = $value;
+                $filled[] = $field;
+            } elseif (mb_strtoupper($current) !== mb_strtoupper($value)) {
+                $this->altaMrzOffered[$field] = $value;
+            }
+        }
+
+        // Named, so the operator knows which fields to check against the document in their hand — the same
+        // "the person is the check" rule the public form's confirmation partial encodes.
+        $this->altaMrzFilled = array_values(array_unique([...$this->altaMrzFilled, ...$filled]));
+
+        return true;
+    }
+
+    /** «Usar» under a field: take the document's value, marked as read from it like the rest. */
+    public function useMrzValue(string $field): void
+    {
+        if (! array_key_exists($field, $this->altaMrzOffered)) {
             return;
         }
-
-        $read = array_filter([
-            'first_name' => $parsed['given_names'],
-            'last_name' => $parsed['surname'],
-            'document_number' => $parsed['document_number'],
-            // The only nullable one: a TD1/TD3 date can fail to parse while the rest of the zone reads.
-            'date_of_birth' => $parsed['birth_date'],
-        ], fn (?string $v): bool => filled($v));
-
-        foreach ($read as $field => $value) {
-            $this->altaForm[$field] = $value;
-        }
-
-        // Named, so the operator knows which four to check against the document in their hand — the same
-        // "the person is the check" rule the public form's confirmation partial encodes.
-        $this->altaMrzFilled = array_keys($read);
+        $this->altaForm[$field] = $this->altaMrzRead[$field] = $this->altaMrzOffered[$field];
+        unset($this->altaMrzOffered[$field]);
+        $this->altaMrzFilled = array_values(array_unique([...$this->altaMrzFilled, $field]));
     }
 
     /**

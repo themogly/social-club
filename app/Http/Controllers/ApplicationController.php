@@ -13,8 +13,10 @@ use App\Models\Member;
 use App\Models\MemberApplication;
 use App\Support\ApplicationSpamGuard;
 use App\Support\CounterHandover;
+use App\Support\Mrz\MrzDocument;
 use App\Support\Mrz\MrzParser;
 use App\Support\MrzPrefill;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\RateLimiter;
@@ -191,7 +193,17 @@ class ApplicationController extends Controller
         return view('socio.application-left', ['expires' => $application->invite_expires_at]);
     }
 
-    public function read(Request $request, string $token): RedirectResponse
+    /**
+     * The read: the browser posts the zone's TEXT (never the image) and the server parses it with `MrzParser` and keeps
+     * the provisional fields in `MrzPrefill`.
+     *
+     * Prompt 346 — the page now asks in the BACKGROUND (`fetch`, JSON): the old full-page submit reloaded the form, and
+     * a file input never survives a reload, so the ID photo the applicant had just taken was silently dropped. The JSON
+     * answer carries what the document says; the page fills only EMPTY fields, and names the ones it left alone in
+     * `keep` so they are not marked provisional (the confirmation gate asks only about values the reader put there).
+     * A plain POST (no script) still redirects back, as before.
+     */
+    public function read(Request $request, string $token): RedirectResponse|JsonResponse
     {
         $application = $this->find($token);
 
@@ -201,7 +213,7 @@ class ApplicationController extends Controller
 
         // Already submitted (prompt 249): the reader changes nothing on a finished form.
         if (! $application->acceptsSubmission()) {
-            return redirect()->route('socio.application', ['token' => $token]);
+            return $request->expectsJson() ? response()->json(['ok' => false]) : redirect()->route('socio.application', ['token' => $token]);
         }
 
         // Rate limited like any unauthenticated write, and bounded in size — an MRZ is at most three lines
@@ -209,7 +221,7 @@ class ApplicationController extends Controller
         $raw = (string) $request->input('mrz', '');
 
         if (mb_strlen($raw) > 200 || ! RateLimiter::attempt('application-mrz:'.$request->ip(), 20, fn () => true, 3600)) {
-            return $this->backToForm($token);
+            return $request->expectsJson() ? response()->json(['ok' => false]) : $this->backToForm($token);
         }
 
         $parsed = (new MrzParser)->parse($raw);
@@ -219,16 +231,16 @@ class ApplicationController extends Controller
         if ($parsed === null || $parsed['valid'] !== true) {
             MrzPrefill::forget($token);
 
-            return $this->backToForm($token);
+            return $request->expectsJson() ? response()->json(['ok' => false]) : $this->backToForm($token);
         }
 
-        MrzPrefill::remember($token, [
-            'first_name' => $parsed['given_names'],
-            'last_name' => $parsed['surname'],
-            'document_number' => $parsed['document_number'],
-            // The only nullable one: a TD1/TD3 date can fail to parse while the rest of the zone reads.
-            'date_of_birth' => (string) ($parsed['birth_date'] ?? ''),
-        ]);
+        $read = MrzDocument::fields($parsed);
+        $keep = array_filter((array) $request->input('keep', []), 'is_string');
+        MrzPrefill::remember($token, array_diff_key($read, array_flip($keep)));
+
+        if ($request->expectsJson()) {
+            return response()->json(['ok' => true, 'fields' => $read, 'provisional' => MrzPrefill::fields($token)]);
+        }
 
         return $this->backToForm($token);
     }

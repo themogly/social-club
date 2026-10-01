@@ -52,18 +52,21 @@
                 <input id="alta-first-name" type="text" wire:model="altaForm.first_name" aria-required="true" @error('altaForm.first_name') aria-invalid="true" aria-describedby="altaForm.first_name-error" @enderror autocomplete="new-first-name" data-no-autofill
                        class="mt-1 h-12 w-full rounded-xl border border-line bg-surface px-4 text-base dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100">
                 <x-socio.field-error name="altaForm.first_name" />
+                @include('livewire.counter.partials.mrz-offer', ['field' => 'first_name'])
             </div>
             <div>
                 <label for="alta-last-name" class="block text-sm font-medium text-ink-muted dark:text-slate-400">{{ __('Apellidos') }}</label>
                 <input id="alta-last-name" type="text" wire:model="altaForm.last_name" aria-required="true" @error('altaForm.last_name') aria-invalid="true" aria-describedby="altaForm.last_name-error" @enderror autocomplete="new-last-name" data-no-autofill
                        class="mt-1 h-12 w-full rounded-xl border border-line bg-surface px-4 text-base dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100">
                 <x-socio.field-error name="altaForm.last_name" />
+                @include('livewire.counter.partials.mrz-offer', ['field' => 'last_name'])
             </div>
             <div>
                 <label for="alta-dob" class="block text-sm font-medium text-ink-muted dark:text-slate-400">{{ __('Fecha de nacimiento') }}</label>
                 <input id="alta-dob" type="date" wire:model="altaForm.date_of_birth" aria-required="true" @error('altaForm.date_of_birth') aria-invalid="true" aria-describedby="altaForm.date_of_birth-error" @enderror autocomplete="new-date-of-birth" data-no-autofill
                        class="mt-1 h-12 w-full rounded-xl border border-line bg-surface px-4 text-base dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100">
                 <x-socio.field-error name="altaForm.date_of_birth" />
+                @include('livewire.counter.partials.mrz-offer', ['field' => 'date_of_birth'])
             </div>
             <div>
                 <label for="alta-doc-type" class="block text-sm font-medium text-ink-muted dark:text-slate-400">{{ __('Tipo de documento') }}</label>
@@ -75,12 +78,14 @@
                     @endforeach
                 </select>
                 <x-socio.field-error name="altaForm.document_type" />
+                @include('livewire.counter.partials.mrz-offer', ['field' => 'document_type'])
             </div>
             <div class="sm:col-span-2">
                 <label for="alta-doc-number" class="block text-sm font-medium text-ink-muted dark:text-slate-400">{{ __('Número de documento') }}</label>
                 <input id="alta-doc-number" type="text" wire:model="altaForm.document_number" aria-required="true" @error('altaForm.document_number') aria-invalid="true" aria-describedby="altaForm.document_number-error" @enderror autocomplete="new-document-number" data-no-autofill
                        class="mt-1 h-12 w-full rounded-xl border border-line bg-surface px-4 text-base dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100">
                 <x-socio.field-error name="altaForm.document_number" />
+                @include('livewire.counter.partials.mrz-offer', ['field' => 'document_number'])
             </div>
         </div>
 
@@ -98,6 +103,7 @@
             </div>
 
             <div>
+                <p data-mrz-tip class="mb-1 text-[11px] font-medium leading-tight text-ink dark:text-slate-200">{{ __('Para rellenar los datos automáticamente: DNI/NIE por detrás, pasaporte por la página de la foto.') }}</p>
                 <x-counter.file-field id="alta-scan" :label="__('Documento de identidad (opcional)')" wire:model="altaDocumentScan" accept="image/*,application/pdf" camera="environment" data-alta-scan="" :hint="__('Se guarda cifrado y cada consulta queda registrada.')" />
             </div>
         </div>
@@ -106,16 +112,21 @@
              browser that cannot run the reader never shows a control that would do nothing — and a failed read
              leaves the form exactly as it was. --}}
         <div data-alta-mrz-region class="rounded-xl border border-line bg-surface-alt px-3 py-2 dark:border-slate-700 dark:bg-slate-800">
+            {{-- Prompt 346 — the read starts by itself when the scan is chosen or taken; this is the retry. The status line
+                 is the script's (`wire:ignore`), so a morph never wipes "Leyendo…" mid-read. --}}
             <button
                 type="button"
                 data-alta-mrz-scan
                 hidden
                 data-reading="{{ __('Leyendo el documento…') }}"
-                data-needs-file="{{ __('Elige primero una foto del documento.') }}"
+                data-pdf="{{ __('Para rellenar los datos automáticamente, usa una foto en lugar de un PDF.') }}"
+                data-failed="{{ __('No se ha podido leer el documento. Fotografía la cara con las líneas de letras y «<<<» (la parte de atrás del DNI o NIE; la página de la foto del pasaporte), con buena luz y sin reflejos, o escribe los datos a mano.') }}"
                 class="inline-flex min-h-11 items-center rounded-xl border border-brand/40 bg-brand-tint px-4 text-sm font-semibold text-brand transition hover:bg-brand-tint/70 disabled:opacity-60 dark:bg-slate-900 dark:text-slate-100 dark:hover:bg-slate-800"
-            >{{ __('Rellenar desde el documento') }}</button>
-            <p data-alta-mrz-status role="status" aria-live="polite" class="text-[11px] leading-tight text-ink-muted empty:hidden dark:text-slate-400"></p>
-            <p class="mt-0.5 text-[11px] leading-tight text-ink-muted dark:text-slate-400">{{ __('Del DNI o NIE, fotografía el REVERSO. Del pasaporte, la página de la foto.') }}</p>
+            >{{ __('Volver a leer el documento') }}</button>
+            <p wire:ignore role="status" aria-live="polite" class="flex items-start gap-2 text-[11px] leading-tight text-ink-muted dark:text-slate-400">
+                <span data-mrz-spinner hidden aria-hidden="true" class="mt-0.5 inline-block h-3 w-3 shrink-0 animate-spin rounded-full border-2 border-brand/30 border-t-brand motion-reduce:animate-none"></span>
+                <span data-alta-mrz-status></span>
+            </p>
 
             @if (! empty($altaMrzFilled))
                 <div data-alta-mrz-filled class="mt-2 rounded-lg border border-warning/40 bg-warning/5 p-2">

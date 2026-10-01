@@ -45,8 +45,11 @@ function extractMrzLines(text) {
 /**
  * OCR a File and return the raw MRZ text, or null. Loads the engine ON DEMAND — a WASM bundle is megabytes
  * and an applicant who never scans, or who is on a slow connection, must not pay for it.
+ *
+ * Prompt 346 — `signal` cancels a read in progress (a newer photo was chosen): the worker is terminated and the read
+ * resolves null, so a stale photo can never fill the form.
  */
-export async function readMrz(file) {
+export async function readMrz(file, signal = null) {
     let Tesseract;
 
     try {
@@ -56,18 +59,22 @@ export async function readMrz(file) {
     }
 
     let worker;
+    const stop = () => worker?.terminate().catch(() => {});
 
     try {
+        if (signal?.aborted) return null;
         worker = await Tesseract.createWorker('eng', 1, ASSETS);
+        signal?.addEventListener('abort', stop, { once: true });
         // The MRZ alphabet only. Constraining it is worth more than any model choice here.
         await worker.setParameters({ tessedit_char_whitelist: 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789<' });
 
         const { data } = await worker.recognize(file);
 
-        return extractMrzLines(data?.text ?? '');
+        return signal?.aborted ? null : extractMrzLines(data?.text ?? '');
     } catch {
         return null;
     } finally {
+        signal?.removeEventListener('abort', stop);
         try {
             await worker?.terminate();
         } catch {
@@ -76,96 +83,217 @@ export async function readMrz(file) {
     }
 }
 
+const isPdf = (file) => file.type === 'application/pdf' || /\.pdf$/i.test(file.name ?? '');
+const isImage = (file) => (file.type ?? '').startsWith('image/');
+
 /**
- * Wire the scan control on the application form.
+ * Prompt 346 — the read starts BY ITSELF when a photo is chosen or taken in the document field (its `change`), on both
+ * forms; the button is a retry with the same photo. A PDF is not read (the engine cannot) and says so. A newer photo
+ * cancels a read in progress. `onZone(mrz, signal)` hands a zone to the form and resolves true when it was a valid one;
+ * anything else ends in the one helpful line — and the photo is never touched.
+ */
+function autoRead({ fileInput, trigger, status, spinner, onZone }) {
+    let running = null;
+
+    const say = (text, busy = false) => {
+        if (status) status.textContent = text || '';
+        if (spinner) spinner.hidden = ! busy;
+    };
+
+    const start = async () => {
+        running?.abort();
+        const file = fileInput.files?.[0];
+        trigger.hidden = ! (file && isImage(file));
+        if (! file) return say('');
+        if (isPdf(file) || ! isImage(file)) return say(isPdf(file) ? trigger.dataset.pdf : '');
+
+        const controller = new AbortController();
+        running = controller;
+        trigger.disabled = true;
+        say(trigger.dataset.reading, true);
+
+        const mrz = await readMrz(file, controller.signal);
+        if (controller.signal.aborted) return; // a newer photo took over; its read reports for itself
+
+        const ok = mrz ? await onZone(mrz, controller.signal).catch(() => false) : false;
+        if (controller.signal.aborted) return;
+
+        running = null;
+        trigger.disabled = false;
+        say(ok ? '' : trigger.dataset.failed);
+    };
+
+    return { start, refresh: () => { trigger.hidden = ! (fileInput.files?.[0] && isImage(fileInput.files[0])); } };
+}
+
+const FIELDS = ['first_name', 'last_name', 'date_of_birth', 'document_number', 'document_type'];
+
+const shown = (value, input) => {
+    if (input?.tagName === 'SELECT') return [...input.options].find((o) => o.value === value)?.textContent?.trim() ?? value;
+    const iso = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+
+    return iso ? `${iso[3]}/${iso[2]}/${iso[1]}` : value;
+};
+
+/**
+ * Wire the reader on the applicant's form.
  *
- * Posts the TEXT to `application.read`, which parses it server-side and redirects back with the fields
- * marked unconfirmed. No image is posted here — a test pins that.
+ * Prompt 346 — the zone goes to `application.read` in the BACKGROUND (JSON, never a page submit): the old
+ * page submit reloaded the page, and a file input never survives a reload, so the ID photo the applicant had just
+ * taken was silently dropped. The server still parses (`MrzParser`) and keeps the provisional fields (`MrzPrefill`);
+ * this page fills only EMPTY fields (or ones an earlier read filled and nobody changed), shows the «Es correcto»
+ * confirmation under each, and offers the document's value under a field the applicant had typed differently. Only the
+ * TEXT is posted — no image (a test pins it).
  */
 export function mountMrzScan(root = document) {
     const trigger = root.querySelector('[data-mrz-scan]');
     const fileInput = root.querySelector('#document_scan');
     const form = root.querySelector('[data-mrz-form]');
-    const status = root.querySelector('[data-mrz-status]');
 
-    if (!trigger || !fileInput || !form) {
+    if (! trigger || ! fileInput || ! form) {
         return;
     }
 
-    trigger.hidden = false;
+    const field = (name) => root.getElementById?.(name) ?? document.getElementById(name);
+    const confirmOf = (name) => root.querySelector(`[data-mrz-prefilled="${name}"]`);
+    const offerOf = (name) => root.querySelector(`[data-mrz-offer="${name}"]`);
+    let lastZone = null;
 
-    trigger.addEventListener('click', async () => {
-        const file = fileInput.files?.[0];
+    // A select always has a value; it counts as the applicant's only once they have changed it.
+    field('document_type')?.addEventListener('change', (e) => { e.target.dataset.touched = '1'; });
 
-        if (!file) {
-            if (status) status.textContent = trigger.dataset.needsFile || '';
-            return;
-        }
+    const typedByThePerson = (name) => {
+        const input = field(name);
+        if (! input) return false;
+        if (input.tagName === 'SELECT') return input.dataset.touched === '1' && input.value !== input.dataset.mrzValue;
+        const value = input.value.trim();
 
-        trigger.disabled = true;
-        if (status) status.textContent = trigger.dataset.reading || '';
+        return value !== '' && value !== (input.dataset.mrzValue ?? null);
+    };
 
-        const mrz = await readMrz(file);
-
-        trigger.disabled = false;
-
-        if (!mrz) {
-            // A failed read is ordinary. Say nothing about it beyond clearing the "reading…" line.
-            if (status) status.textContent = '';
-            return;
-        }
-
+    const ask = async (mrz, keep, signal) => {
         form.querySelector('[data-mrz-input]').value = mrz;
-        form.submit();
+        const response = await fetch(form.action, {
+            method: 'POST',
+            credentials: 'same-origin',
+            signal,
+            headers: {
+                'Content-Type': 'application/json',
+                Accept: 'application/json',
+                'X-Requested-With': 'XMLHttpRequest',
+                'X-CSRF-TOKEN': form.querySelector('input[name="_token"]')?.value ?? '',
+            },
+            body: JSON.stringify({ mrz, keep }),
+        });
+
+        return response.ok ? response.json() : { ok: false };
+    };
+
+    const apply = (answer, keep) => {
+        for (const name of FIELDS) {
+            const input = field(name);
+            const value = answer.fields?.[name];
+            const provisional = (answer.provisional ?? []).includes(name);
+            const confirm = confirmOf(name);
+            const offer = offerOf(name);
+
+            if (provisional && input && value !== undefined) {
+                input.value = value;
+                input.dataset.mrzValue = value;
+                input.dispatchEvent(new Event('input', { bubbles: true }));
+            }
+            if (confirm) {
+                confirm.hidden = ! provisional;
+                const box = confirm.querySelector('[data-mrz-confirm]');
+                if (box) box.checked = false;
+            }
+            if (offer) {
+                const differs = keep.includes(name) && value !== undefined && input
+                    && input.value.trim().toUpperCase() !== String(value).toUpperCase();
+                offer.hidden = ! differs;
+                if (differs) offer.querySelector('[data-mrz-offer-value]').textContent = shown(value, input);
+                offer.dataset.value = differs ? value : '';
+            }
+        }
+    };
+
+    const reader = autoRead({
+        fileInput,
+        trigger,
+        status: root.querySelector('[data-mrz-status]'),
+        spinner: root.querySelector('[data-mrz-spinner]'),
+        onZone: async (mrz, signal) => {
+            const keep = FIELDS.filter(typedByThePerson);
+            const answer = await ask(mrz, keep, signal);
+            if (signal.aborted || ! answer.ok) return false;
+            lastZone = { mrz, keep };
+            apply(answer, keep);
+
+            return true;
+        },
     });
+
+    // «Usar»: the document's value replaces the typed one, as provisional as the rest — the server is told by asking
+    // again with that field no longer kept, so the confirmation gate covers it.
+    root.querySelectorAll('[data-mrz-use]').forEach((button) => button.addEventListener('click', async () => {
+        if (! lastZone) return;
+        const name = button.dataset.mrzUse;
+        const keep = lastZone.keep.filter((k) => k !== name);
+        const answer = await ask(lastZone.mrz, keep).catch(() => ({ ok: false }));
+        if (! answer.ok) return;
+        lastZone = { ...lastZone, keep };
+        apply(answer, keep);
+    }));
+
+    fileInput.addEventListener('change', reader.start);
+    trigger.addEventListener('click', reader.start);
+    reader.refresh();
 }
 
 /**
  * Prompt 215 — the same reader, on the counter's staff sign-up form.
  *
- * 179 built `readMrz()` as a reusable read and wired it to one consumer: the applicant's public form, which
- * POSTs the raw zone to a tokenised route. The staff form has no application yet — the token is minted at
- * submit — so the read goes straight to the Livewire component, which parses it with the SAME `MrzParser`
- * and the same ICAO check-digit rule. One reader, one parser, two callers.
+ * 179 built `readMrz()` as a reusable read and wired it to one consumer: the applicant's public form. The staff form
+ * has no application yet — the token is minted at submit — so the read goes straight to the Livewire component, which
+ * parses it with the SAME `MrzParser` and the same ICAO check-digit rule. One reader, one parser, two callers.
  *
- * Mounted on every Livewire update as well as on load, because the form appears behind a disclosure and
- * Livewire replaces its markup. Idempotent: the trigger is re-found each time and the listener re-bound to
- * the new element.
+ * Prompt 346 — the read starts by itself on choosing the scan; the component fills only empty fields and offers the
+ * rest. Mounted on every Livewire morph as well as on load, because the form appears behind a disclosure and Livewire
+ * replaces its markup: a WeakSet remembers which elements are wired (a data-* flag would be morphed away).
  */
+const wired = new WeakSet();
+
 export function mountStaffMrzScan(root = document) {
     const trigger = root.querySelector('[data-alta-mrz-scan]');
     const fileInput = root.querySelector('[data-alta-scan]');
-    const status = root.querySelector('[data-alta-mrz-status]');
 
-    if (!trigger || !fileInput || trigger.dataset.mounted === '1') {
+    if (! trigger || ! fileInput) {
         return;
     }
 
-    trigger.dataset.mounted = '1';
-    trigger.hidden = false;
+    const reader = autoRead({
+        fileInput,
+        trigger,
+        status: root.querySelector('[data-alta-mrz-status]'),
+        spinner: root.querySelector('[data-alta-mrz-region] [data-mrz-spinner]'),
+        onZone: async (mrz) => {
+            const component = window.Livewire?.find(trigger.closest('[wire\\:id]')?.getAttribute('wire:id'));
 
-    trigger.addEventListener('click', async () => {
-        const file = fileInput.files?.[0];
-
-        if (!file) {
-            if (status) status.textContent = trigger.dataset.needsFile || '';
-            return;
-        }
-
-        trigger.disabled = true;
-        if (status) status.textContent = trigger.dataset.reading || '';
-
-        const mrz = await readMrz(file);
-
-        trigger.disabled = false;
-        if (status) status.textContent = '';
-
-        // A failed read is ordinary and says nothing — the operator types the four fields, as they would
-        // have anyway. The component decides whether a successful read is TRUSTWORTHY (the check digit).
-        if (mrz) {
-            window.Livewire?.find(trigger.closest('[wire\\:id]')?.getAttribute('wire:id'))?.call('applyMrz', mrz);
-        }
+            return component ? Boolean(await component.call('applyMrz', mrz)) : false;
+        },
     });
+
+    // After a morph the trigger comes back `hidden` from the server: show it again if a photo is attached.
+    reader.refresh();
+
+    if (! wired.has(fileInput)) {
+        wired.add(fileInput);
+        fileInput.addEventListener('change', () => reader.start());
+    }
+    if (! wired.has(trigger)) {
+        wired.add(trigger);
+        trigger.addEventListener('click', () => reader.start());
+    }
 }
 
 // WHEN to mount (prompt 223). The applicant's form is on the page at load; the counter's is inserted by a
