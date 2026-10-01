@@ -95,8 +95,8 @@ class ApplicationShape
      */
     public const SIGNATURE_FIELD = 'signature';
 
-    /** The four fields prompt 179's reader can fill from a document. */
-    public const MRZ_FIELDS = ['first_name', 'last_name', 'date_of_birth', 'document_number'];
+    /** The fields prompt 179's reader can fill from a document — and, since 346, the type where the zone says it. */
+    public const MRZ_FIELDS = ['first_name', 'last_name', 'date_of_birth', 'document_number', 'document_type'];
 
     /**
      * The consent fields — the ONE deliberate difference between the two routes.

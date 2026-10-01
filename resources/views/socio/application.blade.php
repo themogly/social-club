@@ -169,10 +169,11 @@
                         <label class="mb-1 block text-sm font-medium" for="document_type">{{ __('Tipo de documento') }} <x-socio.required-mark /></label>
                         <select id="document_type" name="document_type" @error('document_type') aria-invalid="true" aria-describedby="document_type-error" @enderror required class="{{ $input }}">
                             @foreach (\App\Enums\IdDocumentType::cases() as $type)
-                                <option value="{{ $type->value }}" @selected(old('document_type', data_get($payload, 'document_type')) === $type->value)>{{ $type->label() }}</option>
+                                <option value="{{ $type->value }}" @selected(old('document_type', data_get($payload, 'document_type') ?: ($prefill['document_type'] ?? null)) === $type->value)>{{ $type->label() }}</option>
                             @endforeach
                         </select>
                     <x-socio.field-error name="document_type" />
+                        @include('socio.partials.mrz-confirm', ['field' => 'document_type'])
                     </div>
                     <div>
                         <label class="mb-1 block text-sm font-medium" for="document_number">{{ __('Nº documento') }} <x-socio.required-mark /></label>
@@ -206,26 +207,30 @@
                     <div>
                         {{-- Prompt 295 — Hacer foto (the back camera) or Elegir archivo; the MRZ reader below still reads
                              `#document_scan`, which is the field's own input whichever button filled it. --}}
+                        {{-- Prompt 346 — which side to photograph, always visible above the buttons: it is what decides whether the
+                             reader can fill anything in. --}}
+                        <p data-mrz-tip class="mb-1 text-xs font-medium text-ink dark:text-slate-200">{{ __('Para rellenar tus datos automáticamente: DNI/NIE por detrás, pasaporte por la página de la foto.') }}</p>
                         <x-counter.file-field id="document_scan" name="document_scan" :label="__('Documento de identidad (opcional)')" accept="image/*,application/pdf" camera="environment" />
                         <p class="mt-1 text-xs text-ink-muted dark:text-slate-400">{{ \App\Support\DocumentUpload::helperText(__('Foto o PDF de tu DNI, NIE o pasaporte. Se guarda cifrado, solo se abre con un enlace firmado y cada consulta queda registrada. Si tu solicitud no se aprueba, se borra. Puedes omitirlo y enseñarlo en el mostrador.')) }}</p>
 
-                        {{-- Prompt 179 — read it here, on this device. `hidden` until the script mounts, so a
-                             browser that cannot run the reader never shows a control that would do nothing.
-
-                             Which side to photograph is the part most likely to fail with real people, and it
-                             is a UX problem rather than a parsing one — so it is said once, plainly, next to
-                             the button rather than in a wall of text above it. --}}
+                        {{-- Prompt 179 — read it here, on this device. Prompt 346: the read STARTS BY ITSELF when a photo is chosen
+                             or taken (the second button was the step people never found); this button is only a retry with the
+                             same photo, hidden until there is one. Everything stays `hidden` until the script mounts, so a browser
+                             that cannot run the reader never shows a control that would do nothing. --}}
                         <div class="mt-3">
                             <button
                                 type="button"
                                 data-mrz-scan
                                 hidden
                                 data-reading="{{ __('Leyendo el documento…') }}"
-                                data-needs-file="{{ __('Elige primero una foto de tu documento.') }}"
+                                data-pdf="{{ __('Para rellenar tus datos automáticamente, usa una foto en lugar de un PDF.') }}"
+                                data-failed="{{ __('No hemos podido leer el documento. Fotografía la cara con las líneas de letras y «<<<» (la parte de atrás del DNI o NIE; la página de la foto del pasaporte), con buena luz y sin reflejos, o rellena los datos a mano.') }}"
                                 class="inline-flex min-h-11 items-center rounded-xl border border-brand/40 bg-brand-tint px-4 text-sm font-semibold text-brand transition hover:bg-brand-tint/70 disabled:opacity-60 dark:bg-slate-800 dark:text-slate-100"
-                            >{{ __('Rellenar mis datos desde el documento') }}</button>
-                            <p data-mrz-status role="status" aria-live="polite" class="mt-1 text-xs text-ink-muted dark:text-slate-400"></p>
-                            <p class="mt-1 text-xs text-ink-muted dark:text-slate-400">{{ __('Del DNI o NIE, fotografía el REVERSO (las tres líneas de letras y símbolos). Del pasaporte, la página de la foto.') }}</p>
+                            >{{ __('Volver a leer el documento') }}</button>
+                            <p role="status" aria-live="polite" class="mt-1 flex items-start gap-2 text-xs text-ink-muted dark:text-slate-400">
+                                <span data-mrz-spinner hidden aria-hidden="true" class="mt-0.5 inline-block h-3.5 w-3.5 shrink-0 animate-spin rounded-full border-2 border-brand/30 border-t-brand motion-reduce:animate-none"></span>
+                                <span data-mrz-status></span>
+                            </p>
                         </div>
                     </div>
                 </div>

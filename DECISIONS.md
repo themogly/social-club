@@ -18960,3 +18960,91 @@ WebKit (chip y=12, ⋯ y=64; the chip "Club Owner Clocked in 07:14" with no comp
     sizes, the switch's hook and its desktop classes, and our opt-ins, so `composer check` notices a dropped rule.
 - **Still to do on an iPhone:** tap ES/EN, remove a filter chip, tap *Ver todos* on Lotes, and *Configurar* on the
   profile, each with a thumb on the first try.
+
+## Prompt 346 — reading the ID document starts by itself after the photo, keeps the photo, and says when it couldn't
+
+- **The lost-photo defect, confirmed on main first** (a synthetic TD1 image, an emailed link, 390×844):
+  - choosing the photo did nothing: `first_name` was still empty 20 s later;
+  - tapping the old *Rellenar mis datos desde el documento* read it and **reloaded the page**: the field filled, but
+    `#document_scan` held **0 files**.
+
+  So an applicant who used the reader submitted **without** their ID scan unless they noticed and re-attached it.
+- **The read starts by itself.** On both forms, the document field's `change` starts a read when the file is an
+  image. It covers both *Hacer foto* and *Elegir archivo*: 295's camera button hands its file to the field and fires
+  `change`.
+  - It shows «Leyendo el documento…» with a spinner, which is gated by `motion-reduce`.
+  - **A PDF is not read:** «Para rellenar tus datos automáticamente, usa una foto en lugar de un PDF.» The staff
+    form's version says «los datos».
+  - **The button stays as a retry,** *Volver a leer el documento*, hidden until an image is attached.
+  - **A newer photo cancels a read in progress:** `readMrz(file, signal)` terminates its worker and the stale read
+    resolves null. Each read reports only for itself.
+- **A background request replaces the page submit.** `mrz-reader.js` POSTs `{ mrz, keep }` as JSON (with the CSRF
+  header) to the same `socio.application.read` route.
+  - `ApplicationController::read` answers JSON when asked (`expectsJson()`): `{ ok, fields, provisional }`. It still
+    parses with `MrzParser`, keeps the provisional fields with `MrzPrefill::remember`, and never stores the raw zone.
+  - A plain POST still redirects as before, so a no-script submit and every existing test keep working.
+  - Only TEXT is posted. The privacy pins still hold: no `FormData` and no `.append(` in the client.
+  - No reload, so the photo stays attached and uploads with the application, into the vault as before.
+- **Only empty fields are filled.** The page sends `keep`: the fields the person filled themselves (a value that isn't
+  what an earlier read put there). A select counts only once it has been changed. Those fields are left out of
+  `MrzPrefill`, so the confirmation gate asks only about values the reader wrote.
+  - Where a kept value differs from the document, it shows «En el documento: ESPANOLA · Usar». *Usar* asks again with
+    that field no longer kept, so it becomes provisional, with its own «Es correcto» like the rest.
+  - **The staff form does the same, in the component.** `applyMrz` fills empty fields (or ones the previous read
+    filled and nobody changed, so a second photo replaces a wrong first one) and offers the rest in
+    `$altaMrzOffered`. `useMrzValue()` takes one.
+- **The document type is read where the zone says it unambiguously** (`App\Support\Mrz\MrzDocument`, one mapping for
+  both forms):
+  - TD3 → *Pasaporte*;
+  - a TD1 with nationality ESP → *DNI*;
+  - anything else is left for the person to choose. A foreign national's TD1 could be a TIE or their own ID card, and
+    the parser doesn't expose the issuing state (`MrzParser` is unchanged by rule).
+  - The type is gated like the other fields: the public form gained its «Es correcto» under *Tipo de documento*, and
+    `ApplicationShape::MRZ_FIELDS` now lists it.
+  - `MrzPrefillTest`'s submissions confirm `document_type` too, because the ICAO TD3 specimen is a passport.
+- **The failure message.** When nothing valid comes back (no zone found, or the check digits fail), the page shows:
+  «No hemos podido leer el documento. Fotografía la cara con las líneas de letras y «<<<» (la parte de atrás del DNI
+  o NIE; la página de la foto del pasaporte), con buena luz y sin reflejos, o rellena los datos a mano.»
+  - The staff form shows the same in the operator's voice.
+  - The photo is never touched.
+  - A tip above the buttons is always visible: «Para rellenar tus datos automáticamente: DNI/NIE por detrás, pasaporte
+    por la página de la foto.» It replaces the old line under the button.
+  - The applicant never sees MRZ, OCR or "dígito de control" (a test checks the page text).
+- **Unchanged:**
+  - reading stays on the device;
+  - `MrzParser`;
+  - `MrzPrefill`'s storage;
+  - the server-side confirmation gate (pinned: an unconfirmed provisional field still blocks);
+  - the encrypted upload;
+  - the reader stays optional.
+  - The confirmation partial is now always rendered, `hidden` until it applies, so the page can show it after a
+    background read. Hidden, its checkbox is unchecked and posts nothing.
+- **Tests:** `tests/Feature/Socio/MrzReadsByItselfTest.php` (9; 7 red on the old code, the gate pin and the
+  second-read case pass on both):
+  - the JSON read and its fields;
+  - no page submit: the read starts on `change`, and only the text is posted;
+  - `keep` leaves typed fields out, and *Usar* adds one back;
+  - a failed read is `ok: false` and marks nothing;
+  - the tip, the retry, the two messages, the hidden confirmations and offers, and no jargon;
+  - the gate pin;
+  - the staff form: only empty fields, the offer, *Usar*, a failed read returning false, and a second read replacing
+    the first.
+- **The browser proof** (`tests/Browser/prove-346-mrz-auto.mjs`, a freshly seeded demo DB, 15/15 PASS).
+  - **Synthetic documents:** the zones are built in the script with valid ICAO check digits and drawn on a canvas in
+    Menlo (Courier's «<<<» runs read as K/L, and document numbers avoid 0/O, which a generic font blurs).
+  - **Public form at 390:**
+    1. choosing the photo reads it with no tap, and name, date of birth, number and type fill as provisional;
+    2. the photo is still attached, the page never reloaded, and submitting stored the scan in the vault
+       (`member-id-scans/…` exists);
+    3. a surname typed first is kept, with «En el documento: ESPANOLA · Usar», and *Usar* applies it as provisional;
+    4. a photo with no zone shows the failure line with the photo kept; a PDF shows the PDF line, with no spinner and
+       no retry;
+    5. a second photo during a read: only the second fills.
+  - **Staff form at the counter (1180):**
+    6. it reads by itself, and the scan is still attached, both in the field and in the component's
+       `altaDocumentScan`.
+- **Device results:** still pending from Ben and Shane. On the club tablet (handover) and an iPhone (an emailed link):
+  - the back of a DNI/NIE should fill, with the photo kept;
+  - the front should show the "couldn't read" line;
+  - a passport photo page should fill;
+  - note roughly how many tries each needed.

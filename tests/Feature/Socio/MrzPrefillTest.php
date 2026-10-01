@@ -179,7 +179,7 @@ class MrzPrefillTest extends TestCase
         $this->read('mrz-token', self::TD3);
 
         $this->submit('mrz-token', ['mrz_confirmed' => [
-            'first_name' => '1', 'last_name' => '1', 'document_number' => '1', 'date_of_birth' => '1',
+            'first_name' => '1', 'last_name' => '1', 'document_number' => '1', 'date_of_birth' => '1', 'document_type' => '1', // a passport also reads its type (346)
         ]])->assertRedirect();
 
         $this->assertNotNull($application->fresh()->submitted_at);
@@ -265,7 +265,7 @@ class MrzPrefillTest extends TestCase
         // Keeps the document number, corrects the first name.
         $this->submit('mrz-token', [
             'first_name' => 'ANNA MARIE',
-            'mrz_confirmed' => ['first_name' => '1', 'last_name' => '1', 'document_number' => '1', 'date_of_birth' => '1'],
+            'mrz_confirmed' => ['first_name' => '1', 'last_name' => '1', 'document_number' => '1', 'date_of_birth' => '1', 'document_type' => '1'],
         ])->assertRedirect();
 
         $stats = MrzFieldStat::query()->withoutGlobalScopes()->get()->keyBy('field');
@@ -285,7 +285,7 @@ class MrzPrefillTest extends TestCase
 
         $this->submit('mrz-token', [
             'first_name' => 'ANNA MARIE',
-            'mrz_confirmed' => ['first_name' => '1', 'last_name' => '1', 'document_number' => '1', 'date_of_birth' => '1'],
+            'mrz_confirmed' => ['first_name' => '1', 'last_name' => '1', 'document_number' => '1', 'date_of_birth' => '1', 'document_type' => '1'],
         ]);
 
         $this->assertSame('ANNA MARIE', data_get($application->fresh()->payload, 'first_name'));
@@ -296,7 +296,7 @@ class MrzPrefillTest extends TestCase
         $this->invite();
         $this->read('mrz-token', self::TD3);
         $this->submit('mrz-token', ['mrz_confirmed' => [
-            'first_name' => '1', 'last_name' => '1', 'document_number' => '1', 'date_of_birth' => '1',
+            'first_name' => '1', 'last_name' => '1', 'document_number' => '1', 'date_of_birth' => '1', 'document_type' => '1', // a passport also reads its type (346)
         ]]);
 
         $rows = DB::table('mrz_field_stats')->get();
@@ -319,7 +319,7 @@ class MrzPrefillTest extends TestCase
         $this->read('mrz-token', self::TD3);
 
         $this->submit('mrz-token', ['mrz_confirmed' => [
-            'first_name' => '1', 'last_name' => '1', 'document_number' => '1', 'date_of_birth' => '1',
+            'first_name' => '1', 'last_name' => '1', 'document_number' => '1', 'date_of_birth' => '1', 'document_type' => '1', // a passport also reads its type (346)
         ]]);
 
         // The next person handed this tablet must not inherit the last one's read.
