@@ -94,11 +94,11 @@ class BreachLogForm
         $items = implode('', array_map(static fn (string $s): string => '<li style="margin:.15rem 0;">'.e($s).'</li>', $steps));
 
         return '<ol style="margin:.25rem 0 .5rem 1.1rem;padding:0;font-size:.85rem;color:#0f172a;line-height:1.35;">'.$items.'</ol>'
-            .'<div style="font-size:.8rem;color:#475569;">'
+            .'<p style="font-size:.8rem;color:#475569;">' // a sentence with a link in it (345: WCAG 2.5.5's inline case)
             .e(__('Sede electrónica de la AEPD para notificar brechas:'))
             .' <a href="https://sedeagpd.gob.es/" rel="noopener" style="color:#2563eb;">sedeagpd.gob.es</a>'
             .' · '.e(__('Runbook interno: ubicación por definir (config del club).'))
-            .'</div>';
+            .'</p>';
     }
 
     private static function parse(mixed $value): ?Carbon

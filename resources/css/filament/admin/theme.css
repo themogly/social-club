@@ -139,3 +139,92 @@
 .fi-menu-section-heading-danger {
     @apply text-danger-600 dark:text-danger-400;
 }
+
+/* Prompt 345 — thumb-sized targets on a TOUCH screen (WCAG 2.5.5, Apple's 44 pt). Only under `pointer: coarse`, so the
+   desktop panel keeps its density. Two moves:
+     1. controls a thumb lands on squarely (buttons, fields, selects, pagination) grow to a 44 px floor;
+     2. small controls whose LOOK should stay (icon buttons, the avatar, links in a line of text, a filter chip's ✕, a
+        toggle, a select's clear ✕) keep their size and get an invisible 44×44 tap area — a centred ::after. None of
+        these Filament classes uses ::before/::after itself (checked in vendor/filament/support/resources/css). */
+@media (pointer: coarse) {
+    .fi-btn,
+    .fi-pagination-previous-btn,
+    .fi-pagination-next-btn,
+    .fi-input-wrp .fi-input,
+    .fi-input-wrp .fi-select-input,
+    .fi-select-input-btn,
+    .fi-input-wrp select {
+        min-height: 44px;
+    }
+
+    /* ES | EN keeps its two-segment pill; each segment is a real 44×44 (the track's padding drops so the pair fits the
+       390 px top bar). */
+    [data-locale-switch] {
+        padding: 0;
+    }
+    [data-locale-switch] button {
+        min-width: 44px;
+        min-height: 44px;
+    }
+
+    /* The topbar's sede selector at the floor too (it is a native select on touch). */
+    .fi-topbar select {
+        min-height: 44px;
+    }
+
+    .fi-icon-btn,
+    .fi-user-menu-trigger,
+    .fi-link,
+    .fi-toggle,
+    /* The ✕ on an active-filter chip — Filament's table filter indicators render each chip as an `x-filament::badge`
+       whose remove control is `.fi-badge-delete-btn`. Targeted here, not forked. */
+    .fi-ta-filter-indicators .fi-badge-delete-btn,
+    .fi-badge-delete-btn,
+    .fi-select-input-value-remove-btn,
+    /* Our own small controls in the panel: the topbar's help (?) button (help-menu.blade.php), the dashboard section
+       headers' «Ver todo» (components/dashboard/section). */
+    [data-touch-target],
+    .csc-section-link {
+        position: relative;
+    }
+    .fi-icon-btn::after,
+    .fi-user-menu-trigger::after,
+    .fi-link::after,
+    .fi-toggle::after,
+    .fi-badge-delete-btn::after,
+    .fi-select-input-value-remove-btn::after,
+    [data-touch-target]::after,
+    .csc-section-link::after {
+        content: '';
+        position: absolute;
+        left: 50%;
+        top: 50%;
+        width: max(100%, 44px);
+        height: max(100%, 44px);
+        transform: translate(-50%, -50%);
+    }
+
+    /* A checkbox is tapped through its label: the whole row reaches 44 px. */
+    label:has(> .fi-checkbox-input),
+    .fi-fo-checkbox-list-option-label,
+    .fi-fo-checkbox-list-option {
+        min-height: 44px;
+        align-items: center;
+    }
+
+    /* The panel's own filter bars: the reports' sede select (`.csc-select`, report-styles) and the date fields
+       (`.csc-date input`, dashboard/report styles) — native controls, at the floor. Filament's non-native date
+       picker likewise. */
+    .csc-select,
+    .csc-date input,
+    .fi-fo-date-time-picker-trigger,
+    .fi-fo-date-time-picker-display-text-input {
+        min-height: 44px;
+    }
+
+    /* The dashboard's «needs attention» rows (components/dashboard/alerts) — full-width links 41 px tall. */
+    .csc-alert {
+        min-height: 44px;
+        align-items: center;
+    }
+}

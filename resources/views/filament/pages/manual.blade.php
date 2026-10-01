@@ -12,7 +12,7 @@
 
                 <nav class="mt-3 flex flex-wrap gap-2" aria-label="{{ __('Guías de tareas') }}">
                     @foreach ($guides as $key => $guide)
-                        <a href="#guia-{{ $key }}" class="rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-sm text-gray-700 transition hover:border-primary-300 hover:text-primary-700 dark:border-white/10 dark:bg-gray-900 dark:text-gray-200 dark:hover:text-primary-300">
+                        <a href="#guia-{{ $key }}" class="inline-flex items-center rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-sm pointer-coarse:min-h-11 text-gray-700 transition hover:border-primary-300 hover:text-primary-700 dark:border-white/10 dark:bg-gray-900 dark:text-gray-200 dark:hover:text-primary-300">
                             {{ __($guide['title']) }}
                         </a>
                     @endforeach
