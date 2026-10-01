@@ -354,7 +354,7 @@ class BatchForm
     {
         $parts = $record->lotePartsQuery()->with('location')->get()->sortBy(fn (Batch $b): string => (string) $b->location?->name);
         $items = $parts->map(fn (Batch $b): string => sprintf(
-            '<li data-lote-part class="flex items-center justify-between gap-3 py-1"><a href="%s" class="font-medium text-primary-600 hover:underline dark:text-primary-400">%s</a><span class="tabular-nums">%s</span></li>',
+            '<li data-lote-part class="flex items-center justify-between gap-3 py-1 pointer-coarse:min-h-11"><a href="%s" data-touch-target class="font-medium text-primary-600 hover:underline dark:text-primary-400">%s</a><span class="tabular-nums">%s</span></li>',
             e(BatchResource::getUrl('edit', ['record' => $b])),
             e((string) $b->location?->name).($b->is($record) ? ' · '.e(__('este')) : ''),
             e($b->isUnitType() ? __(':count uds', ['count' => (int) $b->remaining_units]) : $b->remaining_cg->formatted()),

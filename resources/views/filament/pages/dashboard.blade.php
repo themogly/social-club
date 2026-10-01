@@ -215,7 +215,7 @@
                                     <dt>{{ $row['label'] }}</dt>
                                     <dd>
                                         @if (($row['href'] ?? '#') !== '#')
-                                            <a href="{{ $row['href'] }}">{{ $row['value'] }}</a>
+                                            <a href="{{ $row['href'] }}" data-touch-target>{{ $row['value'] }}</a>
                                         @else
                                             {{ $row['value'] }}
                                         @endif

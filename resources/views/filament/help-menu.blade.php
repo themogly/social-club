@@ -10,6 +10,7 @@
         aria-haspopup="true"
         :aria-expanded="open.toString()"
         aria-label="{{ __('Ayuda') }}"
+        data-touch-target
         class="flex h-9 w-9 items-center justify-center rounded-lg text-gray-500 transition hover:bg-gray-100 hover:text-gray-700 dark:text-gray-400 dark:hover:bg-white/5 dark:hover:text-gray-200"
     >
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" class="h-5 w-5" aria-hidden="true">

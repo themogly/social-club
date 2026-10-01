@@ -18893,3 +18893,70 @@ WebKit (chip y=12, ⋯ y=64; the chip "Club Owner Clocked in 07:14" with no comp
   link's signature missing from the faked `documents` disk). It then passed 8/8 alone, its folder passed 192/192, and
   the next two full runs passed. The signature write never goes near the limiter (it is not behind `storageAllowed()`),
   so this is recorded as a pre-existing flake to watch, not something this change caused.
+
+## Prompt 345 — the panel's last small controls get thumb-sized tap targets on a phone
+
+- **Red first** (iPhone 14 emulation, 390×844, a coarse pointer; a freshly seeded demo DB):
+  - the filter chip ✕ was 20×20 (on Socios and on Lotes);
+  - *Ver todos* was 64×22;
+  - *Configurar* (2FA) was 98×20;
+  - ES|EN was 31×24 per segment.
+  - The first sweep of 7 pages found **111** controls under 44 px.
+- **Coarse-pointer target sizes** (`resources/css/filament/admin/theme.css`, one `@media (pointer: coarse)` block, so
+  the desktop panel keeps its density). Two moves:
+  1. **Controls a thumb lands on squarely grow to a 44 px floor:**
+     - `.fi-btn`, the pagination buttons;
+     - Filament inputs, selects and the searchable-select button, and its date-time picker;
+     - the topbar's sede select;
+     - the reports' `.csc-select` and `.csc-date input`;
+     - checkbox label rows;
+     - the dashboard's attention rows (`.csc-alert`, 41 → 44).
+  2. **Small controls whose look should stay get an invisible 44×44 tap area, a centred `::after`:**
+     - `.fi-icon-btn`, `.fi-user-menu-trigger`;
+     - `.fi-link` (*Ver todos*, *Configurar*);
+     - `.fi-toggle`;
+     - the filter chip ✕;
+     - the select's clear ✕;
+     - our own opt-ins via `data-touch-target`: the topbar help (?) button, the dashboard's per-sede amount links, a
+       lote's part links.
+
+     None of those Filament classes uses `::before`/`::after` itself (checked in
+     `vendor/filament/support/resources/css`).
+  - **ES|EN** keeps its two-segment pill. On touch each segment is a real 44×44, and the track drops its 2 px padding
+    so the pair fits. The top bar stays on one row at 390 px (checked).
+- **The Filament class for the chip ✕:** `.fi-ta-filter-indicators .fi-badge-delete-btn`. Each active-filter chip is
+  an `x-filament::badge` whose `deleteButton` slot renders `.fi-badge-delete-btn`. It's targeted in the theme, not
+  forked.
+- **The sweep** (`tests/Browser/prove-345-thumb-targets.mjs`, step 3): every panel GET page without a parameter (76),
+  plus a member's and a batch's edit page, at 390×844 with touch. It flags any visible `a[href]`, `button`, `select`,
+  `input`, `textarea`, `[role=button|tab|switch|checkbox]` or `summary` whose tap area is under 44 in either dimension.
+  - A checkbox or radio is measured by its label row, which is what the thumb hits.
+  - **Exclusions (documented):**
+    - the skip link;
+    - anything inside a horizontally scrolling container (the tables);
+    - **a link inside a sentence**, a `<p>` with more words than the link. This is WCAG 2.5.5's own "inline"
+      exception: a 44 px tap area there would swallow the lines above and below.
+  - **What it found, beyond the four reported:**
+    - Filament's standard density everywhere: 36 px buttons, inputs, selects, icon buttons, pagination and the date
+      picker, and 16 px checkboxes;
+    - the topbar's sidebar toggle (36), help (36), avatar (32) and sede select (33);
+    - the dashboard's "Ver todo" section links (49×18), per-sede amount links (63×17) and attention rows (41);
+    - the reports' sede select (30) and the *Libro de socios* date field (31);
+    - the manual's guide chips (34) (`pointer-coarse:min-h-11`);
+    - a lote's part links (20) (the row reaches 44 and the link gets the tap area);
+    - the breach form's AEPD link, in a `<div>` of help text. That div is now the `<p>` it reads as, so the inline
+      exception applies.
+  - **Result:** 78 pages, 0 under 44.
+- **Desktop pin** (1280×800, a fine pointer). The same five controls, measured on main before 345, keep their exact
+  size:
+  - ES|EN 31×24;
+  - the chip ✕ 20×20 (×2);
+  - *Ver todos* 64×22;
+  - *Configurar* 98×20.
+- **Tests:**
+  - **The browser proof:** at 390, the four controls ≥ 44×44 and the top bar on one row; at 1280, the pin; the sweep;
+    no page errors. 15/15 PASS.
+  - **`tests/Feature/Design/ThumbSizedPanelTargetsTest.php`** (3, red first) pins the coarse block's selectors and
+    sizes, the switch's hook and its desktop classes, and our opt-ins, so `composer check` notices a dropped rule.
+- **Still to do on an iPhone:** tap ES/EN, remove a filter chip, tap *Ver todos* on Lotes, and *Configurar* on the
+  profile, each with a thumb on the first try.

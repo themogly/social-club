@@ -7,6 +7,7 @@
 <div
     role="group"
     aria-label="{{ __('Idioma') }}"
+    data-locale-switch
     class="inline-flex items-center gap-0.5 rounded-lg bg-gray-100 p-0.5 dark:bg-white/5"
 >
     @foreach ($locales as $locale)
