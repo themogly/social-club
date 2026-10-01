@@ -18434,3 +18434,57 @@ one tap away after every bar sale.
   - *Deshacer* wrote the ANNUL and *Fichar salida* left again;
   - lock, then PIN, then 281's *Fichar entrada* wrote a `PIN` clock-in;
   - *Mis horas* listed the periods.
+
+## Prompt 339 — the Back guard, properly: Back can never walk out of the pinned app
+
+- **Why:** Ben: "When you pin it and press Back, it's still spinning out." 313 was merged; its device check was recorded
+  as **pending** and had only ever passed in an emulated browser.
+- **Why 313 did not hold:**
+  1. **The early return.** `install()` returned when the page loaded on its own guard entry (`history.state.cscGuard`):
+     every reload, and every Back into an earlier counter page whose current entry was its guard. Such a page had no
+     popstate handler, so Back walked through it toward the first entry, which is Android's exit. Reproduced here:
+     after a reload, Back ×5 reached `about:blank` (red).
+  2. **Chrome's history-manipulation intervention.** The real Back button skips history entries a page created with
+     `pushState` before any user gesture. 313 pushed its guard at load, so on the tablet the root could be skipped.
+     `history.back()` and Playwright's `goBack()` do not apply the skip (probed in this branch: a page pushing at load
+     stays put under both), so a test browser cannot show it. It explains "straight after launch" and "Back too many
+     times".
+  3. The moment of launch, before `app.js` has run.
+- **The approach** (only in the installed app; never in a browser tab, pinned):
+  - **The listener is always installed.** There is no early return; the root is marked only when the entry is neither
+    root nor guard.
+  - **A guard stack 25 deep**, pushed at load and **topped up on every tap** (`pointerdown` / `keydown`, capture).
+    Entries pushed during a gesture aren't skipped, so after any tap, twenty quick Backs land on guards. Back onto the
+    root pushes the stack again. The top-up never goes on top of an overlay's own entry, so overlays (272, 313) still
+    close first on Back.
+  - **The Navigation API** (`window.navigation`, Chrome on Android): a backward `traverse` to an earlier **page** is
+    cancelled wherever the event is cancelable. Same-document traversals (guards, overlays) are left to popstate.
+  - **Replace-navigation was not adopted.** In the installed app the current entry is a guard, so `location.replace()`
+    replaces the guard and leaves the earlier pages below; it would not have removed the walk. The always-installed
+    listener and the cancel cover it instead.
+  - **Launch:** a tiny inline script in the counter layout's `<head>`, before `@vite`, marks the root and stacks the 25
+    guards at once, with the same state shape and depth as `app.js`. Pinned: with `app.js` blocked, the entry is
+    `{cscGuard: 25}` with `history.length` 27. `start_url` already points at `/counter`, the landing.
+- **What can still leave, honestly:**
+  - Android's Home, Recents and unpinning (hold Back and Recents) are system actions and are untouched. Inside the
+    counter, the ways out are the top bar (sign out, *Administración*).
+  - **If Chrome's skip applies, a Back pressed before the first touch after launch may still leave.** No page can make
+    an entry unskippable without a gesture. The PIN pad needs taps, so in practice the first touch comes almost at
+    once. The tablet check covers both cases.
+  - A Chrome **shortcut** (not the installed app) never runs the guard; the device check starts by ruling that out.
+- **Tests:**
+  - `tests/Browser/prove-339-back-guard.mjs` (standalone emulated as in 313), 8/8 PASS:
+    - hub → Dispensario → Barra → Caja then Back ×10 stays on a counter screen, and after landing on an earlier entry
+      Back ×10 still stays (both green before too: Chromium restored the earlier page from its back/forward cache with
+      its listener; a tablet that reloads it hit the early return);
+    - after a reload, Back ×5 keeps the screen (red before);
+    - the sign-up modal and *Mis horas*: Back closes them, then Back stays;
+    - a normal tab is untouched and Back leaves (pin);
+    - the head script with `app.js` blocked (red before).
+  - 313's own proof re-run against the new guard: 20/20 PASS (six screens, a normal tab, moving between screens, the
+    alta modal, the terminal dialog, *Mis horas* and the receipt sheet). The camera overlay is skipped as before, since
+    headless Chromium has no BarcodeDetector.
+  - `CounterBackHistoryTest` gained the structural guard (no early return, the tap top-up, the Navigation API cancel,
+    and the head script before `@vite` with the same depth). It was red against main and is green now.
+- **Device result: pending.** Shane checks on the pinned tablet. The steps, including confirming it's the installed app
+  and not a shortcut, are in `verification/real-device-checks.md` (339).

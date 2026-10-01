@@ -26,6 +26,32 @@ class CounterBackHistoryTest extends TestCase
         $this->assertMatchesRegularExpression('/install\(\)\s*\{\s*if \(! this\.standalone\(\)/', $js, 'the guard must bail out outside the installed app');
     }
 
+    /**
+     * Prompt 339 — what 313 lacked. The listener is installed on EVERY load (313 returned early when a page loaded on its
+     * own guard entry — a reload, a Back into an earlier page — so Back walked through); the stack is topped up on a tap
+     * (Chrome's Back skips entries pushed without a gesture); a backward traversal to an earlier page is cancelled where the
+     * Navigation API allows; and the layout's <head> guards the launch before app.js, with the same depth and state shape.
+     * Proven in a browser by tests/Browser/prove-339-back-guard.mjs; on the pinned tablet only by hand.
+     */
+    public function test_the_guard_holds_on_every_load_on_a_tap_and_at_launch(): void
+    {
+        $js = File::get(resource_path('js/app.js'));
+        $layout = File::get(resource_path('views/components/layouts/counter.blade.php'));
+
+        $this->assertDoesNotMatchRegularExpression('/history\.state\?\.cscGuard\) return;/', $js, '313\'s early return is back');
+        $this->assertMatchesRegularExpression("/\['pointerdown', 'keydown'\]\.forEach\(\(type\) => window\.addEventListener\(type, \(\) => this\.topUp\(\)/", $js, 'no top-up on a tap');
+        $this->assertStringContainsString("window.navigation?.addEventListener('navigate'", $js);
+        $this->assertStringContainsString('event.preventDefault()', $js);
+
+        preg_match('/DEPTH: (\d+)/', $js, $depth);
+        $this->assertNotEmpty($depth);
+        $head = strpos($layout, 'history.pushState({ cscGuard: depth }');
+        $this->assertNotFalse($head, 'no launch guard in the counter layout\'s <head>');
+        $this->assertLessThan(strpos($layout, '@vite('), $head, 'the launch guard must run before app.js');
+        $this->assertStringContainsString('depth <= '.$depth[1].';', $layout, 'the head script and app.js disagree on the depth');
+        $this->assertStringContainsString("['standalone', 'fullscreen']", $layout, 'the head script must not run in a browser tab');
+    }
+
     public function test_no_counter_view_leaves_a_popstate_listener_behind(): void
     {
         foreach (File::allFiles(resource_path('views')) as $file) {

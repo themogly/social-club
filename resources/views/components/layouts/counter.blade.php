@@ -54,6 +54,22 @@
         @php($screenTitle = $title ?? \App\Support\CounterScreens::currentLabel())
         <title>@if (app()->environment('staging')){{ __('[Pruebas]') }} @endif{{ $screenTitle ?? __('Mostrador') }} · {{ config('app.name') }}</title>
 
+        {{-- Prompt 339 — the moment of launch, before app.js has loaded: in the INSTALLED app, mark this entry as the root
+             and stack the guards above it, so a Back pressed straight after launch lands on a guard instead of leaving the
+             app (pinning turns that into the splash loop). app.js's rootBackGuard keeps them up afterwards; both use the
+             same state shape. Never in a browser tab. Inline, tiny, and no request. --}}
+        <script>
+            (function () {
+                try {
+                    var standalone = ['standalone', 'fullscreen'].some(function (m) { return window.matchMedia && window.matchMedia('(display-mode: ' + m + ')').matches; });
+                    var state = history.state || {};
+                    if (! standalone || state.cscRoot || state.cscGuard) return;
+                    history.replaceState(Object.assign({}, state, { cscRoot: true }), '');
+                    for (var depth = 1; depth <= 25; depth++) history.pushState({ cscGuard: depth }, '');
+                } catch (e) {}
+            })();
+        </script>
+
         {{-- Assets only when built (or the Vite dev server is hot); guarded so a
              full-page GET never 500s before `npm run build`, and tests stay quiet. --}}
         @if (file_exists(public_path('build/manifest.json')) || file_exists(public_path('hot')))
