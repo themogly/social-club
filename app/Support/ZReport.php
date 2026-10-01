@@ -48,6 +48,11 @@ class ZReport
         $ids = $sessions->pluck('id')->all();
         $breakdowns = TillSummary::breakdownMany($sessions);
         $dispCounts = self::countsBySession(Dispensation::query()->withoutGlobalScopes(), $ids, DispensationStatus::VOIDED->value);
+        // Prompt 350 — the session's net whole-euro rounding (completed contributions).
+        $rounding = Dispensation::query()->withoutGlobalScopes()->whereIn('till_session_id', $ids)
+            ->where('status', DispensationStatus::COMPLETED->value)
+            ->groupBy('till_session_id')->selectRaw('till_session_id, SUM(rounding_cents) as agg')->get()
+            ->mapWithKeys(fn ($row): array => [(string) $row['till_session_id'] => (int) $row['agg']]);
         $orderCounts = self::countsBySession(Order::query()->withoutGlobalScopes(), $ids, OrderStatus::VOIDED->value);
 
         $out = [];
@@ -87,6 +92,7 @@ class ZReport
                 'expected_live' => $liveExpected,
                 'post_close_adjusted' => $postCloseAdjusted,
                 'transaction_count' => ($dispCounts[$id]['total'] ?? 0) + ($orderCounts[$id]['total'] ?? 0),
+                'rounding' => $rounding[$id] ?? 0,
                 'voids' => ($dispCounts[$id]['voided'] ?? 0) + ($orderCounts[$id]['voided'] ?? 0),
                 'opened_at' => $session->opened_at,
                 'closed_at' => $session->closed_at,

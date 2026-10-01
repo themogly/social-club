@@ -136,6 +136,14 @@
             </tbody>
         </table>
 
+        {{-- Prompt 350 — the whole-euro rounding of a discounted total, transparent. Already spread over the lines above
+             (so they add up to the total); stated here so nobody wonders where the cents went. --}}
+        @if ((int) $dispensation->getRawOriginal('rounding_cents') !== 0)
+            <div class="rounding" data-receipt-rounding style="display:flex;justify-content:space-between;font-size:.9em;opacity:.8;">
+                <span>{{ __('Redondeo (incluido)') }}</span>
+                <span>{{ Money::fromCents((int) $dispensation->getRawOriginal('rounding_cents'))->formatted() }}</span>
+            </div>
+        @endif
         <div class="total">
             <span>{{ __('Total aportación') }}</span>
             <span>{{ $dispensation->total_cents->formatted() }}</span>

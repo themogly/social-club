@@ -19426,3 +19426,78 @@ to do this by hand.
   about 8. Every test folder then passed on its own (67 runs, all green), a streamed full run passed in 8 minutes, and
   the next full `composer check` and English run passed at normal speed (511 s / 985 s). There were overlapping runs and
   servers on the machine at the time. Recorded as environmental, not as a hang in this change.
+
+## Prompt 350 — discounted totals round to a whole euro, so the till needs less change
+
+### One rule, once per dispensary total, spread over the lines
+
+- **`App\Support\DispensaryRounding`** is the ONE rule.
+  - **On screen:** the counter's chargeable total (333's single function, `DispensaryPos::chargeableCents`) calls it.
+    So the basket's «Total aportación», the pay button, *Justo*, *Falta* and the commit's tender all show the same
+    figure.
+  - **At commit:** the dispensation writer (`CommitDispensation`) calls it.
+  - **There's no second copy of the rule.**
+- **Rounded once, on the dispensary part's total** after eighth/ounce breaks and the member's discount, never per line.
+  - The difference is **spread over the lines by largest remainder in whole cents** (`DispensaryRounding::spread`, the
+    eighth break's approach), so the stored line totals still add up to the rounded total (tested).
+  - Integer arithmetic only: never a float in money.
+- **The rounding is stored** as `dispensations.rounding_cents` (signed: −24 given to the member, +50 taken; 0 for every
+  existing row).
+  - The **receipt** shows «Redondeo (incluido) −0,24 €» above the total.
+  - The **basket** shows a *Redondeo* line above *Total aportación*.
+- **The bar is never rounded.** A combined visit's total is the rounded aportación plus the exact bar total (tested
+  with a drink).
+
+### The defaults and the options
+
+- **The settings** are *Ajustes → Descuentos y ajustes*, org-level, **owner only** (disabled for anyone else and
+  stripped on save, like the edible equivalence), audited with the page's `settings.updated`:
+  - **Redondear el total con descuento** (`discount_rounding`): *Al euro más cercano* (default, half up: 19,24 → 19,00;
+    19,50 → 20,00), *Al euro inferior* (19,76 → 19,00), *Sin redondeo*;
+  - **Aplicar a** (`discount_rounding_scope`): *Solo el descuento Local* (default), *Cualquier descuento*, *Todas las
+    aportaciones* (even with no discount).
+- **No per-sede override:** the club's money rule is one rule.
+- **"Local" is the applied discount's kind.** `ResolvePrice` now carries each discount's `kind` (DiscountKind value,
+  `TIER` for a tier's %, `CUSTOM` for a per-member override). A stacked total counts as LOCAL when a Local discount is
+  in it, and `priceParts()` returns the applied `discount_kind` per line.
+
+### A manager's price adjustment wins
+
+- When *Ajustar precio* (333) sets the total, it is charged **as typed**, with no rounding on top (tested: 18,50 stays
+  18,50, `rounding_cents = 0`).
+- In the writer, rounding runs only when there is no price override.
+
+### Where rounding is reported
+
+- ***Informes → Descuentos y ajustes*:**
+  - a *Redondeo* summary figure (net for the period);
+  - a *Redondeo* column per operator;
+  - a new **Redondeo por sede** table;
+  - *Redondeo* events in the detail (filterable), so the CSV/PDF exports carry it.
+- **The Z report** (`ZReport::rounding`): the session's net rounding, shown on the panel's till-session page as
+  «Redondeo (incluido en la dispensación)».
+- **Untouched:** grams, the daily/monthly limits, stock and the registro de dispensación (tested identical with and
+  without rounding).
+
+### Tests and proofs
+
+- **`tests/Feature/Pricing/DiscountRoundingTest.php`** (9; 8 red on the old code, the "staff discount not rounded" one
+  holds on both). It covers:
+  - 21,38 with 10 % Local → 19,00, −24, lines add up, receipt line;
+  - 19,50 → 20,00 (+50);
+  - Staff not rounded by default;
+  - *any*, *all* (an undiscounted 21,38 → 21,00) and *none*;
+  - *down* (19,76 → 19,00);
+  - a combined visit with *Justo*;
+  - the manager's 18,50;
+  - grams, stock and limits identical;
+  - the discounts report (by operator and by sede) and the Z report (net +26).
+- **Full suite:** 2,827 green before commit.
+- **The migration** against a copy seeded before it: every dispensation has `rounding_cents = 0`, totals unchanged.
+  Rollback is clean.
+- **The browser proof** (`tests/Browser/prove-350-rounding.mjs`, a freshly seeded demo DB, a member with a 10 % Local
+  discount), 6/6 PASS:
+  - at 1180 and 820, a 2 g basket shows 17,00 € on the basket, the button and *Justo*, with a *Redondeo* −0,37 € line;
+  - committed at 17,00 € with −37 stored;
+  - the receipt shows «Redondeo (incluido)»;
+  - *Sin redondeo* gives the exact 17,37 € back, with no rounding line.

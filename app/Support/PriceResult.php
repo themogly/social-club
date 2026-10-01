@@ -12,7 +12,7 @@ use App\Enums\DiscountMode;
  * given weight; `lineForUnits()` a UNIT line at a given unit count — the one rounding
  * rule, applied once.
  *
- * @phpstan-type Discount array{mode: DiscountMode, value_bp: ?int, value_cents: ?int, label: string}
+ * @phpstan-type Discount array{mode: DiscountMode, value_bp: ?int, value_cents: ?int, label: string, kind?: ?string}
  * @phpstan-type Line array{rate_cents: int, subtotal_cents: int, discount_cents: int, total_cents: int, label: ?string}
  */
 final class PriceResult
@@ -100,6 +100,12 @@ final class PriceResult
         }
 
         return min((int) $this->discount['value_cents'], $subtotalCents);
+    }
+
+    /** Prompt 350 — the kind of the discount applied (a DiscountKind value, TIER, or null). */
+    public function discountKind(): ?string
+    {
+        return $this->discount['kind'] ?? null;
     }
 
     /** A straight answer for the counter/receipt: why this price. */

@@ -58,6 +58,7 @@ class TillSessionInfolist
                         self::money('cash_out', __('Salidas de efectivo')),
                         self::money('banked', __('Ingresado en banco')),
                         self::money('petty_cash', __('Caja chica')),
+                        self::money('rounding', __('Redondeo (incluido en la dispensación)')), // prompt 350
                         // Prompt 265 — what each petty-cash expense was for, from the same breakdown the counter uses.
                         TextEntry::make('petty_cash_items')
                             ->label(__('Detalle de caja chica'))

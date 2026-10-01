@@ -79,6 +79,8 @@ class ManageSettings extends Page
         'stock_cover_low_days' => SettingType::INT,
         'discounts_stack' => SettingType::BOOL,
         'staff_discount_id' => SettingType::STRING, // prompt 347 — '' = none
+        'discount_rounding' => SettingType::STRING, // prompt 350 — owner only: nearest | down | none
+        'discount_rounding_scope' => SettingType::STRING, // prompt 350 — owner only: local | any | all
         'stock_count_show_expected' => SettingType::BOOL, // prompt 318 — Inventario
         'stock_count_tolerance_pct' => SettingType::INT,
         'stock_count_tolerance_g' => SettingType::INT,
@@ -214,6 +216,17 @@ class ManageSettings extends Page
                         TextInput::make('discount_alert_threshold_pct')->label(__('Umbral de alerta de descuentos (%)'))
                             ->integer()->minValue(1)->maxValue(100)->required()
                             ->helperText(__('Avisa en el panel cuando los ajustes de precio y las cuotas condonadas de una persona superan este % de lo que ha recaudado en 7 días (con al menos 50 € recaudados).')),
+                        // Prompt 350 (Aaron) — the discounted dispensary total to the euro, so the till needs less change. Owner
+                        // only (it is the club's money), audited with the rest of the page (settings.updated).
+                        Select::make('discount_rounding')->label(__('Redondear el total con descuento'))
+                            ->options(['nearest' => __('Al euro más cercano'), 'down' => __('Al euro inferior'), 'none' => __('Sin redondeo')])
+                            ->selectablePlaceholder(false)
+                            ->disabled(fn (): bool => ! (Auth::user()?->hasRole(Role::OWNER->value) ?? false))
+                            ->helperText(__('Solo la parte del dispensario, una vez por visita; la barra nunca. Un ajuste de precio de un responsable manda: no se redondea.')),
+                        Select::make('discount_rounding_scope')->label(__('Aplicar a'))
+                            ->options(['local' => __('Solo el descuento Local'), 'any' => __('Cualquier descuento'), 'all' => __('Todas las aportaciones')])
+                            ->selectablePlaceholder(false)
+                            ->disabled(fn (): bool => ! (Auth::user()?->hasRole(Role::OWNER->value) ?? false)),
                         // Prompt 347 — applied by itself to any member linked to an active staff account (Personal → Ficha de
                         // socio), exactly like an assigned discount. None = nothing changes.
                         Select::make('staff_discount_id')->label(__('Descuento del personal'))
@@ -443,7 +456,7 @@ class ManageSettings extends Page
         // Prompt 326 — only the owner changes the edible equivalence (the field is disabled for anyone else; this holds
         // the line against a crafted payload too).
         if (! (Auth::user()?->hasRole(Role::OWNER->value) ?? false)) {
-            unset($state['edible_thc_mg_per_gram']);
+            unset($state['edible_thc_mg_per_gram'], $state['discount_rounding'], $state['discount_rounding_scope']); // prompt 350 too
         }
 
         foreach (self::SCALARS as $key => $type) {

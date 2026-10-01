@@ -7,6 +7,7 @@ use App\Enums\OrderStatus;
 use App\Filament\Pages\Reports\DiscountsReportPage;
 use App\Filament\Resources\Dispensations\DispensationResource;
 use App\Filament\Resources\Orders\OrderResource;
+use App\Models\Location;
 use App\Models\User;
 use App\Support\ActiveScope;
 use App\Support\Money;
@@ -31,7 +32,7 @@ use Throwable;
  * ({@see GivenAwayQueries}). Bar lines live in a JSON snapshot: loaded in chunks with only the needed columns and summed
  * in PHP — no JSON-path SQL, so SQLite and MySQL cannot disagree. Bounded queries whatever the number of sales.
  *
- * @phpstan-type OperatorRow array{operador: string, operator_id: ?string, ventas: int, recaudado: int, ajustes: int, ajustes_importe: int, condonaciones: int, condonaciones_importe: int, manuales: int, manuales_importe: int, discrecional: int, discrecional_pct: int, descuentos_socio: int}
+ * @phpstan-type OperatorRow array{operador: string, operator_id: ?string, ventas: int, recaudado: int, ajustes: int, ajustes_importe: int, condonaciones: int, condonaciones_importe: int, manuales: int, manuales_importe: int, discrecional: int, discrecional_pct: int, descuentos_socio: int, redondeo: int}
  */
 class DiscountsReport extends AbstractReport
 {
@@ -48,7 +49,7 @@ class DiscountsReport extends AbstractReport
 
     private int $detailPage = 1;
 
-    /** @var array{operators: array<string, OperatorRow>, types: array<string, int>, events: list<array<string, mixed>>, totals: array<string, int>}|null */
+    /** @var array{operators: array<string, OperatorRow>, types: array<string, int>, events: list<array<string, mixed>>, totals: array<string, int>, rounding_by_sede: array<string, int>}|null */
     private ?array $data = null;
 
     public function key(): string
@@ -73,7 +74,7 @@ class DiscountsReport extends AbstractReport
 
     protected function build(): array
     {
-        return [$this->byOperator(), $this->byType(), $this->detail()];
+        return [$this->byOperator(), $this->byType(), $this->roundingBySede(), $this->detail()];
     }
 
     public function summary(): array
@@ -88,6 +89,8 @@ class DiscountsReport extends AbstractReport
             ['key' => 'waivers', 'label' => __('Cuotas condonadas'), 'value' => Money::fromCents($t['waivers'])->formatted(), 'tone' => $t['waivers'] > 0 ? 'warning' : 'success'],
             ['key' => 'manual_lines', 'label' => __('Líneas manuales'), 'value' => trans_choice(':count línea|:count líneas', $t['manual_count'], ['count' => $t['manual_count']]).' · '.Money::fromCents($t['manual'])->formatted()],
             ['key' => 'total_given', 'label' => __('Total cedido'), 'value' => Money::fromCents($given)->formatted().' · '.$share.' %'],
+            // Prompt 350 — the net effect of whole-euro rounding (negative: given away to members; positive: rounded up).
+            ['key' => 'rounding', 'label' => __('Redondeo'), 'value' => Money::fromCents($t['rounding'])->formatted()],
         ];
     }
 
@@ -144,12 +147,33 @@ class DiscountsReport extends AbstractReport
                 ReportColumn::money('discrecional', __('Discrecional')),
                 ReportColumn::number('discrecional_pct', __('Discrecional (%)'), total: false),
                 ReportColumn::money('descuentos_socio', __('Descuentos de socio (informativo)')),
+                ReportColumn::money('redondeo', __('Redondeo')), // prompt 350 — net, signed
             ],
             rows: $rows,
             empty: __('Nadie ha registrado operaciones en este período.'),
             defaultSort: 'discrecional_pct',
             sortable: true,
             note: __('Discrecional = ajustes de precio + cuotas condonadas, sobre lo recaudado por esa persona. Los descuentos de socio siguen al socio, no a quien atiende: se muestran solo como información.'),
+        );
+    }
+
+    /** Prompt 350 — the period's net rounding per sede (signed: negative is what members kept). */
+    private function roundingBySede(): ReportTable
+    {
+        $names = Location::query()->withoutGlobalScopes()->whereIn('id', array_keys($this->data()['rounding_by_sede']))->pluck('name', 'id');
+        $rows = [];
+        foreach ($this->data()['rounding_by_sede'] as $sedeId => $cents) {
+            $rows[] = ['sede' => (string) ($names[$sedeId] ?? $sedeId), 'redondeo' => $cents];
+        }
+
+        return new ReportTable(
+            key: 'rounding_by_sede',
+            title: __('Redondeo por sede'),
+            columns: [ReportColumn::text('sede', __('Sede')), ReportColumn::money('redondeo', __('Redondeo'))],
+            rows: $rows,
+            totals: ['redondeo' => array_sum(array_column($rows, 'redondeo'))],
+            empty: __('Ninguna aportación se ha redondeado en este período.'),
+            note: __('Neto del redondeo al euro de los totales con descuento: negativo es lo que se quedaron los socios.'),
         );
     }
 
@@ -233,7 +257,7 @@ class DiscountsReport extends AbstractReport
     /**
      * Every figure, from one bounded pass: dispensations (+ their discounted lines), orders (chunked), waivers.
      *
-     * @return array{operators: array<string, OperatorRow>, types: array<string, int>, events: list<array<string, mixed>>, totals: array<string, int>}
+     * @return array{operators: array<string, OperatorRow>, types: array<string, int>, events: list<array<string, mixed>>, totals: array<string, int>, rounding_by_sede: array<string, int>}
      */
     private function data(): array
     {
@@ -246,12 +270,13 @@ class DiscountsReport extends AbstractReport
         $ops = [];
         $types = [];
         $events = [];
-        $totals = ['member_discounts' => 0, 'overrides' => 0, 'waivers' => 0, 'manual' => 0, 'manual_count' => 0, 'takings' => 0];
+        $totals = ['member_discounts' => 0, 'overrides' => 0, 'waivers' => 0, 'manual' => 0, 'manual_count' => 0, 'takings' => 0, 'rounding' => 0];
+        $roundingBySede = [];
         $touch = function (?string $id) use (&$ops): string {
             $key = $id ?? 'none';
             $ops[$key] ??= ['operador' => '', 'operator_id' => $id, 'ventas' => 0, 'recaudado' => 0, 'ajustes' => 0, 'ajustes_importe' => 0,
                 'condonaciones' => 0, 'condonaciones_importe' => 0, 'manuales' => 0, 'manuales_importe' => 0, 'discrecional' => 0,
-                'discrecional_pct' => 0, 'descuentos_socio' => 0];
+                'discrecional_pct' => 0, 'descuentos_socio' => 0, 'redondeo' => 0];
 
             return $key;
         };
@@ -260,7 +285,7 @@ class DiscountsReport extends AbstractReport
         $dispensations = DB::table('dispensations')
             ->whereIn('location_id', $ids)->where('status', DispensationStatus::COMPLETED->value)
             ->where('dispensed_at', '>=', $start)->where('dispensed_at', '<', $end)
-            ->get(['id', 'operator_id', 'price_override_by', 'total_cents', 'original_total_cents', 'price_override_reason', 'dispensed_at', 'location_id', 'member_id', 'self_dispensed']);
+            ->get(['id', 'operator_id', 'price_override_by', 'total_cents', 'original_total_cents', 'price_override_reason', 'dispensed_at', 'location_id', 'member_id', 'self_dispensed', 'rounding_cents']);
         $overrideIds = GivenAwayQueries::priceOverrides($ids, $start, $end)->pluck('dispensations.id')->flip();
 
         // 2. Their discounted lines, per sale and label (one query).
@@ -288,6 +313,14 @@ class DiscountsReport extends AbstractReport
                 $ops[$k]['descuentos_socio'] += $discountBySale[$d->id];
                 $totals['member_discounts'] += $discountBySale[$d->id];
                 $events[] = $this->event('descuento', __('Descuento de socio'), $d->dispensed_at, $d->location_id, $d->operator_id, $d->member_id, $discountBySale[$d->id], null, DispensationResource::getUrl('view', ['record' => $d->id]));
+            }
+
+            // Prompt 350 — whole-euro rounding: per operator, per sede, and an event in the detail.
+            if ((int) $d->rounding_cents !== 0) {
+                $ops[$k]['redondeo'] += (int) $d->rounding_cents;
+                $totals['rounding'] += (int) $d->rounding_cents;
+                $roundingBySede[(string) $d->location_id] = ($roundingBySede[(string) $d->location_id] ?? 0) + (int) $d->rounding_cents;
+                $events[] = $this->event('redondeo', __('Redondeo'), $d->dispensed_at, $d->location_id, $d->operator_id, $d->member_id, (int) $d->rounding_cents, null, DispensationResource::getUrl('view', ['record' => $d->id]));
             }
 
             // Prompt 347 — a member of staff served their own member record: listed (the whole contribution), filterable
@@ -378,7 +411,7 @@ class DiscountsReport extends AbstractReport
         }
         arsort($types);
 
-        return $this->data = ['operators' => $ops, 'types' => $types, 'events' => $events, 'totals' => $totals];
+        return $this->data = ['operators' => $ops, 'types' => $types, 'events' => $events, 'totals' => $totals, 'rounding_by_sede' => $roundingBySede];
     }
 
     /** @return array<string, mixed> */
