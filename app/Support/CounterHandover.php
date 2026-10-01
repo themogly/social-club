@@ -3,6 +3,7 @@
 namespace App\Support;
 
 use App\Http\Middleware\EnforceCounterHandover;
+use Carbon\CarbonImmutable;
 
 /**
  * Handed-over mode: the counter tablet is in the hands of someone who is not a member yet (prompt 173).
@@ -23,10 +24,10 @@ class CounterHandover
 {
     private const KEY = 'counter.handover';
 
-    /** @return array{operator_id: string, location_id: ?string, started_at: string, return_url: ?string, submitted_application_id?: ?string}|null */
+    /** @return array{operator_id: string, location_id: ?string, started_at: string, active_at?: string, return_url: ?string, submitted_application_id?: ?string}|null */
     public static function current(): ?array
     {
-        /** @var array{operator_id: string, location_id: ?string, started_at: string, return_url: ?string, submitted_application_id?: ?string}|null $state */
+        /** @var array{operator_id: string, location_id: ?string, started_at: string, active_at?: string, return_url: ?string, submitted_application_id?: ?string}|null $state */
         $state = session(self::KEY);
 
         return is_array($state) ? $state : null;
@@ -48,8 +49,43 @@ class CounterHandover
             'operator_id' => $operatorId,
             'location_id' => $locationId,
             'started_at' => now()->toIso8601String(),
+            'active_at' => now()->toIso8601String(),
             'return_url' => $returnUrl,
         ]]);
+    }
+
+    /** Prompt 342 — a handover lives this long at most, whatever the activity. */
+    public const MAX_AGE_MINUTES = 120;
+
+    /** Prompt 342 — the applicant is still there: record the activity (every request during a handover). */
+    public static function touch(): void
+    {
+        $state = self::current();
+        if ($state !== null) {
+            $state['active_at'] = now()->toIso8601String();
+            session([self::KEY => $state]);
+        }
+    }
+
+    /**
+     * Prompt 342 — an abandoned handover: idle longer than the sede's `handover_idle_minutes` (15), or older than two
+     * hours. Null while it is alive. (A tablet handed over and forgotten kept every page on the form indefinitely.)
+     */
+    public static function expiredReason(): ?string
+    {
+        $state = self::current();
+        if ($state === null) {
+            return null;
+        }
+
+        $idle = max(1, (int) Settings::get('handover_idle_minutes', 15, $state['location_id'] ?? null));
+        $activeAt = CarbonImmutable::parse($state['active_at'] ?? $state['started_at']);
+
+        return match (true) {
+            CarbonImmutable::parse($state['started_at'])->lt(now()->subMinutes(self::MAX_AGE_MINUTES)) => 'age',
+            $activeAt->lt(now()->subMinutes($idle)) => 'idle',
+            default => null,
+        };
     }
 
     /**
@@ -109,5 +145,6 @@ class CounterHandover
     {
         session()->forget(self::KEY);
         session()->forget('counter.handover.draft');
+        session()->forget('application.mrz'); // prompt 342 — and what the tablet's camera read (MrzPrefill), unsent
     }
 }

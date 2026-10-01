@@ -2,9 +2,13 @@
 
 namespace App\Http\Controllers;
 
+use App\Actions\Counter\SignInOperator;
 use App\Actions\Members\SubmitApplication;
+use App\Actions\RecordAuditLog;
+use App\Actions\UnlockOperator;
 use App\Enums\ApplicationStatus;
 use App\Http\Requests\SubmitApplicationRequest;
+use App\Models\Location;
 use App\Models\Member;
 use App\Models\MemberApplication;
 use App\Support\ApplicationSpamGuard;
@@ -63,6 +67,7 @@ class ApplicationController extends Controller
         return view('socio.application', [
             'token' => $token,
             'application' => $application,
+            'handoverActive' => CounterHandover::active(), // prompt 342 — the staff way out, during a handover only
             'payload' => $application->payload ?? [],
             'formToken' => ApplicationSpamGuard::issueToken(),
             // Prompt 179 — what the browser read, still awaiting confirmation. Empty is the ordinary case.
@@ -127,6 +132,65 @@ class ApplicationController extends Controller
      * garbled scan yields nothing and the applicant fills the form exactly as they do today. No warning, no
      * red state, no suggestion they did something wrong.
      */
+    /**
+     * Prompt 342 — *Personal*: a staff PIN ends the handover, from the form, at any moment (not only after submitting).
+     * Anyone ACTIVE at the handover's sede may (a colleague can rescue the tablet), through the counter pad's own check
+     * and throttle. The unsent draft is discarded, the invitation stays as it was (unsubmitted, valid until it expires),
+     * and that person lands on Socios as the operator. A wrong PIN counts toward the throttle and keeps the form.
+     */
+    public function staffExit(Request $request, string $token): RedirectResponse
+    {
+        $form = route('socio.application', ['token' => $token]);
+        $state = CounterHandover::current();
+        $location = isset($state['location_id']) ? Location::query()->withoutGlobalScopes()->find($state['location_id']) : null;
+
+        if ($state === null || $location === null) {
+            return redirect()->to($form);
+        }
+
+        $throttle = 'counter-pin:'.$location->id;
+        $unlock = new UnlockOperator;
+        $operator = $unlock->handle($location, (string) $request->input('pin', ''), $throttle);
+
+        if ($operator === null) {
+            $message = $unlock->isLockedOut($throttle)
+                ? __('Demasiados intentos. Inténtalo en :s s.', ['s' => $unlock->lockoutSecondsRemaining($throttle)])
+                : __('PIN no reconocido.');
+
+            return redirect()->to($form)->with('handoverStaffError', $message);
+        }
+
+        CounterHandover::end();
+        MrzPrefill::forget($token);
+        session(['counter.location_id' => $location->id]);
+        (new SignInOperator)->handle($operator, $location); // the PIN is a sign-in (267/270): naming the operator and signing in are one step
+        (new RecordAuditLog)->handle('counter.handover.cancelled', $location, null, [
+            'reason' => 'staff_pin', 'operator_id' => $operator->id, 'location_id' => $location->id, 'started_by' => $state['operator_id'],
+        ]);
+
+        return redirect()->route('counter.members');
+    }
+
+    /**
+     * Prompt 342 — *Salir sin enviar*, for an applicant on their OWN phone: this browser's draft (what the camera read) is
+     * cleared, nothing is sent, and the same link opens the form again until the invitation expires. Never during a
+     * handover: the applicant does not leave the club's tablet on their own (173).
+     */
+    public function leave(string $token): View|RedirectResponse
+    {
+        if (CounterHandover::active()) {
+            return redirect()->route('socio.application', ['token' => $token]);
+        }
+
+        $application = $this->find($token);
+        abort_if($application === null, 404);
+
+        MrzPrefill::forget($token);
+        session()->forget('_old_input');
+
+        return view('socio.application-left', ['expires' => $application->invite_expires_at]);
+    }
+
     public function read(Request $request, string $token): RedirectResponse
     {
         $application = $this->find($token);
