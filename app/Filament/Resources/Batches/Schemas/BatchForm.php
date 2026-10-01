@@ -14,6 +14,7 @@ use App\Models\Location;
 use App\Rules\GramAmount;
 use App\Support\ActiveScope;
 use App\Support\DocumentUpload;
+use App\Support\Money;
 use App\Support\Weight;
 use Filament\Actions\Action;
 use Filament\Forms\Components\DatePicker;
@@ -32,6 +33,7 @@ use Filament\Support\Enums\FontWeight;
 use Filament\Support\Enums\IconPosition;
 use Filament\Support\Icons\Heroicon;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\HtmlString;
 
 class BatchForm
@@ -215,6 +217,14 @@ class BatchForm
                             ->minValue(0)
                             ->visible(fn (string $operation, Get $get): bool => $operation === 'create' && ! self::isUnitGenetic($get('genetic_id'))),
 
+                        // Prompt 340 — on the batch's page, the CURRENT price, read-only (changed only through the audited
+                        // Precio), and the way to change it right here.
+                        TextEntry::make('current_price')
+                            ->label(__('Precio'))
+                            ->state(fn (?Batch $record): HtmlString => new HtmlString(self::currentPriceHtml($record)))
+                            ->extraAttributes(['data-batch-current-price' => 'true'])
+                            ->visible(fn (string $operation): bool => $operation === 'edit'),
+
                         DatePicker::make('acquired_or_harvested_on')
                             ->label(__('Fecha de adquisición/cosecha')),
 
@@ -357,5 +367,27 @@ class BatchForm
     private static function singleSede(): bool
     {
         return Location::query()->count() === 1;
+    }
+
+    /** Prompt 340 — "12.00 €/g · octavo 38.00 €" and *Cambiar precio*, which opens the page's Precio action. */
+    private static function currentPriceHtml(?Batch $record): string
+    {
+        if ($record === null) {
+            return '';
+        }
+
+        $unit = $record->isUnitType();
+        $rate = $unit ? $record->price_per_unit_cents : $record->price_per_gram_cents;
+        $parts = [$rate !== null
+            ? e(($unit ? __('Precio por unidad') : __('Precio por gramo')).': '.Money::fromCents((int) $rate)->formatted())
+            : e(__('Sin precio propio'))];
+        if (! $unit && $record->price_per_eighth_cents !== null) {
+            $parts[] = e(__('Precio por octavo').': '.Money::fromCents((int) $record->price_per_eighth_cents)->formatted());
+        }
+        $change = Auth::user()?->can('prices.manage')
+            ? ' <button type="button" wire:click="mountAction(\'price\')" data-batch-change-price class="ml-2 inline-flex min-h-11 items-center font-semibold text-primary-600 underline-offset-2 hover:underline dark:text-primary-400">'.e(__('Cambiar precio')).'</button>'
+            : '';
+
+        return '<span class="block">'.implode('</span><span class="block">', $parts).'</span>'.$change;
     }
 }

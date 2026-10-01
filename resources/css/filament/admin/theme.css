@@ -121,3 +121,12 @@
     -webkit-text-security: none;
     text-security: none;
 }
+
+/* Prompt 340 — the page header's actions at the 44 px touch floor, wrapping onto a second row on a phone rather than
+   running off the edge (the batch page on an iPhone showed only «Borrar»). */
+.fi-header-actions-ctn {
+    flex-wrap: wrap;
+}
+.fi-header-actions-ctn .fi-btn {
+    min-height: 44px;
+}

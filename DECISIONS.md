@@ -18488,3 +18488,60 @@ one tap away after every bar sale.
     and the head script before `@vite` with the same depth). It was red against main and is green now.
 - **Device result: pending.** Shane checks on the pinned tablet. The steps, including confirming it's the installed app
   and not a shortcut, are in `verification/real-device-checks.md` (339).
+
+## Prompt 340 — *Precio* on the batch's own page, and the price reachable and visible on a phone
+
+- **Why:** Ben, on his phone: "Can't edit the price."
+  - On a batch's page the only header button visible was *Borrar*, and the form has no price fields (deliberate: prices
+    change only through the audited *Precio*).
+  - On an iPhone, the list's ⋮ showed *Recuento, Ajuste, Merma, Editar*; *Añadir existencias, Retirada* and *Precio*
+    were cut off above the panel.
+  - The list on a phone showed no price at all.
+- **One shared action:** `BatchActions::price()`, beside `transfer()`, `addParts()` and `recount()`, moved verbatim from
+  the table: `prices.manage`, the fields, `SetBatchPrice` (audited `batch.price.updated`) and 295's below-cost question
+  (`belowCostAction`, which saves against the record whose *Precio* was opened). The table's private copy is gone
+  (structural check).
+- **On the batch's page:**
+  - *Precio* is in the header after *Trasladar*, before *Añadir existencias* and *Recuento*, as a normal button.
+  - The **current price** is read-only where the price fields would be ("Precio por gramo / unidad: …", "Precio por
+    octavo: …"), with a link-style **Cambiar precio** that mounts the same header action. The page shows the new price
+    after saving (pinned).
+  - Location and strain stay locked on edit (pin).
+- **The mobile header rule: destructive actions last.**
+  - On the batch page, *Borrar* and *Restaurar* sit in a **Más** group at the end. *Borrar* is never the first or only
+    visible button (390×844: *Lotes, Trasladar, Precio, Añadir existencias en otra sede, Recuento, Más*).
+  - The panel theme now wraps the page header's actions onto a second row and sets every header button to 44 px
+    (measured).
+  - Other edit pages (strains, products, members) were checked: since 334, the *← list* link comes first everywhere, so
+    a destructive button is never alone or first. They are unchanged.
+- **The row ⋮ on a phone:**
+  - The cut-off was the table's scroll box clipping a dropdown that had flipped upwards. The group's panel is now
+    **teleported** to `<body>` (`dropdownTeleport()`), so it can't be clipped, and **bounded**
+    (`dropdownMaxHeight('min(24rem, calc(100dvh - 7rem))')`), so it scrolls inside if needed and flips to fit.
+  - 321's stacking check still passes at 1180: the open menu is on top of the next row.
+  - **The new order:** *Precio, Añadir existencias en otra sede, Recuento, Ajuste, Merma, Retirada, Editar*. The most
+    used comes first, and the heavy ones (*Merma*, *Retirada*) come last.
+- **The price under the name on a phone:** the *Lote* column's subtitle carries " · 12.00 €/g" in a `sm:hidden` span,
+  because the *Precio* column is off-screen there. The column is unchanged on wider screens. Both read one
+  `priceLabel()`.
+- **Tests:**
+  - `tests/Feature/Stock/BatchPriceOnThePageTest.php` (7), 6 red first:
+    - the page's price and its *Precio* through the same audit;
+    - below cost on the page asks first;
+    - *Cambiar precio* mounts the action;
+    - one definition, and the list's *Precio* still works;
+    - the menu order;
+    - the header order with the destructive group last;
+    - the locked fields (pin).
+  - `BelowCostWarningTest` and `HardeningAfter296Test` (the list's action) are unchanged and green.
+- **Verified in a browser** (`tests/Browser/prove-340-batch-price-phone.mjs`, a freshly seeded demo DB, as the owner),
+  11/11 PASS:
+  - 390×844, the batch page: price and *Cambiar precio* shown, *Precio* and *Trasladar* on screen, *Borrar* neither first
+    nor alone, every header button 44 px, *Precio* opens the form;
+  - 390×844, the list: a price under every row's name; ⋮ on the first and last row has 7 items all reachable, *Precio*
+    first, the panel inside the screen (516–782 and 427–693 px); *Precio* from the menu opens the form;
+  - 1280: the *Precio* column as before;
+  - 1180: 321's check.
+
+  Run against main, the proof fails at its first check (no price on the page) and stops there, with no *Precio* to tap,
+  so the cut-off menu was never measured against the old code.

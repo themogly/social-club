@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\Batches;
 
+use App\Actions\Pricing\SetBatchPrice;
 use App\Actions\Stock\IntakeBatch;
 use App\Actions\Stock\RecountBatch;
 use App\Actions\Stock\TransferBatch;
@@ -9,10 +10,13 @@ use App\Exceptions\StockCeilingExceededException;
 use App\Filament\Forms\DecimalInput;
 use App\Filament\Resources\Batches\Schemas\BatchForm;
 use App\Filament\Support\AllOption;
+use App\Filament\Support\ReturnFocus;
 use App\Models\Batch;
 use App\Models\Location;
 use App\Models\User;
 use App\Rules\GramAmount;
+use App\Support\BelowCost;
+use App\Support\Money;
 use App\Support\Weight;
 use DomainException;
 use Filament\Actions\Action;
@@ -28,14 +32,15 @@ use Filament\Schemas\Components\Utilities\Get;
 use Filament\Support\Icons\Heroicon;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\HtmlString;
 use InvalidArgumentException;
 use RuntimeException;
 
 /**
  * Prompt 302 — the batch actions used in MORE than one place, defined once. *Asignar a sede / Trasladar* is a row button
  * on the batch list and the primary button on the batch's own page: the same form, the same rules, the same
- * `TransferBatch`. (Precio, Ajuste and Retirada stay in the list's ⋮ only — whether they belong on the page too is an
- * open question for the owner.)
+ * `TransferBatch`. Prompt 340 — *Precio* joins them (the list's ⋮ and the page's header); Ajuste and Retirada stay in
+ * the list's ⋮.
  */
 final class BatchActions
 {
@@ -262,5 +267,93 @@ final class BatchActions
     private static function signedLabel(Batch $record, int $delta): string
     {
         return ($delta > 0 ? '+' : ($delta < 0 ? '−' : '')).self::quantityLabel($record, abs($delta));
+    }
+
+    /**
+     * Precio (prompts 215, 278, 295) — the batch's own sale price through `SetBatchPrice` (audited from → to), with 295's
+     * below-cost question. Prompt 340: ONE definition, on the list's ⋮ and on the batch's page (Ben, on his phone: "Can't
+     * edit the price" — it lived only in the ⋮, which an iPhone cut off). Gated on `prices.manage`.
+     */
+    public static function price(): Action
+    {
+        return Action::make('price')
+            ->label(__('Precio'))
+            ->icon(Heroicon::OutlinedCurrencyEuro)
+            ->visible(fn (): bool => Auth::user()?->can('prices.manage') ?? false)
+            ->fillForm(fn (Batch $record): array => [
+                'rate_eur' => ($record->isUnitType() ? $record->price_per_unit_cents : $record->price_per_gram_cents) !== null
+                    ? Money::fromCents((int) ($record->isUnitType() ? $record->price_per_unit_cents : $record->price_per_gram_cents))->euros() : null,
+                'eighth_eur' => $record->price_per_eighth_cents !== null ? Money::fromCents((int) $record->price_per_eighth_cents)->euros() : null,
+            ])
+            ->schema([
+                DecimalInput::make('rate_eur')
+                    ->label(fn (Batch $record): string => $record->isUnitType() ? __('Precio por unidad (€)') : __('Precio por gramo (€)'))
+                    ->numeric()->minValue(0)->required(),
+                DecimalInput::make('eighth_eur')
+                    ->label(__('Precio por octavo — 3.5 g (€)'))
+                    ->helperText(__('Opcional.'))
+                    ->numeric()->minValue(0)
+                    ->hidden(fn (Batch $record): bool => $record->isUnitType()),
+            ])
+            ->modalDescription(__('Cambia el precio de este lote. Solo afecta a las aportaciones a partir de ahora; queda en la auditoría.'))
+            ->modalSubmitActionLabel(__('Guardar precio'))
+            // Prompt 295 — below the batch's cost, ask first: *Continuar* saves (and closes both), *Volver y corregir*
+            // returns to this form with nothing written. The same rule as the intake forms (`BelowCost`).
+            ->registerModalActions([self::belowCostAction()])
+            ->action(function (Batch $record, array $data, Action $action): void {
+                $rate = Money::fromEuros((string) $data['rate_eur'])->cents;
+                $eighth = filled($data['eighth_eur'] ?? null) ? Money::fromEuros((string) $data['eighth_eur'])->cents : null;
+                $unit = $record->isUnitType();
+                $offences = BelowCost::offences(
+                    $record->cost_per_gram_cents, $unit ? null : $rate, $unit ? $rate : null, $unit ? null : $eighth,
+                    $record->genetic?->grams_per_unit_cg !== null ? (int) $record->genetic->grams_per_unit_cg : null,
+                );
+
+                if ($offences !== []) {
+                    $action->getLivewire()->mountAction('belowCost', [
+                        'rate' => $rate, 'eighth' => $eighth,
+                        'lines' => array_column($offences, 'line'),
+                        'field' => $offences[0]['field'] === 'per_eighth' ? 'eighth_eur' : 'rate_eur',
+                    ]);
+                    $action->halt();
+                }
+
+                self::savePrice($record, $rate, $eighth);
+            });
+    }
+
+    private static function belowCostAction(): Action
+    {
+        return Action::make('belowCost')
+            ->requiresConfirmation()
+            ->color('warning')
+            ->modalHeading(__('El precio de venta es menor que el coste'))
+            ->modalDescription(function (array $arguments): HtmlString {
+                $lines = is_array($arguments['lines'] ?? null) ? array_filter($arguments['lines'], 'is_string') : [];
+
+                return new HtmlString(implode('', array_map(fn (string $line): string => '<span class="block">'.e($line).'</span>', $lines)));
+            })
+            ->modalSubmitActionLabel(__('Continuar'))
+            ->modalCancelAction(fn (Action $action): Action => $action
+                ->label(__('Volver y corregir'))
+                ->extraAttributes(fn (array $arguments): array => ReturnFocus::to($arguments['field'] ?? 'rate_eur')))
+            ->extraModalWindowAttributes(ReturnFocus::listener())
+            ->modalAutofocus(false)
+            ->cancelParentActions()
+            ->action(function (Action $action, array $arguments): void {
+                // Post-296 audit (P3-1) — the batch is the record whose Precio was opened, never the client-editable
+                // argument (the rate is just a price the same person could have typed).
+                $batch = $action->getParentAction()?->getRecord();
+                abort_unless($batch instanceof Batch, 403);
+                self::savePrice($batch, (int) $arguments['rate'], $arguments['eighth'] !== null ? (int) $arguments['eighth'] : null);
+            });
+    }
+
+    private static function savePrice(Batch $batch, int $rate, ?int $eighth): void
+    {
+        $actor = Auth::user();
+        abort_unless($actor instanceof User, 403);
+        (new SetBatchPrice)->handle($batch, $rate, $eighth, $actor);
+        Notification::make()->title(__('Precio actualizado'))->success()->send();
     }
 }
