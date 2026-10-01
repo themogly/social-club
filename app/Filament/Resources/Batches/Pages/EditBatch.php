@@ -7,10 +7,12 @@ use App\Filament\Concerns\ReturnsToList;
 use App\Filament\Resources\Batches\BatchActions;
 use App\Filament\Resources\Batches\BatchResource;
 use App\Models\Batch;
+use Filament\Actions\ActionGroup;
 use Filament\Actions\DeleteAction;
 use Filament\Actions\RestoreAction;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\EditRecord;
+use Filament\Support\Icons\Heroicon;
 use Illuminate\Database\Eloquent\Model;
 
 /**
@@ -35,11 +37,14 @@ class EditBatch extends EditRecord
         return [
             // Prompt 302 — moving the stock is the page's main job for a store batch: the primary button, the list's action.
             BatchActions::transfer(),
+            // Prompt 340 — Ben, on his phone: "Can't edit the price." The list's own Precio, here too.
+            BatchActions::price()->color('gray'),
             // Prompt 305 — staged stock entry: the lote at another location, and a weigh-up count of this part.
             BatchActions::addParts()->color('gray'),
             BatchActions::recount()->color('gray'),
-            DeleteAction::make(),
-            RestoreAction::make(),
+            // Prompt 340 — the destructive ones LAST and grouped, so on a phone they are never the first or only button.
+            ActionGroup::make([DeleteAction::make(), RestoreAction::make()])
+                ->label(__('Más'))->icon(Heroicon::OutlinedEllipsisVertical)->color('gray')->button(),
         ];
     }
 
