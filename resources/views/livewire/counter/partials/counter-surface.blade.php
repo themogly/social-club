@@ -66,10 +66,12 @@
             if (this.pin === '' || this.keysLocked) return
             $wire.operatorPin = this.pin
             {{-- Prompt 281 — in the clock-out step the same pad confirms "Fichar salida" instead of signing in. --}}
-            const clockOut = this.mode === 'clock'
+            const clockOut = this.mode === 'clock' && $wire.clockPrompt === 'out'
+            {{-- Prompt 338 — and «Fichar entrada» from the top bar, the same pad. --}}
+            const clockIn = this.mode === 'clock' && $wire.clockPrompt === 'in-pin'
             {{-- The semicolon is load-bearing: Blade swallows the newline after an @js() directive. --}}
-            this.successTemplate = clockOut ? @js(__('Salida fichada. Hasta luego, :name.')) : @js(__('Hola, :name'));
-            this.checkPin(() => clockOut ? $wire.confirmClockOut() : $wire.unlockOperator()).then(() => { this.pin = '' })
+            this.successTemplate = clockOut ? @js(__('Salida fichada. Hasta luego, :name.')) : (clockIn ? @js(__('Entrada fichada, :name.')) : @js(__('Hola, :name')));
+            this.checkPin(() => clockOut ? $wire.confirmClockOut() : (clockIn ? $wire.confirmClockIn() : $wire.unlockOperator())).then(() => { this.pin = '' })
         },
         get successText() { return this.successTemplate.replace(':name', this.greeting) },
         {{-- Prompt 272 — the keyboard. Enter used to be bound on window as "submit": but Enter is how a focused
@@ -113,7 +115,7 @@
         {{-- Checking or greeting holds the surface up even when the server's answer has already closed it. --}}
         get open() { return this.pinBusy() || this.mode !== null },
         {{-- The pad is the same pad in all three modes; only what it says differs. --}}
-        get padVisible() { return this.pinBusy() || this.mode === 'locked' || this.mode === 'unidentified' || (this.mode === 'handover' && this.staffPad) || (this.mode === 'clock' && $wire.clockPrompt === 'out') },
+        get padVisible() { return this.pinBusy() || this.mode === 'locked' || this.mode === 'unidentified' || (this.mode === 'handover' && this.staffPad) || (this.mode === 'clock' && ['out', 'in-pin'].includes($wire.clockPrompt)) },
     }"
     x-effect="if (mode !== 'handover') staffPad = false"
     x-init="$watch('open', (v) => focusChanged(v)); if (open) focusChanged(true)"
@@ -246,7 +248,7 @@
             {{-- Checking and success are announced as a status; a wrong PIN stays the server's role="alert" line below. --}}
             <p data-pin-status role="status" class="sr-only" x-text="checking ? @js(__('Comprobando…')) : (holding ? successText : '')"></p>
 
-            @if ($clockPrompt === 'out' && $clockFeedback !== null)
+            @if (in_array($clockPrompt, ['out', 'in-pin'], true) && $clockFeedback !== null)
                 <p data-clock-feedback role="alert" class="mt-3 rounded-lg bg-error/10 px-3 py-2 text-center text-sm font-medium text-error">{{ $clockFeedback }}</p>
             @endif
 
@@ -278,10 +280,10 @@
             <button type="button" data-counter-surface-unlock x-ref="pinPad" @click="submit()" x-bind:disabled="keysLocked" x-bind:aria-busy="checking"
                     class="mt-4 inline-flex min-h-[2.75rem] h-12 w-full items-center justify-center gap-2 rounded-lg bg-brand text-sm font-semibold text-white transition hover:bg-brand-dark disabled:cursor-not-allowed disabled:opacity-70">
                 <svg x-show="checking" x-cloak class="h-4 w-4 motion-safe:animate-spin" viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="3" class="opacity-25"/><path d="M21 12a9 9 0 0 0-9-9" stroke="currentColor" stroke-width="3" stroke-linecap="round"/></svg>
-                <span x-text="checking ? @js(__('Comprobando…')) : holding ? successText : (mode === 'clock' ? @js(__('Fichar salida')) : (mode === 'handover' ? @js(__('Recuperar el mostrador')) : (mode === 'locked' ? @js(__('Desbloquear')) : @js(__('Identificarse')))))"></span>
+                <span x-text="checking ? @js(__('Comprobando…')) : holding ? successText : (mode === 'clock' ? ($wire.clockPrompt === 'in-pin' ? @js(__('Fichar entrada')) : @js(__('Fichar salida'))) : (mode === 'handover' ? @js(__('Recuperar el mostrador')) : (mode === 'locked' ? @js(__('Desbloquear')) : @js(__('Identificarse')))))"></span>
             </button>
 
-            @if ($clockPrompt === 'out')
+            @if (in_array($clockPrompt, ['out', 'in-pin'], true))
                 <button type="button" data-clock-out-cancel wire:click="cancelClockOut" class="mt-3 min-h-[2.75rem] w-full rounded-lg px-4 text-sm font-medium text-ink-muted transition hover:text-ink dark:text-slate-400 dark:hover:text-slate-300">{{ __('Cancelar') }}</button>
             @endif
 
@@ -364,6 +366,10 @@
             <p class="mt-1 text-sm text-ink-muted dark:text-slate-400">
                 {{ __('Esta semana: :week · Este mes: :month', ['week' => sprintf('%d h %02d min', intdiv($mine['week_minutes'], 60), $mine['week_minutes'] % 60), 'month' => sprintf('%d h %02d min', intdiv($mine['month_minutes'], 60), $mine['month_minutes'] % 60)]) }}
             </p>
+            {{-- Prompt 341 — today, first: how long so far, and since when. --}}
+            @if ($mine['today_since'] !== null)
+                <p data-my-hours-today class="mt-1 text-sm font-semibold text-ink dark:text-slate-100">{{ __('Hoy: :hours, desde :time', ['hours' => sprintf('%d h %02d min', intdiv($mine['today_minutes'], 60), $mine['today_minutes'] % 60), 'time' => $mine['today_since']]) }}</p>
+            @endif
             <ul class="mt-3 divide-y divide-line dark:divide-slate-800">
                 @forelse ($mine['periods'] as $p)
                     <li data-my-hours-row class="flex items-center justify-between gap-3 py-2 text-sm">

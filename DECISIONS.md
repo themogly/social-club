@@ -18545,3 +18545,68 @@ one tap away after every bar sale.
 
   Run against main, the proof fails at its first check (no price on the page) and stops there, with no *Precio* to tap,
   so the cut-off menu was never measured against the old code.
+
+## Prompt 341 — the counter top bar: one row, a clear "who is working and are they clocked in", and a tidy menu
+
+- **Why:** Ben, with photos of the tablet in portrait: "The menu, how it works, is a little messy. There's no way to see
+  at the top if you're clocked in and when, and no button for you to clock in if you're not. And it's on 2 lines as
+  well." Twelve icon controls didn't fit one row at ~800 px, and nothing showed the clock state.
+- **One row at 768 px and up:** the header no longer wraps at `md`.
+  - **In the bar, left to right:** the club and screen (home), the sede switcher (with 335's confirmation), flexible
+    space, 330's bell, **the chip**, the amber *Fichar entrada* (only when unclocked), the **padlock** (198, used
+    constantly), the **lockdown shield** (121, one tap plus confirm, still discreet) and **⋯ Más**.
+  - The club name truncates (9rem, 14rem from `lg`).
+  - **Measured at 820×1180 and 1180×820:** every control on one row, each at least 44×44, and none without an accessible
+    name.
+  - **On a phone:** the house link shows only the house (the name stays its accessible name), the right-hand group
+    dissolves into the header row, and the sede and the amber button drop below. The chip, the padlock and ⋯ share the
+    first row with home (measured at 390).
+- **The chip:** one button, the operator's name, and their **clock state** from `App\Support\ClockState`, read live
+  from the record and in the sede's time:
+  - **clocked in:** "Fichado 18:02", green;
+  - **not clocked in:** "Sin fichar", amber, with *Fichar entrada* beside it;
+  - **open from an earlier business day:** "Fichado ayer 23:40" (or "el dd/mm …"), amber. That is 281's forgotten
+    period, which wants a clock-out.
+
+  The chrome (`CounterChrome`) now answers `counter-clock-state` by re-rendering, so the chip changes the moment any
+  clock event lands: the PIN, 338's till open and its undo, 312's close.
+- **The chip's menu:** *Fichar entrada* or *Fichar salida* (whichever applies), *Mis horas* and *Cambiar de persona*.
+  - Each clock act asks for **that person's PIN** on the shared pad (281 / `ClockRules`). The `in-pin` mode,
+    `beginClockIn()` / `confirmClockIn()` and the clock-out's shared `pinIsTheOperators()` came from 338's saved patch.
+  - A wrong PIN counts toward the throttle (pinned).
+  - The clock-in doesn't lock the counter; the clock-out still does (the person is leaving).
+  - *Mis horas* gained today's line: "Hoy: 2 h 15 min, desde 18:02", where an open period counts up to now.
+- **⋯ Más, labelled:** *Modo formación* (324, where allowed), *Instalar como app* (290, only when installable),
+  *Este dispositivo* (289, `terminals.manage`), then, behind a divider, *Administración* and *Salir* (the leave group,
+  with their existing confirmations).
+  - The bare clock icon and the standalone *Fichar salida* are gone: both live in the chip's menu, and the chip shows the
+    state.
+  - In *Modo formación* the clock acts are hidden (a practice clock-in would be discarded).
+- **Unchanged:** every action keeps its behaviour, permission and confirmation, and every `data-counter-*` hook moved
+  with its control. The amber button is `data-counter-clock-in-quick`, and the menus are `data-counter-chip-menu` and
+  `data-counter-more-menu`.
+- **338's top-bar part moved here.** It was applied from the patch saved when 338 was trimmed.
+- **Tests:**
+  - `tests/Feature/Counter/TopBarClockChipTest.php` (6), all red first:
+    - "Fichado 18:02" green;
+    - "Sin fichar" amber with the button;
+    - "Fichado ayer" amber, anchored to the previous **business** day, which rolls over in the small hours, not at
+      midnight;
+    - PIN clock-in (a wrong PIN counts), the chip following through the event, and the clock-out from the menu;
+    - the two menus' contents, with the padlock and shield outside them;
+    - *Mis horas*' today line.
+  - `PinPadStatesTest` follows the pad's clock-in branch. `SharedDevicePolicyTest`'s *Administración*-label check reads
+    the whole link now that its icon is long.
+  - Older proof scripts that click a moved control directly (281, 286, 289, 290, 296, 310, 315, 322, 324 and the
+    `shoot-*` / `measure-topbar` scripts) need a tap on the chip or ⋯ first. They aren't part of the gates and were left
+    as they are; 338's proof was updated.
+- **Verified in a browser** (`tests/Browser/prove-341-top-bar.mjs`, a freshly seeded demo DB, as the owner, PIN 1234),
+  19/19 PASS:
+  - at 1180×820 and 820×1180: one row, 44 px controls, all named; "Sin fichar" with *Fichar entrada*; ⋯ Más lists
+    *Modo formación, Este dispositivo, Administración, Salir*; the padlock and shield stay out; the chip's menu has the
+    three items; lock and unlock work;
+  - at 820: *Fichar entrada* plus PIN turned the chip into "Fichado 01:04" (green) with no reload;
+  - at 390: the chip, the padlock and ⋯ on home's row;
+  - no page errors.
+
+  338's proof was re-run on the new bar: 7/7.
