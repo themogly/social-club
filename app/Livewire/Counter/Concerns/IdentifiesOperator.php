@@ -496,6 +496,7 @@ trait IdentifiesOperator
         $this->clockPrompt = 'out';
     }
 
+    /** Cancels either clock PIN step (out, or 338's in). */
     public function cancelClockOut(): void
     {
         $this->clockPrompt = null;
@@ -519,17 +520,7 @@ trait IdentifiesOperator
             return ['ok' => false];
         }
 
-        $matched = (new UnlockOperator)->handle($location, $pin, $this->operatorThrottleKey());
-
-        if ($matched === null) {
-            $this->clockFeedback = $this->pinFailureMessage();
-
-            return ['ok' => false];
-        }
-
-        if (! $matched->is($operator)) {
-            $this->clockFeedback = __('Ese PIN no es el tuyo: cada persona ficha su propia salida.');
-
+        if (! $this->pinIsTheOperators($operator, $location, $pin, __('Ese PIN no es el tuyo: cada persona ficha su propia salida.'))) {
             return ['ok' => false];
         }
 
@@ -550,6 +541,82 @@ trait IdentifiesOperator
         return ['ok' => true, 'name' => Str::before(trim((string) $operator->name), ' ')];
     }
 
+    /**
+     * Prompt 338 — "Fichar entrada" from the top bar, for a person working unclocked: their own PIN again (the same pad and
+     * throttle as the clock-out), then a PIN clock-in at now at this sede. It never locks: they are starting, not leaving.
+     */
+    #[On('counter-clock-in')]
+    public function beginClockIn(): void
+    {
+        $operator = CounterOperator::current();
+
+        if ($operator === null) {
+            return;
+        }
+
+        if (WorkedHours::openPeriodFor($operator) !== null) {
+            $this->flash(__('Ya tienes la jornada abierta.'), 'warning');
+            $this->dispatch('counter-clock-state', open: true);
+
+            return;
+        }
+
+        $this->operatorPin = '';
+        $this->clockFeedback = null;
+        $this->clockPrompt = 'in-pin';
+    }
+
+    /** @return array{ok: bool, name?: string} */
+    public function confirmClockIn(): array
+    {
+        $operator = CounterOperator::current();
+        $location = $this->resolveLocation();
+        $pin = trim($this->operatorPin);
+        $this->operatorPin = '';
+
+        if ($operator === null || $location === null || $pin === '') {
+            return ['ok' => false];
+        }
+
+        if (! $this->pinIsTheOperators($operator, $location, $pin, __('Ese PIN no es el tuyo: cada persona ficha su propia entrada.'))) {
+            return ['ok' => false];
+        }
+
+        try {
+            (new ClockIn)->handle($operator, $location, $operator, StaffClockSource::PIN);
+        } catch (DomainException|InvalidArgumentException|AuthorizationException $e) {
+            $this->clockFeedback = $e->getMessage();
+
+            return ['ok' => false];
+        }
+
+        $this->clockPrompt = null;
+        $this->clockFeedback = null;
+        $this->dispatch('counter-clock-state', open: true);
+
+        return ['ok' => true, 'name' => Str::before(trim((string) $operator->name), ' ')];
+    }
+
+    /** The clock PIN: through UnlockOperator's throttle, and it must be THIS person's (each person clocks their own day). */
+    private function pinIsTheOperators(User $operator, Location $location, string $pin, string $notYours): bool
+    {
+        $matched = (new UnlockOperator)->handle($location, $pin, $this->operatorThrottleKey());
+
+        if ($matched === null) {
+            $this->clockFeedback = $this->pinFailureMessage();
+
+            return false;
+        }
+
+        if (! $matched->is($operator)) {
+            $this->clockFeedback = $notYours;
+
+            return false;
+        }
+
+        return true;
+    }
+
     #[On('counter-my-hours')]
     public function openMyHours(): void
     {
@@ -564,7 +631,7 @@ trait IdentifiesOperator
     /**
      * "Mis horas" — ONLY the signed-in person's own periods, this week and this month, whatever their role.
      *
-     * @return array{periods: list<array<string, mixed>>, week_minutes: int, month_minutes: int}
+     * @return array{periods: list<array<string, mixed>>, week_minutes: int, month_minutes: int, today_minutes: int, today_since: ?string}
      */
     public function myHours(): array
     {
@@ -572,7 +639,7 @@ trait IdentifiesOperator
         $location = $this->resolveLocation();
 
         if ($operator === null || $location === null) {
-            return ['periods' => [], 'week_minutes' => 0, 'month_minutes' => 0];
+            return ['periods' => [], 'week_minutes' => 0, 'month_minutes' => 0, 'today_minutes' => 0, 'today_since' => null];
         }
 
         $month = Period::thisMonth($location);
@@ -581,10 +648,18 @@ trait IdentifiesOperator
         $periods = WorkedHours::periods([$operator->id], $sedes, $month->start->setTimezone($location->timezone ?: 'Europe/Madrid')->startOfDay(), $month->end->setTimezone($location->timezone ?: 'Europe/Madrid')->startOfDay()->addDay());
         $weekFrom = BusinessDay::date($location, $week->start)->toDateString();
 
+        // Prompt 341 — today's line: the minutes so far (an open period counts up to now) and since when.
+        $todayDate = BusinessDay::today($location);
+        $today = array_values(array_filter($periods, fn (array $p): bool => $p['business_date'] === $todayDate));
+        $todayMinutes = array_sum(array_map(fn (array $p): int => $p['minutes'] ?? (int) $p['in']->occurred_at->diffInMinutes(now()), $today));
+        $since = $today !== [] ? local_datetime(collect($today)->min(fn (array $p) => $p['in']->occurred_at), 'H:i', $location) : null;
+
         return [
             'periods' => array_reverse($periods),
             'week_minutes' => array_sum(array_map(fn (array $p): int => $p['business_date'] >= $weekFrom ? (int) $p['minutes'] : 0, $periods)),
             'month_minutes' => array_sum(array_map(fn (array $p): int => (int) $p['minutes'], $periods)),
+            'today_minutes' => (int) $todayMinutes,
+            'today_since' => $since,
         ];
     }
 

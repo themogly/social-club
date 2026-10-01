@@ -68,6 +68,7 @@ class CounterChrome extends Component
      */
     #[On('counter-unlocked')]
     #[On('counter-lock')]
+    #[On('counter-clock-state')] // prompt 341 — the chip's clock state, re-read from the record
     public function refresh(): void {}
 
     /** Prompt 338 — what an undo or a clock-in here had to say (a refusal, when the 2 minutes have gone). */

@@ -62,7 +62,8 @@ class PinPadStatesTest extends TestCase
         }
 
         // The surface pad: dots stay while checking; keys, Borrar, backspace and confirm all follow ONE disabled state.
-        $this->assertStringContainsString('checkPin(() => clockOut ? $wire.confirmClockOut() : $wire.unlockOperator())', $surface);
+        // Prompt 338 — the same pad also confirms the top bar's «Fichar entrada».
+        $this->assertStringContainsString('checkPin(() => clockOut ? $wire.confirmClockOut() : (clockIn ? $wire.confirmClockIn() : $wire.unlockOperator()))', $surface);
         $this->assertSame(5, substr_count($surface, 'x-bind:disabled="keysLocked"'));
         $this->assertStringContainsString('get keysLocked() { return this.pinBusy() || $wire.pinLocked }', $surface);
         $this->assertStringContainsString('data-pin-status role="status"', $surface);

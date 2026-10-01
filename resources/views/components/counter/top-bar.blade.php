@@ -94,7 +94,7 @@
 --}}
 <header
     data-counter-topbar
-    class="flex flex-wrap items-center justify-between gap-y-2 border-b border-line px-4 py-3 dark:border-slate-800 sm:px-6"
+    class="flex flex-wrap items-center justify-between gap-x-2 gap-y-2 border-b border-line px-4 py-3 dark:border-slate-800 sm:px-6 md:flex-nowrap"
 >
     {{-- Prompt 272 — the row WRAPS rather than crushing or overflowing. At 390 the fixed right-hand group
          was wider than the phone, so the page scrolled sideways (scrollWidth 451), the home link was crushed
@@ -102,7 +102,9 @@
          (and, at phone width, the leave-group to a third) — every control stays ONE tap and ON screen, and
          nothing is hidden behind an overflow: Lock (198) and panic (121) are one-tap by decision, and the
          Administración word is visible at every width (246). --}}
-    <div class="flex min-w-0 max-w-full items-center gap-3">
+    {{-- Prompt 341 — `contents` on a phone, so the sede can drop to its own row (order-last, full width) while the chip,
+         the padlock and ⋯ stay up top; a row of its own from md. --}}
+    <div class="contents min-w-0 md:flex md:items-center md:gap-3">
         {{-- HOME — a labelled link, not a logo (205), and now named by where it goes (206).
 
              205's fix was that the route home must not BE a logo: it was a 44×44 brand square with one letter
@@ -136,10 +138,12 @@
             </span>
             <span class="min-w-0 leading-tight">
                 {{-- Whose terminal this is. Visible, so it is part of the link's accessible name. --}}
-                <span class="block truncate text-sm font-semibold">{{ $clubName }}</span>
+                {{-- Prompt 341 — on a phone the house alone (the name is still the link's accessible name), so the chip,
+                     the padlock and ⋯ share the first row with it. --}}
+                <span class="sr-only sm:not-sr-only sm:block sm:max-w-[9rem] sm:truncate sm:text-sm sm:font-semibold lg:max-w-[14rem]">{{ $clubName }}</span>
                 {{-- The counter screen's one <h1> (a11y): the shared header renders it for every terminal,
                      so headings below can start at h2 without skipping a level. --}}
-                <h1 class="truncate text-xs font-normal text-ink-muted dark:text-slate-400">{{ $title ?? __('Mostrador') }}</h1>
+                <h1 class="sr-only sm:not-sr-only sm:truncate sm:text-xs sm:font-normal sm:text-ink-muted sm:dark:text-slate-400">{{ $title ?? __('Mostrador') }}</h1>
             </span>
             {{-- …and where the link GOES, which the club's name alone does not say. Same idiom as the
                  operator chip's "· Cambiar" below. --}}
@@ -150,7 +154,7 @@
              one shared header. Zero sedes: a warning. One sede: a static badge (nothing to switch to).
              Several: a switcher (each a validated POST to /counter/location, confirming unsaved work);
              several with none chosen yet ⇒ a highlighted "choose your sede" prompt, never a silent guess. --}}
-        <div class="relative shrink-0" data-counter-sede-region>
+        <div class="relative order-last shrink-0 basis-full md:order-none md:basis-auto" data-counter-sede-region>
             @if ($noSede)
                 <span data-counter-sede-state="none"
                       class="inline-flex items-center gap-1.5 rounded-lg bg-warning/10 min-h-11 px-3 text-sm font-medium text-warning">
@@ -251,215 +255,166 @@
          reported, and a strip that took prompts 116, 130 and 132 to fit on a portrait tablet was the more
          expensive of the two copies to keep. `CounterScreens` is unchanged and is read by the tiles. --}}
 
-    {{-- ============ THE TERMINAL CONTROLS ============
-         Every one of these was in TWO places after 189 — here and on the hub's "Terminal" panel. They live
-         here now and only here (prompt 205), because they are facts about this terminal rather than about
-         whichever screen happens to be open.
-
-         **No breakpoint labels any more (prompt 272).** 130's rule is that labelling is all-or-nothing and only
-         where it fits; 206 moved the flip to `xl`. But the counter shell is capped at `max-w-6xl` (1152px), so
-         from 1152 up the bar is ONE width — and after 267 widened the operator chip the labelled row
-         (*"Trabajando:"*, *"Bloquear pantalla"*, *"Cerrar sesión del dispositivo"*) no longer fit it: the home
-         link took the loss and the club name and the screen's h1 read "C." / "D..". Measured, the labelled
-         row needed every pixel of 1104 even without the prefix, so there is no width at which it fits — the
-         rule's answer is "nowhere". Lock and Log out are icon controls at every width, each with an
-         `aria-label` and a `title` (the pointer tooltip); Administración keeps its WORD (246); the chip shows
-         the name alone (the green dot and the sr-only "· Cambiar de persona" carry the rest). --}}
-    <div class="ml-auto flex max-w-full flex-wrap items-center justify-end gap-1">
-        {{-- WHO IS WORKING, and Switch — one control (prompt 173's rule: exactly ONE route to the pad, which
-             is 173's own full-screen surface; this dispatches to it and does not draw a second one). --}}
-        @if ($user !== null && \App\Support\CounterOperator::current() !== null)
+    {{-- ============ THE TERMINAL CONTROLS — prompt 341: ONE row at tablet widths ============
+         Ben: "The menu, how it works, is a little messy. There's no way to see at the top if you're clocked in and
+         when, and no button for you to clock in if you're not. And it's on 2 lines." Twelve icon controls did not fit
+         one row at ~800 px. Now only what is used constantly stays in the bar — the bell (330), WHO is working with
+         their CLOCK STATE (the chip), the padlock (198) and the lockdown shield (121: one tap plus confirm) — and the
+         rest sits, labelled, in ⋯ Más. Every control keeps its behaviour, permission, confirmation and data hook. On a
+         phone the sede drops to its own row so the chip, the padlock and ⋯ stay on the first. --}}
+    @php
+        $chipOperator = \App\Support\CounterOperator::current();
+        $clock = $chipOperator !== null ? \App\Support\ClockState::for($chipOperator) : null;
+        $practising = \App\Support\TrainingMode::active();
+        $menuItem = 'flex min-h-11 w-full items-center gap-3 rounded-lg px-3 text-left text-sm font-medium text-ink transition hover:bg-brand-tint hover:text-brand dark:text-slate-100 dark:hover:bg-slate-800 dark:hover:text-white';
+        $menuPanel = 'absolute right-0 top-full z-40 mt-1 w-64 rounded-xl border border-line bg-surface p-1 shadow-lg dark:border-slate-800 dark:bg-slate-900';
+    @endphp
+    {{-- `contents` on a phone (its controls join the header's own row, the amber «Fichar entrada» dropping below with the
+         sede); its own right-aligned group from md. --}}
+    <div class="contents md:ml-auto md:flex md:shrink-0 md:items-center md:gap-1">
+        <span class="ml-auto md:hidden" aria-hidden="true"></span>
+        @if ($user !== null && $chipOperator !== null)
             {{-- Prompt 330 — sign-ups awaiting review at this sede: the bell (hidden at zero) and the banner under this bar
-                 (teleported to the layout's #counter-notices). Its own component with its own 15 s poll, so a poll never
-                 re-renders the screen; only with someone at the PIN (the chrome leaves this whole bar out during a handover). --}}
+                 (teleported to the layout's #counter-notices). Its own component with its own 15 s poll. --}}
             <livewire:counter.pending-applications-bell :key="'pending-applications-bell'" />
 
-            <button
-                type="button"
-                data-operator-name-chip
-                data-counter-switch-operator
-                @click="window.Livewire.dispatch('counter-switch-operator')"
-                title="{{ __('Cambiar de persona') }}"
-                class="inline-flex min-h-11 items-center gap-2 rounded-lg bg-surface-alt px-3 text-sm transition hover:bg-brand-tint hover:text-brand dark:bg-slate-800 dark:hover:bg-slate-700 dark:hover:text-white"
-            >
-                <span class="inline-block h-2.5 w-2.5 shrink-0 rounded-full bg-success" aria-hidden="true"></span>
-                <span data-operator-name class="max-w-[9rem] truncate font-semibold">{{ \App\Support\CounterOperator::current()?->name }}</span>
-                {{-- Prompt 239 — the operator's shift-end IS this: hand over to the next person, who enters their
-                     own PIN. It replaced "Cerrar sesión" as the thing an operator reaches for at the end of a
-                     turn; the device logout is now a responsable-only action (below). --}}
-                <span class="sr-only">· {{ __('Cambiar de persona') }}</span>
-            </button>
+            {{-- THE CHIP — who is working and whether they are clocked in (ClockState: «Fichado 18:02» green, «Sin fichar»
+                 amber, «Fichado ayer 23:40» amber). The chrome re-renders on `counter-clock-state`, so it changes the
+                 moment a clock event lands. Tapping it opens the person's own actions; each clock act asks for THEIR PIN
+                 (281 / ClockRules). The switch keeps 173's rule: one route to the pad, the surface's own. --}}
+            <div class="relative" x-data="{ open: false }" @keydown.escape.window="open = false" @click.outside="open = false">
+                <button type="button" data-operator-name-chip data-clock-state="{{ $clock['state'] }}"
+                        @click="open = ! open" aria-haspopup="true" :aria-expanded="open.toString()"
+                        title="{{ $chipOperator->name }} · {{ $clock['label'] }}"
+                        @class([
+                            'inline-flex min-h-11 max-w-[8.5rem] items-center gap-2 rounded-lg px-3 text-left text-sm transition hover:bg-brand-tint dark:hover:bg-slate-700 sm:max-w-[13rem]',
+                            'bg-surface-alt dark:bg-slate-800' => $clock['state'] === 'in',
+                            'bg-warning/10 ring-1 ring-warning/40' => $clock['state'] !== 'in',
+                        ])>
+                    <span @class(['inline-block h-2.5 w-2.5 shrink-0 rounded-full', 'bg-success' => $clock['state'] === 'in', 'bg-warning' => $clock['state'] !== 'in']) aria-hidden="true"></span>
+                    <span class="min-w-0 leading-tight">
+                        <span data-operator-name class="block truncate font-semibold">{{ $chipOperator->name }}</span>
+                        <span data-clock-label @class(['block truncate text-xs', 'text-ink-muted dark:text-slate-400' => $clock['state'] === 'in', 'font-semibold text-warning' => $clock['state'] !== 'in'])>{{ $clock['label'] }}</span>
+                    </span>
+                </button>
+                <div x-show="open" x-cloak data-counter-chip-menu class="{{ $menuPanel }}" role="menu">
+                    @unless ($practising)
+                        @if ($clock['state'] === 'out')
+                            <button type="button" role="menuitem" data-counter-clock-in class="{{ $menuItem }}" @click="open = false; window.Livewire.dispatch('counter-clock-in')">
+                                <x-counter.icon name="clock" class="h-5 w-5 shrink-0" />{{ __('Fichar entrada') }}
+                            </button>
+                        @else
+                            <button type="button" role="menuitem" data-counter-clock-out class="{{ $menuItem }}" @click="open = false; window.Livewire.dispatch('counter-clock-out')">
+                                <x-counter.icon name="clock" class="h-5 w-5 shrink-0" />{{ __('Fichar salida') }}
+                            </button>
+                        @endif
+                    @endunless
+                    <button type="button" role="menuitem" data-counter-my-hours class="{{ $menuItem }}" @click="open = false; window.Livewire.dispatch('counter-my-hours')">
+                        <x-counter.icon name="list" class="h-5 w-5 shrink-0" />{{ __('Mis horas') }}
+                    </button>
+                    <button type="button" role="menuitem" data-counter-switch-operator class="{{ $menuItem }}" @click="open = false; window.Livewire.dispatch('counter-switch-operator')">
+                        <x-counter.icon name="user" class="h-5 w-5 shrink-0" />{{ __('Cambiar de persona') }}
+                    </button>
+                    <span data-counter-chip-menu-end hidden></span>
+                </div>
+            </div>
 
-            {{-- Prompt 281 — the registro de jornada from the operator's own controls: "Mis horas" always (your OWN hours,
-                 no permission); "Fichar salida" (below) while you have an open period, asking for your PIN again. Both
-                 dispatch to the screen's component, like the switch above (the bar is outside every component's DOM). --}}
-            <button type="button" data-counter-my-hours @click="window.Livewire.dispatch('counter-my-hours')"
-                    aria-label="{{ __('Mis horas') }}" title="{{ __('Mis horas') }}"
-                    class="inline-flex min-h-11 min-w-11 items-center justify-center rounded-lg px-3 text-sm font-medium text-ink-muted transition hover:bg-brand-tint hover:text-brand dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-white">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" class="h-5 w-5 shrink-0" aria-hidden="true">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"/>
-                </svg>
-            </button>
-        @endif
-        @if ($user !== null)
-            {{-- Rendered for every signed-in device and SHOWN while the operator has an open period: the bar is drawn once
-                 per page, so the screen's component announces each clock in/out (`counter-clock-state`) and this follows
-                 it — "Fichar salida" appears the moment you clock in, not on the next page. --}}
-            @php($clockOperator = \App\Support\CounterOperator::current())
-            <button type="button" data-counter-clock-out @click="window.Livewire.dispatch('counter-clock-out')"
-                    x-data="{ open: @js($clockOperator !== null && \App\Support\WorkedHours::openPeriodFor($clockOperator) !== null) }"
-                    x-show="open" x-cloak x-on:counter-clock-state.window="open = $event.detail.open"
-                    class="inline-flex min-h-11 items-center gap-2 rounded-lg px-3 text-sm font-medium text-ink-muted transition hover:bg-brand-tint hover:text-brand dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-white">
-                {{ __('Fichar salida') }}
-            </button>
+            {{-- The one-tap route for someone working unclocked (not in *Modo formación*: a practice clock-in would be
+                 discarded). Gone once they have clocked in; never a blocker (281). --}}
+            @if ($clock['state'] === 'out' && ! $practising)
+                <button type="button" data-counter-clock-in-quick @click="window.Livewire.dispatch('counter-clock-in')"
+                        aria-label="{{ __('Fichar entrada (no has fichado)') }}"
+                        class="order-last inline-flex min-h-11 items-center rounded-lg border border-warning/50 bg-warning/10 px-3 text-sm font-semibold text-warning transition hover:bg-warning/20 md:order-none">
+                    {{ __('Fichar entrada') }}
+                </button>
+            @endif
         @endif
 
-        {{-- Prompt 324 — *Modo formación*: practise on the real counter, nothing kept. Asks first (the chrome's sheet); only
-             with someone at the PIN, at a sede that allows it, and not while already training (the banner leaves it). --}}
-        @if (\App\Support\CounterOperator::current() !== null && ! \App\Support\TrainingMode::active()
-            && (bool) \App\Support\Settings::get('counter_training_enabled', true, session('counter.location_id')))
-            <button type="button" data-counter-training @click="$dispatch('counter-sheet-open', { name: 'training' })"
-                    aria-label="{{ __('Modo formación') }}" title="{{ __('Modo formación') }}"
-                    class="inline-flex min-h-11 min-w-11 items-center justify-center rounded-lg px-3 text-sm font-medium text-ink-muted transition hover:bg-brand-tint hover:text-brand dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-white">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" class="h-5 w-5 shrink-0" aria-hidden="true">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M4.26 10.147a60.438 60.438 0 0 0-.491 6.347A48.62 48.62 0 0 1 12 20.904a48.62 48.62 0 0 1 8.232-4.41 60.46 60.46 0 0 0-.491-6.347m-15.482 0a50.636 50.636 0 0 0-2.658-.813A59.906 59.906 0 0 1 12 3.493a59.903 59.903 0 0 1 10.399 5.84c-.896.248-1.783.52-2.658.814m-15.482 0A50.717 50.717 0 0 1 12 13.489a50.702 50.702 0 0 1 7.74-3.342M6.75 15a.75.75 0 1 0 0-1.5.75.75 0 0 0 0 1.5Zm0 0v-3.675A55.378 55.378 0 0 1 12 8.443m-7.007 11.55A5.981 5.981 0 0 0 6.75 15.75v-1.5"/>
-                </svg>
-            </button>
-        @endif
-
-        {{-- LOCK — prompt 198's requirement, settled: a first-class control in the bar, on every screen,
-             one tap, no navigation and no confirm. 198 existed because the only lock was on the hub, so
-             locking mid-sale meant leaving the screen; with the lock here that trip is gone entirely.
-             `lockNow()` is the store's own method: it raises the overlay AND dispatches `counter-lock`,
-             which signs the operator out server-side so writes are refused, not merely hidden. --}}
-        <button
-            type="button"
-            data-counter-lock
-            @click="$store.counter.lockNow()"
-            aria-label="{{ __('Bloquear pantalla') }}"
-            title="{{ __('Bloquear pantalla') }}"
-            class="inline-flex min-h-11 items-center gap-2 rounded-lg px-3 text-sm font-medium text-ink-muted transition hover:bg-brand-tint hover:text-brand dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-white"
-        >
+        {{-- LOCK — prompt 198: a first-class control, on every screen, one tap, no navigation and no confirm. `lockNow()`
+             raises the overlay AND dispatches `counter-lock`, which signs the operator out server-side. --}}
+        <button type="button" data-counter-lock @click="$store.counter.lockNow()"
+                aria-label="{{ __('Bloquear pantalla') }}" title="{{ __('Bloquear pantalla') }}"
+                class="inline-flex min-h-11 min-w-11 items-center justify-center rounded-lg px-3 text-sm font-medium text-ink-muted transition hover:bg-brand-tint hover:text-brand dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-white">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" class="h-5 w-5 shrink-0" aria-hidden="true">
                 <path stroke-linecap="round" stroke-linejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 1 0-9 0v3.75m-.75 0h10.5a2.25 2.25 0 0 1 2.25 2.25v6.75a2.25 2.25 0 0 1-2.25 2.25H6.75a2.25 2.25 0 0 1-2.25-2.25v-6.75a2.25 2.25 0 0 1 2.25-2.25Z"/>
             </svg>
         </button>
 
-        {{-- Prompt 290 — "Instalar como app": only when the browser has offered installation, never once installed. --}}
-        <button type="button" data-counter-install x-cloak
-                x-data="{ can: !! window.cscInstallPrompt && ! window.matchMedia('(display-mode: standalone)').matches }"
-                x-show="can"
-                x-on:csc-installable.window="can = ! window.matchMedia('(display-mode: standalone)').matches"
-                x-on:csc-installed.window="can = false"
-                @click="window.cscInstallPrompt?.prompt(); window.cscInstallPrompt?.userChoice.finally(() => { window.cscInstallPrompt = null; can = false })"
-                aria-label="{{ __('Instalar como app') }}" title="{{ __('Instalar como app') }}"
-                class="inline-flex min-h-11 min-w-11 items-center justify-center rounded-lg px-3 text-sm font-medium text-ink-muted transition hover:bg-brand-tint hover:text-brand dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-white">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" class="h-5 w-5 shrink-0" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M16.5 12 12 16.5m0 0L7.5 12m4.5 4.5V3"/></svg>
-        </button>
-
-        {{-- Prompt 289 — "Este dispositivo": register THIS tablet as a counter, or forget it. terminals.manage only, and it
-             asks for the operator's PIN again (the dialog lives on every screen's surface). --}}
-        @if (\App\Support\CounterOperator::current()?->can('terminals.manage'))
-            @php($thisTerminal = \App\Support\CounterTerminals::current())
-            <button type="button" data-counter-terminal @click="window.Livewire.dispatch('counter-terminal')"
-                    aria-label="{{ $thisTerminal ? __('Este dispositivo: :name · :sede', ['name' => $thisTerminal->name, 'sede' => $thisTerminal->location?->name]) : __('Registrar este dispositivo como mostrador') }}"
-                    title="{{ $thisTerminal ? __('Este dispositivo: :name · :sede', ['name' => $thisTerminal->name, 'sede' => $thisTerminal->location?->name]) : __('Registrar este dispositivo como mostrador') }}"
-                    class="inline-flex min-h-11 min-w-11 items-center justify-center rounded-lg px-3 text-sm font-medium text-ink-muted transition hover:bg-brand-tint hover:text-brand dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-white">
-                <x-counter.icon name="tablet" class="h-5 w-5 shrink-0" />
-            </button>
-        @endif
-
-        {{-- ======== THE CONTROLS THAT LEAVE THE COUNTER (prompt 206) ========
-             Everything above stays INSIDE the counter — Home and Lock change nothing about the session.
-             These two end it: Administración opens a different application, Log out takes the session with
-             it. Both already confirmed unsaved work, and that shared behaviour is exactly the tell that they
-             are one group — so they are one group, behind a divider. Nothing moved and nothing was renamed to
-             achieve it; grouping by SCOPE is what makes the row legible.
-
-             The divider is decorative and the group is not a landmark: the separation is visual, and the
-             accessible names below carry the meaning on their own. --}}
-        @if ($canPanel || $canManageDevice)
-        <div data-counter-leave-group class="ml-1 flex items-center gap-1 border-l border-line pl-2 dark:border-slate-800">
-            @if ($canPanel)
-                {{-- ADMINISTRACIÓN — was "Panel", which `lang/en.json` rendered as **Dashboard**, making it a
-                     synonym of the Home link a few pixels away (and the hub is a dashboard too, so the word
-                     could not stay). It is named for its destination now: this is the way OUT of the counter
-                     and into the back office, and the briefcase says office where the house says home. --}}
-                <a
-                    href="{{ url('/') }}"
-                    data-counter-admin-link
-                    wire:navigate.ignore
-                    @click.prevent="(! ($store.counter?.dirty) || window.confirm(@js($confirmLeave))) && window.location.assign('{{ url('/') }}')"
-                    aria-label="{{ __('Administración') }}"
-                    class="inline-flex min-h-11 items-center gap-2 rounded-lg px-3 text-sm font-medium text-ink-muted transition hover:bg-brand-tint hover:text-brand dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-white"
-                >
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" class="h-5 w-5 shrink-0" aria-hidden="true">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M20.25 14.15v4.25c0 1.094-.787 2.036-1.872 2.18-2.087.277-4.216.42-6.378.42s-4.291-.143-6.378-.42c-1.085-.144-1.872-1.086-1.872-2.18v-4.25m16.5 0a2.18 2.18 0 0 0 .75-1.661V8.706c0-1.081-.768-2.015-1.837-2.175a48.114 48.114 0 0 0-3.413-.387m4.5 8.006c-.194.165-.42.295-.673.38A23.978 23.978 0 0 1 12 15.75c-2.648 0-5.195-.429-7.577-1.22a2.016 2.016 0 0 1-.673-.38m0 0A2.18 2.18 0 0 1 3 12.489V8.706c0-1.081.768-2.015 1.837-2.175a48.111 48.111 0 0 1 3.413-.387m7.5 0V5.25A2.25 2.25 0 0 0 13.5 3h-3a2.25 2.25 0 0 0-2.25 2.25v.894m7.5 0a48.667 48.667 0 0 0-7.5 0"/>
-                    </svg>
-                    {{-- Prompt 246 — the admin's way back is a WORD, not an icon, at EVERY width. It was
-                         `hidden xl:inline`, so in portrait on the tablet an administrator saw only an unlabelled
-                         briefcase and could not find the way back to the panel. Kept as "Administración" (206's
-                         deliberate word — the way into the back office, not a synonym of the counter hub, which
-                         205 keeps as the home logo); 246 named it "Panel/Dashboard" but the gap the tester hit
-                         was the missing LABEL, not the word. --}}
-                    <span class="inline" aria-hidden="true">{{ __('Administración') }}</span>
-                </a>
-            @endif
-
-            {{-- THE DEVICE session — a responsable's action, not an operator's (prompt 239). Gated on
-                 staff.manage and confirmed: logging the shared tablet out ends the session floor staff cannot
-                 reopen (they have PINs, not passwords), so it must be deliberate. An operator ending their own
-                 turn uses "Cambiar de persona" above. --}}
-            @if ($canManageDevice)
-                <form
-                    method="POST"
-                    action="{{ route('filament.admin.auth.logout') }}"
-                    @submit="(! window.confirm(@js($confirmDeviceLogout))) && $event.preventDefault()"
-                >
-                    @csrf
-                    <button
-                        type="submit"
-                        data-counter-logout
-                        aria-label="{{ __('Cerrar sesión del dispositivo') }}"
-                        title="{{ __('Cerrar sesión del dispositivo') }}"
-                        class="inline-flex min-h-11 items-center gap-2 rounded-lg px-3 text-sm font-medium text-ink-muted transition hover:bg-black/5 dark:text-slate-400 dark:hover:bg-white/5"
-                    >
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" class="h-5 w-5 shrink-0" aria-hidden="true">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0 0 13.5 3h-6a2.25 2.25 0 0 0-2.25 2.25v13.5A2.25 2.25 0 0 0 7.5 21h6a2.25 2.25 0 0 0 2.25-2.25V15M12 9l-3 3m0 0 3 3m-3-3h12.75"/>
-                        </svg>
-                    </button>
-                </form>
-            @endif
-        </div>
-        @endif
-
-        {{-- PANIC (prompt 121). The hardest thing 205 had to rehome: the overflow it lived in is gone, and
-             121 requires it to stay DISCREET and FAST — a labelled button on a hub is neither.
-
-             Resolved as an icon-only 44×44 control at the end of this row: **one tap plus the confirm**,
-             which is one tap FEWER than the overflow it replaces, and it carries no wording that announces
-             itself to a room — the accessible name is there for a screen reader, and the shield is not a
-             word anybody reads across a counter. Everything 121 guarantees is untouched: gated on
-             `lockdown.initiate`, absent from the DOM without it, confirms before firing, and never
-             announced. --}}
+        {{-- PANIC (prompt 121) — discreet and fast: an icon at the end, one tap plus the confirm, gated on
+             `lockdown.initiate`, absent from the DOM without it, never announced. --}}
         @if ($user?->can('lockdown.initiate'))
-            <form
-                method="POST"
-                action="{{ route('counter.panic') }}"
-                @submit="! window.confirm(@js(__('¿Activar el bloqueo de seguridad? Cerrará el club entero.'))) && $event.preventDefault()"
-            >
+            <form method="POST" action="{{ route('counter.panic') }}"
+                  @submit="! window.confirm(@js(__('¿Activar el bloqueo de seguridad? Cerrará el club entero.'))) && $event.preventDefault()">
                 @csrf
-                <button
-                    type="submit"
-                    data-counter-panic
-                    aria-label="{{ __('Bloqueo de seguridad') }}"
-                    class="inline-flex h-11 w-11 items-center justify-center rounded-lg text-ink-muted/60 transition hover:bg-error/10 hover:text-error dark:text-slate-500 dark:hover:bg-error/10"
-                >
+                <button type="submit" data-counter-panic aria-label="{{ __('Bloqueo de seguridad') }}"
+                        class="inline-flex h-11 w-11 items-center justify-center rounded-lg text-ink-muted/60 transition hover:bg-error/10 hover:text-error dark:text-slate-500 dark:hover:bg-error/10">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" class="h-5 w-5" aria-hidden="true">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75 11.25 15 15 9.75m-3-7.036A11.959 11.959 0 0 1 3.598 6 11.99 11.99 0 0 0 3 9.749c0 5.592 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285Z"/>
                     </svg>
                 </button>
             </form>
         @endif
+
+        {{-- ⋯ MÁS — everything else, labelled: *Modo formación* (324), *Instalar como app* (290), *Este dispositivo* (289),
+             *Administración* and *Salir* (the leave group, 206/239/246) — each with its existing gate and confirmation. --}}
+        <div class="relative" x-data="{ open: false }" @keydown.escape.window="open = false" @click.outside="open = false">
+            <button type="button" data-counter-more @click="open = ! open" aria-haspopup="true" :aria-expanded="open.toString()"
+                    aria-label="{{ __('Más') }}" title="{{ __('Más') }}"
+                    class="inline-flex min-h-11 min-w-11 items-center justify-center rounded-lg px-3 text-ink-muted transition hover:bg-brand-tint hover:text-brand dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-white">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="h-5 w-5" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M6.75 12a.75.75 0 1 1-1.5 0 .75.75 0 0 1 1.5 0ZM12.75 12a.75.75 0 1 1-1.5 0 .75.75 0 0 1 1.5 0ZM18.75 12a.75.75 0 1 1-1.5 0 .75.75 0 0 1 1.5 0Z"/></svg>
+            </button>
+            <div x-show="open" x-cloak data-counter-more-menu class="{{ $menuPanel }}" role="menu">
+                {{-- Prompt 324 — practise on the real counter, nothing kept. Asks first (the chrome's sheet). --}}
+                @if ($chipOperator !== null && ! $practising && (bool) \App\Support\Settings::get('counter_training_enabled', true, session('counter.location_id')))
+                    <button type="button" role="menuitem" data-counter-training class="{{ $menuItem }}" @click="open = false; $dispatch('counter-sheet-open', { name: 'training' })">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" class="h-5 w-5 shrink-0" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M4.26 10.147a60.438 60.438 0 0 0-.491 6.347A48.62 48.62 0 0 1 12 20.904a48.62 48.62 0 0 1 8.232-4.41 60.46 60.46 0 0 0-.491-6.347m-15.482 0a50.636 50.636 0 0 0-2.658-.813A59.906 59.906 0 0 1 12 3.493a59.903 59.903 0 0 1 10.399 5.84c-.896.248-1.783.52-2.658.814m-15.482 0A50.717 50.717 0 0 1 12 13.489a50.702 50.702 0 0 1 7.74-3.342"/></svg>
+                        {{ __('Modo formación') }}
+                    </button>
+                @endif
+                {{-- Prompt 290 — only when the browser has offered installation, never once installed. --}}
+                <button type="button" role="menuitem" data-counter-install x-cloak class="{{ $menuItem }}"
+                        x-data="{ can: !! window.cscInstallPrompt && ! window.matchMedia('(display-mode: standalone)').matches }"
+                        x-show="can"
+                        x-on:csc-installable.window="can = ! window.matchMedia('(display-mode: standalone)').matches"
+                        x-on:csc-installed.window="can = false"
+                        @click="window.cscInstallPrompt?.prompt(); window.cscInstallPrompt?.userChoice.finally(() => { window.cscInstallPrompt = null; can = false })">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" class="h-5 w-5 shrink-0" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M16.5 12 12 16.5m0 0L7.5 12m4.5 4.5V3"/></svg>
+                    {{ __('Instalar como app') }}
+                </button>
+                {{-- Prompt 289 — register THIS tablet as a counter, or forget it. terminals.manage only; asks for the PIN again. --}}
+                @if ($chipOperator?->can('terminals.manage'))
+                    @php($thisTerminal = \App\Support\CounterTerminals::current())
+                    <button type="button" role="menuitem" data-counter-terminal class="{{ $menuItem }}" @click="open = false; window.Livewire.dispatch('counter-terminal')"
+                            title="{{ $thisTerminal ? __('Este dispositivo: :name · :sede', ['name' => $thisTerminal->name, 'sede' => $thisTerminal->location?->name]) : __('Registrar este dispositivo como mostrador') }}">
+                        <x-counter.icon name="tablet" class="h-5 w-5 shrink-0" />
+                        {{ __('Este dispositivo') }}
+                    </button>
+                @endif
+                @if ($canPanel || $canManageDevice)
+                    <div data-counter-leave-group class="mt-1 border-t border-line pt-1 dark:border-slate-800">
+                        @if ($canPanel)
+                            {{-- Leaves the counter: confirms unsaved work (`counter.dirty`), as before. --}}
+                            <a href="{{ url('/') }}" role="menuitem" data-counter-admin-link wire:navigate.ignore class="{{ $menuItem }}"
+                               @click.prevent="(! ($store.counter?.dirty) || window.confirm(@js($confirmLeave))) && window.location.assign('{{ url('/') }}')">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" class="h-5 w-5 shrink-0" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M20.25 14.15v4.25c0 1.094-.787 2.036-1.872 2.18-2.087.277-4.216.42-6.378.42s-4.291-.143-6.378-.42c-1.085-.144-1.872-1.086-1.872-2.18v-4.25m16.5 0a2.18 2.18 0 0 0 .75-1.661V8.706c0-1.081-.768-2.015-1.837-2.175a48.114 48.114 0 0 0-3.413-.387m4.5 8.006c-.194.165-.42.295-.673.38A23.978 23.978 0 0 1 12 15.75c-2.648 0-5.195-.429-7.577-1.22a2.016 2.016 0 0 1-.673-.38m0 0A2.18 2.18 0 0 1 3 12.489V8.706c0-1.081.768-2.015 1.837-2.175a48.111 48.111 0 0 1 3.413-.387m7.5 0V5.25A2.25 2.25 0 0 0 13.5 3h-3a2.25 2.25 0 0 0-2.25 2.25v.894m7.5 0a48.667 48.667 0 0 0-7.5 0"/></svg>
+                                {{ __('Administración') }}
+                            </a>
+                        @endif
+                        {{-- THE DEVICE session — a responsable's act (239): staff.manage, and it asks first. --}}
+                        @if ($canManageDevice)
+                            <form method="POST" action="{{ route('filament.admin.auth.logout') }}"
+                                  @submit="(! window.confirm(@js($confirmDeviceLogout))) && $event.preventDefault()">
+                                @csrf
+                                <button type="submit" role="menuitem" data-counter-logout title="{{ __('Cerrar sesión del dispositivo') }}" class="{{ $menuItem }}">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" class="h-5 w-5 shrink-0" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0 0 13.5 3h-6a2.25 2.25 0 0 0-2.25 2.25v13.5A2.25 2.25 0 0 0 7.5 21h6a2.25 2.25 0 0 0 2.25-2.25V15M12 9l-3 3m0 0 3 3m-3-3h12.75"/></svg>
+                                    {{ __('Salir') }}
+                                </button>
+                            </form>
+                        @endif
+                    </div>
+                @endif
+                <span data-counter-more-menu-end hidden></span>
+            </div>
+        </div>
     </div>
 </header>

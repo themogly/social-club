@@ -135,7 +135,8 @@ class SharedDevicePolicyTest extends TestCase
         // The label is not hidden below xl any more — an unlabelled briefcase was what the tester could not find.
         $at = strpos($html, 'data-counter-admin-link');
         $this->assertNotFalse($at);
-        $window = substr($html, $at, 700);
+        // Prompt 341 — now a labelled item in ⋯ Más; the window spans the link up to its closing tag (the icon is long).
+        $window = substr($html, $at, (int) strpos($html, '</a>', $at) - $at);
         $this->assertStringContainsString('Administración', $window);
         $this->assertStringNotContainsString('hidden xl:inline', $window, 'the panel label is still hidden in portrait');
     }
