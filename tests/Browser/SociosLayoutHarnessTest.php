@@ -17,6 +17,7 @@ use App\Support\ActiveScope;
 use App\Support\CounterOperator;
 use Database\Seeders\RolePermissionSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
 use Livewire\Livewire;
 use Tests\Browser\Concerns\InlinesBuiltCss;
 use Tests\TestCase;
@@ -90,7 +91,7 @@ class SociosLayoutHarnessTest extends TestCase
         $withForm = Livewire::test(MembershipCounter::class)
             ->call('selectMember', $member->id)
             ->call('toggleAlta')
-            ->call('toggleStaffAltaForm')
+            ->call('toggleStaffAltaForm')->set('altaPhoto', UploadedFile::fake()->image('foto.jpg'))
             ->html();
 
         $formPage = substr($page, 0, (int) strpos($page, '<main'));

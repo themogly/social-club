@@ -28,6 +28,10 @@
                     · {{ __('Venció') }} {{ $fix['lapsed']->expires_at->format('d/m/Y') }}
                 @endif
             </p>
+            {{-- Prompt 348 — renewing it renews the home membership, where the fee is. --}}
+            @if ($covered = $fix['lapsed']?->coveredLabel())
+                <p data-membership-covered class="mt-0.5 text-xs text-ink-muted dark:text-slate-400">{{ $covered }}</p>
+            @endif
             <button
                 type="button"
                 wire:click="renewMembership"

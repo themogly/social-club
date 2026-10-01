@@ -65,7 +65,8 @@ class MembershipsRelationManager extends RelationManager
             ->modifyQueryUsing(fn (Builder $query): Builder => $query->withoutGlobalScope(LocationScope::class))
             ->columns([
                 TextColumn::make('tier.name')->label(__('Tarifa'))->searchable()->sortable(),
-                TextColumn::make('location.name')->label(__('Sede'))->sortable(),
+                TextColumn::make('location.name')->label(__('Sede'))->sortable()
+                    ->description(fn (Membership $record): ?string => $record->coveredLabel()), // prompt 348
                 TextColumn::make('status')
                     ->label(__('Estado'))
                     ->badge()
@@ -204,6 +205,7 @@ class MembershipsRelationManager extends RelationManager
         return Action::make('renew')
             ->label(__('Renovar'))
             ->icon(Heroicon::OutlinedArrowPath)
+            ->visible(fn (Membership $record): bool => ! $record->isCovered())
             ->requiresConfirmation()
             ->action(function (Membership $record): void {
                 $membership = (new RenewMembership)->handle($record, ['actor' => Auth::user()]);
@@ -239,7 +241,9 @@ class MembershipsRelationManager extends RelationManager
     {
         $user = Auth::user();
 
-        return $record->status !== MembershipStatus::CANCELLED && MembershipCorrections::may($user instanceof User ? $user : null, $record, $permission);
+        // Prompt 348 — a linked membership is renewed, charged, corrected and cancelled through its home one.
+        return ! $record->isCovered()
+            && $record->status !== MembershipStatus::CANCELLED && MembershipCorrections::may($user instanceof User ? $user : null, $record, $permission);
     }
 
     /** Surface a writer's refusal where the operator is looking, and stop the action. */

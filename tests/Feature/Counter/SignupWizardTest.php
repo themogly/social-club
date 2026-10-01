@@ -21,6 +21,7 @@ use App\Support\CounterOperator;
 use App\Support\Settings;
 use Database\Seeders\RolePermissionSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Mail;
 use Livewire\Features\SupportTesting\Testable;
 use Livewire\Livewire;
@@ -108,7 +109,7 @@ class SignupWizardTest extends TestCase
 
         $html = Livewire::test(MembershipCounter::class)
             ->call('toggleAlta')
-            ->call('toggleStaffAltaForm')
+            ->call('toggleStaffAltaForm')->set('altaPhoto', UploadedFile::fake()->image('foto.jpg'))
             ->html();
 
         $this->assertSame(1, preg_match_all('/data-member-lookup(?![-\w])/', $html), 'the wizard added a second lookup');
@@ -275,7 +276,7 @@ class SignupWizardTest extends TestCase
 
         Livewire::test(MembershipCounter::class)
             ->call('toggleAlta')
-            ->call('toggleStaffAltaForm')
+            ->call('toggleStaffAltaForm')->set('altaPhoto', UploadedFile::fake()->image('foto.jpg'))
             ->assertSet('altaStep', 1)
             ->set('altaForm.first_name', 'Lucía')
             ->set('altaForm.last_name', 'García')
@@ -300,7 +301,7 @@ class SignupWizardTest extends TestCase
 
         Livewire::test(MembershipCounter::class)
             ->call('toggleAlta')
-            ->call('toggleStaffAltaForm')
+            ->call('toggleStaffAltaForm')->set('altaPhoto', UploadedFile::fake()->image('foto.jpg'))
             ->call('altaNext')
             ->assertHasErrors(['altaForm.first_name', 'altaForm.last_name'])
             ->assertSet('altaStep', 1, 'the wizard advanced past an empty identity step');
@@ -313,7 +314,7 @@ class SignupWizardTest extends TestCase
 
         $component = Livewire::test(MembershipCounter::class)
             ->call('toggleAlta')
-            ->call('toggleStaffAltaForm')
+            ->call('toggleStaffAltaForm')->set('altaPhoto', UploadedFile::fake()->image('foto.jpg'))
             ->set('altaForm.first_name', 'Lucía')
             ->set('altaForm.last_name', 'García')
             ->set('altaForm.date_of_birth', now()->subYears(30)->format('Y-m-d'))
@@ -336,7 +337,7 @@ class SignupWizardTest extends TestCase
 
         Livewire::test(MembershipCounter::class)
             ->call('toggleAlta')
-            ->call('toggleStaffAltaForm')
+            ->call('toggleStaffAltaForm')->set('altaPhoto', UploadedFile::fake()->image('foto.jpg'))
             ->call('altaBack')
             ->assertSet('altaStaffFormOpen', false)
             ->assertSet('altaOpen', true, 'going back to the methods closed the whole sign-up');
@@ -396,7 +397,7 @@ class SignupWizardTest extends TestCase
 
         $component = Livewire::test(MembershipCounter::class)
             ->call('toggleAlta')
-            ->call('toggleStaffAltaForm')
+            ->call('toggleStaffAltaForm')->set('altaPhoto', UploadedFile::fake()->image('foto.jpg'))
             ->set('altaForm.first_name', 'Lucía')
             ->set('altaSignaturePath', 'data:image/png;base64,'.base64_encode('sig'))
             ->call('altaNext')
@@ -548,7 +549,7 @@ class SignupWizardTest extends TestCase
     {
         return Livewire::test(MembershipCounter::class)
             ->call('toggleAlta')
-            ->call('toggleStaffAltaForm')
+            ->call('toggleStaffAltaForm')->set('altaPhoto', UploadedFile::fake()->image('foto.jpg'))
             ->set('altaForm.first_name', 'Lucía')
             ->set('altaForm.last_name', 'García')
             ->set('altaForm.email', 'lucia@example.es')

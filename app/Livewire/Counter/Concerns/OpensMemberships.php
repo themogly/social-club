@@ -134,6 +134,12 @@ trait OpensMemberships
             return;
         }
 
+        // Prompt 348 — a linked membership (covered by the one at the sede of the alta) is renewed THROUGH that one:
+        // renewing the home membership brings this one back with it (Membership::booted), and its fee is the home one's.
+        if ($membership->isCovered()) {
+            $membership = Membership::query()->withoutGlobalScopes()->find($membership->covered_by_id) ?? $membership;
+        }
+
         $tier = $membership->tier;
 
         if ($tier === null) {

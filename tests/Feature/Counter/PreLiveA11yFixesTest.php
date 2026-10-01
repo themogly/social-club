@@ -16,6 +16,7 @@ use App\Support\ActiveScope;
 use App\Support\CounterOperator;
 use Database\Seeders\RolePermissionSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Blade;
 use Livewire\Livewire;
 use Symfony\Component\Finder\Finder;
@@ -101,7 +102,7 @@ class PreLiveA11yFixesTest extends TestCase
     {
         $html = Livewire::test(MembershipCounter::class)
             ->call('toggleAlta')
-            ->call('toggleStaffAltaForm')
+            ->call('toggleStaffAltaForm')->set('altaPhoto', UploadedFile::fake()->image('foto.jpg'))
             ->call('altaNext')
             ->html();
 
@@ -113,7 +114,7 @@ class PreLiveA11yFixesTest extends TestCase
 
     public function test_the_wizards_file_fields_are_branded_and_translated(): void
     {
-        $html = Livewire::test(MembershipCounter::class)->call('toggleAlta')->call('toggleStaffAltaForm')->html();
+        $html = Livewire::test(MembershipCounter::class)->call('toggleAlta')->call('toggleStaffAltaForm')->set('altaPhoto', UploadedFile::fake()->image('foto.jpg'))->html();
 
         // A visually hidden input inside the shared button label — never the browser's "Choose File".
         $this->assertMatchesRegularExpression('/<input id="alta-photo" type="file" class="sr-only"/', $html);

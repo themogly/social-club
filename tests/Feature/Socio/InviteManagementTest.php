@@ -12,6 +12,7 @@ use App\Support\ActiveScope;
 use App\Support\ApplicationSpamGuard;
 use Database\Seeders\RolePermissionSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
 use Livewire\Livewire;
 use Tests\TestCase;
 
@@ -117,6 +118,7 @@ class InviteManagementTest extends TestCase
             'date_of_birth' => now()->subYears(30)->format('Y-m-d'),
             'document_type' => 'DNI', 'document_number' => '12345678Z', 'consent_data' => '1', 'consent_statutes' => '1',
             'signature' => 'data:image/png;base64,'.base64_encode('sig'),
+            'photo' => UploadedFile::fake()->image('foto.jpg'), // prompt 348 — required on every sign-up
             ApplicationSpamGuard::HONEYPOT => '',
             ApplicationSpamGuard::TIMESTAMP => $renderToken,
         ])->assertRedirect();

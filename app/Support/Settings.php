@@ -240,6 +240,12 @@ class Settings
         // Prompt 347 (Liam) — after Registrar aportación (and a Barra sale), per sede: back to the counter home (the
         // default), a new member in the dispensary, or stay with the member (the behaviour before 347).
         'after_recording' => 'home',
+        // Prompt 348 — a new member is enrolled at every active sede but the store (one fee, the rest linked). ORG-level.
+        'enrol_all_sedes' => true,
+        // Prompt 348 — per sede: no photo on the record blocks dispensing until one is taken (the counter's Hacer foto).
+        'require_photo_to_dispense' => true,
+        // Prompt 348 — per sede: a QR/card scan shows the member's photo, large, for staff to confirm before anything else.
+        'confirm_photo_on_scan' => true,
         // Prompt 347 — a member of staff serving themselves (their linked member record): allowed and flagged by default;
         // a sede can require someone else to serve them.
         'block_self_dispensation' => false,

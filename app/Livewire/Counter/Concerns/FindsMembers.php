@@ -3,11 +3,13 @@
 namespace App\Livewire\Counter\Concerns;
 
 use App\Actions\Members\ResolveMemberByToken;
+use App\Actions\RecordAuditLog;
 use App\Exceptions\ScanRateLimitedException;
 use App\Livewire\Counter\MembershipCounter;
 use App\Models\Location;
 use App\Models\Member;
 use App\Models\MemberApplication;
+use App\Support\CounterOperator;
 use App\Support\Settings;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
@@ -91,7 +93,7 @@ trait FindsMembers
         if ($member !== null) {
             $this->lookup = '';
             $this->lookupSearched = false;
-            $this->onMemberFound($member, scanned: true);
+            $this->memberScanned($member);
 
             return;
         }
@@ -130,6 +132,66 @@ trait FindsMembers
             $this->clearLookup();
             $this->flash(__('Tarjeta no reconocida.'), 'error');
         }
+    }
+
+    /**
+     * Prompt 348 (Ben: "bring a picture up when they scan the QR code") — a member found by a CARD (QR, camera, reader) is
+     * not selected until staff have looked at the photo: the full-width check comes first. Typing the name skips it (the
+     * person said who they are). *Confirmar la foto al escanear* off (a busy door): straight through, as before.
+     */
+    public ?string $photoCheckMemberId = null;
+
+    private function memberScanned(Member $member): void
+    {
+        if ((bool) Settings::get('confirm_photo_on_scan', true, $this->resolveLocation()?->getKey())) {
+            $this->photoCheckMemberId = $member->getKey();
+
+            return;
+        }
+
+        $this->onMemberFound($member, scanned: true);
+    }
+
+    /** The member whose photo is being checked, for the full-width card. */
+    public function photoCheckMember(): ?Member
+    {
+        return $this->photoCheckMemberId !== null && $this->hasOperator() ? Member::query()->find($this->photoCheckMemberId) : null;
+    }
+
+    /** «Sí, es esta persona» — carry on as a scan always did. */
+    public function confirmPhotoCheck(): void
+    {
+        $member = $this->photoCheckMember();
+        $this->photoCheckMemberId = null;
+        if ($member !== null) {
+            $this->onMemberFound($member, scanned: true);
+        }
+    }
+
+    /** Android Back on the check: nobody selected, nothing recorded (it was neither a yes nor a no). */
+    public function cancelPhotoCheck(): void
+    {
+        $this->photoCheckMemberId = null;
+    }
+
+    /**
+     * «No es esta persona» — nobody is selected; the card's owner is told about (audited, counted on their record, so a
+     * card that keeps turning up in other hands is visible), and the operator is told to get a manager.
+     */
+    public function rejectPhotoCheck(): void
+    {
+        $member = $this->photoCheckMember();
+        $this->photoCheckMemberId = null;
+        if ($member === null) {
+            return;
+        }
+
+        $member->increment('card_misuse_count');
+        (new RecordAuditLog)->handle('member.card_misuse_suspected', $member, null, [
+            'operator_id' => CounterOperator::id(),
+            'location_id' => $this->resolveLocation()?->getKey(),
+        ]);
+        $this->flash(__('No se ha atendido. Avisa a un responsable.'), 'error');
     }
 
     /** A result row was tapped. */

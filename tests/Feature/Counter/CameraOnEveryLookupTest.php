@@ -51,6 +51,8 @@ class CameraOnEveryLookupTest extends TestCase
         $this->seed(RolePermissionSeeder::class);
         $this->org = Organisation::factory()->create();
         app(ActiveScope::class)->setOrganisation($this->org->id);
+        // Prompt 348 — these tests are about the LOOKUP; the photo check a scan now waits for is pinned in PhotoCheckOnScanTest.
+        Settings::set('confirm_photo_on_scan', false, SettingType::BOOL);
         $this->centro = Location::factory()->create(['organisation_id' => $this->org->id, 'name' => 'Sede Centro']);
         $this->norte = Location::factory()->create(['organisation_id' => $this->org->id, 'name' => 'Sede Norte']);
         $owner = User::factory()->create();

@@ -2,6 +2,7 @@
      shell over the shared fee-collection concern (RecordFeePayment). Cash reconciles against the open till. --}}
 <div>
     @include('livewire.counter.partials.counter-surface')
+    @include('livewire.counter.partials.photo-check') {{-- prompt 348 — a scanned card waits for the photo check --}}
 
     @if (! $this->handoverActive())
 
@@ -224,6 +225,15 @@
                     @include('livewire.counter.partials.membership-fix')
 
                     <div data-member-record class="mt-3 space-y-3">
+                        {{-- Prompt 348 — a card shared or lost: the old QR stops working. Confirmed first (it cannot be undone). --}}
+                        <div x-data="{ ask: false }" class="flex flex-wrap items-center gap-2">
+                            <x-button type="button" variant="secondary" size="sm" data-reissue-card x-show="! ask" @click="ask = true">{{ __('Reemitir carné') }}</x-button>
+                            <div x-show="ask" x-cloak class="flex flex-wrap items-center gap-2 rounded-xl border border-warning/40 bg-warning/10 p-2">
+                                <span class="text-sm text-ink dark:text-slate-100">{{ __('El carné actual dejará de funcionar.') }}</span>
+                                <x-button type="button" variant="secondary" size="sm" @click="ask = false">{{ __('Cancelar') }}</x-button>
+                                <x-button type="button" size="sm" data-reissue-card-confirm wire:click="reissueCard" @click="ask = false">{{ __('Reemitir') }}</x-button>
+                            </div>
+                        </div>
                         {{-- Prompt 262 — the member's ID scan, openable at the counter by any operator who may (staff
                              included, the owner's decision), in a sheet, every view logged with the operator's name. --}}
                         @if ($idDocuments->isNotEmpty())

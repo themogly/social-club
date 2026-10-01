@@ -34,6 +34,7 @@ class RecordFeePayment
      */
     public function handle(Membership $membership, int $amountCents, FeePaymentMethod $method, array $options = []): MembershipFeePayment
     {
+        $membership->assertNotCovered(); // prompt 348 — a linked membership is charged through its home one
         $operatorId = $options['operator_id'] ?? Auth::id();
         $reason = isset($options['reason']) ? trim((string) $options['reason']) : null;
 

@@ -19,6 +19,7 @@ use App\Support\ActiveScope;
 use App\Support\CounterOperator;
 use Database\Seeders\RolePermissionSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
 use Livewire\Features\SupportTesting\Testable;
 use Livewire\Livewire;
 use Tests\TestCase;
@@ -78,7 +79,7 @@ class CounterSignupLandsOnReviewTest extends TestCase
     {
         return $component
             ->call('toggleAlta')
-            ->call('toggleStaffAltaForm')
+            ->call('toggleStaffAltaForm')->set('altaPhoto', UploadedFile::fake()->image('foto.jpg'))
             ->set('altaForm.first_name', 'Lucía')
             ->set('altaForm.last_name', 'García')
             ->set('altaForm.date_of_birth', now()->subYears(30)->format('Y-m-d'))

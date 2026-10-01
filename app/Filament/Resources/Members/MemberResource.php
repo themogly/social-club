@@ -6,6 +6,7 @@ use App\Actions\Documents\GenerateMemberDocument;
 use App\Actions\Members\CancelMembership;
 use App\Actions\Members\ExportMemberData;
 use App\Actions\Members\ManageTemporaryMember;
+use App\Actions\Members\ReissueMemberCard;
 use App\Actions\Members\SendMemberCard;
 use App\Actions\Members\SetMemberDebtLimit;
 use App\Actions\Members\SetMemberLimits;
@@ -133,6 +134,7 @@ class MemberResource extends Resource
                     self::convertTemporaryAction(),
                     self::extendTemporaryAction(),
                     self::exportDataAction(),
+                    self::reissueCardAction(),
                     ...array_filter([$openOther]),
                 ]),
                 MenuSection::of(__('Estado del socio'), [
@@ -191,6 +193,26 @@ class MemberResource extends Resource
 
                 Notification::make()
                     ->title(__('Carné QR reenviado'))
+                    ->success()
+                    ->send();
+            });
+    }
+
+    /** Prompt 348 — the old QR stops working; a new card (e-mailed when there is an address). */
+    public static function reissueCardAction(): Action
+    {
+        return Action::make('reissueCard')
+            ->label(__('Reemitir carné'))
+            ->icon(Heroicon::OutlinedArrowPathRoundedSquare)
+            ->requiresConfirmation()
+            ->modalDescription(__('El carné actual deja de funcionar: escanearlo ya no encuentra al socio. Úsalo cuando una tarjeta se ha prestado o perdido.'))
+            ->visible(fn (Member $record): bool => Auth::user()?->can('update', $record) ?? false)
+            ->action(function (Member $record): void {
+                $actor = Auth::user();
+                $emailed = (new ReissueMemberCard)->handle($record, $actor instanceof User ? $actor : null);
+
+                Notification::make()
+                    ->title($emailed ? __('Carné reemitido y enviado por correo') : __('Carné reemitido: el anterior ya no funciona'))
                     ->success()
                     ->send();
             });

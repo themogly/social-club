@@ -247,7 +247,8 @@ class MembershipAtTheCounterTest extends TestCase
         $component->call('enrolAtThisSede')->assertSet('flashType', 'success');
         $component->set('openTierId', $tier->id)->call('enrolAtThisSede')->assertSet('flashType', 'warning');
 
-        $this->assertSame(1, $member->memberships()->withoutGlobalScopes()->count());
+        // At THIS sede (prompt 348's linked memberships at the club's other sedes are not the double tap).
+        $this->assertSame(1, $member->memberships()->withoutGlobalScopes()->whereNull('covered_by_id')->count());
     }
 
     /** A lapsed row does NOT block a fresh enrolment — the import brings across strings of expired ones. */

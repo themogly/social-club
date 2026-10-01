@@ -68,6 +68,7 @@ class ManageSettings extends Page
         'renewal_reminder_lead_days' => SettingType::INT,
         'invite_expiry_days' => SettingType::INT,
         'signature_on_application' => SettingType::BOOL,
+        'enrol_all_sedes' => SettingType::BOOL, // prompt 348
         'refund_window_days' => SettingType::INT,
         'temporary_members_enabled' => SettingType::BOOL,
         'temporary_window_days' => SettingType::INT,
@@ -257,6 +258,10 @@ class ManageSettings extends Page
 
                 Section::make(__('Membresía'))
                     ->schema([
+                        // Prompt 348 (Aaron) — enrol a new member at every sede but the store, one fee, the rest linked to it.
+                        Toggle::make('enrol_all_sedes')->label(__('Alta en todas las sedes'))
+                            ->helperText(__('Al dar de alta a un socio, queda inscrito en todas las sedes activas (no en el almacén) con la misma tarifa y fechas. La cuota se cobra una vez, en la sede del alta; las demás quedan cubiertas por ella y se renuevan y anulan con ella.'))
+                            ->columnSpanFull(),
                         TextInput::make('expiring_soon_days')->label(__('Días "caduca pronto"'))->integer()->minValue(0)->maxValue(365)->required()
                             ->helperText(__('Con cuántos días de antelación una membresía aparece como «caduca pronto».')),
                         TextInput::make('renewal_reminder_lead_days')->label(__('Días de aviso de renovación'))->integer()->minValue(0)->maxValue(365)->required()

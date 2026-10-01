@@ -86,6 +86,9 @@ class TrainingModeTest extends TestCase
         $this->seed(RolePermissionSeeder::class);
         $this->org = Organisation::factory()->create();
         app(ActiveScope::class)->setOrganisation($this->org->id);
+        // Prompt 348 — the training member has no photo on purpose (uploads are refused in practice); training is not the
+        // photo requirement's subject.
+        Settings::set('require_photo_to_dispense', false, SettingType::BOOL);
         $this->centro = Location::factory()->create(['organisation_id' => $this->org->id, 'name' => 'Sede Centro']);
         $this->norte = Location::factory()->create(['organisation_id' => $this->org->id, 'name' => 'Sede Norte']);
         app(ActiveScope::class)->setLocation($this->centro->id);

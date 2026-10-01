@@ -66,6 +66,8 @@ class TheColumnSaysWhatTheScreenDoesNotTest extends TestCase
         $this->seed(RolePermissionSeeder::class);
         $this->org = Organisation::factory()->create();
         app(ActiveScope::class)->setOrganisation($this->org->id);
+        // Prompt 348 — this pins how a WARNED socio reads (157's WARN photo mode), which applies with *Exigir foto para dispensar* off.
+        Settings::set('require_photo_to_dispense', false, SettingType::BOOL);
         $this->location = Location::factory()->create(['organisation_id' => $this->org->id]);
     }
 

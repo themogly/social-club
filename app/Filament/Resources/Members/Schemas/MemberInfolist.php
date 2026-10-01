@@ -40,6 +40,12 @@ class MemberInfolist
                         TextEntry::make('member_no')
                             ->label(__('Nº de socio')),
 
+                        // Prompt 348 — a card that keeps turning up in other hands is visible on the record.
+                        TextEntry::make('card_misuse_count')
+                            ->label(__('Tarjeta usada por otra persona'))
+                            ->color('warning')
+                            ->visible(fn (?Member $record): bool => (int) $record?->card_misuse_count > 0),
+
                         TextEntry::make('status')
                             ->label(__('Estado'))
                             ->badge()

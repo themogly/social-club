@@ -19,6 +19,7 @@ use App\Support\ActiveScope;
 use App\Support\CounterOperator;
 use Database\Seeders\RolePermissionSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
 use Livewire\Features\SupportTesting\Testable;
 use Livewire\Livewire;
 use Tests\TestCase;
@@ -146,7 +147,7 @@ class SharedDevicePolicyTest extends TestCase
     private function wizardTo(Testable $component, ?string $tierId): Testable
     {
         return $component
-            ->call('toggleAlta')->call('toggleStaffAltaForm')
+            ->call('toggleAlta')->call('toggleStaffAltaForm')->set('altaPhoto', UploadedFile::fake()->image('foto.jpg'))
             ->set('altaForm.first_name', 'Nuevo')->set('altaForm.last_name', 'Socio')
             ->set('altaForm.date_of_birth', now()->subYears(30)->format('Y-m-d'))
             ->set('altaForm.document_type', 'DNI')->set('altaForm.document_number', '12345678Z')

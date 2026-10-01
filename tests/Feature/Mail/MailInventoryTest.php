@@ -104,6 +104,7 @@ class MailInventoryTest extends TestCase
             'Invitación reenviada (en cola)' => 'SendApplicationInvite (ApplicationInviteMail)',
             'Invitación creada y email en cola' => 'SendApplicationInvite (ApplicationInviteMail)',
             'Comprobante enviado al socio (en cola).' => 'DispensaryPos::emailReceipt (DispensationReceiptMail)',
+            'Carné reemitido y enviado por correo' => 'ReissueMemberCard → SendMemberCard (MemberCardMail)',
             'Si tu correo está registrado, te hemos enviado un enlace de acceso.' => 'IssueMemberLoginLink (MemberLoginLinkMail)',
             'Cerrará el club entero de inmediato. Solo se reactiva desde el enlace enviado a los propietarios, por el plazo automático o por línea de comandos.' => 'InitiateLockdown (LockdownReactivationMail)',
             'Se reactiva desde el enlace enviado a los propietarios, por el plazo automático o por línea de comandos. No desde aquí.' => 'InitiateLockdown (LockdownReactivationMail)',

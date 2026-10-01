@@ -72,7 +72,9 @@ class ApplicationShape
     public static function files(): array
     {
         return [
-            'photo' => ['nullable', 'image', 'mimes:jpeg,jpg,png,webp', DocumentUpload::maxRule()],
+            // Prompt 348 (Ben: "make it a requirement they send a pic") — REQUIRED on every new sign-up, both routes: staff
+            // compare it with the person on every visit (the photo check on a card scan), so a card cannot be handed round.
+            'photo' => ['required', 'image', 'mimes:jpeg,jpg,png,webp', DocumentUpload::maxRule()],
             'document_scan' => ['nullable', 'file', 'mimes:jpeg,jpg,png,webp,pdf', DocumentUpload::maxRule()],
             // Prompt 244 — the medical certificate, the EVIDENCE behind `is_therapeutic` (which both routes
             // already collect). Without it the wizard created therapeutic members with no evidence the admin

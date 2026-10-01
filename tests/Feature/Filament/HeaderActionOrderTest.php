@@ -97,7 +97,7 @@ class HeaderActionOrderTest extends TestCase
         $this->assertSame(['backToList', 'setDebtLimit', 'resendQr', 'setLimits', 'generateDocument', 'more'], array_keys($header));
 
         [$datos, $estado, $eliminar] = $this->sections($header['more']);
-        $this->assertSame(['updateDeclaredForecast', 'exportData', 'view'], $datos); // the temporary conversions and carencia are offered when they apply
+        $this->assertSame(['updateDeclaredForecast', 'exportData', 'reissueCard', 'view'], $datos); // the temporary conversions and carencia are offered when they apply
         $this->assertSame(['suspend', 'recordBaja', 'expel'], $estado);
         $this->assertSame(['requestErasure', 'delete'], $eliminar, 'Solicitar supresión and Borrar, last');
     }

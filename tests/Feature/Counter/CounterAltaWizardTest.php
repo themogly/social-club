@@ -26,6 +26,7 @@ use App\Support\CounterHandover;
 use App\Support\CounterOperator;
 use Database\Seeders\RolePermissionSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Mail;
 use Livewire\Livewire;
@@ -97,6 +98,7 @@ class CounterAltaWizardTest extends TestCase
             'consent_data' => '1',
             'consent_statutes' => '1',
             'signature' => 'data:image/png;base64,'.base64_encode('sig'),
+            'photo' => UploadedFile::fake()->image('foto.jpg'), // prompt 348 — required on every sign-up
             ApplicationSpamGuard::HONEYPOT => '',
             ApplicationSpamGuard::TIMESTAMP => $this->agedToken(),
         ], $overrides));

@@ -14,6 +14,7 @@ use App\Support\ApplicationSpamGuard;
 use App\Support\ConsentText;
 use App\Support\Settings;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
 use Tests\TestCase;
 
 /**
@@ -55,6 +56,7 @@ class PublicApplicationFormTest extends TestCase
             'document_type' => 'DNI', 'document_number' => '12345678Z',
             'declared_monthly_g' => '30', 'consent_data' => '1', 'consent_statutes' => '1',
             'signature' => 'data:image/png;base64,'.base64_encode('sig'),
+            'photo' => UploadedFile::fake()->image('foto.jpg'), // prompt 348 — required on every sign-up
             ApplicationSpamGuard::HONEYPOT => '',
             // A render token aged past the minimum submit time, so a genuine submit isn't taken for a bot.
             ApplicationSpamGuard::TIMESTAMP => $this->agedToken(ApplicationSpamGuard::MIN_SECONDS + 2),

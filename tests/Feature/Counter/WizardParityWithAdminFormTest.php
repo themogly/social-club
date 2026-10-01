@@ -76,7 +76,7 @@ class WizardParityWithAdminFormTest extends TestCase
 
         Livewire::test(MembershipCounter::class)
             ->call('toggleAlta')
-            ->call('toggleStaffAltaForm')
+            ->call('toggleStaffAltaForm')->set('altaPhoto', UploadedFile::fake()->image('foto.jpg'))
             ->set('altaForm.first_name', 'Tere')
             ->set('altaForm.last_name', 'Peuta')
             ->set('altaForm.date_of_birth', now()->subYears(40)->format('Y-m-d'))
@@ -165,7 +165,7 @@ class WizardParityWithAdminFormTest extends TestCase
 
         $html = Livewire::test(MembershipCounter::class)
             ->call('toggleAlta')
-            ->call('toggleStaffAltaForm')
+            ->call('toggleStaffAltaForm')->set('altaPhoto', UploadedFile::fake()->image('foto.jpg'))
             ->set('altaForm.first_name', 'Nuevo')
             ->set('altaForm.last_name', 'Socio')
             ->set('altaForm.date_of_birth', now()->subYears(25)->format('Y-m-d'))

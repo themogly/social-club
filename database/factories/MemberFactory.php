@@ -29,7 +29,9 @@ class MemberFactory extends Factory
             'phone' => fake()->phoneNumber(),
             'date_of_birth' => fake()->dateTimeBetween('-60 years', '-19 years'),
             'address' => fake()->address(),
-            'photo_path' => null,
+            // Prompt 348 — a photo is required at sign-up and to dispense (per sede, on by default), so a factory member has
+            // one, like every real new member. A test about the no-photo case sets it to null explicitly.
+            'photo_path' => 'member-photos/factory.jpg',
             'document_type' => IdDocumentType::DNI,
             'document_number' => fake()->bothify('########?'),
             'document_scan_path' => null,

@@ -77,6 +77,16 @@
         </section>
     @endif
 
+    {{-- Prompt 348 — *Exigir foto para dispensar*: «Hacer foto» right here, the counter's existing capture (157, encrypted,
+         audited). A saved photo refreshes the screen and the dispensary opens. --}}
+    @if (in_array(\App\Enums\EligibilityRule::PHOTO->value, $blockedKeys, true))
+        <section data-blocked-resolution="photo" class="rounded-2xl border border-line bg-surface p-4 dark:border-slate-800 dark:bg-slate-900">
+            <h3 class="text-base font-semibold">{{ __('Hazle una foto antes de dispensar') }}</h3>
+            <p class="mt-0.5 text-sm text-ink-muted dark:text-slate-400">{{ __('El personal la comprobará en cada visita.') }}</p>
+            <x-counter.photo-capture :member="$member" source="counter" class="mt-3" />
+        </section>
+    @endif
+
     {{-- The way past this socio: the same shared lookup (194). Without it a blocked member would be a dead
          end of a different kind — the operator could neither resolve them nor serve the next person. --}}
     <section class="rounded-2xl border border-line bg-surface p-4 dark:border-slate-800 dark:bg-slate-900">

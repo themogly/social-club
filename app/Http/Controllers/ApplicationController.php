@@ -16,6 +16,7 @@ use App\Support\CounterHandover;
 use App\Support\Mrz\MrzDocument;
 use App\Support\Mrz\MrzParser;
 use App\Support\MrzPrefill;
+use App\Support\SignupTrace;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -115,9 +116,11 @@ class ApplicationController extends Controller
         // mi solicitud" disappears), and the PIN then lands the operator on this application's review. Guarded
         // to this token's form so it never fires on an emailed invite that shares no handover with the counter;
         // the spam-dropped path returned above, so it is never marked either.
-        if (CounterHandover::active() && CounterHandover::returnUrl() === route('socio.application', ['token' => $token])) {
+        $handover = CounterHandover::active() && CounterHandover::returnUrl() === route('socio.application', ['token' => $token]);
+        if ($handover) {
             CounterHandover::markSubmitted($application->id);
         }
+        SignupTrace::record('application.submitted', ['application_id' => $application->id, 'route' => $handover ? 'handover' : 'link']); // prompt 348
 
         return $this->submittedRedirect($token);
     }

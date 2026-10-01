@@ -5,6 +5,7 @@ namespace Tests\Feature\Members;
 use App\Actions\Dispensing\CommitDispensation;
 use App\Actions\Members\ImportMembers;
 use App\Enums\BatchStatus;
+use App\Enums\SettingType;
 use App\Models\Batch;
 use App\Models\ConsentRecord;
 use App\Models\Genetic;
@@ -50,6 +51,8 @@ class MemberImportPaperRegisterTest extends TestCase
         parent::setUp();
         $this->org = Organisation::factory()->create();
         app(ActiveScope::class)->setOrganisation($this->org->id);
+        // Prompt 348 — an imported paper member arrives with no photo; with *Exigir foto para dispensar* on (the default) the first visit takes one first. This pins the rest of the import with that switch off.
+        Settings::set('require_photo_to_dispense', false, SettingType::BOOL);
         $this->location = Location::factory()->create(['organisation_id' => $this->org->id, 'name' => 'Sede Centro']);
         $this->tier = MembershipTier::factory()->create(['organisation_id' => $this->org->id, 'name' => 'General']);
     }

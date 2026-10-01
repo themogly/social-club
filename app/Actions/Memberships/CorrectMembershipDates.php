@@ -22,6 +22,7 @@ class CorrectMembershipDates
     /** @throws AuthorizationException|DomainException */
     public function handle(Membership $membership, CarbonInterface $startsAt, CarbonInterface $expiresAt, User $actor, string $reason): Membership
     {
+        $membership->assertNotCovered(); // prompt 348 — a linked membership is re-dated through its home one
         MembershipCorrections::authorize($actor, $membership);
         $reason = trim($reason);
         if ($reason === '') {

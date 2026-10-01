@@ -16,6 +16,7 @@ use App\Support\ActiveScope;
 use App\Support\CounterOperator;
 use Database\Seeders\RolePermissionSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
 use Livewire\Features\SupportTesting\Testable;
 use Livewire\Livewire;
 use Tests\Browser\Concerns\InlinesBuiltCss;
@@ -116,7 +117,7 @@ class SignupWizardHarnessTest extends TestCase
     {
         $component = Livewire::test(MembershipCounter::class)
             ->call('toggleAlta')
-            ->call('toggleStaffAltaForm')
+            ->call('toggleStaffAltaForm')->set('altaPhoto', UploadedFile::fake()->image('foto.jpg'))
             ->set('altaForm.first_name', 'Ana')
             ->set('altaForm.last_name', 'Ruiz Delgado')
             ->set('altaForm.email', 'ana@example.es')

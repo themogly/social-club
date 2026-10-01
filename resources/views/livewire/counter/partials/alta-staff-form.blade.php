@@ -99,7 +99,7 @@
              access-logged URL — whichever form uploaded them. --}}
         <div class="grid gap-2.5 sm:grid-cols-2">
             <div>
-                <x-counter.file-field id="alta-photo" :label="__('Foto (opcional)')" wire:model="altaPhoto" accept="image/*" camera="user" data-alta-photo="" :hint="__('Se compara con la persona en el mostrador. Puedes omitirla.')" />
+                <x-counter.file-field id="alta-photo" :label="__('Foto (obligatoria)')" wire:model="altaPhoto" accept="image/*" camera="user" data-alta-photo="" :hint="__('El personal la comprobará en cada visita.')" />
             </div>
 
             <div>

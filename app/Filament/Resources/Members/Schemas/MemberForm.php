@@ -23,6 +23,7 @@ use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
 use Filament\Schemas\Components\Section;
+use Filament\Schemas\Components\Text;
 use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
@@ -184,6 +185,10 @@ class MemberForm
                             ->maxSize(DocumentUpload::maxKilobytes())
                             ->previewable(false)
                             ->helperText(DocumentUpload::helperText(__('Se guarda cifrada y solo se puede ver mediante un enlace firmado y registrado.'))), camera: 'user'),
+                        // Prompt 348 — how often staff said this member's scanned card was in someone else's hands.
+                        Text::make(fn (?Member $record): string => __('Tarjeta usada por otra persona: :count', ['count' => (int) $record?->card_misuse_count]))
+                            ->visible(fn (?Member $record): bool => (int) $record?->card_misuse_count > 0)
+                            ->extraAttributes(['data-card-misuse' => 'true', 'class' => 'font-semibold text-warning-600 dark:text-warning-400']),
                     ]),
 
                 Section::make(__('Declaraciones'))

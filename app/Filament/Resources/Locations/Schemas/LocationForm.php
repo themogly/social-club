@@ -43,6 +43,8 @@ class LocationForm
         'applications_chime_enabled', // prompt 330 — off by default
         'reception_enabled', // prompt 337 — on by default
         'block_self_dispensation', // prompt 347 — off by default
+        'require_photo_to_dispense', // prompt 348 — on by default
+        'confirm_photo_on_scan', // prompt 348 — on by default
     ];
 
     /**
@@ -396,6 +398,17 @@ class LocationForm
                             ->helperText(fn (Get $get): string => (bool) $get('reception_enabled')
                                 ? __('El dispensario solo acepta socios con la entrada registrada en recepción.')
                                 : __('Requiere Recepción.')),
+
+                        // Prompt 348 (Ben: "bring a picture up when they scan the QR code") — no sharing cards.
+                        Toggle::make('confirm_photo_on_scan')
+                            ->label(__('Confirmar la foto al escanear'))
+                            ->default(true)
+                            ->helperText(__('Al escanear la tarjeta, se muestra la foto del socio en grande para confirmar que es esa persona. Desactívalo en una puerta con mucha cola: el socio se selecciona sin pedir confirmación (su foto sigue en su ficha).')),
+
+                        Toggle::make('require_photo_to_dispense')
+                            ->label(__('Exigir foto para dispensar'))
+                            ->default(true)
+                            ->helperText(__('Un socio sin foto en su ficha no puede dispensarse hasta que se le haga una (botón «Hacer foto» en el dispensario).')),
 
                         Toggle::make('camera_scan_enabled')
                             ->label(__('Escaneo con cámara'))

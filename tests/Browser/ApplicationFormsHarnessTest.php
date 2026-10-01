@@ -13,6 +13,7 @@ use App\Support\ActiveScope;
 use App\Support\CounterOperator;
 use Database\Seeders\RolePermissionSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
 use Livewire\Livewire;
 use Tests\Browser\Concerns\InlinesBuiltCss;
 use Tests\TestCase;
@@ -47,7 +48,7 @@ class ApplicationFormsHarnessTest extends TestCase
         $page = (string) $this->get(route('counter.members'))->assertOk()->getContent();
         $held = Livewire::test(MembershipCounter::class)
             ->call('toggleAlta')
-            ->call('toggleStaffAltaForm')
+            ->call('toggleStaffAltaForm')->set('altaPhoto', UploadedFile::fake()->image('foto.jpg'))
             ->html();
 
         $open = (int) strpos($page, '<main');
