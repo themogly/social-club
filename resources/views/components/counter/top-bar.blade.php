@@ -94,7 +94,7 @@
 --}}
 <header
     data-counter-topbar
-    class="flex flex-wrap items-center justify-between gap-x-2 gap-y-2 border-b border-line px-4 py-3 dark:border-slate-800 sm:px-6 md:flex-nowrap"
+    class="flex flex-wrap items-center justify-between gap-x-0.5 gap-y-2 border-b border-line px-3 py-3 dark:border-slate-800 sm:gap-x-2 sm:px-6 md:flex-nowrap"
 >
     {{-- Prompt 272 — the row WRAPS rather than crushing or overflowing. At 390 the fixed right-hand group
          was wider than the phone, so the page scrolled sideways (scrollWidth 451), the home link was crushed
@@ -125,7 +125,7 @@
            wire:navigate.ignore
            @click.prevent="(! ($store.counter?.volatile) || window.confirm(@js($confirmDiscard))) && window.location.assign('{{ route('counter.home') }}')"
            @class([
-               'flex min-w-0 min-h-11 items-center gap-2 rounded-xl px-2 text-left transition sm:px-3',
+               'flex min-w-11 min-h-11 items-center gap-2 rounded-xl px-1.5 text-left transition sm:px-3',
                'bg-brand-tint text-brand dark:bg-slate-800 dark:text-white' => request()->routeIs('counter.home'),
                'text-ink hover:bg-brand-tint hover:text-brand dark:text-slate-100 dark:hover:bg-slate-800 dark:hover:text-white' => ! request()->routeIs('counter.home'),
            ])
@@ -267,7 +267,12 @@
         $clock = $chipOperator !== null ? \App\Support\ClockState::for($chipOperator) : null;
         $practising = \App\Support\TrainingMode::active();
         $menuItem = 'flex min-h-11 w-full items-center gap-3 rounded-lg px-3 text-left text-sm font-medium text-ink transition hover:bg-brand-tint hover:text-brand dark:text-slate-100 dark:hover:bg-slate-800 dark:hover:text-white';
-        $menuPanel = 'absolute right-0 top-full z-40 mt-1 w-64 rounded-xl border border-line bg-surface p-1 shadow-lg dark:border-slate-800 dark:bg-slate-900';
+        // Prompt 343 — under 640 px a BOTTOM SHEET (full width, the safe area respected, big rows), because a dropdown
+        // anchored to a button that wraps can open off the screen (Ben's iPhone: ⋯ at the left edge, its menu off it).
+        // From 640 a dropdown under its button, right-aligned: the bar's right-hand group is always at the right edge.
+        $menuPanel = 'fixed inset-x-0 bottom-0 z-50 rounded-t-2xl border-t border-line bg-surface p-2 pb-[max(env(safe-area-inset-bottom),0.75rem)] shadow-2xl dark:border-slate-800 dark:bg-slate-900 sm:absolute sm:inset-x-auto sm:bottom-auto sm:right-0 sm:top-full sm:mt-1 sm:w-64 sm:rounded-xl sm:border sm:p-1 sm:pb-1 sm:shadow-lg';
+        $menuBackdrop = 'fixed inset-0 z-40 bg-ink/40 sm:hidden';
+        $menuHandle = 'mx-auto mb-2 h-1.5 w-10 rounded-full bg-line sm:hidden';
     @endphp
     {{-- `contents` on a phone (its controls join the header's own row, the amber «Fichar entrada» dropping below with the
          sede); its own right-aligned group from md. --}}
@@ -282,37 +287,46 @@
                  amber, «Fichado ayer 23:40» amber). The chrome re-renders on `counter-clock-state`, so it changes the
                  moment a clock event lands. Tapping it opens the person's own actions; each clock act asks for THEIR PIN
                  (281 / ClockRules). The switch keeps 173's rule: one route to the pad, the surface's own. --}}
-            <div class="relative" x-data="{ open: false }" @keydown.escape.window="open = false" @click.outside="open = false">
+            {{-- Prompt 343 — the chip SHRINKS to fit (flex-1 from a zero basis on a phone), so the first row never wraps ⋯
+                 away; the name truncates first, the time never. --}}
+            <div class="relative min-w-0 flex-1 basis-0 md:flex-none md:basis-auto" x-data="topBarMenu('chip')" @keydown.escape.window="close()" @click.outside="close()">
                 <button type="button" data-operator-name-chip data-clock-state="{{ $clock['state'] }}"
-                        @click="open = ! open" aria-haspopup="true" :aria-expanded="open.toString()"
+                        @click="toggle()" aria-haspopup="true" :aria-expanded="open.toString()"
+                        aria-label="{{ $chipOperator->name }} · {{ $clock['label'] }}"
                         title="{{ $chipOperator->name }} · {{ $clock['label'] }}"
                         @class([
-                            'inline-flex min-h-11 max-w-[8.5rem] items-center gap-2 rounded-lg px-3 text-left text-sm transition hover:bg-brand-tint dark:hover:bg-slate-700 sm:max-w-[13rem]',
+                            'inline-flex min-h-11 w-full min-w-0 items-center gap-1.5 rounded-lg px-1.5 text-left text-sm transition hover:bg-brand-tint dark:hover:bg-slate-700 sm:gap-2 sm:px-3 md:w-auto md:max-w-[13rem]',
                             'bg-surface-alt dark:bg-slate-800' => $clock['state'] === 'in',
                             'bg-warning/10 ring-1 ring-warning/40' => $clock['state'] !== 'in',
                         ])>
                     <span @class(['inline-block h-2.5 w-2.5 shrink-0 rounded-full', 'bg-success' => $clock['state'] === 'in', 'bg-warning' => $clock['state'] !== 'in']) aria-hidden="true"></span>
                     <span class="min-w-0 leading-tight">
-                        <span data-operator-name class="block truncate font-semibold">{{ $chipOperator->name }}</span>
-                        <span data-clock-label @class(['block truncate text-xs', 'text-ink-muted dark:text-slate-400' => $clock['state'] === 'in', 'font-semibold text-warning' => $clock['state'] !== 'in'])>{{ $clock['label'] }}</span>
+                        {{-- A phone: "Ben · 08:12" on one line — the compact time beside the name, never cut. --}}
+                        <span class="flex min-w-0 items-baseline gap-1">
+                            <span data-operator-name class="truncate font-semibold">{{ $chipOperator->name }}</span>
+                            <span data-clock-short @class(['shrink-0 whitespace-nowrap text-xs sm:hidden', 'text-ink-muted dark:text-slate-400' => $clock['state'] === 'in', 'font-semibold text-warning' => $clock['state'] !== 'in'])>· {{ $clock['short'] }}</span>
+                        </span>
+                        <span data-clock-label @class(['hidden truncate text-xs sm:block', 'text-ink-muted dark:text-slate-400' => $clock['state'] === 'in', 'font-semibold text-warning' => $clock['state'] !== 'in'])>{{ $clock['label'] }}</span>
                     </span>
                 </button>
+                <div x-show="open" x-cloak class="{{ $menuBackdrop }}" @click="close()" aria-hidden="true"></div>
                 <div x-show="open" x-cloak data-counter-chip-menu class="{{ $menuPanel }}" role="menu">
+                    <div class="{{ $menuHandle }}" aria-hidden="true"></div>
                     @unless ($practising)
                         @if ($clock['state'] === 'out')
-                            <button type="button" role="menuitem" data-counter-clock-in class="{{ $menuItem }}" @click="open = false; window.Livewire.dispatch('counter-clock-in')">
+                            <button type="button" role="menuitem" data-counter-clock-in class="{{ $menuItem }}" @click="close(true); window.Livewire.dispatch('counter-clock-in')">
                                 <x-counter.icon name="clock" class="h-5 w-5 shrink-0" />{{ __('Fichar entrada') }}
                             </button>
                         @else
-                            <button type="button" role="menuitem" data-counter-clock-out class="{{ $menuItem }}" @click="open = false; window.Livewire.dispatch('counter-clock-out')">
+                            <button type="button" role="menuitem" data-counter-clock-out class="{{ $menuItem }}" @click="close(true); window.Livewire.dispatch('counter-clock-out')">
                                 <x-counter.icon name="clock" class="h-5 w-5 shrink-0" />{{ __('Fichar salida') }}
                             </button>
                         @endif
                     @endunless
-                    <button type="button" role="menuitem" data-counter-my-hours class="{{ $menuItem }}" @click="open = false; window.Livewire.dispatch('counter-my-hours')">
+                    <button type="button" role="menuitem" data-counter-my-hours class="{{ $menuItem }}" @click="close(true); window.Livewire.dispatch('counter-my-hours')">
                         <x-counter.icon name="list" class="h-5 w-5 shrink-0" />{{ __('Mis horas') }}
                     </button>
-                    <button type="button" role="menuitem" data-counter-switch-operator class="{{ $menuItem }}" @click="open = false; window.Livewire.dispatch('counter-switch-operator')">
+                    <button type="button" role="menuitem" data-counter-switch-operator class="{{ $menuItem }}" @click="close(true); window.Livewire.dispatch('counter-switch-operator')">
                         <x-counter.icon name="user" class="h-5 w-5 shrink-0" />{{ __('Cambiar de persona') }}
                     </button>
                     <span data-counter-chip-menu-end hidden></span>
@@ -324,8 +338,8 @@
             @if ($clock['state'] === 'out' && ! $practising)
                 <button type="button" data-counter-clock-in-quick @click="window.Livewire.dispatch('counter-clock-in')"
                         aria-label="{{ __('Fichar entrada (no has fichado)') }}"
-                        class="order-last inline-flex min-h-11 items-center rounded-lg border border-warning/50 bg-warning/10 px-3 text-sm font-semibold text-warning transition hover:bg-warning/20 md:order-none">
-                    {{ __('Fichar entrada') }}
+                        class="order-last inline-flex min-h-11 items-center gap-1.5 rounded-lg border border-warning/50 bg-warning/10 px-3 text-sm font-semibold text-warning transition hover:bg-warning/20 md:order-none">
+                    <x-counter.icon name="clock" class="h-4 w-4 shrink-0" />{{ __('Fichar entrada') }}
                 </button>
             @endif
         @endif
@@ -357,16 +371,18 @@
 
         {{-- ⋯ MÁS — everything else, labelled: *Modo formación* (324), *Instalar como app* (290), *Este dispositivo* (289),
              *Administración* and *Salir* (the leave group, 206/239/246) — each with its existing gate and confirmation. --}}
-        <div class="relative" x-data="{ open: false }" @keydown.escape.window="open = false" @click.outside="open = false">
-            <button type="button" data-counter-more @click="open = ! open" aria-haspopup="true" :aria-expanded="open.toString()"
+        <div class="relative" x-data="topBarMenu('more')" @keydown.escape.window="close()" @click.outside="close()">
+            <button type="button" data-counter-more @click="toggle()" aria-haspopup="true" :aria-expanded="open.toString()"
                     aria-label="{{ __('Más') }}" title="{{ __('Más') }}"
                     class="inline-flex min-h-11 min-w-11 items-center justify-center rounded-lg px-3 text-ink-muted transition hover:bg-brand-tint hover:text-brand dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-white">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="h-5 w-5" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M6.75 12a.75.75 0 1 1-1.5 0 .75.75 0 0 1 1.5 0ZM12.75 12a.75.75 0 1 1-1.5 0 .75.75 0 0 1 1.5 0ZM18.75 12a.75.75 0 1 1-1.5 0 .75.75 0 0 1 1.5 0Z"/></svg>
             </button>
+            <div x-show="open" x-cloak class="{{ $menuBackdrop }}" @click="close()" aria-hidden="true"></div>
             <div x-show="open" x-cloak data-counter-more-menu class="{{ $menuPanel }}" role="menu">
+                <div class="{{ $menuHandle }}" aria-hidden="true"></div>
                 {{-- Prompt 324 — practise on the real counter, nothing kept. Asks first (the chrome's sheet). --}}
                 @if ($chipOperator !== null && ! $practising && (bool) \App\Support\Settings::get('counter_training_enabled', true, session('counter.location_id')))
-                    <button type="button" role="menuitem" data-counter-training class="{{ $menuItem }}" @click="open = false; $dispatch('counter-sheet-open', { name: 'training' })">
+                    <button type="button" role="menuitem" data-counter-training class="{{ $menuItem }}" @click="close(true); $dispatch('counter-sheet-open', { name: 'training' })">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" class="h-5 w-5 shrink-0" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M4.26 10.147a60.438 60.438 0 0 0-.491 6.347A48.62 48.62 0 0 1 12 20.904a48.62 48.62 0 0 1 8.232-4.41 60.46 60.46 0 0 0-.491-6.347m-15.482 0a50.636 50.636 0 0 0-2.658-.813A59.906 59.906 0 0 1 12 3.493a59.903 59.903 0 0 1 10.399 5.84c-.896.248-1.783.52-2.658.814m-15.482 0A50.717 50.717 0 0 1 12 13.489a50.702 50.702 0 0 1 7.74-3.342"/></svg>
                         {{ __('Modo formación') }}
                     </button>
@@ -377,14 +393,14 @@
                         x-show="can"
                         x-on:csc-installable.window="can = ! window.matchMedia('(display-mode: standalone)').matches"
                         x-on:csc-installed.window="can = false"
-                        @click="window.cscInstallPrompt?.prompt(); window.cscInstallPrompt?.userChoice.finally(() => { window.cscInstallPrompt = null; can = false })">
+                        @click="close(true); window.cscInstallPrompt?.prompt(); window.cscInstallPrompt?.userChoice.finally(() => { window.cscInstallPrompt = null; can = false })">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" class="h-5 w-5 shrink-0" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M16.5 12 12 16.5m0 0L7.5 12m4.5 4.5V3"/></svg>
                     {{ __('Instalar como app') }}
                 </button>
                 {{-- Prompt 289 — register THIS tablet as a counter, or forget it. terminals.manage only; asks for the PIN again. --}}
                 @if ($chipOperator?->can('terminals.manage'))
                     @php($thisTerminal = \App\Support\CounterTerminals::current())
-                    <button type="button" role="menuitem" data-counter-terminal class="{{ $menuItem }}" @click="open = false; window.Livewire.dispatch('counter-terminal')"
+                    <button type="button" role="menuitem" data-counter-terminal class="{{ $menuItem }}" @click="close(true); window.Livewire.dispatch('counter-terminal')"
                             title="{{ $thisTerminal ? __('Este dispositivo: :name · :sede', ['name' => $thisTerminal->name, 'sede' => $thisTerminal->location?->name]) : __('Registrar este dispositivo como mostrador') }}">
                         <x-counter.icon name="tablet" class="h-5 w-5 shrink-0" />
                         {{ __('Este dispositivo') }}

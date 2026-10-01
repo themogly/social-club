@@ -373,6 +373,40 @@ document.addEventListener('alpine:init', () => {
         },
     }));
 
+    // Prompt 343 — a top-bar menu (the chip's, ⋯ Más). Under 640 px it is a bottom sheet, an overlay, so Android Back
+    // closes it before it leaves the page (CLAUDE.md). Closed by the backdrop, Esc, an outside tap or its button, it
+    // takes back its own entry; closed by CHOOSING an item it leaves the entry — the item opens its own dialog (which
+    // pushes its entry) or navigates, and a history.back() would race either. A spare entry costs one quiet Back.
+    window.Alpine.data('topBarMenu', (name) => ({
+        open: false,
+        entry: null, // unique per opening, so a spare entry left by an earlier choice is never mistaken for this one
+        init() {
+            this.onPopState = () => {
+                if (! this.entry || history.state?.counterOverlay === this.entry) return;
+                this.entry = null;
+                this.open = false;
+            };
+            window.addEventListener('popstate', this.onPopState);
+        },
+        destroy() {
+            window.removeEventListener('popstate', this.onPopState);
+        },
+        toggle() {
+            if (this.open) return this.close();
+            this.open = true;
+            if (window.matchMedia('(max-width: 639px)').matches) {
+                this.entry = `${name}-${Date.now()}`;
+                overlayHistory.push(this.entry);
+            }
+        },
+        close(chosen = false) {
+            if (! this.open) return;
+            this.open = false;
+            if (this.entry && ! chosen) overlayHistory.pop(this.entry);
+            this.entry = null;
+        },
+    }));
+
     // Which catalogue source the dispensary is browsing (prompt 293) — the cart reads it to show the bar section.
     window.Alpine.store('counterCatalogue', { source: 'genetics' });
 

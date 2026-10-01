@@ -18685,3 +18685,56 @@ one tap away after every bar sale.
   - a phone: the date empty with its hint and no *Personal*; *Salir sin enviar* asked ("… hasta el 15/10/2026."); "No se
     ha enviado nada." with nothing else to tap; the link opened the form again;
   - no page errors.
+
+## Prompt 343 — the counter top bar on a phone: ⋯ opens on screen, ⋯ stays on the first row, the chip shows the time
+
+Ben, on an iPhone (Safari, English, the bell showing, clocked in): ⋯ had wrapped to a row of its own at the left edge and
+its menu opened off the screen; the chip cut the time to "08:…". Reproduced red at 390×844 and 360×780 in Chromium AND
+WebKit (chip y=12, ⋯ y=64; the chip "Club Owner Clocked in 07:14" with no compact form).
+
+- **The phone sheet.** Under 640 px both top-bar menus (the chip's and ⋯ Más) open as a **bottom sheet**:
+  - fixed to the bottom, full width, rounded top, a drag handle, `pb-[max(env(safe-area-inset-bottom),0.75rem)]`;
+  - a dimmed backdrop (`bg-ink/40`) under it;
+  - it closes on the backdrop, Esc, an outside tap, its button, or choosing an item.
+  - **Android Back closes it** (CLAUDE.md's overlay rule), through a small `topBarMenu(name)` Alpine component in
+    `app.js` on the shared `overlayHistory`. Only under 640 px does it push an entry (a dropdown is not an overlay).
+  - Closed by choosing an item, it **leaves** its entry rather than calling `history.back()`. The item opens its own
+    dialog (which pushes its own entry) or navigates, and a back() would race either. The cost is one quiet Back.
+  - Each opening's entry is **unique** (`more-<timestamp>`). Found in the proof: a spare entry left by an earlier choice
+    had the same name, so Back landed on it and the sheet thought it was still current.
+- **Viewport positioning from 640 px.** No `x-anchor` (the Alpine anchor plugin isn't installed, and adding it for one
+  dropdown isn't worth it). From 640 the bar's right-hand group always sits at the right edge, so a right-aligned
+  dropdown (`sm:absolute sm:right-0 sm:top-full sm:w-64`) can't overflow. The proof checks it's inside the viewport at
+  820 and 1180 in both engines. The sede dropdown is already left-aligned under a left-edge button, and on a phone its
+  row 2 starts at the left gutter.
+- **The first-row rule, and the order things give way.** Under 768 px the first row is home · (bell) · chip · 🔒 · 🛡 · ⋯;
+  the sede is on row 2 (unchanged from 272/341).
+  - The chip's wrapper is `flex-1 basis-0 min-w-0`, so the chip shrinks to whatever the row leaves and the row never
+    needs to wrap ⋯ away. From 768 it's back to its natural width (`md:flex-none md:basis-auto`, max 13 rem).
+  - To leave the chip room at 360: the header gutter is `px-3` and the gap `gap-x-0.5` below 640 (each control is
+    already a 44 px target with its own padding), and home is icon-only at `min-w-11`. The lock, shield and ⋯ were
+    already 44 px.
+  - The order things give way: the name truncates first, then the gutters tighten. The time and ⋯ never give way.
+- **The compact chip.** `ClockState` gains `short`: the time alone when clocked in ("08:12"), "Sin fichar" when not,
+  "ayer 15:40" or "dd/mm HH:MM" when a period was left open.
+  - Below 640 the chip is one line, "● Ben · 08:12": the name `truncate`, the `[data-clock-short]` part `shrink-0
+    whitespace-nowrap`.
+  - The full label ("Fichado 08:12") is the chip's `aria-label` and `title`, and is its second line again from 640.
+  - Unclocked, *Fichar entrada* stays as in 341 (`order-last`, so it drops below on a phone), now with the clock icon.
+- **Phone widths and WebKit in the top-bar tests.** `tests/Browser/prove-343-top-bar-phone.mjs` runs Chromium AND
+  WebKit at 390×844, 360×780, 820×1180 and 1180×820. It signs in once per engine and reuses the cookies, because the
+  login page allows five attempts a minute and eight sign-ins tripped it on the sixth.
+- **Tests:** three added to `tests/Feature/Counter/TopBarClockChipTest.php`, red first (3 failing on the old view):
+  - the compact chip, with the full label as its accessible name;
+  - the compact "Sin fichar" and "ayer :time";
+  - both menus are sheets with a backdrop below 640 and dropdowns above, wired to Back.
+- **Verified in a browser** (a freshly seeded demo DB, the owner in English, a pending application so the bell shows,
+  clocked in), 32/32 PASS. In each engine:
+  - at 390 and 360:
+    - ⋯ on the chip's row (both y=12);
+    - the chip "Club Owner · 07:14", with the time not clipped;
+    - the ⋯ sheet's four items (training, device, administration, sign out) all on screen;
+    - choosing *Training mode* opens its sheet and closes the menu;
+    - the sheet closes on the backdrop, Esc and Back, staying on `/counter`;
+    - the chip's sheet shows its three items on screen;
+  - at 820 and 1180: 341's one row holds, and the ⋯ dropdown sits inside the viewport.

@@ -147,6 +147,47 @@ class TopBarClockChipTest extends TestCase
             ->assertSee(__('Hoy: :hours, desde :time', ['hours' => '2 h 15 min', 'time' => $since]));
     }
 
+    // --- Prompt 343: the phone ------------------------------------------------------------------------------------------------
+
+    public function test_on_a_phone_the_chip_is_compact_name_then_the_whole_time_and_the_full_label_is_its_name(): void
+    {
+        $at = CarbonImmutable::now('Europe/Madrid')->setTime(8, 12)->min(CarbonImmutable::now('Europe/Madrid'));
+        (new ClockIn)->handle($this->ben, $this->sede, $this->ben, StaffClockSource::PIN, $at);
+        $time = $at->format('H:i');
+
+        $bar = $this->bar();
+        // "● Ben · 08:12" below 640 — the time never truncates (shrink-0, no wrap); the name is the one that gives way.
+        $this->assertMatchesRegularExpression('/data-clock-short class="shrink-0 whitespace-nowrap[^"]*sm:hidden[^"]*">· '.preg_quote($time).'</', $bar);
+        $this->assertMatchesRegularExpression('/data-operator-name class="truncate/', $bar);
+        // The full wording is the accessible name and the title; the second line returns from 640.
+        $label = e('Ben · '.__('Fichado :time', ['time' => $time]));
+        $this->assertStringContainsString('aria-label="'.$label.'"', $bar);
+        $this->assertStringContainsString('title="'.$label.'"', $bar);
+        $this->assertMatchesRegularExpression('/data-clock-label class="hidden truncate text-xs sm:block/', $bar);
+    }
+
+    public function test_unclocked_or_left_open_the_compact_chip_says_sin_fichar_or_ayer(): void
+    {
+        $this->assertMatchesRegularExpression('/data-clock-short[^>]*>· '.preg_quote(e(__('Sin fichar'))).'</', $this->bar());
+
+        $yesterday = CarbonImmutable::parse(BusinessDay::today($this->sede), 'Europe/Madrid')->subDay()->setTime(15, 40);
+        (new ClockIn)->handle($this->ben, $this->sede, $this->ben, StaffClockSource::PIN, $yesterday);
+        $this->assertMatchesRegularExpression('/data-clock-short[^>]*>· '.preg_quote(e(__('ayer :time', ['time' => '15:40']))).'</', $this->bar());
+    }
+
+    public function test_below_640_both_menus_are_bottom_sheets_with_a_backdrop_and_from_640_dropdowns_inside_the_bar(): void
+    {
+        $bar = $this->bar();
+        foreach (['data-counter-chip-menu', 'data-counter-more-menu'] as $menu) {
+            $tag = $this->between($bar, $menu, 'role="menu"');
+            foreach (['fixed', 'inset-x-0', 'bottom-0', 'pb-[max(env(safe-area-inset-bottom),0.75rem)]', 'sm:absolute', 'sm:right-0', 'sm:top-full'] as $class) {
+                $this->assertStringContainsString($class, $tag, "{$menu} lacks {$class}");
+            }
+        }
+        $this->assertSame(2, substr_count($bar, 'fixed inset-0 z-40 bg-ink/40 sm:hidden'), 'a dimmed backdrop under each sheet');
+        $this->assertSame(2, substr_count($bar, 'topBarMenu('), 'both menus close on Android Back');
+    }
+
     private function between(string $html, string $from, string $to): string
     {
         $start = strpos($html, $from);

@@ -374,6 +374,7 @@
     "Avisos operativos al personal": "Operational alerts to staff",
     "Avisos y notificaciones": "Notices and notifications",
     "Avisos: «Sin fichar salida» (jornada abierta de un día anterior), «Hora declarada», «Corregido por…», «Anulado» (tachado, nunca oculto) y «Actividad sin fichar» (se identificó en el mostrador ese día sin fichar).": "Flags: “No clock-out” (a period left open from an earlier day), “Declared time”, “Corrected by…”, “Annulled” (struck through, never hidden) and “Activity without clocking in” (they signed in at the counter that day without clocking in).",
+    "ayer :time": "yesterday :time",
     "Ayuda": "Help",
     "Ayuda a que te reconozcan al llegar. Se comparará contigo en el mostrador. Puedes omitirla y hacerla en la sede.": "Helps staff recognise you on arrival. It is checked against you at the counter. You can skip it and take it at the club.",
     "Añade algún producto de barra para liquidar la visita.": "Add a bar product to settle the visit.",
