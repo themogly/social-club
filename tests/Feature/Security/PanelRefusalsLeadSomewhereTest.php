@@ -176,7 +176,8 @@ class PanelRefusalsLeadSomewhereTest extends TestCase
     {
         Log::spy();
         Cache::extend('exploding', fn (): Repository => new Repository(new ExplodingStore));
-        config(['cache.stores.exploding' => ['driver' => 'exploding'], 'cache.default' => 'exploding']);
+        // The store PanelIdentity keeps the confirmation on — the limiter store since 344 (the default store with it).
+        config(['cache.stores.exploding' => ['driver' => 'exploding'], 'cache.default' => 'exploding', 'cache.limiter' => 'exploding']);
         $this->actingAs($this->manager);
         session(['auth.via_pin' => true]);
 

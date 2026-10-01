@@ -6,6 +6,7 @@ use App\Models\Location;
 use App\Models\User;
 use App\Support\PinLookup;
 use App\Support\Settings;
+use Illuminate\Contracts\Cache\Repository;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
@@ -136,7 +137,7 @@ class UnlockOperator
      */
     public function attemptsRemaining(?Location $location, string $throttleKey): int
     {
-        $attempts = (int) $this->safely(fn (): int => (int) Cache::get($this->key($throttleKey, 'attempts'), 0), 0);
+        $attempts = (int) $this->safely(fn (): int => (int) $this->cache()->get($this->key($throttleKey, 'attempts'), 0), 0);
 
         return max(0, $this->maxAttemptsAt($location) - $attempts);
     }
@@ -175,13 +176,13 @@ class UnlockOperator
 
     public function isLockedOut(string $throttleKey): bool
     {
-        return (bool) $this->safely(fn (): bool => Cache::has($this->key($throttleKey, 'lockout')), false);
+        return (bool) $this->safely(fn (): bool => $this->cache()->has($this->key($throttleKey, 'lockout')), false);
     }
 
     /** Seconds until the pad will accept a PIN again (0 when not locked) — drives the countdown on the pad. */
     public function lockoutSecondsRemaining(string $throttleKey): int
     {
-        $until = (int) $this->safely(fn () => Cache::get($this->key($throttleKey, 'lockout'), 0), 0);
+        $until = (int) $this->safely(fn () => $this->cache()->get($this->key($throttleKey, 'lockout'), 0), 0);
 
         return max(0, $until - now()->getTimestamp());
     }
@@ -190,28 +191,28 @@ class UnlockOperator
     private function reserveAttempt(string $throttleKey): ?int
     {
         return $this->safely(function () use ($throttleKey): int {
-            Cache::add($this->key($throttleKey, 'attempts'), 0, self::ATTEMPT_TTL);
+            $this->cache()->add($this->key($throttleKey, 'attempts'), 0, self::ATTEMPT_TTL);
 
-            return (int) Cache::increment($this->key($throttleKey, 'attempts'));
+            return (int) $this->cache()->increment($this->key($throttleKey, 'attempts'));
         }, null);
     }
 
     private function releaseAttempt(string $throttleKey): void
     {
-        $this->safely(fn () => Cache::decrement($this->key($throttleKey, 'attempts')), null);
+        $this->safely(fn () => $this->cache()->decrement($this->key($throttleKey, 'attempts')), null);
     }
 
     /** Lock the pad, the window escalating with how many times this sede has locked out recently. */
     private function lockOut(string $throttleKey): void
     {
         $this->safely(function () use ($throttleKey): void {
-            Cache::add($this->key($throttleKey, 'strikes'), 0, self::STRIKE_TTL);
-            $strikes = (int) Cache::increment($this->key($throttleKey, 'strikes'));
-            Cache::put($this->key($throttleKey, 'strikes'), $strikes, self::STRIKE_TTL); // decays after an hour of calm
+            $this->cache()->add($this->key($throttleKey, 'strikes'), 0, self::STRIKE_TTL);
+            $strikes = (int) $this->cache()->increment($this->key($throttleKey, 'strikes'));
+            $this->cache()->put($this->key($throttleKey, 'strikes'), $strikes, self::STRIKE_TTL); // decays after an hour of calm
 
             $window = self::LOCKOUT_WINDOWS[min($strikes - 1, count(self::LOCKOUT_WINDOWS) - 1)];
-            Cache::put($this->key($throttleKey, 'lockout'), now()->getTimestamp() + $window, $window);
-            Cache::forget($this->key($throttleKey, 'attempts')); // fresh tally for the next window
+            $this->cache()->put($this->key($throttleKey, 'lockout'), now()->getTimestamp() + $window, $window);
+            $this->cache()->forget($this->key($throttleKey, 'attempts')); // fresh tally for the next window
         }, null);
     }
 
@@ -229,14 +230,14 @@ class UnlockOperator
 
         /** @var array{available: bool, locked: bool, seconds: int, attempts: int, strikes: int} $status */
         $status = $this->safely(function () use ($throttleKey): array {
-            $until = (int) Cache::get($this->key($throttleKey, 'lockout'), 0);
+            $until = (int) $this->cache()->get($this->key($throttleKey, 'lockout'), 0);
 
             return [
                 'available' => true,
                 'locked' => $until > 0,
                 'seconds' => max(0, $until - now()->getTimestamp()),
-                'attempts' => (int) Cache::get($this->key($throttleKey, 'attempts'), 0),
-                'strikes' => (int) Cache::get($this->key($throttleKey, 'strikes'), 0),
+                'attempts' => (int) $this->cache()->get($this->key($throttleKey, 'attempts'), 0),
+                'strikes' => (int) $this->cache()->get($this->key($throttleKey, 'strikes'), 0),
             ];
         }, $unavailable);
 
@@ -265,9 +266,9 @@ class UnlockOperator
     private function clear(string $throttleKey): void
     {
         $this->safely(function () use ($throttleKey): void {
-            Cache::forget($this->key($throttleKey, 'attempts'));
-            Cache::forget($this->key($throttleKey, 'lockout'));
-            Cache::forget($this->key($throttleKey, 'strikes'));
+            $this->cache()->forget($this->key($throttleKey, 'attempts'));
+            $this->cache()->forget($this->key($throttleKey, 'lockout'));
+            $this->cache()->forget($this->key($throttleKey, 'strikes'));
         }, null);
     }
 
@@ -276,6 +277,17 @@ class UnlockOperator
      * NEVER 503 the counter (prompt 124), and the overlay's lockout check runs on every counter render. The
      * throttle simply weakens during an outage; a correct PIN is still required, so access stays gated.
      */
+    /**
+     * Prompt 344 — the tally lives on the LIMITER store (`cache.limiter`, `database` by default), beside Laravel's own
+     * rate limits, not on the default store: on the default (Redis in production) an outage made every read 0 and every
+     * write vanish, so the pad let a correct PIN in but could never lock out — a brute-force window for as long as Redis
+     * was down. Training mode points `cache.limiter` at `array`, so practice never touches the real tally.
+     */
+    private function cache(): Repository
+    {
+        return Cache::store(config('cache.limiter'));
+    }
+
     private function safely(callable $fn, mixed $default): mixed
     {
         try {

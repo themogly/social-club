@@ -3,6 +3,7 @@
 namespace App\Support;
 
 use App\Models\User;
+use Illuminate\Contracts\Cache\Repository;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 use Throwable;
@@ -30,7 +31,7 @@ final class PanelIdentity
         }
 
         try {
-            return ! Cache::has(self::key($user));
+            return ! self::cache()->has(self::key($user));
         } catch (Throwable) {
             self::cacheUnavailable();
 
@@ -43,7 +44,7 @@ final class PanelIdentity
         $until = now()->addHours(self::SHIFT_HOURS);
         // The expiry as the value (a timestamp), so the banner can tell when it is about to run out. Read back with a
         // cast: Redis hands numbers back as strings (prompt 307).
-        Cache::put(self::key($user), $until->getTimestamp(), $until);
+        self::cache()->put(self::key($user), $until->getTimestamp(), $until);
     }
 
     /** Minutes left on this PIN session's confirmation, or null when there is none to renew (or no PIN session). */
@@ -54,7 +55,7 @@ final class PanelIdentity
         }
 
         try {
-            $until = Cache::get(self::key($user));
+            $until = self::cache()->get(self::key($user));
         } catch (Throwable) {
             return null;
         }
@@ -87,6 +88,16 @@ final class PanelIdentity
     }
 
     /** Per person, per tablet: someone else on the same tablet — or the same person on another — is asked for theirs. */
+    /**
+     * Prompt 344 — on the limiter store (`database` by default), not the default (Redis): a PIN sign-in's password
+     * confirmation (310) is part of signing in, and with Redis down `confirmed()` threw, so nobody who came in by PIN could
+     * get past the password step until Redis returned.
+     */
+    private static function cache(): Repository
+    {
+        return Cache::store(config('cache.limiter'));
+    }
+
     private static function key(User $user): string
     {
         $terminal = session('counter.terminal_id');

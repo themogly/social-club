@@ -23,12 +23,7 @@ class EditMember extends EditRecord
 
     protected function getHeaderActions(): array
     {
-        return [
-            ViewAction::make(),
-            ...MemberResource::recordActions(),
-            DeleteAction::make(),
-            RestoreAction::make(),
-        ];
+        return MemberResource::headerActions(ViewAction::make(), status: [RestoreAction::make()], remove: [DeleteAction::make()]);
     }
 
     // A plain member edit (name/email/phone/document) is audited (prompt 48); status transitions have

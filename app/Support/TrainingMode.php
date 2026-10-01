@@ -179,6 +179,7 @@ final class TrainingMode
         config(['queue.default' => 'training']);
         Mail::setDefaultDriver('array');
         Cache::setDefaultDriver('array');
+        config(['cache.limiter' => 'array']); // the limiter is its own store since 344 — practice never touches the real tally
         app()->forgetInstance(RateLimiter::class);
         Facade::clearResolvedInstance(RateLimiter::class);
     }

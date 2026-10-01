@@ -323,7 +323,11 @@
                 </div>
             </dl>
             @unless ($cache['reachable'])
-                <p style="margin-top:.6rem;font-size:.8rem;opacity:.75;">{{ __('La caché no responde. El mostrador y la autorización siguen funcionando (permisos en base de datos).') }}@if ($cache['queue_on_redis']) {{ __('Si Redis no responde, las colas tampoco procesan.') }}@endif</p>
+                {{-- Prompt 344 — what is true: the counter, authorisation, the panel login and every PIN keep working (permissions and
+                     sign-in limits on the database); the queues wait (mail and notices go out when Redis returns). --}}
+                <p data-cache-degraded style="margin-top:.6rem;font-size:.8rem;opacity:.75;">{{ __('La caché no responde. El mostrador y la autorización siguen funcionando (permisos en base de datos).') }}
+                    @if ($cache['limiter_apart']) {{ __('El inicio de sesión y los PIN también (los límites de intentos están en base de datos).') }}@else {{ __('El inicio de sesión y los PIN dependen de esta caché: configura CACHE_LIMITER=database.') }}@endif
+                    @if ($cache['queue_on_redis']) {{ __('Si Redis no responde, las colas tampoco procesan.') }} {{ __('Los correos y avisos salen cuando vuelva; no se pierde nada.') }}@endif</p>
             @endunless
         </x-filament::section>
 

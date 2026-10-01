@@ -18738,3 +18738,158 @@ WebKit (chip y=12, ⋯ y=64; the chip "Club Owner Clocked in 07:14" with no comp
     - the sheet closes on the backdrop, Esc and Back, staying on `/counter`;
     - the chip's sheet shows its three items on screen;
   - at 820 and 1180: 341's one row holds, and the ⋯ dropdown sits inside the viewport.
+
+## Prompt 344 — the member page's actions, tidied; and logins and PINs keep working if Redis is down
+
+### Part 1 — the member header
+
+- **Visible, in order:**
+  1. *← Socios* (334);
+  2. *Cuenta del socio*;
+  3. *Reenviar carné QR*;
+  4. *Límites personalizados*;
+  5. *Generar documento*.
+- **Then one *Más acciones* (⋯), with three sections:**
+  - **Datos:** *Actualizar previsión declarada*, *Levantar carencia*, *Convertir a socio temporal* / *estándar*,
+    *Ampliar estancia temporal*, *Exportar datos (RGPD)*, *Ver*.
+  - **Estado del socio:** *Suspender*, *Registrar baja*, *Expulsar*, *Reactivar*, *Restaurar*.
+  - **Eliminar**, last, after a divider, with its title in red: *Solicitar supresión (RGPD)*, *Borrar*.
+  - The three that weren't named in the prompt went where they belong: *Levantar carencia* and the temporary
+    conversions under Datos; *Reactivar* and *Restaurar* (the undo of a status, or of a delete) under Estado.
+- **Each action is the same object as before** (`MemberResource::*Action()`): its permission, visibility,
+  confirmation, reason fields and audit are untouched; only its place moved.
+  - `recordActions()` became `headerActions(?Action $openOther, $status, $remove)`. The edit page passes *Ver*, its
+    Restore and its Delete.
+  - The **view page** leads with *Editar* (the everyday act from a record's view), then the same header. Restore and
+    Delete stay off it, as before.
+- **Section titles — `App\Filament\Support\MenuSection`.** Filament draws each nested `->dropdown(false)` group as a
+  list between dividers, but with no title.
+  - `MenuSection::of($label, $actions)` puts a title row first. It's an Action subclass whose `toHtml()` draws a plain
+    `role="presentation"` line; it has no `action()`, so there's nothing to click.
+  - The title shows only while something in its section is visible, so a section a role can't use disappears whole.
+  - Its visibility asks the siblings' `isHiddenInGroup()`, **not** `isVisible()`. The latter asks the enclosing
+    group, which asks the title: infinite recursion, found in the first test run.
+  - `MenuSection::more()` is the *Más acciones* button: gray, 44 px, `bottom-end`, 20 rem wide (so «Solicitar
+    supresión (RGPD)» isn't cut), and a max height of `min(32rem, 70dvh)` that scrolls inside the viewport.
+  - Title styles are in `theme.css` (`.fi-menu-section-heading`, `-danger`).
+- **The phone.** At 390 the header wraps (340's rule); the first button is *← Socios* and nothing red or amber is in
+  the visible header. The open list is 320 px, anchored at the right of *Más acciones*, and fully on screen. It's
+  Filament's dropdown, not 343's sheet: the panel isn't the counter, and the list fits.
+- **At 1400 the header takes two rows** (five buttons, then *Más acciones* wraps). It was three rows of twelve, five of
+  them destructive. One row would need smaller buttons than the 44 px floor or a shorter label than the prompt's;
+  neither seemed worth it.
+- **The wider check.** Every edit and view page under `app/Filament/Resources` was read, including *Genéticas*,
+  *Productos*, *Personal*, *Sedes* and *Cajas*:
+  - **Changed: *Solicitudes → Ver* (`ViewMemberApplication`).** It had *Revocar* (red) first, before *Editar*, and
+    *Rechazar* (red) before *Lista de espera*.
+    - Now: *Editar*, *Copiar enlace*, *Reenviar*, *Aprobar*, *Lista de espera*, then *Rechazar* and *Revocar* last.
+    - The shared `recordActions()` (also the list rows) is now approve, waiting list, reject.
+  - **Already right:**
+    - *Genéticas* (delete with its 308 guard, restore);
+    - *Productos* (add to sedes, delete, restore);
+    - *Personal* (test PIN, delete, restore);
+    - *Sedes* and every other edit page (delete, restore);
+    - *Lotes* (340's Más group);
+    - *Mensajes* (reply, convert, close);
+    - *Dispensaciones* (refund alone);
+    - *Cajas* (no header actions).
+  - No other page has more than five header actions.
+- **Structural test** (`HeaderActionOrderTest`): it reads every edit and view page's declared `getHeaderActions()`.
+  - A top-level Delete/ForceDelete or `->color('danger')` item must not come before a harmless one.
+  - Restore counts as part of the destructive tail: it replaces Delete on a trashed record, and the two are never shown
+    together.
+  - A ⋯ group counts as harmless at the top level.
+  - It failed on the old code (`ViewMemberApplication: «revoke» before «edit»`).
+
+### Part 2 — sign-in limits off Redis
+
+- **Moved:** `config/cache.php` now has `'limiter' => env('CACHE_LIMITER', 'database')`. `CacheServiceProvider` builds
+  `RateLimiter` on that store, so the Filament login throttle, every `throttle:` route and every
+  `RateLimiter::` caller now count in the `cache` table.
+  - Documented in `.env.example` and `SETUP.md`, next to `PERMISSION_CACHE_STORE=database`, with the same reasoning:
+    it survives the outage and is shared across workers.
+  - **Production needs nothing set:** the default is `database`, and the `cache` table exists.
+- **Two more things were on the default store and on the sign-in path, and move with it (the same one-line store
+  switch):**
+  - **The counter PIN pad's tally** (`UnlockOperator`, its own attempts/lockout/strikes keys, not `RateLimiter`). With
+    Redis down its `safely()` read 0 and swallowed every write, so the pad **let a correct PIN in but could never lock
+    out**: a brute-force window for as long as Redis was down. It now uses `Cache::store(config('cache.limiter'))`.
+    342's handover-exit PIN uses the same tally.
+  - **The after-PIN password confirmation** (`PanelIdentity`, 310). `confirmed()` wasn't wrapped, so with Redis down
+    nobody who signed in by PIN could get past *Confirma tu identidad*. It moved to the limiter store as well.
+  - **Training mode** points `cache.limiter` at `array` beside the default, so practice never touches the real tally
+    (it switched the default to array before; the limiter used to follow it).
+- **Throttles checked.** Attempts, windows and messages are unchanged; only the store moved.
+
+  | Throttle | Where | Limit |
+  | --- | --- | --- |
+  | Panel login | Filament `rateLimit(5)` | 5/min |
+  | Identity confirmation (310) | `ConfirmIdentity` `rateLimit(5)` | 5/min |
+  | Counter PIN pad (120/235/270) | `UnlockOperator` tally | configurable 3–10, escalating lockouts |
+  | Handover-exit PIN (342) | `UnlockOperator` tally, same location bucket | as the PIN pad |
+  | QR scan failures (58) | `ResolveMemberByToken` | — |
+  | Test-a-PIN | `TestUserPin` | — |
+  | PIN collisions | `PinCollisionGuard` | — |
+  | Invitation sends | `SendApplicationInvite` | cooldown, per day, per sender |
+  | Application uploads | `SubmitApplication` | — |
+  | MRZ reads | `ApplicationController` | 20/h |
+
+  `throttle:` routes:
+  - the member area `throttle:30,1` and `10,1`;
+  - the socio magic link (send 5,1 / verify 10,1);
+  - locale 30,1;
+  - the application store 10,1, read 20,1 and staff exit 20,1;
+  - messages 20,1;
+  - `csp-report` 60,1;
+  - the Telegram webhook 60,1.
+- **The health card** now says: «La caché no responde. El mostrador y la autorización siguen funcionando (permisos en
+  base de datos). El inicio de sesión y los PIN también (los límites de intentos están en base de datos).» With the
+  queue on Redis it adds «Si Redis no responde, las colas tampoco procesan. Los correos y avisos salen cuando vuelva;
+  no se pierde nada.»
+  - It only promises the sign-in part when `cache.limiter` is a different store from the failing default.
+  - If they're the same, it says «El inicio de sesión y los PIN dependen de esta caché: configura
+    CACHE_LIMITER=database.»
+- **Report only: other default-cache uses on the request path.** Searched `Cache::`, `cache()`, `remember`, locks:
+  - **`SystemHealth::cache()`** — the probe itself, deliberately on the default store, already wrapped (124/307).
+    Fine.
+  - **Settings reads (`Settings::get`)** — no cache at all, so unaffected. The 330 bell keeps its state in the
+    session. `MrzPrefill` is session-backed. Sessions and permissions are on the database. **Nothing else reads the
+    default cache on every request.**
+  - **Not a cache, but the remaining Redis dependency on the request path: queued work.** A request that dispatches a
+    job or a queued notification (resend QR card, an invitation email, push) hits Redis and gets 124's stated 503
+    while Redis is down. Logging in, PINs, the counter and dispensing don't queue anything on their path.
+    - **Recommendation:** Laravel's `failover` queue connection (`redis` → `database`) would let those requests
+      succeed and drain later. That changes how Horizon sees the queue, so it needs its own prompt and a test of the
+      worker setup.
+- **Tests:** `tests/Feature/Ops/SignInSurvivesRedisOutageTest.php` (7), all red on the old code. The default store is
+  replaced by 124's `ExplodingStore` (every call throws "Connection refused …6379") and the `RateLimiter` singleton is
+  re-resolved.
+  - a correct panel login succeeds (it errored before);
+  - five wrong passwords then a correct one: still a guest;
+  - the PIN pad accepts a correct PIN;
+  - the PIN pad locks out after the configured number of wrong PINs (red before: it couldn't count);
+  - the counters are in the `cache` table, both `counter-pin:…:attempts` and Filament's `livewire-rate-limiter:…`;
+  - the after-PIN confirmation saves and is read back;
+  - the health card's new sentence, and the misconfigured variant.
+  - Existing tests that read the PIN tally through the default `Cache::` now read `config('cache.limiter')`'s store:
+    `HandoverWayOutTest`, `TopBarClockChipTest`, `HardeningAfter296Test` and `PinLockoutAdminTest`. 310's "a cache
+    that throws" test breaks the limiter store too.
+- **Verified in a browser** (`tests/Browser/prove-344-member-actions-and-redis.mjs`, a freshly seeded demo DB, as the
+  owner):
+  - **The header, at 1400×900 and 390×844 (all PASS):**
+    - the visible buttons are exactly *Socios, Cuenta del socio, Reenviar carné QR, Límites personalizados, Generar
+      documento, Más acciones*, with no red or amber button among them;
+    - the list reads Datos → Estado del socio → Eliminar, with Eliminar holding only *Solicitar supresión (RGPD)* and
+      *Borrar*;
+    - every label reads whole, and the list is inside the viewport;
+    - *Suspender* from the group opens its reason modal.
+  - **Redis down** (the server on `CACHE_STORE=redis` with Redis pointed at a dead port, `CACHE_LIMITER` left at its
+    default):
+    - the panel login lands on `/`;
+    - the counter PIN pad signs the owner in;
+    - the tally is in the `cache` table.
+    - **The same run on main's code bounced both back to `/login?password=1`**, Ben's report reproduced.
+- **One flake on the way.** One full run failed `SignedSignUpTest::test_every_route_stores_the_signature…` (the emailed
+  link's signature missing from the faked `documents` disk). It then passed 8/8 alone, its folder passed 192/192, and
+  the next two full runs passed. The signature write never goes near the limiter (it is not behind `storageAllowed()`),
+  so this is recorded as a pre-existing flake to watch, not something this change caused.

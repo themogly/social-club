@@ -35,6 +35,7 @@ use App\Filament\Resources\Members\RelationManagers\WalletTransactionsRelationMa
 use App\Filament\Resources\Members\Schemas\MemberForm;
 use App\Filament\Resources\Members\Schemas\MemberInfolist;
 use App\Filament\Resources\Members\Tables\MembersTable;
+use App\Filament\Support\MenuSection;
 use App\Models\DataRequest;
 use App\Models\Member;
 use App\Models\User;
@@ -45,6 +46,7 @@ use App\Support\Wallet;
 use App\Support\Weight;
 use BackedEnum;
 use Filament\Actions\Action;
+use Filament\Actions\ActionGroup;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
@@ -103,30 +105,45 @@ class MemberResource extends Resource
     }
 
     /**
-     * Lifecycle actions available on a single member (view/edit page headers).
-     * Every status change routes through the audited domain actions — never a
-     * raw column write from the UI.
+     * The member page's header (view and edit). Every status change routes through the audited domain actions — never
+     * a raw column write from the UI.
      *
-     * @return array<int, Action>
+     * Prompt 344 — everyday first, destructive last and out of reach. Visible (after 334's *← Socios*): *Cuenta del
+     * socio*, *Reenviar carné QR*, *Límites personalizados*, *Generar documento*. Everything else is in ONE *Más
+     * acciones*: *Datos*, then *Estado del socio* (suspend, baja, expel — and their undo), then *Eliminar* in red,
+     * last. Each action keeps its own permission, visibility, confirmation, reason fields and audit; only the place moved.
+     *
+     * @param  Action|null  $openOther  the edit page's *Ver*, in *Datos* (the view page leads with *Editar* instead)
+     * @param  array<Action>  $status  page-only extras for *Estado del socio* (edit's Restore)
+     * @param  array<Action>  $remove  page-only extras for *Eliminar* (edit's Delete)
+     * @return array<int, Action|ActionGroup>
      */
-    public static function recordActions(): array
+    public static function headerActions(?Action $openOther = null, array $status = [], array $remove = []): array
     {
         return [
-            self::resendQrAction(),
-            self::generateDocumentAction(),
-            self::updateDeclaredForecastAction(),
-            self::waiveCarenciaAction(),
-            self::setLimitsAction(),
             self::setDebtLimitAction(),
-            self::recordBajaAction(),
-            self::suspendAction(),
-            self::expelAction(),
-            self::reactivateAction(),
-            self::convertTemporaryAction(),
-            self::extendTemporaryAction(),
-            self::makeTemporaryAction(),
-            self::exportDataAction(),
-            self::requestErasureAction(),
+            self::resendQrAction(),
+            self::setLimitsAction(),
+            self::generateDocumentAction(),
+            MenuSection::more([
+                MenuSection::of(__('Datos'), [
+                    self::updateDeclaredForecastAction(),
+                    self::waiveCarenciaAction(),
+                    self::makeTemporaryAction(),
+                    self::convertTemporaryAction(),
+                    self::extendTemporaryAction(),
+                    self::exportDataAction(),
+                    ...array_filter([$openOther]),
+                ]),
+                MenuSection::of(__('Estado del socio'), [
+                    self::suspendAction(),
+                    self::recordBajaAction(),
+                    self::expelAction(),
+                    self::reactivateAction(),
+                    ...$status,
+                ]),
+                MenuSection::of(__('Eliminar'), [self::requestErasureAction(), ...$remove], danger: true),
+            ]),
         ];
     }
 

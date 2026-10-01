@@ -94,6 +94,12 @@ Everything used in code/config appears in `.env.example`. Highlights:
     sistema** renders and reports the cache as *No accesible*. Recovery is automatic — Redis returning restores
     everything with no restart. `database` (not `file`/`array`) so a role edit + `php artisan
     permission:cache-reset` still propagates across workers; use `file` only on a single-server box.
+  - **Sign-in limits off Redis too (prompt 344).** `CACHE_LIMITER=database` (the default) puts Laravel's
+    `RateLimiter` — the panel login's throttle, every `throttle:` route, the scan/invite/PIN-test limits — and the
+    counter PIN pad's attempt tally and the after-PIN password confirmation on the `cache` table. Before it, a Redis
+    outage bounced every panel login back to the form with no message and left the PIN pad unable to count (a correct
+    PIN worked, a wrong one never locked out). Same reasoning as the permission cache: survives the outage, shared
+    across workers. During an outage the login and PINs keep working; only the queue waits.
 - **`APP_KEY` — generate once, never rotate.** It encrypts sessions, cookies and encrypted columns, and (prompt 286)
   it keys every counter PIN's lookup: rotating it invalidates **every PIN**, and each person would need a new one set
   in the panel. After the first busy evening, `php artisan csc:pin-upgrade-status` shows who is still on the old,

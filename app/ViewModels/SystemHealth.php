@@ -350,9 +350,10 @@ class SystemHealth
      * thing it monitors is not monitoring, so this does a trivial round-trip and reports whether it worked,
      * NEVER throwing. When it is unreachable, authorisation still runs (the permission cache lives on the
      * `database` store), but the queue is stopped and cached reads fall back to a query — so the page shows it
-     * as degraded rather than failing.
+     * as degraded rather than failing. Prompt 344: `limiter_apart` says whether the sign-in limits (login, PINs) live on
+     * a store of their own (`cache.limiter`, `database` by default) — only then does the card promise they still work.
      *
-     * @return array{store: string, reachable: bool}
+     * @return array{store: string, reachable: bool, queue_on_redis: bool, limiter_apart: bool}
      */
     public function cache(): array
     {
@@ -369,7 +370,12 @@ class SystemHealth
             $reachable = false;
         }
 
-        return ['store' => $store, 'reachable' => $reachable, 'queue_on_redis' => config('queue.default') === 'redis'];
+        return [
+            'store' => $store,
+            'reachable' => $reachable,
+            'queue_on_redis' => config('queue.default') === 'redis',
+            'limiter_apart' => (string) config('cache.limiter') !== $store,
+        ];
     }
 
     public function auditRetentionDays(): int
