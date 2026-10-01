@@ -32,6 +32,7 @@ class ChangeMembershipTier
      */
     public function handle(Membership $membership, MembershipTier $tier, User $actor, string $reason, ?int $feeCents = null): array
     {
+        $membership->assertNotCovered(); // prompt 348 — a linked membership is re-tiered through its home one
         MembershipCorrections::authorize($actor, $membership);
         $reason = trim($reason);
         if ($reason === '') {

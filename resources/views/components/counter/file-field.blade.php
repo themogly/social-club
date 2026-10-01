@@ -4,6 +4,7 @@
     'accept' => null,
     'camera' => null,
     'hint' => null,
+    'required' => false, // prompt 348 — a bare `required` on the input itself (the assistive-tech signal)
 ])
 
 {{--
@@ -44,7 +45,7 @@
                    aria-labelledby="{{ $id }}-label {{ $id }}-choose"
                    @error($model) aria-invalid="true" aria-describedby="{{ $model }}-error" @enderror
                    x-on:change="fileName = $event.target.files[0]?.name ?? ''"
-                   {{ $attributes }}>
+                   {{ $attributes }} @if ($required) required @endif>
             <span id="{{ $id }}-choose">{{ __('Elegir archivo') }}</span>
         </x-button>
         <span data-file-name class="min-w-0 truncate text-sm text-ink-muted dark:text-slate-400" x-text="fileName || @js(__('Ningún archivo'))">{{ __('Ningún archivo') }}</span>

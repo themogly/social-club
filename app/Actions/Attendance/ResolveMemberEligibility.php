@@ -46,13 +46,19 @@ class ResolveMemberEligibility
             // TAKEN, so blocking entry over it would be self-defeating.
             if ($surface === 'counter') {
                 $photoMode = Settings::photoEnforcement('counter');
+                // Prompt 348 — *Exigir foto para dispensar* (per sede, on by default): no photo is a hard BLOCK here, resolved by
+                // taking one on this screen (the blocked surface offers «Hacer foto»). CommitDispensation refuses too.
+                $required = (bool) Settings::get('require_photo_to_dispense', true, (string) $location->getKey());
+                if ($required) {
+                    $photoMode = 'BLOCK';
+                }
 
                 if ($photoMode !== 'OFF') {
                     $rules[] = [
                         'rule' => 'photo',
                         'satisfied' => filled($member->photo_path),
                         'mode' => $photoMode,
-                        'message' => __('Sin foto en ficha para verificar su identidad.'),
+                        'message' => $required ? __('Hazle una foto antes de dispensar.') : __('Sin foto en ficha para verificar su identidad.'),
                     ];
                 }
             }

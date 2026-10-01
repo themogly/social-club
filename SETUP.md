@@ -217,6 +217,21 @@ It never touches `.env` or `APP_KEY`, anything outside `storage/app`, or the buc
 **`csc:launch`** is the one-way latch: it stamps the organisation as live, *Salud del sistema* then reads *En marcha
 desde…*, and from then on `csc:reset-for-launch` **and** `csc:install --force` refuse — for good.
 
+## Memberships at every sede (prompt 348) — a one-off, deliberate backfill
+
+*Ajustes → Membresía → Alta en todas las sedes* is **on** by default: from now on a new member is enrolled at every active
+sede except the store. The fee is charged once, at the sede of the sign-up; the other memberships are linked to it, carry
+no fee, and are renewed, expired and cancelled with it.
+
+**Members enrolled before this change are not touched automatically.** Run once, deliberately, after deploying:
+
+```bash
+php artisan csc:extend-memberships-to --all-sedes
+```
+
+It links each active membership across to every other active sede where that member has none (no fee), audits every row,
+and prints the count. **A sede opened later:** `php artisan csc:extend-memberships-to "Nombre de la sede"`.
+
 ## The in-browser MRZ reader (prompt 179)
 
 `npm run build` copies the reader's runtime out of `node_modules` into `public/ocr/` (see

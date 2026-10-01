@@ -175,16 +175,15 @@ class MemberPhotoCaptureTest extends TestCase
 
     // --- Optional photo on the public application form -------------------------------
 
-    public function test_the_application_form_still_submits_without_a_photo(): void
+    /** Prompt 348 — the photo is REQUIRED now (staff check it on every card scan): without one, refused and told why. */
+    public function test_the_application_form_is_refused_without_a_photo(): void
     {
         $application = $this->invite('t');
 
-        $this->post(route('socio.application.store', ['token' => 't']), $this->applicationData())
-            ->assertRedirect();
+        $this->post(route('socio.application.store', ['token' => 't']), array_merge($this->applicationData(), ['photo' => null]))
+            ->assertSessionHasErrors(['photo' => __('Añade una foto tuya: el personal la comprobará en cada visita.')]);
 
-        $payload = $application->fresh()->payload;
-        $this->assertNotNull($payload['first_name'] ?? null);
-        $this->assertArrayNotHasKey('photo_path', $payload);
+        $this->assertNull($application->fresh()->submitted_at);
     }
 
     public function test_an_uploaded_application_photo_is_stored_encrypted_and_applied_on_approval(): void
@@ -228,6 +227,7 @@ class MemberPhotoCaptureTest extends TestCase
             'document_type' => 'DNI', 'document_number' => '12345678Z',
             'declared_monthly_g' => '30', 'consent_data' => '1', 'consent_statutes' => '1',
             'signature' => 'data:image/png;base64,'.base64_encode('sig'),
+            'photo' => UploadedFile::fake()->image('foto.jpg'), // prompt 348 — required on every sign-up
             ApplicationSpamGuard::HONEYPOT => '',
             ApplicationSpamGuard::TIMESTAMP => $this->agedToken(ApplicationSpamGuard::MIN_SECONDS + 2),
         ], $overrides);

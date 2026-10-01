@@ -73,6 +73,16 @@ return [
             'replace_placeholders' => true,
         ],
 
+        // Prompt 348 — sign-up events only (ids, outcomes, validation KEYS, error classes — never a value or a name), so
+        // `php artisan csc:signup-trace` can answer "it didn't save" without anyone digging through the main log.
+        'signup' => [
+            'driver' => 'daily',
+            'path' => storage_path('logs/signup.log'),
+            'level' => 'info',
+            'days' => 60,
+            'replace_placeholders' => true,
+        ],
+
         'slack' => [
             'driver' => 'slack',
             'url' => env('LOG_SLACK_WEBHOOK_URL'),

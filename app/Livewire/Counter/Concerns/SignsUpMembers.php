@@ -23,7 +23,9 @@ use App\Support\ApplicationShape;
 use App\Support\Mrz\MrzDocument;
 use App\Support\Mrz\MrzParser;
 use App\Support\Settings;
+use App\Support\SignupTrace;
 use Illuminate\Support\Collection;
+use Illuminate\Validation\ValidationException;
 use RuntimeException;
 
 /**
@@ -541,7 +543,13 @@ trait SignsUpMembers
 
         // The signature is validated alongside the facts but lives on its own property, so it is pulled out
         // rather than read from the `altaForm` array.
-        $this->validate($this->staffAltaRules(), [], $this->staffAltaAttributes());
+        try {
+            $this->validate($this->staffAltaRules(), [], $this->staffAltaAttributes());
+        } catch (ValidationException $e) {
+            SignupTrace::record('staff_signup.invalid', ['keys' => array_keys($e->errors())]); // prompt 348
+
+            throw $e;
+        }
         $data = $this->altaForm;
 
         // The public route reaches `SubmitApplication` through `ConvertEmptyStringsToNull`, which turns an
@@ -577,6 +585,8 @@ trait SignsUpMembers
             token: (string) $application->invite_token,
             ip: request()->ip(),
         );
+
+        SignupTrace::record('application.submitted', ['application_id' => $application->id, 'route' => 'staff']); // prompt 348
 
         (new RecordAuditLog)->handle('counter.alta.staff_entered', $this->resolveLocation(), [
             'application_id' => $application->id,
@@ -835,6 +845,7 @@ trait SignsUpMembers
             // because the exception carries them only inside its message.
             $this->altaDuplicateBlocked = true;
             $this->flash($e->getMessage(), 'warning');
+            SignupTrace::record('staff_signup.refused', ['application_id' => $application->id, 'error' => class_basename($e)]); // prompt 348
 
             return;
         } catch (RuntimeException $e) {
@@ -842,11 +853,13 @@ trait SignsUpMembers
             // person standing at the counter, so they get the action's own readable sentence — never a stack
             // trace — and the application stays PENDING so a responsable can decide what to do with it.
             $this->flash($e->getMessage(), 'error');
+            SignupTrace::record('staff_signup.refused', ['application_id' => $application->id, 'error' => class_basename($e)]); // prompt 348
 
             return;
         }
 
         (new EnrolMembership)->handle($member, $location, $tier);
+        SignupTrace::record('staff_signup.approved', ['application_id' => $application->id, 'member_id' => $member->id]); // prompt 348
 
         // Approval and payment are DELIBERATELY not one transaction. If the fee cannot be taken — no cash,
         // a card machine that will not talk — the member still exists and owes it, which is an ordinary

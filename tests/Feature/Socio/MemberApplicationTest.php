@@ -8,6 +8,7 @@ use App\Models\Organisation;
 use App\Support\ActiveScope;
 use App\Support\ApplicationSpamGuard;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
 use Tests\TestCase;
 
 class MemberApplicationTest extends TestCase
@@ -80,6 +81,7 @@ class MemberApplicationTest extends TestCase
             'consent_data' => '1',
             'consent_statutes' => '1',
             'signature' => 'data:image/png;base64,'.base64_encode('sig'),
+            'photo' => UploadedFile::fake()->image('foto.jpg'), // prompt 348 — required on every sign-up
             ApplicationSpamGuard::HONEYPOT => '',
             ApplicationSpamGuard::TIMESTAMP => $this->agedToken(ApplicationSpamGuard::MIN_SECONDS + 2),
         ], $overrides);

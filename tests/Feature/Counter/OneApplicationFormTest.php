@@ -208,7 +208,7 @@ class OneApplicationFormTest extends TestCase
 
         Livewire::test(MembershipCounter::class)
             ->call('toggleAlta')
-            ->call('toggleStaffAltaForm')
+            ->call('toggleStaffAltaForm')->set('altaPhoto', UploadedFile::fake()->image('foto.jpg'))
             ->set('altaForm.first_name', 'Lucía')
             ->set('altaForm.last_name', 'García')
             ->set('altaForm.email', 'lucia@example.es')
@@ -250,7 +250,7 @@ class OneApplicationFormTest extends TestCase
 
         Livewire::test(MembershipCounter::class)
             ->call('toggleAlta')
-            ->call('toggleStaffAltaForm')
+            ->call('toggleStaffAltaForm')->set('altaPhoto', UploadedFile::fake()->image('foto.jpg'))
             ->set('altaForm.first_name', 'Lucía')
             ->set('altaForm.last_name', 'García')
             ->set('altaForm.email', 'lucia@example.es')
@@ -272,7 +272,7 @@ class OneApplicationFormTest extends TestCase
 
         $html = Livewire::test(MembershipCounter::class)
             ->call('toggleAlta')
-            ->call('toggleStaffAltaForm')
+            ->call('toggleStaffAltaForm')->set('altaPhoto', UploadedFile::fake()->image('foto.jpg'))
             ->html();
 
         // The file inputs are unconditional; `capture` only ASKS a device with a camera to open it.
@@ -300,7 +300,7 @@ class OneApplicationFormTest extends TestCase
 
         $component = Livewire::test(MembershipCounter::class)
             ->call('toggleAlta')
-            ->call('toggleStaffAltaForm')
+            ->call('toggleStaffAltaForm')->set('altaPhoto', UploadedFile::fake()->image('foto.jpg'))
             ->call('applyMrz', $mrz);
 
         $filled = $component->get('altaMrzFilled');
@@ -324,7 +324,7 @@ class OneApplicationFormTest extends TestCase
 
         $component = Livewire::test(MembershipCounter::class)
             ->call('toggleAlta')
-            ->call('toggleStaffAltaForm')
+            ->call('toggleStaffAltaForm')->set('altaPhoto', UploadedFile::fake()->image('foto.jpg'))
             ->set('altaForm.first_name', 'Escrito a mano')
             ->call('applyMrz', 'not an mrz at all');
 
@@ -345,7 +345,7 @@ class OneApplicationFormTest extends TestCase
 
         $html = Livewire::test(MembershipCounter::class)
             ->call('toggleAlta')
-            ->call('toggleStaffAltaForm')
+            ->call('toggleStaffAltaForm')->set('altaPhoto', UploadedFile::fake()->image('foto.jpg'))
             ->set('altaDocumentScan', UploadedFile::fake()->image('dni.jpg'))
             ->html();
 

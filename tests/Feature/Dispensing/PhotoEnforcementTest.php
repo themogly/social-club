@@ -50,6 +50,8 @@ class PhotoEnforcementTest extends TestCase
         $this->seed(RolePermissionSeeder::class);
         $this->org = Organisation::factory()->create();
         app(ActiveScope::class)->setOrganisation($this->org->id);
+        // Prompt 348 — these pin 157's OFF/WARN/OVERRIDE photo modes, which apply when *Exigir foto para dispensar* is off (it is on by default and makes no-photo a hard block — pinned in PhotoRequiredToDispenseTest).
+        Settings::set('require_photo_to_dispense', false, SettingType::BOOL);
         $this->location = Location::factory()->create(['organisation_id' => $this->org->id]);
         $this->genetic = Genetic::factory()->create(['organisation_id' => $this->org->id]);
         GeneticPrice::factory()->create([

@@ -30,6 +30,7 @@ use App\Support\Settings;
 use App\Support\VaultUrl;
 use Database\Seeders\RolePermissionSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Testing\TestResponse;
 use Livewire\Livewire;
@@ -135,6 +136,7 @@ class SignedSignUpTest extends TestCase
             'consent_data' => '1',
             'consent_statutes' => '1',
             'signature' => $this->drawnSignature(),
+            'photo' => UploadedFile::fake()->image('foto.jpg'), // prompt 348 — required on every sign-up
             ApplicationSpamGuard::HONEYPOT => '',
             ApplicationSpamGuard::TIMESTAMP => $token,
         ], $overrides));
@@ -146,7 +148,7 @@ class SignedSignUpTest extends TestCase
         $this->openCounterTill(); // till-first (prompt 236): the staff-typed route is counter work too
         Livewire::test(MembershipCounter::class)
             ->call('toggleAlta')
-            ->call('toggleStaffAltaForm')
+            ->call('toggleStaffAltaForm')->set('altaPhoto', UploadedFile::fake()->image('foto.jpg'))
             ->set('altaForm', [
                 'first_name' => 'Lucía',
                 'last_name' => 'García',

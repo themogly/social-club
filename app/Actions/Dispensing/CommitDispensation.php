@@ -238,6 +238,12 @@ class CommitDispensation
         // block). OVERRIDE: blocked unless a manager forces it with a reason — the SAME override path a limit
         // breach uses, so a club mid-migration with paper members is never wedged. photoEnforcement() reads
         // OFF-safe: a legacy enforcement matrix with no `photo` key resolves to OFF, never a surprise BLOCK.
+        // Prompt 348 — *Exigir foto para dispensar* (per sede, on by default): no photo, no dispensation. The counter's
+        // blocked surface offers «Hacer foto»; this is the server's half, inside the commit.
+        if (blank($member->photo_path) && (bool) Settings::get('require_photo_to_dispense', true, (string) $location->getKey())) {
+            throw new DispensationBlockedException(__('Hazle una foto antes de dispensar.'));
+        }
+
         if (Settings::photoEnforcement('counter') === 'OVERRIDE' && blank($member->photo_path)) {
             $this->authorisePhotoOverride($member, $location, $options);
         }

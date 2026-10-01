@@ -53,6 +53,7 @@ use App\Models\Setting;
 use App\Models\TillSession;
 use App\Models\User;
 use App\Support\ActiveScope;
+use App\Support\DocumentVault;
 use App\Support\MemberNumber;
 use App\Support\Settings;
 use App\Support\StagingSeed;
@@ -547,7 +548,30 @@ class DemoDataSeeder extends Seeder
             'joined_at' => $status === MemberStatus::APPLICANT ? null : now()->subMonths(random_int(1, 18)),
             'carencia_ends_at' => now()->subDays(random_int(1, 30)),
             'declared_monthly_cg' => 5000,
+            // Prompt 348 — a photo is required to dispense (per sede, on by default) and shown on every card scan: every
+            // demo member carries the same plainly fake placeholder, stored like a real one (encrypted, in the vault).
+            'photo_path' => $this->placeholderPhoto(),
         ]);
+    }
+
+    private ?string $placeholderPhotoPath = null;
+
+    /** One generated "DEMO" square, written to the vault once per seed — never a real face. */
+    private function placeholderPhoto(): string
+    {
+        if ($this->placeholderPhotoPath !== null) {
+            return $this->placeholderPhotoPath;
+        }
+
+        $path = 'member-photos/demo-placeholder.png';
+        $image = imagecreatetruecolor(240, 240);
+        imagefill($image, 0, 0, (int) imagecolorallocate($image, 226, 232, 240));
+        imagestring($image, 5, 98, 112, 'DEMO', (int) imagecolorallocate($image, 71, 85, 105));
+        ob_start();
+        imagepng($image);
+        DocumentVault::put($path, (string) ob_get_clean());
+
+        return $this->placeholderPhotoPath = $path;
     }
 
     /**

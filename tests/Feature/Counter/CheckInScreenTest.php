@@ -8,6 +8,7 @@ use App\Actions\Till\OpenTill;
 use App\Enums\MembershipStatus;
 use App\Enums\MemberStatus;
 use App\Enums\Role;
+use App\Enums\SettingType;
 use App\Livewire\Counter\CheckInScreen;
 use App\Models\Location;
 use App\Models\Member;
@@ -18,6 +19,7 @@ use App\Models\Organisation;
 use App\Models\User;
 use App\Support\ActiveScope;
 use App\Support\CounterOperator;
+use App\Support\Settings;
 use Database\Seeders\RolePermissionSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
@@ -37,6 +39,8 @@ class CheckInScreenTest extends TestCase
         $this->seed(RolePermissionSeeder::class);
         $this->org = Organisation::factory()->create();
         app(ActiveScope::class)->setOrganisation($this->org->id);
+        // Prompt 348 — these tests are about the LOOKUP; the photo check a scan now waits for is pinned in PhotoCheckOnScanTest.
+        Settings::set('confirm_photo_on_scan', false, SettingType::BOOL);
         $this->location = Location::factory()->create(['organisation_id' => $this->org->id, 'capacity' => 10]);
     }
 

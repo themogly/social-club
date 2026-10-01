@@ -5,6 +5,7 @@ namespace App\Livewire\Counter;
 use App\Actions\Attendance\ResolveMemberEligibility;
 use App\Actions\Dispensing\ResolveMemberLimits;
 use App\Actions\Members\IssueDocumentUrl;
+use App\Actions\Members\ReissueMemberCard;
 use App\Actions\Till\SelectTillSession;
 use App\Enums\DashboardAlert;
 use App\Enums\DispensationStatus;
@@ -355,6 +356,24 @@ class MembershipCounter extends Component
      * member's own ID document; the URL is the SAME short-lived signed, access-logged one the panel uses
      * (`IssueDocumentUrl`), with the operator signed into it so the log names them. Nobody identified → nothing (260).
      */
+    /** Prompt 348 — *Reemitir carné* at the counter: the old QR stops working (a card shared or lost). */
+    public function reissueCard(): void
+    {
+        if (! $this->requireOperator()) {
+            return;
+        }
+        $member = $this->feeMemberId !== null ? Member::query()->find($this->feeMemberId) : null;
+        $actor = $this->counterActor();
+        if ($member === null || $actor === null || ! $actor->can('update', $member)) {
+            $this->flash(__('No tienes permiso para reemitir el carné.'), 'error');
+
+            return;
+        }
+
+        $emailed = (new ReissueMemberCard)->handle($member, $actor, CounterOperator::id());
+        $this->flash($emailed ? __('Carné reemitido y enviado por correo') : __('Carné reemitido: el anterior ya no funciona'), 'success');
+    }
+
     public function viewDocument(string $documentId): void
     {
         if (! $this->requireOperator()) {

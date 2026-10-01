@@ -187,12 +187,14 @@
                      copy, so pairing them is what keeps the desktop form from being a column of paragraphs —
                      and the MRZ reader stays inside the document cell, bound to the input directly above it. --}}
                 <div class="grid gap-3 md:grid-cols-2">
-                    {{-- Optional identity photo (prompt 157). Never required — helps staff recognise the applicant
+                    {{-- Identity photo (prompt 157), REQUIRED since 348: staff compare it with the person on every card scan. Marked
+                         `required` (what assistive tech announces; the hidden input sits inside its visible button, so the
+                         browser's bubble points there) and enforced by the server. Originally optional — helps staff recognise the applicant
                          on arrival and shortens the first visit. The copy is honest about what it is for. --}}
                     <div>
                         {{-- Prompt 295 — Hacer foto (the front camera) or Elegir archivo, the counter's shared field. --}}
-                        <x-counter.file-field id="photo" name="photo" :label="__('Foto (opcional)')" accept="image/*" camera="user" />
-                        <p class="mt-1 text-xs text-ink-muted dark:text-slate-400">{{ \App\Support\DocumentUpload::helperText(__('Ayuda a que te reconozcan al llegar. Se comparará contigo en el mostrador. Puedes omitirla y hacerla en la sede.')) }}</p>
+                        <x-counter.file-field id="photo" name="photo" :label="__('Foto (obligatoria)')" accept="image/*" camera="user" required />
+                        <p class="mt-1 text-xs text-ink-muted dark:text-slate-400">{{ \App\Support\DocumentUpload::helperText(__('El personal la comprobará en cada visita.')) }}</p>
                     </div>
 
                     {{-- Optional identity DOCUMENT (prompt 178 — 155's part B, decided by the controller: capture

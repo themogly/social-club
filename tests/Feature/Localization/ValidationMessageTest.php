@@ -8,6 +8,7 @@ use App\Models\Organisation;
 use App\Support\ActiveScope;
 use App\Support\ApplicationSpamGuard;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Validator;
 use Tests\TestCase;
 
@@ -194,6 +195,7 @@ class ValidationMessageTest extends TestCase
             'document_type' => 'DNI', 'document_number' => '12345678Z',
             'declared_monthly_g' => '30', 'consent_data' => '1', 'consent_statutes' => '1',
             'signature' => 'data:image/png;base64,'.base64_encode('sig'),
+            'photo' => UploadedFile::fake()->image('foto.jpg'), // prompt 348 — required on every sign-up
             ApplicationSpamGuard::HONEYPOT => '',
             ApplicationSpamGuard::TIMESTAMP => $token,
         ], $overrides);

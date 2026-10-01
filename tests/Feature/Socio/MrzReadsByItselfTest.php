@@ -16,6 +16,7 @@ use App\Support\CounterOperator;
 use App\Support\MrzPrefill;
 use Database\Seeders\RolePermissionSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Testing\TestResponse;
 use Livewire\Features\SupportTesting\Testable;
@@ -159,7 +160,7 @@ class MrzReadsByItselfTest extends TestCase
         (new OpenTill)->handle($sede, 'POS-1', 10000);
         CounterOperator::set($staff);
 
-        return Livewire::test(MembershipCounter::class)->call('toggleAlta')->call('toggleStaffAltaForm');
+        return Livewire::test(MembershipCounter::class)->call('toggleAlta')->call('toggleStaffAltaForm')->set('altaPhoto', UploadedFile::fake()->image('foto.jpg'));
     }
 
     public function test_the_staff_form_fills_only_empty_fields_and_offers_the_document_value_for_the_rest(): void

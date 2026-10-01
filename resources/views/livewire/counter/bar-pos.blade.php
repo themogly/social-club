@@ -20,6 +20,7 @@
     class="md:h-full"
 >
     @include('livewire.counter.partials.counter-surface')
+    @include('livewire.counter.partials.photo-check') {{-- prompt 348 — a scanned card waits for the photo check --}}
 
     @if (! $this->handoverActive())
 

@@ -1,5 +1,6 @@
 <div class="flex flex-col gap-5 lg:grid lg:grid-cols-[minmax(0,1fr)_22rem] lg:items-start">
     @include('livewire.counter.partials.counter-surface')
+    @include('livewire.counter.partials.photo-check') {{-- prompt 348 — a scanned card waits for the photo check --}}
 
     @if (! $this->handoverActive())
 

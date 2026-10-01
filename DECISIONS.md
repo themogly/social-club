@@ -19185,3 +19185,140 @@ to do this by hand.
     - a sale lands back on `/counter` with «Última: 10.52 € · 1.00 g · 17:27», whose *Opciones* hold *Anular*;
     - the staff user linked to M-00001 (with the club's *Staff* discount set) serving M-00001 sees «Te estás atendiendo
       a ti mismo» and a 10 % discount on the line.
+
+## Prompt 348 — new members join every club; a photo is required and shown on every scan; why a sign-up didn't save
+
+### 1. Enrolled at every club
+
+- **The setting.** *Ajustes → Membresía → Alta en todas las sedes* (`enrol_all_sedes`, org-level), **on by default**.
+- **The fan-out.** `EnrolMembership` is the one enrolment writer: approval at the counter, the panel and the
+  counter's own *Dar de alta* all go through it. After creating the membership at the sede of the sign-up (the
+  **home** one, which carries the fee), it calls `EnrolMembership::linkAcross()`.
+  - This creates a membership at every other **active** sede, never a store (`LocationKind::ALMACEN`).
+  - Each has the same tier and dates, `fee_cents = 0` and `covered_by_id` = the home one, and is audited.
+  - Sedes where the member already has an active membership are skipped.
+  - With the setting off, enrolment is single-sede exactly as before (tested).
+- **They move together through one hook,** not a line in every writer: `Membership::booted()`'s `updated` copies
+  `tier_id`, `starts_at`, `expires_at` and `status` from a home membership to every membership it covers. So renewal,
+  expiry (the sweep), cancellation, a tier change (325) and a date correction all carry over, and no writer can forget
+  to. A linked membership covers nothing, so the hook never recurses.
+- **A linked membership can't be renewed, charged, re-tiered or re-dated on its own.**
+  `Membership::assertNotCovered()` sits at the top of `RenewMembership`, `RecordFeePayment`,
+  `ChangeMembershipTier` and `CorrectMembershipDates`, and refuses with «Cubierta por la membresía de Dream Green».
+  - In the panel, the membership tab shows that line under the sede and hides those actions on linked rows.
+  - At the counter, renewing a lapsed linked membership renews **its home one** (so the linked one follows), and the
+    renewal card says «Cubierta por la membresía de …».
+- **`php artisan csc:extend-memberships-to {sede}`** adds linked memberships at a sede opened later, for every member
+  with an active home membership.
+  - **`--all-sedes`** is the one-off backfill for members enrolled before this change. **It is not run
+    automatically.** `SETUP.md` asks Ben to run it once, deliberately.
+  - Both are audited (`membership.enrolled` per row, plus a `memberships.extended` summary) and print the count.
+- **Unaffected:** limits (per member), wallets (the existing per-sede wallet setting) and the stock ceiling.
+- **The demo seed now produces linked memberships** too, since it enrols through the writer.
+- **The migration** (`2026_10_01_200000_…`): `memberships.covered_by_id` and `members.card_misuse_count` (zero).
+  Against a copy seeded before it: 23 memberships unlinked, 29 members at 0. Migrate → rollback → migrate is clean.
+
+### 2. A photo is required, and shown on every scan
+
+- **Required on every new sign-up, both routes.** `ApplicationShape::files()['photo']` is now `required`, and it's
+  shared by the public form, the handover and the staff wizard.
+  - The label is «Foto (obligatoria)» with «El personal la comprobará en cada visita.»
+  - The public message is «Añade una foto tuya: el personal la comprobará en cada visita.»
+  - The input carries a real `required` (what assistive tech announces), added as a `file-field` prop because Blade
+    would otherwise print `required="required"`.
+  - The staff wizard checks it on **step 1**, where the field is, so the error is on screen and what was typed is kept.
+- **The dispensing block, *Exigir foto para dispensar*** (`require_photo_to_dispense`, per sede, **on by default**):
+  - the eligibility verdict's photo rule becomes BLOCK at that sede (it overrides 157's OFF/WARN/OVERRIDE, which still
+    apply with it off);
+  - the dispensary's blocked surface offers **«Hacer foto»**, the existing 157 capture (encrypted, audited); a saved
+    photo refreshes the screen and the dispensary opens;
+  - `CommitDispensation` refuses too, so the block is real, not a picture.
+  - **⚠ For Ben:** with this on, **every existing member without a photo is blocked at the dispensary until one is
+    taken.** That's one photo each at their first visit after the deploy. Turn it off per sede if a busy night needs
+    it.
+- **The photo check on a scan** (`confirm_photo_on_scan`, per sede, **on by default**):
+  - a member found by a **card** (QR, camera, wedge reader), not by typing a name, is held in `FindsMembers`
+    (`photoCheckMemberId`), and a full-screen card appears first: the photo at 240–288 px, the name and number, and
+    *Sí, es esta persona* / *No es esta persona*;
+  - **Sí** carries on as a scan always did;
+  - **No** selects nobody, writes `member.card_misuse_suspected` (operator, member, sede), increments
+    `card_misuse_count` and says «No se ha atendido. Avisa a un responsable.» The count shows on the member record (the
+    panel's form and infolist) and on the next check: «Tarjeta usada por otra persona: N».
+  - It's one partial (`partials/photo-check`) on all four screens that find members: Recepción, Dispensario, Barra
+    (attach) and Socios. It's an overlay, because a card reader can scan while a member is already open and the search
+    box is hidden.
+  - Android Back closes it (`historyDialog`) and records nothing (`cancelPhotoCheck`).
+  - With the setting off, the member is selected straight away. **Not built:** the prompt's "photo shown large inline
+    instead". The setting's help text says what actually happens, and the photo remains on the record.
+- **Reissuing a card.** *Reemitir carné* lives in the panel member page (*Más acciones → Datos*) and on the counter's
+  Socios record (with an inline confirmation).
+  - `ReissueMemberCard` rotates the QR token, so the old one stops resolving (tested).
+  - When there's an address, the new card goes out by e-mail through the one card path, `SendMemberCard`, which
+    rotates once.
+  - It's audited as `member.card_reissued`.
+
+### 3. "Aaron signed up a user and it didn't save"
+
+- **What the trace found:** nothing yet, from here. The live logs are on the server.
+  - `php artisan csc:signup-trace --since="2026-10-01 14:00"` lists, for a window:
+    - applications created or submitted (id, status, times);
+    - the new sign-up log (`storage/logs/signup*.log`, `App\Support\SignupTrace`): every public/handover submission
+      and refusal (the **validation keys**, never values), every staff submission, and every staff approval or refusal
+      (the **error class**);
+    - exceptions in the main log raised from a sign-up class (`ApplicationController`, `SubmitApplication`,
+      `ApproveApplication`, `EnrolMembership`, `SignsUpMembers`, `MembershipCounter`), shown as the class and the
+      file:line, **never the message**, which can quote what was typed.
+  - **Ben:** run it on the live server for the time of Aaron's attempt. Exceptions from before the deploy show; the
+    sign-up log itself starts at this deploy. Also run the two commands given to Ben earlier. Then tell me what it says
+    and I'll take it from there.
+- **No silent failures:**
+  - the public form says why and keeps what was typed (tested in a feature test and in the browser);
+  - the staff wizard says why on the step with the field (photo on step 1) and keeps the values;
+  - a refused approval (underage, duplicate, no tier) says so on screen with the writer's own message. This was already
+    true; it's pinned now, and traced.
+  - **Likely suspect for Aaron's case:** `approveAlta`'s refusals were already flashed, but a refusal on the review
+    step after a long wizard is easy to miss. The trace will show whether it was a refusal, a validation failure on the
+    public form, or an exception.
+
+### Test changes the new defaults required
+
+- **`MemberFactory`** gives a member a placeholder `photo_path`, as every new member now has one. Tests about the
+  no-photo case set it to null explicitly.
+- **Tests that submit a sign-up** add a fake photo:
+  - the public payload helpers, after their `signature` line;
+  - the staff wizard, after `toggleStaffAltaForm`.
+- **`MemberPhotoCaptureTest`**'s "submits without a photo" became "refused without a photo".
+- **Tests about the lookup** (scans) turn `confirm_photo_on_scan` off; the photo check has its own tests.
+- **Tests about 157's photo modes, training mode, an imported paper member and a warned socio** turn
+  `require_photo_to_dispense` off, each with a one-line reason.
+- **The demo seeder** gives every demo member one generated «DEMO» placeholder photo, stored in the vault like a real
+  one, never a face. `DemoSeedProfileTest` still dispenses.
+- **Smaller ones:**
+  - the settings coverage test documents the two new sede settings;
+  - `MailInventoryTest` names the reissue e-mail's sender;
+  - `HeaderActionOrderTest` expects *Reemitir carné* in *Datos*;
+  - the double-tap test counts home memberships.
+
+### Tests and proofs
+
+- **`tests/Feature/Members/EveryClubAndPhotoCheckTest.php`** (7) and **`SignupTraceTest.php`** (3). 9 of 10 are red
+  on the old code; the 10th, "typing the name skips the photo check", is true on both. They cover:
+  - three sedes and a store, with one fee and two linked memberships, served at Norte;
+  - renewing and cancelling together, and a linked membership refused for charging or renewal on its own;
+  - the extend command, and the setting off;
+  - the no-photo block, the blocked surface's «Hacer foto», and a photo unblocking;
+  - the scan check: No (audit, count, message) and Yes, and typing skips it;
+  - reissue makes the old token dead;
+  - the trace lists a forced validation failure and a forced exception, with no name, DNI or e-mail;
+  - the public and staff paths say why and keep values.
+- **The browser proof** (`tests/Browser/prove-348-every-club-photo.mjs`, a freshly seeded demo DB), 9/9 PASS:
+  - at 1180:
+    - a scanned card shows the photo check (photo 240 px, name, M-00001);
+    - *No* selects nobody, says so and counts it; *Sí* selects;
+    - *Reemitir carné* makes the old token dead;
+    - a member with no photo is blocked, with *Hacer foto* / *Elegir archivo*;
+    - the staff wizard without a photo stays on step 1, says why and keeps the name;
+  - at 390: the public form without a photo shows «Añade una foto tuya…» and keeps what was typed;
+  - a member enrolled at Central gets Central (the fee) and North (covered, no fee), and none at the store.
+- **346 on the staff form:** its automatic read was proven at the counter in 346's own run (the scan still attached).
+  It wasn't re-run here.

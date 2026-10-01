@@ -24,6 +24,7 @@ use App\Support\CounterOperator;
 use App\Support\Settings;
 use Database\Seeders\RolePermissionSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Str;
@@ -113,7 +114,7 @@ class SigningSomeoneUpTest extends TestCase
     {
         return Livewire::test(MembershipCounter::class)
             ->call('toggleAlta')
-            ->call('toggleStaffAltaForm')
+            ->call('toggleStaffAltaForm')->set('altaPhoto', UploadedFile::fake()->image('foto.jpg'))
             ->set('altaForm', array_merge([
                 'first_name' => 'Lucía',
                 'last_name' => 'García',
@@ -212,6 +213,7 @@ class SigningSomeoneUpTest extends TestCase
             'consent_data' => '1',
             'consent_statutes' => '1',
             'signature' => Settings::get('signature_on_application', true) ? $this->drawnSignature() : '',
+            'photo' => UploadedFile::fake()->image('foto.jpg'), // prompt 348 — required on every sign-up
             ApplicationSpamGuard::HONEYPOT => '',
             ApplicationSpamGuard::TIMESTAMP => $token,
         ], $overrides));
@@ -350,7 +352,7 @@ class SigningSomeoneUpTest extends TestCase
         // Without the explicit confirmation, nothing is written at all.
         Livewire::test(MembershipCounter::class)
             ->call('toggleAlta')
-            ->call('toggleStaffAltaForm')
+            ->call('toggleStaffAltaForm')->set('altaPhoto', UploadedFile::fake()->image('foto.jpg'))
             ->set('altaForm.first_name', 'Lucía')
             ->set('altaForm.last_name', 'García')
             ->set('altaForm.email', 'lucia@example.es')
@@ -381,7 +383,7 @@ class SigningSomeoneUpTest extends TestCase
 
         Livewire::test(MembershipCounter::class)
             ->call('toggleAlta')
-            ->call('toggleStaffAltaForm')
+            ->call('toggleStaffAltaForm')->set('altaPhoto', UploadedFile::fake()->image('foto.jpg'))
             ->set('altaForm.first_name', '')
             ->set('altaForm.document_number', '')
             ->set('altaConsentHeld', true)
@@ -464,7 +466,7 @@ class SigningSomeoneUpTest extends TestCase
 
             $html = Livewire::test(MembershipCounter::class)
                 ->call('toggleAlta')
-                ->call('toggleStaffAltaForm')
+                ->call('toggleStaffAltaForm')->set('altaPhoto', UploadedFile::fake()->image('foto.jpg'))
                 ->html();
 
             foreach (['member-id-scans', 'document_scan', 'medical_cert'] as $forbidden) {
@@ -480,7 +482,7 @@ class SigningSomeoneUpTest extends TestCase
 
         $html = Livewire::test(MembershipCounter::class)
             ->call('toggleAlta')
-            ->call('toggleStaffAltaForm')
+            ->call('toggleStaffAltaForm')->set('altaPhoto', UploadedFile::fake()->image('foto.jpg'))
             ->html();
 
         $this->assertSame(1, preg_match_all('/data-member-lookup(?![-\w])/', $html), 'the staff form added a second lookup');

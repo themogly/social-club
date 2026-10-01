@@ -23,6 +23,7 @@ class RenewMembership
      */
     public function handle(Membership $membership, array $options = []): Membership
     {
+        $membership->assertNotCovered(); // prompt 348 — renewed through its home membership
         $tier = $membership->tier;
         $base = CarbonImmutable::now();
         if ($membership->expires_at !== null && $membership->expires_at->greaterThan($base)) {

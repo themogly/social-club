@@ -11,6 +11,7 @@ use App\Models\Member;
 use App\Models\Membership;
 use App\Models\MembershipTier;
 use App\Models\User;
+use App\Support\Settings;
 use Carbon\CarbonInterface;
 use Illuminate\Auth\Access\AuthorizationException;
 use RuntimeException;
@@ -80,7 +81,50 @@ class EnrolMembership
             'reason' => $overridden ? ($options['fee_override_reason'] ?? null) : null,
         ]);
 
+        // Prompt 348 (Aaron: "auto sign up to all locations except storage") — with *Alta en todas las sedes* on, the
+        // member is enrolled at every other active sede too, linked to this one: same tier and dates, no fee of their
+        // own (the fee is this one's), renewed/expired/cancelled with it (Membership::booted).
+        if ((bool) Settings::get('enrol_all_sedes', true)) {
+            self::linkAcross($membership);
+        }
+
         return $membership;
+    }
+
+    /**
+     * Linked memberships at every OTHER active sede (never a store) where the member has no active one yet. Returns how
+     * many were created.
+     */
+    public static function linkAcross(Membership $home): int
+    {
+        $created = 0;
+        $sedes = Location::query()->withoutGlobalScopes()
+            ->where('organisation_id', $home->organisation_id)
+            ->where('active', true)
+            ->whereKeyNot($home->location_id)
+            ->get()
+            ->reject(fn (Location $location): bool => $location->isStore());
+
+        foreach ($sedes as $sede) {
+            if ($home->member->activeMembershipAt($sede) !== null) {
+                continue;
+            }
+            $linked = Membership::create([
+                'organisation_id' => $home->organisation_id,
+                'member_id' => $home->member_id,
+                'location_id' => $sede->id,
+                'tier_id' => $home->tier_id,
+                'starts_at' => $home->starts_at,
+                'expires_at' => $home->expires_at,
+                'fee_cents' => 0,
+                'status' => $home->status,
+                'covered_by_id' => $home->id,
+            ]);
+            (new RecordAuditLog)->handle('membership.enrolled', $linked, null, ['covered_by' => $home->id, 'fee_cents' => 0]);
+            $created++;
+        }
+
+        return $created;
     }
 
     public static function expiryFor(MembershipPeriod $period, CarbonInterface $from, ?CarbonInterface $custom): ?CarbonInterface

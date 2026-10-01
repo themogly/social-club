@@ -3,9 +3,11 @@
 namespace App\Http\Requests;
 
 use App\Support\ApplicationShape;
+use App\Support\CounterHandover;
 use App\Support\DocumentUpload;
 use App\Support\MemberEligibility;
 use App\Support\MrzPrefill;
+use App\Support\SignupTrace;
 use Illuminate\Contracts\Validation\Validator;
 use Illuminate\Foundation\Http\FormRequest;
 
@@ -65,6 +67,17 @@ class SubmitApplicationRequest extends FormRequest
         ]);
     }
 
+    /** Prompt 348 — a refused submission is traced (which keys, never the values) before the usual redirect back. */
+    protected function failedValidation(Validator $validator): void
+    {
+        SignupTrace::record('application.invalid', [
+            'keys' => array_keys($validator->errors()->toArray()),
+            'route' => CounterHandover::active() ? 'handover' : 'link',
+        ]);
+
+        parent::failedValidation($validator);
+    }
+
     public function withValidator(Validator $validator): void
     {
         $validator->after(function (Validator $validator): void {
@@ -102,6 +115,7 @@ class SubmitApplicationRequest extends FormRequest
     public function messages(): array
     {
         return [
+            'photo.required' => __('Añade una foto tuya: el personal la comprobará en cada visita.'),
             'photo.max' => __('La foto es demasiado grande (máximo :size). Prueba con una foto más pequeña.', [
                 'size' => DocumentUpload::limitLabel(),
             ]),
