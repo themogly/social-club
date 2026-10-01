@@ -2,10 +2,12 @@
 
 namespace App\Filament\Resources\Articles\Pages;
 
+use App\Actions\RecordAuditLog;
 use App\Actions\Stock\IntakeArticleAtLocations;
 use App\Filament\Concerns\ReturnsToList;
 use App\Filament\Resources\Articles\ArticleResource;
 use App\Filament\Support\AllOption;
+use App\Support\VapeLikeName;
 use DomainException;
 use Filament\Resources\Pages\CreateRecord;
 use Illuminate\Database\Eloquent\Model;
@@ -66,6 +68,10 @@ class CreateArticle extends CreateRecord
             throw ValidationException::withMessages(['data.location_id' => $e->getMessage()]);
         }
         $this->createdAt = $articles->count();
+        // Prompt 347 — a vape-like name passed the form only with «Es un accesorio, no contiene cannabis» ticked: say so.
+        if (VapeLikeName::barProduct((string) ($data['name'] ?? ''))) {
+            $articles->each(fn (Model $article) => (new RecordAuditLog)->handle('article.accessory_confirmed', $article, null, ['name' => $data['name']]));
+        }
 
         return $articles->first();
     }

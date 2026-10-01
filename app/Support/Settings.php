@@ -237,6 +237,15 @@ class Settings
         // 'automatic' (default): the system draws oldest-first and splits when the old batch runs out — the
         // operator never chooses a lote. 'manual': the operator picks the lote (separate jars per lote).
         'dispensary_batch_selection' => 'automatic',
+        // Prompt 347 (Liam) — after Registrar aportación (and a Barra sale), per sede: back to the counter home (the
+        // default), a new member in the dispensary, or stay with the member (the behaviour before 347).
+        'after_recording' => 'home',
+        // Prompt 347 — a member of staff serving themselves (their linked member record): allowed and flagged by default;
+        // a sede can require someone else to serve them.
+        'block_self_dispensation' => false,
+        // Prompt 347 — the club's discount applied by itself to any member linked to an ACTIVE staff account (normally
+        // the «Personal» one). '' = none, so nothing changes until the owner chooses.
+        'staff_discount_id' => '',
         // Where one link into the counter lands (prompt 189). 'home' = the tile hub, 'screen' = straight to
         // the first screen the operator may open (prompt 172's per-user resolution, which is the fallback
         // either way — a till-only operator must always land somewhere they are allowed to be).

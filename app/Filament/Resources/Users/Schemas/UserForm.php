@@ -5,6 +5,7 @@ namespace App\Filament\Resources\Users\Schemas;
 use App\Actions\ResolveLocale;
 use App\Enums\Role;
 use App\Filament\Forms\PinInput;
+use App\Models\Member;
 use App\Models\User;
 use App\Support\Email;
 use App\Support\PinCollisionGuard;
@@ -144,6 +145,21 @@ class UserForm
                     ->multiple()
                     ->preload()
                     ->helperText(__('Asigna una o varias sedes. El propietario ve todas las sedes de todos modos, así que aquí es opcional. Sin ninguna sede, un gestor o personal puede iniciar sesión pero no tendrá sede activa (sin acceso hasta que se le asigne una).')),
+
+                // Prompt 347 — this person's own member record, when they are also a socio: the club's staff discount
+                // (Ajustes) then applies to them by itself while this account is active, and the counter knows when they
+                // serve themselves. Only people who manage staff see it (this form is `staff.manage`); audited.
+                Select::make('member_id')
+                    ->label(__('Ficha de socio'))
+                    ->helperText(__('Opcional. Vincula a esta persona con su propia ficha de socio (nombre o número).'))
+                    ->searchable()
+                    ->getSearchResultsUsing(fn (string $search): array => blank(trim($search)) ? [] : Member::query()
+                        ->matchingNameOrNumber(trim($search))->limit(20)->get()
+                        ->mapWithKeys(fn (Member $member): array => [$member->id => $member->avaladorLabel()])->all())
+                    ->getOptionLabelUsing(fn (?string $value): ?string => $value !== null ? Member::query()->find($value)?->avaladorLabel() : null)
+                    ->unique(ignoreRecord: true)
+                    ->validationMessages(['unique' => __('Esa ficha de socio ya está vinculada a otra cuenta del personal.')])
+                    ->nullable(),
 
                 Toggle::make('active')
                     ->label(__('Activo'))

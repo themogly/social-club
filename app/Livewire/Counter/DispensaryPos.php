@@ -29,6 +29,7 @@ use App\Livewire\Counter\Concerns\CollectsMembershipFees;
 use App\Livewire\Counter\Concerns\FindsMembers;
 use App\Livewire\Counter\Concerns\HandlesTender;
 use App\Livewire\Counter\Concerns\IdentifiesOperator;
+use App\Livewire\Counter\Concerns\LandsAfterRecording;
 use App\Livewire\Counter\Concerns\OpensMemberships;
 use App\Livewire\Counter\Concerns\PersistsBasket;
 use App\Livewire\Counter\Concerns\RendersIslandsOnChange;
@@ -97,7 +98,7 @@ use RuntimeException;
 #[Layout('components.layouts.counter', ['fullHeight' => true])] // prompt 176: the page must not scroll; the selection pane does
 class DispensaryPos extends Component
 {
-    use AddsManualBarLines, CollectsMembershipFees, FindsMembers, HandlesTender, IdentifiesOperator, OpensMemberships, PersistsBasket, RendersIslandsOnChange, ResolvesCounterLocation, ShowsSettledOutcome;
+    use AddsManualBarLines, CollectsMembershipFees, FindsMembers, HandlesTender, IdentifiesOperator, LandsAfterRecording, OpensMemberships, PersistsBasket, RendersIslandsOnChange, ResolvesCounterLocation, ShowsSettledOutcome;
 
     // --- Identity ---------------------------------------------------------------
     // The ONE lookup field ($lookup) and everything behind it live in FindsMembers (prompt 194). This screen
@@ -373,6 +374,23 @@ class DispensaryPos extends Component
 
         // A new socio always starts a fresh basket → a fresh idempotency key.
         $this->idempotencyKey = (string) Str::ulid();
+    }
+
+    /** Prompt 347 — is the person at the PIN serving their own linked member record? */
+    public function servingSelf(): bool
+    {
+        return $this->memberId !== null && $this->hasOperator() && $this->counterActor()?->member_id === $this->memberId;
+    }
+
+    /**
+     * Prompt 347 — `after_recording` = new_member: nobody selected, the empty dispensary — but the confirmation and 300's
+     * last-sale line (receipt, void) stay, as they would have.
+     */
+    protected function releaseMemberAfterRecording(): void
+    {
+        [$dispensation, $order, $message, $type, $settled] = [$this->lastDispensationId, $this->lastOrderId, $this->flashMessage, $this->flashType, $this->settled];
+        $this->clearMember(confirmed: true);
+        [$this->lastDispensationId, $this->lastOrderId, $this->flashMessage, $this->flashType, $this->settled] = [$dispensation, $order, $message, $type, $settled];
     }
 
     /** Keep the member and the baskets — the answer "no" to {@see clearMember()}'s question. */
@@ -1067,6 +1085,7 @@ class DispensaryPos extends Component
         $this->lastDispensationId = $dispensation->id;
         $this->resetBasketState();
         $this->flashSettled(SettledOutcome::forDispensation($dispensation, $change), __('Dispensación registrada.'));
+        $this->landAfterRecording($dispensation->id, null);
     }
 
     // --- Combined settle: same visit, cannabis + bar, two records (prompt 118) --------
@@ -1203,6 +1222,7 @@ class DispensaryPos extends Component
         $this->resetBasketState();
         $this->barBasket = [];
         $this->flash(__('Visita liquidada: dispensación y barra.'), 'success');
+        $this->landAfterRecording($result['dispensation']->id, $result['order']->id);
     }
 
     /**
@@ -1267,6 +1287,7 @@ class DispensaryPos extends Component
         // mints the next idempotency key.
         $this->resetBasketState();
         $this->flash(__('Barra cobrada.'), 'success');
+        $this->landAfterRecording(null, $order->id);
     }
 
     /** The charged bar total, priced through the SAME resolver CommitOrder uses so the tender matches. */

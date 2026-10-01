@@ -11,6 +11,7 @@ use App\Models\Member;
 use App\Models\MemberApplication;
 use App\Models\Message;
 use App\Models\MessageThread;
+use App\Models\User;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 
@@ -61,6 +62,7 @@ class AnonymiseMember
         'refunds' => 'reference + amount/reason (no name/DNI).',
         'convocatoria_recipients' => 'HANDLED here: the frozen roll keeps the row + status as assembly evidence; the name/email SNAPSHOT it holds is redacted.',
         'message_threads' => 'HANDLED here: the thread + timestamps stay as evidence of contact; the member-authored subject is redacted and their message bodies scrubbed (messages hang off the thread, no member_id of their own).',
+        'users' => 'HANDLED here: a staff account linked to this member record (prompt 347, member_id) is unlinked — the account stays, the tie to the erased person (and the staff discount it carried) goes.',
         'assembly_attendances' => 'HANDLED here: the register keeps the row + mode as assembly evidence; the name SNAPSHOT is redacted, AND proxy_holder is redacted wherever THIS member is the one named there (a column no member_id points at).',
     ];
 
@@ -140,6 +142,9 @@ class AnonymiseMember
 
         // 4. Revoke credentials and redact the member's own AUDIT rows (longer-retained than member data).
         $member->tokens()->whereNull('revoked_at')->update(['revoked_at' => now()]);
+
+        // Prompt 347 — a staff account linked to this member record keeps existing; the link to the erased person does not.
+        User::query()->where('member_id', $member->getKey())->update(['member_id' => null]);
         (new RedactMemberAuditLogs)->handle($member);
 
         // 5. Convocatoria rolls snapshot the member's name + email. Keep the row (and its NOTIFIED/NO_EMAIL

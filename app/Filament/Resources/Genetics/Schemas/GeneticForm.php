@@ -16,7 +16,9 @@ use App\Rules\GramAmount;
 use App\Rules\UniqueGeneticName;
 use App\Support\EdibleEquivalence;
 use App\Support\NumberFormat;
+use App\Support\VapeLikeName;
 use Filament\Forms\Components\FileUpload;
+use Filament\Forms\Components\Radio;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TagsInput;
 use Filament\Forms\Components\Textarea;
@@ -79,17 +81,29 @@ class GeneticForm
                     ->schema([
                         // product_type drives the derived, stored unit_type (set by GeneticObserver).
                         // unit_type is never a form field — it is observer-derived, never user-entered.
-                        Select::make('product_type')
+                        // Prompt 347 — NO default, and the six types as large choices with one line each: an untouched
+                        // «Flor» default is how vapes were entered as flower (weighed, the wrong limits maths, the wrong menu
+                        // group). The same field and values; only how it is chosen changed.
+                        Radio::make('product_type')
                             ->label(__('Tipo de producto'))
                             ->options(collect(ProductType::cases())
                                 ->mapWithKeys(fn (ProductType $case): array => [$case->value => $case->label()])
                                 ->all())
-                            ->default(ProductType::FLOWER->value)
+                            ->descriptions(collect(ProductType::cases())
+                                ->mapWithKeys(fn (ProductType $case): array => [$case->value => $case->choiceDescription()])
+                                ->all())
                             ->required()
                             ->live()
-                            ->helperText(fn (Get $get): string => __('Se dispensa: :modo', [
-                                'modo' => (ProductType::tryFrom((string) $get('product_type')) ?? ProductType::FLOWER)->unitType()->label(),
-                            ])),
+                            ->columns(['default' => 1, 'sm' => 2])
+                            ->extraAttributes(['data-product-type-choices' => 'true'])
+                            ->helperText(fn (Get $get): string => ProductType::tryFrom((string) $get('product_type')) === null
+                                ? __('Elige qué es: flor, hachís, extracto, preliado, comestible o vapeador')
+                                : __('Se dispensa: :modo', ['modo' => ProductType::from((string) $get('product_type'))->unitType()->label()]))
+                            // A gentle check, never a block: a name that says vape, with another type chosen.
+                            ->belowContent(fn (Get $get): ?HtmlString => VapeLikeName::strain((string) $get('name')) && $get('product_type') !== ProductType::VAPE->value
+                                ? new HtmlString('<p data-vape-hint class="text-sm font-medium text-warning-600 dark:text-warning-400">'.e(__('¿Es un vapeador? Elige «Vapeador» para que se dispense por unidad.')).'</p>')
+                                : null)
+                            ->columnSpanFull(),
 
                         // Strain variety (prompt 66) — sativa/indica/hybrid, nullable (some products have none).
                         Select::make('strain_type')
@@ -209,11 +223,8 @@ class GeneticForm
                             ->visible(fn (): bool => Category::query()
                                 ->where('applies_to', CategoryAppliesTo::GENETIC->value)->exists()),
 
-                        Toggle::make('published')
-                            ->label(__('Publicada'))
-                            ->helperText(__('Visible en el menú de la app de socios. El mostrador la ve igualmente.'))
-                            ->default(true),
-
+                        // Prompt 347 — no *Publicada* toggle: strains publish themselves (Genetic::$attributes). *Activa* is
+                        // still how a strain stops being offered.
                         Toggle::make('active')
                             ->label(__('Activa'))
                             ->default(true),

@@ -19,6 +19,7 @@ use Illuminate\Database\Eloquent\Attributes\Hidden;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Foundation\Auth\User as Authenticatable;
@@ -27,7 +28,7 @@ use Illuminate\Support\Facades\Hash;
 use SensitiveParameter;
 use Spatie\Permission\Traits\HasRoles;
 
-#[Fillable(['name', 'email', 'password', 'pin', 'active', 'locale'])]
+#[Fillable(['name', 'email', 'password', 'pin', 'active', 'locale', 'member_id'])]
 #[Hidden(['password', 'remember_token', 'pin', 'pin_lookup', 'mfa_secret', 'mfa_recovery_codes', 'telegram_chat_id', 'telegram_chat_hash'])]
 class User extends Authenticatable implements FilamentUser, HasAppAuthentication, HasAppAuthenticationRecovery, HasLocalePreference
 {
@@ -127,6 +128,17 @@ class User extends Authenticatable implements FilamentUser, HasAppAuthentication
     public function hasPin(): bool
     {
         return filled($this->getRawOriginal('pin_lookup')) || filled($this->getRawOriginal('pin'));
+    }
+
+    /**
+     * Prompt 347 — this person's own member record, when they are also a socio: the club's staff discount applies to it
+     * while the account is active, and the counter knows when they serve themselves. One record per account.
+     *
+     * @return BelongsTo<Member, $this>
+     */
+    public function member(): BelongsTo
+    {
+        return $this->belongsTo(Member::class);
     }
 
     /** @return BelongsToMany<Location, $this> */

@@ -128,6 +128,7 @@ class FormCompletenessTest extends TestCase
             'thc_bp' => 'entered as percent via thc_pct (basis points at the edge).',
             'cbd_bp' => 'entered as percent via cbd_pct (basis points at the edge).',
             'grams_per_unit_cg' => 'entered as grams via grams_per_unit_g (centigrams at the edge).',
+            'published' => 'prompt 347: no toggle — a new strain publishes itself (Genetic::$attributes); existing values are kept and csc:find-vape-like lists the unpublished.',
         ],
         MemberApplicationResource::class => [
             'invite_token_hash' => 'system: set by the tokenised invite flow.',

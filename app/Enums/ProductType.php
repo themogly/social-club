@@ -51,6 +51,22 @@ enum ProductType: string implements HasLabel
         };
     }
 
+    /**
+     * Prompt 347 — one line under each choice on the strain form, so the type is CHOSEN (there is no default: an untouched
+     * default is how vapes became flower).
+     */
+    public function choiceDescription(): string
+    {
+        return match ($this) {
+            self::FLOWER => __('Cogollos — se dispensa por peso'),
+            self::HASH => __('Resina prensada — se dispensa por peso'),
+            self::CONCENTRATE => __('Rosin, BHO, wax… — se dispensa por peso'),
+            self::PREROLL => __('Porro ya liado — se dispensa por unidad'),
+            self::EDIBLE => __('Gominola, galleta… — se dispensa por unidad'),
+            self::VAPE => __('Cartucho o desechable — se dispensa por unidad'),
+        };
+    }
+
     public function getLabel(): string
     {
         return $this->label();

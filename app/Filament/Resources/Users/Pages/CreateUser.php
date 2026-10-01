@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\Users\Pages;
 
+use App\Actions\RecordAuditLog;
 use App\Actions\Users\EnsureRoleChangeIsAllowed;
 use App\Filament\Concerns\ReturnsToList;
 use App\Filament\Resources\Users\UserResource;
@@ -28,6 +29,9 @@ class CreateUser extends CreateRecord
     protected function afterCreate(): void
     {
         $user = $this->getRecord();
+        if ($user instanceof User && $user->getRawOriginal('member_id') !== null) { // prompt 347
+            (new RecordAuditLog)->handle('user.member_linked', $user, null, ['member_id' => $user->getRawOriginal('member_id')]);
+        }
         if ($user instanceof User && $user->hasPin()) {
             PinSavedNotice::send($user->fresh() ?? $user);
         }

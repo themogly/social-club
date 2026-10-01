@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\Articles\Pages;
 
+use App\Actions\RecordAuditLog;
 use App\Actions\Stock\UpdateArticleAcrossSedes;
 use App\Filament\Concerns\AuditsResourceChanges;
 use App\Filament\Concerns\ReturnsToList;
@@ -10,6 +11,7 @@ use App\Filament\Resources\Articles\ArticleResource;
 use App\Filament\Support\AllOption;
 use App\Models\Article;
 use App\Models\User;
+use App\Support\VapeLikeName;
 use DomainException;
 use Filament\Actions\DeleteAction;
 use Filament\Actions\RestoreAction;
@@ -43,6 +45,10 @@ class EditArticle extends EditRecord
     protected function afterSave(): void
     {
         $this->writeAuditLog('article.updated');
+        // Prompt 347 — saved under a vape-like name: the accessory confirmation was ticked to get here.
+        if (VapeLikeName::barProduct((string) $this->record->getAttribute('name'))) {
+            (new RecordAuditLog)->handle('article.accessory_confirmed', $this->record, null, ['name' => $this->record->getAttribute('name')]);
+        }
     }
 
     /**

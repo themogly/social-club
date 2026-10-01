@@ -600,6 +600,11 @@
                 {{-- TOP — who is being served and what they may still have. Never scrolls away. --}}
                 <div class="shrink-0">
                     @include('livewire.counter.partials.member-cart-summary')
+                    {{-- Prompt 347 — the person at the PIN is the member being served. Allowed (and flagged on the record) unless
+                         this sede requires someone else to serve them; the commit itself enforces that. --}}
+                    @if ($this->servingSelf())
+                        <p data-self-serving role="status" class="mt-2 rounded-lg border border-warning/40 bg-warning/10 px-3 py-2 text-sm font-medium text-warning">{{ __('Te estás atendiendo a ti mismo') }}</p>
+                    @endif
                 </div>
 
                 {{-- MIDDLE — the basket and the payment apparatus, plus the member detail that informs it

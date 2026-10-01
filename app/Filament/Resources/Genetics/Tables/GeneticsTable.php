@@ -6,8 +6,10 @@ use App\Enums\BatchStatus;
 use App\Enums\ProductType;
 use App\Enums\StrainType;
 use App\Filament\Resources\Genetics\GeneticDeletion;
+use App\Models\Batch;
 use App\Models\Genetic;
 use App\Models\Location;
+use App\Models\Scopes\LocationScope;
 use App\Support\ActiveScope;
 use App\Support\Percent;
 use App\Support\StockCover;
@@ -79,6 +81,16 @@ class GeneticsTable
 
                         return $cg === 0 ? __('Sin existencias') : Weight::fromCentigrams($cg)->formatted();
                     }),
+                // Prompt 347 — where each strain is in stock (308's rule: anything left), every sede and the store, whatever the
+                // panel's sede: a strain belongs to the club, its stock to batches at a sede.
+                TextColumn::make('in_stock_at')
+                    ->label(__('Sedes'))
+                    ->state(fn (Genetic $record): string => Batch::query()->withoutGlobalScope(LocationScope::class)
+                        ->where('batches.genetic_id', $record->getKey())->inStock()
+                        ->join('locations', 'locations.id', '=', 'batches.location_id')
+                        ->orderBy('locations.name')->distinct()->pluck('locations.name')->implode(' · '))
+                    ->placeholder('—')
+                    ->toggleable(),
                 IconColumn::make('published')->label(__('Publicada'))->boolean(),
                 IconColumn::make('active')->label(__('Activa'))->boolean(),
             ])
@@ -98,6 +110,24 @@ class GeneticsTable
                     ->options(collect(StrainType::cases())
                         ->mapWithKeys(fn (StrainType $case): array => [$case->value => $case->label()])
                         ->all()),
+                // Prompt 347 (Liam: "Strains filter by location") — strains with stock left at one or more sedes (the store
+                // included). With one sede chosen in the panel's top bar it starts as that sede, a chip that can be removed.
+                SelectFilter::make('sede')
+                    ->label(__('Con existencias en…'))
+                    ->multiple()
+                    ->options(fn (): array => Location::query()->withoutGlobalScopes()
+                        ->where('organisation_id', app(ActiveScope::class)->organisationId())
+                        ->orderBy('name')->pluck('name', 'id')->all())
+                    ->default(fn (): array => array_filter([app(ActiveScope::class)->locationId()]))
+                    // A strain with no stock ANYWHERE yet (just created, 320) belongs to no sede, so it stays in view under every
+                    // sede — otherwise the strain you just created would vanish from the list behind the default chip.
+                    ->query(fn (Builder $query, array $data): Builder => filled($data['values'] ?? null)
+                        ? $query->where(fn (Builder $q): Builder => $q
+                            ->whereIn('genetics.id', Batch::query()->withoutGlobalScope(LocationScope::class)
+                                ->select('batches.genetic_id')->inStock()->whereIn('batches.location_id', (array) $data['values']))
+                            ->orWhereNotIn('genetics.id', Batch::query()->withoutGlobalScope(LocationScope::class)
+                                ->select('batches.genetic_id')->inStock()))
+                        : $query),
                 TrashedFilter::make(),
             ])
             // 13 columns needing 1147px in a 1056px holder — six row-action controls were measured

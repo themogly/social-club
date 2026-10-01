@@ -46,6 +46,16 @@ class Genetic extends Model
         // IS fillable (prompt 66) — a user-set property, not derived.
     ];
 
+    /**
+     * Prompt 347 — a new strain is published (on the member app's menu) unless something says otherwise: the form's
+     * *Publicada* toggle is gone. Existing rows keep their value; `csc:find-vape-like` lists the unpublished ones.
+     *
+     * @var array<string, mixed>
+     */
+    protected $attributes = [
+        'published' => true,
+    ];
+
     protected function casts(): array
     {
         return [

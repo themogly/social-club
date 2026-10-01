@@ -34,6 +34,7 @@ class Dispensation extends Model
         'void_reason', 'voided_by', 'voided_at', 'signature_path', 'idempotency_key',
         'reference', 'dispensed_at',
         'original_total_cents', 'price_override_reason', 'price_override_by',
+        'self_dispensed', // prompt 347 — a member of staff served their own linked member record
     ];
 
     protected function casts(): array
@@ -46,6 +47,7 @@ class Dispensation extends Model
             'status' => DispensationStatus::class,
             'voided_at' => 'datetime',
             'dispensed_at' => 'datetime',
+            'self_dispensed' => 'boolean',
         ];
     }
 

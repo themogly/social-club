@@ -12,6 +12,7 @@ use App\Livewire\Counter\Concerns\AddsManualBarLines;
 use App\Livewire\Counter\Concerns\FindsMembers;
 use App\Livewire\Counter\Concerns\HandlesTender;
 use App\Livewire\Counter\Concerns\IdentifiesOperator;
+use App\Livewire\Counter\Concerns\LandsAfterRecording;
 use App\Livewire\Counter\Concerns\PersistsBasket;
 use App\Livewire\Counter\Concerns\RendersIslandsOnChange;
 use App\Livewire\Counter\Concerns\ResolvesCounterLocation;
@@ -66,7 +67,7 @@ use Throwable;
 #[Layout('components.layouts.counter', ['fullHeight' => true])] // prompt 176: the page must not scroll; the selection pane does
 class BarPos extends Component
 {
-    use AddsManualBarLines, FindsMembers, HandlesTender, IdentifiesOperator, PersistsBasket, RendersIslandsOnChange, ResolvesCounterLocation, ShowsSettledOutcome;
+    use AddsManualBarLines, FindsMembers, HandlesTender, IdentifiesOperator, LandsAfterRecording, PersistsBasket, RendersIslandsOnChange, ResolvesCounterLocation, ShowsSettledOutcome;
 
     // --- Identity / scope -------------------------------------------------------
     // The ONE lookup field ($lookup) lives in FindsMembers (prompt 194). The bar used to offer a name box with
@@ -465,6 +466,17 @@ class BarPos extends Component
         $this->lastOrderId = $order->id;
         $this->resetBasketState();
         $this->flashSettled(SettledOutcome::forOrder($order, $change), __('Pedido registrado.'));
+        $this->landAfterRecording(null, $order->id); // prompt 347 — the same setting as the dispensary, same default
+    }
+
+    /** Prompt 347 — `after_recording` = new_member, on the Barra: the next ticket starts with no socio attached. */
+    protected function releaseMemberAfterRecording(): void
+    {
+        $order = $this->lastOrderId;
+        $this->memberId = null;
+        $this->walletInput = '';
+        $this->clearLookup();
+        $this->lastOrderId = $order;
     }
 
     // --- The after-sale line (prompt 300) ------------------------------------------
