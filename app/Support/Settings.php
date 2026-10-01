@@ -246,6 +246,13 @@ class Settings
         'require_photo_to_dispense' => true,
         // Prompt 348 — per sede: a QR/card scan shows the member's photo, large, for staff to confirm before anything else.
         'confirm_photo_on_scan' => true,
+        // Prompt 349 — per sede: the till keeps three cash pots (dispensary, bar, fees); the float and the headline figure
+        // are the dispensary's. OFF here (today's single drawer); the 349 migration switched it ON for this club's sedes.
+        'separate_cash_pots' => false,
+        // Prompt 349 — per sede, with pots on: whether the bar and fees pots are counted every night by default (the
+        // dispensary always is). Not counted carries forward to the next opening.
+        'count_bar_nightly' => false,
+        'count_fees_nightly' => false,
         // Prompt 347 — a member of staff serving themselves (their linked member record): allowed and flagged by default;
         // a sede can require someone else to serve them.
         'block_self_dispensation' => false,

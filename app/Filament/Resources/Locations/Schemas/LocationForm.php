@@ -45,6 +45,9 @@ class LocationForm
         'block_self_dispensation', // prompt 347 — off by default
         'require_photo_to_dispense', // prompt 348 — on by default
         'confirm_photo_on_scan', // prompt 348 — on by default
+        'separate_cash_pots', // prompt 349 — off by default; switched on for this club's sedes by its migration
+        'count_bar_nightly', // prompt 349
+        'count_fees_nightly', // prompt 349
     ];
 
     /**
@@ -368,6 +371,21 @@ class LocationForm
                             ->label(__('Terminales (cajas)'))
                             ->helperText(__('Nombres de las cajas de esta sede, p. ej. «Caja 1», «Barra».'))
                             ->placeholder(__('Añadir terminal')),
+
+                        // Prompt 349 (Aaron: "Membership and bar are separate tills") — three cash pots in the one till.
+                        Toggle::make('separate_cash_pots')
+                            ->label(__('Botes de efectivo separados'))
+                            ->live()
+                            ->helperText(__('Dispensario, barra y cuotas en botes separados. El fondo de caja y el efectivo esperado son los del dispensario; la barra y las cuotas se cuentan aparte.'))
+                            ->columnSpanFull(),
+                        Toggle::make('count_bar_nightly')
+                            ->label(__('Contar la barra cada noche'))
+                            ->helperText(__('Si no, al cerrar se puede dejar sin contar y su saldo pasa a la siguiente caja.'))
+                            ->visible(fn (Get $get): bool => (bool) $get('separate_cash_pots')),
+                        Toggle::make('count_fees_nightly')
+                            ->label(__('Contar las cuotas cada noche'))
+                            ->helperText(__('Si no, al cerrar se puede dejar sin contar y su saldo pasa a la siguiente caja.'))
+                            ->visible(fn (Get $get): bool => (bool) $get('separate_cash_pots')),
 
                         // Prompt 312 — clocking the closer out is automatic by default (with a 2-minute *Deshacer*); a sede
                         // that prefers the old question keeps it.

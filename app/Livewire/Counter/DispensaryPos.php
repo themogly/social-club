@@ -1221,7 +1221,11 @@ class DispensaryPos extends Component
         $this->lastOrderId = $result['order']->id;
         $this->resetBasketState();
         $this->barBasket = [];
-        $this->flash(__('Visita liquidada: dispensación y barra.'), 'success');
+        // Prompt 349 — with separate cash pots each part's cash belongs to its own pot (the ledger already records them
+        // apart). The visit is paid at the dispensary pot, so the operator is told, by amount, what goes in the bar's.
+        $barCash = $result['order']->cash_cents->cents;
+        $pots = $barCash > 0 && (bool) TillSession::query()->withoutGlobalScopes()->whereKey($result['dispensation']->till_session_id)->value('separate_pots');
+        $this->flash(__('Visita liquidada: dispensación y barra.').($pots ? ' '.__('Pon :amount en el bote de la barra.', ['amount' => Money::fromCents($barCash)->formatted()]) : ''), 'success');
         $this->landAfterRecording($result['dispensation']->id, $result['order']->id);
     }
 

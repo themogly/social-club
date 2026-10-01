@@ -2,8 +2,10 @@
 
 namespace App\Filament\Resources\TillSessions\Tables;
 
+use App\Enums\CashPot;
 use App\Enums\TillSessionStatus;
 use App\Models\TillSession;
+use App\Support\Money;
 use Filament\Actions\ViewAction;
 use Filament\Forms\Components\DatePicker;
 use Filament\Tables\Columns\TextColumn;
@@ -51,6 +53,22 @@ class TillSessionsTable
                     // Colour the variance red whenever it is non-zero (a clean arqueo is €0);
                     // an open session has no variance yet (null state) and stays neutral.
                     ->color(fn (?int $state): string => ($state ?? 0) !== 0 ? 'danger' : 'gray'),
+                // Prompt 349 — with separate cash pots the three columns above are the DISPENSARY pot's; the bar and fees
+                // pots are summarised here (counted with its difference, or not counted with what it carried).
+                TextColumn::make('pots')
+                    ->label(__('Barra · Cuotas'))
+                    ->state(fn (TillSession $record): ?string => $record->separate_pots && $record->closed_at !== null
+                        ? collect(CashPot::optional())->map(function (CashPot $pot) use ($record): string {
+                            $counted = $record->getRawOriginal($pot->column().'_counted_cents');
+                            $expected = (int) $record->getRawOriginal($pot->column().'_expected_cents');
+
+                            return $pot->label().': '.($counted === null
+                                ? __('no contado (:amount)', ['amount' => Money::fromCents($expected)->formatted()])
+                                : Money::fromCents((int) $counted)->formatted().' ('.Money::fromCents((int) $counted - $expected)->formatted().')');
+                        })->implode(' · ')
+                        : null)
+                    ->placeholder('—')
+                    ->toggleable(),
             ])
             ->filters([
                 SelectFilter::make('status')

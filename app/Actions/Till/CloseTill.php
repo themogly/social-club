@@ -3,6 +3,7 @@
 namespace App\Actions\Till;
 
 use App\Actions\RecordAuditLog;
+use App\Enums\CashPot;
 use App\Enums\TillSessionStatus;
 use App\Enums\TillShiftStatus;
 use App\Exceptions\TillClosedException;
@@ -23,7 +24,11 @@ use RuntimeException;
  */
 class CloseTill
 {
-    public function handle(TillSession $session, int $countedCents, User $closedBy, ?string $note = null): TillSession
+    /**
+     * @param  array<string, ?int>  $potCounts  prompt 349 — with pots on, the bar/fees counts keyed by pot value
+     *                                          (BAR, FEES); null or missing = not counted tonight (it carries forward).
+     */
+    public function handle(TillSession $session, int $countedCents, User $closedBy, ?string $note = null, array $potCounts = []): TillSession
     {
         if (! $closedBy->can('till.close')) {
             throw new AuthorizationException('Closing a till requires the till.close permission.');
@@ -33,18 +38,41 @@ class CloseTill
         // session CLOSED in ONE transaction, holding the row lock, so a cash movement cannot land between
         // the two steps and be excluded from the immutable arqueo forever. RecordCashMovement contends on
         // the same lock, so a concurrent movement either commits BEFORE (counted) or is refused (closed).
-        return DB::transaction(function () use ($session, $countedCents, $closedBy, $note): TillSession {
+        return DB::transaction(function () use ($session, $countedCents, $closedBy, $note, $potCounts): TillSession {
             $locked = TillSession::withoutGlobalScopes()->whereKey($session->id)->lockForUpdate()->firstOrFail();
 
             if ($locked->status !== TillSessionStatus::OPEN) {
                 throw new TillClosedException('This till session is already closed.');
             }
 
-            $expected = TillSummary::expectedCents($locked);
+            $breakdown = TillSummary::breakdown($locked);
+            $expected = $breakdown['expected']; // the dispensary pot's when the session keeps pots, the drawer's otherwise
             $variance = $countedCents - $expected;
             $tolerance = (int) Settings::get('arqueo_variance_tolerance_cents', 500);
 
-            if (abs($variance) > $tolerance && blank($note)) {
+            // Prompt 349 — the bar and fees pots: counted tonight (against everything accumulated since their last count,
+            // which is what their expected already holds through the carried opening), or not (the expected carries).
+            $potColumns = [];
+            $worst = abs($variance);
+            if ($locked->separate_pots) {
+                foreach (CashPot::optional() as $pot) {
+                    $potExpected = $breakdown['pots'][$pot->value]['expected'];
+                    $potCounted = $potCounts[$pot->value] ?? null;
+                    if ($potCounted !== null && $potCounted < 0) {
+                        throw new RuntimeException('A counted pot cannot be negative.');
+                    }
+                    $potColumns += [
+                        $pot->column().'_expected_cents' => $potExpected,
+                        $pot->column().'_counted_cents' => $potCounted,
+                        $pot->column().'_variance_cents' => $potCounted !== null ? $potCounted - $potExpected : null,
+                    ];
+                    if ($potCounted !== null) {
+                        $worst = max($worst, abs($potCounted - $potExpected));
+                    }
+                }
+            }
+
+            if ($worst > $tolerance && blank($note)) {
                 throw new RuntimeException('A note is required when the variance exceeds the tolerance.');
             }
 
@@ -56,7 +84,7 @@ class CloseTill
                 'closed_at' => now(),
                 'status' => TillSessionStatus::CLOSED,
                 'notes' => $note ?? $locked->notes,
-            ]);
+            ] + $potColumns);
 
             // Prompt 186 — the final shift closes WITH the session, against the same count. The day's figures
             // then reconcile whether it held one shift or three: each shift's expected is what it was handed
@@ -85,7 +113,7 @@ class CloseTill
                 'expected_cents' => $expected,
                 'counted_cents' => $countedCents,
                 'variance_cents' => $variance,
-            ]);
+            ] + $potColumns);
 
             return $locked;
         });

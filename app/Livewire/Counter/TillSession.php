@@ -15,6 +15,7 @@ use App\Actions\Till\RecordCashMovement;
 use App\Actions\UnlockOperator;
 use App\Enums\BatchStatus;
 use App\Enums\CashMovementType;
+use App\Enums\CashPot;
 use App\Enums\StaffClockSource;
 use App\Enums\StockTakeStatus;
 use App\Enums\TillSessionStatus;
@@ -87,6 +88,26 @@ class TillSession extends Component
 
     /** Cash-movement form. */
     public string $movementType = 'IN';
+
+    /** Prompt 349 — which cash pot a movement belongs to (with *Botes de efectivo separados* on). */
+    public string $movementPot = 'DISPENSARY';
+
+    /**
+     * Prompt 349 — at the close, the bar and fees pots: counted now (with an amount) or not counted tonight.
+     *
+     * @var array<string, string>
+     */
+    public array $potCountInput = ['BAR' => '', 'FEES' => ''];
+
+    /** @var array<string, bool> */
+    public array $potCountNow = ['BAR' => false, 'FEES' => false];
+
+    /**
+     * Revealed after the close: each optional pot's expected / counted / variance.
+     *
+     * @var array<string, array{expected: int, counted: ?int, variance: ?int}>
+     */
+    public array $potResults = [];
 
     public string $movementAmount = '';
 
@@ -549,6 +570,8 @@ class TillSession extends Component
         try {
             (new RecordCashMovement)->handle($session, $type, $cents, [
                 'reason' => $reason === '' ? null : $reason,
+                // Prompt 349 — the pot it comes out of (or goes into); only meaningful when the session keeps pots.
+                'pot' => $session->separate_pots ? (CashPot::tryFrom($this->movementPot) ?? CashPot::DISPENSARY) : CashPot::DISPENSARY,
             ]);
         } catch (TillClosedException) {
             $this->flash(__('La caja está cerrada.'), 'error');
@@ -558,6 +581,7 @@ class TillSession extends Component
 
         $this->movementAmount = '';
         $this->movementReason = '';
+        $this->movementPot = 'DISPENSARY';
         // Named, not just acknowledged: the amount field is now blank, so "Movimiento registrado." left the
         // operator with no way to check what they had posted (prompt 202) — and the type with it (prompt 279).
         $this->flash(__('Movimiento registrado: :amount (:type).', [
@@ -638,6 +662,12 @@ class TillSession extends Component
     public function startClose(): void
     {
         $this->closing = true;
+        // Prompt 349 — each optional pot starts on its sede's «Contar cada noche».
+        $this->potCountNow = [
+            'BAR' => (bool) Settings::get('count_bar_nightly', false, $this->locationId),
+            'FEES' => (bool) Settings::get('count_fees_nightly', false, $this->locationId),
+        ];
+        $this->potCountInput = ['BAR' => '', 'FEES' => ''];
         $this->resetCloseState();
 
         // One end-of-day ritual: weigh the touched flower FIRST, then count the cash (prompt 47).
@@ -913,8 +943,25 @@ class TillSession extends Component
 
         $note = trim($this->closeNote);
 
+        // Prompt 349 — the bar and fees pots: a count for each one counted now, null for "no se cuenta hoy".
+        $potCounts = [];
+        if ($session->separate_pots) {
+            foreach (CashPot::optional() as $pot) {
+                if (! ($this->potCountNow[$pot->value] ?? false)) {
+                    continue;
+                }
+                $potCents = $this->toCents($this->potCountInput[$pot->value] ?? '');
+                if ($potCents === null || $potCents < 0) {
+                    $this->flash(__('El importe contado de :pot no es válido.', ['pot' => $pot->label()]), 'error');
+
+                    return;
+                }
+                $potCounts[$pot->value] = $potCents;
+            }
+        }
+
         try {
-            $closed = (new CloseTill)->handle($session, $counted, $user, $note === '' ? null : $note);
+            $closed = (new CloseTill)->handle($session, $counted, $user, $note === '' ? null : $note, $potCounts);
         } catch (TillClosedException) {
             $this->flash(__('La caja ya estaba cerrada.'), 'error');
             $this->cancelClose();
@@ -939,6 +986,16 @@ class TillSession extends Component
         $this->counted = $counted;
         $this->expected = $closed->expected_cents?->cents;
         $this->variance = $closed->variance_cents?->cents;
+        $this->potResults = [];
+        if ($closed->separate_pots) {
+            foreach (CashPot::optional() as $pot) {
+                $this->potResults[$pot->value] = [
+                    'expected' => (int) $closed->getRawOriginal($pot->column().'_expected_cents'),
+                    'counted' => $closed->getRawOriginal($pot->column().'_counted_cents') !== null ? (int) $closed->getRawOriginal($pot->column().'_counted_cents') : null,
+                    'variance' => $closed->getRawOriginal($pot->column().'_variance_cents') !== null ? (int) $closed->getRawOriginal($pot->column().'_variance_cents') : null,
+                ];
+            }
+        }
         $this->flash(__('Caja cerrada.'), 'success');
         $this->clockOutCloser($user, $closed);
     }
@@ -1118,6 +1175,24 @@ class TillSession extends Component
 
     // --- View data -------------------------------------------------------------
 
+    /**
+     * Prompt 349 — what the bar and fees pots would open with at the terminal being opened (their last close's count, or
+     * expected if not counted); null when this sede does not keep pots.
+     *
+     * @return array{bar: int, fees: int}|null
+     */
+    public function carriedPots(): ?array
+    {
+        $location = $this->resolveLocation();
+        if ($location === null || ! (bool) Settings::get('separate_cash_pots', false, (string) $location->getKey())) {
+            return null;
+        }
+
+        $terminal = $this->multipleTills() ? TerminalName::clean($this->terminal) : $this->defaultTerminal();
+
+        return OpenTill::carriedOpenings($location, TerminalName::key($terminal));
+    }
+
     public function render(): View
     {
         $location = $this->resolveLocation();
@@ -1131,6 +1206,7 @@ class TillSession extends Component
                 'location' => $location,
                 'session' => null,
                 'breakdown' => null,
+                'uncountedSince' => [],
                 'expenseCategories' => collect(),
                 // Prompt 265 — after the reveal only (never on the blind count): the closed session's petty cash, itemised.
                 'closedPetty' => $this->closedSessionId !== null ? $this->closedPettyCash($this->closedSessionId) : null,
@@ -1150,6 +1226,10 @@ class TillSession extends Component
         $breakdown = ($session !== null && ! $this->closing && ! $this->handoverOpen)
             ? TillSummary::breakdown($session)
             : null;
+        // Prompt 349 — since when the bar / fees pots have gone uncounted (shown beside their expected, never in a blind count).
+        $uncounted = $breakdown !== null && $breakdown['separate_pots']
+            ? collect(CashPot::optional())->mapWithKeys(fn (CashPot $pot): array => [$pot->value => TillSummary::uncountedSince($session, $pot)])->all()
+            : [];
 
         // Petty-cash categories, only when the drawer is open and not being counted.
         $expenseCategories = ($session !== null && ! $this->closing)
@@ -1163,6 +1243,7 @@ class TillSession extends Component
             'location' => $location,
             'session' => $session,
             'breakdown' => $breakdown,
+            'uncountedSince' => $uncounted,
             'closedPetty' => null,
             'expenseCategories' => $expenseCategories,
             // EOD flower reweigh (prompt 47) — the in-scope batches, only while in that step.

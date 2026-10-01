@@ -2,6 +2,7 @@
 
 namespace App\Support;
 
+use App\Enums\CashPot;
 use App\Enums\DispensationStatus;
 use App\Enums\ExpenseKind;
 use App\Enums\FeePaymentMethod;
@@ -14,6 +15,7 @@ use App\Models\MembershipFeePayment;
 use App\Models\Order;
 use App\Models\TillSession;
 use App\Models\WalletTransaction;
+use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Collection;
@@ -24,7 +26,7 @@ use Illuminate\Support\Collection;
  * payments are shown but excluded (the distinction naive tills get wrong). Voided
  * transactions are excluded, so a void adjusts the expected figure automatically.
  *
- * @phpstan-type Breakdown array{float: int, cash_contributions: int, wallet_contributions: int, bar_cash: int, top_ups: int, refunds: int, fees_cash: int, cash_in: int, cash_out: int, banked: int, petty_cash: int, petty_cash_items: list<array{category: string, note: ?string, amount_cents: int, recorded_by: string, at: string}>, expected: int}
+ * @phpstan-type Breakdown array{float: int, cash_contributions: int, wallet_contributions: int, bar_cash: int, top_ups: int, refunds: int, fees_cash: int, cash_in: int, cash_out: int, banked: int, petty_cash: int, petty_cash_items: list<array{category: string, note: ?string, amount_cents: int, recorded_by: string, at: string}>, expected: int, separate_pots: bool, pots: array<string, array{opening: int, expected: int}>}
  */
 class TillSummary
 {
@@ -102,7 +104,7 @@ class TillSummary
 
         // Full models (so the enum/Money casts hydrate) grouped by session, then reduced per session below.
         $movementsBySession = CashMovement::query()->whereIn('till_session_id', $ids)
-            ->get(['till_session_id', 'type', 'amount_cents'])
+            ->get(['till_session_id', 'type', 'amount_cents', 'pot'])
             ->groupBy('till_session_id');
 
         $out = [];
@@ -123,8 +125,25 @@ class TillSummary
             $rf = $refunds[$id] ?? 0;
             $fc = $feesCash[$id] ?? 0;
 
-            // Cash movements are stored signed (OUT/BANKED/PETTY negative), so they add.
-            $expected = $float + $cash + $bar + $tu + $rf + $fc + $cashIn + $cashOut + $banked + $pettyCash;
+            // Prompt 349 — the cash per POT. Which source feeds which pot is decided HERE and nowhere else:
+            //   dispensary — the float, cash contributions, wallet top-ups taken in cash, refunds paid out, its movements;
+            //   bar        — its carried opening, bar & shop cash, its movements;
+            //   fees       — its carried opening, membership fees in cash, its movements.
+            // Movements are stored signed (OUT/BANKED/PETTY negative), so they add. With pots OFF the openings are 0 and
+            // every movement is the dispensary's, so the three add up to exactly the single-drawer figure of before.
+            $potMovements = fn (CashPot $pot): int => (int) $movements
+                ->filter(fn (CashMovement $m): bool => ($m->pot ?? CashPot::DISPENSARY) === $pot)
+                ->sum(fn (CashMovement $m): int => $m->amount_cents->cents);
+            $pots = [
+                CashPot::DISPENSARY->value => ['opening' => $float, 'expected' => $float + $cash + $tu + $rf + $potMovements(CashPot::DISPENSARY)],
+                CashPot::BAR->value => ['opening' => $session->bar_opening_cents->cents, 'expected' => $session->bar_opening_cents->cents + $bar + $potMovements(CashPot::BAR)],
+                CashPot::FEES->value => ['opening' => $session->fees_opening_cents->cents, 'expected' => $session->fees_opening_cents->cents + $fc + $potMovements(CashPot::FEES)],
+            ];
+            $separate = (bool) $session->separate_pots;
+
+            // The headline «Efectivo esperado en el cajón»: the DISPENSARY pot when the sede keeps pots (the float is its
+            // float, and it is the one counted every night), the whole drawer otherwise.
+            $expected = $separate ? $pots[CashPot::DISPENSARY->value]['expected'] : array_sum(array_column($pots, 'expected'));
 
             $out[$id] = [
                 'float' => $float,
@@ -140,6 +159,8 @@ class TillSummary
                 'petty_cash' => $pettyCash,
                 'petty_cash_items' => self::pettyCashItems($itemsBySession->get($id)),
                 'expected' => $expected,
+                'separate_pots' => $separate,
+                'pots' => $pots,
             ];
         }
 
@@ -170,6 +191,29 @@ class TillSummary
         }
 
         return $out;
+    }
+
+    /**
+     * Prompt 349 — since when an optional pot (bar, fees) has gone uncounted at this session's terminal: the close of the
+     * last session there that counted it (or the first session that kept pots). Null when it was counted at the last close.
+     */
+    public static function uncountedSince(TillSession $session, CashPot $pot): ?CarbonInterface
+    {
+        $column = $pot->column().'_counted_cents';
+        $previous = TillSession::query()->withoutGlobalScopes()
+            ->where('location_id', $session->location_id)->where('terminal', $session->terminal)
+            ->where('separate_pots', true)->whereNotNull('closed_at')->where('id', '!=', $session->id)
+            ->orderByDesc('closed_at')->orderByDesc('id')->get(['id', 'closed_at', 'opened_at', $column]);
+
+        if ($previous->isEmpty() || $previous->first()->getRawOriginal($column) !== null) {
+            return null;
+        }
+        $lastCounted = $previous->first(fn (TillSession $s): bool => $s->getRawOriginal($column) !== null);
+        if ($lastCounted !== null) {
+            return $lastCounted->closed_at;
+        }
+
+        return $previous->last()->opened_at;
     }
 
     public static function expectedCents(TillSession $session): int
