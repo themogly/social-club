@@ -11,6 +11,7 @@
             <option value="manual">{{ __('Línea manual') }}</option>
             <option value="descuento">{{ __('Descuento de socio') }}</option>
             <option value="auto">{{ __('Auto-dispensación') }}</option>
+            <option value="redondeo">{{ __('Redondeo') }}</option>
         </select>
     </label>
     <label class="text-sm">

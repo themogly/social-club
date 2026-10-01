@@ -784,6 +784,13 @@
                     {{-- Prompt 263 — ONE figure for the visit: this header, the tender's "a cobrar" and the pay button
                          all show the same total. With bar lines it is the visit's total (aportación + barra, two
                          ledgers, one payment); with flower only it is still labelled the aportación it is. --}}
+                    @if ($roundingCents !== 0)
+                        {{-- Prompt 350 — the discounted aportación rounded to the euro: said, not hidden in the total. --}}
+                        <div data-basket-rounding class="mt-2 flex items-center justify-between px-4 text-sm text-ink-muted dark:text-slate-400">
+                            <span>{{ __('Redondeo') }}</span>
+                            <span class="tabular-nums">{{ $this->money($roundingCents) }}</span>
+                        </div>
+                    @endif
                     <div class="mt-3 flex items-center justify-between rounded-xl bg-surface-alt px-4 py-3 dark:bg-slate-800">
                         <span class="font-semibold">{{ $hasBarLines ? __('Total de la visita') : __('Total aportación') }}</span>
                         <span data-visit-total class="text-lg font-bold tabular-nums">{{ $this->money($visitTotalCents) }}</span>

@@ -253,6 +253,10 @@ class Settings
         // dispensary always is). Not counted carries forward to the next opening.
         'count_bar_nightly' => false,
         'count_fees_nightly' => false,
+        // Prompt 350 — the dispensary's discounted total to the euro (ORG-level, owner only): nearest | down | none, and
+        // when: local (only a Local discount) | any (any discount) | all (every contribution).
+        'discount_rounding' => 'nearest',
+        'discount_rounding_scope' => 'local',
         // Prompt 347 — a member of staff serving themselves (their linked member record): allowed and flagged by default;
         // a sede can require someone else to serve them.
         'block_self_dispensation' => false,

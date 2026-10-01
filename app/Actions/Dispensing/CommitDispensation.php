@@ -24,6 +24,7 @@ use App\Models\Location;
 use App\Models\Member;
 use App\Models\TillSession;
 use App\Models\User;
+use App\Support\DispensaryRounding;
 use App\Support\LimitSnapshot;
 use App\Support\ManagerApproval;
 use App\Support\MemberEligibility;
@@ -114,7 +115,7 @@ class CommitDispensation
                 $snapshot = (new ResolveMemberLimits)->handle($member, $location, $options['at'] ?? null);
                 $this->assertWithinLimits($snapshot, $totalGrams, $member, $location, $options);
 
-                [$total, $lineData] = $this->buildLines($member, $lines, $location, $options);
+                [$total, $lineData, $discountKinds] = $this->buildLines($member, $lines, $location, $options);
 
                 // Price override (prompt 64): a permissioned, reasoned adjustment to what the member pays for
                 // the whole contribution — comping defective product, or a €0 give-away. It changes only the
@@ -137,6 +138,21 @@ class CommitDispensation
                     $total = max(0, min((int) $options['price_override_cents'], $total)); // reduce only: 0 (free) .. resolved
                 }
 
+                // Prompt 350 — the discounted total rounded to the euro (by default when a Local discount applied), ONCE,
+                // the difference spread over the lines so they still add up. A manager's price adjustment wins: never
+                // rounded on top. The same rule the counter showed (DispensaryRounding), so the commit is that figure.
+                $rounding = 0;
+                if ($originalTotal === null && DispensaryRounding::applies($discountKinds)) {
+                    $rounding = DispensaryRounding::round($total) - $total;
+                    if ($rounding !== 0) {
+                        $shares = DispensaryRounding::spread(array_map(fn (array $l): int => (int) $l['line_total_cents'], $lineData), $rounding);
+                        foreach ($shares as $i => $share) {
+                            $lineData[$i]['line_total_cents'] += $share;
+                        }
+                        $total += $rounding;
+                    }
+                }
+
                 $cash = $options['cash_cents'] ?? $total;
                 $wallet = $options['wallet_cents'] ?? 0;
 
@@ -148,6 +164,7 @@ class CommitDispensation
                     'operator_id' => $options['operator_id'] ?? Auth::id(),
                     'till_session_id' => $options['till_session_id'] ?? null,
                     'total_cents' => $total,
+                    'rounding_cents' => $rounding,
                     'original_total_cents' => $originalTotal,
                     'price_override_reason' => $overrideReason,
                     'price_override_by' => $overrideBy?->id,
@@ -381,13 +398,14 @@ class CommitDispensation
     /**
      * @param  list<NormalisedLine>  $lines
      * @param  CommitOptions  $options
-     * @return array{0: int, 1: list<array<string, mixed>>}
+     * @return array{0: int, 1: list<array<string, mixed>>, 2: list<?string>}
      */
     private function buildLines(Member $member, array $lines, Location $location, array $options): array
     {
         $resolver = new ResolvePrice;
         $priced = [];       // per OPERATOR-line: the whole-quantity price + its batch allocation (FEFO parts)
         $eighthInput = [];  // per OPERATOR-line input to the basket-wide eighth break
+        $discountKinds = []; // per OPERATOR-line: the applied discount's kind (prompt 350)
 
         // PASS 1 — price each operator-line on its WHOLE quantity (prompt 250: price once), and decide which
         // batches it draws from. Manual (a chosen batch_id) is one part; automatic (null) is FEFO across the
@@ -424,6 +442,7 @@ class CommitDispensation
                 ? ['grams_cg' => $grams, 'rate_cents' => 0, 'per_gram_total' => $whole['total_cents'], 'eighth_price' => null]
                 : ['grams_cg' => $grams, 'rate_cents' => $whole['effective_rate_cents'], 'per_gram_total' => $whole['total_cents'], 'eighth_price' => $whole['eighth_price']];
 
+            $discountKinds[] = $whole['discount_kind']; // prompt 350 — for the rounding scope
             $priced[] = [
                 'genetic' => $genetic,
                 'is_unit' => $units !== null,
@@ -499,6 +518,6 @@ class CommitDispensation
             }
         }
 
-        return [$total, $lineData];
+        return [$total, $lineData, $discountKinds];
     }
 }

@@ -52,6 +52,7 @@ use App\Support\ArticleImage;
 use App\Support\BusinessDay;
 use App\Support\CounterOperator;
 use App\Support\CounterScreens;
+use App\Support\DispensaryRounding;
 use App\Support\DocumentVault;
 use App\Support\EligibilityVerdict;
 use App\Support\LimitSnapshot;
@@ -924,7 +925,7 @@ class DispensaryPos extends Component
         }
 
         $resolvedTotal = $this->basketTotalCents($member, $location);
-        $total = $resolvedTotal;
+        $total = $this->chargeableCents($resolvedTotal); // prompt 350 — rounded as shown; an adjustment below replaces it
 
         // Price override (prompt 64): a permission holder may charge LESS than the resolved price (comp a
         // member for defective product, or give it free) with a mandatory reason. It changes the charged
@@ -1528,6 +1529,8 @@ class DispensaryPos extends Component
             'basketLines' => $basketLines,
             'basketTotalCents' => $total,
             'priceOverrideNotice' => $this->priceOverrideNotice($resolvedTotal), // prompt 333
+            // Prompt 350 — the whole-euro rounding, shown as its own line (never when an adjustment set the total).
+            'roundingCents' => trim($this->priceOverrideEuros) === '' ? $total - $resolvedTotal : 0,
             'reasonOptional' => ManagerApproval::allows(CounterOperator::current()), // prompt 333 — "Aprobado por responsable"
             'visitTotalCents' => $total + $barTotal, // prompt 263 — the ONE figure on the header, the tender and the button
             'cashPreviewCents' => $cashPreview,
@@ -1807,7 +1810,11 @@ class DispensaryPos extends Component
     private function chargeableCents(int $resolvedTotal): int
     {
         if (trim($this->priceOverrideEuros) === '' || ! $this->userCan('dispensation.price.override')) {
-            return $resolvedTotal;
+            // Prompt 350 — the discounted total rounded to the euro when the club's rule says so (the SAME rule the
+            // commit applies, DispensaryRounding). A manager's adjustment, below, is used as typed: never rounded on top.
+            $kinds = array_map(fn (array $l): ?string => $l['discount_kind'] ?? null, $this->basketView($this->resolveMember(), $this->resolveLocation()));
+
+            return DispensaryRounding::total($resolvedTotal, $kinds);
         }
 
         $entered = $this->priceOverrideEntered();
@@ -1906,6 +1913,7 @@ class DispensaryPos extends Component
                 'discount_cents' => $priced['discount_cents'],
                 'total_cents' => $priced['total_cents'],
                 'label' => $priced['label'],
+                'discount_kind' => $priced['discount_kind'], // prompt 350 — the rounding scope reads it
                 'eighth_applied' => false,
                 // "parte a 8,00 €/g, parte a 10,00 €/g" — said BEFORE commit, not after (278).
                 'split_note' => $priced['mixed'] ? $this->splitNote($priced['parts'], $units !== null) : null,

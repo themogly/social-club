@@ -40,7 +40,7 @@ use RuntimeException;
  * therapeutic discount automatically. The result is frozen into the dispensation
  * snapshot at commit, so a later price change never rewrites history.
  *
- * @phpstan-type DiscountShape array{mode: DiscountMode, value_bp: ?int, value_cents: ?int, label: string}
+ * @phpstan-type DiscountShape array{mode: DiscountMode, value_bp: ?int, value_cents: ?int, label: string, kind?: ?string}
  */
 class ResolvePrice
 {
@@ -84,7 +84,7 @@ class ResolvePrice
      * is the total charged. `eighth_price` is set only when every part shares one (the basket-wide break then applies).
      *
      * @param  list<array{batch: Batch, qty: int}>  $parts  qty in centigrams (weight) or units
-     * @return array{parts: list<array{batch: Batch, qty: int, rate_cents: int, total_cents: int, discount_cents: int}>, total_cents: int, discount_cents: int, rate_cents: int, effective_rate_cents: int, eighth_price: ?int, label: ?string, mixed: bool}
+     * @return array{parts: list<array{batch: Batch, qty: int, rate_cents: int, total_cents: int, discount_cents: int}>, total_cents: int, discount_cents: int, rate_cents: int, effective_rate_cents: int, eighth_price: ?int, label: ?string, mixed: bool, discount_kind: ?string}
      */
     public function priceParts(Genetic $genetic, Location $location, ?Member $member, array $parts, bool $isUnit): array
     {
@@ -113,6 +113,8 @@ class ResolvePrice
             'eighth_price' => count(array_unique($eighths, SORT_REGULAR)) === 1 ? ($eighths[0] ?? null) : null,
             'label' => $firstLabel,
             'mixed' => count($rates) > 1,
+            // Prompt 350 — the applied discount's kind (null when none applied), for the rounding scope.
+            'discount_kind' => (int) array_sum(array_column($out, 'discount_cents')) > 0 ? $firstPrice?->discountKind() : null,
         ];
     }
 
@@ -390,7 +392,7 @@ class ResolvePrice
         if ($withTier) {
             $tier = $this->activeTier($member, $location);
             if ($tier !== null && (int) $tier->discount_bp > 0) {
-                $candidates[] = ['mode' => DiscountMode::PERCENT, 'value_bp' => (int) $tier->discount_bp, 'value_cents' => null, 'label' => (string) $tier->name];
+                $candidates[] = ['mode' => DiscountMode::PERCENT, 'value_bp' => (int) $tier->discount_bp, 'value_cents' => null, 'label' => (string) $tier->name, 'kind' => 'TIER'];
             }
         }
 
@@ -434,6 +436,7 @@ class ResolvePrice
                     'value_bp' => $memberDiscount->value_bp,
                     'value_cents' => $memberDiscount->value_cents, // plain int cents on MemberDiscount
                     'label' => __('Personalizado'),
+                    'kind' => DiscountKind::CUSTOM->value,
                 ];
             }
         }
@@ -471,6 +474,8 @@ class ResolvePrice
             'value_bp' => $discount->value_bp,
             'value_cents' => $discount->value_cents?->cents,
             'label' => $discount->name,
+            // Prompt 350 — which kind of discount it is, so «round only the Local discount» can tell.
+            'kind' => $discount->kind->value,
         ];
     }
 
@@ -491,7 +496,11 @@ class ResolvePrice
                 $candidates,
             ));
             if ($totalBp > 0) {
-                return ['mode' => DiscountMode::PERCENT, 'value_bp' => min($totalBp, 10_000), 'value_cents' => null, 'label' => __('Descuentos')];
+                // Prompt 350 — a stacked total counts as LOCAL when a Local discount is in it.
+                $kinds = array_column($candidates, 'kind');
+
+                return ['mode' => DiscountMode::PERCENT, 'value_bp' => min($totalBp, 10_000), 'value_cents' => null, 'label' => __('Descuentos'),
+                    'kind' => in_array(DiscountKind::LOCAL->value, $kinds, true) ? DiscountKind::LOCAL->value : ($kinds[0] ?? null)];
             }
         }
 
