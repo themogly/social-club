@@ -151,7 +151,7 @@ class HardeningAfter296Test extends TestCase
         $max = $unlock->maxAttemptsAt($this->sede);
 
         // As if `max` wrong guesses were in flight at once: each reserved its attempt before any finished.
-        Cache::put('pin:probe:attempts', $max, 300);
+        Cache::store(config('cache.limiter'))->put('pin:probe:attempts', $max, 300); // the PIN tally's store (344)
 
         $this->assertNull($unlock->handle($this->sede, '4321', 'pin:probe'), 'a guess got past a full set of attempts');
         $this->assertTrue($unlock->isLockedOut('pin:probe'));

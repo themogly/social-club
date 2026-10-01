@@ -101,7 +101,7 @@ class HandoverWayOutTest extends TestCase
         $this->post(route('socio.application.staff', ['token' => $this->token]), ['pin' => '9999'])
             ->assertRedirect(route('socio.application', ['token' => $this->token]))->assertSessionHas('handoverStaffError');
         $this->assertTrue(CounterHandover::active());
-        $this->assertGreaterThan(0, (int) Cache::get('counter-pin:'.$this->sede->id.':attempts', 0));
+        $this->assertGreaterThan(0, (int) Cache::store(config('cache.limiter'))->get('counter-pin:'.$this->sede->id.':attempts', 0));
 
         $elsewhere = User::factory()->create(['pin' => '7777']);
         $elsewhere->assignRole(Role::STAFF->value);

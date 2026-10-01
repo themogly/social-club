@@ -15,9 +15,7 @@ class ViewMember extends ViewRecord
 
     protected function getHeaderActions(): array
     {
-        return [
-            EditAction::make(),
-            ...MemberResource::recordActions(),
-        ];
+        // From the record's view, *Editar* is the everyday act: it leads, then the edit page's own header (344).
+        return [EditAction::make(), ...MemberResource::headerActions()];
     }
 }

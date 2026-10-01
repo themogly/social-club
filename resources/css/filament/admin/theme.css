@@ -130,3 +130,12 @@
 .fi-header-actions-ctn .fi-btn {
     min-height: 44px;
 }
+
+/* Prompt 344 — the titles inside a header ⋯ group (App\Filament\Support\MenuSection): a quiet label over each section,
+   the last (Eliminar) in the error red so what follows reads as destructive before it is tapped. */
+.fi-menu-section-heading {
+    @apply px-3 pb-1 pt-2 text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400;
+}
+.fi-menu-section-heading-danger {
+    @apply text-danger-600 dark:text-danger-400;
+}

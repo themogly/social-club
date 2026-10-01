@@ -102,7 +102,7 @@ class TopBarClockChipTest extends TestCase
         $home = Livewire::test(CounterHome::class)->dispatch('counter-clock-in')->assertSet('clockPrompt', 'in-pin');
         $home->set('operatorPin', '9999')->call('confirmClockIn');
         $this->assertSame(0, StaffClockEvent::query()->withoutGlobalScopes()->count());
-        $this->assertGreaterThan(0, (int) Cache::get('counter-pin:'.$this->sede->id.':attempts', 0), 'a wrong PIN must count');
+        $this->assertGreaterThan(0, (int) Cache::store(config('cache.limiter'))->get('counter-pin:'.$this->sede->id.':attempts', 0), 'a wrong PIN must count');
 
         $home->set('operatorPin', '1234')->call('confirmClockIn')->assertDispatched('counter-clock-state', open: true);
         $in = StaffClockEvent::query()->withoutGlobalScopes()->sole();

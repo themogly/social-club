@@ -82,8 +82,8 @@ class MemberApplicationResource extends Resource
     {
         return [
             self::approveAction(),
-            self::rejectAction(),
             self::waitingListAction(),
+            self::rejectAction(), // prompt 344 — the red one last
         ];
     }
 

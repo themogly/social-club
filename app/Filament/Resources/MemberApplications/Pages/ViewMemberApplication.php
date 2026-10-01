@@ -15,12 +15,17 @@ class ViewMemberApplication extends ViewRecord
 
     protected function getHeaderActions(): array
     {
+        // The invitation actions (prompt 154, gated on isInviteLive()) and the review decision — the same actions as the
+        // list, not copies. Prompt 344: everyday first, the two red ones (reject, revoke) last, so neither sits before
+        // a harmless button.
         return [
-            // The invitation actions the operator came here for — copy link / resend / revoke (prompt 154),
-            // gated on isInviteLive() so a dead link is never offered. Same actions as the list, not a copy.
-            ...MemberApplicationResource::inviteActions(),
             EditAction::make(),
-            ...MemberApplicationResource::recordActions(),
+            MemberApplicationResource::copyLinkAction(),
+            MemberApplicationResource::resendAction(),
+            MemberApplicationResource::approveAction(),
+            MemberApplicationResource::waitingListAction(),
+            MemberApplicationResource::rejectAction(),
+            MemberApplicationResource::revokeAction(),
         ];
     }
 }

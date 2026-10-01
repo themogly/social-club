@@ -182,7 +182,7 @@ class PinLockoutAdminTest extends TestCase
 
         // Two full lockouts: strikes at 2, so the NEXT window would be 900s if the escalation survived.
         $this->failTimes($this->sedeA, 5);
-        Cache::forget($key.':lockout');            // wait out the first window without touching strikes
+        Cache::store(config('cache.limiter'))->forget($key.':lockout'); // wait out the first window without touching strikes
         $this->failTimes($this->sedeA, 5);
         $this->assertTrue($unlock->isLockedOut($key));
         $this->assertSame(2, $unlock->statusFor($key)['strikes']);

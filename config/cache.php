@@ -19,6 +19,21 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Rate Limiter Store (prompt 344)
+    |--------------------------------------------------------------------------
+    |
+    | Laravel's RateLimiter (the panel login, `throttle:` routes, scan/PIN/invite
+    | limits) and the counter PIN pad's tally live HERE, not on the default store.
+    | `database` by default: production's default is Redis, and with Redis down the
+    | login bounced and the PIN pad could not count. Like PERMISSION_CACHE_STORE,
+    | `database` survives the outage and stays shared across workers.
+    |
+    */
+
+    'limiter' => env('CACHE_LIMITER', 'database'),
+
+    /*
+    |--------------------------------------------------------------------------
     | Cache Stores
     |--------------------------------------------------------------------------
     |
