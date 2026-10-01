@@ -3,6 +3,7 @@
 namespace App\Support;
 
 use App\Actions\RecordAuditLog;
+use App\Filament\Pages\Auth\Login;
 use App\Http\Middleware\EnforceCounterHandover;
 use App\Livewire\Counter\Concerns\IdentifiesOperator;
 use App\Livewire\Counter\CounterChrome;
@@ -64,13 +65,15 @@ class CounterHandoverConfinement
     public static function register(): void
     {
         before('hydrate', function (Component $component): void {
-            if (CounterHandover::active() && ! self::isScreen($component) && ! $component instanceof CounterChrome) {
+            if (CounterHandover::active() && ! self::isScreen($component) && ! $component instanceof CounterChrome && ! $component instanceof Login) {
                 self::refuse($component, 'hydrate');
             }
         });
 
         before('update', function (Component $component, string $path): void {
-            if (CounterHandover::active() && ! (self::isScreen($component) && in_array($path, self::SURFACE_UPDATES, true))) {
+            // Prompt 342 — the staff login's own fields, so a password sign-in can end the handover (it shows nothing of the club's).
+            if (CounterHandover::active() && ! (self::isScreen($component) && in_array($path, self::SURFACE_UPDATES, true))
+                && ! ($component instanceof Login && str_starts_with($path, 'data.'))) {
                 self::refuse($component, 'update:'.strtok($path, '.'));
             }
         });
@@ -99,6 +102,10 @@ class CounterHandoverConfinement
             };
 
             return in_array(self::eventName($params), $events, true);
+        }
+
+        if ($component instanceof Login) {
+            return $method === 'authenticate'; // prompt 342 — and it ends the handover on success
         }
 
         return self::isScreen($component) && in_array($method, self::SURFACE_CALLS, true);

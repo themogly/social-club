@@ -205,6 +205,12 @@ Route::middleware('web')->prefix('socio')->name('socio.')->group(function () {
     Route::post('solicitud/{token}/leer', [ApplicationController::class, 'read'])
         ->middleware('throttle:20,1')->name('application.read');
 
+    // Prompt 342 — the ways out: staff end a handover with their PIN (any staff at that sede); an applicant on their own
+    // phone leaves without sending (the link stays valid).
+    Route::post('solicitud/{token}/personal', [ApplicationController::class, 'staffExit'])
+        ->middleware('throttle:20,1')->name('application.staff');
+    Route::post('solicitud/{token}/salir', [ApplicationController::class, 'leave'])->name('application.leave');
+
     Route::middleware('auth:member')->group(function () {
         Route::get('avisos', [AnnouncementController::class, 'index'])->name('announcements');
 

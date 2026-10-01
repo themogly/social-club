@@ -156,7 +156,7 @@ class OneApplicationFormTest extends TestCase
         // fact about the applicant, and the consent difference is prompt 210's deliberate one.
         $ignore = array_merge(
             ApplicationShape::consentFields()['public'],
-            ['mrz', 'medical_cert'],
+            ['mrz', 'medical_cert', 'pin'], // prompt 342 — 'pin' is the staff exit's own form during a handover, not the applicant's
         );
 
         $public = array_values(array_diff($this->publicFormFields(), $ignore));

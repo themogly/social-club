@@ -144,3 +144,10 @@ select:-webkit-autofill {
 @media (prefers-reduced-motion: no-preference) {
     .pin-shake { animation: pin-shake 0.35s ease-in-out; }
 }
+
+/* Prompt 342 — an EMPTY date of birth must look empty. Safari draws today's date in grey inside an empty date field, which
+   reads as already filled in. While empty (the field is required, so :invalid) that text is hidden; it shows on focus
+   and once a date is chosen. The label carries a visible «dd/mm/aaaa». */
+input[type='date'][data-empty-date]:invalid:not(:focus)::-webkit-datetime-edit {
+    color: transparent;
+}

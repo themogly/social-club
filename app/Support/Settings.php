@@ -227,6 +227,8 @@ class Settings
         // operator out, so commits are refused server-side and an unattended tablet stops showing member data
         // until someone re-enters a PIN. Per-location (a quiet sede may want longer). 0 disables the idle lock.
         'counter_idle_lock_minutes' => 5,
+        // Prompt 342 — a handover with no activity for this long ends by itself (and any handover after two hours).
+        'handover_idle_minutes' => 15,
         // Prompt 235 — failed PIN attempts before the counter pad locks out, per sede. The ESCALATING
         // windows behind it are constants in UnlockOperator: the tolerance is a club preference, the
         // escalation is a security property.

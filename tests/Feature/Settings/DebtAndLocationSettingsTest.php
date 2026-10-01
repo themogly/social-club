@@ -180,6 +180,8 @@ class DebtAndLocationSettingsTest extends TestCase
             // Scheduler constant, not a front-of-house threshold: how many hours before an event to push
             // its reminder (prompt 56 — the events:remind command reads it).
             'event_reminder_lead_hours',
+            // Prompt 342 — a security timer for abandoned handovers (15 min idle), a code default rather than a club choice.
+            'handover_idle_minutes',
             // Per-location counter settings, edited on each LocationForm (not the org page): the POS
             // check-in / signature requirements (prompt 44 — now genuinely per-location) + camera QR (prompt 35).
             'restrict_pos_to_checked_in', 'signature_on_dispensation', 'dispensary_calculator_enabled', 'camera_scan_enabled',

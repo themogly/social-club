@@ -18610,3 +18610,78 @@ one tap away after every bar sale.
   - no page errors.
 
   338's proof was re-run on the new bar: 7/7.
+
+## Prompt 342 — a way out of the membership application, for staff and applicants
+
+- **Why:** Ben closed the browser mid-handover, came back, signed in, and landed on the membership application with no
+  way out. "There needs to be a 'quit application' button somewhere."
+  - The handover lives in the session, which outlives the tab.
+  - The only exit was after submitting.
+  - The confinement also refused the login page's own requests, so signing in again could not have helped (reproduced
+    in a test).
+- **Staff end a handover with a PIN, at any moment:**
+  - During a handover the form shows a small, muted **Personal** (lock icon) at the top. It opens a PIN dialog; the PIN
+    is a text field with CSS dots, so no password manager offers to fill it.
+  - `POST socio/solicitud/{token}/personal` sits under the form's own path, which the confinement already allows. It
+    uses the counter pad's own check and throttle (`UnlockOperator`, `counter-pin:<sede>`), so **any active staff at the
+    handover's sede** may end it and a colleague can rescue the tablet. Staff of another sede are refused, and a wrong
+    PIN counts (pinned).
+  - **A correct PIN:**
+    - ends the handover;
+    - discards the unsent draft (`counter.handover.draft`, and the camera's MRZ prefill, which `CounterHandover::end()`
+      now also forgets);
+    - leaves the invitation unsubmitted and valid until it expires;
+    - signs that person in through **`SignInOperator`** (267/270: naming the operator and signing in stay one step;
+      `PreLiveSignInHardeningTest` pins the single caller);
+    - lands on Socios;
+    - audits `counter.handover.cancelled` (reason `staff_pin`, the operator, the sede, who started it, no applicant
+      data).
+  - The applicant still can't leave on their own: 173's confinement is unchanged without a PIN (pinned, including
+    *salir* refused during a handover).
+- **An abandoned handover ends by itself:** no activity for `handover_idle_minutes` (a setting, default 15), or older
+  than 2 hours however active.
+  - `CounterHandover::touch()` records activity on every request; `EnforceCounterHandover` checks `expiredReason()`
+    first.
+  - Expiry discards the draft, audits `counter.handover.expired` (idle or age), and lands on the counter's lock surface,
+    never the form.
+- **A password login ends any handover.** `CounterAwareLoginResponse` ends it (audited `counter.handover.cancelled`,
+  reason `login`).
+  - To make that possible, `/login` is allowed during a handover, and the confinement lets the panel's `Login`
+    component through for its own `data.*` fields and `authenticate` only. It shows nothing of the club's and needs a
+    staff password.
+  - Filament's test-only `disableSchemaStateUpdateHooksForTesting` is still refused, so the test sets the fields one by
+    one, as a browser does.
+- **The login never lands on an applicant route:** an intended `socio/solicitud/*` is dropped. Staff land on the panel
+  or the counter, as today's fallbacks do.
+- **Salir sin enviar** (an applicant's own phone, never in a handover):
+  - At the bottom of the form, asking first, in the page: "No se enviará nada. Puedes volver con el mismo enlace hasta
+    el dd/mm/aaaa."
+  - Confirming (`POST …/salir`) clears that browser's draft (the MRZ prefill and old input) and shows "No se ha enviado
+    nada." with nothing else to tap.
+  - The same link opens the form again.
+- **Date of birth — the native date field kept**, with an always-visible "dd/mm/aaaa" in the label. While the required
+  field is empty, Safari's greyed "today" is made transparent (`input[type=date][data-empty-date]:invalid:not(:focus)`,
+  app CSS), so an empty field reads as empty.
+  - **Not three fields:** 128/179's camera prefill and its per-field confirmation fill the one `date_of_birth`, and the
+    counter's staff wizard shares the shape (`OneApplicationFormTest`). One field kept all of that intact.
+  - The page's existing "Formato: día / mes / año" helper stays; the two say the same thing.
+- **Structural tests followed:**
+  - `OneApplicationFormTest` ignores the staff exit's `pin` (its own form, not the applicant's).
+  - `MemberPwaFormStyleTest`: the PIN input uses `SocioForm::FIELD`.
+- **Tests:** `tests/Feature/Counter/HandoverWayOutTest.php` (8), all red first:
+  - the staff PIN exit;
+  - a wrong PIN counting, and another sede refused;
+  - 15-minute idle expiry;
+  - activity keeps it alive but 2 hours ends it;
+  - a password login ending it and never landing on the form;
+  - *Salir sin enviar* with the link working afterwards;
+  - the confinement unchanged (pin);
+  - the date of birth empty with its hint.
+- **Verified in a browser** (`tests/Browser/prove-342-way-out.mjs`, a freshly seeded demo DB, as the owner), 10/10 PASS:
+  - hand over → the form with *Personal*;
+  - Ben's state reproduced (the sign-in removed from the stored session, the handover left in it), then the login page
+    answered and signing in landed on `/counter`, with the handover over;
+  - hand over again → *Personal* + PIN → Socios, audited;
+  - a phone: the date empty with its hint and no *Personal*; *Salir sin enviar* asked ("… hasta el 15/10/2026."); "No se
+    ha enviado nada." with nothing else to tap; the link opened the form again;
+  - no page errors.

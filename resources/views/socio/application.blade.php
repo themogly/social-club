@@ -12,6 +12,39 @@
 <x-layouts.socio :title="__('Solicitud de alta')" :nav="false" wide>
     {{-- The layout's cap is the only cap now. --}}
     <div>
+        {{-- Prompt 342 — on the club's tablet, the STAFF way out, at any moment: a staff PIN (anyone at that sede) ends the
+             handover and returns to Socios. Small and muted on purpose — "not for you" to the applicant, who cannot pass
+             the PIN; 173's confinement is otherwise unchanged. --}}
+        @if ($handoverActive ?? false)
+            <div class="mb-2 flex justify-end" x-data="{ open: @js(session()->has('handoverStaffError')) }">
+                <button type="button" data-handover-staff-exit @click="open = true; $nextTick(() => $refs.staffPin?.focus())"
+                        class="inline-flex min-h-11 items-center gap-1.5 rounded-lg px-3 text-xs font-medium text-ink-muted hover:text-ink dark:text-slate-400 dark:hover:text-slate-200">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" class="h-4 w-4" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 1 0-9 0v3.75m-.75 0h10.5a2.25 2.25 0 0 1 2.25 2.25v6.75a2.25 2.25 0 0 1-2.25 2.25H6.75a2.25 2.25 0 0 1-2.25-2.25v-6.75a2.25 2.25 0 0 1 2.25-2.25Z"/></svg>
+                    {{ __('Personal') }}
+                </button>
+                <div x-show="open" x-cloak role="dialog" aria-modal="true" aria-labelledby="handover-staff-title" data-handover-staff-dialog
+                     @keydown.escape.window="open = false" class="fixed inset-0 z-50 flex items-center justify-center bg-ink/40 p-4">
+                    <form method="POST" action="{{ route('socio.application.staff', ['token' => $token]) }}" @click.outside="open = false"
+                          class="w-full max-w-xs rounded-2xl border border-line bg-surface p-5 text-left shadow-xl dark:border-slate-800 dark:bg-slate-900">
+                        @csrf
+                        <h2 id="handover-staff-title" class="text-base font-semibold">{{ __('Recuperar el mostrador') }}</h2>
+                        <p class="mt-1 text-xs text-ink-muted dark:text-slate-400">{{ __('Solo personal del club. La solicitud no se envía y el enlace sigue valiendo.') }}</p>
+                        <label for="staff-pin" class="mt-3 block text-sm font-medium">{{ __('PIN') }}</label>
+                        {{-- Text with the dots drawn by CSS, not type=password: no password manager offers to fill it. --}}
+                        <input id="staff-pin" name="pin" x-ref="staffPin" type="text" inputmode="numeric" pattern="[0-9]*" autocomplete="off" maxlength="8" required
+                               style="-webkit-text-security: disc;" class="{{ \App\Support\SocioForm::FIELD }} mt-1 tracking-widest">
+                        @if (session('handoverStaffError'))
+                            <p role="alert" class="mt-2 text-sm font-medium text-error">{{ session('handoverStaffError') }}</p>
+                        @endif
+                        <div class="mt-4 flex justify-end gap-2">
+                            <x-button type="button" size="sm" variant="secondary" @click="open = false">{{ __('Cancelar') }}</x-button>
+                            <x-button type="submit" size="sm" data-handover-staff-submit>{{ __('Recuperar') }}</x-button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        @endif
+
         <div class="mb-5 text-center">
             <img src="/socio-icons/icon-192.png" width="56" height="56" alt="" class="mx-auto h-14 w-14 rounded-2xl shadow-sm">
             <h1 class="mt-3 text-xl font-semibold">{{ __('Solicitud de alta') }}</h1>
@@ -117,8 +150,12 @@
                 </div>
 
                 <div>
-                    <label class="mb-1 block text-sm font-medium" for="date_of_birth">{{ __('Fecha de nacimiento') }} <x-socio.required-mark /></label>
-                    <input id="date_of_birth" name="date_of_birth" autocomplete="bday" @error('date_of_birth') aria-invalid="true" aria-describedby="date_of_birth-error" @enderror type="date" required value="{{ old('date_of_birth', data_get($payload, 'date_of_birth') ?: ($prefill['date_of_birth'] ?? null)) }}" class="{{ $input }}">
+                    <label class="mb-1 block text-sm font-medium" for="date_of_birth">{{ __('Fecha de nacimiento') }} <x-socio.required-mark />
+                        {{-- Prompt 342 — the format, always visible: an empty date field must never look filled in. --}}
+                        <span class="ml-1 text-xs font-normal text-ink-muted dark:text-slate-400">{{ __('dd/mm/aaaa') }}</span></label>
+                    {{-- `data-empty-date`: while empty (required, so :invalid) Safari's greyed "today" is hidden (app CSS), so the
+                         field reads as empty. Kept a single native date field: 128/179's camera prefill and its confirm fill it. --}}
+                    <input id="date_of_birth" name="date_of_birth" data-empty-date autocomplete="bday" @error('date_of_birth') aria-invalid="true" aria-describedby="date_of_birth-error" @enderror type="date" required value="{{ old('date_of_birth', data_get($payload, 'date_of_birth') ?: ($prefill['date_of_birth'] ?? null)) }}" class="{{ $input }}">
                     <x-socio.field-error name="date_of_birth" />
                         @include('socio.partials.mrz-confirm', ['field' => 'date_of_birth'])
                     {{-- Explicit format hint (prompt 97): the native picker's displayed order follows the
@@ -315,6 +352,26 @@
 
                 <x-button type="submit" size="md" class="w-full">{{ __('Enviar solicitud') }}</x-button>
             </form>
+
+            {{-- Prompt 342 — on their OWN phone (never during a handover), a way to step away: nothing is sent, this
+                 browser's draft goes, and the same link opens the form again until it expires. Asks first, in the page. --}}
+            @unless ($handoverActive ?? false)
+                <div class="mt-4 text-center" x-data="{ asking: false }">
+                    <button type="button" data-application-leave x-show="! asking" @click="asking = true"
+                            class="min-h-11 text-sm font-medium text-ink-muted underline underline-offset-4 hover:text-ink dark:text-slate-400">{{ __('Salir sin enviar') }}</button>
+                    <form x-show="asking" x-cloak method="POST" action="{{ route('socio.application.leave', ['token' => $token]) }}"
+                          class="rounded-xl border border-line bg-surface p-4 text-left dark:border-slate-800 dark:bg-slate-900">
+                        @csrf
+                        <p class="text-sm">{{ $application->invite_expires_at !== null
+                            ? __('No se enviará nada. Puedes volver con el mismo enlace hasta el :date.', ['date' => local_datetime($application->invite_expires_at, 'd/m/Y')])
+                            : __('No se enviará nada. Puedes volver con el mismo enlace.') }}</p>
+                        <div class="mt-3 flex justify-end gap-2">
+                            <x-button type="button" size="sm" variant="secondary" @click="asking = false">{{ __('Seguir con la solicitud') }}</x-button>
+                            <x-button type="submit" size="sm" data-application-leave-confirm>{{ __('Salir sin enviar') }}</x-button>
+                        </div>
+                    </form>
+                </div>
+            @endunless
 
             {{-- Prompt 179 — the read post. Separate from the application form because HTML forbids nesting,
                  and it carries the MRZ TEXT only. No image is posted here: that is the whole privacy

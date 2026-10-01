@@ -2,6 +2,7 @@
 
 namespace App\Http\Middleware;
 
+use App\Actions\RecordAuditLog;
 use App\Support\CounterHandover;
 use App\Support\CounterHandoverConfinement;
 use App\Support\CounterScreens;
@@ -60,6 +61,7 @@ class EnforceCounterHandover
         'counter/bar',
         'socio/solicitud/*',   // the form the applicant was handed, its submit, and 179's MRZ read
         'socio/idioma',        // prompt 167 — choosing a language is not a member-only act
+        'login',               // prompt 342 — a staff password login ENDS the handover (CounterAwareLoginResponse)
         'up',                  // health check
     ];
 
@@ -99,6 +101,20 @@ class EnforceCounterHandover
         if (! CounterHandover::active()) {
             return $next($request);
         }
+
+        // Prompt 342 — an abandoned handover (idle 15 min, or 2 h old) ends here, and the tablet goes to the counter's lock
+        // surface, never back to the form.
+        if (($reason = CounterHandover::expiredReason()) !== null) {
+            $state = (array) CounterHandover::current();
+            CounterHandover::end();
+            (new RecordAuditLog)->handle('counter.handover.expired', null, null, [
+                'reason' => $reason, 'location_id' => $state['location_id'] ?? null, 'started_by' => $state['operator_id'] ?? null,
+            ]);
+
+            return redirect()->route('counter.home');
+        }
+
+        CounterHandover::touch();
 
         if (self::allows($request->path())) {
             return $next($request);
