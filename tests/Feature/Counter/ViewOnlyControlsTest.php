@@ -135,7 +135,8 @@ class ViewOnlyControlsTest extends TestCase
             'tab' => $xpath->query('//*[@data-view-only][@data-source-option]')->length ?? 0,
             'layout' => $xpath->query('//*[@data-view-only][@data-layout-option]')->length ?? 0,
             'search' => $xpath->query('//input[@data-view-only]')->length ?? 0,
-            'filter' => $xpath->query('//button[@data-view-only][not(@data-source-option)][not(@data-layout-option)]')->length ?? 0,
+            'sort' => $xpath->query('//*[@data-view-only][@data-sort-option]')->length ?? 0,
+            'filter' => $xpath->query('//button[@data-view-only][not(@data-source-option)][not(@data-layout-option)][not(@data-sort-option)]')->length ?? 0,
         ];
     }
 
@@ -147,6 +148,7 @@ class ViewOnlyControlsTest extends TestCase
         $this->assertSame(2, $controls['tab'], 'Dispensario and Barra');
         $this->assertSame(2, $controls['layout'], 'list and grid');
         $this->assertSame(2, $controls['search'], 'one search box per source');
+        $this->assertSame(3, $controls['sort'], '€↓ / €↑ / A–Z (prompt 351)');
         // Categoría (Todas + Flores), Tipo (Todos + Flor), Variedad (Todas + Sativa), the bar's Categoría (Todas + Bebidas).
         $this->assertSame(8, $controls['filter']);
         $this->assertSame([], self::violations($html));
@@ -159,6 +161,7 @@ class ViewOnlyControlsTest extends TestCase
         $controls = self::controls($html);
         $this->assertSame(3, $controls['layout'], 'list, grid and large');
         $this->assertSame(1, $controls['search']);
+        $this->assertSame(0, $controls['sort'], 'the bar keeps its own order (351 — the weed only)');
         $this->assertSame(4, $controls['filter'], 'Todo + Bebidas as tiles, and again as chips');
         $this->assertSame([], self::violations($html));
     }

@@ -325,7 +325,7 @@
                         'source' => 'genetics',
                         'layouts' => ['genetics' => $geneticLayout, 'bar' => $articleLayout],
                         'layoutProps' => ['genetics' => 'geneticLayout', 'bar' => 'articleLayout'],
-                    ]))"
+                    ] + $this->catalogueSort()))"
                     class="rounded-2xl border border-line bg-surface p-4 dark:border-slate-800 dark:bg-slate-900"
                 >
                     @island('catalogue-header', always: $this->islandChanged('header'))
@@ -361,6 +361,8 @@
                                 >{{ $label }}</button>
                             @endforeach
                         </div>
+                        {{-- List / grid, and beside it 351's order — one row, so the portrait toolbar grows by nothing. --}}
+                        <div class="flex shrink-0 flex-wrap gap-2 self-start">
                         {{-- List / grid — one remembered choice PER SOURCE (225): list for genetics, grid for the bar by default. --}}
                         <div role="group" aria-label="{{ __('Vista') }}" class="flex w-fit shrink-0 gap-1 self-start rounded-xl border border-line p-1 dark:border-slate-700">
                             @foreach ([['list', __('Lista'), 'list'], ['grid', __('Cuadrícula'), 'grid']] as [$mode, $label, $glyph])
@@ -376,6 +378,29 @@
                                     x-bind:class="{ '{{ $toggleOn }}': layoutOf() === '{{ $mode }}', '{{ $toggleOff }}': ! (layoutOf() === '{{ $mode }}') }"
                                 ><x-counter.icon :name="$glyph" class="h-5 w-5" /></button>
                             @endforeach
+                        </div>
+
+                        {{-- Prompt 351 — the strain order: €↓ / €↑ / A–Z. Starts on the sede's default; the cards carry their rank
+                             in all three orders, so a tap only moves them (CSS `order`) — no request. Remembered on this tablet
+                             for the business day. The Barra keeps its own (alphabetical) order. --}}
+                        @php $sortStart = $this->catalogueSort()['sortDefault']; @endphp
+                        <div role="group" aria-label="{{ __('Orden') }}" data-sort-control x-show="source === 'genetics'"
+                             class="flex w-fit shrink-0 gap-1 self-start rounded-xl border border-line p-1 dark:border-slate-700">
+                            @foreach ([[\App\Support\DispensarySort::PRICE_DESC, '€↓', __('Precio: de mayor a menor')], [\App\Support\DispensarySort::PRICE_ASC, '€↑', __('Precio: de menor a mayor')], [\App\Support\DispensarySort::ALPHA, 'A–Z', __('Alfabético')]] as [$order, $glyph, $label])
+                                <button
+                                    type="button"
+                                    data-view-only
+                                    data-sort-option="{{ $order }}"
+                                    x-on:click="setSort('{{ $order }}')"
+                                    aria-label="{{ $label }}"
+                                    title="{{ $label }}"
+                                    aria-pressed="{{ $sortStart === $order ? 'true' : 'false' }}"
+                                    x-bind:aria-pressed="sort === '{{ $order }}' ? 'true' : 'false'"
+                                    class="inline-flex h-11 min-w-11 items-center justify-center rounded-lg px-3 text-sm font-semibold tabular-nums transition {{ $sortStart === $order ? $toggleOn : $toggleOff }}"
+                                    x-bind:class="{ '{{ $toggleOn }}': sort === '{{ $order }}', '{{ $toggleOff }}': ! (sort === '{{ $order }}') }"
+                                >{{ $glyph }}</button>
+                            @endforeach
+                        </div>
                         </div>
 
                         {{-- One search box per source, each keeping its own term: switching source to check a price and
@@ -510,7 +535,7 @@
                     @island('catalogue-genetics', always: $this->islandChanged('genetics'))
                     @php $gen = $this->islandView('genetics'); @endphp
                     <div x-show="source === 'genetics'">
-                        <div data-layout="{{ $geneticLayout }}" x-bind:data-layout="layoutOf('genetics')"
+                        <div data-genetic-sort-container data-layout="{{ $geneticLayout }}" x-bind:data-layout="layoutOf('genetics')"
                              class="mt-4 as-list:flex as-list:flex-col as-list:gap-2 as-grid:grid as-grid:gap-3 as-grid:sm:grid-cols-2">
                             {{-- Prompt 271 — the variety's photo, 193's rule: the column only when some variety has one. --}}
                             @foreach ($gen['rows'] as $g)
@@ -525,6 +550,8 @@
                                     data-type="{{ $g['product_type'] }}"
                                     data-strain="{{ $g['strain_type'] }}"
                                     data-search="{{ $g['name'] }}"
+                                    @foreach ($g['rank'] ?? [] as $order => $rank) data-rank-{{ $order }}="{{ $rank }}" @endforeach
+                                    x-bind:style="{ order: rankOf($el) }"
                                     x-show="visible($el)"
                                     @class([
                                         'flex w-full min-h-11 flex-col gap-1 rounded-xl border px-3 py-1.5 text-left transition',

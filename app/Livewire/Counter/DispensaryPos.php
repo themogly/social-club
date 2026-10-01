@@ -53,6 +53,7 @@ use App\Support\BusinessDay;
 use App\Support\CounterOperator;
 use App\Support\CounterScreens;
 use App\Support\DispensaryRounding;
+use App\Support\DispensarySort;
 use App\Support\DocumentVault;
 use App\Support\EligibilityVerdict;
 use App\Support\LimitSnapshot;
@@ -1582,6 +1583,23 @@ class DispensaryPos extends Component
         return $this->catalogueData()[$island] ?? [];
     }
 
+    /**
+     * Prompt 351 — what the counter's €↓ / €↑ / A–Z switch starts on: the sede's default, unless this tablet chose another
+     * order at this sede today (the browser remembers it under `scope`; `rememberedSort` in catalogue-search.js).
+     *
+     * @return array{sortDefault: string, sortScope: array{sede: string, date: string}}
+     */
+    protected function catalogueSort(): array
+    {
+        $location = $this->resolveLocation();
+        if ($location === null) {
+            return ['sortDefault' => DispensarySort::PRICE_DESC, 'sortScope' => ['sede' => '', 'date' => '']];
+        }
+
+        return ['sortDefault' => DispensarySort::forLocation((string) $location->getKey()),
+            'sortScope' => ['sede' => (string) $location->getKey(), 'date' => BusinessDay::today($location)]];
+    }
+
     /** @var array<string, array<string, mixed>>|null */
     private ?array $catalogueMemo = null;
 
@@ -1609,7 +1627,9 @@ class DispensaryPos extends Component
                 'articleCategories' => $this->deriveArticleCategories($articles),
             ],
             'genetics' => [
-                'rows' => $genetics,
+                // Prompt 351 — in the sede's default order, every card ranked in all three (the counter switch picks one).
+                // The header above derives its chips from the alphabetical rows, so the chips' order is unchanged.
+                'rows' => $location !== null ? DispensarySort::rank($genetics, DispensarySort::forLocation((string) $location->getKey())) : $genetics,
                 'hasMember' => $member !== null,
                 'thumbs' => collect($genetics)->contains(fn (array $row): bool => $row['image_url'] !== null),
             ],

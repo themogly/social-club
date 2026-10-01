@@ -10,7 +10,7 @@
 // The module itself is ~4KB and the OCR engine is NOT in it: `readMrz()` dynamically imports tesseract.js
 // on the first click, so loading this early costs a few kilobytes and no engine.
 import './mrz-reader.js';
-import { catalogueShows } from './catalogue-search.js';
+import { catalogueShows, rememberedSort } from './catalogue-search.js';
 import { createCardWedge } from './card-wedge.js';
 import './photo-buttons.js';
 import './applications-chime.js';
@@ -269,6 +269,8 @@ window.cardWedge = () => ({
 // card is still a server action (`$wire.chooseGenetic`, `$wire.addBarItem`, `$wire.addArticle`) — price, limits and
 // stock are decided there, never here. The layout choice is still remembered per device by its #[Session] property:
 // `$wire.$set(prop, mode, false)` hands it over with the next real request instead of making one.
+const SORT_KEY = 'csc.dispensarySort';
+
 window.counterCatalogue = (config = {}) => ({
     source: config.source ?? 'genetics',
     layouts: { ...(config.layouts ?? {}) },
@@ -278,8 +280,33 @@ window.counterCatalogue = (config = {}) => ({
     productType: null,
     strainType: null,
     filtersOpen: false,
+    // Prompt 351 — the strain order. The cards carry `data-rank-<order>` (ranked on the server, the one rule); switching
+    // sets their CSS `order`, so nothing is requested and nothing moves in the DOM Livewire morphs.
+    sortDefault: config.sortDefault ?? 'alpha',
+    sortScope: config.sortScope ?? null,
+    sort: config.sortDefault ?? 'alpha',
     init() {
         this.$store.counterCatalogue.source = this.source;
+        if (this.sortScope) {
+            let stored = null;
+            try {
+                stored = JSON.parse(window.localStorage.getItem(SORT_KEY) ?? 'null');
+            } catch {
+                stored = null;
+            }
+            this.sort = rememberedSort(stored, this.sortScope, this.sortDefault);
+        }
+    },
+    setSort(sort) {
+        this.sort = sort;
+        try {
+            window.localStorage.setItem(SORT_KEY, JSON.stringify({ ...this.sortScope, sort }));
+        } catch {
+            // Private mode or blocked storage: the order still changes, it just isn't remembered.
+        }
+    },
+    rankOf(el) {
+        return el.getAttribute(`data-rank-${this.sort}`) ?? '';
     },
     setSource(source) {
         this.source = source;
