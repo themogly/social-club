@@ -237,7 +237,7 @@ class CartSectionsGateOnTheirOwnLinesTest extends TestCase
             ->call('addBarItem', $article->id)
             ->call('quickCash');
 
-        $this->assertSame('18,50', $component->get('cashTendered')); // the panel's Spanish format (prompt 268)
+        $this->assertSame('18.50', $component->get('cashTendered')); // a point, like every figure (316, 352)
     }
 
     // --- A bar-only visit settles -----------------------------------------------------------------

@@ -3,6 +3,7 @@
 namespace App\Livewire\Counter\Concerns;
 
 use App\Support\Money;
+use App\Support\NumberFormat;
 
 /**
  * The ONE tender model shared by both counter screens (prompt 74). Cash entered is what the member
@@ -121,11 +122,9 @@ trait HandlesTender
         return Money::parseTyped($euros); // the one typed-money rule (271)
     }
 
-    /** Integer cents → a euros string for an input ("50,00") — Spanish format like the panel around it (prompt 268). */
+    /** Integer cents → a euros string for an input ("50.00") — a point, like every figure (316; 352 fixed the last comma). */
     protected function eurosString(int $cents): string
     {
-        $cents = max(0, $cents);
-
-        return sprintf('%d,%02d', intdiv($cents, 100), $cents % 100);
+        return NumberFormat::decimal(max(0, $cents) / 100, 2);
     }
 }

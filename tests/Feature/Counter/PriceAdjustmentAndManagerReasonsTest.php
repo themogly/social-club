@@ -128,7 +128,7 @@ class PriceAdjustmentAndManagerReasonsTest extends TestCase
 
         $pos->set('priceOverrideEuros', '15')->set('priceOverrideReason', 'Producto defectuoso')
             ->assertSee(self::button(1500))->assertDontSee(self::button(2000));
-        $pos->call('quickCash')->assertSet('cashTendered', '15,00');
+        $pos->call('quickCash')->assertSet('cashTendered', '15.00');
         $pos->set('cashTendered', '10')->assertSeeHtml('data-tender-summary')->assertSee(Money::fromCents(500)->formatted()); // Falta 5,00
         $pos->call('quickCash')->call('commitDispensation');
 
@@ -152,7 +152,7 @@ class PriceAdjustmentAndManagerReasonsTest extends TestCase
             ->set('priceOverrideEuros', '15');
 
         $pos->assertSee(__('Cobrar visita · :total', ['total' => Money::fromCents(1800)->formatted()]));
-        $pos->call('quickCash')->assertSet('cashTendered', '18,00');
+        $pos->call('quickCash')->assertSet('cashTendered', '18.00');
     }
 
     public function test_an_invalid_adjustment_says_so_and_every_total_stays_at_20(): void
@@ -160,7 +160,7 @@ class PriceAdjustmentAndManagerReasonsTest extends TestCase
         foreach (['abc', '25'] as $typed) {
             $pos = $this->twentyEuroBasket($this->person(Role::MANAGER))->set('priceOverrideEuros', $typed);
             $pos->assertSeeHtml('data-price-override-notice')->assertSee(self::button(2000));
-            $pos->call('quickCash')->assertSet('cashTendered', '20,00');
+            $pos->call('quickCash')->assertSet('cashTendered', '20.00');
             $pos->set('priceOverrideEuros', '')->assertDontSeeHtml('data-price-override-notice')->assertSee(self::button(2000));
         }
     }
