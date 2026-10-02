@@ -19574,3 +19574,67 @@ to do this by hand.
   - with the stored date moved back, it returns to €↓;
   - switching to North Branch gives A–Z;
   - no page errors.
+
+## Prompt 352 — the last two decimal commas on the counter: the *Justo* amount and the quick-weight buttons
+
+### The two hand-built commas, fixed
+
+Both went through `sprintf('%d,%02d', …)` with a literal comma, so 316's helper and its guard never saw them. Both now go
+through 316's one display rule, `NumberFormat::decimal()`, following the existing `decimal($cents / 100, 2)` precedent
+(TillSession's float input).
+
+- **`HandlesTender::eurosString()`** fills the cash box after *Justo* / *Exact* and the €5 / €10 / €20 notes. It now reads
+  `16.00` and `21.00` in both languages.
+  - The same helper fills the dispensary's *Monedero (€)* input when a tab's remainder is put there, so that reads with a
+    point too.
+- **The quick-weight preset label** (`DispensaryPos::weightPresets`) now reads `1 g`, `2 g`, `3.5 g`, `5 g`. The
+  trailing-zero trim is kept, now trimming to the point.
+- **Typing is unchanged.** `parseCents()` (`Money::parseTyped`) still reads `16,00` and `16.00` alike, pinned by a test
+  that gives the same change for both. Only what the system writes changed.
+- **Seven existing assertions had pinned the old comma** (`TenderPanelTest`, `CartSectionsGateOnTheirOwnLinesTest`,
+  `PriceAdjustmentAndManagerReasonsTest`). They now expect the point.
+
+### The structural guard, extended
+
+- **`DecimalPointTest::test_no_hand_built_comma_decimal_outside_the_spreadsheet_rule`** (renamed from the
+  number_format-only name) now also fails on any `sprintf` / `printf` with a comma between two numeric placeholders
+  (`'%d,%02d'`, single or double quotes) anywhere in `app/` or `resources/views`. The spreadsheet rule
+  (`Spreadsheet/ReportExport.php`) is still the one exception.
+- **Planted lines prove it** (both quote styles), and so do non-decimals it must leave alone (`'%d h %02d min'`,
+  `'%d.%02d'`, `'%s, %s'`).
+- **Seen red on the old code:** it named exactly `HandlesTender.php:129` and `DispensaryPos.php:2045`.
+
+### The wider check: nothing else found
+
+- **Searched `app/`, `resources/views` and `resources/js`** for:
+  - `sprintf` with a comma between placeholders;
+  - `number_format(… ',' …)`;
+  - `str_replace('.', ',', …)`;
+  - string concatenation around a `','`;
+  - `toFixed(…)` / `.replace('.', ',')`, `toLocaleString`, `Intl.NumberFormat` and `NumberFormatter`.
+- **Only the two above wrote a decimal comma.** The rest are legitimate:
+  - `Money::formatted` uses `NumberFormatter` with both separator symbols forced to `.` and grouping off (316);
+  - `TypedNumber` and the two keypad handlers in `app.js` *accept* a comma on input;
+  - `MemberResource` already writes `'%d.%02d'`;
+  - `dashboard/spark.blade.php` joins SVG `x,y` coordinates, which aren't decimals.
+- **The accounting export keeps its Spanish-Excel comma** (316's documented exception, pinned).
+
+### Also fixed: a time-of-day flake
+
+- **`TopBarClockChipTest::test_mis_horas_shows_todays_line`** clocked in 135 minutes before *now*. Run between the
+  business-day cutoff and about 08:15 Madrid time (as on the morning of 2 October), that crossed the cutoff, and «Hoy»
+  was rightly empty.
+- **The fix:** the test now travels to 14:00 Madrid first. The behaviour under test is unchanged.
+
+### Tests and proof
+
+- **`tests/Feature/Formatting/CounterDecimalPointTest.php`** (3): *Justo* `16.00` then €5 `21.00` in es and en (red:
+  `16,00`); the quick buttons `1 g / 2 g / 3.5 g / 5 g` (red: `3,5 g`); the typing pin (`20,00` = `20.00` → 4.00 change;
+  `16,00` = `16.00` → 0).
+- **The extended guard** (red on the old code, see above).
+- **The browser proof** (`tests/Browser/prove-352-decimal-points.mjs`, freshly seeded demo DB, 1180×820, the owner in es,
+  then en) passed 7/7:
+  - the presets read `1 g / 2 g / 3.5 g / 5 g`;
+  - *Justo* writes `22.76` for a 22.76 € total;
+  - €5 makes it `27.76`;
+  - no page errors.

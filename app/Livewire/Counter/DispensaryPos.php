@@ -59,6 +59,7 @@ use App\Support\EligibilityVerdict;
 use App\Support\LimitSnapshot;
 use App\Support\ManagerApproval;
 use App\Support\Money;
+use App\Support\NumberFormat;
 use App\Support\PriceResult;
 use App\Support\Settings;
 use App\Support\SettledOutcome;
@@ -2042,7 +2043,8 @@ class DispensaryPos extends Component
 
             $presets[] = [
                 'grams_cg' => $cg,
-                'label' => rtrim(rtrim(sprintf('%d,%02d', intdiv($cg, 100), $cg % 100), '0'), ','),
+                // "3.5", "1" — a point through the one display rule (316; 352 fixed the hand-built comma), trailing zeros trimmed.
+                'label' => rtrim(rtrim(NumberFormat::decimal($cg / 100, 2), '0'), '.'),
                 'price_cents' => $priceCents,
                 'eighth_applied' => $eighthApplied,
                 'available' => $cg <= $remaining,

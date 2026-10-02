@@ -102,7 +102,13 @@ class DecimalPointTest extends TestCase
 
     // --- 3. The structural guard -------------------------------------------------------------------------------------------
 
-    /** @return list<string> "file:line" of every number_format() that writes a literal ',' decimal outside the CSV rule */
+    /**
+     * "file:line" of every number_format() that writes a literal ',' decimal outside the CSV rule — and (prompt 352) every
+     * sprintf() that puts a comma between two numeric placeholders ('%d,%02d'), which is how the cash box and the
+     * quick-weight buttons slipped past this guard.
+     *
+     * @return list<string>
+     */
     private static function commaDecimals(array $sources): array
     {
         $found = [];
@@ -111,7 +117,8 @@ class DecimalPointTest extends TestCase
                 continue; // the ONE spreadsheet rule (Spanish Excel): localeCsvFormat()
             }
             foreach (explode("\n", $source) as $i => $line) {
-                if (preg_match("/number_format\\([^;]*?,\\s*[^,]+?,\\s*','/", $line)) {
+                if (preg_match("/number_format\\([^;]*?,\\s*[^,]+?,\\s*','/", $line)
+                    || preg_match('/s?printf\\(\\s*([\'"])[^\'"]*%[-+0-9.]*[dfFu],%[-+0-9.]*[dfFu]/', $line)) {
                     $found[] = $path.':'.($i + 1);
                 }
             }
@@ -120,7 +127,7 @@ class DecimalPointTest extends TestCase
         return $found;
     }
 
-    public function test_no_number_format_writes_a_comma_decimal_outside_the_spreadsheet_rule(): void
+    public function test_no_hand_built_comma_decimal_outside_the_spreadsheet_rule(): void
     {
         $sources = [];
         foreach ([app_path(), resource_path('views')] as $dir) {
@@ -132,6 +139,10 @@ class DecimalPointTest extends TestCase
 
         // The guard works: a planted violation is caught.
         $this->assertSame(['planted.php:1'], self::commaDecimals(['planted.php' => "echo number_format(\$x, 2, ',', '');"]));
+        $this->assertSame(['planted.php:1'], self::commaDecimals(['planted.php' => "return sprintf('%d,%02d', intdiv(\$c, 100), \$c % 100);"]));
+        $this->assertSame(['planted.php:1'], self::commaDecimals(['planted.php' => '$label = sprintf("%d,%02d", $a, $b);']));
+        // Not a decimal: a list, a duration, a point.
+        $this->assertSame([], self::commaDecimals(['ok.php' => "sprintf('%d h %02d min', \$h, \$m); sprintf('%d.%02d', \$a, \$b); sprintf('%s, %s', \$a, \$b);"]));
     }
 
     public function test_no_translated_copy_writes_a_number_with_a_comma_decimal(): void

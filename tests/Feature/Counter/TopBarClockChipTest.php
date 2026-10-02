@@ -140,6 +140,8 @@ class TopBarClockChipTest extends TestCase
 
     public function test_mis_horas_shows_todays_line(): void
     {
+        // Midday (352): run early in the morning, 135 minutes back crossed the business-day cutoff and "Hoy" was rightly empty.
+        $this->travelTo(CarbonImmutable::now('Europe/Madrid')->setTime(14, 0));
         (new ClockIn)->handle($this->ben, $this->sede, $this->ben, StaffClockSource::PIN, now()->subMinutes(135));
         $since = now()->subMinutes(135)->setTimezone('Europe/Madrid')->format('H:i');
 

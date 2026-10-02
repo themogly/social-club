@@ -117,9 +117,9 @@ class TenderPanelTest extends TestCase
     {
         $pos = $this->dispensary()->call('quickCash', 2000)->call('quickCash', 2000)->call('quickCash', 1000);
 
-        $pos->assertSet('cashTendered', '50,00'); // €50, in the panel's Spanish format — not the last note pressed
+        $pos->assertSet('cashTendered', '50.00'); // €50, with a point (352) — not the last note pressed
 
-        $pos->call('quickCash')->assertSet('cashTendered', '54,00'); // "Justo" SETS
+        $pos->call('quickCash')->assertSet('cashTendered', '54.00'); // "Justo" SETS
     }
 
     public function test_borrar_clears_the_tendered_amount(): void
@@ -200,7 +200,7 @@ class TenderPanelTest extends TestCase
         $bar = Livewire::test(BarPos::class)
             ->call('addArticle', $article->id)
             ->call('quickCash', 2000)->call('quickCash', 2000)->call('quickCash', 1000)
-            ->assertSet('cashTendered', '50,00')
+            ->assertSet('cashTendered', '50.00')
             ->assertSeeHtml('data-cash-shortfall');
 
         $this->assertStringNotContainsString('id="wallet"', $bar->html(), 'no member attached: no wallet box');
