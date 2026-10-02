@@ -19638,3 +19638,176 @@ through 316's one display rule, `NumberFormat::decimal()`, following the existin
   - *Justo* writes `22.76` for a 22.76 € total;
   - €5 makes it `27.76`;
   - no page errors.
+
+## Prompt 353 — *Guías*: the staff and manager guides live in the app, as web pages with a PDF, always current
+
+### The guides are in the repo; pages and PDFs come from the same source
+
+- **Ben's four guides** (`guides-source.zip`, attached to the prompt, so never committed) are imported as
+  `resources/guides/en/{slug}.md`, with images in `resources/guides/img/{slug}/` (50 JPEGs, all referenced, none
+  orphaned):
+  - *Counter quick-start guide for staff*;
+  - *Cash at the counter*;
+  - *Clocking in and out*;
+  - *Manager guide*.
+- **Front matter** (`title`, `summary`, `audience`, `order`, `updated: 2026-10-02`) was added on import. The `# Title`
+  line and the italic "club · updated …" subtitle were removed, because the page header now carries both from the front
+  matter. The text is otherwise Ben's, unchanged and in English.
+- **The parser is a dozen lines of `key: value`**, not symfony/yaml (not installed; YAGNI). Anything but
+  `audience: staff` is treated as managers-only, so a typo can never widen who reads a guide.
+- **`App\Support\Guides`:**
+  - `GuideLibrary`: load, who sees what, image paths and hashes, `problems()`;
+  - `GuideRenderer`: `Str::markdown` with the GFM tables extension, **`html_input: escape`** and no unsafe links.
+    `##` headings get ids and become the contents list. An image `src` is only ever this guide's own repo file,
+    rewritten to its authorised, hashed URL; anything else is dropped;
+  - `GuidePdf`: dompdf, A4, a footer with the title, the updated date and «page / pages». It's cached on the local disk
+    as `guides/pdf/{slug}-{contentHash}.pdf`. The hash covers the text and every image's bytes, so a refreshed
+    screenshot regenerates it too, and older renders of that guide are deleted.
+- **Pages:**
+  - the counter's `/counter/guias[/{guide}]` in the counter layout (the top bar is the way back);
+  - `/docs[/{guide}]` in a minimal layout of its own;
+  - the panel's `Guia` page (`/ayuda/guia?g=…`, out of the navigation, opened from the Manual).
+  All three share one article partial: a ~70ch column, contents, light and dark themes. Images are lazy and open full
+  size in an in-page overlay that Back closes (history entry), never a new tab. *Descargar PDF* is a `download` link,
+  so the page stays put.
+- **Images** are served by `GuideController::image` with a 12-hex hash in `?v=` and
+  `Cache-Control: private, max-age=31536000, immutable`, under the same authorisation as the page. A path escape is a
+  404 (the file name must be a plain image name).
+
+### Who sees what
+
+- **`audience: staff`** guides are for anyone signed in: the counter's PIN person, a panel user, or a `/docs` phone.
+- **`audience: managers`** guides need `panel.access` and (`settings.manage` or `reports.view`), which in practice
+  means owners and managers.
+- **The *For managers* sections** inside staff guides stay, as labelled.
+- **A guide the reader may not read is a 404** (not a 403), so a staff member can't even confirm a managers' slug.
+  With no reader at all it's a 403, and on the counter a redirect to the hub for the PIN.
+- **Where they appear:**
+  - **Panel:** a *Guías* section at the top of *Ayuda → Manual*. The existing task guides, topics and glossary are
+    unchanged.
+  - **Counter:** **⋯ → Guías**, for whoever is at the PIN. It asks before leaving unsaved counter work, like
+    *Administración*. The other ⋯ items are unchanged.
+  - `counter/guias*` is on `RequireOpenTill`'s allowlist, because reading a guide needs no till.
+
+### `/docs`: staff open the guides on their own phone with their PIN
+
+- **Guides only.** A right PIN sets one encrypted cookie (`csc_guides`: the user id, an HMAC fingerprint of their PIN
+  lookup, and an expiry). It's **not a sign-in**: the `web` guard is never touched, so `/counter`, `/counter/pos`, the
+  panel and every member or till URL still see a guest and redirect to the login (tested, and proved in the browser).
+  Only the `/docs` routes and the guide image/PDF routes read the cookie. No operator, no clock prompt, no counter
+  audit.
+- **30 days**, as a persistent cookie, so it survives a browser restart. Every request re-checks the database, so it
+  ends at once when:
+  - the account is deactivated;
+  - the PIN changes (the fingerprint no longer matches);
+  - the person taps *Salir*;
+  - the owner switches *Guías en el móvil (/docs)* off. Then `/docs` and its pages are 404s.
+  The setting is org-level, owner only (disabled for others and stripped on save, like 350's), and on by default.
+- **The PIN check** is 286's keyed HMAC lookup: one indexed query, never a bcrypt scan on a public URL. So a person
+  still on a pre-286 legacy hash can't use `/docs` until they have entered their PIN once at the counter (which
+  upgrades it). That's acceptable, because the go-live list has everyone set a fresh PIN.
+- **Limits.**
+  - Per IP: 5 wrong PINs, then a 15-minute lockout, rising to 1 h and then 4 h on repeats within a day.
+  - Club-wide: 30 wrong `/docs` PINs in an hour shut `/docs` to every PIN for the rest of that hour, with a
+    `Log::warning`.
+  - A Laravel `throttle:20,1` on the POST on top.
+  - The attempt is reserved before the check (296's A·6). A right PIN gives its attempt back but clears nothing
+    (270).
+  - The limiter's store is `config('cache.limiter')` (off Redis, 344), and it **fails closed**: with the store down no
+    PIN is checked, while phones already signed in keep reading.
+  - Every failure is the same «PIN incorrecto» (unknown, inactive, wrong format, locked out alike).
+  - Each sign-in (`guides.docs_signed_in`: who and IP) and each lockout (`guides.docs_locked_out`: IP or club scope)
+    is audited.
+- **Owner decision (2 Oct 2026), a change from the prompt.** The prompt asked for wrong `/docs` PINs to also count
+  against the counter's PIN throttle. That throttle is per sede, so anyone on the internet could have locked every
+  counter tablet out from `/docs`, with escalating lockouts repeatable each hour. Ben chose **own limits only**: wrong
+  `/docs` PINs never touch the counter's buckets (tested). The total guessing rate is still capped by the club-wide
+  ceiling.
+- **Why PIN access is acceptable here:**
+  - the guides describe internal procedures and contain **no personal data**: the screenshots are of the fictional
+    demo club;
+  - the session can reach nothing else;
+  - the limits make guessing impractical: at most 30 wrong PINs an hour club-wide against a 4–8 digit space;
+  - the owner can switch it off and end every session at once.
+- **The pages are `noindex`:** the layout meta, plus the global `X-Robots-Tag`.
+- **The pad is the counter's own.** The counter pad's digits moved to `window.pinEntry()` (app.js) and its dots and
+  keys to `x-counter.pin-keys`. Both the lock surface and `/docs` use them, with identical rendered output on the
+  counter (proved by the shots below).
+  - `CounterSurfaceTest`'s "exactly ONE PIN pad" guard now asserts that single home: one digit implementation, one
+    key grid, and both users of it.
+  - `/docs` is plain Blade, so its layout loads `socio.js` for Alpine (232's rule; `AlpineShipsWhereItIsUsedTest` now
+    covers the guides layout).
+- **Language:** after the PIN, `/docs` speaks the reader's own language (`ResolveLocale`). Dates use the locale's
+  long format.
+
+### Keeping them current
+
+- **The rule is now in `CLAUDE.md`** (Testing & verification): when a change alters a screen, label or flow a guide
+  describes, update the guide in the same branch, with its screenshot if the screen changed, and bump `updated`.
+- **`tests/Feature/Guides`** asserts four guides with valid front matter and every referenced image present, through
+  `GuideLibrary::problems()`. A planted temp directory proves it catches a missing image and missing front matter.
+- **`npm run guides:shots`** (`scripts/guides-shots.mjs`) regenerates screenshots from `resources/guides/shots.json`.
+  - Each recipe gives a URL, an account, a viewport, a `member`, steps (goto, click, fill, press, wait), an optional
+    crop, `openTill` and `locked`.
+  - It uses the harness's `signIn` / `signInToCounter`, signing in once per account and reusing the browser state
+    (the login rate limit stopped a sign-in per shot).
+  - It writes 1600 px-wide JPEGs (quality 82), to `GUIDES_SHOTS_OUT` if set.
+  - The manifest's `locale: en` makes it stop if the pages aren't in English (the demo accounts must be set to English
+    first; the command is in the manifest).
+- **Run in the sandbox** against a `csc:seed-staging` database: all 8 recipes written. They match the originals' 1600
+  px width, in English.
+- **Ben's screenshots stay in the repo.** Replacing curated images is a human call; refresh with
+  `BASE_URL=… npm run guides:shots`.
+- **Recipes so far (counter, the screens that change most):** `counter-quick-start/` `00-pin-pad-crop`,
+  `01-topbar-crop`, `03-till-open`, `u02-sort`, `04-dispensary-weigh`, `05-payment`, `06-bar-tab`,
+  `07-members-pending`.
+- **No recipe yet** (refresh by hand or in a later prompt):
+  - `counter-quick-start/`: `u03-photo-blocker`, `u05c`, `08-review-application`, `09-blocked-fee`,
+    `10-close-recount`, `12-training-crop`. These need a member without a photo, a pending application, an unpaid
+    fee, a till close or training mode set up first;
+  - all of `cash-at-the-counter/` (8), `clocking-in-and-out/` (9) and `manager-guide/` (19, panel screens).
+
+### Tests and proof
+
+- **`tests/Feature/Guides/GuidesTest.php`** (15, all seen red before the implementation) covers:
+  - the counter list for staff (3) and a manager (4), and the managers' guide a 404 for staff;
+  - the PIN first on the counter;
+  - the Manual by role, and the panel guide page refused for staff;
+  - headings, contents, a table, a note, a lazy hashed image with year-long cache headers;
+  - a planted `<script>`, a raw `<img onerror>` and a `javascript:` link, all escaped or dropped;
+  - image authorisation and a path escape;
+  - the PDF: A4 MediaBox, the title (UTF-16 PDF string) and at least one image object per image. The second request is
+    the stored file, and a changed source regenerates it and removes the old one;
+  - `/docs` for staff (3) and a manager (4);
+  - the same message for wrong, inactive and garbage PINs;
+  - the guides session refused at `/counter`, the till, the POS, members, the panel and the counter guides;
+  - 5 wrong PINs lock the IP while another IP still works, the counter throttle untouched, the right PIN back after
+    15 minutes, and audits written;
+  - the club-wide ceiling locking a fresh IP;
+  - 30 days (in on day 29, out on day 31), and the session ended by a new PIN, deactivation, *Salir* and the setting
+    off;
+  - front matter and images, and the planted structural case.
+- **Updated guards:**
+  - `CounterSurfaceTest` (one pad, its new home);
+  - `PinPadStatesTest` (the five `keysLocked` bindings across the surface and the keys component);
+  - `RequireOpenTillTest` (the two new counter routes, allowed);
+  - `HelpGuidesTest` (`Guia` joins Manual and Glosario as a help page with no help topic);
+  - `PanelSectionPermissionsTest` (`Guia` joins the help pages a counter-only user may reach: a guide it may not read is a 404);
+  - `AlpineShipsWhereItIsUsedTest` (the guides layout).
+- **The browser proof** (`tests/Browser/prove-353-guides.mjs`, a `csc:seed-staging` DB, accounts in English) passed
+  19/19:
+  - **Tablet (1180):**
+    - ⋯ → Guías lists the 3 staff guides;
+    - the cash guide shows its contents, tables and 8 images;
+    - an image opens full size and Back closes it on the same page;
+    - *Download PDF* saves a 2 MB `%PDF` and the page stays.
+  - **Phone (390), light and dark:**
+    - `/docs` shows the counter's pad;
+    - a staff PIN gives the 3 staff guides, in English;
+    - no sideways scroll;
+    - `/counter` and `/counter/pos` go to the login;
+    - a manager PIN gives all 4;
+    - five wrong PINs, then the right one, is «PIN incorrecto».
+  - **Panel (1440), light and dark:** the Manual lists the 4 guides above its topics, and the manager guide opens with
+    its way back.
+  - No page errors.

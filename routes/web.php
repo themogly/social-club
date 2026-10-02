@@ -8,6 +8,7 @@ use App\Http\Controllers\CounterManifestController;
 use App\Http\Controllers\CounterPanicController;
 use App\Http\Controllers\CounterTrainingController;
 use App\Http\Controllers\DispensationReceiptController;
+use App\Http\Controllers\GuideController;
 use App\Http\Controllers\LockdownReactivationController;
 use App\Http\Controllers\Member\AnnouncementController;
 use App\Http\Controllers\Member\EventController;
@@ -151,6 +152,22 @@ Route::middleware(['web', 'auth'])->group(function (): void {
 Route::middleware(['web', 'auth'])
     ->post('/counter/location', [CounterLocationController::class, 'switch'])
     ->name('counter.location');
+
+// Prompt 353 — *Guías*: the staff and manager guides (resources/guides), as pages with a PDF. On the counter (⋯ → Guías,
+// the PIN person's role decides which); on a staff phone at /docs, by counter PIN — a guides-only cookie that signs
+// nobody in (DocsAccess), throttled per IP and club-wide on top of this route limit. Images and the PDF answer either.
+Route::middleware(['web', AuthenticateCounter::class])->group(function (): void {
+    Route::get('/counter/guias', [GuideController::class, 'counterIndex'])->name('counter.guides');
+    Route::get('/counter/guias/{guide}', [GuideController::class, 'counterShow'])->name('counter.guides.show');
+});
+Route::middleware('web')->group(function (): void {
+    Route::get('/docs', [GuideController::class, 'docs'])->name('guides.docs');
+    Route::post('/docs', [GuideController::class, 'docsSignIn'])->middleware('throttle:20,1')->name('guides.docs.signin');
+    Route::post('/docs/salir', [GuideController::class, 'docsSignOut'])->name('guides.docs.signout');
+    Route::get('/docs/{guide}', [GuideController::class, 'docsShow'])->name('guides.docs.show');
+    Route::get('/guias/img/{guide}/{file}', [GuideController::class, 'image'])->name('guides.image');
+    Route::get('/guias/{guide}/pdf', [GuideController::class, 'pdf'])->name('guides.pdf');
+});
 
 // The bar / merch POS — the auxiliary-income counterpart, same tablet-first pattern. A
 // THIN shell over CommitOrder (freezes the item snapshot, depletes UNIT stock, optionally

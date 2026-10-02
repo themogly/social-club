@@ -242,6 +242,8 @@ class Settings
         'after_recording' => 'home',
         // Prompt 351 (Liam, Aaron) — per sede: the dispensary's strain order — price_desc (default), price_asc or alpha.
         'dispensary_sort' => 'price_desc',
+        // Prompt 353 — ORG-level, owner only: /docs (the guides on a staff phone, by PIN). Off = a 404, every phone signed out.
+        'guides_docs_enabled' => true,
         // Prompt 348 — a new member is enrolled at every active sede but the store (one fee, the rest linked). ORG-level.
         'enrol_all_sedes' => true,
         // Prompt 348 — per sede: no photo on the record blocks dispensing until one is taken (the counter's Hacer foto).

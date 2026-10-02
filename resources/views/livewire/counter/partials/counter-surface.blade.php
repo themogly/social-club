@@ -36,7 +36,8 @@
         {{-- Prompt 286 — the one shared PIN behaviour (resources/js/app.js): checking, the greeting, the shake. --}}
         ...window.counterPinCheck(),
         successTemplate: '',
-        pin: '',
+        {{-- Prompt 353 — the digits (pin, push, back, clear, digitsLabel) are the ONE pad's, shared with /docs (app.js). --}}
+        ...window.pinEntry({ one: @js(__('1 dígito introducido')), many: @js(__(':count dígitos introducidos')) }),
         {{-- Prompt 188: the mode is READ from $wire, never copied into local state. `serverMode:
              @js($surfaceMode)` snapshotted it at init, and Livewire preserves the DOM across a re-render, so
              x-data never ran again — after identifying, the server said null while Alpine still held
@@ -57,9 +58,6 @@
         staffPad: @js(\App\Support\CounterHandover::submitted()),
         submitted: @js(\App\Support\CounterHandover::submitted()),
         get keysLocked() { return this.pinBusy() || $wire.pinLocked },
-        push(d) { if (! this.keysLocked && this.pin.length < 8) this.pin += d },
-        back() { if (! this.keysLocked) this.pin = this.pin.slice(0, -1) },
-        clear() { if (! this.keysLocked) this.pin = '' },
         {{-- Prompt 286 — the dots STAY filled while the PIN is checked, and nothing can be typed or submitted again
              until the answer is in; they clear on the answer (after the greeting, or with the shake). --}}
         submit() {
@@ -102,7 +100,6 @@
                 this.returnFocusTo = null
             }
         },
-        digitsLabel(n) { return n === 0 ? '' : (n === 1 ? @js(__('1 dígito introducido')) : @js(__(':count dígitos introducidos')).replace(':count', n)) },
         {{-- Handed over outranks everything: the applicant must not be shown a lock screen mid-form.
              Otherwise a client-side idle lock outranks the server's 'no operator yet'. --}}
         get mode() {
@@ -236,46 +233,28 @@
                    x-text="mode === 'clock' ? @js(__('Confirma tu salida con tu PIN.')) : (mode === 'handover' ? @js(__('Introduce tu PIN para finalizar la entrega y volver al mostrador.')) : (mode === 'locked' ? @js(__('Introduce tu PIN para continuar. El trabajo en curso se conserva.')) : @js(__('Introduce tu PIN para identificarte en el mostrador.'))))"></p>
             </div>
 
-            {{-- Masked, client-side display of the digits entered so far. --}}
-            <div class="mt-4 flex h-11 items-center justify-center gap-1.5 rounded-lg border border-line bg-surface-alt dark:border-slate-700 dark:bg-slate-800" aria-hidden="true">
-                <template x-for="i in pin.length" :key="i">
-                    <span class="h-2.5 w-2.5 rounded-full bg-ink dark:bg-slate-200"></span>
-                </template>
-                <span x-show="pin.length === 0" class="text-sm text-ink-muted dark:text-slate-400">••••</span>
-            </div>
-            {{-- The dots are aria-hidden, so the COUNT is announced instead (never the digits). --}}
-            <p data-pin-count class="sr-only" aria-live="polite" x-text="digitsLabel(pin.length)"></p>
-            {{-- Checking and success are announced as a status; a wrong PIN stays the server's role="alert" line below. --}}
-            <p data-pin-status role="status" class="sr-only" x-text="checking ? @js(__('Comprobando…')) : (holding ? successText : '')"></p>
+            <x-counter.pin-keys>
+                {{-- Checking and success are announced as a status; a wrong PIN stays the server's role="alert" line below. --}}
+                <p data-pin-status role="status" class="sr-only" x-text="checking ? @js(__('Comprobando…')) : (holding ? successText : '')"></p>
 
-            @if (in_array($clockPrompt, ['out', 'in-pin'], true) && $clockFeedback !== null)
-                <p data-clock-feedback role="alert" class="mt-3 rounded-lg bg-error/10 px-3 py-2 text-center text-sm font-medium text-error">{{ $clockFeedback }}</p>
-            @endif
+                @if (in_array($clockPrompt, ['out', 'in-pin'], true) && $clockFeedback !== null)
+                    <p data-clock-feedback role="alert" class="mt-3 rounded-lg bg-error/10 px-3 py-2 text-center text-sm font-medium text-error">{{ $clockFeedback }}</p>
+                @endif
 
-            @if ($operatorFeedback !== null)
-                <p data-counter-surface-feedback role="alert" class="mt-3 rounded-lg bg-error/10 px-3 py-2 text-center text-sm font-medium text-error">{{ $operatorFeedback }}</p>
-            @endif
+                @if ($operatorFeedback !== null)
+                    <p data-counter-surface-feedback role="alert" class="mt-3 rounded-lg bg-error/10 px-3 py-2 text-center text-sm font-medium text-error">{{ $operatorFeedback }}</p>
+                @endif
 
-            @if ($this->operatorLockedOut())
-                {{-- Prompt 286 — the keys stay disabled (the same state as checking) until the lockout ends; then the pad
-                     asks the server once, which clears `pinLocked` and gives the keys back. --}}
-                <p data-pin-lockout x-init="setTimeout(() => $wire.$refresh(), {{ ($this->operatorLockoutSeconds() + 1) * 1000 }})"
-                   class="mt-3 text-center text-sm text-ink-muted dark:text-slate-400">{{ __('Demasiados intentos. Inténtalo en :s s.', ['s' => $this->operatorLockoutSeconds()]) }}</p>
-                {{-- Where the key is (prompt 235): the wait is not the only way out any more, and the person
-                     staring at this countdown is the one who most needs to know that. --}}
-                <p data-lockout-hint class="mt-1 text-center text-xs text-ink-muted dark:text-slate-400">{{ __('Un responsable puede desbloquearlo desde Administración › Seguridad.') }}</p>
-            @endif
-
-            {{-- Every control at the counter's 44x44 floor (prompts 116/132) — including this pad's own
-                 confirm, which was 155x42 in the partial this replaces. --}}
-            <div class="mt-4 grid grid-cols-3 gap-2">
-                @foreach (['1', '2', '3', '4', '5', '6', '7', '8', '9'] as $digit)
-                    <button type="button" @click="push('{{ $digit }}')" x-bind:disabled="keysLocked" class="disabled:opacity-50 min-h-[2.75rem] min-w-[2.75rem] rounded-lg border border-line py-3 text-lg font-semibold transition hover:bg-brand-tint hover:text-brand dark:border-slate-700 dark:hover:bg-slate-800 dark:hover:text-white">{{ $digit }}</button>
-                @endforeach
-                <button type="button" @click="clear()" x-bind:disabled="keysLocked" class="disabled:opacity-50 min-h-[2.75rem] min-w-[2.75rem] rounded-lg border border-line py-3 text-sm font-medium text-ink-muted transition hover:bg-slate-100 dark:border-slate-700 dark:hover:bg-slate-800">{{ __('Borrar') }}</button>
-                <button type="button" @click="push('0')" x-bind:disabled="keysLocked" class="disabled:opacity-50 min-h-[2.75rem] min-w-[2.75rem] rounded-lg border border-line py-3 text-lg font-semibold transition hover:bg-brand-tint hover:text-brand dark:border-slate-700 dark:hover:bg-slate-800 dark:hover:text-white">0</button>
-                <button type="button" @click="back()" x-bind:disabled="keysLocked" aria-label="{{ __('Retroceso') }}" class="disabled:opacity-50 min-h-[2.75rem] min-w-[2.75rem] rounded-lg border border-line py-3 text-lg transition hover:bg-slate-100 dark:border-slate-700 dark:hover:bg-slate-800">⌫</button>
-            </div>
+                @if ($this->operatorLockedOut())
+                    {{-- Prompt 286 — the keys stay disabled (the same state as checking) until the lockout ends; then the pad
+                         asks the server once, which clears `pinLocked` and gives the keys back. --}}
+                    <p data-pin-lockout x-init="setTimeout(() => $wire.$refresh(), {{ ($this->operatorLockoutSeconds() + 1) * 1000 }})"
+                       class="mt-3 text-center text-sm text-ink-muted dark:text-slate-400">{{ __('Demasiados intentos. Inténtalo en :s s.', ['s' => $this->operatorLockoutSeconds()]) }}</p>
+                    {{-- Where the key is (prompt 235): the wait is not the only way out any more, and the person
+                         staring at this countdown is the one who most needs to know that. --}}
+                    <p data-lockout-hint class="mt-1 text-center text-xs text-ink-muted dark:text-slate-400">{{ __('Un responsable puede desbloquearlo desde Administración › Seguridad.') }}</p>
+                @endif
+            </x-counter.pin-keys>
 
             <button type="button" data-counter-surface-unlock x-ref="pinPad" @click="submit()" x-bind:disabled="keysLocked" x-bind:aria-busy="checking"
                     class="mt-4 inline-flex min-h-[2.75rem] h-12 w-full items-center justify-center gap-2 rounded-lg bg-brand text-sm font-semibold text-white transition hover:bg-brand-dark disabled:cursor-not-allowed disabled:opacity-70">

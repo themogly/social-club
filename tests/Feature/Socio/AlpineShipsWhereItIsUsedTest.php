@@ -134,6 +134,12 @@ class AlpineShipsWhereItIsUsedTest extends TestCase
     }
 
     /** The guard sees a directive that arrives through a COMPONENT, which is how the real one was missed. */
+    /** Prompt 353 — /docs (a staff phone) is plain Blade too: its PIN pad is Alpine, so its layout must start it. */
+    public function test_the_guides_layout_ships_alpine(): void
+    {
+        $this->assertStringContainsString(self::ENTRY, (string) file_get_contents(resource_path('views/components/layouts/guides.blade.php')));
+    }
+
     public function test_the_guard_sees_directives_that_come_from_a_component(): void
     {
         $throughComponent = '<div><x-counter.signature-pad mode="form" /></div>';

@@ -1,0 +1,111 @@
+{
+    "about": "Prompt 353 — how each guide screenshot is captured by `npm run guides:shots`. Run it against a site seeded with `php artisan csc:seed-staging` (the fictional demo club, prompt 327), with BASE_URL pointing at it. The guides show the ENGLISH screens: first set the demo accounts to English — php artisan tinker --execute=\"App\\\\Models\\\\User::query()->update(['locale' => 'en'])\" — or the script stops. Each recipe: url, account (owner | manager | staff — the harness accounts), viewport [w, h], member (chosen at the dispensary when its search is showing), steps, and an optional crop selector. Steps: {\"goto\": url}, {\"click\": selector}, {\"fill\": [selector, value]}, {\"press\": [selector, key]}, {\"wait\": ms}. Images are written at 1600 px wide (the viewport scaled), JPEG.",
+    "seed": "csc:seed-staging",
+    "locale": "en",
+    "shots": {
+        "counter-quick-start/00-pin-pad-crop.jpg": {
+            "url": "/counter",
+            "account": "staff",
+            "viewport": [
+                1180,
+                820
+            ],
+            "locked": true,
+            "crop": "[data-pin-pad]"
+        },
+        "counter-quick-start/01-topbar-crop.jpg": {
+            "url": "/counter",
+            "account": "staff",
+            "viewport": [
+                1180,
+                820
+            ],
+            "crop": "[data-counter-topbar]"
+        },
+        "counter-quick-start/03-till-open.jpg": {
+            "url": "/counter/till",
+            "account": "manager",
+            "viewport": [
+                1180,
+                820
+            ],
+            "openTill": true
+        },
+        "counter-quick-start/u02-sort.jpg": {
+            "url": "/counter/pos",
+            "account": "staff",
+            "viewport": [
+                1180,
+                820
+            ],
+            "openTill": true,
+            "member": "M-00001"
+        },
+        "counter-quick-start/04-dispensary-weigh.jpg": {
+            "url": "/counter/pos",
+            "account": "staff",
+            "viewport": [
+                1180,
+                820
+            ],
+            "openTill": true,
+            "steps": [
+                {
+                    "click": "[data-catalogue-item=\"genetics\"][data-search=\"Amnesia Haze\"]"
+                },
+                {
+                    "click": "[data-weight-pad] button:text-is(\"2\")"
+                }
+            ],
+            "member": "M-00001"
+        },
+        "counter-quick-start/05-payment.jpg": {
+            "url": "/counter/pos",
+            "account": "staff",
+            "viewport": [
+                1180,
+                820
+            ],
+            "openTill": true,
+            "steps": [
+                {
+                    "click": "[data-catalogue-item=\"genetics\"][data-search=\"Amnesia Haze\"]"
+                },
+                {
+                    "click": "[data-weight-pad] button:text-is(\"2\")"
+                },
+                {
+                    "click": "[data-add-line]"
+                },
+                {
+                    "click": "button[wire\\:click=\"quickCash\"]"
+                }
+            ],
+            "member": "M-00001"
+        },
+        "counter-quick-start/06-bar-tab.jpg": {
+            "url": "/counter/pos",
+            "account": "staff",
+            "viewport": [
+                1180,
+                820
+            ],
+            "openTill": true,
+            "steps": [
+                {
+                    "click": "[data-source-option=\"bar\"]"
+                }
+            ],
+            "member": "M-00001"
+        },
+        "counter-quick-start/07-members-pending.jpg": {
+            "url": "/counter/members",
+            "account": "staff",
+            "viewport": [
+                1180,
+                820
+            ],
+            "openTill": true
+        }
+    }
+}

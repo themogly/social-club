@@ -343,6 +343,16 @@ window.counterCatalogue = (config = {}) => ({
     },
 });
 
+// Prompt 353 — THE PIN pad's digits, shared by the counter's lock surface and /docs (x-counter.pin-keys is its markup).
+// The caller supplies `keysLocked` (the surface: checking or throttled; /docs: never) and what submitting does.
+window.pinEntry = (labels = {}) => ({
+    pin: '',
+    push(d) { if (! this.keysLocked && this.pin.length < 8) this.pin += d },
+    back() { if (! this.keysLocked) this.pin = this.pin.slice(0, -1) },
+    clear() { if (! this.keysLocked) this.pin = '' },
+    digitsLabel(n) { return n === 0 ? '' : (n === 1 ? labels.one : String(labels.many ?? '').replace(':count', n)) },
+});
+
 window.counterPinCheck = () => ({
     checking: false,
     holding: false,
