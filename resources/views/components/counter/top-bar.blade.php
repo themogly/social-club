@@ -387,6 +387,14 @@
                         {{ __('Modo formación') }}
                     </button>
                 @endif
+                {{-- Prompt 353 — the staff and manager guides, for whoever is at the PIN (their role picks which). --}}
+                @if ($chipOperator !== null)
+                    <a href="{{ route('counter.guides') }}" role="menuitem" data-counter-guides class="{{ $menuItem }}"
+                       @click.prevent="(! ($store.counter?.dirty) || window.confirm(@js($confirmLeave))) && window.location.assign('{{ route('counter.guides') }}')">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" class="h-5 w-5 shrink-0" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6.042A8.967 8.967 0 0 0 6 3.75c-1.052 0-2.062.18-3 .512v14.25A8.987 8.987 0 0 1 6 18c2.305 0 4.408.867 6 2.292m0-14.25a8.966 8.966 0 0 1 6-2.292c1.052 0 2.062.18 3 .512v14.25A8.987 8.987 0 0 0 18 18a8.967 8.967 0 0 0-6 2.292m0-14.25v14.25"/></svg>
+                        {{ __('Guías') }}
+                    </a>
+                @endif
                 {{-- Prompt 290 — only when the browser has offered installation, never once installed. --}}
                 <button type="button" role="menuitem" data-counter-install x-cloak class="{{ $menuItem }}"
                         x-data="{ can: !! window.cscInstallPrompt && ! window.matchMedia('(display-mode: standalone)').matches }"

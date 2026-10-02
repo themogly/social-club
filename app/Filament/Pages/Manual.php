@@ -3,6 +3,7 @@
 namespace App\Filament\Pages;
 
 use App\Models\User;
+use App\Support\Guides\GuideLibrary;
 use App\Support\Help;
 use BackedEnum;
 use Filament\Pages\Page;
@@ -52,6 +53,7 @@ class Manual extends Page
         $user = $user instanceof User ? $user : null;
 
         return [
+            'library' => GuideLibrary::visibleTo($user), // prompt 353 — the illustrated guides, above the task guides
             'guides' => Help::guidesVisibleTo($user),
             'topics' => Help::topicsVisibleTo($user),
             'eighthExample' => Help::eighthExample(),

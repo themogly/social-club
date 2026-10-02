@@ -5,6 +5,7 @@
     "scripts": {
         "build": "node scripts/vendor-ocr.mjs && vite build",
         "dev": "vite",
+        "guides:shots": "node scripts/guides-shots.mjs",
         "vendor:ocr": "node scripts/vendor-ocr.mjs"
     },
     "devDependencies": {

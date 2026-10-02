@@ -81,6 +81,7 @@ class ManageSettings extends Page
         'staff_discount_id' => SettingType::STRING, // prompt 347 — '' = none
         'discount_rounding' => SettingType::STRING, // prompt 350 — owner only: nearest | down | none
         'discount_rounding_scope' => SettingType::STRING, // prompt 350 — owner only: local | any | all
+        'guides_docs_enabled' => SettingType::BOOL, // prompt 353 — owner only: /docs, the guides on a staff phone by PIN
         'stock_count_show_expected' => SettingType::BOOL, // prompt 318 — Inventario
         'stock_count_tolerance_pct' => SettingType::INT,
         'stock_count_tolerance_g' => SettingType::INT,
@@ -382,6 +383,10 @@ class ManageSettings extends Page
                                 ->mapWithKeys(fn (array $s): array => [$s['route'] => $s['label']])->all())
                             ->required()
                             ->helperText(__('Qué destino ocupa el botón grande del inicio del mostrador. Quien no tenga permiso para abrirlo verá como principal el primero que sí pueda abrir.')),
+                        // Prompt 353 — owner only: off makes /docs a 404 and ends every phone signed in to it.
+                        Toggle::make('guides_docs_enabled')->label(__('Guías en el móvil (/docs)'))
+                            ->disabled(fn (): bool => ! (Auth::user()?->hasRole(Role::OWNER->value) ?? false))
+                            ->helperText(__('El personal abre las guías en su propio móvil con su PIN del mostrador: solo las guías, nada más.')),
                     ])->columns(2),
             ]);
     }
@@ -456,7 +461,7 @@ class ManageSettings extends Page
         // Prompt 326 — only the owner changes the edible equivalence (the field is disabled for anyone else; this holds
         // the line against a crafted payload too).
         if (! (Auth::user()?->hasRole(Role::OWNER->value) ?? false)) {
-            unset($state['edible_thc_mg_per_gram'], $state['discount_rounding'], $state['discount_rounding_scope']); // prompt 350 too
+            unset($state['edible_thc_mg_per_gram'], $state['discount_rounding'], $state['discount_rounding_scope'], $state['guides_docs_enabled']); // 350, 353 too
         }
 
         foreach (self::SCALARS as $key => $type) {

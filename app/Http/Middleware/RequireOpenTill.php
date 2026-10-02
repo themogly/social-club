@@ -71,6 +71,8 @@ class RequireOpenTill
         'counter/bar/receipt/*',    // reads of a committed sale
         'counter/formacion',        // prompt 324 — entering *Modo formación* (practising a till opening needs no till)
         'counter/formacion/salir',  // prompt 324 — leaving it
+        'counter/guias',            // prompt 353 — the guides: reading how the counter works needs no till
+        'counter/guias/*',
         'filament/*',               // Filament's own auth (log out) and asset routes
         'up',                       // health check
     ];

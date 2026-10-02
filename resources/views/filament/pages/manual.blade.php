@@ -3,6 +3,16 @@
          already filtered by the page to what the reader's role can do, so there is no gating in the view. --}}
     <div class="w-full max-w-3xl space-y-10">
 
+        {{-- Prompt 353 — the illustrated guides (resources/guides), the same ones staff open on the counter (⋯ → Guías)
+             and on their phone (/docs). Only the ones this reader's role may see. --}}
+        @if (count($library) > 0)
+            <section data-manual-guides>
+                <h2 class="text-base font-semibold text-gray-950 dark:text-white">{{ __('Guías') }}</h2>
+                <p class="mt-1 mb-3 text-sm text-gray-600 dark:text-gray-300">{{ __('Las guías ilustradas del club, con PDF. Siempre la versión actual.') }}</p>
+                @include('guides.partials.index', ['guides' => $library, 'link' => fn ($g) => \App\Filament\Pages\Guia::getUrl(['g' => $g->slug])])
+            </section>
+        @endif
+
         {{-- Task guides — the jobs people actually do. A short contents list, then each guide in full so the
              page prints and any step is reachable by anchor from the screen where the task starts. --}}
         @if (count($guides) > 0)

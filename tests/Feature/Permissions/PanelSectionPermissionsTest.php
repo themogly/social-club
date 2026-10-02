@@ -6,6 +6,7 @@ use App\Enums\Role;
 use App\Filament\Pages\Auth\ConfirmIdentity;
 use App\Filament\Pages\Dashboard;
 use App\Filament\Pages\Glosario;
+use App\Filament\Pages\Guia;
 use App\Filament\Pages\Manual;
 use App\Filament\Pages\RolesPermissions;
 use App\Filament\Pages\Seguridad;
@@ -194,8 +195,9 @@ class PanelSectionPermissionsTest extends TestCase
             }
         }
         foreach ($panel->getPages() as $page) {
-            // The home, the help, and *Confirma tu identidad* — the panel's own identity check, not a section.
-            if (in_array($page, [Dashboard::class, Manual::class, Glosario::class, ConfirmIdentity::class], true)) {
+            // The home, the help (Guia: one of the Manual's guides, prompt 353), and *Confirma tu identidad* — the panel's own
+            // identity check, not a section.
+            if (in_array($page, [Dashboard::class, Manual::class, Glosario::class, Guia::class, ConfirmIdentity::class], true)) {
                 continue;
             }
             if ($this->actingAs($staff->fresh())->get($page::getUrl())->status() !== 403) {

@@ -262,6 +262,10 @@ glossary in `DECISIONS.md`; never let "translate" slip into commercial framing (
   certify code no user can run. `tests/Feature/Cleanup/UnreachableCodeGuardTest` now guards it (every
   `app/Actions` class, every notification, every declared permission must be referenced from a non-test
   caller; a docblock mention never counts). When you build an Action, wire its trigger in the SAME branch.
+- **Guides (prompt 353).** When a change alters a screen, label or flow described in `resources/guides/en/*.md`, update
+  that guide in the same branch: the text, and the screenshot if the screen changed (`npm run guides:shots` for the
+  recipes in `resources/guides/shots.json`). Then bump `updated`. `tests/Feature/Guides` checks the front matter and that
+  every image a guide shows exists.
 - Idempotency: anything triggered by schedulers/webhooks must not double-fire (tested under retry).
 - **Tests prove CORRECTNESS, not COMPLETENESS.** No test catches a feature quietly shipped as a
   placeholder/stub. Periodically run the completeness check (grep TODO/FIXME/placeholder; walk pages

@@ -67,24 +67,36 @@ class CounterSurfaceTest extends TestCase
 
     public function test_exactly_one_pin_pad_exists_in_the_codebase(): void
     {
-        // Asserted by enumeration so the pair that existed today cannot quietly become a pair again.
-        $pads = [];
-        foreach (glob(resource_path('views/**/*.blade.php')) ?: [] as $ignored) {
-            // (glob is not recursive enough on its own; the iterator below does the walking)
-        }
-        $iterator = new \RecursiveIteratorIterator(new \RecursiveDirectoryIterator(resource_path('views')));
-        foreach ($iterator as $file) {
-            if (! $file->isFile() || ! str_ends_with($file->getFilename(), '.blade.php')) {
-                continue;
-            }
-            // The pad's digit push — its guard grew a "keys locked" check in prompt 286, the append is the marker.
-            if (str_contains((string) file_get_contents($file->getPathname()), 'this.pin.length < 8) this.pin += d')) {
-                $pads[] = str_replace(resource_path('views').'/', '', $file->getPathname());
+        // Asserted by enumeration so the pair that existed today cannot quietly become a pair again. Prompt 353 gave the
+        // pad a home of its own so /docs could use it: its digits live in app.js (window.pinEntry), its keys in ONE
+        // component (x-counter.pin-keys), and every PIN surface uses those rather than growing its own.
+        $digitLogic = [];
+        $keyGrids = [];
+        foreach ([resource_path('views'), resource_path('js')] as $root) {
+            $iterator = new \RecursiveIteratorIterator(new \RecursiveDirectoryIterator($root));
+            foreach ($iterator as $file) {
+                if (! $file->isFile() || ! preg_match('/\.(blade\.php|js)$/', $file->getFilename())) {
+                    continue;
+                }
+                $source = (string) file_get_contents($file->getPathname());
+                $name = str_replace(resource_path().'/', '', $file->getPathname());
+                // The pad's digit push — its guard grew a "keys locked" check in prompt 286, the append is the marker.
+                if (str_contains($source, 'this.pin.length < 8) this.pin += d')) {
+                    $digitLogic[] = $name;
+                }
+                if (str_contains($source, "@click=\"push('{{ \$digit }}')\" x-bind:disabled=\"keysLocked\"")) { // the PIN keys, not the weight pad
+                    $keyGrids[] = $name;
+                }
             }
         }
 
-        $this->assertSame(['livewire/counter/partials/counter-surface.blade.php'], $pads,
-            'There must be exactly ONE PIN pad. Two partials each grew their own once already.');
+        $this->assertSame(['js/app.js'], $digitLogic, 'There must be exactly ONE PIN pad. Two partials each grew their own once already.');
+        $this->assertSame(['views/components/counter/pin-keys.blade.php'], $keyGrids, 'One set of PIN keys.');
+        foreach (['livewire/counter/partials/counter-surface.blade.php', 'guides/docs-pin.blade.php'] as $user) {
+            $view = (string) file_get_contents(resource_path('views/'.$user));
+            $this->assertStringContainsString('<x-counter.pin-keys>', $view, "{$user} does not use the one pad");
+            $this->assertStringContainsString('...window.pinEntry(', $view, "{$user} does not use the one pad's digits");
+        }
     }
 
     public function test_the_retired_partials_are_gone_from_every_screen(): void

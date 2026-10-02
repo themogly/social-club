@@ -5,6 +5,7 @@ namespace Tests\Feature\Help;
 use App\Actions\Pricing\ResolvePrice;
 use App\Enums\Role;
 use App\Filament\Pages\Glosario;
+use App\Filament\Pages\Guia;
 use App\Filament\Pages\ManageEnforcement;
 use App\Filament\Pages\ManageSettings;
 use App\Filament\Pages\Manual;
@@ -85,7 +86,7 @@ class HelpGuidesTest extends TestCase
     /** Every concrete admin page — minus the abstract report base and the help pages themselves. @return list<class-string> */
     private function pageClasses(): array
     {
-        $exclude = [Glosario::class, Manual::class];
+        $exclude = [Glosario::class, Manual::class, Guia::class]; // the help pages themselves (Guia: prompt 353's guides)
         $classes = [];
         foreach (array_merge(
             glob(app_path('Filament/Pages/*.php')) ?: [],

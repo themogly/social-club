@@ -9,6 +9,7 @@
    loads) and silently do nothing in the browser. */
 @source '../../../../app/Filament/**/*';
 @source '../../../../resources/views/filament/**/*';
+@source '../../../../resources/views/guides/partials/**/*'; /* prompt 353 — the guide page, shared with the counter */
 /* The topbar switchers are Livewire views rendered inside the panel by render hooks in AdminPanelProvider
    (TOPBAR_START → LocationSwitcher, GLOBAL_SEARCH_AFTER → LocaleSwitcher). Their hand-written utilities
    (min-h-[1.5rem], bg-[var(--primary-600)], pl-3 …) were compiling only into app.css — the same miss as the
