@@ -132,8 +132,9 @@ class PanelTabletLayoutTest extends TestCase
         $css = (string) file_get_contents(base_path(self::THEME));
         $mobile = substr($css, (int) strpos($css, '@media (max-width: 1279px)'));
 
-        $this->assertMatchesRegularExpression("/td:last-child:has\\(\\.fi-dropdown-trigger \\[aria-expanded='true'\\]\\)\\s*\\{\\s*z-index: 20;/", $mobile);
-        $this->assertMatchesRegularExpression('/thead > tr > th:last-child\s*\{\s*z-index: 2;/', $mobile, 'the header must stay above the body rows');
+        // Prompt 354 — the selectors name the row-actions cell (one ⋮), no longer whatever cell is last.
+        $this->assertMatchesRegularExpression("/td:last-child:has\\(> \\.fi-ta-actions > :only-child\\):has\\(\\.fi-dropdown-trigger \\[aria-expanded='true'\\]\\)\\s*\\{\\s*z-index: 20;/", $mobile);
+        $this->assertMatchesRegularExpression('/thead > tr > th\.fi-ta-actions-header-cell:last-child\s*\{\s*z-index: 2;/', $mobile, 'the header must stay above the body rows');
 
         $dropdown = (string) file_get_contents(base_path('vendor/filament/support/resources/js/components/dropdown.js'));
         $this->assertStringContainsString("'aria-expanded',", $dropdown);

@@ -25,7 +25,6 @@ use Filament\Actions\RestoreBulkAction;
 use Filament\Forms\Components\Textarea;
 use Filament\Notifications\Notification;
 use Filament\Support\Enums\FontWeight;
-use Filament\Support\Enums\Size;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Filters\SelectFilter;
@@ -131,21 +130,20 @@ class BatchesTable
             // table. Retirada, Ajuste and Merma are all destructive or rare, which is exactly what
             // belongs behind a trigger (prompt 170).
             ->recordActions([
-                // Prompt 302 — moving stock is a store batch's MAIN job, not a rare one: its own button, before the ⋮.
-                BatchActions::transfer()->button()->outlined()->size(Size::Small)->labeledFrom('lg')
-                    ->extraAttributes(['class' => 'min-h-11 min-w-11'])
-                    ->tooltip(fn (Batch $record): string => BatchActions::transferLabel($record)),
                 // Prompt 340 — Precio first (the most used), the heavy ones last; and on a phone the panel is teleported
                 // out of the table's scroll box (which clipped it) and never taller than the screen, scrolling inside.
                 ActionGroup::make([
                     BatchActions::price(),
+                    // Prompt 354 — *Trasladar* (302: a store batch's main job) is second, after the most used, no longer a
+                    // button beside the ⋮: on a phone that button was pinned over the row.
+                    BatchActions::transfer()->tooltip(fn (Batch $record): string => BatchActions::transferLabel($record)),
                     // Prompt 305 — the same lote at more locations, beside the *Trasladar* button.
                     BatchActions::addParts(),
                     BatchActions::recount(), // prompt 305 — set the part to what the scale says (beside Ajuste)
+                    EditAction::make(),
                     self::adjustAction(),
                     self::mermaAction(),
-                    self::recallAction(),
-                    EditAction::make(),
+                    self::recallAction(), // destructive, last (344)
                 ])->dropdownTeleport()->dropdownMaxHeight('min(24rem, calc(100dvh - 7rem))'),
             ])
             ->toolbarActions([

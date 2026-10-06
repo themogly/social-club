@@ -5,6 +5,7 @@ namespace App\Filament\Resources\Convocatorias\Tables;
 use App\Enums\ConvocatoriaType;
 use App\Filament\Resources\Convocatorias\ConvocatoriaResource;
 use App\Models\Convocatoria;
+use Filament\Actions\ActionGroup;
 use Filament\Actions\DeleteAction;
 use Filament\Actions\EditAction;
 use Filament\Actions\ViewAction;
@@ -43,11 +44,14 @@ class ConvocatoriasTable
                     ->falseLabel(__('Borradores')),
             ])
             ->recordActions([
-                ViewAction::make(),
-                ConvocatoriaResource::issueAction(),
-                EditAction::make(),
-                ConvocatoriaResource::pdfAction(),
-                DeleteAction::make(),
+                // Prompt 354 — one ⋮ per row, never inline buttons: below 1280 px the actions cell is pinned over the row.
+                ActionGroup::make([
+                    ViewAction::make(),
+                    ConvocatoriaResource::issueAction(),
+                    EditAction::make(),
+                    ConvocatoriaResource::pdfAction(),
+                    DeleteAction::make(),
+                ]),
             ])
             // Day one of a real club, EVERY one of these tables is empty; a framework shrug is the
             // first thing a new owner sees (admin audit, Phase C). Say what the screen is for and

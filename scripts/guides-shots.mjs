@@ -52,11 +52,11 @@ const browser = await chromium.launch();
 // login rate limit, and the next page is then the login screen.
 const sessions = new Map();
 async function contextFor(recipe, options) {
-    const key = `${recipe.account}|${recipe.locked ? 'locked' : recipe.sede ?? 'Central Branch'}`;
+    const key = `${recipe.account}|${recipe.locked ? 'locked' : recipe.panel ? 'panel' : recipe.sede ?? 'Central Branch'}`;
     if (!sessions.has(key)) {
         const context = await browser.newContext(options);
         const page = await context.newPage();
-        if (recipe.locked) await signIn(page, { account: recipe.account });
+        if (recipe.locked || recipe.panel) await signIn(page, { account: recipe.account });
         else await signInToCounter(page, '/counter', { account: recipe.account, sede: recipe.sede ?? 'Central Branch' });
         sessions.set(key, await context.storageState());
         await context.close();
@@ -72,7 +72,7 @@ for (const [file, recipe] of Object.entries(manifest.shots)) {
     const context = await contextFor(recipe, { viewport: { width: w, height: h }, deviceScaleFactor: WIDTH / w, colorScheme: recipe.dark ? 'dark' : 'light' });
     const page = await context.newPage();
     try {
-        if (recipe.openTill && !recipe.locked) await openTill(page);
+        if (recipe.openTill && !recipe.locked && !recipe.panel) await openTill(page);
         await page.goto(`${BASE}${recipe.url}`, { waitUntil: 'networkidle' });
         await settle(page);
         const lang = await page.evaluate(() => document.documentElement.lang);

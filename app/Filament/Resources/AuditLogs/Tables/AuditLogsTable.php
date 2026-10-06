@@ -4,6 +4,7 @@ namespace App\Filament\Resources\AuditLogs\Tables;
 
 use App\Models\AuditLog;
 use App\Support\ActiveScope;
+use Filament\Actions\ActionGroup;
 use Filament\Actions\ViewAction;
 use Filament\Forms\Components\DatePicker;
 use Filament\Tables\Columns\TextColumn;
@@ -63,7 +64,10 @@ class AuditLogsTable
                         )),
             ])
             ->recordActions([
-                ViewAction::make(),
+                // Prompt 354 — one ⋮ per row, never inline buttons: below 1280 px the actions cell is pinned over the row.
+                ActionGroup::make([
+                    ViewAction::make(),
+                ]),
             ])
             // Day one of a real club, EVERY one of these tables is empty; a framework shrug is the
             // first thing a new owner sees (admin audit, Phase C). Say what the screen is for and

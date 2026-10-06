@@ -3,7 +3,7 @@ title: Manager guide
 summary: Strains, batches, moving stock, bar products, settings, and the daily and weekly routine.
 audience: managers
 order: 4
-updated: 2026-10-02
+updated: 2026-10-06
 ---
 
 > This guide is for owners and managers. Staff work at the counter; stock, prices, products and checks happen in **Administration**. Everything you change there is recorded in the audit log with your name.
@@ -97,7 +97,7 @@ Three different actions, depending on what really happened:
 
 | What happened | Use | Where |
 |---|---|---|
-| Stock physically taken from one location to another (for example from the store to a club) | **Transfer** (from a club) or **Assign to location** (from the store) | The button on the batch's row, or at the top of the batch page |
+| Stock physically taken from one location to another (for example from the store to a club) | **Transfer** (from a club) or **Assign to location** (from the store) | The row's ⋮ menu, or at the top of the batch page |
 | The same batch is already at another club and just needs recording there | **Add stock at another location** | Batch page, or the row's ⋮ menu |
 | You weighed it and the system figure is wrong | **Count** | Batch page, or the row's ⋮ menu |
 
@@ -127,16 +127,17 @@ Open a batch from the list to see everything about it: location, strain, name, b
 
 *A batch page: Assign to location, Price, Add stock at another location, Count, and More.*
 
-The **⋮** menu on each row of the Batches list has the rest:
+The **⋮** menu on each row of the Batches list has every action (tap the row itself to open the batch):
 
 | Menu item | When you would use it |
 |---|---|
 | **Price** | Change what members pay for this batch from now on. |
+| **Transfer** · **Assign to location** | Move stock to another location, as in section 5. |
 | **Add stock at another location** · **Count** | As in section 5. |
+| **Edit** | Change the name, notes, dates, photos or lab report. |
 | **Adjustment** | Correct the stock by a known amount, plus or minus, with a reason. |
 | **Wastage** | Stock lost, spoiled or destroyed. It is recorded as a loss, with a reason. |
 | **Recall** | Pull a whole batch from sale at every location, for example after a quality problem. |
-| **Edit** | Change the name, notes, dates, photos or lab report. |
 
 ![The row ⋮ menu on the Batches list.](img/manager-guide/c18.jpg)
 
@@ -159,9 +160,9 @@ Drinks, snacks, papers, lighters and merchandise are **products**, sold by unit 
 
 **When a delivery arrives,** use **Restock** on the product's row and type the units received. Do not edit the stock number directly: Restock records the delivery properly.
 
-![The Products list: price, stock and threshold per location, with Restock and Edit on each row.](img/manager-guide/c12.jpg)
+![The Products list: price, stock and threshold per location, with Restock and Edit in each row's ⋮ menu.](img/manager-guide/c12.jpg)
 
-*The Products list: price, stock and threshold per location, with Restock and Edit on each row.*
+*The Products list: price, stock and threshold per location, with Restock and Edit in each row's ⋮ menu.*
 
 ![Restock: type the units received.](img/manager-guide/c13-restock.jpg)
 

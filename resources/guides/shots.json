@@ -1,5 +1,5 @@
 {
-    "about": "Prompt 353 — how each guide screenshot is captured by `npm run guides:shots`. Run it against a site seeded with `php artisan csc:seed-staging` (the fictional demo club, prompt 327), with BASE_URL pointing at it. The guides show the ENGLISH screens: first set the demo accounts to English — php artisan tinker --execute=\"App\\\\Models\\\\User::query()->update(['locale' => 'en'])\" — or the script stops. Each recipe: url, account (owner | manager | staff — the harness accounts), viewport [w, h], member (chosen at the dispensary when its search is showing), steps, and an optional crop selector. Steps: {\"goto\": url}, {\"click\": selector}, {\"fill\": [selector, value]}, {\"press\": [selector, key]}, {\"wait\": ms}. Images are written at 1600 px wide (the viewport scaled), JPEG.",
+    "about": "Prompt 353 — how each guide screenshot is captured by `npm run guides:shots`. Run it against a site seeded with `php artisan csc:seed-staging` (the fictional demo club, prompt 327), with BASE_URL pointing at it. The guides show the ENGLISH screens: first set the demo accounts to English — php artisan tinker --execute=\"App\\\\Models\\\\User::query()->update(['locale' => 'en'])\" — or the script stops. Each recipe: url, account (owner | manager | staff — the harness accounts), viewport [w, h], member (chosen at the dispensary when its search is showing), steps, and an optional crop selector, and `panel: true` for an Administration screen (signed in, no counter PIN). Steps: {\"goto\": url}, {\"click\": selector}, {\"fill\": [selector, value]}, {\"press\": [selector, key]}, {\"wait\": ms}. Images are written at 1600 px wide (the viewport scaled), JPEG.",
     "seed": "csc:seed-staging",
     "locale": "en",
     "shots": {
@@ -106,6 +106,41 @@
                 820
             ],
             "openTill": true
+        },
+        "manager-guide/c05.jpg": {
+            "url": "/batches",
+            "account": "manager",
+            "viewport": [
+                1180,
+                1016
+            ],
+            "panel": true
+        },
+        "manager-guide/c12.jpg": {
+            "url": "/articles",
+            "account": "manager",
+            "viewport": [
+                1180,
+                1016
+            ],
+            "panel": true
+        },
+        "manager-guide/c18.jpg": {
+            "url": "/batches",
+            "account": "manager",
+            "viewport": [
+                1180,
+                842
+            ],
+            "panel": true,
+            "steps": [
+                {
+                    "click": ".fi-ta-table > tbody > tr:first-child .fi-ta-actions .fi-dropdown-trigger"
+                },
+                {
+                    "wait": 400
+                }
+            ]
         }
     }
 }

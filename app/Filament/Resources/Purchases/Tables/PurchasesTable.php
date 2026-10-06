@@ -3,6 +3,7 @@
 namespace App\Filament\Resources\Purchases\Tables;
 
 use App\Models\Purchase;
+use Filament\Actions\ActionGroup;
 use Filament\Actions\EditAction;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
@@ -37,7 +38,10 @@ class PurchasesTable
                     ->formatStateUsing(fn (string $state, Purchase $record): string => $record->batch?->displayName() ?? $state), // prompt 282, strain first since 298
             ])
             ->recordActions([
-                EditAction::make(),
+                // Prompt 354 — one ⋮ per row, never inline buttons: below 1280 px the actions cell is pinned over the row.
+                ActionGroup::make([
+                    EditAction::make(),
+                ]),
             ])
             // Day one of a real club, EVERY one of these tables is empty; a framework shrug is the
             // first thing a new owner sees (admin audit, Phase C). Say what the screen is for and

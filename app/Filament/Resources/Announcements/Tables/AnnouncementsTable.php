@@ -3,6 +3,7 @@
 namespace App\Filament\Resources\Announcements\Tables;
 
 use App\Models\Announcement;
+use Filament\Actions\ActionGroup;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteBulkAction;
 use Filament\Actions\EditAction;
@@ -34,7 +35,10 @@ class AnnouncementsTable
                 TrashedFilter::make(),
             ])
             ->recordActions([
-                EditAction::make(),
+                // Prompt 354 — one ⋮ per row, never inline buttons: below 1280 px the actions cell is pinned over the row.
+                ActionGroup::make([
+                    EditAction::make(),
+                ]),
             ])
             ->toolbarActions([
                 BulkActionGroup::make([

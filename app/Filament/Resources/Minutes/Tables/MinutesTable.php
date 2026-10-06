@@ -5,6 +5,7 @@ namespace App\Filament\Resources\Minutes\Tables;
 use App\Enums\MinuteBook;
 use App\Filament\Resources\Minutes\MinuteResource;
 use App\Models\Minute;
+use Filament\Actions\ActionGroup;
 use Filament\Actions\EditAction;
 use Filament\Actions\ViewAction;
 use Filament\Tables\Columns\TextColumn;
@@ -57,11 +58,14 @@ class MinutesTable
                     ->falseLabel(__('Borradores')),
             ])
             ->recordActions([
-                ViewAction::make(),
-                MinuteResource::signAction(),
-                EditAction::make(),
-                MinuteResource::correctAction(),
-                MinuteResource::pdfAction(),
+                // Prompt 354 — one ⋮ per row, never inline buttons: below 1280 px the actions cell is pinned over the row.
+                ActionGroup::make([
+                    ViewAction::make(),
+                    MinuteResource::signAction(),
+                    EditAction::make(),
+                    MinuteResource::correctAction(),
+                    MinuteResource::pdfAction(),
+                ]),
             ])
             // Day one of a real club, EVERY one of these tables is empty; a framework shrug is the
             // first thing a new owner sees (admin audit, Phase C). Say what the screen is for and

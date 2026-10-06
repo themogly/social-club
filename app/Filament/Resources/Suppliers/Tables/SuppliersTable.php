@@ -3,6 +3,7 @@
 namespace App\Filament\Resources\Suppliers\Tables;
 
 use App\Models\Supplier;
+use Filament\Actions\ActionGroup;
 use Filament\Actions\EditAction;
 use Filament\Tables\Columns\IconColumn;
 use Filament\Tables\Columns\TextColumn;
@@ -14,7 +15,8 @@ class SuppliersTable
     public static function configure(Table $table): Table
     {
         return $table
-            ->defaultSort('name')
+            // Prompt 354 — newest first like every list (it was A–Z); the name header still sorts.
+            ->defaultSort('created_at', 'desc')
             // Balance owing = Σ(amount − paid) across the supplier's purchases, aggregated
             // in one query (no N+1). Soft-deleted purchases are excluded by the relation scope.
             ->modifyQueryUsing(fn (Builder $query): Builder => $query
@@ -33,7 +35,10 @@ class SuppliersTable
                 IconColumn::make('active')->label(__('Activo'))->boolean(),
             ])
             ->recordActions([
-                EditAction::make(),
+                // Prompt 354 — one ⋮ per row, never inline buttons: below 1280 px the actions cell is pinned over the row.
+                ActionGroup::make([
+                    EditAction::make(),
+                ]),
             ])
             // Day one of a real club, EVERY one of these tables is empty; a framework shrug is the
             // first thing a new owner sees (admin audit, Phase C). Say what the screen is for and
