@@ -19811,3 +19811,103 @@ through 316's one display rule, `NumberFormat::decimal()`, following the existin
   - **Panel (1440), light and dark:** the Manual lists the 4 guides above its topics, and the manager guide opens with
     its way back.
   - No page errors.
+
+## Prompt 354 — admin tables work on an iPhone, every list is newest first, and "Joined" means joined
+
+### Row actions are always one ⋮; the row opens the record
+
+- **Every list screen's row actions are a single `ActionGroup`.** There are 26 list screens; 24 changed. Members and
+  Strains already were. Two earlier pins move with this:
+  - `MoveStockButtonTest` (302's separate *Trasladar* button) now asserts it's the ⋮'s second line;
+  - `BatchPriceOnThePageTest` (340's order) now expects Precio, Trasladar, …, Editar, then the heavy ones last.
+  - The order inside each group keeps the screen's sense, with destructive actions last (344).
+  - **Batches:** *Trasladar* is the second item, after *Precio* (340's most used; 302's "main job" button is now the ⋮'s second line), and *Editar*
+    moves above *Ajuste / Merma / Retirada*.
+  - **Data requests:** the erasure moves after *Marcar resuelta*.
+  - **Applications:** *Ver*, *Editar*, then either the review set (Aprobar / Lista de espera / Rechazar) or the open
+    invitation's (copy / resend / revoke). The two sets never show on one row, so each row ends on its destructive
+    one. The review actions stay on the application's own page.
+- **`tests/Feature/Panel/ListScreensTest`** asserts every one of the 26 list pages has zero row actions or exactly one
+  `ActionGroup`. A new inline action fails CI by name. It was red with 24 resources listed.
+- **The row opens the record.** Filament's resource default (`recordUrl`: View, else Edit) already did this. The test
+  pins it on Applications, Articles and Dispensations (green before and after), so nobody needs a button to open a
+  record.
+
+### Only the actions cell is pinned, with a width guard
+
+- **The 321 rule pinned `th:last-child` / `td:last-child`, whatever the last cell was.** It now pins:
+  - the body cell `td:last-child:has(> .fi-ta-actions > :only-child)` (Filament v5's row-actions wrapper, holding ONE
+    element: the ⋮);
+  - the header `th.fi-ta-actions-header-cell:last-child`, unless some row holds two actions.
+- **A table with no row actions pins nothing.** Expenses had pinned its last DATA column; it now pins nothing.
+- **The width guard is the `:only-child`.** If a resource ever shows two actions side by side again, nothing is pinned
+  and the row scrolls normally, so the data stays visible instead of being covered. The group test above stops that
+  happening in the first place.
+- **Kept:** 321's open-dropdown z-index (now keyed on the same selector), the opaque light and dark backgrounds, and
+  the right-edge scroll fade. Desktop (≥1280) is unchanged. The ⋮ trigger keeps 345's 44 px coarse-pointer hit area.
+
+### Newest first everywhere
+
+- **Every list without a default sort is now newest first:**
+  - Members by `joined_at` desc, then `member_no` desc;
+  - Applications, Articles, Strains, Discounts, Expense categories, Sedes, Tiers and Users by `created_at` desc.
+- **Suppliers moves off A–Z** (Ben: "all the entries") to `created_at` desc. Its name header still sorts, like every
+  sortable header.
+- **Document templates keep `version` desc.** The newest version is the newest entry.
+- **Batches keep their own sort** (expiry/FEFO, 302).
+- **A sort persisted in the session** (`persistSortInSession`) still wins, unchanged.
+- **Tested per resource:** two rows a day apart, the OLDER one alphabetically first, so A–Z or database order would
+  fail. All 10 were red before.
+
+### Members: «Membresía», not a second «Alta»
+
+- **The badge after the member number** was labelled «Alta» ("Joined") and read «Completa». It says whether the
+  member has an active membership (prompt 93). It's now **«Membresía»** (Membership): **«Activa» / «Sin membresía»**
+  (Active / No membership), tooltip unchanged.
+- **`joined_at` is the one «Alta» column.**
+- **A new test fails on any list screen with two columns sharing a label.** Only Members had one.
+
+### Proof (`tests/Browser/prove-354-phone-tables.mjs`)
+
+- **The setup:** Playwright `devices['iPhone 15']` (393×852), as the owner, on a fresh demo DB plus one factory row in
+  every list the demo leaves empty, so all 26 are measured, in dark and light.
+- **For each list's first row, three checks:**
+  - the pinned cell is ≤ 72 px (one ⋮ plus padding);
+  - the first column's TEXT ends left of the pinned cell (Batches' «Lote» box runs under the ⋮ by its own padding while
+    every word is clear);
+  - no data column is pinned.
+- **Before** (the old code and CSS on the same DB, dark): 19 of 26 failed. Applications and Suppliers had no rows in
+  that run; Ben's report measured Applications at 457 px.
+
+  | screen | pinned | |
+  |---|---|---|
+  | Message threads | 467 px, 4 actions | first column covered |
+  | Convocatorias | 436 px, 5 actions | first column covered |
+  | Minutes | 276 px, 4 actions | first column covered |
+  | Dispensations | 182 px, 2 actions | |
+  | Articles | 175 px, 2 actions | |
+  | Document templates | 144 px | |
+  | Data requests | 143 px | |
+  | Expenses | 104 px | **pins a data column** |
+  | Batches | 88 px, 3 actions | first column covered |
+  | Announcements, Breach logs, Discounts, Events, Expense categories, Sedes, Tiers, Purchases, Users | 87 px | |
+  | Audit log, Member documents, Orders, Tills | 71 px | |
+  | Members, Strains | 48 px (⋮) | fine |
+
+- **After:** 52/52 PASS. Every list pins one 48 px ⋮, Expenses pins nothing, and every first column is clear.
+- **Screenshots** (`storage/app/screenshots/354/`): Applications, Members and Dispensations, light and dark.
+
+### The guides, updated in the same branch (353's rule)
+
+- **`manager-guide.md`** (`updated: 2026-10-06`):
+  - *Transfer / Assign to location* is now "the row's ⋮ menu" (it was a row button);
+  - the batch row-menu table lists *Transfer* second and *Edit* before the heavy ones, matching the new order;
+  - Products' *Restock / Edit* are "in each row's ⋮ menu".
+- **Three screenshots regenerated** (the screens changed): `manager-guide/c05` (the Batches list), `c12` (Products)
+  and `c18` (the Batches row ⋮ open). They now have recipes in `resources/guides/shots.json`, with a new
+  `panel: true` flag for Administration screens (signed in with no counter PIN). They were captured with
+  `npm run guides:shots -- manager-guide` against a fresh demo DB with English accounts.
+- **Nothing else in the guides** describes the changed lists: no Members «Alta» column, no list order.
+- **A flake fixed in passing:** `CashPotsTest`'s handover test (349) picked "the latest closed shift" when both
+  handovers closed in the same second. ULIDs minted in one millisecond have no order, so it sometimes read the first
+  shift. The test now moves the clock a minute between the handovers.

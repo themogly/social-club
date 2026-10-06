@@ -3,6 +3,7 @@
 namespace App\Filament\Resources\DocumentTemplates\Tables;
 
 use App\Filament\Resources\DocumentTemplates\DocumentTemplateResource;
+use Filament\Actions\ActionGroup;
 use Filament\Actions\EditAction;
 use Filament\Tables\Columns\IconColumn;
 use Filament\Tables\Columns\TextColumn;
@@ -31,7 +32,10 @@ class DocumentTemplatesTable
                     ->options(DocumentTemplateResource::typeOptions()),
             ])
             ->recordActions([
-                EditAction::make()->label(__('Nueva versión')),
+                // Prompt 354 — one ⋮ per row, never inline buttons: below 1280 px the actions cell is pinned over the row.
+                ActionGroup::make([
+                    EditAction::make()->label(__('Nueva versión')),
+                ]),
             ])
             // Day one of a real club, EVERY one of these tables is empty; a framework shrug is the
             // first thing a new owner sees (admin audit, Phase C). Say what the screen is for and

@@ -109,8 +109,10 @@ class BatchPriceOnThePageTest extends TestCase
     {
         $table = (string) file_get_contents(app_path('Filament/Resources/Batches/Tables/BatchesTable.php'));
         preg_match('/ActionGroup::make\(\[(.*?)\]\)/s', $table, $group);
-        preg_match_all('/(BatchActions::\w+|self::\w+Action|EditAction)/', $group[1] ?? '', $items);
-        $this->assertSame(['BatchActions::price', 'BatchActions::addParts', 'BatchActions::recount', 'self::adjustAction', 'self::mermaAction', 'self::recallAction', 'EditAction'], $items[1]);
+        preg_match_all('/(BatchActions::\w+(?=\(\))|self::\w+Action|EditAction)/', $group[1] ?? '', $items);
+        // Prompt 354 — *Trasladar* joined the ⋮ (second, after Precio), and Editar moved above the heavy ones, which stay
+        // last (344: destructive last).
+        $this->assertSame(['BatchActions::price', 'BatchActions::transfer', 'BatchActions::addParts', 'BatchActions::recount', 'EditAction', 'self::adjustAction', 'self::mermaAction', 'self::recallAction'], $items[1]);
     }
 
     // --- 4 (structure) + 5. The header, and what stays locked ------------------------------------------------------------------

@@ -7,6 +7,7 @@ use App\Enums\StockMovementType;
 use App\Filament\Resources\Articles\Actions\AddToSedesAction;
 use App\Models\Article;
 use Filament\Actions\Action;
+use Filament\Actions\ActionGroup;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteBulkAction;
 use Filament\Actions\EditAction;
@@ -27,6 +28,8 @@ class ArticlesTable
     public static function configure(Table $table): Table
     {
         return $table
+            // Prompt 354 (Ben: "the latest first on all the entries") — newest first; every header still sorts.
+            ->defaultSort('created_at', 'desc')
             ->columns([
                 TextColumn::make('name')->label(__('Nombre'))->searchable()->sortable(),
                 // Prompt 297 — the same product can now be at several sedes; in the rollup the rows must say which.
@@ -50,9 +53,12 @@ class ArticlesTable
                 TrashedFilter::make(),
             ])
             ->recordActions([
-                self::restockAction(),
-                AddToSedesAction::make(),
-                EditAction::make(),
+                // Prompt 354 — one ⋮ per row, never inline buttons: below 1280 px the actions cell is pinned over the row.
+                ActionGroup::make([
+                    self::restockAction(),
+                    AddToSedesAction::make(),
+                    EditAction::make(),
+                ]),
             ])
             ->toolbarActions([
                 BulkActionGroup::make([

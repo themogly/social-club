@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\ExpenseCategories\Tables;
 
+use Filament\Actions\ActionGroup;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteBulkAction;
 use Filament\Actions\EditAction;
@@ -14,6 +15,8 @@ class ExpenseCategoriesTable
     public static function configure(Table $table): Table
     {
         return $table
+            // Prompt 354 (Ben: "the latest first on all the entries") — newest first; every header still sorts.
+            ->defaultSort('created_at', 'desc')
             ->columns([
                 TextColumn::make('name')->label(__('Nombre'))->searchable()->sortable(),
                 TextColumn::make('default_kind')->label(__('Tipo por defecto'))->badge(),
@@ -23,7 +26,10 @@ class ExpenseCategoriesTable
                 //
             ])
             ->recordActions([
-                EditAction::make(),
+                // Prompt 354 — one ⋮ per row, never inline buttons: below 1280 px the actions cell is pinned over the row.
+                ActionGroup::make([
+                    EditAction::make(),
+                ]),
             ])
             ->toolbarActions([
                 BulkActionGroup::make([

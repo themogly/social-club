@@ -195,6 +195,9 @@ class CashPotsTest extends TestCase
         $closed = $session->shifts()->whereNotNull('closed_at')->latest('closed_at')->first();
         $this->assertSame(0, (int) $closed->getRawOriginal('variance_cents'));
 
+        // A minute later: two handovers in one second tie on closed_at, and ULIDs minted in one millisecond have no
+        // guaranteed order, so «the latest shift» was sometimes the first one (a flake seen on 6 Oct 2026).
+        $this->travel(1)->minutes();
         (new HandOverTill)->handle($session->fresh(), 13500, $next, $this->owner);
         $second = $session->shifts()->whereNotNull('closed_at')->orderByDesc('closed_at')->orderByDesc('id')->first();
         $this->assertSame(1500, (int) $second->getRawOriginal('variance_cents'));

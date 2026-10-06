@@ -33,6 +33,8 @@ class GeneticsTable
     public static function configure(Table $table): Table
     {
         return $table
+            // Prompt 354 (Ben: "the latest first on all the entries") — newest first; every header still sorts.
+            ->defaultSort('created_at', 'desc')
             ->columns([
                 TextColumn::make('name')->label(__('Nombre'))->searchable()->sortable(),
                 // Derived completeness (prompt 93) — NEVER stored. A genetic can be Active + Published and

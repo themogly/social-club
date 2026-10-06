@@ -28,6 +28,8 @@ class MembersTable
     public static function configure(Table $table): Table
     {
         return $table
+            // Prompt 354 (Ben: "the latest first on all the entries") — newest first; every header still sorts.
+            ->defaultSort(fn (Builder $query): Builder => $query->orderByDesc('joined_at')->orderByDesc('member_no'))
             // Wallet balance is a DERIVED column — sum it in ONE aggregate subquery (across all
             // locations), never a per-row query, so the list stays fast on thousands of members.
             ->modifyQueryUsing(fn (Builder $query): Builder => $query->withSum(
@@ -37,10 +39,12 @@ class MembersTable
             ->columns([
                 TextColumn::make('member_no')->label(__('Nº socio'))->searchable()->sortable(),
                 // Derived (prompt 93): a member with no active membership cannot be dispensed to. Never stored.
+                // Prompt 354 — it said «Alta: Completa» ("Joined: Complete"): it is the MEMBERSHIP, not the join date (that is
+                // `joined_at`, the one «Alta» column).
                 TextColumn::make('membership_gap')
-                    ->label(__('Alta'))
+                    ->label(__('Membresía'))
                     ->badge()
-                    ->state(fn (Member $record): string => $record->hasActiveMembership() ? __('Completa') : __('Sin membresía'))
+                    ->state(fn (Member $record): string => $record->hasActiveMembership() ? __('Activa') : __('Sin membresía'))
                     ->color(fn (Member $record): string => $record->hasActiveMembership() ? 'success' : 'warning')
                     ->tooltip(fn (Member $record): ?string => $record->hasActiveMembership() ? null : __('Sin una membresía activa no se le puede dispensar. Enrola una cuota.')),
                 TextColumn::make('first_name')->label(__('Nombre'))->searchable()->sortable(),

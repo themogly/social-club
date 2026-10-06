@@ -8,6 +8,7 @@ use App\Enums\ExpensePaidFrom;
 use App\Models\Expense;
 use App\Models\User;
 use Filament\Actions\Action;
+use Filament\Actions\ActionGroup;
 use Filament\Actions\EditAction;
 use Filament\Forms\Components\DatePicker;
 use Filament\Notifications\Notification;
@@ -101,10 +102,13 @@ class ExpensesTable
                         )),
             ])
             ->recordActions([
-                self::approveAction(),
-                // Editing is overheads-only — petty-cash rows belong to a till reconciliation.
-                EditAction::make()
-                    ->visible(fn (Expense $record): bool => $record->kind === ExpenseKind::OVERHEAD),
+                // Prompt 354 — one ⋮ per row, never inline buttons: below 1280 px the actions cell is pinned over the row.
+                ActionGroup::make([
+                    self::approveAction(),
+                    // Editing is overheads-only — petty-cash rows belong to a till reconciliation.
+                    EditAction::make()
+                        ->visible(fn (Expense $record): bool => $record->kind === ExpenseKind::OVERHEAD),
+                ]),
             ])
             // Day one of a real club, EVERY one of these tables is empty; a framework shrug is the
             // first thing a new owner sees (admin audit, Phase C). Say what the screen is for and

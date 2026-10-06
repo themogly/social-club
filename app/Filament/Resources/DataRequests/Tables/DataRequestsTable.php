@@ -5,6 +5,7 @@ namespace App\Filament\Resources\DataRequests\Tables;
 use App\Enums\DataRequestType;
 use App\Filament\Resources\DataRequests\DataRequestResource;
 use App\Models\DataRequest;
+use Filament\Actions\ActionGroup;
 use Filament\Tables\Columns\IconColumn;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Filters\Filter;
@@ -48,9 +49,12 @@ class DataRequestsTable
                     ->query(fn (Builder $query): Builder => $query->whereNull('completed_at')),
             ])
             ->recordActions([
-                DataRequestResource::fulfilExportAction(),
-                DataRequestResource::fulfilErasureAction(),
-                DataRequestResource::markResolvedAction(),
+                // Prompt 354 — one ⋮ per row, never inline buttons: below 1280 px the actions cell is pinned over the row.
+                ActionGroup::make([
+                    DataRequestResource::fulfilExportAction(),
+                    DataRequestResource::markResolvedAction(),
+                    DataRequestResource::fulfilErasureAction(), // destructive, last (344)
+                ]),
             ])
             // Day one of a real club, EVERY one of these tables is empty; a framework shrug is the
             // first thing a new owner sees (admin audit, Phase C). Say what the screen is for and

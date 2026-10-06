@@ -5,6 +5,7 @@ namespace App\Filament\Resources\MemberApplications\Tables;
 use App\Enums\ApplicationStatus;
 use App\Filament\Resources\MemberApplications\MemberApplicationResource;
 use App\Models\MemberApplication;
+use Filament\Actions\ActionGroup;
 use Filament\Actions\EditAction;
 use Filament\Actions\ViewAction;
 use Filament\Tables\Columns\TextColumn;
@@ -16,6 +17,8 @@ class MemberApplicationsTable
     public static function configure(Table $table): Table
     {
         return $table
+            // Prompt 354 (Ben: "the latest first on all the entries") — newest first; every header still sorts.
+            ->defaultSort('created_at', 'desc')
             ->columns([
                 TextColumn::make('applicant')
                     ->label(__('Solicitante'))
@@ -63,11 +66,15 @@ class MemberApplicationsTable
                     }),
             ])
             ->recordActions([
-                // Invitation lifecycle actions shared with the View page (prompt 154) — copy link / resend / revoke.
-                ...MemberApplicationResource::inviteActions(),
-                ViewAction::make(),
-                ...MemberApplicationResource::recordActions(),
-                EditAction::make(),
+                // Prompt 354 — one ⋮ per row, never inline buttons: below 1280 px the actions cell is pinned over the row.
+                ActionGroup::make([
+                    ViewAction::make(),
+                    EditAction::make(),
+                    // A submitted application: Aprobar / Lista de espera / Rechazar. An open invitation (prompt 154): copy the
+                    // link / resend / revoke. The two sets never show on one row, so each row ends on its destructive one.
+                    ...MemberApplicationResource::recordActions(),
+                    ...MemberApplicationResource::inviteActions(),
+                ]),
             ])
             // Day one of a real club, EVERY one of these tables is empty; a framework shrug is the
             // first thing a new owner sees (admin audit, Phase C). Say what the screen is for and

@@ -5,6 +5,7 @@ namespace App\Filament\Resources\MemberDocuments\Tables;
 use App\Enums\MemberDocumentType;
 use App\Filament\Resources\MemberDocuments\MemberDocumentResource;
 use App\Models\MemberDocument;
+use Filament\Actions\ActionGroup;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
@@ -36,7 +37,10 @@ class MemberDocumentsTable
                         ->all()),
             ])
             ->recordActions([
-                MemberDocumentResource::viewDocumentAction(),
+                // Prompt 354 — one ⋮ per row, never inline buttons: below 1280 px the actions cell is pinned over the row.
+                ActionGroup::make([
+                    MemberDocumentResource::viewDocumentAction(),
+                ]),
             ])
             // Day one of a real club, EVERY one of these tables is empty; a framework shrug is the
             // first thing a new owner sees (admin audit, Phase C). Say what the screen is for and

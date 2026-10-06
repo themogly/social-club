@@ -16,7 +16,6 @@ use App\Models\User;
 use App\Support\ActiveScope;
 use App\Support\Weight;
 use Database\Seeders\RolePermissionSeeder;
-use Filament\Actions\Action;
 use Filament\Actions\ActionGroup;
 use Filament\Facades\Filament;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -66,17 +65,19 @@ class MoveStockButtonTest extends TestCase
 
     // --- 1–2. The row button ------------------------------------------------------------------------------------------
 
-    public function test_the_move_button_is_its_own_row_action_worded_for_where_the_batch_is(): void
+    public function test_the_move_action_is_second_in_the_row_menu_worded_for_where_the_batch_is(): void
     {
         $inStore = $this->batchAt($this->store);
         $atSede = $this->batchAt($this->sede);
 
         $list = Livewire::test(ListBatches::class);
+        // Prompt 354 reverses 302's separate button: on a phone it was pinned over the row. It is the ⋮'s SECOND line, after
+        // Precio — every list's row actions are one group (ListScreensTest).
         $topLevel = collect($list->instance()->getTable()->getRecordActions());
-        $this->assertTrue($topLevel->contains(fn ($a): bool => $a instanceof Action && $a->getName() === 'transfer'), 'the move action is not a row button of its own');
+        $this->assertCount(1, $topLevel);
         $inGroup = $topLevel->filter(fn ($a): bool => $a instanceof ActionGroup)
-            ->flatMap(fn (ActionGroup $g): array => $g->getActions())->map(fn ($a) => $a->getName());
-        $this->assertNotContains('transfer', $inGroup->all(), 'the move action is still inside the ⋮ menu');
+            ->flatMap(fn (ActionGroup $g): array => $g->getActions())->map(fn ($a) => $a->getName())->values();
+        $this->assertSame('transfer', $inGroup[1] ?? null, 'the move action is not the second item of the ⋮ menu');
 
         $list->assertTableActionVisible('transfer', $inStore)->assertTableActionHasLabel('transfer', __('Asignar a sede'), $inStore);
         app(ActiveScope::class)->setLocation(null);

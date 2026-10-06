@@ -5,6 +5,7 @@ namespace App\Filament\Resources\MessageThreads\Tables;
 use App\Enums\MessageThreadStatus;
 use App\Filament\Resources\MessageThreads\MessageThreadResource;
 use App\Models\MessageThread;
+use Filament\Actions\ActionGroup;
 use Filament\Actions\ViewAction;
 use Filament\Tables\Columns\IconColumn;
 use Filament\Tables\Columns\TextColumn;
@@ -45,8 +46,11 @@ class MessageThreadsTable
                     ->options(collect(MessageThreadStatus::cases())->mapWithKeys(fn (MessageThreadStatus $s): array => [$s->value => $s->label()])->all()),
             ])
             ->recordActions([
-                ViewAction::make(),
-                ...MessageThreadResource::recordActions(),
+                // Prompt 354 — one ⋮ per row, never inline buttons: below 1280 px the actions cell is pinned over the row.
+                ActionGroup::make([
+                    ViewAction::make(),
+                    ...MessageThreadResource::recordActions(),
+                ]),
             ])
             ->emptyStateHeading(__('Sin mensajes'))
             ->emptyStateDescription(__('Cuando un socio escriba al club desde su app, su conversación aparecerá aquí.'));

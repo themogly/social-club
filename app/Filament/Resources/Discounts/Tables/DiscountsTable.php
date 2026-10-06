@@ -5,6 +5,7 @@ namespace App\Filament\Resources\Discounts\Tables;
 use App\Enums\DiscountMode;
 use App\Models\Discount;
 use App\Support\Percent;
+use Filament\Actions\ActionGroup;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteBulkAction;
 use Filament\Actions\EditAction;
@@ -19,6 +20,8 @@ class DiscountsTable
     public static function configure(Table $table): Table
     {
         return $table
+            // Prompt 354 (Ben: "the latest first on all the entries") — newest first; every header still sorts.
+            ->defaultSort('created_at', 'desc')
             ->columns([
                 TextColumn::make('name')->label(__('Nombre'))->searchable()->sortable(),
                 TextColumn::make('kind')->label(__('Tipo'))->badge(),
@@ -34,7 +37,10 @@ class DiscountsTable
                 TrashedFilter::make(),
             ])
             ->recordActions([
-                EditAction::make(),
+                // Prompt 354 — one ⋮ per row, never inline buttons: below 1280 px the actions cell is pinned over the row.
+                ActionGroup::make([
+                    EditAction::make(),
+                ]),
             ])
             ->toolbarActions([
                 BulkActionGroup::make([

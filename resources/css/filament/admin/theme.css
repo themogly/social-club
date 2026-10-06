@@ -36,10 +36,17 @@
 /* 1. The row-actions cell is pinned to the right edge of the table's own scroller, so the action trigger
       is on screen at every width no matter how far the table is scrolled. This is what actually answers
       the report: the actions can no longer be the thing that falls off. Header and body are both pinned
-      so the column does not shear when scrolled. */
+      so the column does not shear when scrolled.
+
+      Prompt 354 — ONLY the row-actions cell, and only while it holds ONE thing (the ⋮ of an ActionGroup). It pinned
+      `:last-child`, whatever that was: Applications' inline «Ver · Aprobar · Lista de espera · Rechazar» became a 457 px
+      sticky cell on a 361 px table (every data column covered), and Expenses, with no actions, pinned a DATA column.
+      Every list now groups its row actions (ListScreensTest), and this is the width guard behind that: if a table
+      ever shows two actions side by side again, nothing is pinned and the row scrolls normally — the data stays
+      visible rather than being covered. */
 @media (max-width: 1279px) {
-    .fi-ta-table > thead > tr > th:last-child,
-    .fi-ta-table > tbody > tr > td:last-child {
+    .fi-ta-table:not(:has(> tbody > tr > td:last-child > .fi-ta-actions > :nth-child(2))) > thead > tr > th.fi-ta-actions-header-cell:last-child,
+    .fi-ta-table > tbody > tr > td:last-child:has(> .fi-ta-actions > :only-child) {
         position: sticky;
         right: 0;
         z-index: 1;
@@ -49,8 +56,8 @@
         box-shadow: -1px 0 0 0 var(--fi-color-gray-200, #e2e8f0);
     }
 
-    .dark .fi-ta-table > thead > tr > th:last-child,
-    .dark .fi-ta-table > tbody > tr > td:last-child {
+    .dark .fi-ta-table:not(:has(> tbody > tr > td:last-child > .fi-ta-actions > :nth-child(2))) > thead > tr > th.fi-ta-actions-header-cell:last-child,
+    .dark .fi-ta-table > tbody > tr > td:last-child:has(> .fi-ta-actions > :only-child) {
         background-color: var(--fi-color-gray-900, #0f172a);
         box-shadow: -1px 0 0 0 var(--fi-color-gray-700, #334155);
     }
@@ -60,11 +67,11 @@
        open menu. The cell whose dropdown is open is raised to Filament's own dropdown layer (20; the topbar is 30).
        Keyed on `aria-expanded="true"`, which Filament's dropdown.js keeps on the real trigger exactly while the panel
        is displayed (click, click-away, Escape, morph). The header stays above the body rows. */
-    .fi-ta-table > thead > tr > th:last-child {
+    .fi-ta-table > thead > tr > th.fi-ta-actions-header-cell:last-child {
         z-index: 2;
     }
 
-    .fi-ta-table > tbody > tr > td:last-child:has(.fi-dropdown-trigger [aria-expanded='true']) {
+    .fi-ta-table > tbody > tr > td:last-child:has(> .fi-ta-actions > :only-child):has(.fi-dropdown-trigger [aria-expanded='true']) {
         z-index: 20;
     }
 }
