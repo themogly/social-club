@@ -156,6 +156,51 @@ window.dispensaryPadMath = {
 // pane at md+, the page below it) ONLY when it is not already fully visible, smoothly unless the operator asked for
 // reduced motion, and focused so the physical keyboard (292) types into the pad at once. No request: the panel mounts
 // with the render `chooseGenetic` already makes.
+// Prompt 358 — where the dispensary leaves the operator. A strain tap remembers where the list was (the pad then comes
+// into view, 333); «Cancelar» puts it back, so a mis-tap never loses the place. «Añadir» brings back the strain search,
+// cleared, at the top of the list, ready for the next item: focused only where there is a fine pointer (a mouse or a
+// trackpad, so a keyboard is likely), and otherwise just shown and highlighted — focusing a box on a touch tablet pops
+// the on-screen keyboard over half the counter (Ben's decision). The pane scrolls at md+; below that, the page does.
+window.counterPane = {
+    saved: null,
+    pane() {
+        const pane = document.querySelector('[data-selection-pane]');
+        return pane && getComputedStyle(pane).overflowY !== 'visible' && pane.scrollHeight > pane.clientHeight ? pane : null;
+    },
+    remember() {
+        const pane = this.pane();
+        this.saved = pane ? { pane: true, top: pane.scrollTop } : { pane: false, top: window.scrollY };
+    },
+    restore() {
+        const saved = this.saved;
+        this.saved = null;
+        if (!saved) return;
+        requestAnimationFrame(() => requestAnimationFrame(() => {
+            const pane = document.querySelector('[data-selection-pane]');
+            if (saved.pane && pane) pane.scrollTop = saved.top;
+            else window.scrollTo({ top: saved.top });
+        }));
+    },
+    toSearch() {
+        this.saved = null;
+        requestAnimationFrame(() => requestAnimationFrame(() => {
+            const search = document.querySelector('[data-genetic-search]');
+            if (!search) return;
+            const pane = this.pane();
+            if (pane) pane.scrollTop = 0;
+            else search.scrollIntoView({ block: 'center' });
+            if (window.matchMedia('(any-pointer: fine)').matches) {
+                search.focus({ preventScroll: true });
+            } else {
+                search.setAttribute('data-search-ready', '');
+                setTimeout(() => search.removeAttribute('data-search-ready'), 1500);
+            }
+        }));
+    },
+};
+window.addEventListener('weight-entry-cancelled', () => window.counterPane.restore());
+window.addEventListener('basket-line-added', () => window.counterPane.toSearch());
+
 window.bringIntoView = (el) => {
     if (! el) return;
     const pane = el.closest('[data-selection-pane]');

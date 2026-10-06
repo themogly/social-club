@@ -20024,3 +20024,76 @@ through 316's one display rule, `NumberFormat::decimal()`, following the existin
   - 354's iPhone sweep, re-run on the same DB: still 52/52 (the Batches pin is 48 px; the first column is clear).
 - **The guide:** `manager-guide.md` explains *Date added* / *Received*. `c05` and `c18` were regenerated with their
   recipes (English accounts, fresh demo DB) so the list shows the new column.
+
+## Prompt 358 — adding more of a strain doesn't mean finding it again: lines merge, lines can be edited, and Add lands on the strain search
+
+### The same strain merges into one line
+
+- **`DispensaryPos::addLine()` no longer always appends.** A strain already in the basket with the **same batch
+  selection** adds to that line's amount, in grams or units:
+  - automatic batches (FEFO): any re-add merges;
+  - a manual lote: it merges only with that lote's line, and a different lote is its own line (tested).
+- **The merged line is priced as one line on its total** (per gram, the eighth break, discounts). "A couple of
+  grams" is one amount: 2.00 g + 1.50 g is one 3.50 g line that gets the eighth (tested). Bar items are out of scope:
+  their basket is separate (263).
+- **A brief «+1.00 g»** (or «+1 ud») appears on the line that grew, until the next basket change, so a merge isn't
+  mistaken for a line that vanished.
+- **Limits and stock are checked on the merged amount at commit.** That is where every line's limits are enforced,
+  so a manager can still override there; nothing refuses a line when it is ADDED. The prompt assumed new lines are
+  refused at add time.
+  - A merge past the daily limit is stopped at commit exactly as the two separate lines would have been (tested:
+    `requireOverride`, nothing committed).
+  - Refusing at add time would have blocked the manager's override, so the merge follows the existing rule.
+
+### Tap a line to edit it
+
+- **Each basket line is a button** (`data-edit-line`, «Cambiar la cantidad de …»). It opens the same pad for that
+  strain (and lote) with the line's amount, and the pad's button reads **«Actualizar»**.
+  - Saving replaces the line's amount, priced and checked like any line.
+  - 0 or empty removes it, like ×.
+  - The quick-weight buttons, *Justo* and the € calculator work as for a new line.
+- **The edit state resets** after a removal (the indexes move), a commit, or *Vaciar*.
+
+### Where Add and Cancel leave the operator
+
+- **After «Añadir»** (or a merge), the server dispatches `basket-line-added`. The browser (`window.counterPane` in
+  app.js) clears the strain search, scrolls the selection pane to its top (the search box, then the list from its
+  start) or, below md, brings the search into view, and then:
+  - **Ben's decision (6 Oct 2026):** the search is focused only where `(any-pointer: fine)` holds (a mouse or
+    trackpad, so a keyboard is likely, matching 292's keyboard support);
+  - on a touch-only tablet it is shown and briefly highlighted (`data-search-ready`), never focused, so the on-screen
+    keyboard doesn't cover half the counter. One tap opens it.
+  - If the staff would rather have the keyboard come straight up, that is the one `matchMedia` line.
+- **«Cancelar»** dispatches `weight-entry-cancelled`. The strain tap had remembered the pane's (or the page's) scroll
+  position, and it is restored, so a mis-tap never loses the place. 333's "bring the pad into view" is unchanged.
+- **After an EDIT** nothing moves: the cart column doesn't scroll, and no search is brought back.
+- **The member stays held** throughout (tested).
+
+### Tests and proof
+
+- **`tests/Feature/Counter/BasketLinesMergeAndEditTest.php`** (7, all red before):
+  - merge into one line priced on the total, with the note and the event;
+  - the manual-lote rule;
+  - the limit stops a merged line at commit;
+  - 2 + 1.5 g makes an eighth;
+  - tap-to-edit with «Actualizar», 1 → 2.5 g, then 0 removes it, and no search event after an edit;
+  - Cancelar tells the browser;
+  - the member stays held.
+- **The browser proof** (`tests/Browser/prove-358-basket.mjs`, a fresh demo DB plus 30 strains with stock at Central,
+  sorted A–Z) passed 21/21 at 820×1180 and 1180×820, each in a TOUCH context (`pointer: coarse`, no fine pointer) and
+  a MOUSE context:
+  - the 26th strain sat at pane `scrollTop` ≈ 1400–1450;
+  - after Añadir the pane was at 0, the search visible, empty, and NOT focused on touch / focused with a mouse;
+  - the same strain again gave one line «+1.00 g · 2.00 g»;
+  - tapping the line gave «Actualizar · 2 g»;
+  - Cancelar returned to exactly the same `scrollTop` (1427 → 91 → 1427);
+  - the member was still held;
+  - no page errors.
+- **Before**, as the prompt measured on `a08f9e0`: two «1.00 g» lines, `scrollTop` 1425 → 0 with the strain off-screen
+  and nothing focused, and no way to edit a line.
+- **Screenshots** (`storage/app/screenshots/358/`): after Añadir (touch and mouse), the merged line, the edit pad.
+- **The guide** (`counter-quick-start.md`): step 6 says the search comes back, plus "More of the same strain" and
+  "Changing an amount".
+- **Two older tests assumed two lines for one strain:**
+  - `RoundTripPinsTest` (add, then remove the second line) now merges and edits back to 2 g;
+  - `DispensaryCalculatorTest` (1.5 g typed plus €20 back-solved) now expects the merged 3.50 g line.

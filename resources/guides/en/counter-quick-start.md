@@ -63,7 +63,11 @@ Every dispensation must be to an identified member, from a real batch, by weight
 3. Check their card on the right: name, photo, **Remaining today** and wallet balance. If they have no photo yet, the screen asks you to **take their photo** first. If a red box appears instead, see section 9.
 4. Choose the strain. Their usual ones appear as buttons at the top; otherwise use the list, **Search genetic…** or **Filters**.
 5. Enter the amount. Flower, hash and extracts: type the weight in grams on the keypad, or tap a quick amount (1 g, 2 g, 3.5 g…). Pre-rolls, vapes and edibles: use **−** and **+** to choose the number of units.
-6. Tap **Add to basket**. Repeat for anything else.
+6. Tap **Add to basket**. The strain search comes back at the top of the list, empty, ready for the next item (tap it to type). Repeat for anything else.
+
+**More of the same strain** (a member wants another gram): tap the strain again and add the extra. It joins the same line in the basket (you briefly see **+1.00 g** on it), priced as one amount, so 2 g is charged as 2 g and 3.5 g can get the eighth price.
+
+**Changing an amount:** tap the line in the basket. The pad opens with its amount; type the new one and tap **Update**. Setting it to 0 removes the line, the same as **×**. If you tap a strain by mistake, **Cancel** puts the list back where you were.
 7. Take payment (section 5), then tap **Record contribution · €X**.
 
 The strain list is in **price order**, most expensive first at most clubs. To change it, use **€↓ / €↑ / A–Z** next to the list and grid buttons; the tablet remembers your choice for the day.
@@ -211,7 +215,7 @@ The counter shows Spanish or English, depending on each person's language settin
 | Fondo de caja | Float |
 | Fichar entrada · Fichar salida | Clock in · Clock out |
 | Fichado 18:02 · Sin fichar | Clocked in 18:02 · Not clocked in |
-| Añadir a la cesta | Add to basket |
+| Añadir a la cesta · Actualizar | Add to basket · Update |
 | Registrar aportación | Record contribution |
 | Justo · Monedero | Exact · Wallet |
 | Ajustar precio · Motivo | Adjust price · Reason |

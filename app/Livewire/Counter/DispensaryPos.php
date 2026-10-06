@@ -411,6 +411,15 @@ class DispensaryPos extends Component
 
     // --- Genetic → weight → basket ----------------------------------------------
 
+    /**
+     * Prompt 358 — the basket line being edited (tap a line: the pad opens with its amount and «Actualizar»), or null when
+     * the pad adds. And the last merge's note («+1.00 g» on the line it went into), until the next basket change.
+     */
+    public ?int $editingLine = null;
+
+    /** @var array{index: int, note: string}|null */
+    public ?array $mergeNote = null;
+
     public function chooseGenetic(string $geneticId): void
     {
         if ($this->resolveMember() === null) {
@@ -426,6 +435,7 @@ class DispensaryPos extends Component
         $this->weightInput = '';
         $this->calculatorMode = false;
         $this->unitQty = 1;
+        $this->editingLine = null; // a strain tap ADDS (merging into its line, 358); tapping a line edits it
 
         // Manual mode: default the batch to FEFO (oldest open, non-expired, in stock), overridable below.
         // Automatic mode (prompt 250): no lote is chosen here — allocation happens at commit — so leave it null.
@@ -469,7 +479,30 @@ class DispensaryPos extends Component
 
     public function cancelWeightEntry(): void
     {
-        $this->reset(['activeGeneticId', 'activeBatchId', 'weightInput', 'calculatorMode', 'unitQty']);
+        $this->reset(['activeGeneticId', 'activeBatchId', 'weightInput', 'calculatorMode', 'unitQty', 'editingLine']);
+        // Prompt 358 — a mis-tap must not lose the operator's place: the browser puts the list back where it was.
+        $this->dispatch('weight-entry-cancelled');
+    }
+
+    /**
+     * Prompt 358 — tap a basket line to change it: the pad opens on that strain (and lote) with the line's amount, and its
+     * button reads «Actualizar». Saving replaces the amount (priced and checked like any line); 0 or empty removes it.
+     */
+    public function editLine(int $index): void
+    {
+        $line = $this->basket[$index] ?? null;
+        if ($line === null) {
+            return;
+        }
+
+        $this->dismissOutcome();
+        $this->editingLine = $index;
+        $this->activeGeneticId = (string) $line['genetic_id'];
+        $this->activeBatchId = $line['batch_id'] !== null ? (string) $line['batch_id'] : null;
+        $this->calculatorMode = false;
+        $this->unitQty = max(1, (int) ($line['units'] ?? 1));
+        $this->weightInput = $line['units'] !== null ? '' : rtrim(rtrim(NumberFormat::decimal($line['grams_cg'] / 100, 2), '0'), '.');
+        $this->dispatch('weight-entry-opened');
     }
 
     public function selectBatch(string $batchId): void
@@ -563,6 +596,14 @@ class DispensaryPos extends Component
             $batchId = $batch->id;
         }
 
+        // Prompt 358 — editing a line to nothing removes it, as × does.
+        if ($this->editingLine !== null && ! $genetic->isUnitType() && in_array(trim(str_replace(',', '.', $this->weightInput)), ['', '0', '0.', '0.0', '0.00'], true)) {
+            $this->removeLine($this->editingLine);
+            $this->reset(['activeGeneticId', 'activeBatchId', 'weightInput', 'calculatorMode', 'unitQty', 'editingLine']);
+
+            return;
+        }
+
         // UNIT genetic → the stepper drives whole units; grams_cg is computed. WEIGHT → grams pad.
         if ($genetic->isUnitType()) {
             $units = max(1, $this->unitQty);
@@ -589,7 +630,26 @@ class DispensaryPos extends Component
             ];
         }
 
-        $this->basket[] = $line;
+        // Prompt 358 — one line per strain and lote. An EDIT replaces its line's amount; an ADD of a strain already in the
+        // basket (same genetic and the same batch selection: automatic, or that manual lote) adds to that line, so "a couple
+        // of grams" is ONE line priced on its total (eighth break and all). Limits and stock are checked on the merged
+        // amount at commit, exactly as two lines' sum was.
+        $added = $this->editingLine === null;
+        $this->mergeNote = null;
+        if (! $added && isset($this->basket[$this->editingLine])) {
+            $this->basket[$this->editingLine] = $line;
+        } elseif (($into = $this->mergeableLine($line)) !== null) {
+            $existing = $this->basket[$into];
+            $units = $line['units'] !== null ? (int) $existing['units'] + (int) $line['units'] : null;
+            $this->basket[$into] = ['genetic_id' => $line['genetic_id'], 'batch_id' => $line['batch_id'],
+                'grams_cg' => (int) $existing['grams_cg'] + (int) $line['grams_cg'], 'units' => $units];
+            $this->mergeNote = ['index' => $into, 'note' => '+'.($line['units'] !== null
+                ? trans_choice(':count ud|:count uds', (int) $line['units'], ['count' => (int) $line['units']])
+                : $this->grams((int) $line['grams_cg']))];
+        } else {
+            $this->basket[] = $line;
+        }
+        $this->editingLine = null;
         $this->forgetLastSale();
 
         if ($this->idempotencyKey === null) {
@@ -598,12 +658,37 @@ class DispensaryPos extends Component
 
         // A new line invalidates any prior limit-breach state — re-evaluated on next commit.
         $this->reset(['activeGeneticId', 'activeBatchId', 'weightInput', 'calculatorMode', 'unitQty', 'requireOverride', 'limitBreach']);
+
+        // Prompt 358 — after an ADD the browser brings back the strain search, cleared, at the top of the list (focused only
+        // where there is a fine pointer or a keyboard: never popping a tablet's on-screen keyboard). An edit stays put.
+        if ($added) {
+            $this->dispatch('basket-line-added');
+        }
+    }
+
+    /**
+     * The basket line a new one merges into: the same genetic and the same batch selection (both automatic — null — or the
+     * same manual lote). Null when there is none.
+     *
+     * @param  array{genetic_id: string, batch_id: ?string, grams_cg: int, units: ?int}  $line
+     */
+    private function mergeableLine(array $line): ?int
+    {
+        foreach ($this->basket as $index => $existing) {
+            if ($existing['genetic_id'] === $line['genetic_id'] && $existing['batch_id'] === $line['batch_id']) {
+                return $index;
+            }
+        }
+
+        return null;
     }
 
     public function removeLine(int $index): void
     {
         unset($this->basket[$index]);
         $this->basket = array_values($this->basket);
+        $this->mergeNote = null;
+        $this->editingLine = null; // the indexes have moved
         $this->requireOverride = false;
         $this->limitBreach = false;
     }
@@ -611,7 +696,7 @@ class DispensaryPos extends Component
     public function clearBasket(): void
     {
         $this->reset([
-            'basket', 'activeGeneticId', 'activeBatchId', 'weightInput', 'calculatorMode', 'unitQty',
+            'basket', 'activeGeneticId', 'activeBatchId', 'weightInput', 'calculatorMode', 'unitQty', 'editingLine', 'mergeNote',
             'cashTendered', 'walletInput', 'requireOverride', 'limitBreach', 'overrideReason',
             'priceOverrideEuros', 'priceOverrideReason', 'signaturePath',
         ]);
@@ -2531,7 +2616,7 @@ class DispensaryPos extends Component
     private function resetBasketState(): void
     {
         $this->reset([
-            'basket', 'activeGeneticId', 'activeBatchId', 'weightInput', 'calculatorMode', 'unitQty',
+            'basket', 'activeGeneticId', 'activeBatchId', 'weightInput', 'calculatorMode', 'unitQty', 'editingLine', 'mergeNote',
             'cashTendered', 'walletInput', 'requireOverride', 'limitBreach', 'overrideReason',
             'priceOverrideEuros', 'priceOverrideReason', 'signaturePath', 'onTab', 'debtCollectInput',
         ]);
