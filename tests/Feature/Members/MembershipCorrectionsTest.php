@@ -20,6 +20,7 @@ use App\Models\MembershipTier;
 use App\Models\Organisation;
 use App\Models\User;
 use App\Support\ActiveScope;
+use App\Support\ManagerApproval;
 use App\Support\MembershipExpiry;
 use Database\Seeders\RolePermissionSeeder;
 use Filament\Facades\Filament;
@@ -172,10 +173,12 @@ class MembershipCorrectionsTest extends TestCase
 
     public function test_waiving_in_the_panel_writes_the_counters_waiver_with_its_reason(): void
     {
+        // Prompt 356 — this panel user holds `reasons.optional`: no reason field is shown, and the writer records
+        // «Aprobado por responsable» (whatever a crafted payload says).
         $this->table()->callTableAction('waiveFee', $this->membership, ['waive_reason' => 'OTHER', 'waive_reason_text' => 'Alta duplicada'])->assertHasNoTableActionErrors();
 
         $waiver = MembershipFeePayment::query()->sole();
-        $this->assertSame([1000, FeePaymentMethod::WAIVED, 'Alta duplicada'], [$waiver->amount_cents->cents, $waiver->method, $waiver->reason]);
+        $this->assertSame([1000, FeePaymentMethod::WAIVED, ManagerApproval::reason()], [$waiver->amount_cents->cents, $waiver->method, $waiver->reason]);
         $this->assertSame(1, AuditLog::query()->where('action', 'membership.fee.waived')->count());
     }
 

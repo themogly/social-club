@@ -6,6 +6,7 @@ use App\Actions\RecordAuditLog;
 use App\Enums\MembershipStatus;
 use App\Models\Membership;
 use App\Models\User;
+use App\Support\ManagerApproval;
 use Carbon\CarbonImmutable;
 use Illuminate\Auth\Access\AuthorizationException;
 
@@ -47,9 +48,19 @@ class RenewMembership
             'reminder_sent_for' => null,
         ]);
 
+        // Prompt 356 — an optional reason is not asked for: a holder of `reasons.optional` who overrides the fee and gives
+        // none has «Aprobado por responsable» recorded, as for a price adjustment or a waiver.
+        $reason = trim((string) ($options['fee_override_reason'] ?? ''));
+        if ($overridden && $reason === '' && ManagerApproval::allows($actor)) {
+            $reason = ManagerApproval::reason();
+        }
+        $reason = $reason !== '' ? $reason : null;
+
         (new RecordAuditLog)->handle('membership.renewed', $membership, null, [
             'expires_at' => $membership->expires_at?->toDateString(),
-            'reason' => $overridden ? ($options['fee_override_reason'] ?? null) : null,
+            'reason' => $overridden ? $reason : null,
+            // Prompt 356 — the fee changed with no reason given, by a holder of `reasons.optional`: say so.
+            ...($overridden && ManagerApproval::applies($actor, $reason) ? [ManagerApproval::AUDIT_KEY => ManagerApproval::PERMISSION] : []),
         ]);
 
         return $membership;

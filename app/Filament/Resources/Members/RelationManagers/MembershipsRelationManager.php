@@ -127,8 +127,10 @@ class MembershipsRelationManager extends RelationManager
                     ->numeric()
                     ->minValue(0)
                     ->helperText(__('Deja en blanco para usar la cuota de la tarifa.')),
+                // Prompt 356 — not shown to a holder of `reasons.optional`: EnrolMembership records «Aprobado por responsable».
                 TextInput::make('fee_override_reason')
                     ->label(__('Motivo del cambio de cuota'))
+                    ->hidden(fn (): bool => ManagerApproval::allows(Auth::user()))
                     ->maxLength(255),
             ])
             ->action(function (array $data): void {
@@ -374,16 +376,17 @@ class MembershipsRelationManager extends RelationManager
             ->icon(Heroicon::OutlinedGift)
             ->visible(fn (Membership $record): bool => $record->owedCents() > 0 && self::correctable($record, 'membership.fee.waive'))
             ->schema([
+                // Prompt 356 — not shown to a holder of `reasons.optional`: the writer records «Aprobado por responsable».
                 Select::make('waive_reason')->label(__('Motivo'))->required()->live()
-                    ->options(fn (Membership $record): array => collect(FeeWaiverReasons::options($record->member, $record->location, ManagerApproval::allows(Auth::user())))->pluck('label', 'value')->all())
-                    ->default(fn (): ?string => ManagerApproval::allows(Auth::user()) ? 'MANAGER_APPROVED' : null), // prompt 333
+                    ->hidden(fn (): bool => ManagerApproval::allows(Auth::user()))
+                    ->options(fn (Membership $record): array => collect(FeeWaiverReasons::options($record->member, $record->location))->pluck('label', 'value')->all()),
                 TextInput::make('waive_reason_text')->label(__('Explica el motivo'))->maxLength(255)
                     ->visible(fn (Get $get): bool => $get('waive_reason') === 'OTHER')
                     ->required(fn (Get $get): bool => $get('waive_reason') === 'OTHER'),
             ])
             ->action(function (Membership $record, array $data): void {
-                $reason = FeeWaiverReasons::resolve(FeeWaiverReasons::options($record->member, $record->location, ManagerApproval::allows(Auth::user())), (string) $data['waive_reason'], (string) ($data['waive_reason_text'] ?? ''));
-                if ($reason === null) {
+                $reason = FeeWaiverReasons::resolve(FeeWaiverReasons::options($record->member, $record->location), (string) ($data['waive_reason'] ?? ''), (string) ($data['waive_reason_text'] ?? ''));
+                if ($reason === null && ! ManagerApproval::allows(Auth::user())) {
                     self::refuse(new DomainException(__('Indica el motivo de la condonación.')));
                 }
                 (new RecordFeePayment)->handle($record, $record->owedCents(), FeePaymentMethod::WAIVED, ['operator_id' => Auth::id(), 'reason' => $reason]);

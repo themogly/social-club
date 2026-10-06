@@ -11,6 +11,7 @@ use App\Models\Member;
 use App\Models\Membership;
 use App\Models\MembershipTier;
 use App\Models\User;
+use App\Support\ManagerApproval;
 use App\Support\Settings;
 use Carbon\CarbonInterface;
 use Illuminate\Auth\Access\AuthorizationException;
@@ -74,11 +75,21 @@ class EnrolMembership
             'status' => $options['status'] ?? MembershipStatus::ACTIVE,
         ]);
 
+        // Prompt 356 — an optional reason is not asked for: a holder of `reasons.optional` who overrides the fee and gives
+        // none has «Aprobado por responsable» recorded, as for a price adjustment or a waiver.
+        $reason = trim((string) ($options['fee_override_reason'] ?? ''));
+        if ($overridden && $reason === '' && ManagerApproval::allows($actor)) {
+            $reason = ManagerApproval::reason();
+        }
+        $reason = $reason !== '' ? $reason : null;
+
         (new RecordAuditLog)->handle('membership.enrolled', $membership, null, [
             'tier' => $tier->name,
             'fee_cents' => $feeCents,
             'fee_overridden' => $overridden,
-            'reason' => $overridden ? ($options['fee_override_reason'] ?? null) : null,
+            'reason' => $overridden ? $reason : null,
+            // Prompt 356 — the fee changed with no reason given, by a holder of `reasons.optional`: say so.
+            ...($overridden && ManagerApproval::applies($actor, $reason) ? [ManagerApproval::AUDIT_KEY => ManagerApproval::PERMISSION] : []),
         ]);
 
         // Prompt 348 (Aaron: "auto sign up to all locations except storage") — with *Alta en todas las sedes* on, the

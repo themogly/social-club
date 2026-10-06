@@ -56,6 +56,9 @@
                      waivers in one group. --}}
                 @php($waiveGroup = 'waive-reason-'.$this->getId())
 
+                {{-- Prompt 356 — an OPTIONAL reason is not shown: a holder of `reasons.optional` waives in one tap and the writer
+                     records «Aprobado por responsable». Everyone else picks (or types) a reason, as before. --}}
+                @unless ($this->waiveReasonIsOptional())
                 <div role="radiogroup" aria-label="{{ __('Motivo') }}" class="mt-2 flex flex-col gap-1">
                     @foreach ($waiveOptions as $option)
                         {{-- Keyed: this list legitimately CHANGES between renders (it is computed from the
@@ -81,6 +84,7 @@
                            autocomplete="off"
                            class="mt-1 h-12 w-full rounded-xl border border-line bg-surface px-4 text-base dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100">
                 @endif
+                @endunless
 
                 <p class="mt-2 text-[11px] text-ink-muted dark:text-slate-400">
                     {{ __('Deja el importe vacío para condonar todo lo pendiente. No mueve caja ni monedero.') }}

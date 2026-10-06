@@ -229,7 +229,9 @@ class SignalsThatNeverVaryTest extends TestCase
         $this->assertStringNotContainsString('id="price-override-amount"', substr($html, 0, $at));
         // Prompt 272 — the amount and the reason are LABELLED (a placeholder is not a label).
         $this->assertStringContainsString('<label for="price-override-amount"', substr($html, $at));
-        $this->assertStringContainsString('<label for="price-override-reason"', substr($html, $at));
+        // Prompt 356 — the reason box is shown only to someone who must give one (no `reasons.optional`); this operator
+        // holds it, so there is none (the staff case: TwoWayPriceAndHiddenReasonsTest).
+        $this->assertStringNotContainsString('id="price-override-reason"', substr($html, $at));
     }
 
     /**

@@ -902,7 +902,7 @@
                         <div x-data="{ open: false }" class="mt-3">
                             <button
                                 type="button"
-                                x-on:click="open = ! open; @if ($reasonOptional) if (open && ! $wire.priceOverrideReason) $wire.priceOverrideReason = @js(\App\Support\ManagerApproval::reason()) @endif"
+                                x-on:click="open = ! open"
                                 x-bind:aria-expanded="open ? 'true' : 'false'"
                                 data-price-override-toggle
                                 class="inline-flex min-h-11 w-full items-center justify-between gap-2 rounded-xl border border-line px-4 text-sm font-medium text-ink-muted transition hover:bg-surface-alt dark:border-slate-700 dark:text-slate-400 dark:hover:bg-slate-800"
@@ -927,13 +927,24 @@
                                      total until the next tap (Ben: "it doesn't update the total at the bottom"). Now blur or Enter
                                      re-renders them; the field says when the figure is not taken. --}}
                                 @if ($priceOverrideNotice)
+                                    {{-- Prompt 356 — which way the new total goes: «+4.00 € sobre el precio calculado» / «−5.00 € …». --}}
                                     <p data-price-override-notice role="alert" class="mt-1 text-xs font-medium text-warning">{{ $priceOverrideNotice }}</p>
                                 @endif
+                                {{-- Prompt 356 — after a RAISE, the lasting fix: the batch's own price, in the panel (prices.manage only). --}}
+                                @foreach ($batchPriceLinks as $link)
+                                    <a href="{{ $link['url'] }}" data-batch-price-link wire:navigate.ignore
+                                       @click.prevent="(! ($store.counter?.dirty) || window.confirm(@js(__('Tienes trabajo sin guardar en el mostrador. ¿Seguro que quieres salir?')))) && window.location.assign(@js($link['url']))"
+                                       class="mt-1 inline-flex min-h-11 items-center text-xs font-semibold text-brand underline dark:text-slate-200">{{ __('¿El lote está mal de precio? Cambiar el precio del lote') }}@if (count($batchPriceLinks) > 1) · {{ $link['label'] }}@endif</a>
+                                @endforeach
                                 </div>
+                                {{-- Prompt 356 — an OPTIONAL reason is not shown: a holder of `reasons.optional` (a manager, by default)
+                                     gets no box, and the writer records «Aprobado por responsable». Everyone else types one. --}}
+                                @unless ($reasonOptional)
                                 <div>
-                                <label for="price-override-reason" class="block text-xs font-medium text-ink-muted dark:text-slate-400">{{ __('Motivo') }}@if ($reasonOptional) <span class="font-normal">{{ __('(opcional)') }}</span>@endif</label>
-                                <input id="price-override-reason" type="text" wire:model.blur="priceOverrideReason" data-reason-optional="{{ $reasonOptional ? 'true' : 'false' }}" autocomplete="off" placeholder="{{ $reasonOptional ? \App\Support\ManagerApproval::reason() : __('Motivo (p. ej. producto defectuoso)') }}" class="mt-1 h-11 w-full rounded-xl border border-line bg-surface px-3 text-base text-ink placeholder:text-ink-muted focus:border-warning focus:outline-none focus:ring-2 focus:ring-warning/40 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100">
+                                <label for="price-override-reason" class="block text-xs font-medium text-ink-muted dark:text-slate-400">{{ __('Motivo') }}</label>
+                                <input id="price-override-reason" type="text" wire:model.blur="priceOverrideReason" data-reason-required autocomplete="off" placeholder="{{ __('Motivo (p. ej. producto defectuoso)') }}" class="mt-1 h-11 w-full rounded-xl border border-line bg-surface px-3 text-base text-ink placeholder:text-ink-muted focus:border-warning focus:outline-none focus:ring-2 focus:ring-warning/40 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100">
                                 </div>
+                                @endunless
                             </div>
                             <p class="mt-1 text-[11px] text-ink-muted dark:text-slate-400">{{ __('Deja el importe vacío para cobrar el precio normal. 0 € = gratis.') }}</p>
                         </div>

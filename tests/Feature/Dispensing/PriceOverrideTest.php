@@ -19,6 +19,7 @@ use App\Models\MembershipTier;
 use App\Models\Organisation;
 use App\Models\User;
 use App\Support\ActiveScope;
+use App\Support\ManagerApproval;
 use App\Support\Money;
 use App\Support\Period;
 use App\ViewModels\Reports\ConsumptionReport;
@@ -26,6 +27,7 @@ use Database\Seeders\RolePermissionSeeder;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use RuntimeException;
+use Spatie\Permission\PermissionRegistrar;
 use Tests\TestCase;
 
 /**
@@ -126,10 +128,22 @@ class PriceOverrideTest extends TestCase
         $this->commit($this->member(), 100, ['price_override_cents' => 600, 'price_override_reason' => 'x', 'price_override_by' => $staff]);
     }
 
-    public function test_an_override_without_a_reason_is_refused(): void
+    public function test_an_override_without_a_reason_is_refused_unless_the_reason_is_optional_for_them(): void
     {
+        // Prompt 356 — the WRITER decides: a holder of `reasons.optional` gets «Aprobado por responsable»…
+        $authoriser = $this->authoriser();
+        if (ManagerApproval::allows($authoriser)) {
+            $d = $this->commit($this->member(), 100, ['price_override_cents' => 600, 'price_override_reason' => '   ', 'price_override_by' => $authoriser]);
+            $this->assertSame(ManagerApproval::reason(), $d->price_override_reason);
+            $authoriser->revokePermissionTo(ManagerApproval::PERMISSION);
+            $authoriser->roles->each(fn ($role) => $role->revokePermissionTo(ManagerApproval::PERMISSION));
+            app(PermissionRegistrar::class)->forgetCachedPermissions();
+            $authoriser = $authoriser->fresh();
+        }
+
+        // …and anyone without it is refused.
         $this->expectException(RuntimeException::class);
-        $this->commit($this->member(), 100, ['price_override_cents' => 600, 'price_override_reason' => '   ', 'price_override_by' => $this->authoriser()]);
+        $this->commit($this->member(), 100, ['price_override_cents' => 600, 'price_override_reason' => '   ', 'price_override_by' => $authoriser]);
     }
 
     public function test_the_override_is_audited_with_resolved_overridden_reason_and_authoriser(): void

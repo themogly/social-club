@@ -19911,3 +19911,89 @@ through 316's one display rule, `NumberFormat::decimal()`, following the existin
 - **A flake fixed in passing:** `CashPotsTest`'s handover test (349) picked "the latest closed shift" when both
   handovers closed in the same second. ULIDs minted in one millisecond have no order, so it sometimes read the first
   shift. The test now moves the clock a minute between the handovers.
+
+## Prompt 356 — the counter's price adjustment goes up as well as down, and an optional reason isn't shown at all
+
+### Two-way price adjustment
+
+- **The club: "Some stock is added too cheap — they need to be able to make it more."** *Nuevo total (€)* (prompt 64)
+  was reduce-only: a higher figure was silently clamped back to the calculated price. Nothing in DECISIONS required
+  that, and an under-priced batch could not be charged correctly.
+- **Any total ≥ 0 is now accepted.** The two clamps are gone: `CommitDispensation` and the counter's
+  `chargeableCents()`.
+- **Unchanged:**
+  - the permission (`dispensation.price.override`, following the PIN operator);
+  - `original_total_cents`;
+  - the audit row and the reason rules (below);
+  - limits, stock and eligibility.
+- **Which way it goes is shown before commit.** `priceOverrideNotice()` reads «+4.00 € sobre el precio calculado» or
+  «−5.00 € …». It replaces 333's "the adjustment can only lower the total" notice.
+- **Everything downstream uses the adjusted total, raised or lowered (tested):**
+  - the button, *Justo*, *Falta* and change;
+  - the wallet split;
+  - the tab (259);
+  - the combined visit's single settle (263);
+  - the receipt (the original and the adjusted figure);
+  - the refund cap (`RefundDispensation` caps at `total_cents`, the amount charged; a raised €34 refunds up to €34).
+  350's rule holds for a raise too: a manager's adjustment is never rounded on top.
+- **The lasting fix is pointed at.** After a RAISE, a holder of `prices.manage` sees «¿El lote está mal de precio?
+  Cambiar el precio del lote», which goes to the batch's edit page in the panel.
+  - It's one link per distinct batch in the dispensary basket (the chosen lote, else the FEFO one), named when there
+    are several.
+  - It asks first if counter work is unsaved, like *Administración*.
+  - With 267 a manager's PIN already opens the panel. Without `prices.manage`, there's no link.
+
+### An optional reason is not shown, and the writer fills it in
+
+- **The club: "Can we just get rid of the reason field if it's set to optional."** For whoever holds
+  `reasons.optional` (prompt 333: OWNER and MANAGER by default, editable on *Roles y permisos*), the box is gone:
+  - **price adjustment:** no *Motivo* field (333 showed «Motivo (opcional)», pre-filled by the browser);
+  - **counter fee waiver:** no reason picker, one tap on *Condonar cuota*. 333's «Aprobado por responsable» option is
+    removed from `FeeWaiverReasons`, and a record-backed reason (e.g. *Terapéutico*) is no longer pre-selected out of
+    sight for them, so they never record something they didn't choose;
+  - **panel fee waiver** (*Socios → Membresías → Condonar cuota*): the select is hidden;
+  - **panel fee override** (*Alta en sede*, `fee_override_reason`): the field is hidden. It was optional for everyone
+    and never consulted the permission; it now follows the same rule.
+- **The writers decide, not the forms.** When the acting person (the PIN operator at the counter, the signed-in user
+  in the panel) holds the permission and gives no reason, the writer records `ManagerApproval::reason()` and the
+  `reason_permission` audit key. The writers are:
+  - `CommitDispensation`, for price overrides;
+  - `RecordFeePayment`, for waivers;
+  - `EnrolMembership` and `RenewMembership`, for fee overrides.
+- **An empty reason from someone without the permission is still refused** by the writer. The counter asks first,
+  with its usual sentence.
+- **Staff are unchanged:** a staff operator given `dispensation.price.override` sees a required *Motivo* box. The box
+  follows the person at the PIN (267) and comes back for managers if the owner unticks `reasons.optional` (tested).
+- **Always required, NOT part of this:** limit overrides, voids, refunds, tier changes, expiry changes and stock
+  adjustments keep their reason boxes.
+
+### Tests and proof
+
+- **`tests/Feature/Counter/TwoWayPriceAndHiddenReasonsTest.php`** (10; 8 red on the old code, while «staff unchanged»
+  and «toggled off for managers» held on both):
+  - €30 → €34 charged everywhere, original 3000, receipt both;
+  - lowering and €0, with «−5.00 €»;
+  - the wallet, the tab, a combined visit and the refund cap on a raised total;
+  - the batch-price link for `prices.manage` only, after a raise only;
+  - no box for a manager, and the record says «Aprobado por responsable» with `reason_permission`;
+  - a one-tap waiver for a THERAPEUTIC member, recording «Aprobado por responsable» (not the hidden *Terapéutico*);
+  - the writers refuse staff's empty reason and fill a manager's;
+  - staff still see a required box;
+  - the box follows the PIN person;
+  - the role toggle brings it back.
+- **Older pins updated to the new rule:**
+  - `PriceAdjustmentAndManagerReasonsTest` (333);
+  - `SignalsThatNeverVaryTest` (the reason label is shown only to someone who must give one);
+  - `TheColumnSaysWhatTheScreenDoesNotTest` (one-tap waiver);
+  - `PriceOverrideTest` (the writer fills a holder's empty reason and refuses anyone else's);
+  - `MembershipCorrectionsTest` (the panel waiver by a holder records «Aprobado por responsable»).
+- **The browser proof** (`tests/Browser/prove-356-two-way-price.mjs`, a fresh demo DB at 820×1180) passed 9/9:
+  - staff see the reason box;
+  - a manager raises a total by €4.00: «+4.00 € sobre el precio calculado», the batch-price link, no box, the button
+    at the raised total, committed with the original kept and «Aprobado por responsable»;
+  - a manager waives a fee in one tap, recorded with «Aprobado por responsable».
+  - Screenshots: `storage/app/screenshots/356/`.
+- **The guide** (`counter-quick-start.md`, `updated: 2026-10-06`): *Adjust price* goes down or up and says by how
+  much; managers type no reason; the batch-price link; waiving is one tap for managers.
+- **355 had not arrived** when this was built: the half-gram rounding replaces the calculated price before an
+  adjustment, and the adjustment replaces the final total either way.
