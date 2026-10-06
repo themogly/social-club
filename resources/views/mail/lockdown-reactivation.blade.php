@@ -9,6 +9,7 @@
            style="display:inline-block;background:#2563eb;color:#ffffff;text-decoration:none;padding:12px 28px;border-radius:8px;font-weight:600;">
             {{ __('Reactivar el acceso') }}
         </a>
+        @include('mail.partials.plain-link', ['url' => $url])
         <p style="margin:20px 0 0;color:#94a3b8;font-size:12px;">
             {{ __('Si no reconoces este bloqueo, no reactives y contacta con el resto del equipo. El acceso se restablecerá solo pasado el plazo de seguridad.') }}
         </p>

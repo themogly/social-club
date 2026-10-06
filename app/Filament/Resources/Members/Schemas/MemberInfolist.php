@@ -46,6 +46,13 @@ class MemberInfolist
                             ->color('warning')
                             ->visible(fn (?Member $record): bool => (int) $record?->card_misuse_count > 0),
 
+                        // Prompt 361 — let through unsigned at the counter: shown so the signature can be collected later.
+                        TextEntry::make('signature_waiver')
+                            ->label(__('Firma'))
+                            ->state(fn (?Member $record): ?string => $record?->signatureWaiverLabel())
+                            ->color('warning')
+                            ->visible(fn (?Member $record): bool => $record?->signatureWaiverLabel() !== null),
+
                         TextEntry::make('status')
                             ->label(__('Estado'))
                             ->badge()

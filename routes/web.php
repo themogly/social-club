@@ -227,6 +227,9 @@ Route::middleware('web')->prefix('socio')->name('socio.')->group(function () {
     Route::post('solicitud/{token}/personal', [ApplicationController::class, 'staffExit'])
         ->middleware('throttle:20,1')->name('application.staff');
     Route::post('solicitud/{token}/salir', [ApplicationController::class, 'leave'])->name('application.leave');
+    // Prompt 361 — a file kept from a refused attempt, shown back to the SAME session only («✓ Foto guardada»).
+    Route::get('solicitud/{token}/guardado/{field}', [ApplicationController::class, 'keptUpload'])
+        ->middleware('throttle:60,1')->name('application.kept');
 
     Route::middleware('auth:member')->group(function () {
         Route::get('avisos', [AnnouncementController::class, 'index'])->name('announcements');

@@ -24,6 +24,8 @@
        · `capture`  livewire mode: the method taking a PNG data URL
        · `clear`    livewire mode: the method that discards a stored one
        · `name`     form mode: the hidden input's name (default `signature`)
+       · `draft`    livewire mode: a public property the drawing is copied into at every stroke's end (deferred —
+                    no request), so the host's commit/submit can capture a drawn-but-unsaved pad (prompt 361)
        · `stored`   truthy when one is already captured
        · `label`    the heading                                     (optional)
        · `hint`     one line under the heading, e.g. what is being signed (optional)
@@ -41,6 +43,15 @@
      something other than the bytes on file — which an audit artefact must never do. It is a paper strip in a
      framed card, and it should read as one. Do not "fix" it in a theme sweep.
 
+     **A drawn signature counts without «Guardar firma» (prompt 361).** Ben's video: the applicant signed, tapped
+     the form's submit, and was refused — the hidden field was 0 characters, because only Guardar wrote it.
+     Submitting the form is the deliberate act. So, in FORM mode the field is written at the end of every stroke
+     (and once more on the form's submit event, if inked), «✓ Firma capturada» appears as soon as there is ink,
+     and Guardar is gone — it added nothing. In LIVEWIRE mode Guardar stays (it is the server's confirmation:
+     the pad becomes «✓ Firma capturada» with Rehacer), and every stroke's end also copies the drawing into the
+     host's `draft` property without a request, so the commit/submit action captures a drawn-but-unsaved pad
+     itself. An untouched pad writes nothing either way; Borrar empties the field and the draft.
+
      Touch: `touch-none` on the canvas so a drawn stroke is not a page scroll, and every control clears the
      44px floor — this is used with a finger on a phone (prompt 217's audience) as well as on a tablet. --}}
 @props([
@@ -48,6 +59,7 @@
     'capture' => null,
     'clear' => null,
     'name' => 'signature',
+    'draft' => null,
     'stored' => false,
     'label' => null,
     'hint' => null,
@@ -74,6 +86,9 @@
                 init() {
                     const c = this.$refs.pad; c.width = c.offsetWidth; c.height = 150;
                     this.ctx = c.getContext('2d'); this.ctx.lineWidth = 2; this.ctx.lineCap = 'round'; this.ctx.strokeStyle = '#2563eb';
+                    @if ($mode === 'form')
+                        this.$el.closest('form')?.addEventListener('submit', () => this.keep());
+                    @endif
                 },
                 point(e) { const r = this.$refs.pad.getBoundingClientRect(); const t = e.touches ? e.touches[0] : e; return { x: t.clientX - r.left, y: t.clientY - r.top }; },
                 {{-- Prompt 222: mark the canvas on the FIRST stroke. A drawn-but-unsaved signature reaches no
@@ -82,16 +97,30 @@
                      this attribute; the pad itself does not care. --}}
                 start(e) { this.drawing = true; this.$refs.pad.dataset.drawn = '1'; const p = this.point(e); this.ctx.beginPath(); this.ctx.moveTo(p.x, p.y); },
                 move(e) { if (! this.drawing) return; const p = this.point(e); this.ctx.lineTo(p.x, p.y); this.ctx.stroke(); },
-                stop() { this.drawing = false; },
-                wipe() { this.ctx.clearRect(0, 0, this.$refs.pad.width, this.$refs.pad.height); delete this.$refs.pad.dataset.drawn; },
+                stop() { if (! this.drawing) return; this.drawing = false; this.keep(); },
+                wipe() {
+                    this.ctx.clearRect(0, 0, this.$refs.pad.width, this.$refs.pad.height); delete this.$refs.pad.dataset.drawn;
+                    @if ($mode === 'form')
+                        this.$refs.field.value = ''; this.signed = false;
+                    @elseif ($draft)
+                        $wire.$set('{{ $draft }}', null, false);
+                    @endif
+                },
                 signed: false,
-                save() {
+                {{-- Prompt 361: the ink is kept as it is drawn — an untouched pad (no data-drawn) keeps nothing. --}}
+                keep() {
+                    if (this.$refs.pad.dataset.drawn !== '1') return;
                     const data = this.$refs.pad.toDataURL('image/png');
                     @if ($mode === 'form')
                         this.$refs.field.value = data;
                         this.signed = true;
-                    @else
-                        $wire.{{ $capture }}(data);
+                    @elseif ($draft)
+                        $wire.$set('{{ $draft }}', data, false);
+                    @endif
+                },
+                save() {
+                    @if ($mode === 'livewire')
+                        $wire.{{ $capture }}(this.$refs.pad.toDataURL('image/png'));
                     @endif
                 },
             }"
@@ -103,14 +132,14 @@
                 {{-- Prompt 272 — a name and the instructions (WCAG 1.1.1). The pointer requirement itself is exempt
                      as path-dependent input; being unlabelled is not. --}}
                 role="img"
-                aria-label="{{ ($label ?? __('Firma')).'. '.__('Firma con el dedo o el ratón dentro del recuadro y pulsa «Guardar firma».') }}"
+                aria-label="{{ ($label ?? __('Firma')).'. '.($mode === 'form' ? __('Firma con el dedo o el ratón dentro del recuadro.') : __('Firma con el dedo o el ratón dentro del recuadro y pulsa «Guardar firma».')) }}"
                 class="w-full touch-none rounded-xl border border-line bg-white dark:border-slate-700"
                 @mousedown="start($event)" @mousemove="move($event)" @mouseup="stop()" @mouseleave="stop()"
                 @touchstart.prevent="start($event)" @touchmove.prevent="move($event)" @touchend="stop()"
             ></canvas>
             @if ($mode === 'form')
-                {{-- The drawing travels with the form. Empty until the applicant presses Guardar, which is
-                     what makes "signed" a deliberate act rather than a stray stroke. --}}
+                {{-- The drawing travels with the form: written at each stroke's end and on submit (prompt 361 — the
+                     submit is the deliberate act; it used to wait for a Guardar the applicant never pressed). --}}
                 <input type="hidden" name="{{ $name }}" x-ref="field" value="" data-signature-field>
                 {{-- The live region is always in the DOM and its CONTENT appears, so the save is announced (a region
                      that is itself shown/hidden is not reliably read). --}}
@@ -119,7 +148,9 @@
 
             <div class="mt-2 flex gap-2">
                 <x-button variant="secondary" size="sm" @click="wipe()" data-signature-clear class="min-h-11 flex-1">{{ __('Borrar') }}</x-button>
-                <x-button size="sm" @click="save()" data-signature-save class="min-h-11 flex-1">{{ __('Guardar firma') }}</x-button>
+                @if ($mode === 'livewire')
+                    <x-button size="sm" @click="save()" data-signature-save class="min-h-11 flex-1">{{ __('Guardar firma') }}</x-button>
+                @endif
             </div>
         </div>
     @endif

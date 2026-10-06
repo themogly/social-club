@@ -13,6 +13,7 @@ use App\Livewire\Counter\CheckInScreen;
 use App\Livewire\Counter\DispensaryPos;
 use App\Livewire\Counter\MembershipCounter;
 use App\Models\Batch;
+use App\Models\Dispensation;
 use App\Models\Genetic;
 use App\Models\GeneticPrice;
 use App\Models\Location;
@@ -25,6 +26,7 @@ use App\Models\User;
 use App\Models\WalletTransaction;
 use App\Support\ActiveScope;
 use App\Support\CounterOperator;
+use App\Support\DocumentVault;
 use App\Support\Money;
 use App\Support\Settings;
 use Database\Seeders\RolePermissionSeeder;
@@ -335,6 +337,27 @@ class TheColumnSaysWhatTheScreenDoesNotTest extends TestCase
 
         $component->assertSet('flashMessage', null);
         $this->assertStringContainsString(e(__('Firma capturada')), $component->html(), 'the pad no longer confirms in place either');
+    }
+
+    /** Prompt 361 — a drawn-but-unsaved pad (the stroke-end draft, no «Guardar firma») is captured by the commit itself. */
+    public function test_the_commit_captures_a_drawn_but_unsaved_signature(): void
+    {
+        Settings::set('signature_on_dispensation', true, SettingType::BOOL, $this->location->id);
+        $this->operator();
+        $genetic = $this->genetic();
+
+        $component = $this->pos($this->member())
+            ->call('chooseGenetic', $genetic->id)
+            ->set('weightInput', '2')
+            ->call('addLine')
+            ->set('signatureDraft', 'data:image/png;base64,'.base64_encode('drawn, never saved'))
+            ->call('commitDispensation');
+
+        $this->assertNotSame(__('Falta la firma del socio.'), $component->get('flashMessage'));
+        $dispensation = Dispensation::query()->withoutGlobalScopes()->latest()->first();
+        $this->assertNotNull($dispensation, 'the commit was refused for a missing signature');
+        $this->assertSame('drawn, never saved', DocumentVault::get((string) $dispensation->signature_path));
+        $component->assertSet('signatureDraft', null);
     }
 
     /** A success auto-dismisses; an error does not. */
