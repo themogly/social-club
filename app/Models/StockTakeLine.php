@@ -23,7 +23,8 @@ class StockTakeLine extends Model
     use HasFactory, HasUlids;
 
     protected $fillable = [
-        'stock_take_id', 'countable_type', 'countable_id', 'reserve', 'unrecorded_topup_cg',
+        'stock_take_id', 'countable_type', 'countable_id', 'optional', 'unrecorded_topup_cg',
+        'expected_reserve_cg', 'counted_reserve_cg', 'variance_reserve_cg', // prompt 360 — the sealed reserve, on the same row
         'counted_cg', 'counted_units', 'expected_cg', 'expected_units', 'variance_cg', 'variance_units',
         'not_counted', 'not_counted_reason',
         'counted_by', 'counted_at', 'adjustment_reason', 'adjustment_note', // prompt 318
@@ -39,7 +40,10 @@ class StockTakeLine extends Model
             'variance_cg' => WeightCast::class,
             'variance_units' => 'integer',
             'not_counted' => 'boolean',
-            'reserve' => 'boolean', // prompt 359 — the batch's «Reserva sellada», counted on its own (full inventory)
+            'optional' => 'boolean', // prompt 360 — listed by «Incluir lotes a cero»: untouched, it holds nothing up
+            'expected_reserve_cg' => WeightCast::class, // prompt 360 — the batch's «Reserva sellada» when counted
+            'counted_reserve_cg' => WeightCast::class,
+            'variance_reserve_cg' => WeightCast::class,
             'unrecorded_topup_cg' => WeightCast::class, // prompt 359 — a forgotten «Rellenar» the close count absorbed
             'counted_at' => 'datetime',
             'adjustment_reason' => StockCountReason::class,
@@ -75,15 +79,41 @@ class StockTakeLine extends Model
         return $this->countable_type === Article::class || ($this->countable instanceof Batch && $this->countable->isUnitType());
     }
 
-    /** The difference in the line's own unit (centigrams, or units), from the snapshot taken when it was counted. */
+    /** Does this row count a sealed reserve as well as the jar? Weight batches only (prompt 360; units keep one count). */
+    public function countsReserve(): bool
+    {
+        return $this->countable_type === Batch::class && ! $this->isUnit();
+    }
+
+    /**
+     * The difference in the line's own unit (centigrams, or units), from the snapshot taken when it was counted. For a
+     * weight batch this is the JAR's; null when the jar was left blank (prompt 360: blank = untouched).
+     */
     public function difference(): ?int
     {
         if ($this->not_counted || $this->counted_at === null) {
             return null;
         }
+        if ($this->isUnit()) {
+            return (int) $this->counted_units - (int) $this->expected_units;
+        }
 
-        return $this->isUnit()
-            ? (int) $this->counted_units - (int) $this->expected_units
-            : (int) $this->counted_cg?->centigrams - (int) $this->expected_cg?->centigrams;
+        return $this->counted_cg === null ? null : $this->counted_cg->centigrams - (int) $this->expected_cg?->centigrams;
+    }
+
+    /** Prompt 360 — the sealed reserve's difference in centigrams; null when it was left blank. */
+    public function reserveDifference(): ?int
+    {
+        if ($this->not_counted || $this->counted_at === null || $this->counted_reserve_cg === null) {
+            return null;
+        }
+
+        return $this->counted_reserve_cg->centigrams - (int) $this->expected_reserve_cg?->centigrams;
+    }
+
+    /** Prompt 360 — an empty batch listed by «Incluir lotes a cero» and never touched: skipped, never "pending". */
+    public function isSkippable(): bool
+    {
+        return $this->optional && ! $this->isSettled();
     }
 }

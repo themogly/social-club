@@ -20271,9 +20271,10 @@ so needs lots of testing").
 
 ### The full inventory counts the reserve
 
-- **Inventario (318)** gives each batch with a reserve its OWN line, «Reserva sellada» (`stock_take_lines.reserve`),
-  counted as one total against `reserve_cg`. Its variance is an ADJUSTMENT on the reserve only (tested). This, not the
-  daily close, is where sealed stock is verified.
+- ~~Inventario (318) gives each batch with a reserve its OWN line, «Reserva sellada» (`stock_take_lines.reserve`).~~
+  **Superseded by prompt 360 on this same branch:** the reserve is a second figure on the batch's own row, and the
+  `reserve` column never shipped (removed from 359's migration). This, not the daily close, is where sealed stock is
+  verified.
 
 ### Also
 
@@ -20318,3 +20319,156 @@ so needs lots of testing").
   - jar + reserve equals the intake less exactly what was weighed out;
   - the evening count of the jar reconciles to zero with no adjustment.
 - **`FormCompletenessTest`'s allowlist documents `reserve_cg`:** it is system-computed, like `remaining_cg`.
+
+
+## Prompt 360 — the admin stock count corrects the jar and the sealed reserve separately, the end-of-day weigh asks one reason only when it's off, and every guide says so
+
+**Built on 359's branch** (`feat/355-359-half-gram-rounding-and-reserve`), committed on top, pushed, **not merged**, as the
+prompt says. 359's tests stay green; its separate «Reserva sellada» line is replaced (see the note in 359's entry).
+
+### 1. Inventario: one row per batch, two counts
+
+- **Each weight batch's row has «Bote (g)» and «Reserva sellada (g)».** `stock_take_lines` gains `expected_reserve_cg`,
+  `counted_reserve_cg`, `variance_reserve_cg` (nullable) in the new migration `2026_10_07_200000`.
+  - `RecordStockCountLine` snapshots BOTH expected figures when the row is saved (318's rule: a sale between counting and
+    applying is never counted twice).
+  - Either figure may be blank, which means that figure is untouched. Both blank is still *No contado* with its reason.
+  - Unit products keep one count.
+- **The system figures follow the sede's blind setting, as before** (`stock_count_show_expected`). When it is on, both are
+  shown on the row; the review always shows both. *Judgment call:* the prompt asks for "each with its expected figure",
+  but Inventario is blind by default on purpose (318), and this keeps that one switch in charge.
+- **The reserve movement marker: ADJUSTMENT with the recorded bucket** (`stock_movements.on_reserve`, which 359 added),
+  not a new type. One adjustment type, two figures.
+  - The stock report's movements table groups by type and bucket («Ajuste · reserva sellada»), so a reserve correction is
+    never folded into a jar one. It also labels 359's RESERVE_IN / RESERVE_OUT («Pasar a reserva» / «Rellenar»).
+  - The stock-take variances table gains reserve expected / counted / variance columns.
+  - The audit names the figure (`reserve_cg`).
+  - Also fixed: 359's stock report «Bote» column header read "Pot" in English (the cash-pot key). It is now «En el bote» /
+    "In the jar".
+
+### The zero-batch toggle and its default
+
+- **«Incluir lotes a cero»** sits in the *Nuevo inventario* modal. It also lists every WEIGHT batch at the sede with
+  nothing in the jar or the reserve, as an `optional` row.
+  - An optional row left blank is skipped: it is never "pending", never blocks «Aplicar ajustes», never touched, and is
+    left out of the PDF.
+- **Its default (`StartStockCount::suggestsZeroBatches`)** is ON while the sede looks like the cleanup is still to do: no
+  batch there holds a reserve yet, AND an evening reweigh (`kind != inventory`) has adjusted some batch below zero. It is
+  OFF once reserves exist. *Reading of the prompt:* "any sede batch has `reserve_cg = 0`" is read as "no batch has a
+  reserve yet", because nearly every batch has a zero reserve after go-live and the default would never turn off.
+- **A batch corrected upward from a CLOSED state is reopened** (status OPEN, audited `batch.reopened`), so the counter
+  can sell it. Batches only close by hand here, so "depleted" is just zero stock, which is already sellable once
+  restocked.
+
+### The shared regularisation reason
+
+- **«Usar un motivo para todas las diferencias»** sits beside «Aplicar ajustes», with a reason select defaulting to the
+  new `StockCountReason::RESERVE_REGULARISATION`, «Regularización: alta de la reserva sellada».
+  - It stands in for every row with no reason of its own and asks for no note.
+  - A row's own reason (with its note) still wins.
+  - The rows say «Motivo común» and «Supera la tolerancia: lo cubre el motivo común» while it is on.
+- **356:** a holder of `reasons.optional` is never made to type a note. A reason (their own or the shared one) is still
+  picked, because the prompt waives the note, not the reason.
+- **The tolerance applies per figure.** Jar and reserve are each checked against their own expected figure
+  (`CommitStockTake::beyondTolerance`, shared with section 3).
+- **Layout.** The review's reason and note moved to their own row under each difference, so the six figure columns fit a
+  laptop width.
+
+### The ceiling never blocks a correction
+
+- `applyCount` never checks the premises ceiling: a count records what is there; it isn't intake.
+- `StockCountSheet::ceilingWarning()` tells the review (`data-count-ceiling`) and the apply confirmation when the
+  counted result (on-site plus the net jar and reserve differences) would be over the sede's ceiling.
+- The dashboard's ceiling warning then shows as usual. This is tested with a BLOCK ceiling.
+
+### 2. Ajuste: Bote / Reserva
+
+- The batch's **Ajuste** asks «¿Qué corriges?»: «El bote» / «La reserva sellada» (weight batches only), with the current
+  figures in its help. It keeps the same permission and audit, and writes the same ADJUSTMENT, with `reserve` set for the
+  reserve.
+- The labels use new keys because «Bote» alone is already "Pot" (a cash pot) in English.
+
+### 3. The end-of-day weigh: one reason, only when it's off, staying blind
+
+- **When:** after staff submit the weights, before anything commits, `CommitStockTake::closeCountIsOff()` decides. The
+  count is off when either:
+  - a jar is marked «No contado»; or
+  - a jar's difference, after 359's forgotten-top-up absorption (a surplus up to the reserve is not "off"), is beyond
+    Inventario's tolerance.
+- **If nothing is off,** the close carries on exactly as before, with no question (pinned).
+- **If something is off,** ONE box: «El recuento no cuadra — ¿qué ha pasado?». Its quick picks come from the
+  `CloseCountReason` enum: «Error al pesar», «Derrame / merma», «Rellené sin registrar», «Bote no disponible», and «Otro»
+  with a short line (max 120).
+  - One tap answers it.
+  - The per-jar reason fields for «No contado» are gone; one answer covers the whole count.
+  - **The server decides,** so the screen cannot skip it.
+- **356:** a `reasons.optional` operator is not asked; «Aprobado por responsable» is recorded when the count was off.
+- **Blind:** the box names no jar and no amount, and while it is up the jar list is hidden, so it does not invite
+  re-weighing to hit a number. The per-jar variances are revealed after the close, as before. Cancel starts the close
+  over; `resetCloseState` now also clears the «No contado» marks, which it never did.
+- **Stored once, copied where it is needed:**
+  - `stock_takes.reason` (new column);
+  - every adjustment's reason (instead of «Recuento de inventario»);
+  - every «No contado» line with no reason of its own;
+  - the `stocktake.committed` audit payload.
+- **Where the manager sees it:**
+  - the close summary («Motivo: …» above the revealed variances);
+  - the Z report (`stock_count_reason`, plus `stock_count_lines` with each jar's variance);
+  - the panel's till-session page («Recuento de flor» and «Motivo del recuento de flor»).
+  - The Z report reads only till recounts (`kind = till_recount`) taken during the session at its sede.
+
+### 4. The documents
+
+- **Guides** (`resources/guides/en/`; `updated` bumped):
+  - **counter-quick-start:** the reserve block (Reserve: X g, With reserve, the empty jar with a reserve, Top up / All of
+    the reserve / Move to reserve, a forgotten Top up handled); the close recount (weigh the jars only, sealed bags not
+    weighed, the one question); the word list (Rellenar, Reserva, El recuento no cuadra…).
+  - **cash-at-the-counter:** the close section (jars only, a forgotten Top up, the one reason box).
+  - **manager-guide:** intake «Of which in reserve (sealed)»; Ajuste's choice; Inventario's two columns, «Include empty
+    batches», the shared reason, the ceiling; «Unrecorded top-up» on the close summary and till report; the Batches
+    «Reserve» column; the **«Setting up the reserve (go-live)»** checklist; the word list.
+- **Screenshots** go through the pipeline (`resources/guides/shots.json`):
+  - retaken: `04-dispensary-weigh`, `10-close-recount`, `c08-add-stock`, `c09-count`;
+  - new: `04b-top-up`, `10b-close-reason`, `c09b-adjust`, `c15-count-two-columns`, `c16-count-review`.
+  - The shooter gains a `clickAll` step. `10b` needs a closer without «Aprobar sin motivo», so the "about" note says to
+    grant the demo STAFF `till.close` + `stock.take` first.
+  - The demo seed gives Amnesia Haze a sealed quarter through `IntakeBatch`'s `reserve_grams` (the fixture rule), so the
+    reserve shows on a fresh install. `DemoSeedProfileTest` now reconciles the jar and the reserve ledgers separately.
+- **PDFs** regenerate from the same Markdown (content-hashed cache, 353). Checked: the rendered page and the PDF text of
+  all three guides carry the new passages.
+- **In-app help (`Help.php`):** the Inventario page help (two figures, blank untouched, the toggle, the shared reason, the
+  ceiling); Lotes (jar and reserve, Rellenar, Ajuste's choice); the till-day guide's reweigh step (jars only, a forgotten
+  Rellenar, the single question and its quick picks). The intake field already carried its help (359), and Ajuste's
+  choice shows the current jar and reserve.
+- **Glosario:** adds «Reserva (sellada)», «Rellenar» and «Rellenado sin registrar». «Arqueo» notes that the closing
+  flower count weighs only the jars.
+- **There is no Spanish guide source anywhere** (only `resources/guides/en/`, plus each guide's Spanish word list). None
+  was created, as the prompt asks.
+
+### Tests and proof
+
+- **`tests/Feature/Stock/ReserveCountAndCloseReasonTest.php`** has 13 tests; 1, 3, 11 and 12 were seen red. It covers:
+  - two counts on one row → −200 cg on the jar and +40000 cg on the reserve as two movements, with the PDF showing both;
+  - a blank figure is untouched;
+  - a batch zeroed by a past reweigh is listed by default, corrected, reopened and FEFO-sellable, while an untouched
+    empty row blocks nothing;
+  - 30 differences with the shared reason and no typing, and without it a big difference still needs its own reason;
+  - a BLOCK ceiling: applied and warned;
+  - Ajuste with Bote / Reserva;
+  - staff can't open Inventario;
+  - the close weigh: all within tolerance → no box; one jar off → exactly one blind box, with the answer on the take,
+    the movement and the Z report; two off plus one «No contado» → one box covering all three, with no per-jar field; a
+    forgotten top-up absorbed → no box; a manager → no box and «Aprobado por responsable».
+- **`tests/Feature/Guides/ReserveInTheGuidesTest.php`** has 4 tests: the guides name Rellenar and Reserva; the close
+  section says jars only and one reason, and no longer says "Weigh each batch listed" or "give a reason"; the manager
+  guide has the columns, toggle, shared reason and checklist; the help and glossary exist in both languages.
+- **Updated:**
+  - `SealedReserveTest` (359's inventory test now uses the same-row reserve);
+  - `DemoSeedProfileTest` (reconciles each figure).
+- **The browser proof** (`tests/Browser/prove-360.mjs`, a throwaway `csc:seed-staging` DB) passed 9/9 at 820×1180 touch,
+  light and dark:
+  - the off count shows exactly one box, with no per-jar field and no grams or jar names;
+  - every jar typed at its system figure asks nothing and reveals «no difference»;
+  - «Include empty batches» shows in the start modal (off there, because the demo has reserves).
+- **Screenshots** are in `storage/app/screenshots/360/`, plus the guide images above (Inventario's two columns, the
+  review with the shared reason and the ceiling warning, the Ajuste choice).

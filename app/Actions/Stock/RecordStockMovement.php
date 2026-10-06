@@ -103,7 +103,7 @@ class RecordStockMovement
             // not just on the movement row. INSIDE the txn (boundary matches CommitStockTake). Routine
             // SALE/INTAKE depletions are not audited here (traced by their own movement rows).
             if ($type === StockMovementType::ADJUSTMENT || $type === StockMovementType::MERMA) {
-                $key = $unitBased ? 'remaining_units' : 'remaining_cg';
+                $key = $onReserve ? 'reserve_cg' : ($unitBased ? 'remaining_units' : 'remaining_cg'); // 360 — say which figure
                 (new RecordAuditLog)->handle(
                     $type === StockMovementType::MERMA ? 'stock.merma' : 'stock.adjusted',
                     $locked,

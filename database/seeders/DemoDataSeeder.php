@@ -387,6 +387,9 @@ class DemoDataSeeder extends Seeder
                     'cost_per_gram_cents' => random_int(300, 600),
                     // Prompt 278 — the sale price is the batch's; the strain's sede price row stays as the fallback.
                     'price_per_gram_cents' => $pricePerGram, 'price_per_eighth_cents' => 2300,
+                    // Prompts 359–360 — one strain arrives partly in sealed top-up bags, so the reserve, «Rellenar» and the
+                    // two-column stock count show on a fresh install (and in the guides' screenshots). A quarter, sealed.
+                    'reserve_grams' => $name === 'Amnesia Haze' ? (string) intdiv($initial, 400) : 0,
                     'operator_id' => $staff['owner']->id,
                 ]);
 

@@ -22,11 +22,15 @@ use Illuminate\Support\Facades\DB;
  *
  * `$typed` is grams for a weighed batch (either decimal separator), whole units for a unit batch or a product; null with a
  * `$notCountedReason` marks the line *No contado* (the existing columns).
+ *
+ * Prompt 360 — a weight batch's row also takes `$reserve`, its SEALED reserve («Reserva sellada»), snapshotted the same way
+ * against `reserve_cg`. Either figure may be blank: that figure was not counted and is left untouched (so the owner can
+ * correct only the bags, or only the jar). Both blank is still *No contado*, with its reason.
  */
 class RecordStockCountLine
 {
     /** @throws AuthorizationException|DomainException */
-    public function handle(StockTakeLine $line, ?string $typed, User $actor, ?string $notCountedReason = null): StockTakeLine
+    public function handle(StockTakeLine $line, ?string $typed, User $actor, ?string $notCountedReason = null, ?string $reserve = null): StockTakeLine
     {
         if (! $actor->can('stock.take')) {
             throw new AuthorizationException(__('No tienes permiso para hacer inventarios.'));
@@ -35,38 +39,46 @@ class RecordStockCountLine
             throw new DomainException(__('Este inventario ya no está abierto.'));
         }
 
-        if ($typed === null || trim($typed) === '') {
+        $typed = trim((string) $typed);
+        $reserve = trim((string) $reserve);
+        if ($typed === '' && ($reserve === '' || ! $line->countsReserve())) {
             if (trim((string) $notCountedReason) === '') {
                 throw new DomainException(__('Indica por qué no se cuenta.'));
             }
             $line->forceFill([
                 'not_counted' => true, 'not_counted_reason' => trim((string) $notCountedReason),
                 'counted_cg' => null, 'counted_units' => null, 'expected_cg' => null, 'expected_units' => null,
+                'counted_reserve_cg' => null, 'expected_reserve_cg' => null,
                 'counted_by' => $actor->id, 'counted_at' => null,
             ])->save();
 
             return $line;
         }
 
-        return DB::transaction(function () use ($line, $typed, $actor): StockTakeLine {
+        return DB::transaction(function () use ($line, $typed, $reserve, $actor): StockTakeLine {
             $item = $line->countable_type === Batch::class
                 ? Batch::query()->withoutGlobalScopes()->whereKey($line->countable_id)->lockForUpdate()->firstOrFail()
                 : Article::query()->withoutGlobalScopes()->whereKey($line->countable_id)->lockForUpdate()->firstOrFail();
             $unit = $item instanceof Article || $item->isUnitType();
 
             if ($unit) {
-                if (preg_match('/^\d+$/', trim($typed)) !== 1) {
+                if (preg_match('/^\d+$/', $typed) !== 1) {
                     throw new DomainException(__('Escribe un número entero de unidades.'));
                 }
-                $counted = ['counted_units' => (int) trim($typed), 'expected_units' => $item instanceof Article ? (int) $item->stock : (int) $item->remaining_units,
+                $counted = ['counted_units' => (int) $typed, 'expected_units' => $item instanceof Article ? (int) $item->stock : (int) $item->remaining_units,
                     'counted_cg' => null, 'expected_cg' => null];
             } else {
-                if (TypedNumber::canonical($typed) === null) {
-                    throw new DomainException(__('Escribe los gramos sin separador de miles y con dos decimales como máximo (p. ej. 1000 o 3.5).'));
+                foreach (array_filter([$typed, $reserve], fn (string $v): bool => $v !== '') as $grams) {
+                    if (TypedNumber::canonical($grams) === null) {
+                        throw new DomainException(__('Escribe los gramos sin separador de miles y con dos decimales como máximo (p. ej. 1000 o 3.5).'));
+                    }
                 }
-                $counted = ['counted_cg' => Weight::fromGrams($typed)->centigrams,
-                    'expected_cg' => $line->reserve ? $item->reserve_cg->centigrams : $item->remaining_cg->centigrams, // 359
-                    'counted_units' => null, 'expected_units' => null];
+                // Both snapshots, whatever was typed: what the system held for each figure WHEN this row was counted.
+                $counted = [
+                    'counted_cg' => $typed === '' ? null : Weight::fromGrams($typed)->centigrams, 'expected_cg' => $item->remaining_cg->centigrams,
+                    'counted_reserve_cg' => $reserve === '' ? null : Weight::fromGrams($reserve)->centigrams, 'expected_reserve_cg' => $item->reserve_cg->centigrams,
+                    'counted_units' => null, 'expected_units' => null,
+                ];
             }
 
             $line->forceFill($counted + [

@@ -228,18 +228,15 @@ class SealedReserveTest extends TestCase
         $this->assertSame(50000, (int) StockMovement::query()->withoutGlobalScopes()->where('stockable_id', $batch->id)->where('type', StockMovementType::INTAKE->value)->sum('qty_cg'));
     }
 
-    public function test_the_full_inventory_counts_the_reserve_as_its_own_line(): void
+    public function test_the_full_inventory_counts_the_reserve_on_the_same_row(): void
     {
+        // Prompt 360 replaced 359's separate «Reserva sellada» line with a second figure on the batch's own row.
         $batch = $this->batch(5000, 45000);
         $take = (new StartStockCount)->handle($this->sede, $this->owner);
-        $lines = $take->lines()->get();
-        $this->assertSame(2, $lines->where('countable_id', $batch->id)->count(), 'the jar and «Reserva sellada»');
+        $line = $take->lines()->where('countable_id', $batch->id)->sole();
 
-        $jar = $lines->first(fn ($l): bool => ! $l->reserve);
-        $reserve = $lines->first(fn ($l): bool => (bool) $l->reserve);
-        (new RecordStockCountLine)->handle($jar, '50', $this->owner);
-        (new RecordStockCountLine)->handle($reserve, '440', $this->owner); // 10 g short in the bags
-        (new CommitStockTake)->applyCount($take->fresh(), $this->owner, [$reserve->id => ['reason' => 'RECORDING_ERROR', 'note' => 'Bolsa abierta']]);
+        (new RecordStockCountLine)->handle($line, '50', $this->owner, reserve: '440'); // 10 g short in the bags
+        (new CommitStockTake)->applyCount($take->fresh(), $this->owner, [$line->id => ['reason' => 'RECORDING_ERROR', 'note' => 'Bolsa abierta']]);
 
         $this->assertSame([[-1000, true]], $this->adjustments($batch));
         $this->assertSame([5000, 44000], [$batch->fresh()->remaining_cg->centigrams, $batch->fresh()->reserve_cg->centigrams]);

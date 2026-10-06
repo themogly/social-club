@@ -3,7 +3,7 @@ title: Counter quick-start guide for staff
 summary: A normal shift on the counter tablet: signing in, the till, serving members, sign-ups and closing up.
 audience: staff
 order: 1
-updated: 2026-10-06
+updated: 2026-10-07
 ---
 
 > This guide walks through a normal shift on the counter tablet: signing in, opening the till, serving members, signing up new members and closing up. The screenshots show the English screens; the Spanish words you may see are listed at the end.
@@ -65,7 +65,16 @@ Every dispensation must be to an identified member, from a real batch, by weight
 5. Enter the amount. Flower, hash and extracts: type the weight in grams on the keypad, or tap a quick amount (1 g, 2 g, 3.5 g…). Pre-rolls, vapes and edibles: use **−** and **+** to choose the number of units.
 6. Tap **Add to basket**. The strain search comes back at the top of the list, empty, ready for the next item (tap it to type). Repeat for anything else.
 
-**Sealed top-ups (reserve):** a strain whose spare stock is in sealed bags shows **Reserve: 30.00 g** on its line, and the **With reserve** filter lists only those strains. When a jar runs low, the line says **Jar low, reserve available**; when it is empty it says **Jar empty — 30.00 g in reserve · Top up**. Tap the strain: under the keypad, **Top up** moves the grams you typed from the bags into the jar (**All of the reserve** moves the lot), and **Move to reserve** does the opposite when you weigh up bags yourself. You only ever enter a total, never a bag count. The evening flower count weighs only the jar, as before; if you opened a bag without tapping **Top up**, the system notices and tells the manager, so nothing goes wrong.
+**Sealed top-ups (reserve):** the sealed bags of a strain kept off the counter are its **reserve**. They are not in the jar, so they are not dispensed and not weighed at closing.
+
+- A strain with a reserve shows **Reserve: 30.00 g** on its line, and the **With reserve** filter (beside *Filters*) lists only those strains.
+- When a jar runs low, the line says **Jar low, reserve available**. When it is empty it says **Jar empty — 30.00 g in reserve · Top up**, and you can still tap it.
+- **When you open a bag, tap Top up.** Tap the strain: under the keypad, **Top up** moves the grams you typed from the reserve into the jar, and **All of the reserve** moves the lot. **Move to reserve** does the opposite, when you weigh up bags yourself. You only ever enter a total, never a bag count.
+- **Forgot to tap Top up?** The closing count notices the heavier jar, puts it right by itself and notes it for the manager (*Unrecorded top-up*). You do not have to do anything.
+
+![Top up: the reserve shown on the strain, and Top up / All of the reserve under the keypad.](img/counter-quick-start/04b-top-up.jpg)
+
+*Top up: the reserve shown on the strain, and Top up / All of the reserve under the keypad.*
 
 **Half-gram rounding:** the weight the member pays for is rounded to the nearest half gram (never less than 0.5 g): 1.10 g is charged as 1.0 g, 0.20 g as 0.5 g, and 3.40 g as 3.5 g, which gets the eighth price. The basket shows it, for example *"1.10 g · charged 1.00 g"*. Stock and the member's limits always use the exact weight. To turn it off for yourself, use the **Round to 0.5 g** switch above the total; it stays as you set it until you sign out, and it shows **(changed)** while it differs from the club's setting.
 
@@ -165,14 +174,20 @@ Anything else about a member (their history, documents, discounts) is in **Admin
 Closing is two counts: the flower, then the cash. Both are done **blind**: weigh and count what is really there, and the system shows the expected figures only afterwards.
 
 1. On the **Till** screen, tap **Close till**.
-2. **Flower recount** (end of day): this appears once per club per day, when the last till there closes. Weigh each batch listed and type the grams. If you cannot weigh one, tap **Can't count it** and give a reason; its stock will not be touched. Then tap **Confirm count**.
+2. **Flower recount** (end of day): this appears once per club per day, when the last till there closes. **Weigh the jars only**: for each batch listed, weigh its jar and type the grams. Sealed bags in the reserve are not weighed at closing (managers check them in the stock count). If you cannot weigh a jar, tap **Can't count it**; its stock will not be touched. Then tap **Confirm count**.
+   - If everything matches, the close simply carries on.
+   - If the count does not match, **one** question appears: **The count doesn't match — what happened?** Tap what happened (*Weighing error*, *Spill / wastage*, *Topped up without recording*, *Jar not available*), or **Other** with a few words. One answer covers the whole count. It does not say which jar or by how much; that is shown after the close.
 3. **Cash count:** count the drawer and type the total.
 4. If the cash does not match what was expected, the **Difference** shows in red. Write what you know in the **Note**, even "don't know". Petty-cash payments made during the day are listed with their reasons.
 5. Confirm. The till shows **Closed**.
 
-![The end-of-day flower recount: type the grams for each batch, or tap Can't count it.](img/counter-quick-start/10-close-recount.jpg)
+![The end-of-day flower recount: weigh each jar and type the grams, or tap Can't count it. Sealed bags are not weighed.](img/counter-quick-start/10-close-recount.jpg)
 
-*The end-of-day flower recount: type the grams for each batch, or tap Can't count it.*
+*The end-of-day flower recount: weigh each jar and type the grams, or tap Can't count it. Sealed bags are not weighed.*
+
+![When the count doesn't match: one question for the whole count, with no jar or amount shown.](img/counter-quick-start/10b-close-reason.jpg)
+
+*When the count doesn't match: one question for the whole count, with no jar or amount shown.*
 
 Closing also clocks you out: *"Clocked out at 23:04 · Undo"*. If you are staying on, tap **Undo** within two minutes. Anyone else still clocked in at that club is listed with a **Clock out** button; they each confirm with their own PIN.
 
@@ -232,6 +247,9 @@ The counter shows Spanish or English, depending on each person's language settin
 | Hazle una foto antes de dispensar | Take their photo before dispensing |
 | Redondeo | Rounding |
 | Recuento de flor · No se puede contar | Flower recount · Can't count it |
+| El recuento no cuadra — ¿qué ha pasado? | The count doesn't match — what happened? |
+| Reserva · Con reserva · Rellenar · Toda la reserva · Pasar a reserva | Reserve · With reserve · Top up · All of the reserve · Move to reserve |
+| Bote vacío · Rellenado sin registrar | Jar empty · Unrecorded top-up |
 | Diferencia · Nota | Difference · Note |
 | Modo formación | Training mode |
 | Personal | Staff |

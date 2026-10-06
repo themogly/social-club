@@ -22,6 +22,7 @@ use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteBulkAction;
 use Filament\Actions\EditAction;
 use Filament\Actions\RestoreBulkAction;
+use Filament\Forms\Components\Radio;
 use Filament\Forms\Components\Textarea;
 use Filament\Notifications\Notification;
 use Filament\Support\Enums\FontWeight;
@@ -259,6 +260,16 @@ class BatchesTable
             ->label(__('Ajuste'))
             ->icon(Heroicon::OutlinedAdjustmentsHorizontal)
             ->schema([
+                // Prompt 360 — a weight batch holds two figures (359): correct the jar, or set its sealed reserve, here
+                // without starting a full Inventario. The same ADJUSTMENT, the reserve's marked `on_reserve`.
+                Radio::make('bucket')
+                    ->label(__('¿Qué corriges?'))
+                    ->options(['jar' => __('El bote'), 'reserve' => __('La reserva sellada')]) // «Bote» alone is a cash pot in English
+                    ->default('jar')
+                    ->inline()
+                    ->required()
+                    ->helperText(fn (Batch $record): string => __('Ahora: bote :jar · reserva :reserve', ['jar' => $record->remaining_cg->formatted(), 'reserve' => $record->reserve_cg->formatted()]))
+                    ->visible(fn (Batch $record): bool => ! $record->isUnitType()),
                 DecimalInput::make('quantity')
                     ->label(fn (Batch $record): string => $record->isUnitType() ? __('Ajuste (uds)') : __('Ajuste (g)'))
                     ->numeric()
@@ -274,7 +285,8 @@ class BatchesTable
                         $record,
                         StockMovementType::ADJUSTMENT,
                         self::signedDelta($record, (float) $data['quantity']),
-                        ['reason' => (string) $data['reason'], 'operator_id' => self::operatorId()],
+                        ['reason' => (string) $data['reason'], 'operator_id' => self::operatorId(),
+                            'reserve' => ! $record->isUnitType() && ($data['bucket'] ?? 'jar') === 'reserve'],
                     );
 
                     Notification::make()->title(__('Ajuste registrado'))->success()->send();

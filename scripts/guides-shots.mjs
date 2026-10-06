@@ -41,6 +41,13 @@ async function chooseMember(page, memberNo) {
 async function run(page, step) {
     if (step.goto) await page.goto(`${BASE}${step.goto}`, { waitUntil: 'networkidle' });
     if (step.click) await page.locator(step.click).first().click();
+    // Prompt 360 — every match, one at a time (e.g. «Can't count it» on each jar of the evening count).
+    if (step.clickAll) {
+        for (let i = 0; i < await page.locator(step.clickAll).count(); i++) {
+            await page.locator(step.clickAll).nth(i).click();
+            await settle(page);
+        }
+    }
     if (step.fill) await page.fill(step.fill[0], step.fill[1]);
     if (step.press) await page.press(step.press[0], step.press[1]);
     if (step.wait) await page.waitForTimeout(step.wait);

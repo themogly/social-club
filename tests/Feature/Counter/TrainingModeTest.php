@@ -185,8 +185,8 @@ class TrainingModeTest extends TestCase
         $this->livewirePost($this->snapshotFrom('/counter/till', 'counter.till-session'), ['movementType' => 'IN', 'movementAmount' => '5', 'movementReason' => 'Cambio'], [['recordMovement']])->assertOk();
         $close = $this->livewirePost($this->snapshotFrom('/counter/till', 'counter.till-session'), [], [['startClose']])->assertOk();
         $this->livewirePost((string) $close->json('components.0.snapshot'), [
-            "reweighNotCounted.{$this->batch->id}" => true, "reweighReasons.{$this->batch->id}" => 'Prueba', 'countInput' => '110', 'closeNote' => 'Prueba',
-        ], [['submitReweigh'], ['submitCount'], ['finishClose']])->assertOk();
+            "reweighNotCounted.{$this->batch->id}" => true, 'countInput' => '110', 'closeNote' => 'Prueba',
+        ], [['submitReweigh', ['JAR_UNAVAILABLE']], ['submitCount'], ['finishClose']])->assertOk(); // 360 — one answer for the count
 
         return $html;
     }

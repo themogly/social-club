@@ -18,6 +18,7 @@ use App\Models\StockTakeLine;
 use App\Models\User;
 use App\Support\ActiveScope;
 use App\Support\CounterOperator;
+use App\Support\ManagerApproval;
 use Carbon\CarbonImmutable;
 use Database\Seeders\DatabaseSeeder;
 use Database\Seeders\RolePermissionSeeder;
@@ -25,6 +26,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Notification;
 use Livewire\Features\SupportTesting\Testable;
 use Livewire\Livewire;
+use Tests\Concerns\ChangesRolePermissions;
 use Tests\TestCase;
 
 /**
@@ -35,7 +37,7 @@ use Tests\TestCase;
  */
 class CounterStaffDayTest extends TestCase
 {
-    use RefreshDatabase;
+    use ChangesRolePermissions, RefreshDatabase;
 
     private Organisation $org;
 
@@ -80,7 +82,6 @@ class CounterStaffDayTest extends TestCase
 
         Livewire::test(TillSession::class)
             ->set('reweighNotCounted', [$batch->id => true])
-            ->set('reweighReasons', [$batch->id => 'Bote no localizado'])
             ->call('submitReweigh')
             ->assertSet('reweighDone', true); // the close proceeds
 
@@ -89,24 +90,35 @@ class CounterStaffDayTest extends TestCase
         $this->assertSame(0, StockMovement::query()->where('type', 'ADJUSTMENT')->count());
         $this->assertSame(0, StockMovement::query()->where('type', 'MERMA')->count());
 
-        // The omission is recorded and visible, with its reason.
+        // The omission is recorded and visible, with its reason — prompt 360: the count's ONE answer, which for a manager
+        // (`reasons.optional`, never asked) is «Aprobado por responsable».
         $line = StockTakeLine::query()->where('countable_id', $batch->id)->firstOrFail();
         $this->assertTrue($line->not_counted);
-        $this->assertSame('Bote no localizado', $line->not_counted_reason);
+        $this->assertSame(ManagerApproval::reason(), $line->not_counted_reason);
     }
 
-    public function test_a_not_counted_batch_needs_a_reason(): void
+    /** Prompt 360 — no reason box per jar any more: a «No contado» jar makes the count ask its one question first. */
+    public function test_a_not_counted_batch_needs_the_counts_one_answer(): void
     {
-        $this->actingAs($this->operator());
+        $this->setRolePermission(Role::STAFF, 'stock.take', true);
+        $this->setRolePermission(Role::STAFF, 'till.close', true);
+        $staff = User::factory()->create();
+        $staff->assignRole(Role::STAFF->value);
+        $staff->locations()->sync([$this->location->id]);
+        CounterOperator::set($staff);
+        $this->actingAs($staff);
         (new OpenTill)->handle($this->location, 'POS-1', 10000);
         $batch = $this->flowerBatch(100000, 90000);
 
-        Livewire::test(TillSession::class)
+        $till = Livewire::test(TillSession::class)
             ->set('reweighNotCounted', [$batch->id => true])
-            ->set('reweighReasons', [$batch->id => '   '])
             ->call('submitReweigh')
-            ->assertSet('reweighDone', false) // refused
-            ->assertSet('flashType', 'error');
+            ->assertSet('reweighDone', false) // not without an answer
+            ->assertSet('reweighAsking', true);
+        $this->assertSame(0, StockTakeLine::query()->count());
+
+        $till->call('submitReweigh', 'JAR_UNAVAILABLE')->assertSet('reweighDone', true);
+        $this->assertSame(__('Bote no disponible'), StockTakeLine::query()->where('countable_id', $batch->id)->sole()->not_counted_reason);
     }
 
     // 2) A real count of zero is NOT "not counted".
@@ -120,7 +132,6 @@ class CounterStaffDayTest extends TestCase
         Livewire::test(TillSession::class)
             ->set('reweighCounts', [$zeroed->id => '0'])
             ->set('reweighNotCounted', [$skipped->id => true])
-            ->set('reweighReasons', [$skipped->id => 'En uso'])
             ->call('submitReweigh')
             ->assertSet('reweighDone', true);
 
@@ -235,7 +246,8 @@ class CounterStaffDayTest extends TestCase
         $html = $component->html();
 
         // Copy describes the real filter (touched since intake), not "dispensed today".
-        $this->assertStringContainsString(__('Pesa cada lote de flor tocado desde su entrada e introduce los gramos contados. Si no puedes contar un bote, márcalo como no contado e indica el motivo — su stock no se tocará. El peso esperado se revela solo después de confirmar (recuento a ciegas).'), $html);
+        // Prompt 360 — the jar only (sealed bags are not weighed), and no reason per jar.
+        $this->assertStringContainsString(__('Pesa solo el bote de cada lote de flor tocado desde su entrada e introduce los gramos; las bolsas selladas no se pesan. Si no puedes pesar un bote, márcalo como no contado — su stock no se tocará. El peso esperado se revela solo después de confirmar (recuento a ciegas).'), $html);
         $this->assertStringNotContainsString('dispensado hoy', $html);
 
         // Progress starts at 0 of 1…

@@ -29,7 +29,8 @@
             <td><strong>{{ __('Líneas') }}:</strong> {{ $totals['lines'] }}</td>
             <td><strong>{{ __('No contado') }}:</strong> {{ $totals['not_counted'] }}</td>
             <td><strong>{{ __('Con diferencia') }}:</strong> {{ $totals['differences'] }}</td>
-            <td><strong>{{ __('Diferencia neta') }}:</strong> {{ $totals['net_weight'] }} · {{ $totals['net_units_text'] }}</td>
+            <td><strong>{{ __('Diferencia neta (bote)') }}:</strong> {{ $totals['net_weight'] }} · {{ $totals['net_units_text'] }}</td>
+            <td><strong>{{ __('Diferencia neta (reserva sellada)') }}:</strong> {{ $totals['net_reserve_weight'] }}</td>
             <td><strong>{{ __('Valor (a la aportación)') }}:</strong> {{ $totals['net_value'] }}</td>
         </tr>
     </table>
@@ -37,24 +38,39 @@
     <table>
         <thead>
             <tr>
-                <th>{{ __('Lote o producto') }}</th><th>{{ __('Tipo') }}</th><th class="num">{{ __('Sistema') }}</th><th class="num">{{ __('Contado') }}</th>
-                <th class="num">{{ __('Diferencia') }}</th><th class="num">{{ __('Valor') }}</th><th>{{ __('Motivo') }}</th><th>{{ __('Contado por') }}</th>
+                <th rowspan="2">{{ __('Lote o producto') }}</th><th rowspan="2">{{ __('Tipo') }}</th>
+                <th class="num" colspan="3">{{ __('El bote') }}</th><th class="num" colspan="3">{{ __('La reserva sellada') }}</th>
+                <th class="num" rowspan="2">{{ __('Valor') }}</th><th rowspan="2">{{ __('Motivo') }}</th><th rowspan="2">{{ __('Contado por') }}</th>
+            </tr>
+            <tr>
+                <th class="num">{{ __('Sistema') }}</th><th class="num">{{ __('Contado') }}</th><th class="num">{{ __('Diferencia') }}</th>
+                <th class="num">{{ __('Sistema') }}</th><th class="num">{{ __('Contado') }}</th><th class="num">{{ __('Diferencia') }}</th>
             </tr>
         </thead>
         <tbody>
-            @foreach ($rows as $row)
+            @foreach (array_filter($rows, fn (array $row): bool => ! ($row['optional'] && ! $row['settled'])) as $row)
                 <tr>
                     <td>{{ $row['name'] }}@if ($row['reference']) · {{ $row['reference'] }}@endif</td>
                     <td>{{ $row['group'] }}</td>
                     <td class="num">{{ $row['expected'] ?? '—' }}</td>
                     <td class="num">{{ $row['not_counted'] ? __('No contado') : ($row['counted'] ?? '—') }}</td>
                     <td class="num">{{ $row['difference_text'] }}</td>
+                    <td class="num">{{ $row['counts_reserve'] ? ($row['expected_reserve'] ?? '—') : '' }}</td>
+                    <td class="num">{{ $row['counts_reserve'] && ! $row['not_counted'] ? ($row['counted_reserve'] ?? '—') : '' }}</td>
+                    <td class="num">{{ $row['counts_reserve'] ? $row['reserve_difference_text'] : '' }}</td>
                     <td class="num">{{ $row['value_text'] }}</td>
                     <td>{{ $row['not_counted'] ? $row['not_counted_reason'] : trim(($row['reason_label'] ?? '').($row['note'] ? ': '.$row['note'] : ''), ': ') }}</td>
                     <td>{{ $row['counted_by'] }}@if ($row['counted_at']) · {{ $row['counted_at'] }}@endif</td>
                 </tr>
             @endforeach
         </tbody>
+        <tfoot>
+            <tr>
+                <th colspan="4">{{ __('Total') }}</th><th class="num">{{ $totals['net_weight'] }}</th>
+                <th colspan="2"></th><th class="num">{{ $totals['net_reserve_weight'] }}</th>
+                <th class="num">{{ $totals['net_value'] }}</th><th colspan="2"></th>
+            </tr>
+        </tfoot>
     </table>
 
     <p class="muted">{{ __('La diferencia de cada línea es contra lo que había en el sistema cuando se contó. El valor es a la aportación del lote o producto.') }}</p>

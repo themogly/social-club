@@ -114,7 +114,7 @@ class StockReport extends AbstractReport
                 ReportColumn::text('nombre', __('Nombre')),
                 ReportColumn::text('genetica', __('Genética')),
                 ReportColumn::text('tipo', __('Tipo')),
-                ReportColumn::weight('bote', __('Bote')),
+                ReportColumn::weight('bote', __('En el bote')), // 360 — «Bote» alone is a cash pot in English
                 ReportColumn::weight('reserva', __('Reserva')),
                 ReportColumn::weight('restante', __('Restante')),
                 ReportColumn::money('coste_g', __('Coste/g'), total: false),
@@ -146,9 +146,10 @@ class StockReport extends AbstractReport
         $byType = DB::table('stock_movements')
             ->whereIn('location_id', $this->resolvedLocationIds())
             ->where('created_at', '>=', $start)->where('created_at', '<', $end)
-            ->groupBy('type')
+            ->groupBy('type', 'on_reserve') // prompt 360 — a reserve correction is never folded into a jar one
             ->get([
                 'type',
+                'on_reserve',
                 DB::raw('COUNT(*) as movimientos'),
                 DB::raw('SUM(qty_cg) as grams_cg'),
                 DB::raw('SUM(qty_units) as uds'),
@@ -162,6 +163,8 @@ class StockReport extends AbstractReport
             StockMovementType::MERMA->value => __('Merma'),
             StockMovementType::TRANSFER_IN->value => __('Traspaso entrada'),
             StockMovementType::TRANSFER_OUT->value => __('Traspaso salida'),
+            StockMovementType::RESERVE_IN->value => __('Pasar a reserva'),
+            StockMovementType::RESERVE_OUT->value => __('Rellenar'),
         ];
 
         $rows = $byType->map(function (\stdClass $r) use ($labels): array {
@@ -170,7 +173,7 @@ class StockReport extends AbstractReport
             }
 
             return [
-                'tipo' => $labels[$r->type] ?? $r->type,
+                'tipo' => ($labels[$r->type] ?? $r->type).((bool) $r->on_reserve ? ' · '.__('reserva sellada') : ''),
                 'movimientos' => (int) $r->movimientos,
                 'grams' => (int) $r->grams_cg,
                 'uds' => (int) $r->uds,
@@ -213,6 +216,9 @@ class StockReport extends AbstractReport
                 'stock_take_lines.expected_cg as expected_cg',
                 'stock_take_lines.counted_cg as counted_cg',
                 'stock_take_lines.variance_cg as variance_cg',
+                'stock_take_lines.expected_reserve_cg as expected_reserve_cg',
+                'stock_take_lines.counted_reserve_cg as counted_reserve_cg',
+                'stock_take_lines.variance_reserve_cg as variance_reserve_cg',
             ]);
 
         // Strain and description first (298), then the lote number — a stock-count report is traceability (282).
@@ -224,6 +230,10 @@ class StockReport extends AbstractReport
             'esperado' => (int) $r->expected_cg,
             'contado' => (int) $r->counted_cg,
             'variacion' => (int) $r->variance_cg,
+            // Prompt 360 — the sealed reserve's own expected / counted / variance (blank where it was not counted).
+            'reserva_esperada' => $r->counted_reserve_cg === null ? null : (int) $r->expected_reserve_cg,
+            'reserva_contada' => $r->counted_reserve_cg === null ? null : (int) $r->counted_reserve_cg,
+            'reserva_variacion' => (int) $r->variance_reserve_cg,
         ])->all();
 
         return new ReportTable(
@@ -234,9 +244,12 @@ class StockReport extends AbstractReport
                 ReportColumn::weight('esperado', __('Esperado'), total: false),
                 ReportColumn::weight('contado', __('Contado'), total: false),
                 ReportColumn::weight('variacion', __('Variación')),
+                ReportColumn::weight('reserva_esperada', __('Reserva esperada'), total: false),
+                ReportColumn::weight('reserva_contada', __('Reserva contada'), total: false),
+                ReportColumn::weight('reserva_variacion', __('Variación de la reserva')),
             ],
             rows: $rows,
-            totals: ['variacion' => array_sum(array_column($rows, 'variacion'))],
+            totals: ['variacion' => array_sum(array_column($rows, 'variacion')), 'reserva_variacion' => array_sum(array_column($rows, 'reserva_variacion'))],
             empty: __('Sin recuentos cerrados en este período'),
         );
     }

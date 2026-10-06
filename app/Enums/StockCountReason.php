@@ -12,6 +12,8 @@ enum StockCountReason: string
     case RECORDING_ERROR = 'RECORDING_ERROR';
     case THEFT_OR_LOSS = 'THEFT_OR_LOSS';
     case OTHER = 'OTHER';
+    // Prompt 360 — the go-live cleanup: putting the sealed bags 359 introduced into the system, in one pass per sede.
+    case RESERVE_REGULARISATION = 'RESERVE_REGULARISATION';
 
     public function label(): string
     {
@@ -20,6 +22,7 @@ enum StockCountReason: string
             self::RECORDING_ERROR => __('Error de registro'),
             self::THEFT_OR_LOSS => __('Robo o pérdida'),
             self::OTHER => __('Otro'),
+            self::RESERVE_REGULARISATION => __('Regularización: alta de la reserva sellada'),
         };
     }
 }

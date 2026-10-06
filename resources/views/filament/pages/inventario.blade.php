@@ -104,28 +104,46 @@
                         @foreach ($group['rows'] as $row)
                             <li class="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 py-3" data-count-line="{{ $row['id'] }}" wire:key="line-{{ $row['id'] }}" x-data="{ skip: false }">
                                 <div class="min-w-48 flex-1">
-                                    <p class="font-medium text-gray-950 dark:text-white">{{ $row['name'] }}@if ($row['reference']) <span class="text-xs font-normal text-gray-500 dark:text-gray-400">· {{ $row['reference'] }}</span>@endif</p>
+                                    <p class="font-medium text-gray-950 dark:text-white">{{ $row['name'] }}@if ($row['reference']) <span class="text-xs font-normal text-gray-500 dark:text-gray-400">· {{ $row['reference'] }}</span>@endif
+                                        @if ($row['optional']) <x-filament::badge color="gray" size="sm" class="ms-1 inline-flex" data-count-zero>{{ __('A cero en el sistema') }}</x-filament::badge>@endif
+                                    </p>
                                     <p class="text-xs text-gray-500 dark:text-gray-400">
                                         @if ($sheet->showsExpected() && $row['current'] !== null)
-                                            <span data-count-system>{{ __('Sistema: :qty', ['qty' => $row['current']]) }}</span> ·
+                                            <span data-count-system>{{ $row['counts_reserve'] ? __('Sistema: bote :jar · reserva :reserve', ['jar' => $row['current'], 'reserve' => $row['current_reserve']]) : __('Sistema: :qty', ['qty' => $row['current']]) }}</span> ·
                                         @endif
                                         @if ($row['not_counted'])
                                             <span class="text-warning-600 dark:text-warning-400">{{ __('No contado: :reason', ['reason' => $row['not_counted_reason']]) }}</span>
                                         @elseif ($row['settled'])
-                                            <span class="text-success-600 dark:text-success-400" data-count-saved>{{ __('Contado :qty · :name · :time', ['qty' => $row['counted'], 'name' => (string) $row['counted_by'], 'time' => (string) $row['counted_at']]) }}</span>
+                                            <span class="text-success-600 dark:text-success-400" data-count-saved>{{ __('Contado :qty · :name · :time', [
+                                                'qty' => $row['counted_reserve'] !== null ? __('bote :jar · reserva :reserve', ['jar' => $row['counted'] ?? '—', 'reserve' => $row['counted_reserve']]) : $row['counted'],
+                                                'name' => (string) $row['counted_by'], 'time' => (string) $row['counted_at']]) }}</span>
+                                        @elseif ($row['optional'])
+                                            {{ __('Déjalo en blanco si no hay nada') }}
                                         @else
                                             {{ __('Pendiente') }}
                                         @endif
                                     </p>
                                 </div>
                                 @if ($open)
-                                    <form class="ms-auto flex items-center gap-2" wire:submit="saveLine('{{ $row['id'] }}')" x-show="! skip">
-                                        <label class="sr-only" for="entry-{{ $row['id'] }}">{{ __('Cantidad contada de :item', ['item' => $row['name']]) }}</label>
-                                        <x-filament::input.wrapper class="w-28" :valid="! $errors->has('entries.'.$row['id'])">
-                                            <x-filament::input :id="'entry-'.$row['id']" type="text" :inputmode="$row['unit'] ? 'numeric' : 'decimal'" autocomplete="off"
-                                                wire:model="entries.{{ $row['id'] }}" :placeholder="$row['unit'] ? '0' : '0.00'" class="text-right tabular-nums" />
-                                        </x-filament::input.wrapper>
-                                        <span class="w-6 text-sm text-gray-500 dark:text-gray-400">{{ $row['unit'] ? __('ud.') : 'g' }}</span>
+                                    {{-- Prompt 360 — a weight batch's row counts the JAR and its SEALED RESERVE; either may be left blank
+                                         (that figure is not counted and is left untouched). Unit products keep one count. --}}
+                                    <form class="ms-auto flex flex-wrap items-end gap-2" wire:submit="saveLine('{{ $row['id'] }}')" x-show="! skip">
+                                        <label class="text-xs text-gray-600 dark:text-gray-400" for="entry-{{ $row['id'] }}">
+                                            <span class="block">{{ $row['counts_reserve'] ? __('Bote (g)') : ($row['unit'] ? __('Contado (ud.)') : __('Contado (g)')) }}</span>
+                                            <x-filament::input.wrapper class="mt-1 w-28" :valid="! $errors->has('entries.'.$row['id'])">
+                                                <x-filament::input :id="'entry-'.$row['id']" type="text" :inputmode="$row['unit'] ? 'numeric' : 'decimal'" autocomplete="off"
+                                                    wire:model="entries.{{ $row['id'] }}" :placeholder="$row['unit'] ? '0' : '0.00'" class="text-right tabular-nums" />
+                                            </x-filament::input.wrapper>
+                                        </label>
+                                        @if ($row['counts_reserve'])
+                                            <label class="text-xs text-gray-600 dark:text-gray-400" for="reserve-{{ $row['id'] }}" data-count-reserve-field>
+                                                <span class="block">{{ __('Reserva sellada (g)') }}</span>
+                                                <x-filament::input.wrapper class="mt-1 w-28">
+                                                    <x-filament::input :id="'reserve-'.$row['id']" type="text" inputmode="decimal" autocomplete="off"
+                                                        wire:model="reserveEntries.{{ $row['id'] }}" placeholder="0.00" class="text-right tabular-nums" />
+                                                </x-filament::input.wrapper>
+                                            </label>
+                                        @endif
                                         <x-filament::button type="submit" size="sm">{{ $row['settled'] && ! $row['not_counted'] ? __('Recontar') : __('Guardar') }}</x-filament::button>
                                         <x-filament::button type="button" size="sm" color="gray" x-on:click="skip = true">{{ __('No contado') }}</x-filament::button>
                                     </form>
