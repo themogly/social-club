@@ -239,6 +239,47 @@
                     </p>
                 </div>
 
+                {{-- Prompt 361 — the tablet came back from a handover unsigned. One clear step before approval (which the
+                     server refuses until it is settled): the member signs here, or staff carry on with a one-tap reason. --}}
+                @if ($altaReviewing->awaitsSignature())
+                    @php $reasonOptional = \App\Support\ManagerApproval::allows(\App\Support\CounterOperator::current()); @endphp
+                    <div data-missing-signature x-data="{ step: null, other: '' }" class="rounded-xl border border-warning/40 bg-warning/10 p-3 text-sm">
+                        <p class="font-semibold text-warning">{{ __('Falta la firma') }}</p>
+                        <p class="mt-0.5 text-ink-muted dark:text-slate-400">{{ __('La solicitud llegó sin firma desde la tableta.') }}</p>
+                        <div class="mt-3 flex flex-wrap gap-2" x-show="step === null">
+                            <x-button size="sm" x-on:click="step = 'sign'" data-sign-now class="min-h-11">{{ __('Firmar ahora') }}</x-button>
+                            <x-button variant="secondary" size="sm" x-on:click="step = 'waive'" data-sign-waive class="min-h-11">{{ __('Seguir sin firma') }}</x-button>
+                        </div>
+                        <div x-show="step === 'sign'" x-cloak>
+                            <x-counter.signature-pad capture="captureApplicationSignature" :label="__('Firma del socio/a')"
+                                :hint="__('Pásale la tablet: firma quien se da de alta, no tú.')" class="mt-3" />
+                            <button type="button" x-on:click="step = null" class="mt-2 inline-flex min-h-11 items-center text-sm font-semibold text-ink-muted underline-offset-2 hover:underline dark:text-slate-400">{{ __('Volver') }}</button>
+                        </div>
+                        <div x-show="step === 'waive'" x-cloak class="mt-3 space-y-2" data-sign-waive-reasons>
+                            @if ($reasonOptional)
+                                <x-button size="sm" wire:click="waiveApplicationSignature" class="min-h-11">{{ __('Seguir sin firma') }}</x-button>
+                            @else
+                                <p class="text-xs font-medium text-ink-muted dark:text-slate-400">{{ __('¿Por qué?') }}</p>
+                                <div class="flex flex-wrap gap-2">
+                                    @foreach (['TABLET', 'PAPER'] as $key)
+                                        <x-button variant="secondary" size="sm" wire:click="waiveApplicationSignature('{{ $key }}')" data-sign-waive-reason="{{ $key }}" class="min-h-11">{{ \App\Actions\Members\WaiveApplicationSignature::reasons()[$key] }}</x-button>
+                                    @endforeach
+                                </div>
+                                <div class="flex gap-2">
+                                    <input type="text" x-model="other" maxlength="255" aria-label="{{ __('Otro motivo') }}" placeholder="{{ __('Otro motivo…') }}"
+                                           class="h-11 min-w-0 flex-1 rounded-xl border border-line bg-surface px-3 text-base dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100">
+                                    <x-button variant="secondary" size="sm" x-bind:disabled="other.trim() === ''" x-on:click="$wire.waiveApplicationSignature('OTHER', other)" data-sign-waive-reason="OTHER" class="min-h-11">{{ __('Otro') }}</x-button>
+                                </div>
+                            @endif
+                            <button type="button" x-on:click="step = null" class="inline-flex min-h-11 items-center text-sm font-semibold text-ink-muted underline-offset-2 hover:underline dark:text-slate-400">{{ __('Volver') }}</button>
+                        </div>
+                    </div>
+                @elseif ($altaReviewing->signature_override_at !== null)
+                    <p data-signature-waived class="rounded-xl bg-surface-alt p-3 text-sm text-ink-muted dark:bg-slate-800 dark:text-slate-400">
+                        {{ __('Sin firma digital — autorizado por :name', ['name' => $altaReviewing->signatureOverrider->name ?? '—']) }} · {{ $altaReviewing->signature_override_reason }}
+                    </p>
+                @endif
+
                 <div>
                     <label for="alta-tier" class="block text-sm font-medium text-ink-muted dark:text-slate-400">{{ __('Cuota / tier') }}</label>
                     <select id="alta-tier" wire:model="altaTierId" class="mt-1.5 h-12 w-full rounded-xl border border-line bg-surface px-4 text-base dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100">

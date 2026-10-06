@@ -51,10 +51,7 @@ async function fillAndSubmitApplication(page) {
     }
     await page.mouse.up();
   }
-  // "Guardar firma" is what copies the drawing into the hidden field the server reads (prompt 220) — a stroke
-  // alone leaves the field empty and the server answers "Falta la firma".
-  await page.click('[data-signature-save]');
-  await page.waitForTimeout(400);
+  // Prompt 361 — the stroke's end writes the hidden field the server reads; form mode has no "Guardar firma".
   await page.waitForTimeout(3500); // clear the spam guard's minimum dwell
   // The APPLICATION form's submit, scoped to its form. A bare `button[type="submit"]` matched the locale
   // switcher's ES button first in the DOM (prompt 167's header), so the harness posted a language change and

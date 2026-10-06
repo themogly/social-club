@@ -31,6 +31,16 @@ class MemberApplicationInfolist
                         TextEntry::make('reviewer.name')->label(__('Revisada por'))->placeholder('—'),
                         TextEntry::make('reviewed_at')->label(__('Fecha de revisión'))->dateTime()->placeholder('—'),
                         TextEntry::make('reject_reason')->label(__('Motivo del rechazo'))->placeholder('—'),
+                        // Prompt 361 — sent unsigned from the club's tablet, and how staff settled it.
+                        TextEntry::make('signature_override_reason')
+                            ->label(__('Firma'))
+                            ->state(fn (MemberApplication $record): ?string => match (true) {
+                                $record->signature_override_at !== null => __('Sin firma digital — autorizado por :name', ['name' => $record->signatureOverrider->name ?? '—']).' · '.$record->signature_override_reason,
+                                $record->awaitsSignature() => __('Falta la firma'),
+                                default => null,
+                            })
+                            ->color('warning')
+                            ->visible(fn (MemberApplication $record): bool => (bool) $record->signature_missing || $record->signature_override_at !== null),
                     ])
                     ->columns(2),
 

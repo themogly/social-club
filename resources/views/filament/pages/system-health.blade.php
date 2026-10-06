@@ -174,6 +174,25 @@
             </dl>
         </x-filament::section>
 
+        {{-- Prompt 361 — photos and ID scans kept from a refused application submit: purged hourly (24 h, or a dead invite). --}}
+        <x-filament::section :heading="__('Barrido de fotos de solicitudes')" icon="heroicon-o-trash">
+            <div style="display:flex;align-items:center;gap:.5rem;margin-bottom:.5rem;">
+                <x-filament::badge :color="$keptUploadsSweep['stale'] ? 'danger' : 'success'">
+                    {{ $keptUploadsSweep['stale'] ? __('Sin ejecución reciente') : __('Al día') }}
+                </x-filament::badge>
+            </div>
+            <dl style="font-size:.875rem;display:grid;gap:.35rem;">
+                <div style="display:flex;justify-content:space-between;gap:1rem;">
+                    <dt style="opacity:.65;">{{ __('Última ejecución') }}</dt>
+                    <dd>{{ $keptUploadsSweep['last_at']?->format('d/m/Y H:i:s') ?? '—' }}</dd>
+                </div>
+                <div style="display:flex;justify-content:space-between;gap:1rem;">
+                    <dt style="opacity:.65;">{{ __('Antigüedad') }}</dt>
+                    <dd>{{ $fmtAge($keptUploadsSweep['age_seconds']) }}</dd>
+                </div>
+            </dl>
+        </x-filament::section>
+
         <x-filament::section :heading="__('Colas')" icon="heroicon-o-queue-list">
             <div style="display:flex;align-items:center;gap:.5rem;margin-bottom:.5rem;">
                 <x-filament::badge :color="$queue['failed'] > 0 ? 'danger' : 'success'">

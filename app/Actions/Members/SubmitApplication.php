@@ -8,6 +8,7 @@ use App\Models\MemberApplication;
 use App\Models\MrzFieldStat;
 use App\Support\ApplicationShape;
 use App\Support\DocumentVault;
+use App\Support\KeptUploads;
 use App\Support\MrzPrefill;
 use App\Support\Settings;
 use App\Support\Weight;
@@ -41,11 +42,11 @@ class SubmitApplication
 
     /**
      * @param  array<string, mixed>  $data  the validated form data (SubmitApplicationRequest)
-     * @param  array<string, UploadedFile|null>  $files  ['photo' => …, 'document_scan' => …]; either may be null
+     * @param  array<string, UploadedFile|string|null>  $files  ['photo' => …, 'document_scan' => …]; either may be null, or a KEPT vault path (361)
      * @param  string  $token  the raw invite token — the key the MRZ prefill was cached under
      * @param  string|null  $ip  the submitter's IP, for the upload rate limit; null skips it
      */
-    public function handle(MemberApplication $application, array $data, array $files, string $token, ?string $ip = null): MemberApplication
+    public function handle(MemberApplication $application, array $data, array $files, string $token, ?string $ip = null, bool $unsignedAllowed = false): MemberApplication
     {
         $payload = [
             'first_name' => $data['first_name'],
@@ -78,7 +79,9 @@ class SubmitApplication
         // Prompt 220 — the applicant's own signature over the consent text they just read. Stored through the
         // SAME vault path family as a dispensation signature (prompt 113): encrypted at rest, private disk,
         // signed-URL display, and already known to `AnonymiseMember`'s erasure sweep.
-        $signaturePath = $this->storeSignature($data[ApplicationShape::SIGNATURE_FIELD] ?? null);
+        // Prompt 361 — `$unsignedAllowed`: filled in on the CLUB'S tablet (a handover) and the applicant confirmed
+        // «¿Enviar sin firma?». Never on the emailed link: nobody from the club is there to check.
+        $signaturePath = $this->storeSignature($data[ApplicationShape::SIGNATURE_FIELD] ?? null, $unsignedAllowed);
 
         if ($signaturePath !== null) {
             $payload['signature_path'] = $signaturePath;
@@ -100,7 +103,7 @@ class SubmitApplication
         // at it. A rejected or abandoned application is anonymised and this photo deleted by
         // `applications:prune-retention` past application_retention_days.
         if ($allowed && $photo !== null) {
-            $payload['photo_path'] = DocumentVault::storeUpload($photo, 'member-photos');
+            $payload['photo_path'] = $this->storeFile($photo, 'member-photos');
         }
 
         // Optional identity DOCUMENT (prompt 178 — 155's part B). Same vault, same private encrypted disk, same
@@ -109,7 +112,7 @@ class SubmitApplication
         // the photo — a face is not a document — so its own payload key, its own member column, never merged.
         // On approval the member points at THIS SAME FILE rather than a copy.
         if ($allowed && $scan !== null) {
-            $payload['document_scan_path'] = DocumentVault::storeUpload($scan, 'member-id-scans');
+            $payload['document_scan_path'] = $this->storeFile($scan, 'member-id-scans');
         }
 
         // Prompt 244 — the medical certificate behind a therapeutic declaration, same vault family, its own
@@ -124,7 +127,8 @@ class SubmitApplication
         $this->recordMrzCorrections($application, $payload, $token);
 
         // Still PENDING — it now carries the applicant's details and enters the review queue.
-        $application->update(['payload' => $payload, 'submitted_at' => now()]);
+        $application->update(['payload' => $payload, 'submitted_at' => now(), 'signature_missing' => $signaturePath === null && $unsignedAllowed
+            && (bool) Settings::get('signature_on_application', true)]);
 
         return $application;
     }
@@ -136,7 +140,7 @@ class SubmitApplication
      * signature-less application on every route — the public form, the handover and the staff form — rather
      * than relying on a disabled button, because a disabled button is not a rule.
      */
-    private function storeSignature(mixed $dataUrl): ?string
+    private function storeSignature(mixed $dataUrl, bool $unsignedAllowed = false): ?string
     {
         $prefix = 'data:image/png;base64,';
         $binary = is_string($dataUrl) && str_starts_with($dataUrl, $prefix)
@@ -144,7 +148,7 @@ class SubmitApplication
             : false;
 
         if ($binary === false || $binary === '') {
-            if ((bool) Settings::get('signature_on_application', true)) {
+            if ((bool) Settings::get('signature_on_application', true) && ! $unsignedAllowed) {
                 throw ValidationException::withMessages([
                     ApplicationShape::SIGNATURE_FIELD => __('Falta la firma.'),
                 ]);
@@ -157,6 +161,15 @@ class SubmitApplication
         DocumentVault::put($path, $binary);
 
         return $path;
+    }
+
+    /**
+     * Prompt 361 — a file the applicant sent now, or one KEPT from a refused attempt (a vault path, bound to this token and
+     * session — {@see KeptUploads}): adopted into the same directory a fresh upload would land in.
+     */
+    private function storeFile(UploadedFile|string $file, string $directory): string
+    {
+        return is_string($file) ? KeptUploads::adopt($file, $directory) : DocumentVault::storeUpload($file, $directory);
     }
 
     /**

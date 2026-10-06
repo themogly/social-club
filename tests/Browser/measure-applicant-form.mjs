@@ -21,10 +21,11 @@ import { pathToFileURL } from 'node:url';
 import { resolve } from 'node:path';
 
 // Counts rose by two in prompt 220: the shared signature pad puts Borrar + Guardar firma on this page.
-// Bumped deliberately — the point of asserting the sample count is that it moves when the page does.
+// Bumped deliberately — the point of asserting the sample count is that it moves when the page does. Down one in
+// prompt 361: form mode lost Guardar firma (the stroke itself writes the field).
 const STATES = [
-  { key: 'initial', file: 'storage/app/applicant-217-initial.html', minControls: 22 },
-  { key: 'scanned', file: 'storage/app/applicant-217-scanned.html', minControls: 26 },
+  { key: 'initial', file: 'storage/app/applicant-217-initial.html', minControls: 21 },
+  { key: 'scanned', file: 'storage/app/applicant-217-scanned.html', minControls: 25 },
 ];
 const FLOOR = 44;
 

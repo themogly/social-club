@@ -6,6 +6,7 @@
            style="display:inline-block;background:#2563eb;color:#ffffff;text-decoration:none;padding:12px 28px;border-radius:8px;font-weight:600;">
             {{ __('Completar mi solicitud') }}
         </a>
+        @include('mail.partials.plain-link', ['url' => $url])
         <p style="margin:20px 0 0;color:#94a3b8;font-size:12px;">
             {{ __('Si no esperabas esta invitación, puedes ignorar este correo.') }}
         </p>

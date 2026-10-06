@@ -161,6 +161,22 @@ class Member extends Model implements Authenticatable, HasLocalePreference
         return $this->hasMany(self::class, 'avalador_member_id');
     }
 
+    /**
+     * Prompt 361 — «Sin firma digital — autorizado por X» when this member's application was let through unsigned at the
+     * counter (the tablet came back without one), so the signature can be collected later; null otherwise.
+     */
+    public function signatureWaiverLabel(): ?string
+    {
+        $application = MemberApplication::query()->withoutGlobalScopes()->with('signatureOverrider')
+            ->where('resulting_member_id', $this->id)->whereNotNull('signature_override_at')->latest('signature_override_at')->first();
+
+        if ($application === null) {
+            return null;
+        }
+
+        return __('Sin firma digital — autorizado por :name', ['name' => $application->signatureOverrider->name ?? '—']);
+    }
+
     /** @return HasMany<Membership, $this> */
     public function memberships(): HasMany
     {

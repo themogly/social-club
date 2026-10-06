@@ -219,6 +219,17 @@ class SystemHealth
     }
 
     /**
+     * Prompt 361 — the photos and ID scans kept from refused application submits (applications:purge-kept-uploads). An
+     * unsubmitted ID scan must never linger, so the hourly purge is proven running, like the import staging sweep.
+     *
+     * @return array{last_at: ?CarbonInterface, age_seconds: ?int, stale: bool, threshold_seconds: int}
+     */
+    public function keptUploadsSweep(): array
+    {
+        return $this->component('kept-uploads-sweep', self::HOURLY_STALE_SECONDS);
+    }
+
+    /**
      * Every heartbeat the page grades, by component — prompt 311's System alert fires when one goes red, reading exactly
      * what the page reads. The temporary-member sweep only counts when that feature is on (idle by design otherwise).
      *
@@ -233,6 +244,7 @@ class SystemHealth
             'audit-retention-sweep' => $this->auditRetentionSweep(),
             'message-retention-sweep' => $this->messageRetentionSweep(),
             'import-staging-sweep' => $this->importStagingSweep(),
+            'kept-uploads-sweep' => $this->keptUploadsSweep(),
         ]);
     }
 

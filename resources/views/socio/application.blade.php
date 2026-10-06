@@ -91,7 +91,15 @@
                 </div>
             @endif
 
+            {{-- Prompt 361 — on the club's tablet (handover only) an UNSIGNED form may be sent, once confirmed: a pad that
+                 will not cooperate no longer ends the sign-up. Staff settle it at the counter («Falta la firma»), and the
+                 server allows it only with `confirm_unsigned` during a handover — the emailed link still must sign. --}}
+            @php($asksUnsigned = ($handoverActive ?? false) && \App\Support\Settings::get('signature_on_application', true))
             <form method="POST" action="{{ route('socio.application.store', ['token' => $token]) }}" enctype="multipart/form-data"
+                  @if ($asksUnsigned)
+                      x-data="{ askUnsigned: false }"
+                      x-on:submit="if ($refs.confirmUnsigned.value !== '1' && ! $el.querySelector('[data-signature-canvas][data-drawn]') && ! $el.querySelector('[data-signature-field]')?.value) { $event.preventDefault(); askUnsigned = true }"
+                  @endif
                   class="space-y-3 rounded-2xl border border-line bg-surface p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
                 @csrf
 
@@ -193,7 +201,17 @@
                          on arrival and shortens the first visit. The copy is honest about what it is for. --}}
                     <div>
                         {{-- Prompt 295 — Hacer foto (the front camera) or Elegir archivo, the counter's shared field. --}}
-                        <x-counter.file-field id="photo" name="photo" :label="__('Foto (obligatoria)')" accept="image/*" camera="user" required />
+                        @php($kept = \App\Support\KeptUploads::for($token))
+                        <div x-data="{ change: false }">
+                            @if (isset($kept['photo']))
+                                @include('socio.partials.kept-upload', ['field' => 'photo', 'token' => $token, 'label' => __('Foto (obligatoria)'), 'saved' => __('✓ Foto guardada')])
+                                <div x-show="change" x-cloak>
+                                    <x-counter.file-field id="photo" name="photo" :label="__('Foto (obligatoria)')" accept="image/*" camera="user" />
+                                </div>
+                            @else
+                                <x-counter.file-field id="photo" name="photo" :label="__('Foto (obligatoria)')" accept="image/*" camera="user" required />
+                            @endif
+                        </div>
                         <p class="mt-1 text-xs text-ink-muted dark:text-slate-400">{{ \App\Support\DocumentUpload::helperText(__('El personal la comprobará en cada visita.')) }}</p>
                     </div>
 
@@ -212,7 +230,16 @@
                         {{-- Prompt 346 — which side to photograph, always visible above the buttons: it is what decides whether the
                              reader can fill anything in. --}}
                         <p data-mrz-tip class="mb-1 text-xs font-medium text-ink dark:text-slate-200">{{ __('Para rellenar tus datos automáticamente: DNI/NIE por detrás, pasaporte por la página de la foto.') }}</p>
-                        <x-counter.file-field id="document_scan" name="document_scan" :label="__('Documento de identidad (opcional)')" accept="image/*,application/pdf" camera="environment" />
+                        <div x-data="{ change: false }">
+                            @if (isset($kept['document_scan']))
+                                @include('socio.partials.kept-upload', ['field' => 'document_scan', 'token' => $token, 'label' => __('Documento de identidad (opcional)'), 'saved' => __('✓ Documento guardado')])
+                                <div x-show="change" x-cloak>
+                                    <x-counter.file-field id="document_scan" name="document_scan" :label="__('Documento de identidad (opcional)')" accept="image/*,application/pdf" camera="environment" />
+                                </div>
+                            @else
+                                <x-counter.file-field id="document_scan" name="document_scan" :label="__('Documento de identidad (opcional)')" accept="image/*,application/pdf" camera="environment" />
+                            @endif
+                        </div>
                         <p class="mt-1 text-xs text-ink-muted dark:text-slate-400">{{ \App\Support\DocumentUpload::helperText(__('Foto o PDF de tu DNI, NIE o pasaporte. Se guarda cifrado, solo se abre con un enlace firmado y cada consulta queda registrada. Si tu solicitud no se aprueba, se borra. Puedes omitirlo y enseñarlo en el mostrador.')) }}</p>
 
                         {{-- Prompt 179 — read it here, on this device. Prompt 346: the read STARTS BY ITSELF when a photo is chosen
@@ -358,6 +385,22 @@
                 </p>
 
                 <x-button type="submit" size="md" class="w-full">{{ __('Enviar solicitud') }}</x-button>
+
+                @if ($asksUnsigned)
+                    <input type="hidden" name="confirm_unsigned" x-ref="confirmUnsigned" value="">
+                    <div x-show="askUnsigned" x-cloak role="dialog" aria-modal="true" aria-labelledby="unsigned-title" data-unsigned-confirm
+                         @keydown.escape.window="askUnsigned = false" class="fixed inset-0 z-50 flex items-center justify-center bg-ink/40 p-4">
+                        <div @click.outside="askUnsigned = false" class="w-full max-w-xs rounded-2xl border border-line bg-surface p-5 text-left shadow-xl dark:border-slate-800 dark:bg-slate-900">
+                            <h2 id="unsigned-title" class="text-base font-semibold">{{ __('¿Enviar sin firma? El personal lo revisará contigo.') }}</h2>
+                            <div class="mt-4 flex justify-end gap-2">
+                                <x-button type="button" size="sm" variant="secondary" data-unsigned-sign
+                                          @click="askUnsigned = false; $nextTick(() => $el.closest('form').querySelector('[data-signature-pad]')?.scrollIntoView({ block: 'center' }))">{{ __('Firmar ahora') }}</x-button>
+                                <x-button type="button" size="sm" data-unsigned-send
+                                          @click="$refs.confirmUnsigned.value = '1'; askUnsigned = false; $el.closest('form').requestSubmit()">{{ __('Enviar') }}</x-button>
+                            </div>
+                        </div>
+                    </div>
+                @endif
             </form>
 
             {{-- Prompt 342 — on their OWN phone (never during a handover), a way to step away: nothing is sent, this

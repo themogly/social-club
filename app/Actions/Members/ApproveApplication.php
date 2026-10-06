@@ -39,6 +39,12 @@ class ApproveApplication
             throw new RuntimeException(__('La solicitud todavía no se ha enviado: es una invitación pendiente, no una solicitud para revisar.'));
         }
 
+        // Prompt 361 — a handover submitted unsigned is approved only once staff have had it signed at the counter or
+        // waived it with a reason. The server's rule, not the screen's.
+        if ($application->awaitsSignature()) {
+            throw new RuntimeException(__('Falta la firma: que firme ahora o sigue sin firma indicando el motivo.'));
+        }
+
         if (! MemberEligibility::isOldEnough($payload['date_of_birth'] ?? null)) {
             throw new RuntimeException(__('El solicitante es menor de la edad mínima configurada.'));
         }

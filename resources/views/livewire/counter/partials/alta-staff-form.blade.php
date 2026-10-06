@@ -248,6 +248,7 @@
             <div class="rounded-xl border border-brand/30 bg-brand-tint p-4 dark:border-slate-700 dark:bg-slate-800">
                 <x-counter.signature-pad
                     capture="saveAltaSignature"
+                    draft="altaSignatureDraft"
                     clear="clearAltaSignature"
                     :stored="(bool) $altaSignaturePath"
                     :label="__('Firma del socio/a')"

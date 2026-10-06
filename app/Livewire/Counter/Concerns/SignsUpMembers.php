@@ -7,7 +7,9 @@ use App\Actions\Members\FindDuplicateMembers;
 use App\Actions\Members\IssueApplicationInvite;
 use App\Actions\Members\ResolveAvalador;
 use App\Actions\Members\SendApplicationInvite;
+use App\Actions\Members\SignApplicationAtCounter;
 use App\Actions\Members\SubmitApplication;
+use App\Actions\Members\WaiveApplicationSignature;
 use App\Actions\Memberships\EnrolMembership;
 use App\Actions\RecordAuditLog;
 use App\Enums\ApplicationStatus;
@@ -135,6 +137,9 @@ trait SignsUpMembers
      * orphans nothing owns. `SubmitApplication` stores it at the same moment it stores the record.
      */
     public ?string $altaSignaturePath = null;
+
+    /** Prompt 361 — the pad's drawing, copied in at each stroke's end without a request; submit captures it. */
+    public ?string $altaSignatureDraft = null;
 
     /**
      * Which fields prompt 179's reader filled, so the operator can see what to check.
@@ -404,6 +409,7 @@ trait SignsUpMembers
         $this->altaMrzOffered = [];
         $this->altaMrzRead = [];
         $this->altaSignaturePath = null;
+        $this->altaSignatureDraft = null;
         $this->altaStep = 1;
     }
 
@@ -422,12 +428,14 @@ trait SignsUpMembers
         }
 
         $this->altaSignaturePath = $dataUrl;
+        $this->altaSignatureDraft = null;
         $this->flash(__('Firma capturada.'), 'success');
     }
 
     public function clearAltaSignature(): void
     {
         $this->altaSignaturePath = null;
+        $this->altaSignatureDraft = null;
     }
 
     /**
@@ -540,6 +548,12 @@ trait SignsUpMembers
         if ($operator === null) {
             return;
         }
+
+        // A drawn-but-unsaved pad counts (prompt 361) — pressing Guardar socio/a is the deliberate act.
+        if ($this->altaSignaturePath === null && str_starts_with((string) $this->altaSignatureDraft, 'data:image/png;base64,')) {
+            $this->altaSignaturePath = $this->altaSignatureDraft;
+        }
+        $this->altaSignatureDraft = null;
 
         // The signature is validated alongside the facts but lives on its own property, so it is pulled out
         // rather than read from the `altaForm` array.
@@ -803,6 +817,53 @@ trait SignsUpMembers
         $this->altaApplicationId = $applicationId;
         $this->altaTierId = null;
         $this->altaDuplicateBlocked = false;
+    }
+
+    /**
+     * Prompt 361 — «Firmar ahora»: the handover came back unsigned and the member signs on this screen. Same permission
+     * as the review itself; the application must be the one under review, of this sede.
+     */
+    public function captureApplicationSignature(string $dataUrl): void
+    {
+        $application = $this->altaApplication();
+        if ($application === null || ! $this->userCan('applications.review') || ! $application->signature_missing) {
+            return;
+        }
+
+        try {
+            (new SignApplicationAtCounter)->handle($application, $dataUrl);
+        } catch (RuntimeException $e) {
+            $this->flash($e->getMessage(), 'error');
+
+            return;
+        }
+
+        $this->flash(__('Firma capturada.'), 'success');
+    }
+
+    /** Prompt 361 — «Seguir sin firma», with a one-tap reason (none asked of a `reasons.optional` holder). */
+    public function waiveApplicationSignature(?string $reason = null, ?string $text = null): void
+    {
+        $operator = $this->requireOperatorForAlta();
+        $application = $this->altaApplication();
+        if ($operator === null || $application === null) {
+            return;
+        }
+        if (! $this->userCan('applications.review')) {
+            $this->flash(__('No tienes permiso para revisar solicitudes.'), 'error');
+
+            return;
+        }
+
+        try {
+            (new WaiveApplicationSignature)->handle($application, $operator, $reason, $text);
+        } catch (RuntimeException $e) {
+            $this->flash($e->getMessage(), 'error');
+
+            return;
+        }
+
+        $this->flash(__('Sigue sin firma. Queda registrado quién lo autorizó y por qué.'), 'success');
     }
 
     public function cancelAltaReview(): void

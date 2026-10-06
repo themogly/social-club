@@ -72,6 +72,7 @@ class SystemHealth extends Page
             'auditRetentionSweep' => $health->auditRetentionSweep(),
             'messageRetentionSweep' => $health->messageRetentionSweep(),
             'importStagingSweep' => $health->importStagingSweep(),
+            'keptUploadsSweep' => $health->keptUploadsSweep(), // prompt 361
             'queue' => $health->queue(),
             'cache' => $health->cache(),
             'alerts' => $health->alerts(),

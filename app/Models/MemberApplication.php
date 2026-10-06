@@ -21,6 +21,8 @@ class MemberApplication extends Model
         'organisation_id', 'location_id', 'invite_token_hash', 'invite_token', 'invited_by', 'applicant_email', 'applicant_reference',
         'invite_expires_at', 'opened_at', 'submitted_at', 'revoked_at', 'payload', 'status',
         'reject_reason', 'reviewed_by', 'reviewed_at', 'resulting_member_id',
+        // Prompt 361 — sent from the club's tablet without a signature, and what staff decided about it.
+        'signature_missing', 'signature_override_by', 'signature_override_reason', 'signature_override_at',
     ];
 
     protected function casts(): array
@@ -37,7 +39,21 @@ class MemberApplication extends Model
             'opened_at' => 'datetime',
             'submitted_at' => 'datetime',
             'revoked_at' => 'datetime',
+            'signature_missing' => 'boolean',
+            'signature_override_at' => 'datetime',
         ];
+    }
+
+    /** Prompt 361 — sent unsigned and nobody has signed or waived it yet: the review's «Falta la firma». */
+    public function awaitsSignature(): bool
+    {
+        return $this->signature_missing && $this->signature_override_at === null;
+    }
+
+    /** @return BelongsTo<User, $this> who let it through without a signature (prompt 361) */
+    public function signatureOverrider(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'signature_override_by');
     }
 
     /** not_opened → started → submitted, from the lifecycle timestamps. */

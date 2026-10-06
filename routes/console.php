@@ -47,6 +47,8 @@ Schedule::command('applications:prune-retention')->dailyAt('05:55');
 // and resetImport() misses the walk-away case. Hourly, because the window is hours — the scratch space of a
 // multi-step form, not a record. Idempotent and safe on an empty/absent directory.
 Schedule::command('imports:prune-staging')->hourly();
+// Prompt 361 — photos / ID scans kept from a refused application submit: never older than 24 h, never past the invite.
+Schedule::command('applications:purge-kept-uploads')->hourly();
 
 // Post-296 audit — failed jobs keep their payload (a receipt's grams, names, tokens), outside every other retention path.
 // Prune them after the dead-letter window; RGPD erasure also removes a member's (AnonymiseMember). Idempotent.

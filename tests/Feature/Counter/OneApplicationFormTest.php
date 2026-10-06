@@ -156,7 +156,9 @@ class OneApplicationFormTest extends TestCase
         // fact about the applicant, and the consent difference is prompt 210's deliberate one.
         $ignore = array_merge(
             ApplicationShape::consentFields()['public'],
-            ['mrz', 'medical_cert', 'pin'], // prompt 342 — 'pin' is the staff exit's own form during a handover, not the applicant's
+            // prompt 342 — 'pin' is the staff exit's own form during a handover, not the applicant's; prompt 361 —
+            // 'confirm_unsigned' is the handover's «¿Enviar sin firma?» answer, a submit flag, not a fact.
+            ['mrz', 'medical_cert', 'pin', 'confirm_unsigned'],
         );
 
         $public = array_values(array_diff($this->publicFormFields(), $ignore));

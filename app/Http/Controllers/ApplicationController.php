@@ -13,6 +13,8 @@ use App\Models\Member;
 use App\Models\MemberApplication;
 use App\Support\ApplicationSpamGuard;
 use App\Support\CounterHandover;
+use App\Support\DocumentVault;
+use App\Support\KeptUploads;
 use App\Support\Mrz\MrzDocument;
 use App\Support\Mrz\MrzParser;
 use App\Support\MrzPrefill;
@@ -21,7 +23,9 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\RateLimiter;
+use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
+use Symfony\Component\HttpFoundation\Response;
 
 /**
  * The tokenised invite → application form (prompt 04 invite, prompt 15 surface). This
@@ -103,20 +107,33 @@ class ApplicationController extends Controller
         // Everything the submission MEANS — payload assembly, the avalador match, grams to centigrams, the
         // consent version and locale, the rate-limited vault uploads, the MRZ read rate — belongs to the
         // Action (code-style audit). The controller resolves, guards and redirects.
-        (new SubmitApplication)->handle(
-            $application,
-            $request->validated(),
-            ['photo' => $request->file('photo'), 'document_scan' => $request->file('document_scan')],
-            $token,
-            $request->ip(),
-        );
-
-        // Prompt 249 — if this form is the one a handover was handed over FOR, record the handover as submitted:
-        // returnUrl() goes null (strays fall through to the counter's PIN pad and the surface's "Continuar con
-        // mi solicitud" disappears), and the PIN then lands the operator on this application's review. Guarded
-        // to this token's form so it never fires on an emailed invite that shares no handover with the counter;
-        // the spam-dropped path returned above, so it is never marked either.
+        // Prompt 249 — is this form the one a handover was handed over FOR (the club's tablet)? Prompt 361 — only there may
+        // it go unsigned, once the applicant confirms «¿Enviar sin firma?»; the emailed link must still be signed.
         $handover = CounterHandover::active() && CounterHandover::returnUrl() === route('socio.application', ['token' => $token]);
+
+        // Prompt 361 — a photo / ID scan KEPT from a refused attempt is used when no new file was sent.
+        $kept = KeptUploads::for($token);
+        $files = [
+            'photo' => $request->file('photo') ?? ($kept['photo'] ?? null),
+            'document_scan' => $request->file('document_scan') ?? ($kept['document_scan'] ?? null),
+        ];
+
+        try {
+            (new SubmitApplication)->handle($application, $request->validated(), $files, $token, $request->ip(),
+                unsignedAllowed: $handover && $request->boolean('confirm_unsigned'));
+        } catch (ValidationException $e) {
+            // The action's own refusals (a missing signature…) keep the files too, exactly like a validation error.
+            KeptUploads::keep($token, $application, $request->allFiles());
+
+            throw $e;
+        }
+        KeptUploads::forget($token);
+        KeptUploads::discardApplication($application->id);
+
+        // Record the handover as submitted: returnUrl() goes null (strays fall through to the counter's PIN pad and the
+        // surface's "Continuar con mi solicitud" disappears), and the PIN then lands the operator on this application's
+        // review. Guarded to this token's form so it never fires on an emailed invite that shares no handover with the
+        // counter; the spam-dropped path returned above, so it is never marked either.
         if ($handover) {
             CounterHandover::markSubmitted($application->id);
         }
@@ -125,18 +142,15 @@ class ApplicationController extends Controller
         return $this->submittedRedirect($token);
     }
 
-    /**
-     * Read an MRZ (prompt 179). The BROWSER did the OCR; this receives the resulting TEXT and parses it with
-     * the one parser that already exists.
-     *
-     * The image never arrives here for the purpose of being read — that is the whole privacy argument, and
-     * a test pins that this endpoint accepts a string and nothing else. The raw MRZ lives for the length of
-     * this request: parsed, mapped, discarded. It is never persisted, never logged and never echoed back.
-     *
-     * A failed or invalid read is an ORDINARY outcome, not an error: the parser is correct-or-invalid, so a
-     * garbled scan yields nothing and the applicant fills the form exactly as they do today. No warning, no
-     * red state, no suggestion they did something wrong.
-     */
+    /** Prompt 361 — the thumbnail of a file KEPT from a refused attempt: only to the same token and the same browser session. */
+    public function keptUpload(string $token, string $field): Response
+    {
+        $path = KeptUploads::for($token)[$field] ?? null;
+        abort_if($path === null, 404); // only `photo` / `document_scan` are ever kept
+
+        return response(DocumentVault::get($path), 200, ['Content-Type' => DocumentVault::mimeFor($path), 'Cache-Control' => 'private, no-store']);
+    }
+
     /**
      * Prompt 342 — *Personal*: a staff PIN ends the handover, from the form, at any moment (not only after submitting).
      * Anyone ACTIVE at the handover's sede may (a colleague can rescue the tablet), through the counter pad's own check
@@ -167,6 +181,7 @@ class ApplicationController extends Controller
 
         CounterHandover::end();
         MrzPrefill::forget($token);
+        KeptUploads::forget($token); // prompt 361 — an unsent draft's photo and ID scan go with it
         session(['counter.location_id' => $location->id]);
         (new SignInOperator)->handle($operator, $location); // the PIN is a sign-in (267/270): naming the operator and signing in are one step
         (new RecordAuditLog)->handle('counter.handover.cancelled', $location, null, [
@@ -191,12 +206,24 @@ class ApplicationController extends Controller
         abort_if($application === null, 404);
 
         MrzPrefill::forget($token);
+        KeptUploads::forget($token); // prompt 361 — «Salir sin enviar»: nothing kept outlives the draft
         session()->forget('_old_input');
 
         return view('socio.application-left', ['expires' => $application->invite_expires_at]);
     }
 
     /**
+     * Read an MRZ (prompt 179). The BROWSER did the OCR; this receives the resulting TEXT and parses it with
+     * the one parser that already exists.
+     *
+     * The image never arrives here for the purpose of being read — that is the whole privacy argument, and
+     * a test pins that this endpoint accepts a string and nothing else. The raw MRZ lives for the length of
+     * this request: parsed, mapped, discarded. It is never persisted, never logged and never echoed back.
+     *
+     * A failed or invalid read is an ORDINARY outcome, not an error: the parser is correct-or-invalid, so a
+     * garbled scan yields nothing and the applicant fills the form exactly as they do today. No warning, no
+     * red state, no suggestion they did something wrong.
+     *
      * The read: the browser posts the zone's TEXT (never the image) and the server parses it with `MrzParser` and keeps
      * the provisional fields in `MrzPrefill`.
      *
