@@ -120,13 +120,14 @@ class DemoDataSeeder extends Seeder
         $this->seedSettings($org->id);
         $this->seedDemoProfile();
 
-        // The first demo sede runs timezone-neutral (UTC, midnight cutoff) so its business day equals the storage
-        // calendar day (prompt 105). The SECOND is a real one — Europe/Madrid with a 06:00 cutoff (prompt 271) —
-        // because an all-UTC demo hid every place that measured "today" in UTC: the counter hub's takings reset at
-        // 02:00 and the monthly cap disagreed with the reports, and nobody could see it.
+        // Every demo sede is in Spain, like every real one (prompt 362): a UTC sede made lists shown in each sede's own
+        // zone (357's «Añadido») read out of order in development, and hid real day-boundary behaviour. The first keeps
+        // a midnight cutoff (prompt 105); the SECOND keeps the 06:00 cutoff (prompt 271) — an all-UTC demo hid every
+        // place that measured "today" in UTC: the counter hub's takings reset at 02:00 and the monthly cap disagreed with
+        // the reports, and nobody could see it.
         $centro = Location::create([
             'organisation_id' => $org->id, 'name' => $strings['locations'][0], 'address' => 'Calle de Ejemplo 1, 28001 Madrid',
-            'capacity' => 50, 'timezone' => 'UTC', 'business_day_cutoff' => '00:00',
+            'capacity' => 50, 'timezone' => 'Europe/Madrid', 'business_day_cutoff' => '00:00',
             'opening_time' => '12:00', 'closing_time' => '00:00', 'accent' => '#2563eb', 'active' => true,
         ]);
         $norte = Location::create([
@@ -186,7 +187,7 @@ class DemoDataSeeder extends Seeder
     {
         $store = Location::create([
             'organisation_id' => $orgId, 'name' => $storeName, 'kind' => LocationKind::ALMACEN, 'address' => 'Polígono de Ejemplo 7, 28500 Madrid',
-            'timezone' => 'UTC', 'business_day_cutoff' => '00:00', 'active' => true,
+            'timezone' => 'Europe/Madrid', 'business_day_cutoff' => '00:00', 'active' => true, // 362 — in Spain, like the sedes
         ]);
         $staff['owner']->locations()->syncWithoutDetaching([$store->id]);
         $this->scope->setLocation($centro->id);

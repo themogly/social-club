@@ -51,6 +51,10 @@ class BatchesTable
                     ->label(__('Lote'))
                     ->state(fn (Batch $record): string => $record->displayTitle())
                     ->weight(FontWeight::SemiBold)
+                    // Prompt 362 — below 1280 px the theme lets this cell wrap (unwrapped, the subtitle's end ran under the
+                    // ⋮ pinned on a phone, 354) inside a minimum width, so it never collapses to a word per line. Desktop
+                    // is unchanged.
+                    ->extraCellAttributes(['data-batch-lote-cell' => true])
                     // Prompt 340 — on a phone the Precio column is off-screen, so the price rides under the name there.
                     ->description(fn (Batch $record): HtmlString => new HtmlString(e($record->displaySubtitle())
                         .(($price = self::priceLabel($record)) !== null ? '<span class="sm:hidden" data-batch-row-price> · '.e($price).'</span>' : '')))

@@ -21,6 +21,7 @@ use App\Support\PanelReturnUrl;
 use Database\Seeders\RolePermissionSeeder;
 use Filament\Facades\Filament;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Livewire\Features\SupportLockedProperties\CannotUpdateLockedPropertyException;
 use Livewire\Livewire;
 use Tests\Feature\Security\Concerns\PostsLivewireOverHttp;
 use Tests\TestCase;
@@ -281,8 +282,13 @@ class ActiveSedeTest extends TestCase
         app(ActiveScope::class)->setLocation($centro->id);
         $snapshot = $this->snapshotFrom(BatchResource::getUrl('index'), 'location-switcher');
 
-        // The client cannot change it: the property is #[Locked], so an update to it is refused outright.
-        $this->livewirePost($snapshot, ['returnUrl' => 'https://evil.example/'], [['switchTo', ['']]])->assertStatus(500);
+        // The client cannot change it: the property is #[Locked], so an update to it is refused outright. Prompt 362 —
+        // Livewire answers that with a bare 419 when APP_DEBUG is off (production, and a fresh clone's .env.example) and
+        // lets Laravel render a 500 error page when it is on (a developer's .env): this used to assert the 500 and failed
+        // on every clean checkout. Pin production's answer, and prove it was the LOCK that refused it, not anything else.
+        config(['app.debug' => false]);
+        $refused = $this->livewirePost($snapshot, ['returnUrl' => 'https://evil.example/'], [['switchTo', ['']]])->assertStatus(419);
+        $this->assertInstanceOf(CannotUpdateLockedPropertyException::class, $refused->exception);
 
         // And the resolver never follows anything off-host or outside the panel, whatever got in.
         foreach (['https://evil.example/batches', '//evil.example/batches', '/\\evil.example', 'javascript:alert(1)',

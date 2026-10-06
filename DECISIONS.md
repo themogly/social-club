@@ -20605,3 +20605,83 @@ although the prompt says not to merge.
 - **Screenshots** are in `storage/app/screenshots/361/`.
 - **The guide** (`counter-quick-start.md`) has a new step 4, «Falta la firma», a handover note (signature counts once
   drawn, the unsigned confirm, kept photos), and a glossary row.
+
+## Prompt 362 — fixes from testing 354–361 and the 355/359 branch
+
+**On `feat/355-359-half-gram-rounding-and-reserve`, not merged.** Ben: "run this but don't merge to main as still
+testing". The prompt assumes the branch is already on main; it isn't, so 362 is built on top of the branch.
+
+### 0. The merge
+
+- `main` (`cf85530`, 361) was merged INTO the branch, as merge commit `80c4c85`. Git combined it with no conflicts at
+  all, `DECISIONS.md` included: both sides' appended entries were kept, in prompt order (355, 359, 360, then 361, then
+  this).
+- The full suite (`es` pinned, then `en`) passed on the merged tree: 2,955 tests, 355's, 359's, 360's and 361's
+  together, including `RoundingAndReserveTogetherTest` with 361's form changes.
+- `main` itself is unchanged.
+
+### 1. The spam guard: a real sign-up is never silently discarded after a form error
+
+- **The cause.** `ApplicationSpamGuard` re-issued the signed render time on every render, including the redisplay after
+  a refusal. Since 361 the photos survive that refusal, so an applicant who fixed one field and pressed Enviar again
+  within 3 s saw «¡Gracias!» and was never registered.
+- **Before (test 1, red):** the resubmit redirected to the thank-you page and the application kept `submitted_at = null`
+  ("the applicant saw «¡Gracias!» and was not registered").
+- **The rule now:**
+  - **The clock starts at the FIRST render.** `issueToken($token)` keeps a per-token "first rendered at" in the session
+    and embeds that, so a redisplay carries the original time.
+    - *Judgment call:* the session, not the submitted `form_started_at`. It covers the redisplay without reading back
+      a client value.
+  - **A form already refused once is not "impossibly fast".** `recordFailedAttempt($token)` is called on a
+    FormRequest failure and on the action's own refusals. That flag, or kept uploads for the token, skips the
+    ELAPSED-time check.
+  - **A handover skips it too.** The applicant is at the counter, signed in through staff.
+  - **The honeypot always applies,** including after a refusal and during a handover.
+  - **So does the token's validity.** It must decrypt and not be in the future, so a forged render time is still
+    automation in every case.
+  - **Every silent discard is logged:** `Log::warning('application.discarded')` plus `SignupTrace`, with the
+    application id, the signal (`honeypot` | `token` | `timing`) and the route.
+  - The applicant still sees the identical «¡Gracias!».
+  - The rate limit, the honeypot field and a bot's response are unchanged.
+- **Tests:** `tests/Feature/Socio/SpamGuardAfterAFormErrorTest.php` (5 tests; 1, 2 and 4 seen red).
+  1. A quick fix after a refusal is stored, with the kept photo.
+  2. A first impossibly fast submit is discarded and logged with `timing`.
+  3. The honeypot is discarded after a refusal and on the tablet.
+  4. A quick handover submit is stored.
+  5. A future-dated or garbage token is discarded.
+
+### 2. `ActiveSedeTest::test_a_tampered_return_url_falls_back_to_the_dashboard`
+
+- **Reproduced on a fresh clone of the branch** (`.env.example`, a new `key:generate`, the built assets). It failed:
+  `Expected 500 but received 419`.
+- **The cause is not CSRF.** The request DOES reach the component, and Livewire throws
+  `CannotUpdateLockedPropertyException`. That exception renders a bare **419** when `APP_DEBUG` is false, to avoid
+  leaking details, and lets Laravel show a **500** error page when it is true.
+  - Ben's `.env` has `APP_DEBUG=true`; `.env.example` has `false`; `phpunit.xml` doesn't pin it. So the test passed in
+    one checkout and failed in the other.
+- **The fix is in the test only.** It sets `app.debug` false (production's answer), asserts **419**, and asserts that
+  the response's exception is `CannotUpdateLockedPropertyException`: it was the lock that refused it, not anything else.
+  - No change to CSRF, `#[Locked]`, or the app's debug setting.
+  - It passes in both checkouts.
+- **A fresh clone also needs `npm run build`** (or the Vite manifest is missing and panel pages 500). That is the normal
+  setup, but worth knowing for CI.
+
+### 3. The dev seed's time zones
+
+- Every demo location is now `Europe/Madrid`: Centro (which was UTC) and the store (also UTC), like Norte.
+- Centro keeps its midnight cutoff (prompt 105); Norte keeps 06:00 (prompt 271).
+- Tests that deliberately use UTC set it themselves and are unchanged. The seed-dependent suites pass.
+
+### 4. The pinned ⋮ on Batches on a phone
+
+- **Measured at 393×852** (`tests/Browser/measure-362-pin.mjs`, all 26 list screens of 354's sweep: the pinned cell's
+  left edge against the text of each row's first data column).
+- **Before:** Batches failed. The Lote subtitle ended at x 341–346, under the ⋮ at 329.
+- **The fix.** Below 1280 px the theme lets Batches' Lote cell (`data-batch-lote-cell`) wrap, inside a minimum width:
+  16rem, or the phone's width less 9.5rem below 640 px. One batch reads as one block, its subtitle wraps clear of the ⋮,
+  and the next columns sit to the right (scrolled to), never squeezed.
+  - A plain Filament `->wrap()` was tried first and rejected. It made the column collapse to a word per line on the
+    phone, and wrapped on desktop too (row height 125 vs 81).
+  - Desktop is unchanged: the cell is 81 px at 1440 and 1280, as before.
+- **After:** 26 of 26 pass.
+- **Screenshots:** `storage/app/screenshots/362/batches-393.png` (light and dark), plus 820 and 1280/1440.

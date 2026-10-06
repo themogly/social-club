@@ -22,6 +22,7 @@ use App\Support\SignupTrace;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
@@ -76,7 +77,7 @@ class ApplicationController extends Controller
             'application' => $application,
             'handoverActive' => CounterHandover::active(), // prompt 342 — the staff way out, during a handover only
             'payload' => $application->payload ?? [],
-            'formToken' => ApplicationSpamGuard::issueToken(),
+            'formToken' => ApplicationSpamGuard::issueToken($token), // prompt 362 — the FIRST render's clock, carried forward
             // Prompt 179 — what the browser read, still awaiting confirmation. Empty is the ordinary case.
             'prefill' => MrzPrefill::get($token),
         ]);
@@ -97,19 +98,25 @@ class ApplicationController extends Controller
             return redirect()->route('socio.application', ['token' => $token]);
         }
 
-        // Spam mitigation on top of the route rate limit: a filled honeypot or an
-        // impossibly-fast submit is discarded SILENTLY (identical thank-you response),
-        // so an automated submitter never learns its rows aren't landing.
-        if (ApplicationSpamGuard::looksAutomated($request)) {
+        // Prompt 249 — is this form the one a handover was handed over FOR (the club's tablet)? Prompt 361 — only there may
+        // it go unsigned, once the applicant confirms «¿Enviar sin firma?»; the emailed link must still be signed.
+        $handover = CounterHandover::active() && CounterHandover::returnUrl() === route('socio.application', ['token' => $token]);
+
+        // Spam mitigation on top of the route rate limit: a filled honeypot or an impossibly-fast submit is discarded
+        // SILENTLY (identical thank-you response), so an automated submitter never learns its rows aren't landing.
+        // Prompt 362 — the clock is the first render's, a refused-once form and a handover skip it, and every discard is
+        // logged with the signal that fired, so "I signed up and nothing happened" can be answered.
+        if (($signal = ApplicationSpamGuard::signal($request, $token, $handover)) !== null) {
+            $context = ['application_id' => $application->id, 'signal' => $signal, 'route' => $handover ? 'handover' : 'link'];
+            Log::warning('application.discarded', $context);
+            SignupTrace::record('application.discarded', $context);
+
             return $this->submittedRedirect($token);
         }
 
         // Everything the submission MEANS — payload assembly, the avalador match, grams to centigrams, the
         // consent version and locale, the rate-limited vault uploads, the MRZ read rate — belongs to the
         // Action (code-style audit). The controller resolves, guards and redirects.
-        // Prompt 249 — is this form the one a handover was handed over FOR (the club's tablet)? Prompt 361 — only there may
-        // it go unsigned, once the applicant confirms «¿Enviar sin firma?»; the emailed link must still be signed.
-        $handover = CounterHandover::active() && CounterHandover::returnUrl() === route('socio.application', ['token' => $token]);
 
         // Prompt 361 — a photo / ID scan KEPT from a refused attempt is used when no new file was sent.
         $kept = KeptUploads::for($token);
@@ -124,6 +131,7 @@ class ApplicationController extends Controller
         } catch (ValidationException $e) {
             // The action's own refusals (a missing signature…) keep the files too, exactly like a validation error.
             KeptUploads::keep($token, $application, $request->allFiles());
+            ApplicationSpamGuard::recordFailedAttempt($token); // prompt 362
 
             throw $e;
         }
