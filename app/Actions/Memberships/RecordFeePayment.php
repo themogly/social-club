@@ -40,6 +40,11 @@ class RecordFeePayment
 
         // A waiver without a reason is not a waiver, it is a hole in the register. Refused HERE — at the
         // writer — rather than only in the form, so no future caller can skip it.
+        // Prompt 356 — a holder of `reasons.optional` waives without one: the writer records «Aprobado por responsable».
+        if ($method === FeePaymentMethod::WAIVED && ($reason === null || $reason === '')
+            && ManagerApproval::allows($operatorId !== null ? User::query()->find($operatorId) : null)) {
+            $reason = ManagerApproval::reason();
+        }
         if ($method === FeePaymentMethod::WAIVED && ($reason === null || $reason === '')) {
             throw new InvalidArgumentException('A waived fee requires a reason.');
         }

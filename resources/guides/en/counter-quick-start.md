@@ -3,7 +3,7 @@ title: Counter quick-start guide for staff
 summary: A normal shift on the counter tablet: signing in, the till, serving members, sign-ups and closing up.
 audience: staff
 order: 1
-updated: 2026-10-02
+updated: 2026-10-06
 ---
 
 > This guide walks through a normal shift on the counter tablet: signing in, opening the till, serving members, signing up new members and closing up. The screenshots show the English screens; the Spanish words you may see are listed at the end.
@@ -100,7 +100,7 @@ The amount on the **Record contribution** button is always what the member owes.
 
 - **Cash:** under **Cash tendered**, tap **Exact** if they hand over the right money, or **€5 / €10 / €20**, or type what they gave you. The screen shows the change to give back.
 - **Wallet:** if the member has credit, type how much to take from it in **Wallet (€)**. Any rest is paid in cash.
-- **Adjust price** (managers and owners): opens **New total (€)** and **Reason**. The button updates to the new total, and so does **Exact**. Leave the amount empty to charge the normal price; €0 means free. Every adjustment is recorded with who did it.
+- **Adjust price** (managers and owners): opens **New total (€)**. The total can go **down or up** (up when a batch was entered too cheap); a line under it says how far it is from the calculated price, for example *"+4.00 € on the calculated price"*. The button updates to the new total, and so does **Exact**. Leave the amount empty to charge the normal price; €0 means free. Managers and owners don't type a reason (it is recorded as *"Manager approved"*); anyone else given this permission fills in **Reason**. After raising a price, managers see a link to fix **the batch's own price** in Administration. Every adjustment is recorded with who did it.
 
 ![Payment: Exact fills in the amount owed, and the button shows the total to record.](img/counter-quick-start/05-payment.jpg)
 
@@ -124,7 +124,7 @@ When someone fills in the sign-up form, an alert appears at the top of every scr
 2. Check their details, their **photo** and their ID document against the person in front of you.
 3. Choose their membership **tier**.
 4. Tap **Approve and sign up**. The system checks their age and looks for duplicates.
-5. Take the membership fee with **Collect fee**, or **Waive** it (a reason is needed).
+5. Take the membership fee with **Collect fee**, or **Waive** it (staff pick a reason; for managers and owners it is one tap).
 
 ![Members, with Pending applications at the top and the new-application alert above.](img/counter-quick-start/07-members-pending.jpg)
 
@@ -147,7 +147,7 @@ New members are added to **every club** automatically (not the store), and pay t
 
 - Search by name or number, or scan their card.
 - Their card shows their tier, when their membership expires, what they have taken this month, and any **fee owed**.
-- If a fee is owed, take it there with **Collect fee** (cash or wallet), or **Waive** it with a reason.
+- If a fee is owed, take it there with **Collect fee** (cash or wallet), or **Waive** it (staff pick a reason; managers and owners waive in one tap).
 - Anyone still waiting for approval appears at the top under **Pending applications**.
 
 Anything else about a member (their history, documents, discounts) is in **Administration**, which managers and owners use.

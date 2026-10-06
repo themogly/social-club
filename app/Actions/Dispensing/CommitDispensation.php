@@ -118,7 +118,7 @@ class CommitDispensation
                 [$total, $lineData, $discountKinds] = $this->buildLines($member, $lines, $location, $options);
 
                 // Price override (prompt 64): a permissioned, reasoned adjustment to what the member pays for
-                // the whole contribution — comping defective product, or a €0 give-away. It changes only the
+                // the whole contribution — comping defective product, a €0 give-away, or (356) a batch entered too cheap. It changes only the
                 // CHARGED total; limits/eligibility (already enforced above) are UNTOUCHED. The resolved figure
                 // is kept in original_total_cents so the override is reconstructable, attributed and reportable.
                 // Zero is valid and goes through the identical permission + reason + audit path.
@@ -130,12 +130,19 @@ class CommitDispensation
                     if (! ($overrideBy instanceof User) || ! $overrideBy->can('dispensation.price.override')) {
                         throw new AuthorizationException('Overriding the dispensation price requires the dispensation.price.override permission.');
                     }
+                    // Prompt 356 — THE WRITER decides the reason, not the form: a holder of `reasons.optional` (a manager, by
+                    // default) gives none and «Aprobado por responsable» is recorded; anyone else must give one.
                     $overrideReason = trim((string) ($options['price_override_reason'] ?? ''));
+                    if ($overrideReason === '' && ManagerApproval::allows($overrideBy)) {
+                        $overrideReason = ManagerApproval::reason();
+                    }
                     if ($overrideReason === '') {
                         throw new RuntimeException('A price override requires a reason.');
                     }
                     $originalTotal = $total;
-                    $total = max(0, min((int) $options['price_override_cents'], $total)); // reduce only: 0 (free) .. resolved
+                    // Prompt 356 — UP as well as down ("some stock is added too cheap"): any total ≥ 0. The lasting fix is the
+                    // batch's own price (SetBatchPrice); this charges the right amount for THIS sale.
+                    $total = max(0, (int) $options['price_override_cents']);
                 }
 
                 // Prompt 350 — the discounted total rounded to the euro (by default when a Local discount applied), ONCE,

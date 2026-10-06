@@ -158,11 +158,14 @@ trait CollectsMembershipFees
             return ['type' => 'error', 'message' => __('Este socio no tiene cuota pendiente en esta sede.')];
         }
 
-        $reason = $this->resolvedWaiveReason();
+        // Prompt 356 — no reasons are shown to a holder of `reasons.optional`, so nothing they did not choose (a record-backed
+        // reason pre-selected out of sight) is sent: the writer records «Aprobado por responsable».
+        $reason = $this->waiveReasonIsOptional() ? null : $this->resolvedWaiveReason();
 
         // Refused HERE as well as at the writer: a reason is what turns forgoing income into a governance
-        // record rather than a hole, and the UI disabling a button is not a rule.
-        if ($reason === null) {
+        // record rather than a hole, and the UI disabling a button is not a rule. Prompt 356 — a holder of
+        // `reasons.optional` gives none (no picker is shown); the writer records «Aprobado por responsable».
+        if ($reason === null && ! $this->waiveReasonIsOptional()) {
             return ['type' => 'error', 'message' => __('Indica el motivo de la condonación.')];
         }
 
@@ -271,9 +274,13 @@ trait CollectsMembershipFees
     {
         $subjectId = $this->feeSubjectId();
 
-        // Prompt 333 — "Aprobado por responsable" first, for the PIN operator who may approve without a reason.
-        return FeeWaiverReasons::options($subjectId !== null ? Member::query()->find($subjectId) : null, $this->resolveLocation(),
-            ManagerApproval::allows(CounterOperator::current()));
+        return FeeWaiverReasons::options($subjectId !== null ? Member::query()->find($subjectId) : null, $this->resolveLocation());
+    }
+
+    /** Prompt 356 — the PIN operator may waive without a reason (`reasons.optional`), so no picker is shown to them. */
+    public function waiveReasonIsOptional(): bool
+    {
+        return ManagerApproval::allows(CounterOperator::current());
     }
 
     /** Open the waiver, pre-selecting the record-backed reason when there is exactly one obvious candidate. */
@@ -287,7 +294,7 @@ trait CollectsMembershipFees
             return;
         }
 
-        $suggested = collect($this->waiveReasonOptions())->firstWhere('suggested', true);
+        $suggested = $this->waiveReasonIsOptional() ? null : collect($this->waiveReasonOptions())->firstWhere('suggested', true);
         $this->waiveReason = (string) ($suggested['value'] ?? '');
     }
 

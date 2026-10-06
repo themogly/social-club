@@ -157,7 +157,8 @@ class PriceAdjustmentAndManagerReasonsTest extends TestCase
 
     public function test_an_invalid_adjustment_says_so_and_every_total_stays_at_20(): void
     {
-        foreach (['abc', '25'] as $typed) {
+        // Prompt 356 — a higher figure is no longer "invalid" (the adjustment goes up too: TwoWayPriceAndHiddenReasonsTest).
+        foreach (['abc'] as $typed) {
             $pos = $this->twentyEuroBasket($this->person(Role::MANAGER))->set('priceOverrideEuros', $typed);
             $pos->assertSeeHtml('data-price-override-notice')->assertSee(self::button(2000));
             $pos->call('quickCash')->assertSet('cashTendered', '20.00');
@@ -175,11 +176,13 @@ class PriceAdjustmentAndManagerReasonsTest extends TestCase
         $this->assertSame(__('Aprobar sin motivo'), Permissions::label(ManagerApproval::PERMISSION));
     }
 
-    public function test_a_manager_adjusts_with_the_reason_left_as_it_is_or_emptied(): void
+    public function test_a_manager_adjusts_with_no_reason_box_and_the_writer_records_aprobado_por_responsable(): void
     {
+        // Prompt 356 — 333 showed a manager an «(opcional)» box pre-filled with the text; an optional reason is now not
+        // shown at all, and the writer fills it in (a crafted reason still counts as theirs).
         foreach ([ManagerApproval::reason(), ''] as $reason) {
             $manager = $this->person(Role::MANAGER);
-            $pos = $this->twentyEuroBasket($manager)->assertSeeHtml('<span class="font-normal">'.e(__('(opcional)')).'</span>')->assertSeeHtml('data-reason-optional="true"');
+            $pos = $this->twentyEuroBasket($manager)->assertDontSeeHtml('id="price-override-reason"');
             $pos->set('priceOverrideEuros', '15')->set('priceOverrideReason', $reason)->call('quickCash')->call('commitDispensation');
 
             $d = Dispensation::query()->latest('dispensed_at')->latest('id')->first();
@@ -191,13 +194,14 @@ class PriceAdjustmentAndManagerReasonsTest extends TestCase
         }
     }
 
-    public function test_a_manager_waives_a_fee_with_the_preselected_option(): void
+    public function test_a_manager_waives_a_fee_in_one_tap_with_no_reasons_shown(): void
     {
         $manager = $this->person(Role::MANAGER);
         $member = $this->member(1000);
 
+        // Prompt 356 — no picker (333 pre-selected «Aprobado por responsable» in one); the writer records it.
         $socios = Livewire::test(MembershipCounter::class)->call('selectFeeMember', $member->id)->call('toggleWaive')
-            ->assertSet('waiveReason', 'MANAGER_APPROVED')->assertSee(ManagerApproval::reason());
+            ->assertDontSeeHtml('data-waive-reason=');
         $socios->call('waiveFee');
 
         $waiver = MembershipFeePayment::query()->where('method', FeePaymentMethod::WAIVED->value)->sole();
@@ -211,7 +215,7 @@ class PriceAdjustmentAndManagerReasonsTest extends TestCase
         $this->setRolePermission(Role::STAFF, 'dispensation.price.override', true);
         $staff = $this->person(Role::STAFF);
 
-        $this->twentyEuroBasket($staff)->assertSeeHtml('data-reason-optional="false"')->assertDontSeeHtml('<span class="font-normal">'.e(__('(opcional)')).'</span>')
+        $this->twentyEuroBasket($staff)->assertSeeHtml('id="price-override-reason"')->assertSeeHtml('data-reason-required')
             ->set('priceOverrideEuros', '15')->call('quickCash')->call('commitDispensation')
             ->assertSet('flashMessage', __('Indica el motivo del ajuste de precio (queda registrado).'));
         $this->assertSame(0, Dispensation::query()->count());
@@ -229,11 +233,12 @@ class PriceAdjustmentAndManagerReasonsTest extends TestCase
         $manager = $this->person(Role::MANAGER);
         CounterOperator::set($manager->fresh());
 
-        $this->twentyEuroBasket($manager)->set('priceOverrideEuros', '15')->call('quickCash')->call('commitDispensation')
+        $this->twentyEuroBasket($manager)->assertSeeHtml('id="price-override-reason"')
+            ->set('priceOverrideEuros', '15')->call('quickCash')->call('commitDispensation')
             ->assertSet('flashMessage', __('Indica el motivo del ajuste de precio (queda registrado).'));
         $this->assertSame(0, Dispensation::query()->count());
 
         Livewire::test(MembershipCounter::class)->call('selectFeeMember', $this->member(1000)->id)->call('toggleWaive')
-            ->assertSet('waiveReason', '')->assertDontSee(ManagerApproval::reason());
+            ->assertSeeHtml('data-waive-reason=')->assertDontSee(ManagerApproval::reason());
     }
 }

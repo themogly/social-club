@@ -24,6 +24,7 @@ use App\Exceptions\DispensationBlockedException;
 use App\Exceptions\LimitExceededException;
 use App\Exceptions\StockUnavailableException;
 use App\Exceptions\TillClosedException;
+use App\Filament\Resources\Batches\Pages\EditBatch;
 use App\Livewire\Counter\Concerns\AddsManualBarLines;
 use App\Livewire\Counter\Concerns\CollectsMembershipFees;
 use App\Livewire\Counter\Concerns\FindsMembers;
@@ -929,10 +930,9 @@ class DispensaryPos extends Component
         $resolvedTotal = $this->basketTotalCents($member, $location);
         $total = $this->chargeableCents($resolvedTotal); // prompt 350 — rounded as shown; an adjustment below replaces it
 
-        // Price override (prompt 64): a permission holder may charge LESS than the resolved price (comp a
-        // member for defective product, or give it free) with a mandatory reason. It changes the charged
-        // total ONLY — eligibility + limits were already enforced above. The reason panel reuses the same
-        // interaction as the limit override.
+        // Price override (prompt 64): a permission holder may charge a different total — less (comp a member for
+        // defective product, or give it free) or, since 356, MORE (a batch entered too cheap) — with a reason. It
+        // changes the charged total ONLY — eligibility + limits were already enforced above.
         $priceOverrideCents = null;
         if (trim($this->priceOverrideEuros) !== '') {
             $user = $this->counterActor();
@@ -943,15 +943,13 @@ class DispensaryPos extends Component
                 return;
             }
 
-            // Prompt 333 — a holder of `reasons.optional` (a manager, by default) may leave it: the reason stored is
-            // "Aprobado por responsable", and the dispensation and the audit still name them. Everyone else types one.
-            if (trim($this->priceOverrideReason) === '') {
-                if (! ManagerApproval::allows($user)) {
-                    $this->flash(__('Indica el motivo del ajuste de precio (queda registrado).'), 'error');
+            // Prompt 356 — a holder of `reasons.optional` (a manager, by default) is not shown a reason box at all; the
+            // WRITER records «Aprobado por responsable» and still names them. Everyone else types one (asked here first,
+            // so they get the sentence rather than the writer's refusal).
+            if (trim($this->priceOverrideReason) === '' && ! ManagerApproval::allows($user)) {
+                $this->flash(__('Indica el motivo del ajuste de precio (queda registrado).'), 'error');
 
-                    return;
-                }
-                $this->priceOverrideReason = ManagerApproval::reason();
+                return;
             }
 
             // Parse through the shared validating helper: a non-numeric entry is REJECTED, never silently coerced to
@@ -962,7 +960,7 @@ class DispensaryPos extends Component
                 return;
             }
 
-            $priceOverrideCents = $this->chargeableCents($resolvedTotal); // reduce only: 0 (free) .. resolved
+            $priceOverrideCents = $this->chargeableCents($resolvedTotal); // any total ≥ 0 (356: up as well as down)
             $total = $priceOverrideCents;
         }
 
@@ -1531,6 +1529,7 @@ class DispensaryPos extends Component
             'basketLines' => $basketLines,
             'basketTotalCents' => $total,
             'priceOverrideNotice' => $this->priceOverrideNotice($resolvedTotal), // prompt 333
+            'batchPriceLinks' => $this->batchPriceLinks($resolvedTotal), // prompt 356 — after a raise, for prices.manage
             // Prompt 350 — the whole-euro rounding, shown as its own line (never when an adjustment set the total).
             'roundingCents' => trim($this->priceOverrideEuros) === '' ? $total - $resolvedTotal : 0,
             'reasonOptional' => ManagerApproval::allows(CounterOperator::current()), // prompt 333 — "Aprobado por responsable"
@@ -1840,7 +1839,7 @@ class DispensaryPos extends Component
 
         $entered = $this->priceOverrideEntered();
 
-        return $entered === null ? $resolvedTotal : max(0, min($entered, $resolvedTotal));
+        return $entered === null ? $resolvedTotal : max(0, $entered); // prompt 356 — up as well as down
     }
 
     /** The typed adjustment in cents, or null when blank or unparseable — the ONE reading of the field (333). */
@@ -1850,9 +1849,9 @@ class DispensaryPos extends Component
     }
 
     /**
-     * Prompt 333 — what the adjustment field says about itself, shown under it: an unparseable entry (the commit refuses
-     * it), or one above the resolved total (the adjustment only lowers, so the normal price stands). The totals meanwhile
-     * stay at the resolved figure, through {@see chargeableCents()}.
+     * What the adjustment field says about itself, shown under it: an unparseable entry (333 — the commit refuses it), or
+     * (356) which way the new total goes and by how much — «+4.00 € sobre el precio calculado» / «−5.00 € …». Raising a
+     * price must be as visible as lowering it.
      */
     private function priceOverrideNotice(int $resolvedTotal): ?string
     {
@@ -1860,12 +1859,46 @@ class DispensaryPos extends Component
             return null;
         }
         $entered = $this->priceOverrideEntered();
+        if ($entered === null) {
+            return __('El precio ajustado no es válido.');
+        }
+        $difference = $entered - $resolvedTotal;
 
-        return match (true) {
-            $entered === null => __('El precio ajustado no es válido.'),
-            $entered > $resolvedTotal => __('El ajuste solo puede bajar el total: se cobra el precio normal.'),
-            default => null,
-        };
+        return $difference === 0 ? null : __(':amount sobre el precio calculado', [
+            'amount' => ($difference > 0 ? '+' : '−').Money::fromCents(abs($difference))->formatted(),
+        ]);
+    }
+
+    /**
+     * Prompt 356 — after an adjustment that RAISES the total, the lasting fix: the price of the batch(es) this basket draws
+     * from, on its page in the panel. Only for someone who may change prices (`prices.manage`); empty otherwise.
+     *
+     * @return list<array{label: string, url: string}>
+     */
+    private function batchPriceLinks(int $resolvedTotal): array
+    {
+        $entered = $this->priceOverrideEntered();
+        if ($entered === null || $entered <= $resolvedTotal || ! $this->userCan('prices.manage')) {
+            return [];
+        }
+        $location = $this->resolveLocation();
+        if ($location === null) {
+            return [];
+        }
+
+        $links = [];
+        foreach ($this->basket as $line) {
+            $genetic = Genetic::query()->find($line['genetic_id']);
+            if ($genetic === null) {
+                continue;
+            }
+            $batch = $line['batch_id'] !== null ? Batch::query()->find($line['batch_id']) : (new SelectBatch)->fefo($genetic, $location);
+            if ($batch !== null && ! isset($links[$batch->id])) {
+                $links[$batch->id] = ['label' => $genetic->name, 'url' => EditBatch::getUrl(['record' => $batch], panel: 'admin')];
+            }
+        }
+
+        return array_values($links);
     }
 
     /** The live visit total the shared HandlesTender model splits/tenders against — price-override-aware (271). */
