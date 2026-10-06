@@ -35,7 +35,7 @@ class Dispensation extends Model
         'reference', 'dispensed_at',
         'original_total_cents', 'price_override_reason', 'price_override_by',
         'self_dispensed', // prompt 347 — a member of staff served their own linked member record
-        'rounding_cents', // prompt 350 — the signed rounding applied to the discounted total
+        'rounding_cents', 'charge_rounding', // prompt 350 — the signed rounding applied to the discounted total
     ];
 
     protected function casts(): array
@@ -50,6 +50,7 @@ class Dispensation extends Model
             'dispensed_at' => 'datetime',
             'self_dispensed' => 'boolean',
             'rounding_cents' => MoneyCast::class,
+            'charge_rounding' => 'boolean', // prompt 355 — was half-gram rounding on for this sale
         ];
     }
 

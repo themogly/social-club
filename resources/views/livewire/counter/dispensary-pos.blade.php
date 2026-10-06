@@ -778,7 +778,7 @@
                                         @if ($line['per_unit'])
                                             {{ $line['units'] }} {{ __('uds') }} ({{ $this->grams($line['grams_cg']) }}) × {{ $this->money($line['rate_cents']) }}/{{ __('ud') }}
                                         @else
-                                            {{ $this->grams($line['grams_cg']) }} × {{ $this->money($line['rate_cents']) }}/g
+                                            {{ $this->grams($line['grams_cg']) }}@if (($line['charged_cg'] ?? null) !== null && $line['charged_cg'] !== $line['grams_cg']) <span data-charged-grams class="font-medium text-ink dark:text-slate-200">· {{ __('se cobra :grams', ['grams' => $this->grams($line['charged_cg'])]) }}</span>@endif × {{ $this->money($line['rate_cents']) }}/g
                                         @endif
                                         @if ($line['discount_cents'] > 0)· <span class="text-success">−{{ $this->money($line['discount_cents']) }}</span>@endif
                                     </p>
@@ -821,6 +821,19 @@
                     {{-- Prompt 263 — ONE figure for the visit: this header, the tender's "a cobrar" and the pay button
                          all show the same total. With bar lines it is the visit's total (aportación + barra, two
                          ledgers, one payment); with flower only it is still labelled the aportación it is. --}}
+                    {{-- Prompt 355 — «Redondeo 0.5 g»: what the member PAYS for is rounded to the half gram (stock and limits keep
+                         the weighed grams). Kept for THIS person at this sede until their session ends, so it says when it
+                         differs from the sede's default — an hour later it must still be obvious that it is off. --}}
+                    @php($chargeRoundingOn = $this->chargeRoundingOn())
+                    @php($chargeRoundingChanged = $chargeRoundingOn !== \App\Support\ChargeRounding::sedeDefault($locationId))
+                    <button type="button" wire:click="toggleChargeRounding" data-charge-rounding="{{ $chargeRoundingOn ? 'on' : 'off' }}"
+                            role="switch" aria-checked="{{ $chargeRoundingOn ? 'true' : 'false' }}"
+                            class="mt-2 flex min-h-11 w-full items-center justify-between gap-3 rounded-xl px-4 text-sm transition hover:bg-surface-alt dark:hover:bg-slate-800">
+                        <span class="text-ink-muted dark:text-slate-400">{{ __('Redondeo 0.5 g') }}@if ($chargeRoundingChanged) <span data-charge-rounding-changed class="font-semibold text-warning">{{ __('(cambiado)') }}</span>@endif</span>
+                        <span aria-hidden="true" @class(['relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition', 'bg-brand' => $chargeRoundingOn, 'bg-slate-300 dark:bg-slate-600' => ! $chargeRoundingOn])>
+                            <span @class(['inline-block h-5 w-5 rounded-full bg-white shadow transition', 'translate-x-5' => $chargeRoundingOn, 'translate-x-0.5' => ! $chargeRoundingOn])></span>
+                        </span>
+                    </button>
                     @if ($roundingCents !== 0)
                         {{-- Prompt 350 — the discounted aportación rounded to the euro: said, not hidden in the total. --}}
                         <div data-basket-rounding class="mt-2 flex items-center justify-between px-4 text-sm text-ink-muted dark:text-slate-400">

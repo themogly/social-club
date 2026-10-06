@@ -65,6 +65,8 @@ Every dispensation must be to an identified member, from a real batch, by weight
 5. Enter the amount. Flower, hash and extracts: type the weight in grams on the keypad, or tap a quick amount (1 g, 2 g, 3.5 g…). Pre-rolls, vapes and edibles: use **−** and **+** to choose the number of units.
 6. Tap **Add to basket**. The strain search comes back at the top of the list, empty, ready for the next item (tap it to type). Repeat for anything else.
 
+**Half-gram rounding:** the weight the member pays for is rounded to the nearest half gram (never less than 0.5 g): 1.10 g is charged as 1.0 g, 0.20 g as 0.5 g, and 3.40 g as 3.5 g, which gets the eighth price. The basket shows it, for example *"1.10 g · charged 1.00 g"*. Stock and the member's limits always use the exact weight. To turn it off for yourself, use the **Round to 0.5 g** switch above the total; it stays as you set it until you sign out, and it shows **(changed)** while it differs from the club's setting.
+
 **More of the same strain** (a member wants another gram): tap the strain again and add the extra. It joins the same line in the basket (you briefly see **+1.00 g** on it), priced as one amount, so 2 g is charged as 2 g and 3.5 g can get the eighth price.
 
 **Changing an amount:** tap the line in the basket. The pad opens with its amount; type the new one and tap **Update**. Setting it to 0 removes the line, the same as **×**. If you tap a strain by mistake, **Cancel** puts the list back where you were.

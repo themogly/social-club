@@ -24,6 +24,7 @@ use App\Models\Location;
 use App\Models\Member;
 use App\Models\TillSession;
 use App\Models\User;
+use App\Support\ChargeRounding;
 use App\Support\DispensaryRounding;
 use App\Support\LimitSnapshot;
 use App\Support\ManagerApproval;
@@ -55,7 +56,7 @@ use RuntimeException;
  *
  * @phpstan-type Line array{genetic_id: string, batch_id?: ?string, grams_cg?: int, units?: int}
  * @phpstan-type NormalisedLine array{genetic_id: string, batch_id: ?string, grams_cg: int, units: ?int}
- * @phpstan-type CommitOptions array{operator_id?: ?string, till_session_id?: ?string, cash_cents?: int, wallet_cents?: int, signature_path?: ?string, idempotency_key?: ?string, reversal_of_id?: ?string, override?: bool, override_by?: ?User, override_reason?: ?string, price_override_cents?: ?int, price_override_reason?: ?string, price_override_by?: ?User, on_tab?: bool, at?: ?\DateTimeInterface}
+ * @phpstan-type CommitOptions array{operator_id?: ?string, till_session_id?: ?string, cash_cents?: int, wallet_cents?: int, signature_path?: ?string, idempotency_key?: ?string, reversal_of_id?: ?string, override?: bool, override_by?: ?User, override_reason?: ?string, price_override_cents?: ?int, price_override_reason?: ?string, price_override_by?: ?User, on_tab?: bool, charge_rounding?: bool, at?: ?\DateTimeInterface}
  */
 class CommitDispensation
 {
@@ -172,6 +173,7 @@ class CommitDispensation
                     'till_session_id' => $options['till_session_id'] ?? null,
                     'total_cents' => $total,
                     'rounding_cents' => $rounding,
+                    'charge_rounding' => (bool) ($options['charge_rounding'] ?? false), // prompt 355
                     'original_total_cents' => $originalTotal,
                     'price_override_reason' => $overrideReason,
                     'price_override_by' => $overrideBy?->id,
@@ -417,10 +419,15 @@ class CommitDispensation
         // PASS 1 — price each operator-line on its WHOLE quantity (prompt 250: price once), and decide which
         // batches it draws from. Manual (a chosen batch_id) is one part; automatic (null) is FEFO across the
         // sede's dispensable batches. No stock is moved yet — the eighth pass needs every line's total first.
+        // Prompt 355 — half-gram rounding of what is CHARGED, decided by the server (the counter passes the operator's
+        // session choice; a request cannot), once per weight line on its total. Stock and limits keep the weighed grams.
+        $rounding = (bool) ($options['charge_rounding'] ?? false);
+
         foreach ($lines as $line) {
             $genetic = Genetic::withoutGlobalScopes()->findOrFail($line['genetic_id']);
             $grams = (int) $line['grams_cg'];
             $units = $line['units'];
+            $charged = $units === null && $rounding ? ChargeRounding::charged($grams) : $grams;
             $quantity = $units ?? $grams; // the allocation unit: whole units for UNIT, centigrams for WEIGHT
 
             if ($line['batch_id'] !== null) {
@@ -443,17 +450,19 @@ class CommitDispensation
             }
 
             // Prompt 278 — each part at ITS OWN batch's price (owner decision 2); the line is their sum.
-            $whole = $resolver->priceParts($genetic, $location, $member, $allocation, $units !== null);
+            $whole = $resolver->priceParts($genetic, $location, $member, $allocation, $units !== null, $units === null ? $charged : null);
 
+            // The eighth break groups on CHARGED grams (355): 3.40 g weighed → 3.5 g charged → one eighth.
             $eighthInput[] = $units !== null
                 ? ['grams_cg' => $grams, 'rate_cents' => 0, 'per_gram_total' => $whole['total_cents'], 'eighth_price' => null]
-                : ['grams_cg' => $grams, 'rate_cents' => $whole['effective_rate_cents'], 'per_gram_total' => $whole['total_cents'], 'eighth_price' => $whole['eighth_price']];
+                : ['grams_cg' => $charged, 'rate_cents' => $whole['effective_rate_cents'], 'per_gram_total' => $whole['total_cents'], 'eighth_price' => $whole['eighth_price']];
 
             $discountKinds[] = $whole['discount_kind']; // prompt 350 — for the rounding scope
             $priced[] = [
                 'genetic' => $genetic,
                 'is_unit' => $units !== null,
                 'quantity' => $quantity,          // total in the allocation unit
+                'charged' => $units === null ? $charged : $quantity, // what the price was computed on (355)
                 'discount_cents' => $whole['discount_cents'],
                 'parts' => $whole['parts'],       // per part: its batch, qty, rate, total and discount
             ];
@@ -475,7 +484,7 @@ class CommitDispensation
             $lineTotal = $adjusted[$i]['total_cents'];
             $lineDiscount = $p['discount_cents'];
             $pricingNote = $adjusted[$i]['eighth_applied'] ? __('Octavo (1/8)') : null;
-            $qtyTotal = $p['quantity'];
+            $qtyTotal = $p['charged']; // an eighth-adjusted total is split by the CHARGED grams of each part (355)
             $parts = $p['parts'];
             $lastIndex = count($parts) - 1;
             // Without an eighth break, every part keeps its OWN batch-priced total (278). An eighth break re-prices the
@@ -491,10 +500,11 @@ class CommitDispensation
                 $partQty = $part['qty'];
                 $isLast = $j === $lastIndex;
 
+                $partCharged = (int) $part['charged_qty'];
                 $partTotal = $ownTotals ? (int) $part['total_cents']
-                    : ($isLast ? $lineTotal - $allocatedTotal : intdiv($lineTotal * $partQty, $qtyTotal));
+                    : ($isLast ? $lineTotal - $allocatedTotal : intdiv($lineTotal * $partCharged, max(1, $qtyTotal)));
                 $partDiscount = $ownTotals ? (int) $part['discount_cents']
-                    : ($isLast ? $lineDiscount - $allocatedDiscount : intdiv($lineDiscount * $partQty, $qtyTotal));
+                    : ($isLast ? $lineDiscount - $allocatedDiscount : intdiv($lineDiscount * $partCharged, max(1, $qtyTotal)));
                 $allocatedTotal += $partTotal;
                 $allocatedDiscount += $partDiscount;
 
@@ -511,6 +521,7 @@ class CommitDispensation
                     'batch_id' => $batch->id,
                     // grams_cg is populated on EVERY row (computed for UNIT) — the load-bearing invariant.
                     'grams_cg' => $partGrams,
+                    'charged_cg' => $p['is_unit'] ? null : $partCharged, // prompt 355 — what this part was charged for
                     'units_dispensed' => $partUnits,
                     'discount_cents' => $partDiscount,
                     'line_total_cents' => $partTotal,

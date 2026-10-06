@@ -33,6 +33,7 @@ class LocationForm
         'bar_receipt_enabled', // prompt 317
         'signature_on_dispensation',
         'dispensary_calculator_enabled', // prompt 292 — the € calculator, off by default
+        'charge_rounding_enabled', // prompt 355 — the charged weight rounded to the half gram, on by default
         'restrict_pos_to_checked_in',
         'camera_scan_enabled',
         'ring_fenced',
@@ -317,6 +318,12 @@ class LocationForm
                             ])
                             ->default('home')
                             ->selectablePlaceholder(false),
+
+                        // Prompt 355 — the weight a member pays for, rounded to the half gram (0.2 g → 0.5 g, 1.1 g → 1.0 g).
+                        Toggle::make('charge_rounding_enabled')
+                            ->label(__('Redondeo del peso cobrado'))
+                            ->default(true)
+                            ->helperText(__('Se cobra el peso redondeado al medio gramo (mínimo 0.5 g); el stock y los límites usan el peso exacto. Cada persona puede desactivarlo en el mostrador para su sesión.')),
 
                         // Prompt 351 — the order of the dispensary's strain list; the counter's €↓ / €↑ / A–Z switch starts here.
                         Select::make('dispensary_sort')

@@ -110,6 +110,9 @@
                         $first = $parts->first();
                         $isUnit = $first->units_dispensed !== null;
                         $gramsCg = (int) $parts->sum(fn ($l) => (int) $l->getRawOriginal('grams_cg'));
+                        // Prompt 355 — the grams CHARGED (half-gram rounding), when they differ from what was weighed.
+                        $chargedCg = $parts->every(fn ($l) => $l->getRawOriginal('charged_cg') !== null)
+                            ? (int) $parts->sum(fn ($l) => (int) $l->getRawOriginal('charged_cg')) : null;
                         $units = $isUnit ? (int) $parts->sum(fn ($l) => (int) $l->units_dispensed) : null;
                         $lineTotalCents = (int) $parts->sum(fn ($l) => (int) $l->getRawOriginal('line_total_cents'));
                         $note = $parts->pluck('pricing_note')->filter()->first();
@@ -121,6 +124,9 @@
                                 {{ $units }} {{ __('uds') }} ({{ Weight::fromCentigrams($gramsCg)->formatted() }})
                             @else
                                 {{ Weight::fromCentigrams($gramsCg)->formatted() }}
+                                @if ($chargedCg !== null && $chargedCg !== $gramsCg)
+                                    <span class="note" data-receipt-charged>· {{ __('se cobra :grams', ['grams' => Weight::fromCentigrams($chargedCg)->formatted()]) }}</span>
+                                @endif
                             @endif
                         </td>
                         <td class="num">

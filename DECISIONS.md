@@ -20097,3 +20097,96 @@ through 316's one display rule, `NumberFormat::decimal()`, following the existin
 - **Two older tests assumed two lines for one strain:**
   - `RoundTripPinsTest` (add, then remove the second line) now merges and edits back to 2 g;
   - `DispensaryCalculatorTest` (1.5 g typed plus €20 back-solved) now expects the merged 3.50 g line.
+
+## Prompt 355 — charge for the weight rounded to the half gram, eighths included, with a staff on/off switch
+
+**Branch `feat/355-359-half-gram-rounding-and-reserve`, NOT merged** (Ben, 6 Oct 2026: "run this last on a separate
+branch … don't merge to main"; 359 goes on the same branch, "2 big changes so needs lots of testing").
+
+### The rule, and Ben's two answers
+
+- **Every weight line has two weights:**
+  - **weighed** (`grams_cg`, unchanged): what left the jar. Stock, the daily and monthly limits, the legal ceiling,
+    the register and the recount read only this;
+  - **charged** (`dispensation_lines.charged_cg`, new): what the member pays for.
+- **The rule:** `charged = max(0.5 g, nearest 0.5 g)` (`App\Support\ChargeRounding::charged`, integer centigrams).
+  Ben chose:
+  - **«nearest»**, as the prompt assumed (1.30 g → 1.5 g; 3.40 g → 3.5 g, an eighth);
+  - **exact halves round DOWN** (0.75 → 0.5; 1.25 → 1.0), the member-friendly choice.
+- **Unit products are unaffected** (`charged_cg` is null on unit lines).
+
+### Its place in the pricing order
+
+1. **Charged grams per weight line,** on the line's total, once, by one helper used by the counter's preview AND the
+   commit.
+2. **Per-gram totals on charged grams.** `ResolvePrice::priceParts(…, $chargedCg)` keeps each batch part's WEIGHED qty
+   for stock and prices it on its share of the charged grams. `ChargeRounding::overParts` applies the difference from
+   the last part backwards, never below zero, so the parts' charged grams add up exactly. Each part is still priced at
+   its own batch's rate with the discount (278).
+3. **The eighth break on charged grams.** `applyEighthBreaks()` receives charged grams and the per-gram totals from
+   step 2, so the never-pay-more floor compares like with like. When it applies, the commit splits the line total over
+   the parts by their CHARGED grams.
+4. **350's whole-euro rounding**, unchanged.
+5. **A manual price adjustment** (356), unchanged: it replaces the final total.
+
+### Rounding is per line
+
+- **Each line rounds on its own; an eighth group then sums the charged grams.** 1.20 g + 2.30 g of two strains
+  sharing a €32 eighth → 1.0 + 2.5 = 3.5 g → €32.00, split 1.0 : 2.5 (€9.14 / €22.86, no lost cent). Tested.
+- Two strains sharing an eighth price group across the basket, exactly as before. The browser proof gives one strain
+  no eighth, so the switch's difference shows.
+
+### The switch: kept per staff session, server-held, audited
+
+- **«Redondeo 0.5 g»** sits in the cart column just above the total. It's a 44 px row and the commit button stays
+  above the fold at 820×1180 and 1180×820 (proved).
+- **Who:** anyone who can dispense (`pos.use`), for **themselves at this sede**.
+- **It's held in the server session** under `counter.charge_rounding.{operator}.{sede}`:
+  - it survives visits, a member change, an idle lock and the same PIN again;
+  - another person's PIN starts from the sede default (or their own earlier choice this session);
+  - another sede has its own;
+  - it ends with the browser session.
+- **«(cambiado)»** shows while it differs from the sede default.
+- **Flipping re-prices the basket at once.** Each flip is audited as `counter.rounding.toggled` (who, sede, on/off).
+- **The commit reads the flag from the server.** `DispensaryPos::chargeRoundingOn()` passes `charge_rounding` into
+  `CommitDispensation` (also via the combined settle), so the preview and the commit always agree, and no request
+  field can change it. A caller passing nothing (seeders, tests) gets no rounding.
+- **The starting value is a per-sede setting:** «Redondeo del peso cobrado» (`charge_rounding_enabled`), on by
+  default, on the *Mostrador* section of the sede form. Existing sedes read the code default (Activado) with no data
+  migration, like 351's `dispensary_sort`.
+
+### Recorded and shown
+
+- **Stored:** `dispensation_lines.charged_cg` (`WeightCast`) and `dispensations.charge_rounding`. Changing the setting
+  later never rewrites a past sale (tested). Pre-355 rows have `charged_cg` null, which reads as not rounded.
+- **The basket:** «1.10 g · se cobra 1.00 g». **The receipt:** the weighed grams, plus «se cobra …» when different.
+- **Refunds:** the amount is capped at `total_cents` (what was charged) and the grams at the weighed grams (tested).
+- **Reports:** revenue reads charged amounts and weight totals read weighed grams. No report derives an average €/g.
+
+### Tests and proof
+
+- **`tests/Feature/Pricing/HalfGramRoundingTest.php`** (28 at €10/g with a €32 eighth; 26 red before, while history
+  and the refund cap needed the code to differ). It covers:
+  - the rule table, with both ties;
+  - prices, each also checked on the counter's preview (preview = commit):
+    - 1.10 → €10 and 0.20 → €5;
+    - 3.40 / 3.60 → €32, 3.20 → €30, 4.10 → €37, 6.90 → €64;
+    - off: 1.10 → €11, 3.40 → €34, 3.60 → €33;
+  - the two-line eighth group;
+  - the floor;
+  - stock, limits and the receipt;
+  - a line across two batches, with and without the eighth (charged 0.70 + 0.30 over weighed 0.70 + 0.40; stock by
+    the weighed parts);
+  - stable history, the refund caps, and unit products;
+  - the switch: sede default, re-pricing, the server flag at commit, audit, `(cambiado)`, two consecutive visits
+    unrounded, lock and same PIN, another person, another sede.
+- **`TenderPanelTest`** turns rounding off at its sede. It's a tender test on a 5.4 g basket, which would now charge
+  5.5 g.
+- **The browser proof** (`tests/Browser/prove-355-half-gram.mjs`, a fresh demo DB at 820×1180 and 1180×820, staff)
+  passed 8/8:
+  - ON: «1.10 g · se cobra 1.00 g», 3.40 g takes the eighth, €42;
+  - OFF: €45 with «(cambiado)»;
+  - the button stays above the fold;
+  - each flip is audited;
+  - no page errors.
+- **The guide:** `counter-quick-start.md` has a «Half-gram rounding» paragraph.

@@ -51,6 +51,7 @@ use App\Models\TillSession;
 use App\Models\User;
 use App\Support\ArticleImage;
 use App\Support\BusinessDay;
+use App\Support\ChargeRounding;
 use App\Support\CounterOperator;
 use App\Support\CounterScreens;
 use App\Support\DispensaryRounding;
@@ -482,6 +483,23 @@ class DispensaryPos extends Component
         $this->reset(['activeGeneticId', 'activeBatchId', 'weightInput', 'calculatorMode', 'unitQty', 'editingLine']);
         // Prompt 358 — a mis-tap must not lose the operator's place: the browser puts the list back where it was.
         $this->dispatch('weight-entry-cancelled');
+    }
+
+    /** Prompt 355 — half-gram rounding of the CHARGED weight, as this person has it at this sede (server session). */
+    public function chargeRoundingOn(): bool
+    {
+        return ChargeRounding::enabled(CounterOperator::current(), $this->resolveLocation()?->id);
+    }
+
+    /** Prompt 355 — «Redondeo 0.5 g»: anyone who can dispense flips it for THEMSELVES at this sede; re-prices the basket. */
+    public function toggleChargeRounding(): void
+    {
+        $operator = CounterOperator::current();
+        $location = $this->resolveLocation();
+        if ($operator === null || $location === null || ! $operator->can('pos.use')) {
+            return;
+        }
+        ChargeRounding::set($operator, $location, ! $this->chargeRoundingOn());
     }
 
     /**
@@ -1076,6 +1094,7 @@ class DispensaryPos extends Component
             'wallet_cents' => $walletCents,
             'idempotency_key' => $this->idempotencyKey,
             'on_tab' => $this->onTab, // prompt 259 — only via "Añadir a la cuenta", and only within the tab
+            'charge_rounding' => $this->chargeRoundingOn(), // prompt 355 — the server's flag, never the request's
         ];
 
         if ($this->signaturePath !== null) {
@@ -1264,7 +1283,7 @@ class DispensaryPos extends Component
                 'till_session_id' => $dispOptions['till_session_id'],
                 'operator_id' => $dispOptions['operator_id'],
                 'on_tab' => $this->onTab,
-                'dispensation' => $dispOptions,
+                'dispensation' => $dispOptions, // carries `charge_rounding` (355)
                 'order' => [
                     'cash_cents' => $barTotal - $barWallet,
                     'wallet_cents' => $barWallet,
@@ -2019,6 +2038,7 @@ class DispensaryPos extends Component
         $rows = [];
         $eighthInput = [];
         $resolver = new ResolvePrice;
+        $rounding = $this->chargeRoundingOn(); // prompt 355 — the same server-held flag the commit is given
 
         foreach ($this->basket as $index => $line) {
             $genetic = Genetic::query()->withoutGlobalScopes()->find($line['genetic_id']);
@@ -2037,7 +2057,8 @@ class DispensaryPos extends Component
                 $parts = $chosen !== null
                     ? [['batch' => $chosen, 'qty' => $quantity]]
                     : (new AllocateFromBatches)->preview($genetic, $location, $quantity);
-                $priced = $resolver->priceParts($genetic, $location, $member, $parts, $units !== null);
+                $charged = $units === null && $rounding ? ChargeRounding::charged((int) $line['grams_cg']) : (int) $line['grams_cg'];
+                $priced = $resolver->priceParts($genetic, $location, $member, $parts, $units !== null, $units === null ? $charged : null);
             } catch (RuntimeException) {
                 continue;
             }
@@ -2046,6 +2067,7 @@ class DispensaryPos extends Component
                 'index' => $index,
                 'genetic_name' => $genetic->name,
                 'grams_cg' => (int) $line['grams_cg'],
+                'charged_cg' => $units === null ? $charged : null, // prompt 355 — «1.10 g · se cobra 1.00 g»
                 'units' => $units !== null ? (int) $units : null,
                 'per_unit' => $units !== null,
                 'rate_cents' => $priced['rate_cents'],
@@ -2059,7 +2081,7 @@ class DispensaryPos extends Component
             ];
             $eighthInput[] = $units !== null
                 ? ['grams_cg' => (int) $line['grams_cg'], 'rate_cents' => 0, 'per_gram_total' => $priced['total_cents'], 'eighth_price' => null]
-                : ['grams_cg' => (int) $line['grams_cg'], 'rate_cents' => $priced['effective_rate_cents'], 'per_gram_total' => $priced['total_cents'], 'eighth_price' => $priced['eighth_price']];
+                : ['grams_cg' => $charged, 'rate_cents' => $priced['effective_rate_cents'], 'per_gram_total' => $priced['total_cents'], 'eighth_price' => $priced['eighth_price']];
         }
 
         // Basket-wide eighth (3.5 g) break (prompt 83) — the SAME resolver call CommitDispensation makes, so

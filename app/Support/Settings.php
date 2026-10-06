@@ -242,6 +242,9 @@ class Settings
         'after_recording' => 'home',
         // Prompt 351 (Liam, Aaron) — per sede: the dispensary's strain order — price_desc (default), price_asc or alpha.
         'dispensary_sort' => 'price_desc',
+        // Prompt 355 — per sede: what a member PAYS for is the weight rounded to the half gram (on by default; staff may turn
+        // it off for themselves at the counter — ChargeRounding). Stock and limits always read the weighed grams.
+        'charge_rounding_enabled' => true,
         // Prompt 353 — ORG-level, owner only: /docs (the guides on a staff phone, by PIN). Off = a 404, every phone signed out.
         'guides_docs_enabled' => true,
         // Prompt 348 — a new member is enrolled at every active sede but the store (one fee, the rest linked). ORG-level.

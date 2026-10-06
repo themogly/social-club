@@ -16,7 +16,7 @@ class DispensationLine extends Model
     use HasFactory, HasUlids;
 
     protected $fillable = [
-        'dispensation_id', 'genetic_id', 'batch_id', 'grams_cg', 'price_per_gram_cents',
+        'dispensation_id', 'genetic_id', 'batch_id', 'grams_cg', 'charged_cg', 'price_per_gram_cents',
         'units_dispensed', 'price_per_unit_cents',
         'discount_cents', 'line_total_cents', 'pricing_note', 'genetic_name_snapshot', 'batch_no_snapshot',
     ];
@@ -26,6 +26,8 @@ class DispensationLine extends Model
         return [
             // grams_cg is populated on EVERY line (computed for UNIT) — consumers never branch.
             'grams_cg' => WeightCast::class,
+            // Prompt 355 — the grams this line was CHARGED for (half-gram rounding); null on unit lines and before 355.
+            'charged_cg' => WeightCast::class,
             'price_per_gram_cents' => 'integer',   // frozen rate (WEIGHT lines)
             'units_dispensed' => 'integer',        // UNIT lines
             'price_per_unit_cents' => 'integer',   // frozen rate (UNIT lines)
