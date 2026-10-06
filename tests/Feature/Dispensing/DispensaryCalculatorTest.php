@@ -171,7 +171,8 @@ class DispensaryCalculatorTest extends TestCase
         $pos->call('addLine', '1,5', 'grams');
         $pos->call('chooseGenetic', $this->flower->id)->call('addLine', '20', 'calculator'); // adding closes the panel, as ever
 
-        $this->assertSame([150, 200], collect($pos->get('basket'))->pluck('grams_cg')->map(fn ($v): int => (int) $v)->all());
+        // 1.5 g typed + €20 back-solved to 2 g — the same strain, so ONE line since 358 (it was two lines).
+        $this->assertSame([350], collect($pos->get('basket'))->pluck('grams_cg')->map(fn ($v): int => (int) $v)->all());
     }
 
     // 11 ------------------------------------------------------------------------------------------------------------

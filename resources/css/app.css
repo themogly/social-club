@@ -151,3 +151,15 @@ select:-webkit-autofill {
 input[type='date'][data-empty-date]:invalid:not(:focus)::-webkit-datetime-edit {
     color: transparent;
 }
+
+/* Prompt 358 — after «Añadir», on a touch tablet the strain search is shown (not focused — no keyboard) and briefly
+   highlighted, so the next item is one tap away. */
+[data-genetic-search][data-search-ready] {
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-brand) 45%, transparent);
+    border-color: var(--color-brand);
+}
+@media (prefers-reduced-motion: no-preference) {
+    [data-genetic-search] {
+        transition: box-shadow 0.3s ease, border-color 0.3s ease;
+    }
+}

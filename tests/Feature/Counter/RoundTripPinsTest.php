@@ -114,8 +114,8 @@ class RoundTripPinsTest extends TestCase
         $pos = Livewire::test(DispensaryPos::class)
             ->call('selectMember', $this->member->id)
             ->call('chooseGenetic', $this->genetic->id)->call('addLine', '2', 'grams')   // €20,00
-            ->call('chooseGenetic', $this->genetic->id)->call('addLine', '1', 'grams')   // €10,00…
-            ->call('removeLine', 1)                                                        // …removed
+            ->call('chooseGenetic', $this->genetic->id)->call('addLine', '1', 'grams')   // +€10,00 — the same line (358: 3 g)…
+            ->call('editLine', 0)->call('addLine', '2', 'grams')                           // …edited back to 2 g
             ->call('addBarItem', $this->beer->id)->call('addBarItem', $this->beer->id);   // €3,00
 
         $pos->set('walletInput', '5,00')->set('cashTendered', '20,00')->call('commitDispensation')->assertSet('flashType', 'success');

@@ -308,7 +308,8 @@
                         @endif
 
                         {{-- One request in flight: only this button shows a loading state, and a double tap adds one line. --}}
-                        <x-button size="lg" class="mt-4 w-full" data-add-line @click="add()" x-bind:disabled="adding" x-bind:aria-busy="adding">{{ __('Añadir a la cesta') }}</x-button>
+                        {{-- Prompt 358 — the same pad edits a basket line (tap the line): the button then says so. --}}
+                        <x-button size="lg" class="mt-4 w-full" data-add-line @click="add()" x-bind:disabled="adding" x-bind:aria-busy="adding">{{ $editingLine !== null ? __('Actualizar') : __('Añadir a la cesta') }}</x-button>
                     </section>
                 @endif
 
@@ -409,6 +410,8 @@
                             type="text"
                             data-view-only
                             x-model="search.genetics"
+                            data-genetic-search
+                            x-on:basket-line-added.window="search.genetics = ''"
                             x-show="source === 'genetics'"
                             aria-label="{{ __('Buscar genética…') }}"
                             autocomplete="off"
@@ -447,7 +450,7 @@
                                 @foreach ($head['usual'] as $usual)
                                     <button
                                         type="button"
-                                        x-on:click="$wire.chooseGenetic('{{ $usual['id'] }}')"
+                                        x-on:click="window.counterPane.remember(); $wire.chooseGenetic('{{ $usual['id'] }}')"
                                         data-usual-genetic="{{ $usual['id'] }}"
                                         class="inline-flex min-h-11 items-center gap-1.5 rounded-full border border-brand/40 bg-brand-tint px-4 text-sm font-semibold text-brand transition hover:bg-brand hover:text-white dark:bg-slate-800 dark:text-slate-100"
                                     >{{ $usual['name'] }}</button>
@@ -542,7 +545,7 @@
                                 @php $disabledCard = ! $gen['hasMember'] || ! $g['has_batch']; @endphp
                                 <button
                                     type="button"
-                                    @if (! $disabledCard) x-on:click="$wire.chooseGenetic('{{ $g['id'] }}')" @endif
+                                    @if (! $disabledCard) x-on:click="window.counterPane.remember(); $wire.chooseGenetic('{{ $g['id'] }}')" @endif
                                     @disabled($disabledCard)
                                     data-product
                                     data-catalogue-item="genetics"
@@ -757,9 +760,16 @@
                     <ul class="mt-3 divide-y divide-line dark:divide-slate-800">
                         @forelse ($basketLines as $line)
                             <li wire:key="line-{{ $line['index'] }}" class="flex items-start justify-between gap-3 py-2.5">
-                                <div class="min-w-0">
+                                {{-- Prompt 358 — tap the line to change its amount (the pad opens with it, «Actualizar»); × removes. --}}
+                                <button type="button" wire:click="editLine({{ $line['index'] }})" data-edit-line="{{ $line['index'] }}"
+                                        aria-label="{{ __('Cambiar la cantidad de :name', ['name' => $line['genetic_name']]) }}"
+                                        @class(['-mx-1 min-h-11 min-w-0 flex-1 rounded-lg px-1 text-left transition hover:bg-black/5 dark:hover:bg-white/5', 'ring-2 ring-brand' => $editingLine === $line['index']])>
                                     <p class="truncate font-medium">
                                         {{ $line['genetic_name'] }}
+                                        @if (($mergeNote['index'] ?? null) === $line['index'])
+                                            {{-- …and a merge says so, so a line that grew is not mistaken for one that vanished. --}}
+                                            <span data-merge-note class="ml-1 rounded-full bg-success/10 px-1.5 py-0.5 text-[11px] font-semibold text-success">{{ $mergeNote['note'] }}</span>
+                                        @endif
                                         @if ($line['eighth_applied'] ?? false)
                                             <span class="ml-1 rounded-full border border-brand/30 bg-brand-tint px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-brand dark:bg-slate-800 dark:text-slate-200">{{ __('1/8') }}</span>
                                         @endif
@@ -776,7 +786,7 @@
                                     @if ($line['split_note'] ?? null)
                                         <p data-split-note class="text-xs font-medium text-warning">{{ $line['split_note'] }}</p>
                                     @endif
-                                </div>
+                                </button>
                                 <div class="flex shrink-0 items-center gap-2">
                                     <span class="font-semibold tabular-nums">{{ $this->money($line['total_cents']) }}</span>
                                     <button type="button" wire:click="removeLine({{ $line['index'] }})" aria-label="{{ __('Quitar de la cesta') }}" class="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-md text-ink-muted hover:bg-black/5 dark:text-slate-400 dark:hover:bg-white/5">✕</button>
