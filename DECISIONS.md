@@ -19997,3 +19997,30 @@ through 316's one display rule, `NumberFormat::decimal()`, following the existin
   much; managers type no reason; the batch-price link; waiving is one tap for managers.
 - **355 had not arrived** when this was built: the half-gram rounding replaces the calculated price before an
   adjustment, and the adjustment replaces the final total either way.
+
+## Prompt 357 — Batches gets a sortable «Añadido» (date added) column
+
+- **«Añadido» (Date added)** is the batch's own `created_at`, shown as `d M Y, H:i` in the **sede's** timezone
+  (`locations.timezone`, falling back to Europe/Madrid). It's sortable, visible by default, and placed right after
+  *Sede*.
+  - **Why it mattered:** the list has `persistSortInSession()`. Once Ben sorted by *Lote* (`?sort=lote:desc`), that
+    sort stuck, and there was no date header to click back to date order. Nor could anyone see when a batch was
+    entered (what was added today; what was mis-priced on intake, 356).
+  - **Note on the demo data:** it seeds Central and the Store as UTC and North as Europe/Madrid, so batches created in
+    the same second read two hours apart there. That is the per-sede rule working.
+- **«Recibido» (Received)** is `acquired_or_harvested_on`, the date 308's default sort uses. It's sortable and
+  toggleable, hidden by default, since the *Lote* subtitle already says it.
+- **The default sort is unchanged:** newest received first, `COALESCE(acquired_or_harvested_on, created_at) DESC`.
+  It already meets 354's newest-first rule.
+- **A transferred child batch** (277's part transfer) shows its OWN `created_at`: when the transfer created it here.
+  That is the right answer to "added here".
+- **Tests:** `tests/Feature/Stock/BatchDateColumnsTest.php` (4). Two batches were added in the opposite order to
+  their receipt, so the sorts can be told apart.
+  - **Red before:** «Añadido» present with the Madrid time, after *Sede*; sortable both ways, replacing a persisted
+    *Lote* sort; «Recibido» sortable and hidden by default.
+  - **Green before, a pin:** the default sort is still by receipt.
+- **The browser proof** (`tests/Browser/prove-357-batch-dates.mjs`, 1440×900, `/batches?sort=lote:desc`): the column
+  sits after *Sede*, and one click on it replaces the *Lote* sort.
+  - 354's iPhone sweep, re-run on the same DB: still 52/52 (the Batches pin is 48 px; the first column is clear).
+- **The guide:** `manager-guide.md` explains *Date added* / *Received*. `c05` and `c18` were regenerated with their
+  recipes (English accounts, fresh demo DB) so the list shows the new column.
