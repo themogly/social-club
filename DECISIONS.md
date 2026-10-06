@@ -20190,3 +20190,131 @@ branch … don't merge to main"; 359 goes on the same branch, "2 big changes so 
   - each flip is audited;
   - no page errors.
 - **The guide:** `counter-quick-start.md` has a «Half-gram rounding» paragraph.
+
+## Prompt 359 — sealed top-up bags are a reserve the end-of-day count doesn't expect, and «Rellenar» moves them into the jar
+
+**Same branch as 355, NOT merged** (Ben: "this should be done after 355 and merged on to the same branch … 2 big changes
+so needs lots of testing").
+
+### The reserve lives inside the batch, not in ALMACEN and not in transfers
+
+- **The batch holds two figures at its sede:**
+  - `remaining_cg`, the JAR on the counter (unchanged in meaning);
+  - `reserve_cg` (new), its SEALED top-ups off the counter: integer centigrams, ≥ 0, default 0.
+- **Why not the store (`LocationKind::ALMACEN`) and `TransferBatch` (277):** a part transfer always creates a new child
+  batch at the destination and never adds to one already there. Every opened bag would become another batch at the
+  sede, and another line in the evening count: exactly the extra work the club asked to avoid. Hence a second figure
+  inside the batch.
+- **Weight products only.** Unit products (pre-rolls, edibles, vapes) get no reserve in this prompt. The writer refuses
+  a reserve move on a unit batch.
+
+### Who reads which figure
+
+| reads the JAR (`remaining_cg`) only | reads jar + reserve (on the premises) |
+|---|---|
+| dispensing and FEFO allocation (`SelectBatch`, `AllocateFromBatches`) | the legal stock ceiling (`StockCeiling::onSiteCg`) — non-negotiable |
+| the end-of-day reweigh's expected figure (`CommitStockTake::handle`) | stock value and the stock report (`StockReport`: Bote, Reserva, Restante = their total) |
+| the counter's «En stock» and the card's figure | low stock / reorder (`StockCover::onHandCgFor`, the dashboard alerts and the member app's availability) |
+
+### Moving stock between jar and reserve: one total, two movements, one transaction
+
+- **`RESERVE_IN` / `RESERVE_OUT` are moves WITHIN the batch.** Each is a pair of rows through the one stock writer
+  (`RecordStockMovement` with the new `reserve: true` option, which locks the row and never goes negative), one on
+  each figure, netting to zero, so stock and register totals never change. `stock_movements.on_reserve` says which
+  figure a row touched.
+- **The writers:**
+  - **«Rellenar»**: `TopUpFromReserve`, reserve → jar, `RESERVE_OUT`, audited `stock.topped_up`. `null` means «Toda la
+    reserva». It refuses 0, a negative amount, or more than the reserve;
+  - **«Pasar a reserva»**: `MoveToReserve`, jar → reserve, `RESERVE_IN`, audited `stock.reserved`. It refuses more than
+    the jar.
+  - **Who:** anyone with `pos.use`, as the PIN operator (staff do this all day).
+- **Intake:** «De ello, en reserva (sellado)» beside the quantity on *Crear lote*, for a single sede (the strain form's
+  «Crear lote» opens the same page). It's ONE `INTAKE` of the total, then a `RESERVE_IN` pair for the sealed share:
+  500 g with 450 g sealed is jar 50 + reserve 450.
+  - A split intake (303) takes no per-sede reserve field: move bags with «Pasar a reserva» afterwards.
+- **Only a total is ever asked for, never a bag count.**
+
+### At the counter
+
+- **Every strain with a reserve** shows «Reserva: 30.00 g» in its card's meta line and in its weight panel.
+- **«Con reserva»** (beside *Filtros*) is a view-only chip, filtered in the browser like 293's, listing only strains
+  with spare top-ups.
+- **An empty jar with a reserve is not «Sin lote».** It reads «Bote vacío — 30.00 g en reserva · Rellenar», and its card
+  stays tappable so the panel's «Rellenar» is one tap away. FEFO still never draws from the reserve (tested).
+- **«Bote bajo, hay reserva»** shows when the JAR alone is low by 216's cover verdict and a reserve exists: a prompt to
+  top up, not to reorder. Reordering is judged on jar + reserve.
+- **The weight panel's controls:**
+  - «Rellenar» moves the grams typed on the pad;
+  - «Toda la reserva» moves the whole reserve;
+  - «Pasar a reserva» moves the typed grams the other way.
+  - «Rellenar» draws from the strain's OLDEST batch that has a reserve (FEFO's order); «Pasar a reserva» from the FEFO
+    jar batch. When several batches of one strain hold reserves, Rellenar empties the oldest first; the panel's
+    «Rellenar desde reserva» row action reaches any one batch.
+
+### The end-of-day count: no more work than today
+
+- **The reweigh screen is unchanged:** one line per batch, blind, the same fields, no bag questions (tested on the view
+  source and in the browser).
+- **Its expected figure is the jar,** so a correct count of a jar reconciles to zero whatever is sealed in the back.
+  The prompt's before-state was a −450 g adjustment for 450 g of bags.
+- **The reweigh lists batches that were touched,** `remaining_cg + reserve_cg <> initial_cg` (it was `remaining_cg <>
+  initial_cg`). A batch whose bags merely sit there, or one that was only topped up, adds no line.
+- **A forgotten «Rellenar» is absorbed.** A jar counted OVER, while its batch has a reserve, absorbs the surplus up to
+  the reserve as an unrecorded top-up: a `RESERVE_OUT` pair (reason «Rellenado sin registrar»), audited
+  `stock.topped_up_unrecorded`, with no stock created. Only a surplus beyond the reserve becomes an ADJUSTMENT. The
+  line stores `unrecorded_topup_cg`.
+- **The manager sees it, staff are never asked:**
+  - «Rellenado sin registrar: 10.00 g» on the close summary;
+  - on the Z report (`unrecorded_topup_cg`: the session's sede, stock takes opened during the session);
+  - on the panel's till-session page.
+- **A jar counted UNDER is a real shortfall,** as before. The reserve is never touched to cover it (tested).
+
+### The full inventory counts the reserve
+
+- **Inventario (318)** gives each batch with a reserve its OWN line, «Reserva sellada» (`stock_take_lines.reserve`),
+  counted as one total against `reserve_cg`. Its variance is an ADJUSTMENT on the reserve only (tested). This, not the
+  daily close, is where sealed stock is verified.
+
+### Also
+
+- **Panel:**
+  - the Batches list gets a toggleable «Reserva» column;
+  - the row ⋮ gets «Pasar a reserva» and «Rellenar desde reserva» after *Recuento* (340's order pin updated);
+  - the edit page leaves `reserve_cg` out of the form fill, like the other weight columns.
+- **Guides:** `counter-quick-start.md` has a «Sealed top-ups (reserve)» paragraph, and `manager-guide.md` has the
+  intake field, the row actions and the inventory's «Sealed reserve» line.
+
+### Tests and proof
+
+- **`tests/Feature/Stock/SealedReserveTest.php`** (11, all red before; most could not run without the column). It
+  covers:
+  - the count leaves 450 g of bags alone;
+  - Rellenar: two movements and the audit, «Toda la reserva», and refusals for 0, negative and more than the reserve;
+  - Pasar a reserva, and its refusal;
+  - an empty jar shows «Bote vacío … Rellenar», FEFO ignores the reserve, and the counter's Rellenar works;
+  - a low jar with a reserve shows the hint and on-hand reads jar + reserve;
+  - a forgotten Rellenar: counted 15 g against 5 g + 10 g reserve is absorbed with no adjustment; counted 20 g is 10 g
+    absorbed + 5 g adjusted; the Z report shows it;
+  - a shortfall is untouched;
+  - the ceiling includes the reserve;
+  - the intake split is one INTAKE;
+  - the full inventory's reserve line adjusts only the reserve;
+  - the reweigh: no bag fields, and no lines for untouched or merely topped-up reserves.
+- **The browser proof** (`tests/Browser/prove-359-reserve.mjs`, a fresh demo DB plus two reserve strains, 820×1180)
+  passed 8/8:
+  - «Reserva: 30.00 g»;
+  - «Con reserva» lists just the two;
+  - the empty jar says «Bote vacío … Rellenar» and can be tapped;
+  - the panel offers Rellenar and Toda la reserva, and Toda la reserva moved 30 g;
+  - the manager's close: the reweigh asks nothing about bags; a jar counted 10 g over gives «Rellenado sin registrar:
+    10.00 g», with the jar and reserve correct and no ADJUSTMENT;
+  - no page errors.
+- **Screenshots:** `storage/app/screenshots/359/`.
+- **Tested together** (`tests/Feature/Stock/RoundingAndReserveTogetherTest.php`), a day with 355's rounding on and a
+  sealed reserve:
+  - 1.10 g charged €10 while the jar falls by exactly 1.10 g and the reserve is untouched;
+  - a 5 g top-up, then 3.40 g charged as the eighth (€32);
+  - the ceiling sees jar + bags;
+  - jar + reserve equals the intake less exactly what was weighed out;
+  - the evening count of the jar reconciles to zero with no adjustment.
+- **`FormCompletenessTest`'s allowlist documents `reserve_cg`:** it is system-computed, like `remaining_cg`.

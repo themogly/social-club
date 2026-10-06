@@ -698,7 +698,9 @@ class TillSession extends Component
         return Batch::query()->withoutGlobalScopes()
             ->where('location_id', $this->locationId)
             ->where('status', BatchStatus::OPEN->value)
-            ->whereColumn('remaining_cg', '<>', 'initial_cg')
+            // Touched today, counting the sealed reserve as untouched stock (359): a batch whose bags merely sit in the back
+            // is not added to the evening's count — no new end-of-day work.
+            ->whereRaw('remaining_cg + reserve_cg <> initial_cg')
             ->whereHas('genetic', fn ($q) => $q->where('unit_type', UnitType::WEIGHT->value))
             ->with('genetic')
             ->get()
@@ -841,6 +843,8 @@ class TillSession extends Component
                 'variance' => Weight::fromCentigrams($variance)->formatted(),
                 'adjusted' => $variance !== 0,
                 'not_counted' => false, 'reason' => null, 'repeated' => false,
+                // Prompt 359 — a bag opened into the jar without «Rellenar», absorbed by the count (said, never asked).
+                'unrecorded_topup' => self::topUpLabel($line),
             ];
         })->all();
 
@@ -850,6 +854,14 @@ class TillSession extends Component
         $this->reweighNotCounted = [];
         $this->reweighReasons = [];
         $this->flash(__('Recuento de flor registrado.'), 'success');
+    }
+
+    /** Prompt 359 — «Rellenado sin registrar: …» for a line whose count absorbed a forgotten top-up, else null. */
+    private static function topUpLabel(?StockTakeLine $line): ?string
+    {
+        $absorbed = $line === null ? 0 : (int) $line->getRawOriginal('unrecorded_topup_cg');
+
+        return $absorbed > 0 ? Weight::fromCentigrams($absorbed)->formatted() : null;
     }
 
     /** Toggle a batch between "counted" (needs a weight) and "not counted" (needs a reason) — prompt 91. */

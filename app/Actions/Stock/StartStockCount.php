@@ -44,11 +44,16 @@ class StartStockCount
                 'status' => StockTakeStatus::OPEN,
             ]);
 
-            $batches = Batch::query()->withoutGlobalScopes()
+            $base = fn () => Batch::query()->withoutGlobalScopes()
                 ->where('batches.organisation_id', $location->organisation_id)->where('batches.location_id', $location->id)
-                ->whereNull('batches.deleted_at')->inStock()->pluck('id');
-            foreach ($batches as $id) {
+                ->whereNull('batches.deleted_at');
+            foreach ($base()->inStock()->pluck('id') as $id) {
                 $take->lines()->create(['countable_type' => Batch::class, 'countable_id' => $id]);
+            }
+            // Prompt 359 — the full inventory is where sealed stock is actually verified: each batch's reserve is its OWN
+            // line («Reserva sellada»), counted as one total, its variance adjusting only the reserve.
+            foreach ($base()->where('batches.reserve_cg', '>', 0)->pluck('id') as $id) {
+                $take->lines()->create(['countable_type' => Batch::class, 'countable_id' => $id, 'reserve' => true]);
             }
 
             if (! $location->isStore()) {

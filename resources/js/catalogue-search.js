@@ -26,6 +26,7 @@ export function catalogueShows(item, state) {
     if (item.source === 'genetics') {
         if ((state.productType ?? null) !== null && (item.type ?? '') !== state.productType) return false;
         if ((state.strainType ?? null) !== null && (item.strain ?? '') !== state.strainType) return false;
+        if (state.reserveOnly && !(Number(item.reserve ?? 0) > 0)) return false; // prompt 359 — «Con reserva»
     }
     return catalogueMatches(state.search?.[item.source] ?? '', item.search ?? []);
 }

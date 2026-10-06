@@ -87,6 +87,10 @@ class BatchesTable
                 // says it, so hidden until switched on.
                 TextColumn::make('acquired_or_harvested_on')->label(__('Recibido'))->date()->sortable()->placeholder('—')
                     ->toggleable(isToggledHiddenByDefault: true),
+                // Prompt 359 — sealed top-ups of this batch at its sede, off the counter (Restante is the jar).
+                TextColumn::make('reserve_cg')->label(__('Reserva'))
+                    ->state(fn (Batch $record): ?string => $record->reserve_cg->centigrams > 0 ? $record->reserve_cg->formatted() : null)
+                    ->placeholder('—')->toggleable(),
                 TextColumn::make('remaining')
                     ->label(__('Restante'))
                     ->state(function (Batch $record): string {
@@ -152,6 +156,8 @@ class BatchesTable
                     // Prompt 305 — the same lote at more locations, beside the *Trasladar* button.
                     BatchActions::addParts(),
                     BatchActions::recount(), // prompt 305 — set the part to what the scale says (beside Ajuste)
+                    BatchActions::toReserve(), // prompt 359 — jar → sealed bags
+                    BatchActions::topUp(), // prompt 359 — sealed bags → jar
                     EditAction::make(),
                     self::adjustAction(),
                     self::mermaAction(),

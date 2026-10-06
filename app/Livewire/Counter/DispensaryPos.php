@@ -12,9 +12,12 @@ use App\Actions\Pricing\ResolveArticleDiscount;
 use App\Actions\Pricing\ResolvePrice;
 use App\Actions\ResolveLocale;
 use App\Actions\Stock\AllocateFromBatches;
+use App\Actions\Stock\MoveToReserve;
 use App\Actions\Stock\SelectBatch;
+use App\Actions\Stock\TopUpFromReserve;
 use App\Actions\Till\SelectTillSession;
 use App\Actions\Wallet\RecordWalletTransaction;
+use App\Enums\BatchStatus;
 use App\Enums\DispensationStatus;
 use App\Enums\ProductType;
 use App\Enums\TillSessionStatus;
@@ -483,6 +486,63 @@ class DispensaryPos extends Component
         $this->reset(['activeGeneticId', 'activeBatchId', 'weightInput', 'calculatorMode', 'unitQty', 'editingLine']);
         // Prompt 358 — a mis-tap must not lose the operator's place: the browser puts the list back where it was.
         $this->dispatch('weight-entry-cancelled');
+    }
+
+    /** Prompt 359 — the active strain's sealed reserve at this sede (centigrams). */
+    public function activeGeneticReserveCg(): int
+    {
+        $location = $this->resolveLocation();
+        $genetic = $this->activeGeneticId !== null ? Genetic::query()->find($this->activeGeneticId) : null;
+
+        return $location !== null && $genetic !== null ? (StockCover::reserveFor([$genetic], $location->id)[$genetic->id] ?? 0) : 0;
+    }
+
+    /**
+     * Prompt 359 — «Rellenar»: a sealed bag of the active strain opened into the jar. `$grams` from the pad (null = «Toda la
+     * reserva»), from the OLDEST batch that has a reserve at this sede (FEFO's order). The pad stays open: the next tap is
+     * usually the weighing.
+     */
+    public function topUpJar(?string $grams): void
+    {
+        $this->moveReserve($grams, toJar: true);
+    }
+
+    /** Prompt 359 — «Pasar a reserva»: grams typed on the pad move from the jar (the FEFO batch) into sealed bags. */
+    public function moveToReserve(string $grams): void
+    {
+        $this->moveReserve($grams, toJar: false);
+    }
+
+    private function moveReserve(?string $grams, bool $toJar): void
+    {
+        $operator = $this->counterActor();
+        $location = $this->resolveLocation();
+        $genetic = $this->activeGeneticId !== null ? Genetic::query()->find($this->activeGeneticId) : null;
+        if ($operator === null || $location === null || $genetic === null || $genetic->isUnitType()) {
+            return;
+        }
+
+        $cg = $grams === null ? null : (Weight::canonicalGrams($grams) !== null ? Weight::fromGrams($grams)->centigrams : -1);
+        $batch = $toJar
+            ? Batch::query()->where('genetic_id', $genetic->id)->where('location_id', $location->id)->where('status', BatchStatus::OPEN->value)
+                ->where('reserve_cg', '>', 0)->orderBy('expires_on')->orderBy('acquired_or_harvested_on')->orderBy('id')->first()
+            : (new SelectBatch)->fefo($genetic, $location);
+        if ($batch === null || (! $toJar && $cg === null)) {
+            $this->flash($toJar ? __('No hay reserva de esta genética.') : __('No hay nada en el bote.'), 'error');
+
+            return;
+        }
+
+        try {
+            $toJar ? (new TopUpFromReserve)->handle($batch, $cg, $operator) : (new MoveToReserve)->handle($batch, (int) $cg, $operator);
+        } catch (RuntimeException|AuthorizationException $e) {
+            $this->flash($e->getMessage(), 'error');
+
+            return;
+        }
+
+        $this->weightInput = '';
+        $this->flash($toJar ? __('Bote rellenado desde la reserva.') : __('Pasado a reserva.'), 'success');
     }
 
     /** Prompt 355 — half-gram rounding of the CHARGED weight, as this person has it at this sede (server session). */
@@ -1728,6 +1788,7 @@ class DispensaryPos extends Component
                 'categories' => $this->deriveCategories($genetics),
                 'productTypes' => $this->deriveProductTypes($genetics),
                 'strainTypes' => $this->deriveStrainTypes($genetics),
+                'hasReserve' => collect($genetics)->contains(fn (array $row): bool => $row['reserve_cg'] > 0), // prompt 359
                 'articleCategories' => $this->deriveArticleCategories($articles),
             ],
             'genetics' => [
@@ -2275,6 +2336,7 @@ class DispensaryPos extends Component
         // Prompt 273 — the stock for the whole grid in ONE grouped query too; it was two or three per card (remaining,
         // and a FEFO lookup just to answer "has a lote"). 11 varieties cost 119 queries per render, on every key press.
         $stock = StockCover::stockFor($genetics->values()->all(), $location->id);
+        $reserves = StockCover::reserveFor($genetics->values()->all(), $location->id); // prompt 359 — sealed top-ups
         // …and each card's price/photo batch (278) in two queries, not one FEFO lookup per card.
         $resolver->preloadDisplayBatches($genetics, $location);
 
@@ -2290,6 +2352,7 @@ class DispensaryPos extends Component
             $isUnit = $genetic->isUnitType();
             $remainingUnits = $isUnit ? $stock[$genetic->id]['units'] : null;
             $remainingCg = $isUnit ? ($remainingUnits ?? 0) * (int) $genetic->grams_per_unit_cg : $stock[$genetic->id]['cg'];
+            $reserveCg = $isUnit ? 0 : ($reserves[$genetic->id] ?? 0);
 
             $rows[] = [
                 'id' => $genetic->id,
@@ -2314,11 +2377,16 @@ class DispensaryPos extends Component
                 'remaining_cg' => $remainingCg,
                 'remaining_units' => $remainingUnits,
                 // The one resolver, handed the bulk figures — never a second calculation on the screen.
+                // Prompt 359 — low stock reads the jar AND the sealed reserve (a full reserve is not a reorder)…
                 'cover' => $cover = StockCover::verdictWith(
-                    $genetic, $location->id, $remainingCg,
+                    $genetic, $location->id, $remainingCg + $reserveCg,
                     $trailingCg[$genetic->id] ?? 0,
                     $firstDispensed[$genetic->id] ?? null,
                 ),
+                // …and «Bote bajo, hay reserva» is the JAR's own verdict while a reserve exists: a prompt to top up.
+                'reserve_cg' => $reserveCg,
+                'jar_low' => $reserveCg > 0 && $remainingCg > 0 && StockCover::verdictWith($genetic, $location->id, $remainingCg,
+                    $trailingCg[$genetic->id] ?? 0, $firstDispensed[$genetic->id] ?? null)['low'],
                 'low_stock' => $cover['low'],
                 // Staff screens may carry quantities; the member menu may not (185). "Runs out in about two
                 // days at the current rate" is information — the word "low" is not.

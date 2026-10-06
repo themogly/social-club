@@ -339,6 +339,9 @@
                                         @else
                                             {{ $line['counted'] }} <span class="text-success">{{ __('sin diferencia') }}</span>
                                         @endif
+                                        @if ($line['unrecorded_topup'] ?? null)
+                                            <span class="block text-xs font-normal text-ink-muted dark:text-slate-400" data-unrecorded-topup>{{ __('Rellenado sin registrar: :grams', ['grams' => $line['unrecorded_topup']]) }}</span>
+                                        @endif
                                     </span>
                                 </li>
                             @endforeach

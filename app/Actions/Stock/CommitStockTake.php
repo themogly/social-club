@@ -54,12 +54,28 @@ class CommitStockTake
 
                 if ($count['type'] === 'batch') {
                     $batch = Batch::withoutGlobalScopes()->findOrFail($count['id']);
+                    // Prompt 359 — the JAR is what was weighed, so the jar is what is expected: the sealed bags in the back
+                    // are never a "shortfall" to adjust out of stock.
                     $expected = $batch->remaining_cg->centigrams;
                     $variance = $counted - $expected;
+
+                    // A forgotten «Rellenar»: a bag opened into the jar with nobody tapping it. The jar counts OVER while the
+                    // reserve still holds the bag — absorb the surplus, up to the reserve, as the top-up it was (no stock is
+                    // created); only what is beyond the reserve is an adjustment. A jar counted UNDER is a real shortfall,
+                    // and the reserve is never touched to cover it. Flagged for the manager, never asked of staff.
+                    $absorbed = $variance > 0 ? min($variance, $batch->reserve_cg->centigrams) : 0;
+                    if ($absorbed > 0) {
+                        $options = ['stock_take_id' => $stockTake->id, 'reason' => 'Rellenado sin registrar', 'operator_id' => $committer->id];
+                        $recorder->handle($batch, StockMovementType::RESERVE_OUT, -$absorbed, $options + ['reserve' => true]);
+                        $recorder->handle($batch, StockMovementType::RESERVE_OUT, $absorbed, $options);
+                        (new RecordAuditLog)->handle('stock.topped_up_unrecorded', $batch, null, ['cg' => $absorbed, 'stock_take_id' => $stockTake->id]);
+                    }
+                    $variance -= $absorbed;
 
                     $stockTake->lines()->create([
                         'countable_type' => Batch::class, 'countable_id' => $batch->id,
                         'counted_cg' => $counted, 'expected_cg' => $expected, 'variance_cg' => $variance,
+                        'unrecorded_topup_cg' => $absorbed > 0 ? $absorbed : null,
                     ]);
 
                     if ($variance !== 0) {
@@ -156,6 +172,7 @@ class CommitStockTake
                 $item = $line->countable;
                 $label = $line->adjustment_reason?->label();
                 $recorder->handle($item, StockMovementType::ADJUSTMENT, $difference, [
+                    'reserve' => (bool) $line->reserve, // prompt 359 — «Reserva sellada» adjusts the reserve only
                     'stock_take_id' => $take->id, 'operator_id' => $committer->id, 'actor' => $committer,
                     'reason' => trim(__('Inventario').($label !== null ? ' — '.$label : '').($line->adjustment_note ? ': '.$line->adjustment_note : '')),
                 ]);

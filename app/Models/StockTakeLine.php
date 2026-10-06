@@ -23,7 +23,7 @@ class StockTakeLine extends Model
     use HasFactory, HasUlids;
 
     protected $fillable = [
-        'stock_take_id', 'countable_type', 'countable_id',
+        'stock_take_id', 'countable_type', 'countable_id', 'reserve', 'unrecorded_topup_cg',
         'counted_cg', 'counted_units', 'expected_cg', 'expected_units', 'variance_cg', 'variance_units',
         'not_counted', 'not_counted_reason',
         'counted_by', 'counted_at', 'adjustment_reason', 'adjustment_note', // prompt 318
@@ -39,6 +39,8 @@ class StockTakeLine extends Model
             'variance_cg' => WeightCast::class,
             'variance_units' => 'integer',
             'not_counted' => 'boolean',
+            'reserve' => 'boolean', // prompt 359 — the batch's «Reserva sellada», counted on its own (full inventory)
+            'unrecorded_topup_cg' => WeightCast::class, // prompt 359 — a forgotten «Rellenar» the close count absorbed
             'counted_at' => 'datetime',
             'adjustment_reason' => StockCountReason::class,
         ];

@@ -5,6 +5,7 @@ namespace App\Filament\Resources\TillSessions\Schemas;
 use App\Enums\TillSessionStatus;
 use App\Models\TillSession;
 use App\Support\Money;
+use App\Support\Weight;
 use App\Support\ZReport;
 use Filament\Infolists\Components\TextEntry;
 use Filament\Schemas\Components\Section;
@@ -59,6 +60,10 @@ class TillSessionInfolist
                         self::money('banked', __('Ingresado en banco')),
                         self::money('petty_cash', __('Caja chica')),
                         self::money('rounding', __('Redondeo (incluido en la dispensación)')), // prompt 350
+                        // Prompt 359 — for the manager: bags opened into a jar with no «Rellenar», absorbed by the close count.
+                        TextEntry::make('unrecorded_topup_cg')->label(__('Rellenado sin registrar'))
+                            ->state(fn (TillSession $record): string => Weight::fromCentigrams((int) (self::report($record)['unrecorded_topup_cg'] ?? 0))->formatted())
+                            ->visible(fn (TillSession $record): bool => (int) (self::report($record)['unrecorded_topup_cg'] ?? 0) > 0),
                         // Prompt 265 — what each petty-cash expense was for, from the same breakdown the counter uses.
                         TextEntry::make('petty_cash_items')
                             ->label(__('Detalle de caja chica'))

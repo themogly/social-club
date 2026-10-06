@@ -112,7 +112,8 @@ class BatchPriceOnThePageTest extends TestCase
         preg_match_all('/(BatchActions::\w+(?=\(\))|self::\w+Action|EditAction)/', $group[1] ?? '', $items);
         // Prompt 354 — *Trasladar* joined the ⋮ (second, after Precio), and Editar moved above the heavy ones, which stay
         // last (344: destructive last).
-        $this->assertSame(['BatchActions::price', 'BatchActions::transfer', 'BatchActions::addParts', 'BatchActions::recount', 'EditAction', 'self::adjustAction', 'self::mermaAction', 'self::recallAction'], $items[1]);
+        // Prompt 359 — «Pasar a reserva» and «Rellenar desde reserva» after the count.
+        $this->assertSame(['BatchActions::price', 'BatchActions::transfer', 'BatchActions::addParts', 'BatchActions::recount', 'BatchActions::toReserve', 'BatchActions::topUp', 'EditAction', 'self::adjustAction', 'self::mermaAction', 'self::recallAction'], $items[1]);
     }
 
     // --- 4 (structure) + 5. The header, and what stays locked ------------------------------------------------------------------

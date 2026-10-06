@@ -77,7 +77,7 @@ A batch is a delivery or harvest of one strain: how much arrived, where it is, w
 2. **Locations:** tick every place the stock is going, including the store (*Almacén*).
 3. **Product type**, then **Genetic** (the strain). The strain list only shows strains of that type.
 4. **Name** (optional, for example *"October harvest"*) and **Own batch number** if the grower or supplier has one. Leave it empty and the system makes one.
-5. **Total quantity**, then the grams for each location. **Split equally** divides the total for you.
+5. **Total quantity**, then the grams for each location. **Split equally** divides the total for you. For a single location, **Of which in reserve (sealed)** records how much of it arrives in sealed top-up bags: 500 g with 450 g sealed puts 50 g in the jar and 450 g in the reserve. The **Reserve** column on the Batches list shows it, and each row's ⋮ has **Move to reserve** and **Top up from reserve**.
 6. **Cost per gram** (what the club paid), **Price per gram** (what members pay) and, optionally, the **Eighth price — 3.5 g**.
 7. Dates, laboratory report and photos if you have them. Then **Create**.
 
@@ -179,6 +179,8 @@ A full count of everything at one location: every batch with stock and every pro
 3. Mark anything you cannot count as **Not counted**, with a reason.
 4. **Review** shows only the differences, in grams and €. Big ones need a reason.
 5. **Apply adjustments** posts every correction in one go and produces a printable report.
+
+**Sealed reserve:** a batch with sealed top-up bags gets a second line, **Sealed reserve**: weigh the bags together and type the total. A difference there corrects only the reserve. (The evening flower count at the counter weighs only the jar, so sealed bags are checked here.) If a till's closing count found a jar heavier than expected while that batch had a reserve, the till report shows **Unrecorded top-up**: someone opened a bag without tapping **Top up**. The stock is already correct; it is worth a word with the staff.
 
 ![Stock count: start a New stock count for a location.](img/manager-guide/c14.jpg)
 

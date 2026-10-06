@@ -64,7 +64,8 @@ class RecordStockCountLine
                 if (TypedNumber::canonical($typed) === null) {
                     throw new DomainException(__('Escribe los gramos sin separador de miles y con dos decimales como máximo (p. ej. 1000 o 3.5).'));
                 }
-                $counted = ['counted_cg' => Weight::fromGrams($typed)->centigrams, 'expected_cg' => $item->remaining_cg->centigrams,
+                $counted = ['counted_cg' => Weight::fromGrams($typed)->centigrams,
+                    'expected_cg' => $line->reserve ? $item->reserve_cg->centigrams : $item->remaining_cg->centigrams, // 359
                     'counted_units' => null, 'expected_units' => null];
             }
 

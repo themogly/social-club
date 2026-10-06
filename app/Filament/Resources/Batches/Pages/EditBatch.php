@@ -58,7 +58,7 @@ class EditBatch extends EditRecord
      */
     protected function mutateFormDataBeforeFill(array $data): array
     {
-        unset($data['initial_cg'], $data['remaining_cg']);
+        unset($data['initial_cg'], $data['remaining_cg'], $data['reserve_cg']); // prompt 359 — the reserve too
 
         return $data;
     }

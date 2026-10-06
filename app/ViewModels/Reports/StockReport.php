@@ -66,7 +66,7 @@ class StockReport extends AbstractReport
             ->whereIn('location_id', $this->resolvedLocationIds())
             ->where('status', BatchStatus::OPEN->value)
             ->whereNull('deleted_at')
-            ->get(['id', 'batch_no', 'label', 'genetic_id', 'remaining_cg', 'remaining_units', 'cost_per_gram_cents', 'expires_on']);
+            ->get(['id', 'batch_no', 'label', 'genetic_id', 'remaining_cg', 'reserve_cg', 'remaining_units', 'cost_per_gram_cents', 'expires_on']);
 
         $genetics = DB::table('genetics')
             ->whereIn('id', $batches->pluck('genetic_id')->unique()->all())
@@ -80,9 +80,12 @@ class StockReport extends AbstractReport
         $rows = $batches->map(function (\stdClass $b) use ($genetics, $dispensed): array {
             $g = $genetics[$b->genetic_id] ?? null;
             // Restante is the gram-equivalent for both kinds (UNIT: remaining_units × grams_per_unit_cg).
-            $remaining = ($g !== null && $g->unit_type === 'UNIT')
+            // Prompt 359 — the jar and the sealed reserve, and their total (what is on the premises, and what is valued).
+            $jar = ($g !== null && $g->unit_type === 'UNIT')
                 ? (int) $b->remaining_units * (int) ($g->grams_per_unit_cg ?? 0)
                 : (int) $b->remaining_cg;
+            $reserve = ($g !== null && $g->unit_type === 'UNIT') ? 0 : (int) $b->reserve_cg;
+            $remaining = $jar + $reserve;
             $rate = (int) $b->cost_per_gram_cents;
             $value = intdiv($remaining * $rate, 100);
             $this->valueCents += $value;
@@ -93,6 +96,8 @@ class StockReport extends AbstractReport
                 'nombre' => $b->label !== null ? (string) $b->label : '—', // the club's own name (prompt 282)
                 'genetica' => (string) ($g->name ?? __('Sin genética')),
                 'tipo' => $g !== null ? (ProductType::tryFrom((string) $g->product_type)?->label() ?? '—') : '—',
+                'bote' => $jar,
+                'reserva' => $reserve,
                 'restante' => $remaining,
                 'coste_g' => $rate,
                 'valor' => $value,
@@ -109,6 +114,8 @@ class StockReport extends AbstractReport
                 ReportColumn::text('nombre', __('Nombre')),
                 ReportColumn::text('genetica', __('Genética')),
                 ReportColumn::text('tipo', __('Tipo')),
+                ReportColumn::weight('bote', __('Bote')),
+                ReportColumn::weight('reserva', __('Reserva')),
                 ReportColumn::weight('restante', __('Restante')),
                 ReportColumn::money('coste_g', __('Coste/g'), total: false),
                 ReportColumn::money('valor', __('Valor')),
@@ -117,6 +124,8 @@ class StockReport extends AbstractReport
             ],
             rows: $rows,
             totals: [
+                'bote' => array_sum(array_column($rows, 'bote')),
+                'reserva' => array_sum(array_column($rows, 'reserva')),
                 'restante' => $this->onHandCg,
                 'valor' => $this->valueCents,
                 'dispensado' => array_sum(array_column($rows, 'dispensado')),

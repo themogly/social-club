@@ -106,7 +106,8 @@ class StockCeiling
             ->join('genetics', 'batches.genetic_id', '=', 'genetics.id')
             ->whereNull('batches.deleted_at') // a soft-deleted batch is not on-site (prompt 107)
             ->whereIn('batches.location_id', $locationIds)
-            ->selectRaw("COALESCE(SUM(CASE WHEN genetics.unit_type = 'UNIT' THEN batches.remaining_units * genetics.grams_per_unit_cg ELSE batches.remaining_cg END), 0) as cg")
+            // Prompt 359 — sealed top-up bags on the premises ARE stock on the premises: the jar plus the reserve.
+            ->selectRaw("COALESCE(SUM(CASE WHEN genetics.unit_type = 'UNIT' THEN batches.remaining_units * genetics.grams_per_unit_cg ELSE batches.remaining_cg + batches.reserve_cg END), 0) as cg")
             ->value('cg');
     }
 }

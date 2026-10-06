@@ -8,6 +8,7 @@ use App\Enums\OrderStatus;
 use App\Enums\TillSessionStatus;
 use App\Models\Dispensation;
 use App\Models\Order;
+use App\Models\StockTakeLine;
 use App\Models\TillSession;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
@@ -93,6 +94,11 @@ class ZReport
                 'post_close_adjusted' => $postCloseAdjusted,
                 'transaction_count' => ($dispCounts[$id]['total'] ?? 0) + ($orderCounts[$id]['total'] ?? 0),
                 'rounding' => $rounding[$id] ?? 0,
+                // Prompt 359 — sealed top-ups opened into a jar without «Rellenar», absorbed by this session's close count.
+                'unrecorded_topup_cg' => (int) StockTakeLine::query()
+                    ->whereHas('stockTake', fn ($q) => $q->withoutGlobalScopes()->where('location_id', $session->location_id)
+                        ->where('opened_at', '>=', $session->opened_at)->where('opened_at', '<=', $session->closed_at ?? now()))
+                    ->sum('unrecorded_topup_cg'),
                 'voids' => ($dispCounts[$id]['voided'] ?? 0) + ($orderCounts[$id]['voided'] ?? 0),
                 'opened_at' => $session->opened_at,
                 'closed_at' => $session->closed_at,

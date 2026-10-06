@@ -2,6 +2,7 @@
 
 namespace App\Support;
 
+use App\Enums\BatchStatus;
 use App\Enums\DispensationStatus;
 use App\Models\Batch;
 use App\Models\DispensationLine;
@@ -155,15 +156,40 @@ class StockCover
     public static function onHandCgFor(array $genetics, string $locationId): array
     {
         $stock = self::stockFor($genetics, $locationId);
+        $reserve = self::reserveFor($genetics, $locationId);
         $onHand = [];
 
         foreach ($genetics as $genetic) {
+            // Prompt 359 — low stock / reorder reads what is on the premises: the jar AND the sealed reserve, so a full
+            // reserve never triggers a reorder (the counter separately says «Bote bajo, hay reserva»: top up, don't reorder).
             $onHand[$genetic->id] = $genetic->isUnitType()
                 ? $stock[$genetic->id]['units'] * (int) $genetic->grams_per_unit_cg
-                : $stock[$genetic->id]['cg'];
+                : $stock[$genetic->id]['cg'] + ($reserve[$genetic->id] ?? 0);
         }
 
         return $onHand;
+    }
+
+    /**
+     * Prompt 359 — the sealed reserve per genetic at a sede (open, not deleted batches), in one grouped query. Weight
+     * products only; a genetic with none is absent.
+     *
+     * @param  list<Genetic>  $genetics
+     * @return array<string, int>
+     */
+    public static function reserveFor(array $genetics, string $locationId): array
+    {
+        if ($genetics === []) {
+            return [];
+        }
+
+        return Batch::query()->withoutGlobalScopes()
+            ->whereIn('genetic_id', array_map(fn (Genetic $genetic): string => $genetic->id, $genetics))
+            ->where('location_id', $locationId)->whereNull('deleted_at')
+            ->where('status', BatchStatus::OPEN->value)->where('reserve_cg', '>', 0)
+            ->groupBy('genetic_id')
+            ->selectRaw('genetic_id, SUM(reserve_cg) AS cg')
+            ->toBase()->get()->mapWithKeys(fn ($row): array => [(string) $row->genetic_id => (int) $row->cg])->all();
     }
 
     /**

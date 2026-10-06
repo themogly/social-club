@@ -26,7 +26,7 @@ class StockMovement extends Model
 
     protected $fillable = [
         'organisation_id', 'location_id', 'stockable_type', 'stockable_id',
-        'qty_cg', 'qty_units', 'type', 'reason', 'operator_id', 'reference', 'stock_take_id',
+        'qty_cg', 'qty_units', 'on_reserve', 'type', 'reason', 'operator_id', 'reference', 'stock_take_id',
     ];
 
     protected function casts(): array
@@ -34,6 +34,7 @@ class StockMovement extends Model
         return [
             'qty_cg' => WeightCast::class,
             'qty_units' => 'integer',
+            'on_reserve' => 'boolean', // prompt 359 — the batch's sealed reserve, not its jar
             'type' => StockMovementType::class,
         ];
     }
