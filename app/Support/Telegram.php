@@ -2,8 +2,12 @@
 
 namespace App\Support;
 
+use App\Exceptions\TelegramTokenRejectedException;
+use Carbon\CarbonInterface;
 use GuzzleHttp\Psr7\Response as Psr7Response;
 use Illuminate\Http\Client\Response;
+use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 
 /**
@@ -13,6 +17,12 @@ use Illuminate\Support\Facades\Http;
  */
 final class Telegram
 {
+    /** Prompt 363 — when Telegram last rejected the bot token (cache, forever until a good send clears it). */
+    private const REJECTED = 'telegram.token_rejected_at';
+
+    /** One Sentry report an hour while the token stays rejected, not one per message. */
+    private const REPORTED = 'telegram.token_rejected_reported';
+
     public static function configured(): bool
     {
         return filled(config('services.telegram.token')) && filled(config('services.telegram.username'));
@@ -27,6 +37,40 @@ final class Telegram
 
         return Http::asJson()->timeout(10)
             ->post(self::endpoint('sendMessage'), ['chat_id' => $chatId, 'text' => $text, 'disable_web_page_preview' => true]);
+    }
+
+    /** Prompt 363 — the token's real check: who the bot is (`telegram:check`, and before `telegram:set-webhook`). */
+    public static function getMe(): Response
+    {
+        return Http::timeout(10)->get(self::endpoint('getMe'));
+    }
+
+    /** 401 (wrong or revoked token) and 404 (a malformed one) are configuration, never a passing outage. */
+    public static function rejectsToken(int $status): bool
+    {
+        return $status === 401 || $status === 404;
+    }
+
+    /** Flag the token as rejected for Salud del sistema, and tell Sentry — at most once an hour. */
+    public static function markTokenRejected(int $status): void
+    {
+        Cache::forever(self::REJECTED, now()->timestamp);
+        if (Cache::add(self::REPORTED, true, now()->addHour())) {
+            report(new TelegramTokenRejectedException($status));
+        }
+    }
+
+    public static function clearTokenRejected(): void
+    {
+        Cache::forget(self::REJECTED);
+        Cache::forget(self::REPORTED);
+    }
+
+    public static function tokenRejectedAt(): ?CarbonInterface
+    {
+        $at = Cache::get(self::REJECTED);
+
+        return is_int($at) ? Carbon::createFromTimestamp($at) : null;
     }
 
     public static function setWebhook(string $url): Response

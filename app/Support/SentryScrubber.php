@@ -2,6 +2,7 @@
 
 namespace App\Support;
 
+use Sentry\Breadcrumb;
 use Sentry\Event;
 use Sentry\EventHint;
 
@@ -41,8 +42,23 @@ class SentryScrubber
 
     private const REDACTED = '[redacted]';
 
+    /**
+     * Prompt 363 — a Telegram Bot API URL carries the bot TOKEN in its path (`/bot<token>/sendMessage`). It reaches Sentry
+     * in an outgoing-request breadcrumb, or inside a cURL error message. Matched by shape, not by value.
+     */
+    private const TELEGRAM_TOKEN = '#/bot\d+:[A-Za-z0-9_-]+#';
+
     public static function handle(Event $event, ?EventHint $hint = null): ?Event
     {
+        // Prompt 363 — the bot token, wherever a message or an exception value quotes a Telegram URL.
+        foreach ($event->getExceptions() as $exception) {
+            $exception->setValue(self::scrubTelegram($exception->getValue()));
+        }
+        if ($event->getMessage() !== null) {
+            $event->setMessage(self::scrubTelegram($event->getMessage()), $event->getMessageParams(),
+                $event->getMessageFormatted() !== null ? self::scrubTelegram($event->getMessageFormatted()) : null);
+        }
+
         $request = $event->getRequest();
 
         // The body should never be here at all (`max_request_body_size => 'none'`). Removed rather than
@@ -61,6 +77,26 @@ class SentryScrubber
         $event->setExtra(self::redact($event->getExtra()));
 
         return $event;
+    }
+
+    /** Prompt 363 — `before_breadcrumb`: an outgoing request to Telegram keeps its method and status, never the token. */
+    public static function breadcrumb(Breadcrumb $breadcrumb): ?Breadcrumb
+    {
+        foreach ($breadcrumb->getMetadata() as $name => $value) {
+            if (is_string($value)) {
+                $breadcrumb = $breadcrumb->withMetadata((string) $name, self::scrubTelegram($value));
+            }
+        }
+        if ($breadcrumb->getMessage() !== null) {
+            $breadcrumb = $breadcrumb->withMessage(self::scrubTelegram($breadcrumb->getMessage()));
+        }
+
+        return $breadcrumb;
+    }
+
+    private static function scrubTelegram(string $text): string
+    {
+        return (string) preg_replace(self::TELEGRAM_TOKEN, '/bot'.self::REDACTED, $text);
     }
 
     /**

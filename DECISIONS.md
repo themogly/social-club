@@ -20685,3 +20685,80 @@ testing". The prompt assumes the branch is already on main; it isn't, so 362 is 
   - Desktop is unchanged: the cell is 81 px at 1440 and 1280, as before.
 - **After:** 26 of 26 pass.
 - **Screenshots:** `storage/app/screenshots/362/batches-393.png` (light and dark), plus 820 and 1280/1440.
+
+## Prompt 363 — two production errors from Sentry: Telegram answering 401, and a Filament notifications TypeError
+
+**On `feat/355-359-half-gram-rounding-and-reserve`, not merged** (Ben: "one more to add to this branch").
+
+### 1. Telegram 401/404: the bot token is wrong, so no retries, email instead, and one report an hour
+
+- **Before (test 1, red):** `SendTelegramMessage` threw `Telegram answered 401`, so the job retried four times per alert,
+  sent four Sentry errors, and the owner's alert never arrived until the morning email. Test 4 also found a real leak: a
+  timeout's `ConnectionException` message is cURL's, with the URL, and the URL holds the bot token.
+- **401 and 404 are configuration** (a wrong, revoked or malformed token), so `Telegram::rejectsToken()` covers both.
+  On either, the job:
+  - **does not retry** and lets no exception escape to the queue;
+  - **sends the same alert by email** to the same person, in their language. The new `TelegramAlertByEmailMail`
+    carries the text they would have read in Telegram; it is in `/dev/mail` and the render test;
+  - **flags the fault:** `Telegram::markTokenRejected()` caches `telegram.token_rejected_at`;
+  - **reports to Sentry at most once an hour** (`Cache::add` on a one-hour key), as `TelegramTokenRejectedException`.
+    Its message names the setting and the commands, never the token;
+  - audits `alert.failed` with `error: token_rejected` and `fallback: email`.
+- **A good send clears the flag.** `telegram:check` clears it too when the token is accepted.
+- **403 is unchanged:** the person blocked the bot, so their link is cleared and they get one "disconnected" email.
+- **429** releases the job with Telegram's `parameters.retry_after` (30 s if absent).
+- **5xx and timeouts** keep the retries. A timeout now rethrows as `Telegram unreachable`, without the URL.
+- **Salud del sistema → Avisos** shows «Token de Telegram rechazado — revisa TELEGRAM_BOT_TOKEN» in red, with when it
+  was last seen and the check command, while the flag is set. The badge goes to «Revisar».
+- **`php artisan telegram:check`** calls Telegram's `getMe` and prints the bot's @username, or the exact HTTP status
+  and description with how to fix it. It never prints the token.
+  - `telegram:set-webhook` runs it first and stops on a rejected token.
+  - `.env.example`'s Telegram comment mentions it.
+- **The token never reaches Sentry.**
+  - `SentryScrubber` now scrubs `/bot<id>:<secret>` from exception values and the event message (`before_send`).
+  - A new `before_breadcrumb` (`SentryScrubber::breadcrumb`) scrubs outgoing-request breadcrumbs' URL and message.
+  - It matches by shape, never by the configured value.
+- **Tests:** `tests/Feature/Alerts/TelegramTokenRejectedTest.php` (8, all red before):
+  1. a 401 sends email, with no retry and the flag set;
+  2. ten 401s give one report and ten emails, and a second report after an hour;
+  3. a 404 behaves like a 401;
+  4. a 500 retries, a timeout retries with no token in the message, and a 429 waits 5 s;
+  5. a 403 is unchanged;
+  6. a good send clears the flag and the health row;
+  7. `telegram:check` handles a good and a bad token, and `set-webhook` refuses a bad one without calling Telegram;
+  8. no token in the report, the logs, a breadcrumb or an event.
+- **Ops (Ben, on the server):**
+  - In @BotFather, go to /mybots → the bot → API Token and copy the current token.
+  - In Ploi, set `TELEGRAM_BOT_TOKEN` (and check `TELEGRAM_BOT_USERNAME`), then run `php artisan config:cache`,
+    `php artisan telegram:check` and `php artisan telegram:set-webhook`.
+  - Check that the Sentry issue stops recurring.
+
+### 2. `Collection::fromLivewire(): Argument #1 ($notification) must be of type array, int given` — diagnosis in progress, NO fix shipped
+
+- **The prompt rule:** don't fix until we can say what sent the integer. The Sentry event hasn't been pasted yet.
+- **What the investigation established:**
+  - **The mechanism.** Replayed over HTTP against the real update endpoint with debug on, an update that replaces the
+    WHOLE `notifications` property with a structure holding an integer gives exactly the production message:
+    - `{"notifications": {"x": 5}}` → 500 with the TypeError;
+    - `{"notifications": [5]}` → 500 with the TypeError;
+    - `{"notifications.x": 5}` → 200 (a nested update is ignored safely);
+    - `{"notifications": 5}` → a different TypeError.
+    - So it arrives through Livewire 4.4's `HandleSynths::hydratePropertyUpdate`, not from the snapshot. The panel
+      snapshot holds `notifications: [[], {s: wrbl}]`, and a checksum-verified snapshot cannot carry the integer.
+  - **Who doesn't send it:**
+    - Filament's notifications view and `notification.js` never write `$wire.notifications`; they only call
+      `removeNotification` / `handleBroadcastNotification`.
+    - Our `app/` and `resources/` never touch it.
+  - **The browser reproductions, all negative** (`tests/Browser/probe-363-notifications.mjs`, a staging-seeded DB):
+    - a toast followed by a second Livewire action (3 times);
+    - closing a toast while a search request was in flight (3 times);
+    - counter → Administración after a notice.
+    - Six toasts in all, every Livewire response 200, and nothing in the log.
+  - **Not tried:** a tab left open across the 25 September deploy (a 4.3.3 snapshot against 4.4.6). It can't be
+    replayed without that old page.
+- **What would settle it:** the Sentry event's request URL and method, the user agent and browser, the release, how many
+  times and since when, and the breadcrumbs.
+  - Our Sentry config sends **no request body** (`max_request_body_size => 'none'`), so the update payload itself will
+    NOT be in the event.
+  - If the event doesn't settle it, the next step proposed to Ben is a narrow log (component, update keys, value types,
+    user agent) on updates that replace `notifications`. That is instrumentation, not a fix.
