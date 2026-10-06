@@ -75,6 +75,18 @@ class BatchesTable
                     ->searchable()
                     ->sortable()
                     ->visible(fn (): bool => Location::query()->active()->count() > 1),
+                // Prompt 357 (Ben: "date added field") — when the batch was ENTERED here: its own created_at, in the sede's
+                // time. A part transferred from the store is a child batch created by the transfer, so it shows when it
+                // arrived HERE. Sortable, so a sort by Lote that stuck in the session (persistSortInSession) is one click
+                // from date order again.
+                TextColumn::make('created_at')->label(__('Añadido'))
+                    ->dateTime('d M Y, H:i')
+                    ->timezone(fn (Batch $record): string => $record->location?->timezone ?: 'Europe/Madrid')
+                    ->sortable(),
+                // …and when it was RECEIVED or harvested (the date the default sort, 308, uses) — the subtitle already
+                // says it, so hidden until switched on.
+                TextColumn::make('acquired_or_harvested_on')->label(__('Recibido'))->date()->sortable()->placeholder('—')
+                    ->toggleable(isToggledHiddenByDefault: true),
                 TextColumn::make('remaining')
                     ->label(__('Restante'))
                     ->state(function (Batch $record): string {

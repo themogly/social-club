@@ -91,6 +91,8 @@ If the price is below the cost, the form warns you before you save. After saving
 
 *The Batches list: newest first, empty batches hidden, each location on its own line.*
 
+**Date added** shows when each batch was entered at that location (a batch moved from the store shows when it arrived). Click its header to sort by it, for example to check what was added today. **Received** (the delivery or harvest date) can be switched on from the columns button.
+
 ## 5. Moving stock between locations
 
 Three different actions, depending on what really happened:
