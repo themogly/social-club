@@ -2,9 +2,11 @@
 
 namespace App\Http\Requests;
 
+use App\Models\MemberApplication;
 use App\Support\ApplicationShape;
 use App\Support\CounterHandover;
 use App\Support\DocumentUpload;
+use App\Support\KeptUploads;
 use App\Support\MemberEligibility;
 use App\Support\MrzPrefill;
 use App\Support\SignupTrace;
@@ -59,7 +61,14 @@ class SubmitApplicationRequest extends FormRequest
      */
     public function rules(): array
     {
-        return array_merge(self::factRules(), [
+        $rules = self::factRules();
+        // Prompt 361 — a photo KEPT from a refused attempt (this token, this browser session) stands in for one: not
+        // required again. A new file sent now still replaces it, validated as ever.
+        if (isset(KeptUploads::for((string) $this->route('token'))['photo'])) {
+            $rules['photo'] = array_values(array_map(fn ($rule) => $rule === 'required' ? 'nullable' : $rule, $rules['photo']));
+        }
+
+        return array_merge($rules, [
             // Two SEPARATE consents (prompt 97): data processing and the statutes are different agreements,
             // and two ticks are stronger evidence than one bundled box. Both are required.
             'consent_data' => ['accepted'],
@@ -70,6 +79,13 @@ class SubmitApplicationRequest extends FormRequest
     /** Prompt 348 — a refused submission is traced (which keys, never the values) before the usual redirect back. */
     protected function failedValidation(Validator $validator): void
     {
+        // Prompt 361 — a refused submit must not cost the applicant their photo and ID scan: keep the valid ones.
+        $token = (string) $this->route('token');
+        $application = MemberApplication::query()->withoutGlobalScopes()->where('invite_token_hash', hash('sha256', $token))->first();
+        if ($application !== null) {
+            KeptUploads::keep($token, $application, $this->allFiles());
+        }
+
         SignupTrace::record('application.invalid', [
             'keys' => array_keys($validator->errors()->toArray()),
             'route' => CounterHandover::active() ? 'handover' : 'link',

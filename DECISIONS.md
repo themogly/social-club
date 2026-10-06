@@ -20472,3 +20472,136 @@ prompt says. 359's tests stay green; its separate «Reserva sellada» line is re
   - «Include empty batches» shows in the start modal (off there, because the demo has reserves).
 - **Screenshots** are in `storage/app/screenshots/360/`, plus the guide images above (Inventario's two columns, the
   review with the shared reason and the ceiling warning, the Ajuste choice).
+## Prompt 361 — a drawn signature counts without «Guardar firma», staff carry on when the tablet comes back unsigned, photos survive a form error, and the invitation email works when its button doesn't
+
+From Ben's video at the club. Merged to main on Ben's instruction ("this should go onto main branch and pushed"),
+although the prompt says not to merge.
+
+### 1. Capture on submit (and what happened to Guardar)
+
+- **Form mode** (the public application page, handover included): the hidden `signature` field is written at the end
+  of every stroke, and once more on the form's `submit` event if the canvas is inked (`data-drawn="1"`).
+  - «✓ Firma capturada» appears as soon as there is ink.
+  - **Guardar firma is removed in form mode.** It added nothing once the stroke writes the field, and it was the trap.
+  - **Borrar** empties the field and the confirmation.
+  - An untouched pad writes nothing, so a blank canvas is never sent.
+- **Livewire mode** (the counter's staff sign-up form, the dispensation signature, and the new «Firmar ahora»):
+  - **Guardar stays.** It is the server's confirmation: the pad becomes «✓ Firma capturada» with Rehacer.
+  - A new optional `draft` prop names a host property. Each stroke's end copies the drawing into it with
+    `$wire.$set(draft, data, false)`, which is deferred and sends no request.
+  - `attemptCommit` (`DispensaryPos::$signatureDraft`) and `submitStaffAlta` (`$altaSignatureDraft`) capture a
+    drawn-but-unsaved pad themselves.
+  - The draft is nulled once stored, so its bytes don't ride every round-trip.
+  - Every `<x-counter.signature-pad>` was swept. There are three consumers plus the new review pad.
+
+### 2. Unsigned on the club's tablet only
+
+- `SubmitApplication::handle(..., unsignedAllowed:)` is true only when the controller saw an active handover **and**
+  `confirm_unsigned=1`.
+  - The application is then stored with `signature_missing = true`.
+  - The emailed link is unchanged: an unsigned submit is refused, `confirm_unsigned` or not (tested).
+- The form asks first, in-page and only during a handover with `signature_on_application` on: «¿Enviar sin firma? El
+  personal lo revisará contigo.»
+  - **Enviar** sets the hidden `confirm_unsigned` and resubmits.
+  - **Firmar ahora** closes the dialog and scrolls to the pad.
+- **Back at the counter**, the alta review shows **«Falta la firma»** (`data-missing-signature`) while
+  `MemberApplication::awaitsSignature()`:
+  - **Firmar ahora**: a Livewire pad → `captureApplicationSignature` → `SignApplicationAtCounter`. It writes
+    `signatures/{ulid}.png` to the vault, sets the payload's `signature_path`, and makes `consent_channel` SIGNED
+    (the member's own act, as on the form). It also clears `signature_missing` and audits
+    `application.signed_at_counter`.
+  - **Seguir sin firma**: `waiveApplicationSignature` → `WaiveApplicationSignature`.
+    - It needs `applications.review` only, so staff can do it, as Ben asked.
+    - One-tap reasons: «La tableta no funcionaba», «Firmará en papel», or «Otro» with a short line (max 255).
+    - A holder of `reasons.optional` gets no reasons (356). Their waiver records «Aprobado por responsable» with the
+      permission in the audit payload.
+    - It stores `signature_override_by/at/reason` and audits `application.signature_waived`.
+- **The server enforces it:** `ApproveApplication` refuses while `awaitsSignature()`.
+  - That applies to the panel too. A panel approver sees the refusal, because the counter is where the person is.
+- **Where it shows:**
+  - the review (after the waiver);
+  - the application's infolist («Falta la firma», or «Sin firma digital — autorizado por X · reason»);
+  - the member's infolist, through `Member::signatureWaiverLabel()`: «Sin firma digital — autorizado por X».
+- Consent ticks are unaffected. They are still required and recorded with their text versions; only the signature
+  is waived.
+
+### 3. The plain link under the button
+
+- `mail/partials/plain-link.blade.php`: «¿El botón no funciona? Copia y pega este enlace en tu navegador:» and the
+  full URL as text (`data-plain-link`, `word-break: break-all`).
+- It is included in every mail view with exactly one link: invitation, approval (login), member login link, and
+  lockdown reactivation. A test guards the sweep.
+- The plain-text parts already had the URL as their own line. They stay as they are, since a text part has no button.
+- Laravel's own password-reset mail already carries "trouble clicking" text.
+- Link lifetime and token handling are unchanged.
+- **Ops note:** Gmail disables links in a message it has filtered to **Spam** or flagged. This is the likely cause in
+  Ben's video, and code cannot fix it. Check the member's Spam folder ("Not spam" restores the links), and check the
+  sending domain's SPF, DKIM and DMARC in Resend (runbook step 8).
+
+### 4. Kept uploads
+
+- `App\Support\KeptUploads`: on a refused submit, either `SubmitApplicationRequest::failedValidation` or a
+  `ValidationException` from the action, every photo or ID scan that arrived and is itself valid (the
+  `ApplicationShape::files()` rules minus `required`) is stored:
+  - encrypted through `DocumentVault` under `kept-uploads/{application}/{sha(session)}/`;
+  - with its path in this browser session's map under `sha256(token)`.
+- **The binding is token AND session.** Another browser on the same link gets an empty form (tested).
+- **The thumbnail.** It is served by `socio.application.kept` (`/socio/solicitud/{token}/guardado/{field}`):
+  - only when the file is in this session's map for this token;
+  - decrypted, `no-store`, throttled.
+  - It is not the members' signed-URL route: no member exists yet, and the token plus session is the access check.
+- **The redisplayed form** shows «✓ Foto guardada» / «✓ Documento guardado» with «Cambiar», which brings the picker
+  back. A new file replaces the kept one; leaving it uses the kept one. The photo is not `required` while one is
+  kept, in HTML and in the request rules.
+- **On success**, a kept file is adopted (re-encrypted into the directory a fresh upload lands in) and the kept copy
+  is deleted.
+- **Deleted:**
+  - on submit (plus the application's whole kept directory);
+  - on «Salir sin enviar»;
+  - on a staff PIN ending the handover (`CounterHandover::end()` forgets the session's map);
+  - on invitation expiry;
+  - by the hourly `applications:purge-kept-uploads`, which removes anything older than 24 h or belonging to a dead or
+    submitted application. It is audited and has a `kept-uploads-sweep` heartbeat on System health, like the
+    import-staging sweep.
+- **The counter's staff sign-up form already keeps its uploads** across a validation error. Livewire holds them as
+  component properties, so nothing was changed (a test pins it).
+
+### Tests and proof
+
+- **`tests/Feature/Socio/SignatureHandoverAndKeptUploadsTest.php`** has 9 tests, all but the link-refusal pin red before:
+  - unsigned on the link is refused;
+  - handover unsigned needs `confirm_unsigned` and sets `signature_missing`;
+  - the review shows «Falta la firma», and Firmar ahora attaches a vault signature;
+  - approval is refused with no override, then passes after Seguir sin firma (TABLET), with the override fields, the
+    audit row and the member's waiver label;
+  - the plain link appears in the invitation (HTML and text), and the sweep covers every one-link mail view;
+  - kept photo and scan survive a refusal, are shown, and are stored byte-identical without re-attaching;
+  - a new photo replaces the kept one;
+  - another session sees nothing, and the 24 h purge works;
+  - Salir sin enviar (staff PIN) and expiry delete.
+- **The Livewire pads**, both red before (no draft property):
+  - `TheColumnSaysWhatTheScreenDoesNotTest::test_the_commit_captures_a_drawn_but_unsaved_signature`;
+  - `SignedSignUpTest::test_the_staff_route_captures_a_drawn_but_unsaved_pad_on_submit`.
+  - `SignedSignUpTest::test_the_staff_form_keeps_its_photo_after_a_refusal` pins the staff form's existing behaviour.
+- **`OneApplicationFormTest`** ignores `confirm_unsigned`, which is a submit flag, not a fact.
+- **The browser scripts** `measure-applicant-signature` and `shoot-handover-return` no longer press the form's Guardar.
+- **The browser proof** (`tests/Browser/prove-361.mjs`, throwaway DB) passed 29/29 at 820×1180 in a touch context.
+  Strokes were real CDP touch events.
+  - **A:** no Guardar on the form. The field held 0 characters before a stroke and 13,746 after one touch stroke, and
+    «✓ Firma capturada» showed. The submit was accepted, and the DB had `signature_path`. (Before, per the prompt's
+    measurement on `a08f9e0`: 0 characters until Guardar, then the refusal.)
+  - **K (light and dark):**
+    - an unsigned link submit with a photo and scan was refused;
+    - both showed kept, and the thumbnail loaded (320 px);
+    - Cambiar brought the picker back;
+    - signed and resubmitted without re-attaching, the submit was accepted, with the photo and scan stored;
+    - 0 files were left under `kept-uploads/`.
+  - **H (light and dark, the staff account):**
+    - the unsigned handover submit asked «¿Enviar sin firma?», and Enviar sent it;
+    - after the way back and the PIN, the review showed «Falta la firma»;
+    - Firmar ahora showed the pad;
+    - Seguir sin firma showed the reasons, and La tableta no funcionaba recorded the waiver, which the review names.
+  - **M:** `/dev/mail/application-invite` shows the plain link, wrapping at 820 and 390.
+- **Screenshots** are in `storage/app/screenshots/361/`.
+- **The guide** (`counter-quick-start.md`) has a new step 4, «Falta la firma», a handover note (signature counts once
+  drawn, the unsigned confirm, kept photos), and a glossary row.

@@ -143,6 +143,8 @@ class CounterHandover
      */
     public static function end(): void
     {
+        KeptUploads::forgetSession(); // prompt 361 — a handover's unsent photo and ID scan never outlive it
+
         session()->forget(self::KEY);
         session()->forget('counter.handover.draft');
         session()->forget('application.mrz'); // prompt 342 — and what the tablet's camera read (MrzPrefill), unsent

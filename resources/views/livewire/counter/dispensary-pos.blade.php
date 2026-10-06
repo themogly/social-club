@@ -1117,6 +1117,7 @@
                         <div class="mt-4 border-t border-line pt-4 dark:border-slate-800">
                             <x-counter.signature-pad
                                 capture="saveSignature"
+                                draft="signatureDraft"
                                 clear="clearSignature"
                                 :stored="(bool) $signaturePath"
                                 :label="__('Firma del socio')"

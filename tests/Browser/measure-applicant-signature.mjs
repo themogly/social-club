@@ -122,9 +122,8 @@ for (const size of SIZES) {
 
     await page.screenshot({ path: `${OUT}/${STAGE}-pad-drawn-${size.name}-${theme}.png` });
 
-    // --- 4. Guardar firma fills the field the server reads ---------------------------------------
-    await page.click('[data-signature-save]');
-    await page.waitForTimeout(400);
+    // --- 4. The stroke itself fills the field the server reads (prompt 361 — there is no Guardar in form mode) ----
+    await page.waitForTimeout(200);
 
     const saved = await page.evaluate(() => ({
       value: document.querySelector('[data-signature-field]')?.value ?? '',

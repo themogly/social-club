@@ -130,6 +130,7 @@ final class AlertMessage
             'audit-retention-sweep' => __('La limpieza del registro de auditoría'),
             'message-retention-sweep' => __('La limpieza de mensajes'),
             'import-staging-sweep' => __('La limpieza de importaciones'),
+            'kept-uploads-sweep' => __('La limpieza de fotos de solicitudes'),
             default => $component,
         };
     }

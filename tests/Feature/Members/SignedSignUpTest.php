@@ -249,6 +249,44 @@ class SignedSignUpTest extends TestCase
         $this->assertSame(0, MemberApplication::query()->withoutGlobalScopes()->whereNotNull('submitted_at')->count());
     }
 
+    /** Prompt 361 — drawn on the staff form's pad but never «Guardar firma»: the submit captures the draft itself. */
+    public function test_the_staff_route_captures_a_drawn_but_unsaved_pad_on_submit(): void
+    {
+        $this->staff();
+        $this->openCounterTill();
+        Livewire::test(MembershipCounter::class)
+            ->call('toggleAlta')
+            ->call('toggleStaffAltaForm')->set('altaPhoto', UploadedFile::fake()->image('foto.jpg'))
+            ->set('altaForm', [
+                'first_name' => 'Lucía', 'last_name' => 'García', 'email' => 'lucia@example.es', 'phone' => '600111222',
+                'date_of_birth' => now()->subYears(30)->format('Y-m-d'), 'address' => 'Calle Mayor 1',
+                'document_type' => 'DNI', 'document_number' => '12345678Z', 'is_therapeutic' => false, 'avalador_ref' => '',
+            ])
+            ->set('altaConsentHeld', true)
+            ->set('altaSignatureDraft', $this->drawnSignature()) // what the pad's stroke-end writes, deferred
+            ->call('submitStaffAlta')
+            ->assertHasNoErrors();
+
+        $path = data_get($this->latestApplication()->payload, 'signature_path');
+        $this->assertIsString($path);
+        $this->assertNotSame('', DocumentVault::get($path));
+    }
+
+    /** Prompt 361 — the counter's staff form already keeps its uploads across a refusal: Livewire holds them as properties. */
+    public function test_the_staff_form_keeps_its_photo_after_a_refusal(): void
+    {
+        $this->staff();
+        $this->openCounterTill();
+        $component = Livewire::test(MembershipCounter::class)
+            ->call('toggleAlta')
+            ->call('toggleStaffAltaForm')->set('altaPhoto', UploadedFile::fake()->image('foto.jpg'))
+            ->set('altaForm', ['first_name' => 'Lucía', 'last_name' => 'García', 'document_number' => ''])
+            ->call('submitStaffAlta')
+            ->assertHasErrors();
+
+        $this->assertNotNull($component->get('altaPhoto'), 'the photo was dropped by the refusal');
+    }
+
     /** A drawn signature is the member's OWN act, so the staff route stops being an attestation. */
     public function test_a_signed_staff_application_is_not_a_paper_attestation(): void
     {

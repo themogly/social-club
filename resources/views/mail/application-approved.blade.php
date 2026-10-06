@@ -10,4 +10,5 @@
        style="display:inline-block;background:#2563eb;color:#ffffff;text-decoration:none;padding:12px 28px;border-radius:8px;font-weight:600;">
         {{ __('Acceder a mi área de socio/a') }}
     </a>
+    @include('mail.partials.plain-link', ['url' => $loginUrl])
 </x-mail.shell>

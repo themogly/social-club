@@ -140,8 +140,9 @@ When someone fills in the sign-up form, an alert appears at the top of every scr
 1. Tap **Review and approve**, or find them by typing their name on **Members** (they appear under **Pending applications**).
 2. Check their details, their **photo** and their ID document against the person in front of you.
 3. Choose their membership **tier**.
-4. Tap **Approve and sign up**. The system checks their age and looks for duplicates.
-5. Take the membership fee with **Collect fee**, or **Waive** it (staff pick a reason; for managers and owners it is one tap).
+4. If it says **Signature missing** (the tablet came back without one), either tap **Sign now** and pass them the tablet to sign there, or **Continue without signature** and tap the reason (*The tablet wasn't working*, *Will sign on paper*, or *Other* with a few words). Managers and owners continue in one tap. Their record then shows who let it through, so the signature can be collected later.
+5. Tap **Approve and sign up**. The system checks their age and looks for duplicates.
+6. Take the membership fee with **Collect fee**, or **Waive** it (staff pick a reason; for managers and owners it is one tap).
 
 ![Members, with Pending applications at the top and the new-application alert above.](img/counter-quick-start/07-members-pending.jpg)
 
@@ -155,7 +156,7 @@ New members are added to **every club** automatically (not the store), and pay t
 
 **To sign someone up who has not applied yet:** go to **Members**, then **New member**, and either:
 
-- **Hand over the tablet:** they fill in their own details on this tablet. A **photo of them is required**. When they photograph their ID document (the back of a DNI or NIE, or the photo page of a passport), their details fill in by themselves; they check each one. While they do this, the tablet shows only the form. When they finish, it comes back to you. To cancel, tap **Staff** at the top of the form and enter your PIN.
+- **Hand over the tablet:** they fill in their own details on this tablet. A **photo of them is required**. When they photograph their ID document (the back of a DNI or NIE, or the photo page of a passport), their details fill in by themselves; they check each one. While they do this, the tablet shows only the form. When they finish, it comes back to you. A signature counts as soon as it is drawn; if the pad will not work, they can send the form without one (it asks first) and you sort it out when you review it. If the form comes back with an error, the photos they took are kept, so they only fix what it says. To cancel, tap **Staff** at the top of the form and enter your PIN.
 - **Send an invitation:** type their email and they fill it in on their own phone. Their application then appears in the bell like any other.
 
 ## 7. Members screen
@@ -242,6 +243,7 @@ The counter shows Spanish or English, depending on each person's language settin
 | Cobrar cuota · Condonar | Collect fee · Waive |
 | Solicitudes pendientes · Revisar y aprobar | Pending applications · Review and approve |
 | Nuevo socio · Entregar la tablet | New member · Hand over the tablet |
+| Falta la firma · Firmar ahora · Seguir sin firma | Signature missing · Sign now · Continue without signature |
 | Restante hoy | Remaining today |
 | Sí, es esta persona · No es esta persona | Yes, it's this person · It's not this person |
 | Hazle una foto antes de dispensar | Take their photo before dispensing |

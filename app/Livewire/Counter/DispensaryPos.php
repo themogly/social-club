@@ -254,6 +254,9 @@ class DispensaryPos extends Component
     /** Path on the PRIVATE documents disk once a signature has been captured this basket. */
     public ?string $signaturePath = null;
 
+    /** Prompt 361 — the pad's drawing, copied in at each stroke's end without a request; the commit captures it. */
+    public ?string $signatureDraft = null;
+
     // --- Void -------------------------------------------------------------------
 
     /** The just-committed dispensation (offer the receipt + a void affordance). */
@@ -376,7 +379,7 @@ class DispensaryPos extends Component
         $this->reset([
             'memberId', 'scanned', 'lookup', 'lookupSearched', 'basket', 'activeGeneticId', 'activeBatchId',
             'weightInput', 'calculatorMode', 'unitQty', 'cashTendered', 'walletInput', 'requireOverride',
-            'limitBreach', 'overrideReason', 'priceOverrideEuros', 'priceOverrideReason', 'signaturePath',
+            'limitBreach', 'overrideReason', 'priceOverrideEuros', 'priceOverrideReason', 'signaturePath', 'signatureDraft',
             'lastDispensationId', 'lastOrderId', 'barBasket', 'voidReason', 'flashMessage',
         ]);
 
@@ -776,7 +779,7 @@ class DispensaryPos extends Component
         $this->reset([
             'basket', 'activeGeneticId', 'activeBatchId', 'weightInput', 'calculatorMode', 'unitQty', 'editingLine', 'mergeNote',
             'cashTendered', 'walletInput', 'requireOverride', 'limitBreach', 'overrideReason',
-            'priceOverrideEuros', 'priceOverrideReason', 'signaturePath',
+            'priceOverrideEuros', 'priceOverrideReason', 'signaturePath', 'signatureDraft',
         ]);
 
         $this->idempotencyKey = (string) Str::ulid();
@@ -805,11 +808,13 @@ class DispensaryPos extends Component
         // moment this returns. A toast saying the same thing, in the pinned foot, took height from the basket
         // to repeat what the operator was looking at.
         $this->signaturePath = $path;
+        $this->signatureDraft = null; // its bytes no longer ride every round-trip once stored
     }
 
     public function clearSignature(): void
     {
         $this->signaturePath = null;
+        $this->signatureDraft = null;
     }
 
     // --- Commit -----------------------------------------------------------------
@@ -1071,7 +1076,11 @@ class DispensaryPos extends Component
             return;
         }
 
-        // Signature, when the location mandates one for a dispensation.
+        // Signature, when the location mandates one for a dispensation. A drawn-but-unsaved pad counts (prompt 361):
+        // the operator pressing commit is the deliberate act, not a Guardar nobody noticed.
+        if ($this->signaturePath === null && $this->signatureDraft !== null) {
+            $this->saveSignature($this->signatureDraft);
+        }
         if ($this->signatureRequired() && $this->signaturePath === null) {
             $this->flash(__('Falta la firma del socio.'), 'warning');
 
@@ -2697,7 +2706,7 @@ class DispensaryPos extends Component
         $this->reset([
             'basket', 'activeGeneticId', 'activeBatchId', 'weightInput', 'calculatorMode', 'unitQty',
             'cashTendered', 'walletInput', 'requireOverride', 'limitBreach', 'overrideReason',
-            'signaturePath', 'lastDispensationId', 'lastOrderId', 'voidReason', 'flashMessage', 'barBasket', 'confirmDiscard',
+            'signaturePath', 'signatureDraft', 'lastDispensationId', 'lastOrderId', 'voidReason', 'flashMessage', 'barBasket', 'confirmDiscard',
         ]);
         $this->idempotencyKey = (string) Str::ulid();
     }
@@ -2708,7 +2717,7 @@ class DispensaryPos extends Component
         $this->reset([
             'basket', 'activeGeneticId', 'activeBatchId', 'weightInput', 'calculatorMode', 'unitQty', 'editingLine', 'mergeNote',
             'cashTendered', 'walletInput', 'requireOverride', 'limitBreach', 'overrideReason',
-            'priceOverrideEuros', 'priceOverrideReason', 'signaturePath', 'onTab', 'debtCollectInput',
+            'priceOverrideEuros', 'priceOverrideReason', 'signaturePath', 'signatureDraft', 'onTab', 'debtCollectInput',
         ]);
         $this->idempotencyKey = (string) Str::ulid();
     }
