@@ -20909,3 +20909,63 @@ staff `stock.take`, and merge to main when green.
   excluded members who had dispensations "today" in UTC (`whereDate(now())`). The daily limit counts the SEDE's business
   day, and every demo sede has been in Madrid since 362. Depending on the random seed, a dispensation at 22:30 UTC
   yesterday (00:30 today in Madrid) let it pick a member already at the cap. It now uses `BusinessDay::window($location)`.
+
+## Prompt 365 — *Existencias* on a phone: the search box gets its own row, the empties are counted, and an empty reserve says why
+
+From Ben's iPhone screenshots of the live screen. Merged to main on Ben's standing instruction (as 364), although the
+prompt says not to merge.
+
+### The header layout rule
+
+- **Phone:** the search box has its OWN full-width row, with the filter chips in a row underneath (they wrap).
+- **From 768 px (`md`):** one row is allowed only while the box keeps `min-w-56` (14rem) and grows (`flex-1`);
+  otherwise it wraps.
+- **The cause:** in one `flex-wrap` row with the chips and the checkbox, the `min-w-0 flex-1` input SHRANK instead of
+  wrapping.
+- **Before:** measured **48 px wide** on an iPhone 15, with the placeholder clipped to a 14 px content box. The prompt
+  measured 119 px; Ben's live English screenshot showed «Se».
+- **After:** 327 px of the card's 327 px inner width at 393, and 319 of 319 with the root type +12.5% (one larger iOS
+  text size). The placeholder fits in es and en; at 820 the box is 451 px (406 px with larger text).
+
+### The hidden-count line replaces the checkbox
+
+- «Mostrar agotados» worked but looked broken, because the zero/zero batches appeared A–Z far down a long list.
+- **Now a line counts them:** «3 lotes agotados ocultos · Mostrar» ("3 empty batches hidden · Show"), the panel's
+  Batches pattern.
+- **Shown:** they come AFTER every other row, under a small heading «Agotados». The sheet sorts the empty group last,
+  stably, so A–Z and FEFO hold within each group. The line then reads «Ocultar agotados».
+- **No empties, no line.** The search and the filters still apply; `emptyCount()` counts what the current filter and
+  search would show.
+- **The row markup is now one partial** (`partials/stock-row`), shared by both groups.
+
+### The empty-reserve wording
+
+- With «Con reserva» on, no search, and a sede reserve of 0, the empty state says it is data, not a typing problem:
+  «No hay reserva sellada apuntada en esta sede.», then «Se apunta al recibir un lote («De ello, en reserva»), con
+  «Pasar a reserva» aquí, o en Inventario.»
+- «Nada coincide.» stays for a search or filter that finds nothing.
+- **Ops:** the live "0.00 g in 0 batches" means no reserve has been recorded at that sede yet. That is 360's go-live
+  step (Inventario with «Incluir lotes a cero»).
+
+### Also
+
+- **Vocabulary fix:** «Agotado»'s English was "Sold out", which is sale framing. It is now "Out of stock" (the counter
+  chip and the bar's article card).
+- **Guides:** `counter-quick-start.md` describes the hidden-count line and the empty-reserve message, with the word
+  list; `04b-top-up.jpg` was retaken through `shots.json`.
+- **Unchanged:** what the list contains, its order, the actions panel and the permissions.
+
+### Tests and proof
+
+- **`StockScreenTest`** (+3, the first two seen red before):
+  - 2 empties → «2 lotes agotados ocultos · Mostrar», and once shown every non-empty row precedes «Agotados», which
+    precedes the empties;
+  - no empties → no line;
+  - an empty reserve says why, while a failed search still says «Nada coincide.»
+- The 364 tests still pass.
+- **`tests/Browser/prove-365-existencias-phone.mjs`** (iPhone 15 and 820×1180, es and en, default and larger text)
+  passed 24/24. It checks that the page is in the language, the box is at least 90% of the card on a phone (at least
+  224 px on a tablet), and the placeholder is not clipped.
+  - The harness signs in once per language; eight sign-ins trip the login rate limit.
+- **Screenshots** (`storage/app/screenshots/365/`, en, 393 light and dark plus 820): the header, the empties shown, and
+  the empty-reserve message.
