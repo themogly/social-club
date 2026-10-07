@@ -10,11 +10,13 @@ use App\Support\CounterHandoverConfinement;
 use App\Support\CounterLockConfinement;
 use App\Support\CounterRequest;
 use App\Support\Help;
+use App\Support\NotificationsUpdateGuard;
 use App\Support\TrainingMode;
 use Filament\Actions\DeleteBulkAction;
 use Filament\Actions\ForceDeleteBulkAction;
 use Filament\Actions\RestoreBulkAction;
 use Filament\Auth\Http\Responses\Contracts\LoginResponse;
+use Filament\Notifications\Collection as NotificationsCollection;
 use Filament\Schemas\Components\Form;
 use Filament\Tables\Table;
 use Illuminate\Auth\Events\Logout;
@@ -34,6 +36,10 @@ class AppServiceProvider extends ServiceProvider
 
         // One active scope per request (current organisation + active location).
         $this->app->singleton(ActiveScope::class);
+
+        // Prompt 363 — a junk update to Filament's notifications (any anonymous client, from /login's snapshot) 500'd the
+        // panel; non-array items are dropped and logged. Remove with filamentphp/filament#19447.
+        $this->app->bind(NotificationsCollection::class, fn ($app, array $parameters): NotificationsCollection => NotificationsUpdateGuard::make($parameters));
     }
 
     /**
