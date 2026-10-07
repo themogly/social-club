@@ -256,6 +256,49 @@ class StockScreenTest extends TestCase
         $this->assertNotContains($elsewhere->id, $screen->instance()->sheet()->rows('all', showEmpty: true)->pluck('id')->all());
     }
 
+    // --- Prompt 365 — the empties are counted and grouped; an empty reserve says why ----------------------------------------
+
+    public function test_the_empties_are_counted_and_shown_grouped_at_the_bottom(): void
+    {
+        $this->batch($this->critical, 2000);
+        $this->batch($this->amnesia, 0, 0);
+        $this->batch($this->critical, 0, 0);
+        $screen = $this->screen($this->user(Role::STAFF));
+
+        $line = trans_choice(':count lote agotado oculto|:count lotes agotados ocultos', 2, ['count' => 2]);
+        $screen->assertSee($line)->assertSeeHtml('data-stock-empty-toggle')->assertDontSeeHtml('data-stock-empty-heading');
+
+        $html = $screen->call('toggleEmpty')->assertSee(__('Ocultar agotados'))->html();
+        $heading = strpos($html, 'data-stock-empty-heading');
+        $this->assertNotFalse($heading);
+        $rows = [];
+        preg_match_all('/data-stock-row="([^"]+)"/', $html, $rows, PREG_OFFSET_CAPTURE);
+        $positions = collect($rows[1])->mapWithKeys(fn (array $m): array => [$m[0] => $m[1]]);
+        $nonEmpty = Batch::query()->withoutGlobalScopes()->where('remaining_cg', '>', 0)->pluck('id');
+        $empty = Batch::query()->withoutGlobalScopes()->where('remaining_cg', 0)->where('reserve_cg', 0)->pluck('id');
+        $this->assertTrue($nonEmpty->every(fn (string $id): bool => $positions[$id] < $heading), 'every non-empty row comes first');
+        $this->assertTrue($empty->every(fn (string $id): bool => $positions[$id] > $heading), 'the empties are grouped under «Agotados»');
+    }
+
+    public function test_with_no_empty_batch_there_is_no_line(): void
+    {
+        $this->batch($this->amnesia, 2000);
+        $this->screen($this->user(Role::STAFF))->assertDontSeeHtml('data-stock-empty-toggle');
+    }
+
+    public function test_an_empty_reserve_says_why_and_a_failed_search_still_says_nothing_matches(): void
+    {
+        $this->batch($this->amnesia, 2000);
+        $screen = $this->screen($this->user(Role::STAFF));
+
+        $screen->call('setFilter', 'reserve')->assertSee(__('No hay reserva sellada apuntada en esta sede.'))
+            ->assertSee(__('Se apunta al recibir un lote («De ello, en reserva»), con «Pasar a reserva» aquí, o en Inventario.'))
+            ->assertDontSee(__('Nada coincide.'));
+
+        $screen->call('setFilter', 'all')->set('batchFilter', 'zzz')->assertSee(__('Nada coincide.'))
+            ->assertDontSee(__('No hay reserva sellada apuntada en esta sede.'));
+    }
+
     // --- 8. The dispensary no longer carries the reserve controls -------------------------------------------------------------
 
     public function test_the_dispensary_weight_panel_has_no_reserve_controls_and_its_empty_jar_links_here(): void

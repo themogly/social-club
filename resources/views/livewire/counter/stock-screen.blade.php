@@ -40,55 +40,66 @@
                     @endif
                 </div>
 
-                <div class="mt-3 flex flex-wrap items-center gap-2">
+                {{-- Prompt 365 — the search box has its OWN full-width row on a phone (in one wrapping row with the chips it shrank
+                     to a sliver: «Se»), and keeps ≥ 14rem beside the chips from 768 px. The chips wrap underneath. --}}
+                <div class="mt-3 flex flex-col gap-2 md:flex-row md:flex-wrap md:items-center">
                     <label class="sr-only" for="stock-search">{{ __('Buscar variedad o lote') }}</label>
                     <input id="stock-search" type="search" wire:model.live.debounce.300ms="batchFilter" autocomplete="off" data-stock-search
                            placeholder="{{ __('Buscar variedad o lote…') }}"
-                           class="h-12 min-w-0 flex-1 rounded-xl border border-line bg-surface px-4 text-base text-ink placeholder:text-ink-muted focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/40 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100">
-                    @foreach (['all' => __('Todos'), 'reserve' => __('Con reserva'), 'low' => __('Bote bajo')] as $key => $label)
-                        <button type="button" wire:click="setFilter('{{ $key }}')" data-stock-filter="{{ $key }}" aria-pressed="{{ $filter === $key ? 'true' : 'false' }}"
-                                @class(['inline-flex min-h-11 items-center rounded-full border px-4 text-sm font-semibold transition',
-                                    'border-brand bg-brand text-white' => $filter === $key,
-                                    'border-line bg-surface text-ink-muted hover:bg-surface-alt dark:border-slate-700 dark:bg-slate-950 dark:text-slate-300' => $filter !== $key])>{{ $label }}</button>
-                    @endforeach
-                    <label class="inline-flex min-h-11 items-center gap-2 px-2 text-sm text-ink-muted dark:text-slate-400">
-                        <input type="checkbox" wire:model.live="showEmpty" class="h-5 w-5 rounded border-line text-brand focus:ring-brand/40 dark:border-slate-600 dark:bg-slate-900" data-stock-show-empty>
-                        {{ __('Mostrar agotados') }}
-                    </label>
+                           class="h-12 w-full rounded-xl border border-line bg-surface px-4 text-base text-ink placeholder:text-ink-muted focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/40 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 md:w-auto md:min-w-56 md:flex-1">
+                    <div class="flex flex-wrap items-center gap-2" data-stock-filters>
+                        @foreach (['all' => __('Todos'), 'reserve' => __('Con reserva'), 'low' => __('Bote bajo')] as $key => $label)
+                            <button type="button" wire:click="setFilter('{{ $key }}')" data-stock-filter="{{ $key }}" aria-pressed="{{ $filter === $key ? 'true' : 'false' }}"
+                                    @class(['inline-flex min-h-11 items-center rounded-full border px-4 text-sm font-semibold transition',
+                                        'border-brand bg-brand text-white' => $filter === $key,
+                                        'border-line bg-surface text-ink-muted hover:bg-surface-alt dark:border-slate-700 dark:bg-slate-950 dark:text-slate-300' => $filter !== $key])>{{ $label }}</button>
+                        @endforeach
+                    </div>
                 </div>
 
                 <div class="counter-scroll-region mt-4 max-h-[calc(100dvh-16rem)] overflow-y-auto overscroll-contain">
-                    @forelse ($rows as $row)
-                        <button type="button" wire:click="openBatch('{{ $row['id'] }}')" wire:key="stock-{{ $row['id'] }}" data-stock-row="{{ $row['id'] }}"
-                                @class(['mb-2 flex w-full min-h-11 flex-col gap-1 rounded-xl border px-3 py-2 text-left transition sm:flex-row sm:items-center sm:justify-between sm:gap-4',
-                                    'border-brand bg-brand-tint/50 dark:bg-slate-800' => $open !== null && $open['id'] === $row['id'],
-                                    'border-line bg-surface hover:border-brand hover:bg-brand-tint/40 dark:border-slate-700 dark:bg-slate-950 dark:hover:bg-slate-800' => $open === null || $open['id'] !== $row['id']])>
-                            <span class="min-w-0">
-                                <span class="block font-semibold text-ink dark:text-slate-100">{{ $row['name'] }}</span>
-                                <span class="block truncate text-xs text-ink-muted dark:text-slate-400">{{ $row['subtitle'] }}</span>
-                                @if ($row['last_count'])
-                                    <span class="block text-xs text-ink-muted dark:text-slate-400" data-stock-last-count>{{ $row['last_count'] }}</span>
-                                @endif
-                            </span>
-                            <span class="flex shrink-0 flex-wrap items-center gap-x-4 gap-y-1 text-sm sm:justify-end">
-                                <span class="tabular-nums"><span class="text-ink-muted dark:text-slate-400">{{ __('En el bote') }}</span> <strong class="text-ink dark:text-slate-100">{{ $row['jar_text'] }}</strong></span>
-                                @if ($row['reserve_cg'] > 0)
-                                    <span class="tabular-nums" data-stock-reserve><span class="text-ink-muted dark:text-slate-400">{{ __('Reserva') }}</span> <strong class="text-ink dark:text-slate-100">{{ $row['reserve_text'] }}</strong></span>
-                                @endif
-                                <span class="tabular-nums text-ink-muted dark:text-slate-400">{{ $row['price_text'] }}</span>
-                                @if ($row['chip'])
-                                    <span data-stock-chip @class(['inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold',
-                                        'bg-brand-tint text-brand dark:bg-slate-800 dark:text-slate-200' => $row['reserve_cg'] > 0 || ! $row['jar_empty'],
-                                        'bg-surface-alt text-ink-muted dark:bg-slate-800 dark:text-slate-400' => $row['empty']])>{{ $row['chip'] }}</span>
-                                @endif
-                            </span>
+                    @php
+                        $mainRows = $rows->where('empty', false);
+                        $emptyRows = $rows->where('empty', true);
+                    @endphp
+                    @foreach ($mainRows as $row)
+                        @include('livewire.counter.partials.stock-row')
+                    @endforeach
+
+                    {{-- Prompt 365 — the batches with nothing in the jar or the reserve are COUNTED, not a silent checkbox («the show empty
+                         isn't working»: they appeared A–Z far down a long list). Shown, they are grouped at the bottom. --}}
+                    @if ($emptyCount > 0)
+                        <button type="button" wire:click="toggleEmpty" data-stock-empty-toggle
+                                class="mb-2 inline-flex min-h-11 items-center gap-1 rounded-lg px-2 text-sm text-ink-muted hover:text-ink dark:text-slate-400 dark:hover:text-slate-200">
+                            @if ($showEmpty)
+                                {{ __('Ocultar agotados') }}
+                            @else
+                                {{ trans_choice(':count lote agotado oculto|:count lotes agotados ocultos', $emptyCount, ['count' => $emptyCount]) }} · <span class="font-semibold text-brand dark:text-slate-200">{{ __('Mostrar') }}</span>
+                            @endif
                         </button>
-                    @empty
+                    @endif
+                    @if ($showEmpty && $emptyRows->isNotEmpty())
+                        <h3 class="mb-2 mt-2 text-xs font-semibold uppercase tracking-wide text-ink-muted dark:text-slate-400" data-stock-empty-heading>{{ __('Agotados') }}</h3>
+                        @foreach ($emptyRows as $row)
+                            @include('livewire.counter.partials.stock-row')
+                        @endforeach
+                    @endif
+
+                    @if ($mainRows->isEmpty() && ! ($showEmpty && $emptyRows->isNotEmpty()))
                         <div class="rounded-xl border border-dashed border-line px-4 py-8 text-center dark:border-slate-700" data-stock-empty>
-                            <p class="font-medium text-ink dark:text-slate-100">{{ $batchFilter !== '' || $filter !== 'all' ? __('Nada coincide.') : __('No hay existencias en esta sede.') }}</p>
-                            <p class="mt-1 text-sm text-ink-muted dark:text-slate-400">{{ $batchFilter !== '' || $filter !== 'all' ? __('Prueba con otro nombre o quita el filtro.') : __('Los lotes aparecen aquí al darles entrada en el panel.') }}</p>
+                            @if ($filter === 'reserve' && $batchFilter === '' && ($summary['reserve_cg'] ?? 0) === 0)
+                                {{-- Prompt 365 — an empty reserve is data, not a typing problem: say why, and how it gets there. --}}
+                                <p class="font-medium text-ink dark:text-slate-100" data-stock-no-reserve>{{ __('No hay reserva sellada apuntada en esta sede.') }}</p>
+                                <p class="mt-1 text-sm text-ink-muted dark:text-slate-400">{{ __('Se apunta al recibir un lote («De ello, en reserva»), con «Pasar a reserva» aquí, o en Inventario.') }}</p>
+                            @elseif ($batchFilter !== '' || $filter !== 'all')
+                                <p class="font-medium text-ink dark:text-slate-100">{{ __('Nada coincide.') }}</p>
+                                <p class="mt-1 text-sm text-ink-muted dark:text-slate-400">{{ __('Prueba con otro nombre o quita el filtro.') }}</p>
+                            @else
+                                <p class="font-medium text-ink dark:text-slate-100">{{ __('No hay existencias en esta sede.') }}</p>
+                                <p class="mt-1 text-sm text-ink-muted dark:text-slate-400">{{ __('Los lotes aparecen aquí al darles entrada en el panel.') }}</p>
+                            @endif
                         </div>
-                    @endforelse
+                    @endif
                 </div>
             </section>
 

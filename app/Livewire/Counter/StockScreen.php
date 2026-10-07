@@ -90,6 +90,12 @@ class StockScreen extends Component
         return new CounterStockSheet($this->resolveLocation() ?? new Location);
     }
 
+    /** Prompt 365 — «N lotes agotados ocultos · Mostrar» / «Ocultar agotados». */
+    public function toggleEmpty(): void
+    {
+        $this->showEmpty = ! $this->showEmpty;
+    }
+
     public function setFilter(string $filter): void
     {
         $this->filter = in_array($filter, ['all', 'reserve', 'low'], true) ? $filter : 'all';
@@ -266,6 +272,7 @@ class StockScreen extends Component
         return view('livewire.counter.stock-screen', [
             'rows' => $this->resolveLocation() !== null ? $sheet->rows($this->filter, $this->showEmpty, $this->batchFilter) : collect(),
             'summary' => $this->resolveLocation() !== null ? $sheet->summary() : null,
+            'emptyCount' => $this->resolveLocation() !== null ? $sheet->emptyCount($this->filter, $this->batchFilter) : 0,
             'open' => $sheet->row($this->openBatchId),
             'canTopUp' => $this->userCan('pos.use'),
             'canWeigh' => $this->userCan('stock.take'),

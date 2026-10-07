@@ -45,7 +45,15 @@ class CounterStockSheet
                 default => true,
             })
             ->filter(fn (array $row): bool => $needle === '' || str_contains(mb_strtolower($row['name'].' '.$row['batch_no']), $needle))
+            // Prompt 365 — the empties, when shown, come AFTER every other row (grouped under «Agotados»), not A–Z among them.
+            ->sortBy(fn (array $row): int => $row['empty'] ? 1 : 0)
             ->values();
+    }
+
+    /** Prompt 365 — how many zero/zero batches the current filter and search would show on «Mostrar» (0 = no line at all). */
+    public function emptyCount(string $filter = 'all', string $search = ''): int
+    {
+        return $this->rows($filter, true, $search)->where('empty', true)->count();
     }
 
     /** @return array<string, mixed>|null one batch's row (for the action panel), only if it is at this sede */

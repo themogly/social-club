@@ -156,7 +156,7 @@ New members are added to **every club** automatically (not the store), and pay t
 
 ### Stock (Existencias)
 
-**Stock** on the counter home lists every batch at this club: what is in each **jar**, what is sealed in its **reserve**, its price, and when it was last weighed. The line at the top says how much sealed reserve the club holds in total. Search by strain or batch number, or use **All / With reserve / Jar low**; **Show empty** adds batches with nothing left.
+**Stock** on the counter home lists every batch at this club: what is in each **jar**, what is sealed in its **reserve**, its price, and when it was last weighed. The line at the top says how much sealed reserve the club holds in total. Search by strain or batch number, or use **All / With reserve / Jar low**. Batches with nothing left are hidden; a line under the list says how many (*"2 empty batches hidden · Show"*), and **Show** lists them at the bottom under **Empty**. If **With reserve** shows nothing, no sealed reserve has been recorded at this club yet (the screen says so).
 
 Tap a batch to open its actions. Type the grams on the keypad first:
 
@@ -264,6 +264,7 @@ The counter shows Spanish or English, depending on each person's language settin
 | El recuento no cuadra — ¿qué ha pasado? | The count doesn't match — what happened? |
 | Reserva · Con reserva · Rellenar · Toda la reserva · Pasar a reserva | Reserve · With reserve · Top up · All of the reserve · Move to reserve |
 | Existencias · Actualizar peso del bote · Añadir a la reserva · Volver al dispensario | Stock · Update jar weight · Add to reserve · Back to the dispensary |
+| lotes agotados ocultos · Mostrar · Agotados | empty batches hidden · Show · Empty |
 | Bote vacío · Rellenado sin registrar | Jar empty · Unrecorded top-up |
 | Diferencia · Nota | Difference · Note |
 | Modo formación | Training mode |
