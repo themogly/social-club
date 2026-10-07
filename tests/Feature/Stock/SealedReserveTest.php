@@ -19,6 +19,7 @@ use App\Enums\SettingType;
 use App\Enums\StockMovementType;
 use App\Enums\StockTakeStatus;
 use App\Livewire\Counter\DispensaryPos;
+use App\Livewire\Counter\StockScreen;
 use App\Livewire\Counter\TillSession;
 use App\Models\AuditLog;
 use App\Models\Batch;
@@ -165,11 +166,14 @@ class SealedReserveTest extends TestCase
         $batch = $this->batch(0, 3000);
 
         $this->assertNull((new SelectBatch)->fefo($this->genetic, $this->sede), 'FEFO never allocates from the reserve');
-        $pos = $this->counter()
-            ->assertSee(__('Bote vacío — :grams en reserva · Rellenar', ['grams' => '30.00 g']))
-            ->assertSeeHtml('data-reserve="3000"')->assertSeeHtml('data-reserve-filter');
+        $this->counter()
+            ->assertSee(__('Bote vacío — :grams en reserva · Rellenar en Existencias', ['grams' => '30.00 g']))
+            ->assertSeeHtml('data-reserve="3000"')->assertSeeHtml('data-reserve-filter')
+            // Prompt 364 — «Rellenar» moved to Existencias: the card links there with this lote's panel open.
+            ->assertSeeHtml(e(route('counter.stock', ['lote' => $batch->id, 'from' => 'pos'])));
 
-        $pos->call('chooseGenetic', $this->genetic->id)->assertSeeHtml('data-top-up')->call('topUpJar', null);
+        Livewire::withQueryParams(['lote' => $batch->id, 'from' => 'pos'])->test(StockScreen::class)
+            ->assertSet('openBatchId', $batch->id)->call('topUpJar', null);
         $this->assertSame([3000, 0], [$batch->fresh()->remaining_cg->centigrams, $batch->fresh()->reserve_cg->centigrams]);
     }
 

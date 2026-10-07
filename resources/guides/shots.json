@@ -60,8 +60,8 @@
             "member": "M-00001"
         },
         "counter-quick-start/04b-top-up.jpg": {
-            "url": "/counter/pos",
-            "account": "staff",
+            "url": "/counter/existencias",
+            "account": "manager",
             "viewport": [
                 1180,
                 820
@@ -69,10 +69,9 @@
             "openTill": true,
             "steps": [
                 {
-                    "click": "[data-catalogue-item=\"genetics\"][data-search=\"Amnesia Haze\"]"
+                    "click": "[data-stock-row]:has-text(\"Amnesia Haze\")"
                 }
-            ],
-            "member": "M-00001"
+            ]
         },
         "counter-quick-start/05-payment.jpg": {
             "url": "/counter/pos",

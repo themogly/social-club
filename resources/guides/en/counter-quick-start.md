@@ -68,13 +68,8 @@ Every dispensation must be to an identified member, from a real batch, by weight
 **Sealed top-ups (reserve):** the sealed bags of a strain kept off the counter are its **reserve**. They are not in the jar, so they are not dispensed and not weighed at closing.
 
 - A strain with a reserve shows **Reserve: 30.00 g** on its line, and the **With reserve** filter (beside *Filters*) lists only those strains.
-- When a jar runs low, the line says **Jar low, reserve available**. When it is empty it says **Jar empty — 30.00 g in reserve · Top up**, and you can still tap it.
-- **When you open a bag, tap Top up.** Tap the strain: under the keypad, **Top up** moves the grams you typed from the reserve into the jar, and **All of the reserve** moves the lot. **Move to reserve** does the opposite, when you weigh up bags yourself. You only ever enter a total, never a bag count.
+- When a jar runs low, the line says **Jar low, reserve available**. When it is empty it says **Jar empty — 30.00 g in reserve · Top up on Stock**: tap it and the **Stock** screen opens on that batch (see *Stock* below). **Back to the dispensary** returns you to the same member and basket.
 - **Forgot to tap Top up?** The closing count notices the heavier jar, puts it right by itself and notes it for the manager (*Unrecorded top-up*). You do not have to do anything.
-
-![Top up: the reserve shown on the strain, and Top up / All of the reserve under the keypad.](img/counter-quick-start/04b-top-up.jpg)
-
-*Top up: the reserve shown on the strain, and Top up / All of the reserve under the keypad.*
 
 **Half-gram rounding:** the weight the member pays for is rounded to the nearest half gram (never less than 0.5 g): 1.10 g is charged as 1.0 g, 0.20 g as 0.5 g, and 3.40 g as 3.5 g, which gets the eighth price. The basket shows it, for example *"1.10 g · charged 1.00 g"*. Stock and the member's limits always use the exact weight. To turn it off for yourself, use the **Round to 0.5 g** switch above the total; it stays as you set it until you sign out, and it shows **(changed)** while it differs from the club's setting.
 
@@ -158,6 +153,23 @@ New members are added to **every club** automatically (not the store), and pay t
 
 - **Hand over the tablet:** they fill in their own details on this tablet. A **photo of them is required**. When they photograph their ID document (the back of a DNI or NIE, or the photo page of a passport), their details fill in by themselves; they check each one. While they do this, the tablet shows only the form. When they finish, it comes back to you. A signature counts as soon as it is drawn; if the pad will not work, they can send the form without one (it asks first) and you sort it out when you review it. If the form comes back with an error, the photos they took are kept, so they only fix what it says. To cancel, tap **Staff** at the top of the form and enter your PIN.
 - **Send an invitation:** type their email and they fill it in on their own phone. Their application then appears in the bell like any other.
+
+### Stock (Existencias)
+
+**Stock** on the counter home lists every batch at this club: what is in each **jar**, what is sealed in its **reserve**, its price, and when it was last weighed. The line at the top says how much sealed reserve the club holds in total. Search by strain or batch number, or use **All / With reserve / Jar low**; **Show empty** adds batches with nothing left.
+
+Tap a batch to open its actions. Type the grams on the keypad first:
+
+- **Top up** moves those grams from the reserve into the jar; **All of the reserve** moves the lot. Do this whenever you open a sealed bag.
+- **Move to reserve** puts grams from the jar back into sealed bags.
+- **Update jar weight:** weigh the jar, type what the scale says and tap **Save weight**, then tap what happened (*Weighing error*, *Spill / wastage*, *Topped up without recording*, or *Other*). The system works out the difference; if the jar is heavier because a bag was opened without **Top up**, it takes that from the reserve. Managers are not asked for a reason.
+- **Add to reserve** (managers and owners) records sealed bags that arrived and were never entered, with a reason.
+
+Each action confirms right under its buttons, for example *"Topped up: +10.00 g · jar 958.10 g · reserve 5.00 g"*.
+
+![Stock: every jar and sealed top-up at the club, with a batch's actions open.](img/counter-quick-start/04b-top-up.jpg)
+
+*Stock: every jar and sealed top-up at the club, with a batch's actions open.*
 
 ## 7. Members screen
 
@@ -251,6 +263,7 @@ The counter shows Spanish or English, depending on each person's language settin
 | Recuento de flor · No se puede contar | Flower recount · Can't count it |
 | El recuento no cuadra — ¿qué ha pasado? | The count doesn't match — what happened? |
 | Reserva · Con reserva · Rellenar · Toda la reserva · Pasar a reserva | Reserve · With reserve · Top up · All of the reserve · Move to reserve |
+| Existencias · Actualizar peso del bote · Añadir a la reserva · Volver al dispensario | Stock · Update jar weight · Add to reserve · Back to the dispensary |
 | Bote vacío · Rellenado sin registrar | Jar empty · Unrecorded top-up |
 | Diferencia · Nota | Difference · Note |
 | Modo formación | Training mode |

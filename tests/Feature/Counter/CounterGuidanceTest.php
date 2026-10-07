@@ -99,6 +99,7 @@ class CounterGuidanceTest extends TestCase
 
     public function test_the_roles_page_warns_when_close_till_is_granted_without_the_recount(): void
     {
+        $this->setRolePermission(Role::STAFF, 'stock.take', false); // 364 — staff hold it by default; a club that revoked it
         $this->setRolePermission(Role::STAFF, 'till.close', true);
 
         $html = Livewire::actingAs($this->owner)->test(RolesPermissions::class)->html();
@@ -120,7 +121,8 @@ class CounterGuidanceTest extends TestCase
             'initial_cg' => 5000, 'remaining_cg' => 4000, 'status' => BatchStatus::OPEN, 'expires_on' => now()->addYear(),
         ]); // touched today → the recount is required before the last close
 
-        // Only "Cerrar caja": stuck at the recount.
+        // Only "Cerrar caja": stuck at the recount. (364 — staff hold the recount by default; this club revoked it.)
+        $this->setRolePermission(Role::STAFF, 'stock.take', false);
         $this->setRolePermission(Role::STAFF, 'till.close', true);
         Livewire::test(TillSession::class)
             ->call('startClose')->set('countInput', '100')->call('submitCount')

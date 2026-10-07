@@ -111,6 +111,9 @@ class Permissions
         // and open a scan from the counter's member record.
         'member.documents.view',
         'expenses.record', 'membership.fee.collect', 'till.open',
+        // Prompt 364 — Ben's decision: staff weigh jars and fix a jar's weight on *Existencias* (and can do the closing
+        // flower count). A club that disagrees revokes «Hacer recuentos de inventario» from STAFF on Roles y permisos.
+        'stock.take',
         // Prompt 219, the owner's explicit decision, and the 174 shape again: waiving is ROUTINE at this club
         // — therapeutic members, and members already paying at another sede — and one person is usually
         // working, so mirroring `membership.fee.override` (MANAGER+) would mean the common case needs someone

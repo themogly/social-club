@@ -152,7 +152,7 @@ class Help
             'Cada lote es stock real de una genética en una sede. El stock se mueve siempre por el registro de movimientos, nunca a mano.',
             'Consecuencias: poner un lote en cuarentena o cerrarlo lo retira del mostrador. La retirada muestra quién recibió producto de un lote.',
             // Prompts 359–360 — the jar and the sealed reserve.
-            'Un lote de flor tiene su bote (lo que se dispensa) y su reserva sellada (las bolsas cerradas fuera del bote, columna «Reserva»). En el mostrador, «Rellenar» pasa reserva al bote. «Ajuste» pregunta qué corriges, «El bote» o «La reserva sellada», para arreglar un solo lote sin hacer un inventario.',
+            'Un lote de flor tiene su bote (lo que se dispensa) y su reserva sellada (las bolsas cerradas fuera del bote, columna «Reserva»). En el mostrador, la pantalla Existencias muestra todos los botes y la reserva, y desde ahí se rellena, se pasa a reserva y se corrige el peso de un bote. «Ajuste» pregunta qué corriges, «El bote» o «La reserva sellada», para arreglar un solo lote sin hacer un inventario.',
         ]],
         Article::class => ['permission' => 'articles.manage', 'title' => 'Productos', 'body' => [
             'Los productos de barra y tienda (bebidas, comida, merch) y las unidades como prerolls o comestibles. Se dispensan o venden por unidad.',
@@ -372,7 +372,7 @@ class Help
         'Aforo' => 'El número máximo de personas permitido simultáneamente en una sede.',
         'Arqueo' => 'El recuento del efectivo del cajón al cerrar la caja. Se hace a ciegas: se cuenta antes de ver la cifra esperada. (El recuento de flor del cierre pesa solo los botes, no la reserva sellada.)',
         'Reserva (sellada)' => 'Las bolsas cerradas de un lote que se guardan en la sede fuera del bote. No se dispensan ni se pesan al cerrar la caja; se comprueban en el Inventario.',
-        'Rellenar' => 'Pasar gramos de la reserva sellada al bote al abrir una bolsa. Se pulsa en el mostrador, en el panel de la variedad; «Toda la reserva» pasa todo.',
+        'Rellenar' => 'Pasar gramos de la reserva sellada al bote al abrir una bolsa. Se pulsa en el mostrador, en Existencias; «Toda la reserva» pasa todo.',
         'Rellenado sin registrar' => 'Una bolsa abierta en el bote sin pulsar «Rellenar». El recuento de cierre lo detecta, lo corrige solo y lo anota para el responsable en el resumen de cierre y el informe de caja.',
         'Merma' => 'Una pérdida de stock (rotura, deterioro, decomiso), registrada como reducción en el inventario.',
         'Avalador' => 'El socio que avala (presenta) a un aspirante para su alta.',

@@ -180,7 +180,7 @@ class CounterHeroTileTest extends TestCase
     public function test_the_counter_screens_order_is_unchanged(): void
     {
         $this->assertSame(
-            ['counter.checkin', 'counter.members', 'counter.pos', 'counter.bar', 'counter.till'],
+            ['counter.checkin', 'counter.members', 'counter.pos', 'counter.stock', 'counter.bar', 'counter.till'], // 364 — Existencias after Dispensario
             array_column(CounterScreens::forUser(null), 'route'),
         );
     }

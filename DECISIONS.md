@@ -20770,3 +20770,142 @@ testing". The prompt assumes the branch is already on main; it isn't, so 362 is 
     notifications held;
   - `fromLivewire(['a' => valid, 'b' => 5])` keeps `a`, drops the integer and logs `dropped: ['int']`.
 - **The browser probe** used for the negative reproductions stays at `tests/Browser/probe-363-notifications.mjs`.
+
+## Prompt 364 — «Existencias»: a counter screen where staff see every jar and sealed top-up, fix a jar's weight, and top up
+
+Ben: "a button in a separate page in the counter — something like 'view stock' for the staff — where they can quickly
+adjust the batches, like update weights, view what top-ups are in the club, and top up a jar." **Ben's answers:** give
+staff `stock.take`, and merge to main when green.
+
+### The sixth screen and its gate
+
+- **Route and registration.** `GET /counter/existencias` (`counter.stock`), component `App\Livewire\Counter\StockScreen`.
+  In `CounterScreens` it is labelled «Existencias» ("Stock"), with the purpose line «Botes, reserva sellada y
+  rellenar», an archive-box icon, and placed after Dispensario.
+- **Gate:** `pos.use` OR `stock.take`, the same as its `mount()`.
+- **It follows the counter's rules** like every other screen:
+  - the PIN operator's permissions (255/267), the idle lock, and the lock surface;
+  - **handover:** it is in `EnforceCounterHandover`'s screen list, so it shows only the surface. Its Livewire calls
+    are refused by `CounterHandoverConfinement` (global, for every `IdentifiesOperator` component); tested over HTTP;
+  - **training:** a top-up is rolled back (tested over HTTP). Nothing on it is non-rollbackable: no files, no mail.
+  - It now has the `resolveLocation()` that `IdentifiesOperator` needs from its host. Starting a handover from the
+    screen 500'd without it; the browser proof caught that, and a test now pins it.
+- **No open till needed** (`RequireOpenTill` allowlist, and its route classification): topping up or weighing a jar is
+  stock work, not trading, and no drawer is involved.
+
+### What it shows, and the A–Z order
+
+- `App\ViewModels\CounterStockSheet` (read live, never cached) lists every batch at the counter's sede with anything in
+  the jar or the reserve. Each row shows:
+  - the strain and the lote's short subtitle;
+  - «En el bote» ("In the jar"; units for unit products) and «Reserva» when it is above 0;
+  - the price per gram or unit;
+  - «Último recuento: hoy 14:05 · Name», from the new `stock.recounted` audit or a committed count line;
+  - the dispensary's own status words: «Bote vacío — X g en reserva», «Bote bajo, hay reserva» (216's cover verdict on
+    the jar, as the dispensary uses), «Agotado».
+- **Above the list:** a search box (strain or lote number), the filters «Todos / Con reserva / Bote bajo», «Mostrar
+  agotados», and the summary «Reserva sellada en la sede: 45.61 g en 2 lotes».
+- **The order is strain A–Z, then lote oldest first (FEFO).** It is a lookup screen, found the way the jar is found on
+  the shelf, not a log, so it is not newest-first.
+- **Labels:** the row label uses «En el bote», not «Bote», which is already "Pot" (the cash pot) in English.
+
+### Its actions (a panel with the counter's number pad, each shown only to who may do it, refused server-side otherwise)
+
+- **Rellenar / Toda la reserva** and **Pasar a reserva** (`pos.use`): through 359's `TopUpFromReserve` and
+  `MoveToReserve`.
+- **Actualizar peso del bote** (`stock.take`): the COUNTED figure, never a difference, through `RecountBatch`.
+  - **One tapped reason** from 360's quick picks: «Error al pesar», «Derrame / merma», «Rellené sin registrar», or
+    «Otro» with a short line. «Bote no disponible» is left out, since the jar is there being weighed.
+  - A `reasons.optional` holder gets no box and «Aprobado por responsable» is recorded (356).
+- **Añadir a la reserva** (`stock.manage`, so managers and owners) **is built, with an existing writer.** It is the
+  ADJUSTMENT on the reserve that 360's batch Ajuste already uses (`RecordStockMovement` with `reserve: true`, plus a
+  reason, audited `stock.adjusted` on `reserve_cg`). There is no new way to create stock.
+- **Feedback.**
+  - Each action confirms inline in the panel, by its buttons (275), for example «Rellenado: +5.00 g · bote 5.00 g ·
+    reserva 32.61 g»; the row updates.
+  - Errors use the actions' own messages.
+  - Every button has the `wire:loading` double-tap guard.
+- **Panel placement:** the panel comes first and scrolls into view in portrait, and is sticky beside the list in
+  landscape.
+
+### The shared forgotten top-up rule
+
+- `App\Actions\Stock\AbsorbUnrecordedTopUp` is now the ONE place for 359's rule. When a jar is weighed heavier while its
+  batch holds sealed stock, the surplus up to the reserve moves reserve → jar: a `RESERVE_OUT` pair with reason
+  «Rellenado sin registrar», audited `stock.topped_up_unrecorded`, and no stock is created.
+- **Both writers that set a jar to the scale's figure call it:**
+  - the end-of-day count, `CommitStockTake::handle` (its earlier inline copy is gone);
+  - `RecountBatch`, which is the counter's *Actualizar peso* and the panel's *Recuento*.
+- A shortfall never touches the reserve.
+- `RecountBatch` returns `absorbed` and always audits `stock.recounted`, a zero difference included.
+
+### The reserve controls moved out of the dispensary
+
+- **Removed** from the dispensary's weight panel: `data-reserve-panel` (Rellenar, Toda la reserva, Pasar a reserva) and
+  its methods (`topUpJar`, `moveToReserve`, `activeGeneticReserveCg`).
+- **Kept:** «Reserva: X g», the «Con reserva» filter and the empty-jar notice.
+- **The empty-jar card** (nothing to sell, sealed stock waiting) is now a LINK to
+  `/counter/existencias?lote=<id>&from=pos`. The id is the strain's oldest lote with a reserve, in one grid query. The
+  notice reads «Bote vacío — X g en reserva · Rellenar en Existencias».
+  - `?lote=` opens only a lote at the counter's sede in the organisation; a forged id opens nothing (tested).
+- **«Volver al dispensario»** goes back with `?volver=1`. Only then does the dispensary resume the held socio
+  (`CounterBasket::visit`, beside 205's restored basket).
+  - *Judgment call:* restoring the socio on EVERY mount changed established behaviour: renders doubled (the cover-query
+    test) and fresh visits inherited an old socio. The resume is tied to this round trip.
+
+### Ben's answer on `stock.take` for staff
+
+- **STAFF now holds `stock.take` («Hacer recuentos de inventario») by default.** Staff fix a jar's weight on
+  Existencias, and can do the evening flower count. A club that disagrees revokes it on *Roles y permisos*; the next
+  deploy's `csc:sync-permissions` applies the default except where the club overrode it.
+- **Tests that assumed staff lacked it now revoke it first:** `EodStockTakeTest`, and two in `CounterGuidanceTest`.
+- `PanelSectionPermissionsTest` treats `stock.manage` as SAME_JOB, because adding sealed bags on Existencias and
+  managing batches on Lotes are one job.
+
+### Guides and help
+
+- **`counter-quick-start.md`:**
+  - the reserve block now sends staff to *Stock*;
+  - a new «Stock (Existencias)» section (find a jar, top up, move to reserve, update weight, add to reserve);
+  - the word list;
+  - the screenshot `04b-top-up.jpg`, retaken through `shots.json` (the recipe now opens Existencias).
+- **`manager-guide.md`:** *Count* applies the forgotten top-up rule, and the counter's *Stock* screen with its
+  permission note and *Add to reserve*.
+- **Help:** the Lotes topic and the glossary's «Rellenar» point to Existencias.
+- **PDFs:** they regenerate from the same Markdown (353).
+
+### Tests and proof
+
+- **`tests/Feature/Counter/StockScreenTest.php`:** 15 tests, all red before (no route; `RecountBatch` ignored the
+  reserve). They cover:
+  - the screen and its gate, its tile and its order;
+  - Rellenar, with two movements, the audit and the inline confirmation; «Toda la reserva»; more than the reserve;
+  - Pasar a reserva, and more than the jar;
+  - Actualizar peso by staff with a tapped reason; a manager is not asked; without `stock.take` it is hidden and a
+    forged call is refused;
+  - Añadir a la reserva for `stock.manage` only;
+  - `RecountBatch` absorbs before adjusting, beyond it, and never on a shortfall;
+  - the filters, the summary and the empty rows;
+  - the dispensary has no reserve panel, and its empty-jar link;
+  - the trait contract and handover;
+  - handover refusal and the training rollback over HTTP;
+  - a forged `?lote=`.
+- **Updated:**
+  - `SealedReserveTest`: the empty-jar card links to Existencias, and Rellenar happens there;
+  - the screen-order lists, the confirmation-block list, `RequireOpenTillTest`'s classification;
+  - `OneMemberLookupTest`, by renaming the filter to `batchFilter`;
+  - the three `stock.take` tests.
+- **The browser proof** (`tests/Browser/prove-364-existencias.mjs`, a throwaway staging DB with Critical Kush's jar moved
+  into its reserve) passed 19/19 in a touch context:
+  - the round trip at 820×1180: hold a member and add a line → tap the empty-jar card → Existencias opens on that lote →
+    top up 5 g → «Rellenado: +5.00 g · bote 5.00 g · reserva 32.61 g» → «Volver al dispensario» → the same member, one
+    basket line, and Critical Kush sellable again;
+  - the summary and «Con reserva» at 820 and 1180;
+  - panels: staff get the reserve actions and the weigh; a manager also gets «Añadir a la reserva»;
+  - every control is at least 44×44;
+  - no page errors. An earlier run caught `@js()` left uncompiled inside an `<x-button>` attribute, and it was fixed.
+- **Screenshots:** `storage/app/screenshots/364/` (including dark mode).
+- **A latent test bug from 362, found by this gate.** `DemoSeedProfileTest::test_a_seeded_member_can_be_dispensed_to…`
+  excluded members who had dispensations "today" in UTC (`whereDate(now())`). The daily limit counts the SEDE's business
+  day, and every demo sede has been in Madrid since 362. Depending on the random seed, a dispensation at 22:30 UTC
+  yesterday (00:30 today in Madrid) let it pick a member already at the cap. It now uses `BusinessDay::window($location)`.

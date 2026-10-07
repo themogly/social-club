@@ -24,6 +24,7 @@ use App\Livewire\Counter\CheckInScreen;
 use App\Livewire\Counter\CounterHome;
 use App\Livewire\Counter\DispensaryPos;
 use App\Livewire\Counter\MembershipCounter;
+use App\Livewire\Counter\StockScreen;
 use App\Livewire\Counter\TillSession;
 use Illuminate\Support\Facades\Route;
 
@@ -112,6 +113,12 @@ Route::middleware(['web', AuthenticateCounter::class])
 Route::middleware(['web', AuthenticateCounter::class])
     ->get('/counter/pos', DispensaryPos::class)
     ->name('counter.pos');
+
+// Prompt 364 — *Existencias*: every jar and sealed top-up at the counter's sede — top up, move to reserve, fix a jar's
+// weight. Gated in the component on pos.use OR stock.take; every write is an existing stock Action, as the PIN operator.
+Route::middleware(['web', AuthenticateCounter::class])
+    ->get('/counter/existencias', StockScreen::class)
+    ->name('counter.stock');
 
 Route::middleware(['web', 'auth'])
     ->get('/counter/pos/receipt/{dispensation}', [DispensationReceiptController::class, 'show'])

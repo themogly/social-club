@@ -5,7 +5,7 @@ namespace App\Support;
 use App\Models\User;
 
 /**
- * The counter's five destinations and the gate on each — ONE list, in one place (prompt 172).
+ * The counter's destinations (six since prompt 364's *Existencias*) and the gate on each — ONE list, in one place (prompt 172).
  *
  * It lived inline in `components/counter/top-bar.blade.php`, which was fine while the tab strip was its
  * only consumer. The panel's sidebar then needed the same question answered — "can this user reach the
@@ -37,6 +37,7 @@ class CounterScreens
             'counter.checkin' => __('Identifica al socio y registra su entrada'),
             'counter.members' => __('Ficha, cuota y alta de socios'),
             'counter.pos' => __('Dispensa por peso y registra la aportación'),
+            'counter.stock' => __('Botes, reserva sellada y rellenar'),
             'counter.bar' => __('Cobra bebidas y productos'),
             'counter.till' => __('Abre, arquea y cierra la caja'),
             default => '',
@@ -79,6 +80,14 @@ class CounterScreens
                 'label' => __('Dispensario'),
                 'granted' => $terminal || (bool) $user?->can('pos.use'),
                 'icon' => 'M12 3v17.25m0 0c-1.472 0-2.882.265-4.185.75M12 20.25c1.472 0 2.882.265 4.185.75M18.75 4.97A48.416 48.416 0 0 0 12 4.5c-2.291 0-4.545.16-6.75.47m13.5 0c1.01.143 2.01.317 3 .52m-3-.52 2.62 10.726c.122.499-.106 1.028-.589 1.202a5.988 5.988 0 0 1-2.031.352 5.988 5.988 0 0 1-2.031-.352c-.483-.174-.711-.703-.59-1.202L18.75 4.971Zm-16.5.52c.99-.203 1.99-.377 3-.52m0 0 2.62 10.726c.122.499-.106 1.028-.589 1.202a5.989 5.989 0 0 1-2.031.352 5.989 5.989 0 0 1-2.031-.352c-.483-.174-.711-.703-.59-1.202L5.25 4.971Z',
+            ],
+            // Prompt 364 — *Existencias*: every jar and sealed top-up at the sede; top up, move to reserve, fix a jar's
+            // weight. Stock work beside selling, never inside it. Mirrors StockScreen::mount()'s gate.
+            [
+                'route' => 'counter.stock',
+                'label' => __('Existencias'),
+                'granted' => $terminal || (bool) ($user?->can('pos.use') || $user?->can('stock.take')),
+                'icon' => 'm20.25 7.5-.625 10.632a2.25 2.25 0 0 1-2.247 2.118H6.622a2.25 2.25 0 0 1-2.247-2.118L3.75 7.5M10 11.25h4M3.375 7.5h17.25c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125Z',
             ],
             [
                 'route' => 'counter.bar',
