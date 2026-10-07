@@ -20,6 +20,11 @@ class SetTelegramWebhook extends Command
             return self::FAILURE;
         }
 
+        // Prompt 363 — test the token for real first: a rejected one stops here with telegram:check's own message.
+        if ($this->call('telegram:check') !== self::SUCCESS) {
+            return self::FAILURE;
+        }
+
         $response = Telegram::setWebhook(route('telegram.webhook'));
         if (! $response->successful() || ! $response->json('ok')) {
             $this->error('Telegram refused the webhook: '.(string) $response->json('description'));

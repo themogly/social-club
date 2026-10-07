@@ -20,8 +20,10 @@ use Barryvdh\DomPDF\Facade\Pdf;
 use DomainException;
 use Filament\Actions\Action;
 use Filament\Forms\Components\Select;
+use Filament\Forms\Components\Toggle;
 use Filament\Notifications\Notification;
 use Filament\Pages\Page;
+use Filament\Schemas\Components\Utilities\Set;
 use Filament\Support\Icons\Heroicon;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Contracts\View\View;
@@ -62,6 +64,14 @@ class Inventario extends Page
 
     /** @var array<string, string> line id → what was typed */
     public array $entries = [];
+
+    /** @var array<string, string> line id → the sealed reserve typed (prompt 360; weight batches) */
+    public array $reserveEntries = [];
+
+    /** Prompt 360 — «Usar un motivo para todas las diferencias»: one reason for every row with none of its own. */
+    public bool $useSharedReason = false;
+
+    public string $sharedReason = StockCountReason::RESERVE_REGULARISATION->value;
 
     /** @var array<string, string> line id → why it was not counted */
     public array $notCounted = [];
@@ -164,17 +174,31 @@ class Inventario extends Page
     public function startAction(): Action
     {
         return Action::make('start')->label(__('Nuevo inventario'))
-            ->schema([Select::make('location_id')->label(__('Sede'))->options(fn (): array => $this->sedeOptions())->required()
-                ->default(array_key_first($this->sedeOptions()))])
-            ->modalDescription(__('Se crea una línea por cada lote con existencias y cada producto activo de la sede. La barra sigue funcionando mientras se cuenta. Si ya hay un inventario abierto en esa sede, se abre ese.'))
+            ->schema([
+                Select::make('location_id')->label(__('Sede'))->options(fn (): array => $this->sedeOptions())->required()
+                    ->default(array_key_first($this->sedeOptions()))->live()
+                    ->afterStateUpdated(fn (?string $state, Set $set) => $set('include_zero', self::suggestsZero($state))),
+                // Prompt 360 — the go-live cleanup: batches the old evening reweigh zeroed while their bags sat in the back.
+                Toggle::make('include_zero')->label(__('Incluir lotes a cero'))
+                    ->helperText(__('Lista también los lotes de flor que el sistema da por vacíos, para poder darles su bote y su reserva. Los que dejes en blanco no se tocan.'))
+                    ->default(fn (): bool => self::suggestsZero(array_key_first($this->sedeOptions()))),
+            ])
+            ->modalDescription(__('Se crea una línea por cada lote con existencias (en el bote o en reserva) y cada producto activo de la sede. La barra sigue funcionando mientras se cuenta. Si ya hay un inventario abierto en esa sede, se abre ese.'))
             ->action(function (array $data): void {
                 $location = Location::query()->withoutGlobalScopes()->findOrFail($data['location_id']);
                 abort_unless(array_key_exists($location->id, $this->sedeOptions()), 403);
                 /** @var User $user */
                 $user = Auth::user();
-                $take = (new StartStockCount)->handle($location, $user);
+                $take = (new StartStockCount)->handle($location, $user, includeZero: (bool) ($data['include_zero'] ?? false));
                 $this->redirect(self::getUrl(['count' => $take->id]));
             });
+    }
+
+    private static function suggestsZero(?string $locationId): bool
+    {
+        $location = $locationId === null ? null : Location::query()->withoutGlobalScopes()->find($locationId);
+
+        return $location !== null && StartStockCount::suggestsZeroBatches($location);
     }
 
     public function backAction(): Action
@@ -203,14 +227,15 @@ class Inventario extends Page
         return Action::make('apply')->label(__('Aplicar ajustes'))
             ->visible(fn (): bool => $this->count !== null && $this->take()->isOpen())
             ->requiresConfirmation()
-            ->modalDescription(fn (): string => __('Se registrará un ajuste por cada línea con diferencia (:count), con su motivo. Diferencia neta: :value.', [
+            ->modalDescription(fn (): string => trim(__('Se registrará un ajuste por cada línea con diferencia (:count), con su motivo. Diferencia neta: :value.', [
                 'count' => $this->sheet()->totals()['differences'], 'value' => $this->sheet()->totals()['net_value'],
-            ]))
+            ]).' '.$this->sheet()->ceilingWarning()))
             ->action(function (): void {
                 /** @var User $user */
                 $user = Auth::user();
                 try {
-                    (new CommitStockTake)->applyCount($this->take(), $user, $this->reasons);
+                    (new CommitStockTake)->applyCount($this->take(), $user, $this->reasons,
+                        $this->useSharedReason ? StockCountReason::tryFrom($this->sharedReason) : null);
                 } catch (DomainException|RuntimeException $e) {
                     Notification::make()->title($e->getMessage())->danger()->send();
 
@@ -223,7 +248,8 @@ class Inventario extends Page
 
     public function saveLine(string $lineId): void
     {
-        $this->record($lineId, fn (StockTakeLine $line, User $user) => (new RecordStockCountLine)->handle($line, $this->entries[$lineId] ?? '', $user));
+        $this->record($lineId, fn (StockTakeLine $line, User $user) => (new RecordStockCountLine)->handle($line, $this->entries[$lineId] ?? '', $user,
+            reserve: $this->reserveEntries[$lineId] ?? ''));
     }
 
     public function markNotCounted(string $lineId): void
@@ -297,6 +323,7 @@ class Inventario extends Page
     {
         foreach ($this->sheet()->rows() as $row) {
             $this->entries[$row['id']] = $row['counted_input'];
+            $this->reserveEntries[$row['id']] = $row['counted_reserve_input'];
             $this->notCounted[$row['id']] = (string) $row['not_counted_reason'];
             $this->reasons[$row['id']] = ['reason' => $row['reason'], 'note' => (string) $row['note']];
         }

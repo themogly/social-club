@@ -3,7 +3,7 @@ title: Manager guide
 summary: Strains, batches, moving stock, bar products, settings, and the daily and weekly routine.
 audience: managers
 order: 4
-updated: 2026-10-06
+updated: 2026-10-07
 ---
 
 > This guide is for owners and managers. Staff work at the counter; stock, prices, products and checks happen in **Administration**. Everything you change there is recorded in the audit log with your name.
@@ -77,7 +77,7 @@ A batch is a delivery or harvest of one strain: how much arrived, where it is, w
 2. **Locations:** tick every place the stock is going, including the store (*Almacén*).
 3. **Product type**, then **Genetic** (the strain). The strain list only shows strains of that type.
 4. **Name** (optional, for example *"October harvest"*) and **Own batch number** if the grower or supplier has one. Leave it empty and the system makes one.
-5. **Total quantity**, then the grams for each location. **Split equally** divides the total for you.
+5. **Total quantity**, then the grams for each location. **Split equally** divides the total for you. For a single location, **Of which in reserve (sealed)** records how much of it arrives in sealed top-up bags: 500 g with 450 g sealed puts 50 g in the jar and 450 g in the reserve. Staff tap **Top up** at the counter when they open a bag. The **Reserve** column on the Batches list shows the reserve, and each row's ⋮ has **Move to reserve** and **Top up from reserve**.
 6. **Cost per gram** (what the club paid), **Price per gram** (what members pay) and, optionally, the **Eighth price — 3.5 g**.
 7. Dates, laboratory report and photos if you have them. Then **Create**.
 
@@ -116,6 +116,12 @@ Three different actions, depending on what really happened:
 *Add stock at another location: records stock that is already there, as part of the same batch.*
 
 **Count:** type what the scale says. The system works out the difference and records it with your reason. Use this after weighing, rather than **Adjustment**, so nobody has to do the maths.
+
+**Adjustment** asks **What are you correcting?**: **The jar** or **The sealed reserve**. Use it to fix one batch, including setting its reserve, without starting a full stock count. Type the grams to add (or a negative number to take away) and a reason.
+
+![Adjustment: choose The jar or The sealed reserve, then the grams and a reason.](img/manager-guide/c09b-adjust.jpg)
+
+*Adjustment: choose The jar or The sealed reserve, then the grams and a reason.*
 
 ![Count: the counted quantity replaces the system figure, and the difference is recorded.](img/manager-guide/c09-count.jpg)
 
@@ -174,11 +180,36 @@ Drinks, snacks, papers, lighters and merchandise are **products**, sold by unit 
 
 A full count of everything at one location: every batch with stock and every product. Use it weekly or monthly, and whenever something feels wrong.
 
-1. Go to **Stock count → New stock count** and choose the location.
+1. Go to **Stock count → New stock count** and choose the location. **Include empty batches** also lists batches the system thinks are empty (see *Setting up the reserve* below).
 2. Count in any order, over several sessions if needed. The count is **blind**: the system figure is hidden until you review.
-3. Mark anything you cannot count as **Not counted**, with a reason.
-4. **Review** shows only the differences, in grams and €. Big ones need a reason.
-5. **Apply adjustments** posts every correction in one go and produces a printable report.
+3. Each flower batch has **two columns: Jar (g)** and **Sealed reserve (g)**. Weigh the jar, add up the sealed bags, and type both. **Leave one blank and it is not touched**, so you can correct only the reserve, or only the jar. Products counted in units have one figure.
+4. Mark anything you cannot count as **Not counted**, with a reason.
+5. **Review** shows only the differences, jar and reserve in their own columns, in grams and €. Big ones need a reason. **Use one reason for every difference** applies one reason to every line without its own (for example *Regularisation: sealed reserve added*) and asks for no notes; a line's own reason still wins.
+6. **Apply adjustments** posts every correction in one go and produces a printable report with the jar and the reserve in separate columns.
+
+**The reserve is checked here.** The evening flower count at the counter weighs only the jars, so this is where sealed bags are verified.
+
+**The stock ceiling never blocks a count.** A count records what is really there. If the result is over the location's ceiling, the review says so before you apply, and the Dashboard shows the usual ceiling warning.
+
+**Unrecorded top-up:** if a till's closing count found a jar heavier than expected while that batch had a reserve, the close summary and the till report show **Unrecorded top-up**: someone opened a bag without tapping **Top up**. The stock is already correct; it is worth a word with the staff. The till report also shows each jar's difference and the one reason staff gave if the count did not match.
+
+![Stock count: the Jar and Sealed reserve columns on each flower batch.](img/manager-guide/c15-count-two-columns.jpg)
+
+*Stock count: the Jar and Sealed reserve columns on each flower batch.*
+
+![Review: jar and reserve differences side by side, with one reason for every difference.](img/manager-guide/c16-count-review.jpg)
+
+*Review: jar and reserve differences side by side, with one reason for every difference.*
+
+### Setting up the reserve (go-live)
+
+Before the reserve existed, each evening count took the sealed bags out of stock, so some batches read too low, or zero, while their bags sit in the back. Do this once per location:
+
+1. Deploy the update.
+2. Start a **New stock count** for the location with **Include empty batches** ticked (it is ticked for you while no batch there has a reserve yet).
+3. Weigh every jar and add up every sealed bag of each batch. Type the jar in **Jar (g)** and the bags in **Sealed reserve (g)**. Leave empty batches with nothing in the back blank.
+4. Review, tick **Use one reason for every difference** with **Regularisation: sealed reserve added**, and **Apply adjustments**. Batches corrected up from zero reopen and can be dispensed again.
+5. From then on, staff tap **Top up** when they open a bag. The evening count weighs jars only.
 
 ![Stock count: start a New stock count for a location.](img/manager-guide/c14.jpg)
 
@@ -264,6 +295,10 @@ A full count of everything at one location: every batch with stock and every pro
 | Productos · Reponer | Products · Restock |
 | Umbral de stock bajo | Low stock threshold |
 | Inventario · Nuevo inventario | Stock count · New stock count |
+| Bote (g) · Reserva sellada (g) · Incluir lotes a cero | Jar (g) · Sealed reserve (g) · Include empty batches |
+| Usar un motivo para todas las diferencias · Regularización: alta de la reserva sellada | Use one reason for every difference · Regularisation: sealed reserve added |
+| Reserva · Pasar a reserva · Rellenar desde reserva · Rellenado sin registrar | Reserve · Move to reserve · Top up from reserve · Unrecorded top-up |
+| ¿Qué corriges? · El bote · La reserva sellada | What are you correcting? · The jar · The sealed reserve |
 | Informes → Cajas · Horas del personal | Reports → Tills · Staff hours |
 | Descuentos y ajustes · Deudores | Discounts & adjustments · Debtors |
 | Solicitudes | Applications |

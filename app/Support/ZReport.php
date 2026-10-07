@@ -6,8 +6,11 @@ use App\Enums\CashPot;
 use App\Enums\DispensationStatus;
 use App\Enums\OrderStatus;
 use App\Enums\TillSessionStatus;
+use App\Models\Batch;
 use App\Models\Dispensation;
 use App\Models\Order;
+use App\Models\StockTake;
+use App\Models\StockTakeLine;
 use App\Models\TillSession;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
@@ -93,6 +96,13 @@ class ZReport
                 'post_close_adjusted' => $postCloseAdjusted,
                 'transaction_count' => ($dispCounts[$id]['total'] ?? 0) + ($orderCounts[$id]['total'] ?? 0),
                 'rounding' => $rounding[$id] ?? 0,
+                // Prompt 359 — sealed top-ups opened into a jar without «Rellenar», absorbed by this session's close count.
+                'unrecorded_topup_cg' => (int) StockTakeLine::query()
+                    ->whereHas('stockTake', fn ($q) => $q->withoutGlobalScopes()->where('location_id', $session->location_id)
+                        ->where('opened_at', '>=', $session->opened_at)->where('opened_at', '<=', $session->closed_at ?? now()))
+                    ->sum('unrecorded_topup_cg'),
+                // Prompt 360 — the close count's one answer (asked only when it was off) beside its per-jar variances.
+            ] + self::closeCount($session) + [
                 'voids' => ($dispCounts[$id]['voided'] ?? 0) + ($orderCounts[$id]['voided'] ?? 0),
                 'opened_at' => $session->opened_at,
                 'closed_at' => $session->closed_at,
@@ -102,6 +112,29 @@ class ZReport
         }
 
         return $out;
+    }
+
+    /**
+     * Prompt 360 — the evening flower count(s) taken during this session at its sede: the one reason staff gave (only asked
+     * when the count was off), and each jar's variance, revealed here as on the close summary.
+     *
+     * @return array{stock_count_reason: ?string, stock_count_lines: list<string>}
+     */
+    private static function closeCount(TillSession $session): array
+    {
+        $takes = StockTake::query()->withoutGlobalScopes()->with('lines.countable')
+            ->where('location_id', $session->location_id)->where('kind', StockTake::KIND_TILL_RECOUNT)
+            ->where('opened_at', '>=', $session->opened_at)->where('opened_at', '<=', $session->closed_at ?? now())->get();
+
+        $lines = $takes->flatMap(fn (StockTake $take) => $take->lines)->map(function (StockTakeLine $line): string {
+            $name = $line->countable instanceof Batch ? $line->countable->displayName() : '—';
+
+            return $line->not_counted
+                ? $name.': '.__('No contado')
+                : $name.': '.(($v = (int) $line->getRawOriginal('variance_cg')) === 0 ? __('sin diferencia') : ($v > 0 ? '+' : '').Weight::fromCentigrams($v)->formatted());
+        })->values()->all();
+
+        return ['stock_count_reason' => $takes->pluck('reason')->filter()->first(), 'stock_count_lines' => $lines];
     }
 
     /**

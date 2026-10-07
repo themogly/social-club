@@ -252,12 +252,16 @@ class SystemHealth
      * Prompt 311 — the *Avisos* row: Telegram configured, when alerts were last evaluated (its own heartbeat, every 15
      * minutes), and the alert messages that failed for good in the last 7 days.
      *
-     * @return array{telegram: bool, last_evaluation: array{last_at: ?CarbonInterface, age_seconds: ?int, stale: bool, threshold_seconds: int}, failed_last_7_days: int}
+     * Prompt 363 — and whether Telegram is REJECTING the bot token (it answered 401/404 since the last good send): "filled
+     * in" is not "working", and every alert silently went to email while this read green.
+     *
+     * @return array{telegram: bool, telegram_rejected_at: ?CarbonInterface, last_evaluation: array{last_at: ?CarbonInterface, age_seconds: ?int, stale: bool, threshold_seconds: int}, failed_last_7_days: int}
      */
     public function alerts(): array
     {
         return [
             'telegram' => Telegram::configured(),
+            'telegram_rejected_at' => Telegram::configured() ? Telegram::tokenRejectedAt() : null,
             'last_evaluation' => $this->component('alerts', 3 * 900),
             'failed_last_7_days' => AuditLog::query()->withoutGlobalScopes()->where('action', 'alert.failed')->where('created_at', '>=', now()->subDays(7))->count(),
         ];

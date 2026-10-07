@@ -256,9 +256,31 @@
                 </div>
                 <p class="mt-1 text-sm text-ink-muted dark:text-slate-400">
                     {{-- Copy matches the FILTER: touched since intake (remaining ≠ initial), not "dispensed today" (prompt 91). --}}
-                    {{ __('Pesa cada lote de flor tocado desde su entrada e introduce los gramos contados. Si no puedes contar un bote, márcalo como no contado e indica el motivo — su stock no se tocará. El peso esperado se revela solo después de confirmar (recuento a ciegas).') }}
+                    {{ __('Pesa solo el bote de cada lote de flor tocado desde su entrada e introduce los gramos; las bolsas selladas no se pesan. Si no puedes pesar un bote, márcalo como no contado — su stock no se tocará. El peso esperado se revela solo después de confirmar (recuento a ciegas).') }}
                 </p>
 
+                @if ($reweighAsking)
+                    {{-- Prompt 360 — ONE question for the whole count, only because something is off. Blind: no jar, no amount,
+                         nothing to re-weigh towards; the variances are revealed after, as before. One tap answers it. --}}
+                    <div data-reweigh-reason-box x-data="{ other: '' }" class="mt-5 rounded-xl border border-warning/50 bg-surface p-4 dark:bg-slate-900">
+                        <h3 class="text-base font-semibold text-ink dark:text-slate-100">{{ __('El recuento no cuadra — ¿qué ha pasado?') }}</h3>
+                        <p class="mt-1 text-sm text-ink-muted dark:text-slate-400">{{ __('Elige lo que ha pasado. Una respuesta vale para todo el recuento; el responsable verá el detalle después.') }}</p>
+                        <div class="mt-3 grid gap-2 sm:grid-cols-2">
+                            @foreach (\App\Enums\CloseCountReason::cases() as $pick)
+                                @continue($pick === \App\Enums\CloseCountReason::OTHER)
+                                <x-button variant="secondary" size="lg" wire:click="submitReweigh('{{ $pick->value }}')" data-reweigh-reason-pick="{{ $pick->value }}">{{ $pick->label() }}</x-button>
+                            @endforeach
+                        </div>
+                        <div class="mt-2 flex gap-2">
+                            <input type="text" x-model="other" maxlength="120" autocomplete="off" aria-label="{{ __('Otro motivo') }}" placeholder="{{ __('Otro motivo…') }}"
+                                   class="h-14 min-w-0 flex-1 rounded-xl border border-line bg-surface px-4 text-base text-ink placeholder:text-ink-muted focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/40 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100">
+                            <x-button variant="secondary" size="lg" x-bind:disabled="other.trim() === ''" x-on:click="$wire.submitReweigh('OTHER', other)" data-reweigh-reason-pick="OTHER">{{ __('Otro') }}</x-button>
+                        </div>
+                        <div class="mt-3">
+                            <x-button variant="secondary" size="lg" wire:click="cancelClose" class="w-full">{{ __('Cancelar') }}</x-button>
+                        </div>
+                    </div>
+                @else
                 <form wire:submit="submitReweigh" class="mt-5 space-y-4">
                     @foreach ($reweighBatches as $batch)
                         @php $notCounted = $reweighNotCounted[$batch->id] ?? false; @endphp
@@ -282,16 +304,7 @@
                             </div>
 
                             @if ($notCounted)
-                                <input
-                                    type="text"
-                                    wire:model="reweighReasons.{{ $batch->id }}"
-                                    data-reweigh-reason="{{ $batch->id }}"
-                                    autocomplete="off"
-                                    aria-label="{{ __('Motivo por el que no se puede contar') }}"
-                                    placeholder="{{ __('Motivo (p. ej. bote no localizado)') }}"
-                                    class="mt-2 h-14 w-full rounded-xl border border-warning/50 bg-warning/5 px-4 text-base text-ink placeholder:text-ink-muted focus:border-warning focus:outline-none focus:ring-2 focus:ring-warning/40 dark:text-slate-100"
-                                >
-                                <p class="mt-1 text-xs text-warning">{{ __('No contado: el stock de este lote no se modificará. Un responsable lo revisará.') }}</p>
+                                <p class="mt-2 text-xs text-warning" data-reweigh-not-counted="{{ $batch->id }}">{{ __('No contado: el stock de este lote no se modificará. Un responsable lo revisará.') }}</p>
                             @else
                                 <div class="mt-2 flex items-center gap-2">
                                     <input
@@ -318,6 +331,7 @@
                         <x-button type="submit" variant="warning" size="lg" class="flex-1">{{ __('Confirmar recuento') }}</x-button>
                     </div>
                 </form>
+                @endif
             </section>
 
         @elseif ($closing)
@@ -327,6 +341,9 @@
                     {{-- Reweigh revealed: the variances, now that the blind count is committed. --}}
                     <div class="mb-5 rounded-xl border border-line bg-surface p-4 dark:border-slate-700 dark:bg-slate-900">
                         <h3 class="text-sm font-semibold text-ink dark:text-slate-100">{{ __('Recuento de flor registrado') }}</h3>
+                        @if ($reweighReason)
+                            <p class="mt-1 text-sm text-ink-muted dark:text-slate-400" data-reweigh-reason>{{ __('Motivo: :reason', ['reason' => $reweighReason]) }}</p>
+                        @endif
                         <ul class="mt-2 space-y-1 text-sm">
                             @foreach ($reweighResult as $line)
                                 <li class="flex items-center justify-between gap-3">
@@ -338,6 +355,9 @@
                                             {{ $line['counted'] }} <span class="text-warning">({{ __('ajuste') }} {{ $line['variance'] }})</span>
                                         @else
                                             {{ $line['counted'] }} <span class="text-success">{{ __('sin diferencia') }}</span>
+                                        @endif
+                                        @if ($line['unrecorded_topup'] ?? null)
+                                            <span class="block text-xs font-normal text-ink-muted dark:text-slate-400" data-unrecorded-topup>{{ __('Rellenado sin registrar: :grams', ['grams' => $line['unrecorded_topup']]) }}</span>
                                         @endif
                                     </span>
                                 </li>

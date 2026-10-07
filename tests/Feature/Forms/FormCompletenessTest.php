@@ -94,6 +94,7 @@ class FormCompletenessTest extends TestCase
             'price_per_eighth_cents' => 'entered as euros via price_per_eighth_eur at intake; changed later by the Precio action (278).',
             'initial_cg' => 'entered as grams; converted on intake by IntakeBatch (WEIGHT genetics).',
             'remaining_cg' => 'system-computed: maintained by the stock-movement ledger.',
+            'reserve_cg' => 'system-computed (prompt 359): the sealed reserve, moved only through the stock writer — set on intake by «De ello, en reserva», then «Rellenar» / «Pasar a reserva».',
             'initial_units' => 'entered as units; recorded on intake by IntakeBatch (UNIT genetics).',
             'remaining_units' => 'system-computed: maintained by the stock-movement ledger.',
             'cost_per_gram_cents' => 'entered as euros via cost_per_gram_eur.',

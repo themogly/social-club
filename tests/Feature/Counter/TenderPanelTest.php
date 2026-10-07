@@ -64,6 +64,8 @@ class TenderPanelTest extends TestCase
         $this->location = Location::factory()->create(['organisation_id' => $this->org->id]);
         app(ActiveScope::class)->setLocation($this->location->id);
         session(['counter.location_id' => $this->location->id]);
+        // Prompt 355 — these are TENDER tests on a 5.4 g basket (€54): the half-gram rounding (5.5 g) is HalfGramRoundingTest's.
+        Settings::set('charge_rounding_enabled', false, SettingType::BOOL, (string) $this->location->id);
 
         $this->owner = User::factory()->create();
         $this->owner->assignRole(Role::OWNER->value);

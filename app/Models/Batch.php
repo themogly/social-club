@@ -35,7 +35,7 @@ class Batch extends Model
 
     protected $fillable = [
         'organisation_id', 'genetic_id', 'parent_batch_id', 'location_id', 'batch_no', 'lote_seq', 'label',
-        'acquired_or_harvested_on', 'expires_on', 'initial_cg', 'remaining_cg',
+        'acquired_or_harvested_on', 'expires_on', 'initial_cg', 'remaining_cg', 'reserve_cg',
         'initial_units', 'remaining_units',
         'cost_per_gram_cents', 'price_per_gram_cents', 'price_per_unit_cents', 'price_per_eighth_cents',
         'lab_report_path', 'images', 'notes', 'status',
@@ -48,6 +48,8 @@ class Batch extends Model
             'expires_on' => 'date',
             'initial_cg' => WeightCast::class,
             'remaining_cg' => WeightCast::class,
+            // Prompt 359 — sealed top-ups of this batch at its sede, off the counter (the jar is remaining_cg).
+            'reserve_cg' => WeightCast::class,
             'lote_seq' => 'integer',
             'initial_units' => 'integer',
             'remaining_units' => 'integer',

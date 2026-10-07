@@ -4,6 +4,7 @@ namespace App\Http\Requests;
 
 use App\Models\MemberApplication;
 use App\Support\ApplicationShape;
+use App\Support\ApplicationSpamGuard;
 use App\Support\CounterHandover;
 use App\Support\DocumentUpload;
 use App\Support\KeptUploads;
@@ -84,6 +85,7 @@ class SubmitApplicationRequest extends FormRequest
         $application = MemberApplication::query()->withoutGlobalScopes()->where('invite_token_hash', hash('sha256', $token))->first();
         if ($application !== null) {
             KeptUploads::keep($token, $application, $this->allFiles());
+            ApplicationSpamGuard::recordFailedAttempt($token); // prompt 362 — a real person; the clock no longer applies
         }
 
         SignupTrace::record('application.invalid', [

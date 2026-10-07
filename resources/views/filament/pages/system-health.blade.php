@@ -354,10 +354,17 @@
              message fail for good this week. --}}
         <x-filament::section :heading="__('Avisos')" icon="heroicon-o-bell-alert">
             <div style="display:flex;align-items:center;gap:.5rem;margin-bottom:.5rem;">
-                <x-filament::badge :color="$alerts['last_evaluation']['stale'] ? 'danger' : ($alerts['failed_last_7_days'] > 0 ? 'warning' : 'success')">
-                    {{ $alerts['last_evaluation']['stale'] ? __('Sin evaluación reciente') : ($alerts['failed_last_7_days'] > 0 ? __('Revisar') : __('Funcionando')) }}
+                <x-filament::badge :color="($alerts['last_evaluation']['stale'] || $alerts['telegram_rejected_at']) ? 'danger' : ($alerts['failed_last_7_days'] > 0 ? 'warning' : 'success')">
+                    {{ $alerts['last_evaluation']['stale'] ? __('Sin evaluación reciente') : ($alerts['telegram_rejected_at'] ? __('Revisar') : ($alerts['failed_last_7_days'] > 0 ? __('Revisar') : __('Funcionando'))) }}
                 </x-filament::badge>
             </div>
+            {{-- Prompt 363 — Telegram answering 401/404: the token is wrong. Alerts are going by email meanwhile. --}}
+            @if ($alerts['telegram_rejected_at'])
+                <p data-alerts-telegram-rejected role="alert" style="margin:0 0 .5rem;font-size:.875rem;font-weight:600;color:#dc2626;">
+                    {{ __('Token de Telegram rechazado — revisa TELEGRAM_BOT_TOKEN') }}
+                    <span style="display:block;font-weight:400;opacity:.85;">{{ __('Último rechazo: :when. Los avisos se envían por correo mientras tanto. Comprueba el token con «php artisan telegram:check».', ['when' => $alerts['telegram_rejected_at']->translatedFormat('j M H:i')]) }}</span>
+                </p>
+            @endif
             <dl style="font-size:.875rem;display:grid;gap:.35rem;">
                 <div style="display:flex;justify-content:space-between;gap:1rem;">
                     <dt style="opacity:.65;">{{ __('Telegram configurado') }}</dt>

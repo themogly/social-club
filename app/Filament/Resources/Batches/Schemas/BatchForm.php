@@ -170,6 +170,23 @@ class BatchForm
                             ->required(fn (Get $get): bool => ! self::isUnitGenetic($get('genetic_id')) && ! self::isSplit($get))
                             ->visible(fn (string $operation, Get $get): bool => $operation === 'create' && ! self::isUnitGenetic($get('genetic_id'))),
 
+                        // Prompt 359 — of the total received, how much is in sealed top-up bags (bags arrive weighed, or staff
+                        // weigh them up): only the TOTAL, never a bag count. The jar gets the rest.
+                        DecimalInput::make('reserve_grams')
+                            ->label(__('De ello, en reserva (sellado)'))
+                            ->helperText(__('Bolsas selladas de este lote en la sede, fuera del bote. El recuento de cierre solo pesa el bote; en el mostrador, «Rellenar» las pasa al bote.'))
+                            ->numeric()
+                            ->rule(new GramAmount)
+                            ->minValue(0)
+                            ->rule(fn (Get $get): \Closure => function (string $attribute, mixed $value, \Closure $fail) use ($get): void {
+                                $reserve = DecimalInput::number($value);
+                                $total = DecimalInput::number($get('grams'));
+                                if ($reserve !== null && $total !== null && $reserve > $total) {
+                                    $fail(__('La reserva no puede superar la cantidad recibida.'));
+                                }
+                            })
+                            ->visible(fn (string $operation, Get $get): bool => $operation === 'create' && ! self::isUnitGenetic($get('genetic_id')) && ! self::isSplit($get)),
+
                         TextInput::make('units')
                             ->label(fn (Get $get): string => self::isSplit($get) ? __('Cantidad total (uds)') : __('Cantidad (uds)'))
                             ->numeric()

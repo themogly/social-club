@@ -26,6 +26,7 @@ class StockTake extends Model
     protected $fillable = [
         'organisation_id', 'location_id', 'kind', 'opened_by', 'opened_at',
         'committed_by', 'committed_at', 'cancelled_by', 'cancelled_at', 'status', 'notes',
+        'reason', // prompt 360 — the end-of-day weigh's one answer when the count was off (copied onto its adjustments)
     ];
 
     protected function casts(): array

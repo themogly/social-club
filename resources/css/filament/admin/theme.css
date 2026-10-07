@@ -76,6 +76,25 @@
     }
 }
 
+/* 1b. Prompt 362 — Batches' first column (strain, then a long description line) wraps rather than run under the pinned ⋮
+       on a phone. It keeps a readable width: the phone's width less the selection box and the pin, so one batch is one
+       block and the next columns sit to the right (reached by scrolling), never squeezed to a word per line. */
+@media (max-width: 1279px) {
+    .fi-ta-table td[data-batch-lote-cell] {
+        min-width: 16rem;
+    }
+
+    .fi-ta-table td[data-batch-lote-cell] * {
+        white-space: normal;
+    }
+}
+
+@media (max-width: 639px) {
+    .fi-ta-table td[data-batch-lote-cell] {
+        min-width: calc(100vw - 9.5rem);
+    }
+}
+
 /* 2. Make the horizontal scroll DISCOVERABLE. iOS shows no persistent scrollbar, so a table that scrolls
       sideways is indistinguishable from a table that is simply cut off — which is half of why this was
       reported as broken rather than as awkward. A right-edge fade appears only while there is more to

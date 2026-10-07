@@ -20098,6 +20098,380 @@ through 316's one display rule, `NumberFormat::decimal()`, following the existin
   - `RoundTripPinsTest` (add, then remove the second line) now merges and edits back to 2 g;
   - `DispensaryCalculatorTest` (1.5 g typed plus €20 back-solved) now expects the merged 3.50 g line.
 
+## Prompt 355 — charge for the weight rounded to the half gram, eighths included, with a staff on/off switch
+
+**Branch `feat/355-359-half-gram-rounding-and-reserve`, NOT merged** (Ben, 6 Oct 2026: "run this last on a separate
+branch … don't merge to main"; 359 goes on the same branch, "2 big changes so needs lots of testing").
+
+### The rule, and Ben's two answers
+
+- **Every weight line has two weights:**
+  - **weighed** (`grams_cg`, unchanged): what left the jar. Stock, the daily and monthly limits, the legal ceiling,
+    the register and the recount read only this;
+  - **charged** (`dispensation_lines.charged_cg`, new): what the member pays for.
+- **The rule:** `charged = max(0.5 g, nearest 0.5 g)` (`App\Support\ChargeRounding::charged`, integer centigrams).
+  Ben chose:
+  - **«nearest»**, as the prompt assumed (1.30 g → 1.5 g; 3.40 g → 3.5 g, an eighth);
+  - **exact halves round DOWN** (0.75 → 0.5; 1.25 → 1.0), the member-friendly choice.
+- **Unit products are unaffected** (`charged_cg` is null on unit lines).
+
+### Its place in the pricing order
+
+1. **Charged grams per weight line,** on the line's total, once, by one helper used by the counter's preview AND the
+   commit.
+2. **Per-gram totals on charged grams.** `ResolvePrice::priceParts(…, $chargedCg)` keeps each batch part's WEIGHED qty
+   for stock and prices it on its share of the charged grams. `ChargeRounding::overParts` applies the difference from
+   the last part backwards, never below zero, so the parts' charged grams add up exactly. Each part is still priced at
+   its own batch's rate with the discount (278).
+3. **The eighth break on charged grams.** `applyEighthBreaks()` receives charged grams and the per-gram totals from
+   step 2, so the never-pay-more floor compares like with like. When it applies, the commit splits the line total over
+   the parts by their CHARGED grams.
+4. **350's whole-euro rounding**, unchanged.
+5. **A manual price adjustment** (356), unchanged: it replaces the final total.
+
+### Rounding is per line
+
+- **Each line rounds on its own; an eighth group then sums the charged grams.** 1.20 g + 2.30 g of two strains
+  sharing a €32 eighth → 1.0 + 2.5 = 3.5 g → €32.00, split 1.0 : 2.5 (€9.14 / €22.86, no lost cent). Tested.
+- Two strains sharing an eighth price group across the basket, exactly as before. The browser proof gives one strain
+  no eighth, so the switch's difference shows.
+
+### The switch: kept per staff session, server-held, audited
+
+- **«Redondeo 0.5 g»** sits in the cart column just above the total. It's a 44 px row and the commit button stays
+  above the fold at 820×1180 and 1180×820 (proved).
+- **Who:** anyone who can dispense (`pos.use`), for **themselves at this sede**.
+- **It's held in the server session** under `counter.charge_rounding.{operator}.{sede}`:
+  - it survives visits, a member change, an idle lock and the same PIN again;
+  - another person's PIN starts from the sede default (or their own earlier choice this session);
+  - another sede has its own;
+  - it ends with the browser session.
+- **«(cambiado)»** shows while it differs from the sede default.
+- **Flipping re-prices the basket at once.** Each flip is audited as `counter.rounding.toggled` (who, sede, on/off).
+- **The commit reads the flag from the server.** `DispensaryPos::chargeRoundingOn()` passes `charge_rounding` into
+  `CommitDispensation` (also via the combined settle), so the preview and the commit always agree, and no request
+  field can change it. A caller passing nothing (seeders, tests) gets no rounding.
+- **The starting value is a per-sede setting:** «Redondeo del peso cobrado» (`charge_rounding_enabled`), on by
+  default, on the *Mostrador* section of the sede form. Existing sedes read the code default (Activado) with no data
+  migration, like 351's `dispensary_sort`.
+
+### Recorded and shown
+
+- **Stored:** `dispensation_lines.charged_cg` (`WeightCast`) and `dispensations.charge_rounding`. Changing the setting
+  later never rewrites a past sale (tested). Pre-355 rows have `charged_cg` null, which reads as not rounded.
+- **The basket:** «1.10 g · se cobra 1.00 g». **The receipt:** the weighed grams, plus «se cobra …» when different.
+- **Refunds:** the amount is capped at `total_cents` (what was charged) and the grams at the weighed grams (tested).
+- **Reports:** revenue reads charged amounts and weight totals read weighed grams. No report derives an average €/g.
+
+### Tests and proof
+
+- **`tests/Feature/Pricing/HalfGramRoundingTest.php`** (28 at €10/g with a €32 eighth; 26 red before, while history
+  and the refund cap needed the code to differ). It covers:
+  - the rule table, with both ties;
+  - prices, each also checked on the counter's preview (preview = commit):
+    - 1.10 → €10 and 0.20 → €5;
+    - 3.40 / 3.60 → €32, 3.20 → €30, 4.10 → €37, 6.90 → €64;
+    - off: 1.10 → €11, 3.40 → €34, 3.60 → €33;
+  - the two-line eighth group;
+  - the floor;
+  - stock, limits and the receipt;
+  - a line across two batches, with and without the eighth (charged 0.70 + 0.30 over weighed 0.70 + 0.40; stock by
+    the weighed parts);
+  - stable history, the refund caps, and unit products;
+  - the switch: sede default, re-pricing, the server flag at commit, audit, `(cambiado)`, two consecutive visits
+    unrounded, lock and same PIN, another person, another sede.
+- **`TenderPanelTest`** turns rounding off at its sede. It's a tender test on a 5.4 g basket, which would now charge
+  5.5 g.
+- **The browser proof** (`tests/Browser/prove-355-half-gram.mjs`, a fresh demo DB at 820×1180 and 1180×820, staff)
+  passed 8/8:
+  - ON: «1.10 g · se cobra 1.00 g», 3.40 g takes the eighth, €42;
+  - OFF: €45 with «(cambiado)»;
+  - the button stays above the fold;
+  - each flip is audited;
+  - no page errors.
+- **The guide:** `counter-quick-start.md` has a «Half-gram rounding» paragraph.
+
+## Prompt 359 — sealed top-up bags are a reserve the end-of-day count doesn't expect, and «Rellenar» moves them into the jar
+
+**Same branch as 355, NOT merged** (Ben: "this should be done after 355 and merged on to the same branch … 2 big changes
+so needs lots of testing").
+
+### The reserve lives inside the batch, not in ALMACEN and not in transfers
+
+- **The batch holds two figures at its sede:**
+  - `remaining_cg`, the JAR on the counter (unchanged in meaning);
+  - `reserve_cg` (new), its SEALED top-ups off the counter: integer centigrams, ≥ 0, default 0.
+- **Why not the store (`LocationKind::ALMACEN`) and `TransferBatch` (277):** a part transfer always creates a new child
+  batch at the destination and never adds to one already there. Every opened bag would become another batch at the
+  sede, and another line in the evening count: exactly the extra work the club asked to avoid. Hence a second figure
+  inside the batch.
+- **Weight products only.** Unit products (pre-rolls, edibles, vapes) get no reserve in this prompt. The writer refuses
+  a reserve move on a unit batch.
+
+### Who reads which figure
+
+| reads the JAR (`remaining_cg`) only | reads jar + reserve (on the premises) |
+|---|---|
+| dispensing and FEFO allocation (`SelectBatch`, `AllocateFromBatches`) | the legal stock ceiling (`StockCeiling::onSiteCg`) — non-negotiable |
+| the end-of-day reweigh's expected figure (`CommitStockTake::handle`) | stock value and the stock report (`StockReport`: Bote, Reserva, Restante = their total) |
+| the counter's «En stock» and the card's figure | low stock / reorder (`StockCover::onHandCgFor`, the dashboard alerts and the member app's availability) |
+
+### Moving stock between jar and reserve: one total, two movements, one transaction
+
+- **`RESERVE_IN` / `RESERVE_OUT` are moves WITHIN the batch.** Each is a pair of rows through the one stock writer
+  (`RecordStockMovement` with the new `reserve: true` option, which locks the row and never goes negative), one on
+  each figure, netting to zero, so stock and register totals never change. `stock_movements.on_reserve` says which
+  figure a row touched.
+- **The writers:**
+  - **«Rellenar»**: `TopUpFromReserve`, reserve → jar, `RESERVE_OUT`, audited `stock.topped_up`. `null` means «Toda la
+    reserva». It refuses 0, a negative amount, or more than the reserve;
+  - **«Pasar a reserva»**: `MoveToReserve`, jar → reserve, `RESERVE_IN`, audited `stock.reserved`. It refuses more than
+    the jar.
+  - **Who:** anyone with `pos.use`, as the PIN operator (staff do this all day).
+- **Intake:** «De ello, en reserva (sellado)» beside the quantity on *Crear lote*, for a single sede (the strain form's
+  «Crear lote» opens the same page). It's ONE `INTAKE` of the total, then a `RESERVE_IN` pair for the sealed share:
+  500 g with 450 g sealed is jar 50 + reserve 450.
+  - A split intake (303) takes no per-sede reserve field: move bags with «Pasar a reserva» afterwards.
+- **Only a total is ever asked for, never a bag count.**
+
+### At the counter
+
+- **Every strain with a reserve** shows «Reserva: 30.00 g» in its card's meta line and in its weight panel.
+- **«Con reserva»** (beside *Filtros*) is a view-only chip, filtered in the browser like 293's, listing only strains
+  with spare top-ups.
+- **An empty jar with a reserve is not «Sin lote».** It reads «Bote vacío — 30.00 g en reserva · Rellenar», and its card
+  stays tappable so the panel's «Rellenar» is one tap away. FEFO still never draws from the reserve (tested).
+- **«Bote bajo, hay reserva»** shows when the JAR alone is low by 216's cover verdict and a reserve exists: a prompt to
+  top up, not to reorder. Reordering is judged on jar + reserve.
+- **The weight panel's controls:**
+  - «Rellenar» moves the grams typed on the pad;
+  - «Toda la reserva» moves the whole reserve;
+  - «Pasar a reserva» moves the typed grams the other way.
+  - «Rellenar» draws from the strain's OLDEST batch that has a reserve (FEFO's order); «Pasar a reserva» from the FEFO
+    jar batch. When several batches of one strain hold reserves, Rellenar empties the oldest first; the panel's
+    «Rellenar desde reserva» row action reaches any one batch.
+
+### The end-of-day count: no more work than today
+
+- **The reweigh screen is unchanged:** one line per batch, blind, the same fields, no bag questions (tested on the view
+  source and in the browser).
+- **Its expected figure is the jar,** so a correct count of a jar reconciles to zero whatever is sealed in the back.
+  The prompt's before-state was a −450 g adjustment for 450 g of bags.
+- **The reweigh lists batches that were touched,** `remaining_cg + reserve_cg <> initial_cg` (it was `remaining_cg <>
+  initial_cg`). A batch whose bags merely sit there, or one that was only topped up, adds no line.
+- **A forgotten «Rellenar» is absorbed.** A jar counted OVER, while its batch has a reserve, absorbs the surplus up to
+  the reserve as an unrecorded top-up: a `RESERVE_OUT` pair (reason «Rellenado sin registrar»), audited
+  `stock.topped_up_unrecorded`, with no stock created. Only a surplus beyond the reserve becomes an ADJUSTMENT. The
+  line stores `unrecorded_topup_cg`.
+- **The manager sees it, staff are never asked:**
+  - «Rellenado sin registrar: 10.00 g» on the close summary;
+  - on the Z report (`unrecorded_topup_cg`: the session's sede, stock takes opened during the session);
+  - on the panel's till-session page.
+- **A jar counted UNDER is a real shortfall,** as before. The reserve is never touched to cover it (tested).
+
+### The full inventory counts the reserve
+
+- ~~Inventario (318) gives each batch with a reserve its OWN line, «Reserva sellada» (`stock_take_lines.reserve`).~~
+  **Superseded by prompt 360 on this same branch:** the reserve is a second figure on the batch's own row, and the
+  `reserve` column never shipped (removed from 359's migration). This, not the daily close, is where sealed stock is
+  verified.
+
+### Also
+
+- **Panel:**
+  - the Batches list gets a toggleable «Reserva» column;
+  - the row ⋮ gets «Pasar a reserva» and «Rellenar desde reserva» after *Recuento* (340's order pin updated);
+  - the edit page leaves `reserve_cg` out of the form fill, like the other weight columns.
+- **Guides:** `counter-quick-start.md` has a «Sealed top-ups (reserve)» paragraph, and `manager-guide.md` has the
+  intake field, the row actions and the inventory's «Sealed reserve» line.
+
+### Tests and proof
+
+- **`tests/Feature/Stock/SealedReserveTest.php`** (11, all red before; most could not run without the column). It
+  covers:
+  - the count leaves 450 g of bags alone;
+  - Rellenar: two movements and the audit, «Toda la reserva», and refusals for 0, negative and more than the reserve;
+  - Pasar a reserva, and its refusal;
+  - an empty jar shows «Bote vacío … Rellenar», FEFO ignores the reserve, and the counter's Rellenar works;
+  - a low jar with a reserve shows the hint and on-hand reads jar + reserve;
+  - a forgotten Rellenar: counted 15 g against 5 g + 10 g reserve is absorbed with no adjustment; counted 20 g is 10 g
+    absorbed + 5 g adjusted; the Z report shows it;
+  - a shortfall is untouched;
+  - the ceiling includes the reserve;
+  - the intake split is one INTAKE;
+  - the full inventory's reserve line adjusts only the reserve;
+  - the reweigh: no bag fields, and no lines for untouched or merely topped-up reserves.
+- **The browser proof** (`tests/Browser/prove-359-reserve.mjs`, a fresh demo DB plus two reserve strains, 820×1180)
+  passed 8/8:
+  - «Reserva: 30.00 g»;
+  - «Con reserva» lists just the two;
+  - the empty jar says «Bote vacío … Rellenar» and can be tapped;
+  - the panel offers Rellenar and Toda la reserva, and Toda la reserva moved 30 g;
+  - the manager's close: the reweigh asks nothing about bags; a jar counted 10 g over gives «Rellenado sin registrar:
+    10.00 g», with the jar and reserve correct and no ADJUSTMENT;
+  - no page errors.
+- **Screenshots:** `storage/app/screenshots/359/`.
+- **Tested together** (`tests/Feature/Stock/RoundingAndReserveTogetherTest.php`), a day with 355's rounding on and a
+  sealed reserve:
+  - 1.10 g charged €10 while the jar falls by exactly 1.10 g and the reserve is untouched;
+  - a 5 g top-up, then 3.40 g charged as the eighth (€32);
+  - the ceiling sees jar + bags;
+  - jar + reserve equals the intake less exactly what was weighed out;
+  - the evening count of the jar reconciles to zero with no adjustment.
+- **`FormCompletenessTest`'s allowlist documents `reserve_cg`:** it is system-computed, like `remaining_cg`.
+
+
+## Prompt 360 — the admin stock count corrects the jar and the sealed reserve separately, the end-of-day weigh asks one reason only when it's off, and every guide says so
+
+**Built on 359's branch** (`feat/355-359-half-gram-rounding-and-reserve`), committed on top, pushed, **not merged**, as the
+prompt says. 359's tests stay green; its separate «Reserva sellada» line is replaced (see the note in 359's entry).
+
+### 1. Inventario: one row per batch, two counts
+
+- **Each weight batch's row has «Bote (g)» and «Reserva sellada (g)».** `stock_take_lines` gains `expected_reserve_cg`,
+  `counted_reserve_cg`, `variance_reserve_cg` (nullable) in the new migration `2026_10_07_200000`.
+  - `RecordStockCountLine` snapshots BOTH expected figures when the row is saved (318's rule: a sale between counting and
+    applying is never counted twice).
+  - Either figure may be blank, which means that figure is untouched. Both blank is still *No contado* with its reason.
+  - Unit products keep one count.
+- **The system figures follow the sede's blind setting, as before** (`stock_count_show_expected`). When it is on, both are
+  shown on the row; the review always shows both. *Judgment call:* the prompt asks for "each with its expected figure",
+  but Inventario is blind by default on purpose (318), and this keeps that one switch in charge.
+- **The reserve movement marker: ADJUSTMENT with the recorded bucket** (`stock_movements.on_reserve`, which 359 added),
+  not a new type. One adjustment type, two figures.
+  - The stock report's movements table groups by type and bucket («Ajuste · reserva sellada»), so a reserve correction is
+    never folded into a jar one. It also labels 359's RESERVE_IN / RESERVE_OUT («Pasar a reserva» / «Rellenar»).
+  - The stock-take variances table gains reserve expected / counted / variance columns.
+  - The audit names the figure (`reserve_cg`).
+  - Also fixed: 359's stock report «Bote» column header read "Pot" in English (the cash-pot key). It is now «En el bote» /
+    "In the jar".
+
+### The zero-batch toggle and its default
+
+- **«Incluir lotes a cero»** sits in the *Nuevo inventario* modal. It also lists every WEIGHT batch at the sede with
+  nothing in the jar or the reserve, as an `optional` row.
+  - An optional row left blank is skipped: it is never "pending", never blocks «Aplicar ajustes», never touched, and is
+    left out of the PDF.
+- **Its default (`StartStockCount::suggestsZeroBatches`)** is ON while the sede looks like the cleanup is still to do: no
+  batch there holds a reserve yet, AND an evening reweigh (`kind != inventory`) has adjusted some batch below zero. It is
+  OFF once reserves exist. *Reading of the prompt:* "any sede batch has `reserve_cg = 0`" is read as "no batch has a
+  reserve yet", because nearly every batch has a zero reserve after go-live and the default would never turn off.
+- **A batch corrected upward from a CLOSED state is reopened** (status OPEN, audited `batch.reopened`), so the counter
+  can sell it. Batches only close by hand here, so "depleted" is just zero stock, which is already sellable once
+  restocked.
+
+### The shared regularisation reason
+
+- **«Usar un motivo para todas las diferencias»** sits beside «Aplicar ajustes», with a reason select defaulting to the
+  new `StockCountReason::RESERVE_REGULARISATION`, «Regularización: alta de la reserva sellada».
+  - It stands in for every row with no reason of its own and asks for no note.
+  - A row's own reason (with its note) still wins.
+  - The rows say «Motivo común» and «Supera la tolerancia: lo cubre el motivo común» while it is on.
+- **356:** a holder of `reasons.optional` is never made to type a note. A reason (their own or the shared one) is still
+  picked, because the prompt waives the note, not the reason.
+- **The tolerance applies per figure.** Jar and reserve are each checked against their own expected figure
+  (`CommitStockTake::beyondTolerance`, shared with section 3).
+- **Layout.** The review's reason and note moved to their own row under each difference, so the six figure columns fit a
+  laptop width.
+
+### The ceiling never blocks a correction
+
+- `applyCount` never checks the premises ceiling: a count records what is there; it isn't intake.
+- `StockCountSheet::ceilingWarning()` tells the review (`data-count-ceiling`) and the apply confirmation when the
+  counted result (on-site plus the net jar and reserve differences) would be over the sede's ceiling.
+- The dashboard's ceiling warning then shows as usual. This is tested with a BLOCK ceiling.
+
+### 2. Ajuste: Bote / Reserva
+
+- The batch's **Ajuste** asks «¿Qué corriges?»: «El bote» / «La reserva sellada» (weight batches only), with the current
+  figures in its help. It keeps the same permission and audit, and writes the same ADJUSTMENT, with `reserve` set for the
+  reserve.
+- The labels use new keys because «Bote» alone is already "Pot" (a cash pot) in English.
+
+### 3. The end-of-day weigh: one reason, only when it's off, staying blind
+
+- **When:** after staff submit the weights, before anything commits, `CommitStockTake::closeCountIsOff()` decides. The
+  count is off when either:
+  - a jar is marked «No contado»; or
+  - a jar's difference, after 359's forgotten-top-up absorption (a surplus up to the reserve is not "off"), is beyond
+    Inventario's tolerance.
+- **If nothing is off,** the close carries on exactly as before, with no question (pinned).
+- **If something is off,** ONE box: «El recuento no cuadra — ¿qué ha pasado?». Its quick picks come from the
+  `CloseCountReason` enum: «Error al pesar», «Derrame / merma», «Rellené sin registrar», «Bote no disponible», and «Otro»
+  with a short line (max 120).
+  - One tap answers it.
+  - The per-jar reason fields for «No contado» are gone; one answer covers the whole count.
+  - **The server decides,** so the screen cannot skip it.
+- **356:** a `reasons.optional` operator is not asked; «Aprobado por responsable» is recorded when the count was off.
+- **Blind:** the box names no jar and no amount, and while it is up the jar list is hidden, so it does not invite
+  re-weighing to hit a number. The per-jar variances are revealed after the close, as before. Cancel starts the close
+  over; `resetCloseState` now also clears the «No contado» marks, which it never did.
+- **Stored once, copied where it is needed:**
+  - `stock_takes.reason` (new column);
+  - every adjustment's reason (instead of «Recuento de inventario»);
+  - every «No contado» line with no reason of its own;
+  - the `stocktake.committed` audit payload.
+- **Where the manager sees it:**
+  - the close summary («Motivo: …» above the revealed variances);
+  - the Z report (`stock_count_reason`, plus `stock_count_lines` with each jar's variance);
+  - the panel's till-session page («Recuento de flor» and «Motivo del recuento de flor»).
+  - The Z report reads only till recounts (`kind = till_recount`) taken during the session at its sede.
+
+### 4. The documents
+
+- **Guides** (`resources/guides/en/`; `updated` bumped):
+  - **counter-quick-start:** the reserve block (Reserve: X g, With reserve, the empty jar with a reserve, Top up / All of
+    the reserve / Move to reserve, a forgotten Top up handled); the close recount (weigh the jars only, sealed bags not
+    weighed, the one question); the word list (Rellenar, Reserva, El recuento no cuadra…).
+  - **cash-at-the-counter:** the close section (jars only, a forgotten Top up, the one reason box).
+  - **manager-guide:** intake «Of which in reserve (sealed)»; Ajuste's choice; Inventario's two columns, «Include empty
+    batches», the shared reason, the ceiling; «Unrecorded top-up» on the close summary and till report; the Batches
+    «Reserve» column; the **«Setting up the reserve (go-live)»** checklist; the word list.
+- **Screenshots** go through the pipeline (`resources/guides/shots.json`):
+  - retaken: `04-dispensary-weigh`, `10-close-recount`, `c08-add-stock`, `c09-count`;
+  - new: `04b-top-up`, `10b-close-reason`, `c09b-adjust`, `c15-count-two-columns`, `c16-count-review`.
+  - The shooter gains a `clickAll` step. `10b` needs a closer without «Aprobar sin motivo», so the "about" note says to
+    grant the demo STAFF `till.close` + `stock.take` first.
+  - The demo seed gives Amnesia Haze a sealed quarter through `IntakeBatch`'s `reserve_grams` (the fixture rule), so the
+    reserve shows on a fresh install. `DemoSeedProfileTest` now reconciles the jar and the reserve ledgers separately.
+- **PDFs** regenerate from the same Markdown (content-hashed cache, 353). Checked: the rendered page and the PDF text of
+  all three guides carry the new passages.
+- **In-app help (`Help.php`):** the Inventario page help (two figures, blank untouched, the toggle, the shared reason, the
+  ceiling); Lotes (jar and reserve, Rellenar, Ajuste's choice); the till-day guide's reweigh step (jars only, a forgotten
+  Rellenar, the single question and its quick picks). The intake field already carried its help (359), and Ajuste's
+  choice shows the current jar and reserve.
+- **Glosario:** adds «Reserva (sellada)», «Rellenar» and «Rellenado sin registrar». «Arqueo» notes that the closing
+  flower count weighs only the jars.
+- **There is no Spanish guide source anywhere** (only `resources/guides/en/`, plus each guide's Spanish word list). None
+  was created, as the prompt asks.
+
+### Tests and proof
+
+- **`tests/Feature/Stock/ReserveCountAndCloseReasonTest.php`** has 13 tests; 1, 3, 11 and 12 were seen red. It covers:
+  - two counts on one row → −200 cg on the jar and +40000 cg on the reserve as two movements, with the PDF showing both;
+  - a blank figure is untouched;
+  - a batch zeroed by a past reweigh is listed by default, corrected, reopened and FEFO-sellable, while an untouched
+    empty row blocks nothing;
+  - 30 differences with the shared reason and no typing, and without it a big difference still needs its own reason;
+  - a BLOCK ceiling: applied and warned;
+  - Ajuste with Bote / Reserva;
+  - staff can't open Inventario;
+  - the close weigh: all within tolerance → no box; one jar off → exactly one blind box, with the answer on the take,
+    the movement and the Z report; two off plus one «No contado» → one box covering all three, with no per-jar field; a
+    forgotten top-up absorbed → no box; a manager → no box and «Aprobado por responsable».
+- **`tests/Feature/Guides/ReserveInTheGuidesTest.php`** has 4 tests: the guides name Rellenar and Reserva; the close
+  section says jars only and one reason, and no longer says "Weigh each batch listed" or "give a reason"; the manager
+  guide has the columns, toggle, shared reason and checklist; the help and glossary exist in both languages.
+- **Updated:**
+  - `SealedReserveTest` (359's inventory test now uses the same-row reserve);
+  - `DemoSeedProfileTest` (reconciles each figure).
+- **The browser proof** (`tests/Browser/prove-360.mjs`, a throwaway `csc:seed-staging` DB) passed 9/9 at 820×1180 touch,
+  light and dark:
+  - the off count shows exactly one box, with no per-jar field and no grams or jar names;
+  - every jar typed at its system figure asks nothing and reveals «no difference»;
+  - «Include empty batches» shows in the start modal (off there, because the demo has reserves).
+- **Screenshots** are in `storage/app/screenshots/360/`, plus the guide images above (Inventario's two columns, the
+  review with the shared reason and the ceiling warning, the Ajuste choice).
 ## Prompt 361 — a drawn signature counts without «Guardar firma», staff carry on when the tablet comes back unsigned, photos survive a form error, and the invitation email works when its button doesn't
 
 From Ben's video at the club. Merged to main on Ben's instruction ("this should go onto main branch and pushed"),
@@ -20231,3 +20605,160 @@ although the prompt says not to merge.
 - **Screenshots** are in `storage/app/screenshots/361/`.
 - **The guide** (`counter-quick-start.md`) has a new step 4, «Falta la firma», a handover note (signature counts once
   drawn, the unsigned confirm, kept photos), and a glossary row.
+
+## Prompt 362 — fixes from testing 354–361 and the 355/359 branch
+
+**On `feat/355-359-half-gram-rounding-and-reserve`, not merged.** Ben: "run this but don't merge to main as still
+testing". The prompt assumes the branch is already on main; it isn't, so 362 is built on top of the branch.
+
+### 0. The merge
+
+- `main` (`cf85530`, 361) was merged INTO the branch, as merge commit `80c4c85`. Git combined it with no conflicts at
+  all, `DECISIONS.md` included: both sides' appended entries were kept, in prompt order (355, 359, 360, then 361, then
+  this).
+- The full suite (`es` pinned, then `en`) passed on the merged tree: 2,955 tests, 355's, 359's, 360's and 361's
+  together, including `RoundingAndReserveTogetherTest` with 361's form changes.
+- `main` itself is unchanged.
+
+### 1. The spam guard: a real sign-up is never silently discarded after a form error
+
+- **The cause.** `ApplicationSpamGuard` re-issued the signed render time on every render, including the redisplay after
+  a refusal. Since 361 the photos survive that refusal, so an applicant who fixed one field and pressed Enviar again
+  within 3 s saw «¡Gracias!» and was never registered.
+- **Before (test 1, red):** the resubmit redirected to the thank-you page and the application kept `submitted_at = null`
+  ("the applicant saw «¡Gracias!» and was not registered").
+- **The rule now:**
+  - **The clock starts at the FIRST render.** `issueToken($token)` keeps a per-token "first rendered at" in the session
+    and embeds that, so a redisplay carries the original time.
+    - *Judgment call:* the session, not the submitted `form_started_at`. It covers the redisplay without reading back
+      a client value.
+  - **A form already refused once is not "impossibly fast".** `recordFailedAttempt($token)` is called on a
+    FormRequest failure and on the action's own refusals. That flag, or kept uploads for the token, skips the
+    ELAPSED-time check.
+  - **A handover skips it too.** The applicant is at the counter, signed in through staff.
+  - **The honeypot always applies,** including after a refusal and during a handover.
+  - **So does the token's validity.** It must decrypt and not be in the future, so a forged render time is still
+    automation in every case.
+  - **Every silent discard is logged:** `Log::warning('application.discarded')` plus `SignupTrace`, with the
+    application id, the signal (`honeypot` | `token` | `timing`) and the route.
+  - The applicant still sees the identical «¡Gracias!».
+  - The rate limit, the honeypot field and a bot's response are unchanged.
+- **Tests:** `tests/Feature/Socio/SpamGuardAfterAFormErrorTest.php` (5 tests; 1, 2 and 4 seen red).
+  1. A quick fix after a refusal is stored, with the kept photo.
+  2. A first impossibly fast submit is discarded and logged with `timing`.
+  3. The honeypot is discarded after a refusal and on the tablet.
+  4. A quick handover submit is stored.
+  5. A future-dated or garbage token is discarded.
+
+### 2. `ActiveSedeTest::test_a_tampered_return_url_falls_back_to_the_dashboard`
+
+- **Reproduced on a fresh clone of the branch** (`.env.example`, a new `key:generate`, the built assets). It failed:
+  `Expected 500 but received 419`.
+- **The cause is not CSRF.** The request DOES reach the component, and Livewire throws
+  `CannotUpdateLockedPropertyException`. That exception renders a bare **419** when `APP_DEBUG` is false, to avoid
+  leaking details, and lets Laravel show a **500** error page when it is true.
+  - Ben's `.env` has `APP_DEBUG=true`; `.env.example` has `false`; `phpunit.xml` doesn't pin it. So the test passed in
+    one checkout and failed in the other.
+- **The fix is in the test only.** It sets `app.debug` false (production's answer), asserts **419**, and asserts that
+  the response's exception is `CannotUpdateLockedPropertyException`: it was the lock that refused it, not anything else.
+  - No change to CSRF, `#[Locked]`, or the app's debug setting.
+  - It passes in both checkouts.
+- **A fresh clone also needs `npm run build`** (or the Vite manifest is missing and panel pages 500). That is the normal
+  setup, but worth knowing for CI.
+
+### 3. The dev seed's time zones
+
+- Every demo location is now `Europe/Madrid`: Centro (which was UTC) and the store (also UTC), like Norte.
+- Centro keeps its midnight cutoff (prompt 105); Norte keeps 06:00 (prompt 271).
+- Tests that deliberately use UTC set it themselves and are unchanged. The seed-dependent suites pass.
+
+### 4. The pinned ⋮ on Batches on a phone
+
+- **Measured at 393×852** (`tests/Browser/measure-362-pin.mjs`, all 26 list screens of 354's sweep: the pinned cell's
+  left edge against the text of each row's first data column).
+- **Before:** Batches failed. The Lote subtitle ended at x 341–346, under the ⋮ at 329.
+- **The fix.** Below 1280 px the theme lets Batches' Lote cell (`data-batch-lote-cell`) wrap, inside a minimum width:
+  16rem, or the phone's width less 9.5rem below 640 px. One batch reads as one block, its subtitle wraps clear of the ⋮,
+  and the next columns sit to the right (scrolled to), never squeezed.
+  - A plain Filament `->wrap()` was tried first and rejected. It made the column collapse to a word per line on the
+    phone, and wrapped on desktop too (row height 125 vs 81).
+  - Desktop is unchanged: the cell is 81 px at 1440 and 1280, as before.
+- **After:** 26 of 26 pass.
+- **Screenshots:** `storage/app/screenshots/362/batches-393.png` (light and dark), plus 820 and 1280/1440.
+
+## Prompt 363 — two production errors from Sentry: Telegram answering 401, and a Filament notifications TypeError
+
+**On `feat/355-359-half-gram-rounding-and-reserve`, not merged** (Ben: "one more to add to this branch").
+
+### 1. Telegram 401/404: the bot token is wrong, so no retries, email instead, and one report an hour
+
+- **Before (test 1, red):** `SendTelegramMessage` threw `Telegram answered 401`, so the job retried four times per alert,
+  sent four Sentry errors, and the owner's alert never arrived until the morning email. Test 4 also found a real leak: a
+  timeout's `ConnectionException` message is cURL's, with the URL, and the URL holds the bot token.
+- **401 and 404 are configuration** (a wrong, revoked or malformed token), so `Telegram::rejectsToken()` covers both.
+  On either, the job:
+  - **does not retry** and lets no exception escape to the queue;
+  - **sends the same alert by email** to the same person, in their language. The new `TelegramAlertByEmailMail`
+    carries the text they would have read in Telegram; it is in `/dev/mail` and the render test;
+  - **flags the fault:** `Telegram::markTokenRejected()` caches `telegram.token_rejected_at`;
+  - **reports to Sentry at most once an hour** (`Cache::add` on a one-hour key), as `TelegramTokenRejectedException`.
+    Its message names the setting and the commands, never the token;
+  - audits `alert.failed` with `error: token_rejected` and `fallback: email`.
+- **A good send clears the flag.** `telegram:check` clears it too when the token is accepted.
+- **403 is unchanged:** the person blocked the bot, so their link is cleared and they get one "disconnected" email.
+- **429** releases the job with Telegram's `parameters.retry_after` (30 s if absent).
+- **5xx and timeouts** keep the retries. A timeout now rethrows as `Telegram unreachable`, without the URL.
+- **Salud del sistema → Avisos** shows «Token de Telegram rechazado — revisa TELEGRAM_BOT_TOKEN» in red, with when it
+  was last seen and the check command, while the flag is set. The badge goes to «Revisar».
+- **`php artisan telegram:check`** calls Telegram's `getMe` and prints the bot's @username, or the exact HTTP status
+  and description with how to fix it. It never prints the token.
+  - `telegram:set-webhook` runs it first and stops on a rejected token.
+  - `.env.example`'s Telegram comment mentions it.
+- **The token never reaches Sentry.**
+  - `SentryScrubber` now scrubs `/bot<id>:<secret>` from exception values and the event message (`before_send`).
+  - A new `before_breadcrumb` (`SentryScrubber::breadcrumb`) scrubs outgoing-request breadcrumbs' URL and message.
+  - It matches by shape, never by the configured value.
+- **Tests:** `tests/Feature/Alerts/TelegramTokenRejectedTest.php` (8, all red before):
+  1. a 401 sends email, with no retry and the flag set;
+  2. ten 401s give one report and ten emails, and a second report after an hour;
+  3. a 404 behaves like a 401;
+  4. a 500 retries, a timeout retries with no token in the message, and a 429 waits 5 s;
+  5. a 403 is unchanged;
+  6. a good send clears the flag and the health row;
+  7. `telegram:check` handles a good and a bad token, and `set-webhook` refuses a bad one without calling Telegram;
+  8. no token in the report, the logs, a breadcrumb or an event.
+- **Ops (Ben, on the server):**
+  - In @BotFather, go to /mybots → the bot → API Token and copy the current token.
+  - In Ploi, set `TELEGRAM_BOT_TOKEN` (and check `TELEGRAM_BOT_USERNAME`), then run `php artisan config:cache`,
+    `php artisan telegram:check` and `php artisan telegram:set-webhook`.
+  - Check that the Sentry issue stops recurring.
+
+### 2. `Collection::fromLivewire(): Argument #1 ($notification) must be of type array, int given` — diagnosis in progress, NO fix shipped
+
+- **The prompt rule:** don't fix until we can say what sent the integer. The Sentry event hasn't been pasted yet.
+- **What the investigation established:**
+  - **The mechanism.** Replayed over HTTP against the real update endpoint with debug on, an update that replaces the
+    WHOLE `notifications` property with a structure holding an integer gives exactly the production message:
+    - `{"notifications": {"x": 5}}` → 500 with the TypeError;
+    - `{"notifications": [5]}` → 500 with the TypeError;
+    - `{"notifications.x": 5}` → 200 (a nested update is ignored safely);
+    - `{"notifications": 5}` → a different TypeError.
+    - So it arrives through Livewire 4.4's `HandleSynths::hydratePropertyUpdate`, not from the snapshot. The panel
+      snapshot holds `notifications: [[], {s: wrbl}]`, and a checksum-verified snapshot cannot carry the integer.
+  - **Who doesn't send it:**
+    - Filament's notifications view and `notification.js` never write `$wire.notifications`; they only call
+      `removeNotification` / `handleBroadcastNotification`.
+    - Our `app/` and `resources/` never touch it.
+  - **The browser reproductions, all negative** (`tests/Browser/probe-363-notifications.mjs`, a staging-seeded DB):
+    - a toast followed by a second Livewire action (3 times);
+    - closing a toast while a search request was in flight (3 times);
+    - counter → Administración after a notice.
+    - Six toasts in all, every Livewire response 200, and nothing in the log.
+  - **Not tried:** a tab left open across the 25 September deploy (a 4.3.3 snapshot against 4.4.6). It can't be
+    replayed without that old page.
+- **What would settle it:** the Sentry event's request URL and method, the user agent and browser, the release, how many
+  times and since when, and the breadcrumbs.
+  - Our Sentry config sends **no request body** (`max_request_body_size => 'none'`), so the update payload itself will
+    NOT be in the event.
+  - If the event doesn't settle it, the next step proposed to Ben is a narrow log (component, update keys, value types,
+    user agent) on updates that replace `notifications`. That is instrumentation, not a fix.

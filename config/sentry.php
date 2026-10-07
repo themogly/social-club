@@ -26,6 +26,10 @@ return [
     // ARRAY, not a Closure — a closure in config breaks `config:cache`.
     'before_send' => [SentryScrubber::class, 'handle'],
 
+    // Prompt 363 — an outgoing request to Telegram puts the bot token in its URL (`/bot<token>/…`): scrubbed from every
+    // breadcrumb before it is recorded.
+    'before_breadcrumb' => [SentryScrubber::class, 'breadcrumb'],
+
     // Breadcrumbs record what happened before the error. SQL BINDINGS are the dangerous ones: they carry the
     // literal values of whatever was being written — a document number, an email, a PIN hash comparison.
     'breadcrumbs' => [

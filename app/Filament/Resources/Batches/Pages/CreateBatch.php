@@ -115,6 +115,7 @@ class CreateBatch extends CreateRecord
             $this->intakeQuantity = trans_choice(':count unidad|:count unidades', $units, ['count' => $units]);
         } else {
             $intake['grams'] = $data['grams'];
+            $intake['reserve_grams'] = filled($data['reserve_grams'] ?? null) ? (string) $data['reserve_grams'] : 0; // prompt 359
             // "g" is a unit symbol, not translatable copy; only the number varies.
             $this->intakeQuantity = Weight::fromGrams((string) $data['grams'])->formatted(); // the one formatter — rtrim read 250 as "25 g"
         }

@@ -3,7 +3,7 @@ title: Cash at the counter
 summary: Cash pots, expenses, cash in and out, banking and handovers.
 audience: staff
 order: 2
-updated: 2026-10-02
+updated: 2026-10-07
 ---
 
 > Every euro that goes into or out of the drawer is recorded with **who** did it and **why**. That is what lets the cash count at closing come out right, and what explains it when it does not. This guide shows which button to use for each situation. It follows on from the *Counter quick-start guide*.
@@ -108,7 +108,13 @@ When one person finishes and another takes over during the same day, **do not cl
 
 ## 6. Closing and differences
 
-At the end of the day, **Close till · cash count** starts with the flower recount, as described in the *Counter quick-start guide*. Then comes the blind cash count, pot by pot:
+At the end of the day, **Close till · cash count** starts with the flower recount, as described in the *Counter quick-start guide*:
+
+- **Weigh the jars only.** Sealed bags in the reserve are not counted at closing; managers check them in the stock count.
+- If you opened a bag without tapping **Top up**, the count puts it right by itself and tells the manager (*Unrecorded top-up*).
+- **The one reason box** only appears when the count does not match: **The count doesn't match — what happened?** Pick what happened (*Weighing error*, *Spill / wastage*, *Topped up without recording*, *Jar not available*, or **Other** with a few words). One answer covers the whole count, so there is never a reason to type per jar. The box does not show which jar or by how much; the differences appear after the close, with your answer beside them on the till report.
+
+Then comes the blind cash count, pot by pot:
 
 - **Dispensary counted (€) — including the float:** always counted, every night.
 - **Bar** and **Fees:** each has **Count now** or **Not counted today**. Your club chooses which is ticked by default.

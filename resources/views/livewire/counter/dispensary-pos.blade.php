@@ -307,6 +307,27 @@
                             </div>
                         @endif
 
+                        {{-- Prompt 359 — the sealed top-ups of this strain at this sede, and the two moves staff make all day:
+                             «Rellenar» (bag → jar, the grams typed on the pad, or «Toda la reserva») and «Pasar a reserva» (jar →
+                             bags). Weight products only; one tap each, as the PIN operator. --}}
+                        @if (! $activeGenetic->isUnitType())
+                            @php $activeReserveCg = $this->activeGeneticReserveCg(); @endphp
+                            <div data-reserve-panel class="mt-3 rounded-xl border border-line bg-surface px-3 py-2 dark:border-slate-700 dark:bg-slate-950">
+                                <p class="text-sm font-medium text-ink-muted dark:text-slate-400">{{ __('Reserva: :grams', ['grams' => $this->grams($activeReserveCg)]) }}</p>
+                                <div class="mt-2 flex flex-wrap gap-2">
+                                    @if ($activeReserveCg > 0)
+                                        <button type="button" data-top-up x-on:click="$wire.topUpJar(value === '' ? null : value)"
+                                                class="inline-flex min-h-11 items-center rounded-xl border border-brand/40 bg-brand-tint px-3 text-sm font-semibold text-brand dark:bg-slate-800 dark:text-slate-100">{{ __('Rellenar') }}</button>
+                                        <button type="button" data-top-up-all x-on:click="$wire.topUpJar(null)"
+                                                class="inline-flex min-h-11 items-center rounded-xl border border-line px-3 text-sm font-medium text-ink-muted dark:border-slate-700 dark:text-slate-300">{{ __('Toda la reserva') }}</button>
+                                    @endif
+                                    <button type="button" data-move-to-reserve x-on:click="value !== '' && $wire.moveToReserve(value)"
+                                            class="inline-flex min-h-11 items-center rounded-xl border border-line px-3 text-sm font-medium text-ink-muted dark:border-slate-700 dark:text-slate-300">{{ __('Pasar a reserva') }}</button>
+                                </div>
+                                <p class="mt-1 text-[11px] text-ink-muted dark:text-slate-400">{{ __('Escribe los gramos en el teclado y toca Rellenar (de la reserva al bote) o Pasar a reserva (del bote a bolsas selladas).') }}</p>
+                            </div>
+                        @endif
+
                         {{-- One request in flight: only this button shows a loading state, and a double tap adds one line. --}}
                         {{-- Prompt 358 — the same pad edits a basket line (tap the line): the button then says so. --}}
                         <x-button size="lg" class="mt-4 w-full" data-add-line @click="add()" x-bind:disabled="adding" x-bind:aria-busy="adding">{{ $editingLine !== null ? __('Actualizar') : __('Añadir a la cesta') }}</x-button>
@@ -482,6 +503,14 @@
                             <span x-show="activeFilters > 0" x-cloak x-text="activeFilters" class="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-brand px-1.5 text-[11px] font-bold text-white"></span>
                             <span aria-hidden="true" x-text="filtersOpen ? '▴' : '▾'">&#9662;</span>
                         </button>
+                        {{-- Prompt 359 — «Con reserva»: only the strains with spare sealed top-ups ("staff want to see what spare
+                             top-ups there are"). View-only, like every catalogue filter (293). --}}
+                        @if ($head['hasReserve'] ?? false)
+                            <button type="button" data-view-only data-reserve-filter x-show="source === 'genetics'"
+                                    x-on:click="reserveOnly = ! reserveOnly" aria-pressed="false" x-bind:aria-pressed="reserveOnly ? 'true' : 'false'"
+                                    class="ml-2 inline-flex min-h-11 items-center rounded-full border px-4 text-sm {{ $chipOff }}"
+                                    x-bind:class="{ '{{ $chipOn }}': reserveOnly, '{{ $chipOff }}': ! reserveOnly }">{{ __('Con reserva') }}</button>
+                        @endif
 
                         <div x-show="filtersOpen" x-cloak>
                             @foreach ($filterRows as [$rowSource, $axis, $heading, $allLabel, $options])
@@ -542,7 +571,8 @@
                              class="mt-4 as-list:flex as-list:flex-col as-list:gap-2 as-grid:grid as-grid:gap-3 as-grid:sm:grid-cols-2">
                             {{-- Prompt 271 — the variety's photo, 193's rule: the column only when some variety has one. --}}
                             @foreach ($gen['rows'] as $g)
-                                @php $disabledCard = ! $gen['hasMember'] || ! $g['has_batch']; @endphp
+                                {{-- Prompt 359 — an empty jar with sealed top-ups is NOT «agotado»: tapping it opens the pad for «Rellenar». --}}
+                                @php $disabledCard = ! $gen['hasMember'] || (! $g['has_batch'] && $g['reserve_cg'] <= 0); @endphp
                                 <button
                                     type="button"
                                     @if (! $disabledCard) x-on:click="window.counterPane.remember(); $wire.chooseGenetic('{{ $g['id'] }}')" @endif
@@ -553,6 +583,7 @@
                                     data-type="{{ $g['product_type'] }}"
                                     data-strain="{{ $g['strain_type'] }}"
                                     data-search="{{ $g['name'] }}"
+                                    data-reserve="{{ $g['reserve_cg'] }}"
                                     @foreach ($g['rank'] ?? [] as $order => $rank) data-rank-{{ $order }}="{{ $rank }}" @endforeach
                                     x-bind:style="{ order: rankOf($el) }"
                                     x-show="visible($el)"
@@ -586,6 +617,8 @@
                                             @endif
                                             @if ($g['cultivation'])<span>{{ $g['cultivation'] }}</span>@endif
                                             @if ($g['price_label'])<span class="font-medium text-brand dark:text-slate-300">{{ $g['price_label'] }}</span>@endif
+                                            {{-- Prompt 359 — the spare sealed top-ups of this strain at this sede. --}}
+                                            @if ($g['reserve_cg'] > 0)<span data-reserve-line class="font-medium text-ink dark:text-slate-200">{{ __('Reserva: :grams', ['grams' => $this->grams($g['reserve_cg'])]) }}</span>@endif
                                         </span>
                                     </span>
 
@@ -595,12 +628,22 @@
                                          tile: on one line that could not wrap, "499,00 g ● Con lote" ran past a portrait tile's
                                          edge. The figure and the dot never shrink; the status word truncates as a last resort
                                          and keeps its full text in `title`. List view is unchanged. --}}
-                                    @php($statusWord = $g['has_batch'] && $g['low_stock'] ? ($g['cover_label'] ?? __('Stock bajo')) : ($g['has_batch'] ? __('Con lote') : __('Sin lote')))
+                                    @php
+                                        $statusWord = match (true) {
+                                        ! $g['has_batch'] && $g['reserve_cg'] > 0 => __('Bote vacío — :grams en reserva · Rellenar', ['grams' => $this->grams($g['reserve_cg'])]),
+                                        $g['jar_low'] => __('Bote bajo, hay reserva'), // prompt 359 — top up, don't reorder
+                                        $g['has_batch'] && $g['low_stock'] => $g['cover_label'] ?? __('Stock bajo'),
+                                        $g['has_batch'] => __('Con lote'),
+                                        default => __('Sin lote'),
+                                    };
+                                    @endphp
                                     <span class="flex shrink-0 items-center gap-3 text-xs as-list:sm:flex-col as-list:sm:items-end as-list:sm:gap-0.5 as-grid:w-full as-grid:min-w-0 as-grid:shrink as-grid:flex-col as-grid:items-start as-grid:gap-0.5">
                                         <span class="text-sm font-semibold text-brand tabular-nums dark:text-slate-100">{{ $this->money($g['rate_cents']) }}/{{ $g['is_unit'] ? __('ud') : 'g' }}</span>
                                         <span data-genetic-stock class="flex min-w-0 max-w-full items-center gap-1.5 whitespace-nowrap text-ink-muted dark:text-slate-400">
                                             <span class="shrink-0 tabular-nums">{{ $g['is_unit'] ? $g['remaining_units'].' '.__('uds') : $this->grams($g['remaining_cg']) }}</span>
-                                            @if ($g['has_batch'] && $g['low_stock'])
+                                            @if (! $g['has_batch'] && $g['reserve_cg'] > 0 || $g['jar_low'])
+                                                <span data-jar-top-up title="{{ $statusWord }}" class="inline-flex min-w-0 items-center gap-1 text-brand dark:text-slate-200"><span class="h-2 w-2 shrink-0 rounded-full bg-brand"></span><span class="truncate">{{ $statusWord }}</span></span>
+                                            @elseif ($g['has_batch'] && $g['low_stock'])
                                                 <span data-stock-cover="{{ $g['cover']['basis'] }}" title="{{ $statusWord }}" class="inline-flex min-w-0 items-center gap-1 text-warning"><span class="h-2 w-2 shrink-0 rounded-full bg-warning"></span><span class="truncate">{{ $statusWord }}</span></span>
                                             @elseif ($g['has_batch'])
                                                 <span title="{{ $statusWord }}" class="inline-flex min-w-0 items-center gap-1 text-success"><span class="h-2 w-2 shrink-0 rounded-full bg-success"></span><span class="truncate">{{ $statusWord }}</span></span>
@@ -778,7 +821,7 @@
                                         @if ($line['per_unit'])
                                             {{ $line['units'] }} {{ __('uds') }} ({{ $this->grams($line['grams_cg']) }}) × {{ $this->money($line['rate_cents']) }}/{{ __('ud') }}
                                         @else
-                                            {{ $this->grams($line['grams_cg']) }} × {{ $this->money($line['rate_cents']) }}/g
+                                            {{ $this->grams($line['grams_cg']) }}@if (($line['charged_cg'] ?? null) !== null && $line['charged_cg'] !== $line['grams_cg']) <span data-charged-grams class="font-medium text-ink dark:text-slate-200">· {{ __('se cobra :grams', ['grams' => $this->grams($line['charged_cg'])]) }}</span>@endif × {{ $this->money($line['rate_cents']) }}/g
                                         @endif
                                         @if ($line['discount_cents'] > 0)· <span class="text-success">−{{ $this->money($line['discount_cents']) }}</span>@endif
                                     </p>
@@ -821,6 +864,19 @@
                     {{-- Prompt 263 — ONE figure for the visit: this header, the tender's "a cobrar" and the pay button
                          all show the same total. With bar lines it is the visit's total (aportación + barra, two
                          ledgers, one payment); with flower only it is still labelled the aportación it is. --}}
+                    {{-- Prompt 355 — «Redondeo 0.5 g»: what the member PAYS for is rounded to the half gram (stock and limits keep
+                         the weighed grams). Kept for THIS person at this sede until their session ends, so it says when it
+                         differs from the sede's default — an hour later it must still be obvious that it is off. --}}
+                    @php($chargeRoundingOn = $this->chargeRoundingOn())
+                    @php($chargeRoundingChanged = $chargeRoundingOn !== \App\Support\ChargeRounding::sedeDefault($locationId))
+                    <button type="button" wire:click="toggleChargeRounding" data-charge-rounding="{{ $chargeRoundingOn ? 'on' : 'off' }}"
+                            role="switch" aria-checked="{{ $chargeRoundingOn ? 'true' : 'false' }}"
+                            class="mt-2 flex min-h-11 w-full items-center justify-between gap-3 rounded-xl px-4 text-sm transition hover:bg-surface-alt dark:hover:bg-slate-800">
+                        <span class="text-ink-muted dark:text-slate-400">{{ __('Redondeo 0.5 g') }}@if ($chargeRoundingChanged) <span data-charge-rounding-changed class="font-semibold text-warning">{{ __('(cambiado)') }}</span>@endif</span>
+                        <span aria-hidden="true" @class(['relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition', 'bg-brand' => $chargeRoundingOn, 'bg-slate-300 dark:bg-slate-600' => ! $chargeRoundingOn])>
+                            <span @class(['inline-block h-5 w-5 rounded-full bg-white shadow transition', 'translate-x-5' => $chargeRoundingOn, 'translate-x-0.5' => ! $chargeRoundingOn])></span>
+                        </span>
+                    </button>
                     @if ($roundingCents !== 0)
                         {{-- Prompt 350 — the discounted aportación rounded to the euro: said, not hidden in the total. --}}
                         <div data-basket-rounding class="mt-2 flex items-center justify-between px-4 text-sm text-ink-muted dark:text-slate-400">

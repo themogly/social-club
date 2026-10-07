@@ -14,6 +14,7 @@ use App\Mail\LockdownReactivationMail;
 use App\Mail\MemberCardMail;
 use App\Mail\MemberLoginLinkMail;
 use App\Mail\MembershipReminderMail;
+use App\Mail\TelegramAlertByEmailMail;
 use App\Mail\TelegramDisconnectedMail;
 use App\Models\Location;
 use App\Models\Member;
@@ -76,6 +77,7 @@ class DevMail
                     ->setRelation('location', new Location(['name' => 'Sede Centro'])),
             ])),
             'telegram-disconnected' => new TelegramDisconnectedMail('Ana Ruiz'),
+            'telegram-alert-by-email' => new TelegramAlertByEmailMail("⚠️ Sede Centro\n· Stock bajo: Amnesia Haze (12.00 g)"), // prompt 363
             'lockdown-reactivation' => new LockdownReactivationMail(
                 new User(['name' => 'Ana Ruiz']),
                 new OrganisationLockdown(['is_drill' => false]),

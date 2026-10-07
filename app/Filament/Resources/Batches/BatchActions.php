@@ -4,7 +4,9 @@ namespace App\Filament\Resources\Batches;
 
 use App\Actions\Pricing\SetBatchPrice;
 use App\Actions\Stock\IntakeBatch;
+use App\Actions\Stock\MoveToReserve;
 use App\Actions\Stock\RecountBatch;
+use App\Actions\Stock\TopUpFromReserve;
 use App\Actions\Stock\TransferBatch;
 use App\Exceptions\StockCeilingExceededException;
 use App\Filament\Forms\DecimalInput;
@@ -184,6 +186,48 @@ final class BatchActions
      * *Recuento* (prompt 305) — set this part to what the scale says: the COUNTED quantity, the difference shown live,
      * one ADJUSTMENT for it ({@see RecountBatch}, computed against the locked current figure). Gated on `stock.take`.
      */
+    /** Prompt 359 — «Pasar a reserva»: grams from the jar into sealed top-up bags (weight batches only). */
+    public static function toReserve(): Action
+    {
+        return self::reserveMove('toReserve', __('Pasar a reserva'), Heroicon::OutlinedArchiveBoxArrowDown, toJar: false);
+    }
+
+    /** Prompt 359 — «Rellenar»: grams from the sealed reserve into the jar (blank = all of it). */
+    public static function topUp(): Action
+    {
+        return self::reserveMove('topUp', __('Rellenar desde reserva'), Heroicon::OutlinedArrowUpTray, toJar: true);
+    }
+
+    private static function reserveMove(string $name, string $label, Heroicon $icon, bool $toJar): Action
+    {
+        return Action::make($name)
+            ->label($label)
+            ->icon($icon)
+            ->visible(fn (Batch $record): bool => ! $record->isUnitType() && (Auth::user()?->can('pos.use') ?? false)
+                && ($toJar ? $record->reserve_cg->centigrams > 0 : $record->remaining_cg->centigrams > 0))
+            ->modalHeading(fn (Batch $record): string => $label.' · '.$record->displayName())
+            ->schema(fn (Batch $record): array => [
+                Text::make(fn (): string => __('En el bote: :jar · En reserva: :reserve', ['jar' => $record->remaining_cg->formatted(), 'reserve' => $record->reserve_cg->formatted()])),
+                DecimalInput::make('grams')
+                    ->label($toJar ? __('Gramos (vacío = toda la reserva)') : __('Gramos'))
+                    ->numeric()->minValue(0)->rule(new GramAmount)
+                    ->required(! $toJar),
+            ])
+            ->action(function (Batch $record, array $data) use ($toJar): void {
+                $actor = Auth::user();
+                abort_unless($actor instanceof User, 403);
+                $cg = filled($data['grams'] ?? null) ? Weight::fromGrams((string) $data['grams'])->centigrams : null;
+                try {
+                    $toJar ? (new TopUpFromReserve)->handle($record, $cg, $actor) : (new MoveToReserve)->handle($record, (int) $cg, $actor);
+                } catch (RuntimeException|AuthorizationException $e) {
+                    Notification::make()->title($e->getMessage())->danger()->send();
+
+                    return;
+                }
+                Notification::make()->title($toJar ? __('Bote rellenado desde la reserva.') : __('Pasado a reserva.'))->success()->send();
+            });
+    }
+
     public static function recount(): Action
     {
         return Action::make('recount')

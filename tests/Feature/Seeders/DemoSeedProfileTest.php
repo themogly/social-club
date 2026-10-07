@@ -78,9 +78,12 @@ class DemoSeedProfileTest extends TestCase
                     ->where('stockable_type', $morphBatch)->where('stockable_id', $batch->id)->sum('qty_units');
                 $this->assertSame((int) $batch->remaining_units, $ledger, "Unit batch {$batch->batch_no} must reconcile.");
             } else {
-                $ledger = (int) StockMovement::query()->withoutGlobalScopes()
-                    ->where('stockable_type', $morphBatch)->where('stockable_id', $batch->id)->sum('qty_cg');
-                $this->assertSame($batch->remaining_cg->centigrams, $ledger, "Weight batch {$batch->batch_no} must reconcile.");
+                // Prompts 359–360 — two figures, each with its own ledger: the jar's movements and the sealed reserve's
+                // (`on_reserve`). The demo seeds a reserve on one strain, so both must reconcile.
+                $ledger = fn (bool $onReserve): int => (int) StockMovement::query()->withoutGlobalScopes()
+                    ->where('stockable_type', $morphBatch)->where('stockable_id', $batch->id)->where('on_reserve', $onReserve)->sum('qty_cg');
+                $this->assertSame($batch->remaining_cg->centigrams, $ledger(false), "Weight batch {$batch->batch_no}'s jar must reconcile.");
+                $this->assertSame($batch->reserve_cg->centigrams, $ledger(true), "Weight batch {$batch->batch_no}'s reserve must reconcile.");
             }
         }
     }

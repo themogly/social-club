@@ -324,6 +324,7 @@ window.counterCatalogue = (config = {}) => ({
     category: { genetics: null, bar: null },
     productType: null,
     strainType: null,
+    reserveOnly: false, // prompt 359 — «Con reserva»
     filtersOpen: false,
     // Prompt 351 — the strain order. The cards carry `data-rank-<order>` (ranked on the server, the one rule); switching
     // sets their CSS `order`, so nothing is requested and nothing moves in the DOM Livewire morphs.
@@ -371,19 +372,19 @@ window.counterCatalogue = (config = {}) => ({
     },
     get activeFilters() {
         if (this.source === 'bar') return this.category.bar === null ? 0 : 1;
-        return [this.category.genetics, this.productType, this.strainType].filter((v) => v !== null).length;
+        return [this.category.genetics, this.productType, this.strainType].filter((v) => v !== null).length + (this.reserveOnly ? 1 : 0);
     },
     // A card lists its own facts as data attributes, so a card added by a later render is filtered like the rest.
     visible(el) {
         const d = el.dataset;
         return catalogueShows(
-            { source: d.catalogueItem, category: d.category, type: d.type, strain: d.strain, search: (d.search ?? '').split('\n') },
+            { source: d.catalogueItem, category: d.category, type: d.type, strain: d.strain, reserve: Number(d.reserve ?? 0), search: (d.search ?? '').split('\n') },
             this,
         );
     },
     anyVisible(source) {
         // Read the filter state first so Alpine re-evaluates this when any of it changes.
-        const deps = [this.search[source], this.category[source], this.productType, this.strainType];
+        const deps = [this.search[source], this.category[source], this.productType, this.strainType, this.reserveOnly];
         return deps && [...this.$root.querySelectorAll(`[data-catalogue-item="${source}"]`)].some((el) => this.visible(el));
     },
 });

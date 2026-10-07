@@ -22,6 +22,7 @@ use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteBulkAction;
 use Filament\Actions\EditAction;
 use Filament\Actions\RestoreBulkAction;
+use Filament\Forms\Components\Radio;
 use Filament\Forms\Components\Textarea;
 use Filament\Notifications\Notification;
 use Filament\Support\Enums\FontWeight;
@@ -50,6 +51,10 @@ class BatchesTable
                     ->label(__('Lote'))
                     ->state(fn (Batch $record): string => $record->displayTitle())
                     ->weight(FontWeight::SemiBold)
+                    // Prompt 362 — below 1280 px the theme lets this cell wrap (unwrapped, the subtitle's end ran under the
+                    // ⋮ pinned on a phone, 354) inside a minimum width, so it never collapses to a word per line. Desktop
+                    // is unchanged.
+                    ->extraCellAttributes(['data-batch-lote-cell' => true])
                     // Prompt 340 — on a phone the Precio column is off-screen, so the price rides under the name there.
                     ->description(fn (Batch $record): HtmlString => new HtmlString(e($record->displaySubtitle())
                         .(($price = self::priceLabel($record)) !== null ? '<span class="sm:hidden" data-batch-row-price> · '.e($price).'</span>' : '')))
@@ -87,6 +92,10 @@ class BatchesTable
                 // says it, so hidden until switched on.
                 TextColumn::make('acquired_or_harvested_on')->label(__('Recibido'))->date()->sortable()->placeholder('—')
                     ->toggleable(isToggledHiddenByDefault: true),
+                // Prompt 359 — sealed top-ups of this batch at its sede, off the counter (Restante is the jar).
+                TextColumn::make('reserve_cg')->label(__('Reserva'))
+                    ->state(fn (Batch $record): ?string => $record->reserve_cg->centigrams > 0 ? $record->reserve_cg->formatted() : null)
+                    ->placeholder('—')->toggleable(),
                 TextColumn::make('remaining')
                     ->label(__('Restante'))
                     ->state(function (Batch $record): string {
@@ -152,6 +161,8 @@ class BatchesTable
                     // Prompt 305 — the same lote at more locations, beside the *Trasladar* button.
                     BatchActions::addParts(),
                     BatchActions::recount(), // prompt 305 — set the part to what the scale says (beside Ajuste)
+                    BatchActions::toReserve(), // prompt 359 — jar → sealed bags
+                    BatchActions::topUp(), // prompt 359 — sealed bags → jar
                     EditAction::make(),
                     self::adjustAction(),
                     self::mermaAction(),
@@ -253,6 +264,16 @@ class BatchesTable
             ->label(__('Ajuste'))
             ->icon(Heroicon::OutlinedAdjustmentsHorizontal)
             ->schema([
+                // Prompt 360 — a weight batch holds two figures (359): correct the jar, or set its sealed reserve, here
+                // without starting a full Inventario. The same ADJUSTMENT, the reserve's marked `on_reserve`.
+                Radio::make('bucket')
+                    ->label(__('¿Qué corriges?'))
+                    ->options(['jar' => __('El bote'), 'reserve' => __('La reserva sellada')]) // «Bote» alone is a cash pot in English
+                    ->default('jar')
+                    ->inline()
+                    ->required()
+                    ->helperText(fn (Batch $record): string => __('Ahora: bote :jar · reserva :reserve', ['jar' => $record->remaining_cg->formatted(), 'reserve' => $record->reserve_cg->formatted()]))
+                    ->visible(fn (Batch $record): bool => ! $record->isUnitType()),
                 DecimalInput::make('quantity')
                     ->label(fn (Batch $record): string => $record->isUnitType() ? __('Ajuste (uds)') : __('Ajuste (g)'))
                     ->numeric()
@@ -268,7 +289,8 @@ class BatchesTable
                         $record,
                         StockMovementType::ADJUSTMENT,
                         self::signedDelta($record, (float) $data['quantity']),
-                        ['reason' => (string) $data['reason'], 'operator_id' => self::operatorId()],
+                        ['reason' => (string) $data['reason'], 'operator_id' => self::operatorId(),
+                            'reserve' => ! $record->isUnitType() && ($data['bucket'] ?? 'jar') === 'reserve'],
                     );
 
                     Notification::make()->title(__('Ajuste registrado'))->success()->send();

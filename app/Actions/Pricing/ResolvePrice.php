@@ -16,6 +16,7 @@ use App\Models\Location;
 use App\Models\Member;
 use App\Models\MemberDiscount;
 use App\Models\MembershipTier;
+use App\Support\ChargeRounding;
 use App\Support\PriceResult;
 use App\Support\Settings;
 use App\Support\StaffDiscount;
@@ -83,23 +84,30 @@ class ResolvePrice
      * the sum — honest and traceable. The counter's preview and `CommitDispensation` both call this, so the total shown
      * is the total charged. `eighth_price` is set only when every part shares one (the basket-wide break then applies).
      *
+     * Prompt 355 — `$chargedCg` (weight lines): the grams the member PAYS for, the line's weighed total rounded to the half
+     * gram. The parts keep their WEIGHED quantities (stock moves by them); each is PRICED on its share of the charged
+     * grams ({@see ChargeRounding::overParts()}: the difference applied from the last part back, never below zero).
+     *
      * @param  list<array{batch: Batch, qty: int}>  $parts  qty in centigrams (weight) or units
-     * @return array{parts: list<array{batch: Batch, qty: int, rate_cents: int, total_cents: int, discount_cents: int}>, total_cents: int, discount_cents: int, rate_cents: int, effective_rate_cents: int, eighth_price: ?int, label: ?string, mixed: bool, discount_kind: ?string}
+     * @return array{parts: list<array{batch: Batch, qty: int, charged_qty: int, rate_cents: int, total_cents: int, discount_cents: int}>, total_cents: int, discount_cents: int, rate_cents: int, effective_rate_cents: int, eighth_price: ?int, label: ?string, mixed: bool, discount_kind: ?string}
      */
-    public function priceParts(Genetic $genetic, Location $location, ?Member $member, array $parts, bool $isUnit): array
+    public function priceParts(Genetic $genetic, Location $location, ?Member $member, array $parts, bool $isUnit, ?int $chargedCg = null): array
     {
         $out = [];
         $eighths = [];
         $firstPrice = null;
         $firstLabel = null;
+        $charged = ! $isUnit && $chargedCg !== null
+            ? ChargeRounding::overParts(array_map(fn (array $p): int => (int) $p['qty'], $parts), $chargedCg)
+            : array_map(fn (array $p): int => (int) $p['qty'], $parts);
 
-        foreach ($parts as $part) {
+        foreach ($parts as $j => $part) {
             $price = $this->forBatch($part['batch'], $genetic, $location, $member);
-            $line = $isUnit ? $price->lineForUnits($part['qty']) : $price->lineFor($part['qty']);
+            $line = $isUnit ? $price->lineForUnits($part['qty']) : $price->lineFor($charged[$j]);
             $firstPrice ??= $price;
             $firstLabel ??= $line['label'];
             $eighths[] = $isUnit ? null : $price->effectiveEighthPriceCents();
-            $out[] = ['batch' => $part['batch'], 'qty' => $part['qty'], 'rate_cents' => $line['rate_cents'], 'total_cents' => $line['total_cents'], 'discount_cents' => $line['discount_cents']];
+            $out[] = ['batch' => $part['batch'], 'qty' => $part['qty'], 'charged_qty' => $charged[$j], 'rate_cents' => $line['rate_cents'], 'total_cents' => $line['total_cents'], 'discount_cents' => $line['discount_cents']];
         }
 
         $rates = array_unique(array_column($out, 'rate_cents'));

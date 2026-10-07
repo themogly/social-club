@@ -31,7 +31,7 @@ use Illuminate\Support\Str;
  * as an INTAKE movement (opening balances always enter through the ledger). Exactly one
  * of the cg / units column pairs is populated — the other is set null explicitly.
  *
- * @phpstan-type IntakeData array{grams?: int|float|string, units?: int|string, batch_no?: ?string, label?: ?string, cost_per_gram_cents?: int, price_per_gram_cents?: ?int, price_per_unit_cents?: ?int, price_per_eighth_cents?: ?int, images?: list<string>, acquired_or_harvested_on?: mixed, expires_on?: mixed, lab_report_path?: ?string, notes?: ?string, operator_id?: ?string, override?: bool, override_by?: ?User, override_reason?: ?string}
+ * @phpstan-type IntakeData array{grams?: int|float|string, reserve_grams?: int|float|string, units?: int|string, batch_no?: ?string, label?: ?string, cost_per_gram_cents?: int, price_per_gram_cents?: ?int, price_per_unit_cents?: ?int, price_per_eighth_cents?: ?int, images?: list<string>, acquired_or_harvested_on?: mixed, expires_on?: mixed, lab_report_path?: ?string, notes?: ?string, operator_id?: ?string, override?: bool, override_by?: ?User, override_reason?: ?string}
  */
 class IntakeBatch
 {
@@ -43,7 +43,7 @@ class IntakeBatch
      */
     public function handle(Genetic $genetic, Location $location, array $data): Batch
     {
-        $part = ['location' => $location] + array_intersect_key($data, array_flip(['grams', 'units']));
+        $part = ['location' => $location] + array_intersect_key($data, array_flip(['grams', 'units', 'reserve_grams']));
 
         return $this->handleParts($genetic, [$part], $data)->first();
     }
@@ -55,7 +55,7 @@ class IntakeBatch
      * lote (a rename and a recall reach every part). All or nothing, in one transaction. A single part is exactly the
      * intake this action always did ({@see self::handle()} delegates here).
      *
-     * @param  list<array{location: Location, grams?: int|float|string, units?: int|string}>  $parts
+     * @param  list<array{location: Location, grams?: int|float|string, units?: int|string, reserve_grams?: int|float|string}>  $parts
      * @param  IntakeData  $data  everything shared by the parts (their quantities come from `$parts`)
      * @return Collection<int, Batch>
      *
@@ -69,7 +69,14 @@ class IntakeBatch
             'location' => $part['location'],
             'units' => $isUnit ? (int) ($part['units'] ?? 0) : null,
             'cg' => $isUnit ? null : Weight::fromGrams($part['grams'] ?? 0)->centigrams,
+            // Prompt 359 — «De ello, en reserva (sellado)»: of the total received, how much is in sealed top-up bags.
+            'reserve_cg' => $isUnit ? 0 : Weight::fromGrams($part['reserve_grams'] ?? 0)->centigrams,
         ], $parts);
+        foreach ($parts as $part) {
+            if ($part['reserve_cg'] < 0 || $part['reserve_cg'] > (int) $part['cg']) {
+                throw new DomainException(__('La reserva no puede superar la cantidad recibida.'));
+            }
+        }
         if ($parts === []) {
             throw new DomainException(__('Elige al menos una sede.'));
         }
@@ -205,7 +212,7 @@ class IntakeBatch
      * One part of a lote at one location, and its opening INTAKE movement — shared by a new intake ({@see
      * self::handleParts()}) and a part added later ({@see self::addParts()}).
      *
-     * @param  array{location: Location, cg: ?int, units: ?int}  $part
+     * @param  array{location: Location, cg: ?int, units: ?int, reserve_cg?: int}  $part
      * @param  array<string, mixed>  $identity  the lote's shared columns (batch_no, lote_seq, label, prices, dates…)
      */
     private function createPart(Genetic $genetic, array $part, array $identity, string $reason, ?string $operatorId): Batch
@@ -233,6 +240,17 @@ class IntakeBatch
             'operator_id' => $operatorId ?? Auth::id(),
             'reference' => $batch->batch_no,
         ]);
+
+        // Prompt 359 — ONE intake of the whole amount; the sealed share then moves to the reserve (a RESERVE_IN pair that
+        // nets to zero), so 500 g received with 450 g sealed is jar 50 + reserve 450.
+        $reserve = (int) ($part['reserve_cg'] ?? 0);
+        if ($reserve > 0) {
+            $writer = new RecordStockMovement;
+            $options = ['operator_id' => $operatorId ?? Auth::id(), 'reason' => 'A reserva', 'reference' => $batch->batch_no];
+            $writer->handle($batch, StockMovementType::RESERVE_IN, -$reserve, $options);
+            $writer->handle($batch, StockMovementType::RESERVE_IN, $reserve, $options + ['reserve' => true]);
+            $batch->refresh();
+        }
 
         return $batch;
     }

@@ -151,6 +151,8 @@ class Help
         Batch::class => ['permission' => 'stock.manage', 'title' => 'Lotes', 'body' => [
             'Cada lote es stock real de una genética en una sede. El stock se mueve siempre por el registro de movimientos, nunca a mano.',
             'Consecuencias: poner un lote en cuarentena o cerrarlo lo retira del mostrador. La retirada muestra quién recibió producto de un lote.',
+            // Prompts 359–360 — the jar and the sealed reserve.
+            'Un lote de flor tiene su bote (lo que se dispensa) y su reserva sellada (las bolsas cerradas fuera del bote, columna «Reserva»). En el mostrador, «Rellenar» pasa reserva al bote. «Ajuste» pregunta qué corriges, «El bote» o «La reserva sellada», para arreglar un solo lote sin hacer un inventario.',
         ]],
         Article::class => ['permission' => 'articles.manage', 'title' => 'Productos', 'body' => [
             'Los productos de barra y tienda (bebidas, comida, merch) y las unidades como prerolls o comestibles. Se dispensan o venden por unidad.',
@@ -258,6 +260,11 @@ class Help
             'Se cuenta a ciegas por defecto: se pesa y se escribe lo que hay, sin ver la cifra del sistema (se puede cambiar en Ajustes → Inventario). Lo que no se pueda contar se marca «No contado» con su motivo y no se toca.',
             'La barra y el dispensario siguen funcionando mientras se cuenta. Cada línea guarda lo que había en el sistema en el momento de contarla, así que una venta posterior no se cuenta dos veces.',
             'Al revisar, las diferencias salen de mayor a menor. Por encima de la tolerancia (por defecto 5 % o 2 g, lo que sea mayor; se ajusta en Ajustes → Inventario) hace falta un motivo y una nota. «Aplicar ajustes» registra un ajuste por línea con su motivo; «Cancelar inventario» lo descarta sin tocar nada.',
+            // Prompt 360 — the sealed reserve is checked here, not at the till close.
+            'Cada lote de flor tiene dos cifras en la misma fila: «Bote (g)» y «Reserva sellada (g)», las bolsas cerradas que se guardan fuera del bote. Aquí se comprueba la reserva: el recuento de cierre del mostrador solo pesa los botes. Deja una cifra en blanco y no se toca, así puedes corregir solo la reserva o solo el bote. Los productos por unidades tienen una sola cifra.',
+            '«Incluir lotes a cero» (al empezar) lista también los lotes que el sistema da por vacíos, para darles su bote y su reserva si tienen bolsas guardadas; los que dejes en blanco no se tocan. Un lote cerrado que vuelve a tener stock se reabre.',
+            '«Usar un motivo para todas las diferencias» aplica un mismo motivo a todas las líneas sin motivo propio (por ejemplo «Regularización: alta de la reserva sellada») y no pide nota; el motivo de una línea manda sobre el común. Quien tiene «Aprobar sin motivo» no necesita escribir nota.',
+            'El techo de stock de la sede nunca impide aplicar un recuento: refleja lo que hay. Si el resultado lo supera, la revisión lo avisa antes de aplicar y el panel muestra el aviso del techo.',
         ]],
         Seguridad::class => ['permission' => 'lockdown.manage', 'title' => 'Seguridad', 'body' => [
             'Desde aquí se activa el bloqueo de seguridad ante una amenaza, se ensaya con un simulacro y se consulta el historial de activaciones.',
@@ -363,7 +370,10 @@ class Help
         'Cuota' => 'La aportación periódica de socio (membresía). Estar al corriente de la cuota es requisito para dispensar.',
         'Carencia' => 'El período de espera obligatorio desde el alta antes de la primera dispensación.',
         'Aforo' => 'El número máximo de personas permitido simultáneamente en una sede.',
-        'Arqueo' => 'El recuento del efectivo del cajón al cerrar la caja. Se hace a ciegas: se cuenta antes de ver la cifra esperada.',
+        'Arqueo' => 'El recuento del efectivo del cajón al cerrar la caja. Se hace a ciegas: se cuenta antes de ver la cifra esperada. (El recuento de flor del cierre pesa solo los botes, no la reserva sellada.)',
+        'Reserva (sellada)' => 'Las bolsas cerradas de un lote que se guardan en la sede fuera del bote. No se dispensan ni se pesan al cerrar la caja; se comprueban en el Inventario.',
+        'Rellenar' => 'Pasar gramos de la reserva sellada al bote al abrir una bolsa. Se pulsa en el mostrador, en el panel de la variedad; «Toda la reserva» pasa todo.',
+        'Rellenado sin registrar' => 'Una bolsa abierta en el bote sin pulsar «Rellenar». El recuento de cierre lo detecta, lo corrige solo y lo anota para el responsable en el resumen de cierre y el informe de caja.',
         'Merma' => 'Una pérdida de stock (rotura, deterioro, decomiso), registrada como reducción en el inventario.',
         'Avalador' => 'El socio que avala (presenta) a un aspirante para su alta.',
         'Aval' => 'La presentación de un aspirante por parte de un socio avalador.',
@@ -525,7 +535,9 @@ class Help
                     'Al cerrar, cuenta el efectivo del cajón ANTES de ver lo que el sistema espera. El esperado se calcula del registro, no se guarda: contar a ciegas es lo que hace real el descuadre.',
                 ]],
                 ['title' => 'Repesa lo que se ha abierto', 'body' => [
-                    'Repesa el producto que se ha tocado en el turno para cuadrar el stock; lo que no se ha contado queda como estaba.',
+                    'Pesa solo los botes de flor que se han tocado; las bolsas selladas de reserva no se pesan al cerrar (se comprueban en el Inventario). Un bote que no puedas pesar se marca «No se puede contar» y queda como estaba.',
+                    'Si te olvidaste de pulsar «Rellenar» al abrir una bolsa, el sistema lo detecta y lo anota para el responsable («Rellenado sin registrar»); no tienes que hacer nada.',
+                    'Si el recuento no cuadra, aparece una sola pregunta, «El recuento no cuadra — ¿qué ha pasado?»: elige «Error al pesar», «Derrame / merma», «Rellené sin registrar», «Bote no disponible» u «Otro» con una frase. Una respuesta vale para todo el recuento. No dice qué bote ni cuánto: las diferencias se ven después de cerrar.',
                 ]],
                 ['title' => 'Anota el descuadre', 'body' => [
                     'Se revela la diferencia entre lo contado y lo esperado. Si supera la tolerancia configurada, añade una nota explicando por qué. El cierre genera el informe de la sesión.',

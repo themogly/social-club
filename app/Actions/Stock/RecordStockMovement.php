@@ -30,7 +30,7 @@ use RuntimeException;
  * Article is always units (qty_units). So a UNIT Batch and an Article share the units
  * path; a WEIGHT Batch is the only cg path.
  *
- * @phpstan-type MovementOptions array{reason?: ?string, operator_id?: ?string, reference?: ?string, stock_take_id?: ?string, actor?: ?User}
+ * @phpstan-type MovementOptions array{reason?: ?string, operator_id?: ?string, reference?: ?string, stock_take_id?: ?string, actor?: ?User, reserve?: bool}
  */
 class RecordStockMovement
 {
@@ -49,7 +49,20 @@ class RecordStockMovement
 
             $unitBased = $locked instanceof Article || $locked->isUnitType();
 
-            if (! $unitBased) {
+            // Prompt 359 — `reserve: true` moves the batch's SEALED reserve instead of its jar (weight batches only).
+            $onReserve = (bool) ($options['reserve'] ?? false);
+            if ($onReserve && $unitBased) {
+                throw new RuntimeException('Only a weight batch has a sealed reserve.');
+            }
+
+            if ($onReserve) {
+                /** @var Batch $locked */
+                $new = $locked->reserve_cg->centigrams + $delta;
+                if ($new < 0) {
+                    throw new RuntimeException(__('Reserva insuficiente en el lote :batch.', ['batch' => $locked->displayName()]));
+                }
+                $locked->reserve_cg = Weight::fromCentigrams($new);
+            } elseif (! $unitBased) {
                 /** @var Batch $locked */
                 $new = $locked->remaining_cg->centigrams + $delta;
                 if ($new < 0) {
@@ -78,6 +91,7 @@ class RecordStockMovement
                 'stockable_id' => $locked->getKey(),
                 'qty_cg' => $unitBased ? null : $delta,
                 'qty_units' => $unitBased ? $delta : null,
+                'on_reserve' => $onReserve,
                 'type' => $type,
                 'reason' => $options['reason'] ?? null,
                 'operator_id' => $options['operator_id'] ?? Auth::id(),
@@ -89,7 +103,7 @@ class RecordStockMovement
             // not just on the movement row. INSIDE the txn (boundary matches CommitStockTake). Routine
             // SALE/INTAKE depletions are not audited here (traced by their own movement rows).
             if ($type === StockMovementType::ADJUSTMENT || $type === StockMovementType::MERMA) {
-                $key = $unitBased ? 'remaining_units' : 'remaining_cg';
+                $key = $onReserve ? 'reserve_cg' : ($unitBased ? 'remaining_units' : 'remaining_cg'); // 360 — say which figure
                 (new RecordAuditLog)->handle(
                     $type === StockMovementType::MERMA ? 'stock.merma' : 'stock.adjusted',
                     $locked,

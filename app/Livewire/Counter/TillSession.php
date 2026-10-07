@@ -16,6 +16,7 @@ use App\Actions\UnlockOperator;
 use App\Enums\BatchStatus;
 use App\Enums\CashMovementType;
 use App\Enums\CashPot;
+use App\Enums\CloseCountReason;
 use App\Enums\StaffClockSource;
 use App\Enums\StockTakeStatus;
 use App\Enums\TillSessionStatus;
@@ -36,6 +37,7 @@ use App\Models\User;
 use App\Support\BusinessDay;
 use App\Support\CounterOperator;
 use App\Support\CounterScreens;
+use App\Support\ManagerApproval;
 use App\Support\Money;
 use App\Support\NumberFormat;
 use App\Support\Settings;
@@ -168,11 +170,17 @@ class TillSession extends Component
     /** @var array<string, bool> batch id => marked "not counted" (could not be weighed) this reweigh (prompt 91). */
     public array $reweighNotCounted = [];
 
-    /** @var array<string, string> batch id => why a batch was not counted (required when not counted). */
-    public array $reweighReasons = [];
+    /**
+     * Prompt 360 — the count was off (a jar beyond the tolerance, or «No contado»), so ONE question is on screen before it
+     * commits: «El recuento no cuadra — ¿qué ha pasado?». Blind: which jar, and by how much, is revealed after, as before.
+     */
+    public bool $reweighAsking = false;
 
     /** @var list<array{name: string, counted: ?string, variance: ?string, adjusted: bool, not_counted: bool, reason: ?string, repeated: bool}>|null Revealed after commit. */
     public ?array $reweighResult = null;
+
+    /** Prompt 360 — the count's one answer, shown beside the revealed variances (null when nothing was off). */
+    public ?string $reweighReason = null;
 
     /**
      * Revealed ONLY after a successful blind close (read from the closed session).
@@ -698,7 +706,9 @@ class TillSession extends Component
         return Batch::query()->withoutGlobalScopes()
             ->where('location_id', $this->locationId)
             ->where('status', BatchStatus::OPEN->value)
-            ->whereColumn('remaining_cg', '<>', 'initial_cg')
+            // Touched today, counting the sealed reserve as untouched stock (359): a batch whose bags merely sit in the back
+            // is not added to the evening's count — no new end-of-day work.
+            ->whereRaw('remaining_cg + reserve_cg <> initial_cg')
             ->whereHas('genetic', fn ($q) => $q->where('unit_type', UnitType::WEIGHT->value))
             ->with('genetic')
             ->get()
@@ -754,7 +764,7 @@ class TillSession extends Component
      * movements). Blind, like the cash arqueo: expected weights are never shown while entering; the variances
      * are revealed only after commit. Gated on `stock.take`.
      */
-    public function submitReweigh(): void
+    public function submitReweigh(?string $reasonKey = null, ?string $otherText = null): void
     {
         $this->feedbackIn = 'reweigh';
 
@@ -779,16 +789,11 @@ class TillSession extends Component
         $counts = [];
 
         foreach ($batches as $batch) {
-            // Escape hatch (prompt 91): a jar that cannot be weighed is marked "not counted" WITH A REASON —
-            // the close proceeds and its stock is left untouched. Never a silent skip, never a fake number.
+            // Escape hatch (prompt 91): a jar that cannot be weighed is marked "not counted" — the close proceeds and its
+            // stock is left untouched. Never a silent skip, never a fake number. Prompt 360: its reason is the count's ONE
+            // answer below, not a box per jar.
             if ($this->reweighNotCounted[$batch->id] ?? false) {
-                $reason = trim($this->reweighReasons[$batch->id] ?? '');
-                if ($reason === '') {
-                    $this->flash(__('Indica por qué no se pudo contar el lote.'), 'error');
-
-                    return;
-                }
-                $counts[] = ['type' => 'batch', 'id' => $batch->id, 'not_counted' => true, 'reason' => $reason];
+                $counts[] = ['type' => 'batch', 'id' => $batch->id, 'not_counted' => true];
 
                 continue;
             }
@@ -804,6 +809,19 @@ class TillSession extends Component
             $counts[] = ['type' => 'batch', 'id' => $batch->id, 'counted' => Weight::fromGrams($raw)->centigrams];
         }
 
+        // Prompt 360 — Ben: "when the staff weigh at the end of the day, it just gives them one reason to fill out if wrong".
+        // Nothing off ⇒ no question. Off ⇒ one answer covers the whole count; a `reasons.optional` holder (356) is not
+        // asked and «Aprobado por responsable» is recorded. The server decides, so the screen cannot skip it.
+        $reason = null;
+        if (CommitStockTake::closeCountIsOff($counts, $this->locationId)) {
+            $reason = ManagerApproval::allows($user) ? ManagerApproval::reason() : $this->closeCountReason($reasonKey, $otherText);
+            if ($reason === null) {
+                $this->reweighAsking = true;
+
+                return;
+            }
+        }
+
         $stockTake = StockTake::create([
             'organisation_id' => $session->organisation_id,
             'location_id' => $this->locationId,
@@ -812,7 +830,7 @@ class TillSession extends Component
             'status' => StockTakeStatus::OPEN,
         ]);
 
-        $committed = (new CommitStockTake)->handle($stockTake, $counts, $user);
+        $committed = (new CommitStockTake)->handle($stockTake, $counts, $user, $reason);
 
         // Reveal the variances (blind entry, reveal after — like the cash arqueo), read back from the
         // committed lines and matched to the batches we counted (a morph column, so via getAttribute()).
@@ -841,15 +859,39 @@ class TillSession extends Component
                 'variance' => Weight::fromCentigrams($variance)->formatted(),
                 'adjusted' => $variance !== 0,
                 'not_counted' => false, 'reason' => null, 'repeated' => false,
+                // Prompt 359 — a bag opened into the jar without «Rellenar», absorbed by the count (said, never asked).
+                'unrecorded_topup' => self::topUpLabel($line),
             ];
         })->all();
 
+        $this->reweighReason = $reason;
         $this->reweighDone = true;
         $this->reweighing = false;
+        $this->reweighAsking = false;
         $this->reweighCounts = [];
         $this->reweighNotCounted = [];
-        $this->reweighReasons = [];
         $this->flash(__('Recuento de flor registrado.'), 'success');
+    }
+
+    /** Prompt 360 — the answer as stored: a quick pick's label, or «Otro» with its short line (both required). */
+    private function closeCountReason(?string $key, ?string $otherText): ?string
+    {
+        $pick = CloseCountReason::tryFrom((string) $key);
+        if ($pick === CloseCountReason::OTHER) {
+            $text = mb_substr(trim((string) $otherText), 0, 120);
+
+            return $text === '' ? null : $text;
+        }
+
+        return $pick?->label();
+    }
+
+    /** Prompt 359 — «Rellenado sin registrar: …» for a line whose count absorbed a forgotten top-up, else null. */
+    private static function topUpLabel(?StockTakeLine $line): ?string
+    {
+        $absorbed = $line === null ? 0 : (int) $line->getRawOriginal('unrecorded_topup_cg');
+
+        return $absorbed > 0 ? Weight::fromCentigrams($absorbed)->formatted() : null;
     }
 
     /** Toggle a batch between "counted" (needs a weight) and "not counted" (needs a reason) — prompt 91. */
@@ -1303,7 +1345,10 @@ class TillSession extends Component
         $this->reweighing = false;
         $this->reweighDone = false;
         $this->reweighCounts = [];
+        $this->reweighNotCounted = []; // 360 — a cancelled count (e.g. from the reason box) starts over, marks included
         $this->reweighResult = null;
+        $this->reweighReason = null;
+        $this->reweighAsking = false;
         $this->clockOutOffer = false;
         $this->clockedOutAt = null;
         $this->clockOutOtherId = null;

@@ -66,7 +66,7 @@ class StockReport extends AbstractReport
             ->whereIn('location_id', $this->resolvedLocationIds())
             ->where('status', BatchStatus::OPEN->value)
             ->whereNull('deleted_at')
-            ->get(['id', 'batch_no', 'label', 'genetic_id', 'remaining_cg', 'remaining_units', 'cost_per_gram_cents', 'expires_on']);
+            ->get(['id', 'batch_no', 'label', 'genetic_id', 'remaining_cg', 'reserve_cg', 'remaining_units', 'cost_per_gram_cents', 'expires_on']);
 
         $genetics = DB::table('genetics')
             ->whereIn('id', $batches->pluck('genetic_id')->unique()->all())
@@ -80,9 +80,12 @@ class StockReport extends AbstractReport
         $rows = $batches->map(function (\stdClass $b) use ($genetics, $dispensed): array {
             $g = $genetics[$b->genetic_id] ?? null;
             // Restante is the gram-equivalent for both kinds (UNIT: remaining_units × grams_per_unit_cg).
-            $remaining = ($g !== null && $g->unit_type === 'UNIT')
+            // Prompt 359 — the jar and the sealed reserve, and their total (what is on the premises, and what is valued).
+            $jar = ($g !== null && $g->unit_type === 'UNIT')
                 ? (int) $b->remaining_units * (int) ($g->grams_per_unit_cg ?? 0)
                 : (int) $b->remaining_cg;
+            $reserve = ($g !== null && $g->unit_type === 'UNIT') ? 0 : (int) $b->reserve_cg;
+            $remaining = $jar + $reserve;
             $rate = (int) $b->cost_per_gram_cents;
             $value = intdiv($remaining * $rate, 100);
             $this->valueCents += $value;
@@ -93,6 +96,8 @@ class StockReport extends AbstractReport
                 'nombre' => $b->label !== null ? (string) $b->label : '—', // the club's own name (prompt 282)
                 'genetica' => (string) ($g->name ?? __('Sin genética')),
                 'tipo' => $g !== null ? (ProductType::tryFrom((string) $g->product_type)?->label() ?? '—') : '—',
+                'bote' => $jar,
+                'reserva' => $reserve,
                 'restante' => $remaining,
                 'coste_g' => $rate,
                 'valor' => $value,
@@ -109,6 +114,8 @@ class StockReport extends AbstractReport
                 ReportColumn::text('nombre', __('Nombre')),
                 ReportColumn::text('genetica', __('Genética')),
                 ReportColumn::text('tipo', __('Tipo')),
+                ReportColumn::weight('bote', __('En el bote')), // 360 — «Bote» alone is a cash pot in English
+                ReportColumn::weight('reserva', __('Reserva')),
                 ReportColumn::weight('restante', __('Restante')),
                 ReportColumn::money('coste_g', __('Coste/g'), total: false),
                 ReportColumn::money('valor', __('Valor')),
@@ -117,6 +124,8 @@ class StockReport extends AbstractReport
             ],
             rows: $rows,
             totals: [
+                'bote' => array_sum(array_column($rows, 'bote')),
+                'reserva' => array_sum(array_column($rows, 'reserva')),
                 'restante' => $this->onHandCg,
                 'valor' => $this->valueCents,
                 'dispensado' => array_sum(array_column($rows, 'dispensado')),
@@ -137,9 +146,10 @@ class StockReport extends AbstractReport
         $byType = DB::table('stock_movements')
             ->whereIn('location_id', $this->resolvedLocationIds())
             ->where('created_at', '>=', $start)->where('created_at', '<', $end)
-            ->groupBy('type')
+            ->groupBy('type', 'on_reserve') // prompt 360 — a reserve correction is never folded into a jar one
             ->get([
                 'type',
+                'on_reserve',
                 DB::raw('COUNT(*) as movimientos'),
                 DB::raw('SUM(qty_cg) as grams_cg'),
                 DB::raw('SUM(qty_units) as uds'),
@@ -153,6 +163,8 @@ class StockReport extends AbstractReport
             StockMovementType::MERMA->value => __('Merma'),
             StockMovementType::TRANSFER_IN->value => __('Traspaso entrada'),
             StockMovementType::TRANSFER_OUT->value => __('Traspaso salida'),
+            StockMovementType::RESERVE_IN->value => __('Pasar a reserva'),
+            StockMovementType::RESERVE_OUT->value => __('Rellenar'),
         ];
 
         $rows = $byType->map(function (\stdClass $r) use ($labels): array {
@@ -161,7 +173,7 @@ class StockReport extends AbstractReport
             }
 
             return [
-                'tipo' => $labels[$r->type] ?? $r->type,
+                'tipo' => ($labels[$r->type] ?? $r->type).((bool) $r->on_reserve ? ' · '.__('reserva sellada') : ''),
                 'movimientos' => (int) $r->movimientos,
                 'grams' => (int) $r->grams_cg,
                 'uds' => (int) $r->uds,
@@ -204,6 +216,9 @@ class StockReport extends AbstractReport
                 'stock_take_lines.expected_cg as expected_cg',
                 'stock_take_lines.counted_cg as counted_cg',
                 'stock_take_lines.variance_cg as variance_cg',
+                'stock_take_lines.expected_reserve_cg as expected_reserve_cg',
+                'stock_take_lines.counted_reserve_cg as counted_reserve_cg',
+                'stock_take_lines.variance_reserve_cg as variance_reserve_cg',
             ]);
 
         // Strain and description first (298), then the lote number — a stock-count report is traceability (282).
@@ -215,6 +230,10 @@ class StockReport extends AbstractReport
             'esperado' => (int) $r->expected_cg,
             'contado' => (int) $r->counted_cg,
             'variacion' => (int) $r->variance_cg,
+            // Prompt 360 — the sealed reserve's own expected / counted / variance (blank where it was not counted).
+            'reserva_esperada' => $r->counted_reserve_cg === null ? null : (int) $r->expected_reserve_cg,
+            'reserva_contada' => $r->counted_reserve_cg === null ? null : (int) $r->counted_reserve_cg,
+            'reserva_variacion' => (int) $r->variance_reserve_cg,
         ])->all();
 
         return new ReportTable(
@@ -225,9 +244,12 @@ class StockReport extends AbstractReport
                 ReportColumn::weight('esperado', __('Esperado'), total: false),
                 ReportColumn::weight('contado', __('Contado'), total: false),
                 ReportColumn::weight('variacion', __('Variación')),
+                ReportColumn::weight('reserva_esperada', __('Reserva esperada'), total: false),
+                ReportColumn::weight('reserva_contada', __('Reserva contada'), total: false),
+                ReportColumn::weight('reserva_variacion', __('Variación de la reserva')),
             ],
             rows: $rows,
-            totals: ['variacion' => array_sum(array_column($rows, 'variacion'))],
+            totals: ['variacion' => array_sum(array_column($rows, 'variacion')), 'reserva_variacion' => array_sum(array_column($rows, 'reserva_variacion'))],
             empty: __('Sin recuentos cerrados en este período'),
         );
     }
