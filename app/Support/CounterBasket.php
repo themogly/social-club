@@ -108,6 +108,15 @@ class CounterBasket
         $memberId === null ? Session::forget('counter.visit'.substr($key, strlen('counter.basket'))) : Session::put('counter.visit'.substr($key, strlen('counter.basket')), $memberId);
     }
 
+    /** Prompt 364 — the socio this screen was serving (same operator, same sede), to resume the visit after a trip away. */
+    public static function visit(string $screen, ?string $locationId): ?string
+    {
+        $key = self::key($screen, $locationId);
+        $member = $key === null ? null : Session::get('counter.visit'.substr($key, strlen('counter.basket')));
+
+        return is_string($member) ? $member : null;
+    }
+
     /** Prompt 324 — is a visit under way on either basket screen at this sede (items, or a socio held)? */
     public static function inProgress(?string $locationId): bool
     {

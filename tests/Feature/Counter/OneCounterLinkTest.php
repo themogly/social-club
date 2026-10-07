@@ -167,7 +167,7 @@ class OneCounterLinkTest extends TestCase
         $this->actor(Role::OWNER);
 
         $this->assertSame(
-            ['counter.checkin', 'counter.members', 'counter.pos', 'counter.bar', 'counter.till'],
+            ['counter.checkin', 'counter.members', 'counter.pos', 'counter.stock', 'counter.bar', 'counter.till'], // 364 — Existencias after Dispensario
             array_column(CounterScreens::forUser(Auth::user()), 'route'),
         );
     }

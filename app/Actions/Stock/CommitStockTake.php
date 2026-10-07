@@ -70,17 +70,9 @@ class CommitStockTake
                     $expected = $batch->remaining_cg->centigrams;
                     $variance = $counted - $expected;
 
-                    // A forgotten «Rellenar»: a bag opened into the jar with nobody tapping it. The jar counts OVER while the
-                    // reserve still holds the bag — absorb the surplus, up to the reserve, as the top-up it was (no stock is
-                    // created); only what is beyond the reserve is an adjustment. A jar counted UNDER is a real shortfall,
-                    // and the reserve is never touched to cover it. Flagged for the manager, never asked of staff.
-                    $absorbed = $variance > 0 ? min($variance, $batch->reserve_cg->centigrams) : 0;
-                    if ($absorbed > 0) {
-                        $options = ['stock_take_id' => $stockTake->id, 'reason' => 'Rellenado sin registrar', 'operator_id' => $committer->id];
-                        $recorder->handle($batch, StockMovementType::RESERVE_OUT, -$absorbed, $options + ['reserve' => true]);
-                        $recorder->handle($batch, StockMovementType::RESERVE_OUT, $absorbed, $options);
-                        (new RecordAuditLog)->handle('stock.topped_up_unrecorded', $batch, null, ['cg' => $absorbed, 'stock_take_id' => $stockTake->id]);
-                    }
+                    // A forgotten «Rellenar» (359): a jar counted OVER while the reserve still holds the bag is the top-up it
+                    // was — absorbed up to the reserve, never created. One rule, shared with RecountBatch (prompt 364).
+                    $absorbed = (new AbsorbUnrecordedTopUp)->handle($batch, $variance, ['stock_take_id' => $stockTake->id, 'operator_id' => $committer->id]);
                     $variance -= $absorbed;
 
                     $stockTake->lines()->create([

@@ -59,6 +59,7 @@ class EnforceCounterHandover
         'counter/till',
         'counter/pos',
         'counter/bar',
+        'counter/existencias', // prompt 364 — the sixth screen: the surface and PIN pad only, like the others
         'socio/solicitud/*',   // the form the applicant was handed, its submit, and 179's MRZ read
         'socio/idioma',        // prompt 167 — choosing a language is not a member-only act
         'login',               // prompt 342 — a staff password login ENDS the handover (CounterAwareLoginResponse)

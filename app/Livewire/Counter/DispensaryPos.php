@@ -12,9 +12,7 @@ use App\Actions\Pricing\ResolveArticleDiscount;
 use App\Actions\Pricing\ResolvePrice;
 use App\Actions\ResolveLocale;
 use App\Actions\Stock\AllocateFromBatches;
-use App\Actions\Stock\MoveToReserve;
 use App\Actions\Stock\SelectBatch;
-use App\Actions\Stock\TopUpFromReserve;
 use App\Actions\Till\SelectTillSession;
 use App\Actions\Wallet\RecordWalletTransaction;
 use App\Enums\BatchStatus;
@@ -55,6 +53,7 @@ use App\Models\User;
 use App\Support\ArticleImage;
 use App\Support\BusinessDay;
 use App\Support\ChargeRounding;
+use App\Support\CounterBasket;
 use App\Support\CounterOperator;
 use App\Support\CounterScreens;
 use App\Support\DispensaryRounding;
@@ -302,6 +301,11 @@ class DispensaryPos extends Component
 
         // Prompt 205 — a basket left on this screen comes back. Last, because it needs the sede above.
         $this->restoreBasket();
+        // Prompt 364 — and, coming back from Existencias' «Volver al dispensario» (only then), the socio it was for: the
+        // trip to top up a jar resumes the visit exactly as it was. Every other arrival starts as it always has.
+        if (request()->boolean('volver')) {
+            $this->memberId ??= CounterBasket::visit($this->basketScreen(), $this->locationId);
+        }
     }
 
     protected function basketScreen(): string
@@ -489,63 +493,6 @@ class DispensaryPos extends Component
         $this->reset(['activeGeneticId', 'activeBatchId', 'weightInput', 'calculatorMode', 'unitQty', 'editingLine']);
         // Prompt 358 — a mis-tap must not lose the operator's place: the browser puts the list back where it was.
         $this->dispatch('weight-entry-cancelled');
-    }
-
-    /** Prompt 359 — the active strain's sealed reserve at this sede (centigrams). */
-    public function activeGeneticReserveCg(): int
-    {
-        $location = $this->resolveLocation();
-        $genetic = $this->activeGeneticId !== null ? Genetic::query()->find($this->activeGeneticId) : null;
-
-        return $location !== null && $genetic !== null ? (StockCover::reserveFor([$genetic], $location->id)[$genetic->id] ?? 0) : 0;
-    }
-
-    /**
-     * Prompt 359 — «Rellenar»: a sealed bag of the active strain opened into the jar. `$grams` from the pad (null = «Toda la
-     * reserva»), from the OLDEST batch that has a reserve at this sede (FEFO's order). The pad stays open: the next tap is
-     * usually the weighing.
-     */
-    public function topUpJar(?string $grams): void
-    {
-        $this->moveReserve($grams, toJar: true);
-    }
-
-    /** Prompt 359 — «Pasar a reserva»: grams typed on the pad move from the jar (the FEFO batch) into sealed bags. */
-    public function moveToReserve(string $grams): void
-    {
-        $this->moveReserve($grams, toJar: false);
-    }
-
-    private function moveReserve(?string $grams, bool $toJar): void
-    {
-        $operator = $this->counterActor();
-        $location = $this->resolveLocation();
-        $genetic = $this->activeGeneticId !== null ? Genetic::query()->find($this->activeGeneticId) : null;
-        if ($operator === null || $location === null || $genetic === null || $genetic->isUnitType()) {
-            return;
-        }
-
-        $cg = $grams === null ? null : (Weight::canonicalGrams($grams) !== null ? Weight::fromGrams($grams)->centigrams : -1);
-        $batch = $toJar
-            ? Batch::query()->where('genetic_id', $genetic->id)->where('location_id', $location->id)->where('status', BatchStatus::OPEN->value)
-                ->where('reserve_cg', '>', 0)->orderBy('expires_on')->orderBy('acquired_or_harvested_on')->orderBy('id')->first()
-            : (new SelectBatch)->fefo($genetic, $location);
-        if ($batch === null || (! $toJar && $cg === null)) {
-            $this->flash($toJar ? __('No hay reserva de esta genética.') : __('No hay nada en el bote.'), 'error');
-
-            return;
-        }
-
-        try {
-            $toJar ? (new TopUpFromReserve)->handle($batch, $cg, $operator) : (new MoveToReserve)->handle($batch, (int) $cg, $operator);
-        } catch (RuntimeException|AuthorizationException $e) {
-            $this->flash($e->getMessage(), 'error');
-
-            return;
-        }
-
-        $this->weightInput = '';
-        $this->flash($toJar ? __('Bote rellenado desde la reserva.') : __('Pasado a reserva.'), 'success');
     }
 
     /** Prompt 355 — half-gram rounding of the CHARGED weight, as this person has it at this sede (server session). */
@@ -2346,6 +2293,13 @@ class DispensaryPos extends Component
         // and a FEFO lookup just to answer "has a lote"). 11 varieties cost 119 queries per render, on every key press.
         $stock = StockCover::stockFor($genetics->values()->all(), $location->id);
         $reserves = StockCover::reserveFor($genetics->values()->all(), $location->id); // prompt 359 — sealed top-ups
+        // Prompt 364 — for the strains whose jar is EMPTY but sealed stock waits: the lote to open on Existencias (the oldest
+        // with a reserve, Rellenar's own order), in one query for the whole grid.
+        $emptyWithReserve = collect($genetics)->filter(fn (Genetic $g): bool => ! $g->isUnitType() && ($reserves[$g->id] ?? 0) > 0 && ($stock[$g->id]['cg'] ?? 0) <= 0)->pluck('id')->all();
+        $reserveBatches = $emptyWithReserve === [] ? [] : Batch::query()->where('location_id', $location->id)->where('status', BatchStatus::OPEN->value)
+            ->whereIn('genetic_id', $emptyWithReserve)->where('reserve_cg', '>', 0)
+            ->orderBy('expires_on')->orderBy('acquired_or_harvested_on')->orderBy('id')->get(['id', 'genetic_id'])
+            ->unique('genetic_id')->pluck('id', 'genetic_id')->all();
         // …and each card's price/photo batch (278) in two queries, not one FEFO lookup per card.
         $resolver->preloadDisplayBatches($genetics, $location);
 
@@ -2365,6 +2319,8 @@ class DispensaryPos extends Component
 
             $rows[] = [
                 'id' => $genetic->id,
+                // Prompt 364 — an empty jar with sealed stock links to Existencias with this lote open (its oldest reserve).
+                'reserve_batch_id' => $reserveBatches[$genetic->id] ?? null,
                 'name' => $genetic->name,
                 'product_type' => $genetic->product_type->value,
                 'product_type_label' => $genetic->product_type->label(),

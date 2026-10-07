@@ -49,10 +49,11 @@ class PanelSectionPermissionsTest extends TestCase
     /**
      * Counter-checked permissions whose panel page IS the same job, so they are not paired (DECISIONS, prompt 309):
      * registering a tablet at the counter and revoking it on *Mostradores registrados* are one job (terminals.manage);
-     * choosing a counter's sede and managing the sede on *Sedes* are one authority (settings.manage.location). Both are
-     * manager grants, held by no STAFF by default.
+     * choosing a counter's sede and managing the sede on *Sedes* are one authority (settings.manage.location); adding
+     * sealed bags to a batch's reserve on *Existencias* and managing batches on *Lotes* are one job (stock.manage, prompt
+     * 364). All are manager grants, held by no STAFF by default.
      */
-    private const SAME_JOB = ['terminals.manage', 'settings.manage.location'];
+    private const SAME_JOB = ['terminals.manage', 'settings.manage.location', 'stock.manage'];
 
     private Organisation $org;
 

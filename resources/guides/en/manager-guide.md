@@ -115,7 +115,9 @@ Three different actions, depending on what really happened:
 
 *Add stock at another location: records stock that is already there, as part of the same batch.*
 
-**Count:** type what the scale says. The system works out the difference and records it with your reason. Use this after weighing, rather than **Adjustment**, so nobody has to do the maths.
+**Count:** type what the scale says. The system works out the difference and records it with your reason. Use this after weighing, rather than **Adjustment**, so nobody has to do the maths. If the jar is heavier than expected and the batch has a sealed reserve, the extra is taken from the reserve first (a bag opened without **Top up**), exactly as the closing count does.
+
+**On the counter:** the **Stock** screen (*Existencias*) lets staff top up a jar from the reserve, move grams back to the reserve and fix a jar's weight the same way, with one tapped reason. Fixing a weight needs *Hacer recuentos de inventario* (stock count), which staff have by default; untick it for staff in **Roles and permissions** if you would rather keep weight fixes to managers. Managers and owners also get **Add to reserve** there, for sealed bags that arrived and were never entered.
 
 **Adjustment** asks **What are you correcting?**: **The jar** or **The sealed reserve**. Use it to fix one batch, including setting its reserve, without starting a full stock count. Type the grams to add (or a negative number to take away) and a reason.
 

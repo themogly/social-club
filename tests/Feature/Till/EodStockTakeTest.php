@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\Till;
 
+use App\Actions\Roles\SetRolePermission;
 use App\Actions\Till\OpenTill;
 use App\Enums\BatchStatus;
 use App\Enums\Role;
@@ -190,6 +191,8 @@ class EodStockTakeTest extends TestCase
 
     public function test_a_user_without_stock_take_cannot_commit_the_reweigh(): void
     {
+        // Prompt 364 — staff hold stock.take by default now; a club that revoked it is this case.
+        (new SetRolePermission)->handle(Role::STAFF, 'stock.take', false, tap(User::factory()->create(), fn (User $o) => $o->assignRole(Role::OWNER->value)));
         $staff = User::factory()->create();
         $staff->assignRole(Role::STAFF->value); // has till.open, NOT stock.take
         $staff->locations()->sync([$this->location->id]);

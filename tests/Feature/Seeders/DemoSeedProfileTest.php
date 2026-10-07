@@ -20,6 +20,7 @@ use App\Models\MembershipTier;
 use App\Models\Organisation;
 use App\Models\StockMovement;
 use App\Support\ActiveScope;
+use App\Support\BusinessDay;
 use App\Support\Period;
 use App\Support\Settings;
 use App\Support\StockCeiling;
@@ -213,7 +214,10 @@ class DemoSeedProfileTest extends TestCase
                 && $m->memberships()->where('location_id', $location->id)->where('status', 'ACTIVE')->exists()
                 // …who hasn't already consumed toward today's limit during the seeded fortnight (else the
                 // extra 100 cg could breach the daily cap — a limit concern, not the fee block under test).
-                && $m->dispensations()->whereDate('dispensed_at', now())->doesntExist();
+                // Prompt 364 — the SEDE's business day, as the daily limit counts it. A UTC `whereDate(now())` missed a
+                // dispensation at 22:30 UTC yesterday that is 00:30 today in Madrid (every demo sede since 362), so the
+                // test could pick a member already at today's cap, depending on the random seed.
+                && $m->dispensations()->whereBetween('dispensed_at', BusinessDay::window($location))->doesntExist();
         });
         $this->assertNotNull($member, 'the seed must contain a clean, dispensable active member');
 

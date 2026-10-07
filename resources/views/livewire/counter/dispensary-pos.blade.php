@@ -307,26 +307,8 @@
                             </div>
                         @endif
 
-                        {{-- Prompt 359 — the sealed top-ups of this strain at this sede, and the two moves staff make all day:
-                             «Rellenar» (bag → jar, the grams typed on the pad, or «Toda la reserva») and «Pasar a reserva» (jar →
-                             bags). Weight products only; one tap each, as the PIN operator. --}}
-                        @if (! $activeGenetic->isUnitType())
-                            @php $activeReserveCg = $this->activeGeneticReserveCg(); @endphp
-                            <div data-reserve-panel class="mt-3 rounded-xl border border-line bg-surface px-3 py-2 dark:border-slate-700 dark:bg-slate-950">
-                                <p class="text-sm font-medium text-ink-muted dark:text-slate-400">{{ __('Reserva: :grams', ['grams' => $this->grams($activeReserveCg)]) }}</p>
-                                <div class="mt-2 flex flex-wrap gap-2">
-                                    @if ($activeReserveCg > 0)
-                                        <button type="button" data-top-up x-on:click="$wire.topUpJar(value === '' ? null : value)"
-                                                class="inline-flex min-h-11 items-center rounded-xl border border-brand/40 bg-brand-tint px-3 text-sm font-semibold text-brand dark:bg-slate-800 dark:text-slate-100">{{ __('Rellenar') }}</button>
-                                        <button type="button" data-top-up-all x-on:click="$wire.topUpJar(null)"
-                                                class="inline-flex min-h-11 items-center rounded-xl border border-line px-3 text-sm font-medium text-ink-muted dark:border-slate-700 dark:text-slate-300">{{ __('Toda la reserva') }}</button>
-                                    @endif
-                                    <button type="button" data-move-to-reserve x-on:click="value !== '' && $wire.moveToReserve(value)"
-                                            class="inline-flex min-h-11 items-center rounded-xl border border-line px-3 text-sm font-medium text-ink-muted dark:border-slate-700 dark:text-slate-300">{{ __('Pasar a reserva') }}</button>
-                                </div>
-                                <p class="mt-1 text-[11px] text-ink-muted dark:text-slate-400">{{ __('Escribe los gramos en el teclado y toca Rellenar (de la reserva al bote) o Pasar a reserva (del bote a bolsas selladas).') }}</p>
-                            </div>
-                        @endif
+                        {{-- Prompt 364 — the reserve's moves (Rellenar, Toda la reserva, Pasar a reserva) live on «Existencias» now: selling
+                             and stock work are two places (Ben). The strain still shows «Reserva: X g» in its card. --}}
 
                         {{-- One request in flight: only this button shows a loading state, and a double tap adds one line. --}}
                         {{-- Prompt 358 — the same pad edits a basket line (tap the line): the button then says so. --}}
@@ -571,12 +553,16 @@
                              class="mt-4 as-list:flex as-list:flex-col as-list:gap-2 as-grid:grid as-grid:gap-3 as-grid:sm:grid-cols-2">
                             {{-- Prompt 271 — the variety's photo, 193's rule: the column only when some variety has one. --}}
                             @foreach ($gen['rows'] as $g)
-                                {{-- Prompt 359 — an empty jar with sealed top-ups is NOT «agotado»: tapping it opens the pad for «Rellenar». --}}
-                                @php $disabledCard = ! $gen['hasMember'] || (! $g['has_batch'] && $g['reserve_cg'] <= 0); @endphp
-                                <button
-                                    type="button"
-                                    @if (! $disabledCard) x-on:click="window.counterPane.remember(); $wire.chooseGenetic('{{ $g['id'] }}')" @endif
-                                    @disabled($disabledCard)
+                                {{-- Prompt 359 — an empty jar with sealed top-ups is NOT «agotado». Prompt 364 — its «Rellenar» is on Existencias:
+                                     the card is a LINK there with that lote open; the basket and the held socio wait (205). --}}
+                                @php
+                                    $topUpCard = ! $g['has_batch'] && $g['reserve_cg'] > 0 && $g['reserve_batch_id'] !== null;
+                                    $disabledCard = ! $topUpCard && (! $gen['hasMember'] || ! $g['has_batch']);
+                                @endphp
+                                <{{ $topUpCard ? 'a' : 'button' }}
+                                    @if ($topUpCard) href="{{ route('counter.stock', ['lote' => $g['reserve_batch_id'], 'from' => 'pos']) }}" data-jar-top-up-link @else type="button" @endif
+                                    @if (! $disabledCard && ! $topUpCard) x-on:click="window.counterPane.remember(); $wire.chooseGenetic('{{ $g['id'] }}')" @endif
+                                    @if (! $topUpCard) @disabled($disabledCard) @endif
                                     data-product
                                     data-catalogue-item="genetics"
                                     data-category="{{ $g['category_id'] }}"
@@ -630,7 +616,7 @@
                                          and keeps its full text in `title`. List view is unchanged. --}}
                                     @php
                                         $statusWord = match (true) {
-                                        ! $g['has_batch'] && $g['reserve_cg'] > 0 => __('Bote vacío — :grams en reserva · Rellenar', ['grams' => $this->grams($g['reserve_cg'])]),
+                                        ! $g['has_batch'] && $g['reserve_cg'] > 0 => __('Bote vacío — :grams en reserva · Rellenar en Existencias', ['grams' => $this->grams($g['reserve_cg'])]),
                                         $g['jar_low'] => __('Bote bajo, hay reserva'), // prompt 359 — top up, don't reorder
                                         $g['has_batch'] && $g['low_stock'] => $g['cover_label'] ?? __('Stock bajo'),
                                         $g['has_batch'] => __('Con lote'),
@@ -652,7 +638,7 @@
                                             @endif
                                         </span>
                                     </span>
-                                </button>
+                                </{{ $topUpCard ? 'a' : 'button' }}>
                             @endforeach
                         </div>
                         @if (empty($gen['rows']))
