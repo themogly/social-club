@@ -20733,32 +20733,40 @@ testing". The prompt assumes the branch is already on main; it isn't, so 362 is 
     `php artisan telegram:check` and `php artisan telegram:set-webhook`.
   - Check that the Sentry issue stops recurring.
 
-### 2. `Collection::fromLivewire(): Argument #1 ($notification) must be of type array, int given` — diagnosis in progress, NO fix shipped
+### 2. `Collection::fromLivewire(): Argument #1 ($notification) must be of type array, int given` — cause found, guarded
 
-- **The prompt rule:** don't fix until we can say what sent the integer. The Sentry event hasn't been pasted yet.
-- **What the investigation established:**
-  - **The mechanism.** Replayed over HTTP against the real update endpoint with debug on, an update that replaces the
-    WHOLE `notifications` property with a structure holding an integer gives exactly the production message:
-    - `{"notifications": {"x": 5}}` → 500 with the TypeError;
-    - `{"notifications": [5]}` → 500 with the TypeError;
-    - `{"notifications.x": 5}` → 200 (a nested update is ignored safely);
-    - `{"notifications": 5}` → a different TypeError.
-    - So it arrives through Livewire 4.4's `HandleSynths::hydratePropertyUpdate`, not from the snapshot. The panel
-      snapshot holds `notifications: [[], {s: wrbl}]`, and a checksum-verified snapshot cannot carry the integer.
-  - **Who doesn't send it:**
-    - Filament's notifications view and `notification.js` never write `$wire.notifications`; they only call
-      `removeNotification` / `handleBroadcastNotification`.
-    - Our `app/` and `resources/` never touch it.
-  - **The browser reproductions, all negative** (`tests/Browser/probe-363-notifications.mjs`, a staging-seeded DB):
-    - a toast followed by a second Livewire action (3 times);
-    - closing a toast while a search request was in flight (3 times);
-    - counter → Administración after a notice.
-    - Six toasts in all, every Livewire response 200, and nothing in the log.
-  - **Not tried:** a tab left open across the 25 September deploy (a 4.3.3 snapshot against 4.4.6). It can't be
-    replayed without that old page.
-- **What would settle it:** the Sentry event's request URL and method, the user agent and browser, the release, how many
-  times and since when, and the breadcrumbs.
-  - Our Sentry config sends **no request body** (`max_request_body_size => 'none'`), so the update payload itself will
-    NOT be in the event.
-  - If the event doesn't settle it, the next step proposed to Ben is a narrow log (component, update keys, value types,
-    user agent) on updates that replace `notifications`. That is instrumentation, not a fix.
+- **The Sentry event** (pasted by Ben): one event, 5 Oct 2026 16:49 UTC, POST `https://dg.padron.app/livewire-b2aa5caa/update`,
+  component `Filament\Livewire\Notifications`. There were no commits between 3 and 6 October, so "a tab open across a
+  deploy" does not fit.
+- **The cause, in one paragraph.**
+  - The integer was sent by an HTTP request our page never builds: an update that replaces the WHOLE `notifications`
+    property with junk.
+  - Replayed against the real endpoint, `{"notifications": [5]}` and `{"notifications": {"x": 5}}` give exactly the
+    production message. The snapshot path cannot carry it; a nested update (`notifications.x`) is harmless.
+  - Neither our `app/` and `resources/` nor Filament's notification JS ever writes that property. Browser reproductions
+    of a toast followed by a second action, closing a toast mid-request, and counter → Administración all returned 200.
+  - The decisive finding: **the public `/login` page renders Filament's Notifications component**, so an anonymous
+    client can take a valid snapshot there and post that update. Done as a guest in the test, it gives the same 500,
+    with no account.
+  - Together with filamentphp/filament#19447 (the same TypeError reported beside "Cannot update locked property" on
+    Filament internals, which only a crafted request sends; closed upstream as "not planned"), the sender is almost
+    certainly an **automated scanner probing Livewire on a public URL**, not a member of staff.
+  - The event's user agent, if Ben wants certainty, would confirm it. Our Sentry config sends no request body.
+- **Upstream:**
+  - Livewire **4.4.7** (the only newer patch) changes `ImplicitlyBoundMethod` and rebuilt assets only, not this.
+  - Filament 5.9 and 5.10 leave `Collection::fromLivewire()` unchanged.
+  - So no upgrade fixes it.
+- **The guard (narrow, temporary).** `App\Support\NotificationsUpdateGuard`, bound in `AppServiceProvider::register()`
+  for `Filament\Notifications\Collection`:
+  - `fromLivewire()` resolves through `app(static::class, ['items' => …])`, so the binding takes effect.
+  - The class's constructor is `final`, so the prompt's subclass idea was impossible; a binding closure is used instead.
+  - Non-array items are dropped and logged at warning level with their TYPES (never their values); valid notifications
+    are untouched.
+  - The junk request now gets a 200 with an empty list instead of a 500 in Sentry.
+  - No TypeError is caught anywhere, and nothing wraps Livewire's update endpoint.
+  - **Remove it when Filament validates the shape itself** (track filamentphp/filament#19447).
+- **Tests:** `tests/Feature/Security/NotificationsJunkUpdateTest.php` (both red before with the production message):
+  - a guest replays `/login`'s snapshot with `notifications: [5]` and `{"x": 5}` over HTTP → 200, with only valid
+    notifications held;
+  - `fromLivewire(['a' => valid, 'b' => 5])` keeps `a`, drops the integer and logs `dropped: ['int']`.
+- **The browser probe** used for the negative reproductions stays at `tests/Browser/probe-363-notifications.mjs`.
