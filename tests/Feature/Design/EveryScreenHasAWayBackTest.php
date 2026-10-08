@@ -64,6 +64,9 @@ class EveryScreenHasAWayBackTest extends TestCase
             if (str_contains($uri, '{')) {
                 continue; // receipts and photo carry a param — the receipt way-back is pinned elsewhere
             }
+            if (str_ends_with($uri, '/csv')) {
+                continue; // a file download (prompt 371's day sheet), not a page
+            }
             $controller = $route->getAction('controller');
             if (! is_string($controller) || str_contains($controller, '@')) {
                 continue; // POST-style controllers (location switch, panic) are not full pages

@@ -21386,3 +21386,101 @@ From Ben's iPhone screenshots of live and a video from the club (Ste, 8 October)
 - `AjusteNowAndNewTotalTest`: the below-zero test now expects an error on `amount` and the modal still mounted.
 - Guides: `cash-at-the-counter.md` (who closed, the table's new title) and `counter-quick-start.md` (the merge
   wording, the forgotten top-up confirmation).
+
+## Prompt 371 — tap «Hoy» on the counter for the day's sheet, to check against the paper
+
+Liam (8 October): *"…we just click on Today and we get a sheet-equivalent rundown of the day's transactions… not knowing how
+to double-check sheet vs iPad."*
+
+### The screen
+
+- `/counter/hoy` (`counter.today`), `App\Livewire\Counter\TodaySheet`; the data comes from `App\ViewModels\CounterDaySheet`.
+- **One row per operation, oldest first** (the order a paper sheet is written in), dispensary and bar together. Each
+  row shows:
+  - the time and the member («Sin socio» for a bar sale with none);
+  - what was taken: grams weighed and, when 355's rounding changed it, «se cobra …»; units; bar items;
+  - who served.
+- **Voided operations are struck through with their reason, and never counted.**
+- **A partial refund (`refunds`) leaves the dispensation COMPLETED.** It stays counted, exactly as the panel counts it,
+  and is marked «Devuelta en parte». The prompt asked that refunded sales not be counted, but the panel's
+  «Operaciones» counts them, and the sheet's count must equal the panel's.
+- **Totals** follow the filters:
+  - operations (dispensary and bar);
+  - grams per strain and in total (weighed, plus charged where it differs);
+  - units per unit product;
+  - bar and shop products;
+  - money as total / cash / wallet / tab.
+  - All summed in PHP from the rows; no SQL arithmetic (370).
+- **The tab share** comes from 259's `wallet.tab.added` audit (`sale_id`, `added_cents`). Wallet = `wallet_cents` minus
+  that.
+- **Filters:** *Todo / Dispensario / Barra*, *Solo lo mío* plus each person who served today, and a member filter
+  (`memberFilter`, deliberately not `search`: it is not a member lookup).
+- **A row opens its receipt in 252's one receipt sheet.** Its `counter-receipt-open` event may now carry a URL; the
+  POS screens' calls are unchanged. A bar row is tappable only where bar receipts are on.
+
+### One definition of "today"
+
+- The sede's business day ({@see Period::today()}: its time zone and cutoff), COMPLETED dispensations by `dispensed_at`
+  and COMPLETED orders by `created_at`, the same as `Dashboard::transactionCount()`.
+- A test asserts the sheet's count equals the home panel's «Operaciones».
+- **The time-zone test sets the cutoff to 00:00.** With the default 06:00 cutoff, a sale at 00:30 belongs to the
+  previous business day (the evening's sheet), as on the panel and the gram cap. At 00:00, a sale at 00:30 Madrid
+  (22:30 UTC) is on that Madrid day's sheet.
+
+### Who sees what
+
+- **The screen opens for `pos.use` or `pos.bar`** (the `TodaySheet::mount()` gate, mirrored in `CounterScreens`).
+- **Amounts and money totals are shown only to `reports.view`,** the home panel's «Aportaciones» rule, for the same
+  reason (a cash business, a screen on show).
+  - Staff see the rows and the gram/unit totals, and no € anywhere on the screen (asserted).
+  - To let staff see amounts, tick *Ver informes de su sede* for STAFF on *Roles y permisos*.
+- No document numbers or photos on this screen.
+
+### Getting there
+
+- The whole «Hoy» panel on the home is now a link, with «Ver el día →».
+- A seventh hub tile «Hoy» («Todo lo de hoy, para cuadrar con la hoja»).
+- «Ver el día →» at the top of *Caja*.
+- **Counter guards:**
+  - in `EnforceCounterHandover`'s allowed screens, so a handover renders only the surface;
+  - in `RequireOpenTill`'s allowed paths, since it is read-only and needed during the cash-up;
+  - classified in `RequireOpenTillTest`.
+- **Test updates:**
+  - the two tile-order tests;
+  - `PanelSectionPermissionsTest` now lists `reports.view` and `reports.export` as SAME_JOB: seeing the day's money at
+    the counter and reading Informes are one authority;
+  - `EveryScreenHasAWayBackTest` skips the CSV download (not a page).
+
+### Print and export
+
+- **«Imprimir»** prints this page as a clean sheet: print styles hide the top bar, the controls and the receipt sheet,
+  in black on white.
+- **«Descargar (CSV)»** (`counter.today.csv`, `TodaySheetCsvController`) is for a PIN operator holding
+  `reports.export`, at the counter's own sede.
+  - It has the same rows and totals, with amounts only with `reports.view`, and numbers in 316's form.
+  - A STAFF PIN gets 403.
+
+### Vocabulary
+
+- The screen never says «venta». It counts «Operaciones», as the home panel does (CLAUDE.md).
+
+### Tests and proof
+
+- **`tests/Feature/Counter/TodaySheetTest.php`** (7). Tests 1, 2 and 4 were red first (no route, no screen). They
+  cover:
+  - the panel link;
+  - the counts (3 dispensations + 2 bar today at Centro, 1 yesterday, 1 at Norte, 1 voided → 6 rows in time order, 5
+    counted = the panel's figure);
+  - the totals, including 1.10 g charged 1.00 g and a €10.00 tab sale;
+  - the money gate;
+  - the filters;
+  - the receipt, print and CSV gate;
+  - the 00:30 Madrid time zone.
+  - Fixtures go through `CommitDispensation`, `CommitOrder` and `VoidDispensation`.
+- **`tests/Browser/prove-371-today.mjs`** passed 38/38 (manager and staff × 1180×820 light and 820×1180 dark): the panel
+  link, the sheet, the struck-through voided row, no € for staff, a row's receipt in-page and Close, the print
+  layout, and no sideways scroll.
+- Screenshots are in `storage/app/screenshots/371/`.
+- **Guides:** `counter-quick-start.md` has «Checking the day against the sheet (Today)», with `11-today-sheet.jpg`
+  through `shots.json`.
+- **Help:** a new `today-sheet` topic, «Cuadrar el día con la hoja».

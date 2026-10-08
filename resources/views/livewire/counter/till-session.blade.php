@@ -21,6 +21,13 @@
             :body="$mustChooseLocation ? __('Trabajas en varias sedes. Selecciona en la barra superior en cuál estás.') : __('No tienes ninguna sede activa. Pide a un responsable que te asigne una para gestionar la caja.')"
         />
     @else
+        {{-- Prompt 371 — where staff are when they cash up: the day's sheet, to check against the paper. --}}
+        @if ($this->userCan('pos.use') || $this->userCan('pos.bar'))
+            <div class="flex justify-end">
+                <a href="{{ route('counter.today') }}" data-till-today-link
+                   class="inline-flex min-h-11 items-center gap-2 rounded-xl border border-line bg-surface px-4 text-sm font-semibold text-ink transition hover:bg-surface-alt dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:hover:bg-slate-800">{{ __('Ver el día') }} <span aria-hidden="true">→</span></a>
+            </div>
+        @endif
         {{-- The shared slot at the top now answers only whole-screen outcomes (the arqueo revealed, the recount
              committed, the drawer opened or already closed) and anything raised outside a form. A form's own
              result renders INSIDE its card, beside its button (prompt 279) — at iPad landscape the operator has

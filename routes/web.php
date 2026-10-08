@@ -18,6 +18,7 @@ use App\Http\Controllers\MemberDocumentController;
 use App\Http\Controllers\MemberMediaController;
 use App\Http\Controllers\Socio\AuthController as SocioAuthController;
 use App\Http\Controllers\Socio\PwaController;
+use App\Http\Controllers\TodaySheetCsvController;
 use App\Http\Middleware\AuthenticateCounter;
 use App\Livewire\Counter\BarPos;
 use App\Livewire\Counter\CheckInScreen;
@@ -26,6 +27,7 @@ use App\Livewire\Counter\DispensaryPos;
 use App\Livewire\Counter\MembershipCounter;
 use App\Livewire\Counter\StockScreen;
 use App\Livewire\Counter\TillSession;
+use App\Livewire\Counter\TodaySheet;
 use Illuminate\Support\Facades\Route;
 
 // The Content-Security-Policy's report stream (prompt 270) is registered OUTSIDE this web group in bootstrap/app.php —
@@ -119,6 +121,15 @@ Route::middleware(['web', AuthenticateCounter::class])
 Route::middleware(['web', AuthenticateCounter::class])
     ->get('/counter/existencias', StockScreen::class)
     ->name('counter.stock');
+
+// Prompt 371 — «Hoy»: the day's sheet at the counter's sede (every sale, oldest first, and the totals) to check against the
+// paper sheet. Gated in the component on pos.use OR pos.bar; money only for reports.view; CSV for reports.export.
+Route::middleware(['web', AuthenticateCounter::class])
+    ->get('/counter/hoy', TodaySheet::class)
+    ->name('counter.today');
+Route::middleware(['web', AuthenticateCounter::class])
+    ->get('/counter/hoy/csv', TodaySheetCsvController::class)
+    ->name('counter.today.csv');
 
 Route::middleware(['web', 'auth'])
     ->get('/counter/pos/receipt/{dispensation}', [DispensationReceiptController::class, 'show'])

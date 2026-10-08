@@ -51,9 +51,10 @@ class PanelSectionPermissionsTest extends TestCase
      * registering a tablet at the counter and revoking it on *Mostradores registrados* are one job (terminals.manage);
      * choosing a counter's sede and managing the sede on *Sedes* are one authority (settings.manage.location); adding
      * sealed bags to a batch's reserve on *Existencias* and managing batches on *Lotes* are one job (stock.manage, prompt
-     * 364). All are manager grants, held by no STAFF by default.
+     * 364); seeing the day's money on the counter's sheet and reading Informes are one authority, and its CSV the reports'
+     * export (reports.view, reports.export — prompt 371). All are manager grants, held by no STAFF by default.
      */
-    private const SAME_JOB = ['terminals.manage', 'settings.manage.location', 'stock.manage'];
+    private const SAME_JOB = ['terminals.manage', 'settings.manage.location', 'stock.manage', 'reports.view', 'reports.export'];
 
     private Organisation $org;
 

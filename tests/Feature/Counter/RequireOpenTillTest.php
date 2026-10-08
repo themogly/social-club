@@ -78,6 +78,8 @@ class RequireOpenTillTest extends TestCase
         'counter/formacion' => 'allow',                  // prompt 324 — enter *Modo formación* (POST)
         'counter/formacion/salir' => 'allow',            // prompt 324 — leave it (POST)
         'counter/existencias' => 'allow',                // prompt 364 — stock work (top up, weigh a jar) is not trading
+        'counter/hoy' => 'allow',                        // prompt 371 — the day's sheet is read-only
+        'counter/hoy/csv' => 'allow',                    // prompt 371 — its download
         'counter/guias' => 'allow',                      // prompt 353 — the guides need no till
         'counter/guias/{guide}' => 'allow',
     ];
