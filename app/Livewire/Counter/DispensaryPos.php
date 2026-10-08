@@ -16,6 +16,7 @@ use App\Actions\Stock\SelectBatch;
 use App\Actions\Till\SelectTillSession;
 use App\Actions\Wallet\RecordWalletTransaction;
 use App\Enums\BatchStatus;
+use App\Enums\CashPot;
 use App\Enums\DispensationStatus;
 use App\Enums\ProductType;
 use App\Enums\TillSessionStatus;
@@ -53,6 +54,7 @@ use App\Models\TillSession;
 use App\Models\User;
 use App\Support\ArticleImage;
 use App\Support\BusinessDay;
+use App\Support\CashBoxes;
 use App\Support\ChargeRounding;
 use App\Support\CounterBasket;
 use App\Support\CounterOperator;
@@ -1336,7 +1338,10 @@ class DispensaryPos extends Component
 
         $this->lastDispensationId = $dispensation->id;
         $this->resetBasketState();
-        $this->flashSettled(SettledOutcome::forDispensation($dispensation, $change), __('Dispensación registrada.'));
+        // Prompt 373 — edibles paid in cash, with their own box this session: «Pon 10.00 € en el bote de comestibles.»
+        $session = TillSession::query()->withoutGlobalScopes()->find($dispensation->till_session_id);
+        $boxes = $session === null ? null : CashBoxes::sentence($session, [CashPot::EDIBLES->value => $dispensation->edibles_cash_cents->cents]);
+        $this->flashSettled(SettledOutcome::forDispensation($dispensation, $change), trim(__('Dispensación registrada.').' '.($boxes ?? '')));
         $this->landAfterRecording($dispensation->id, null);
     }
 
@@ -1477,11 +1482,14 @@ class DispensaryPos extends Component
         $this->lastOrderId = $result['order']->id;
         $this->resetBasketState();
         $this->barBasket = [];
-        // Prompt 349 — with separate cash pots each part's cash belongs to its own pot (the ledger already records them
-        // apart). The visit is paid at the dispensary pot, so the operator is told, by amount, what goes in the bar's.
-        $barCash = $result['order']->cash_cents->cents;
-        $pots = $barCash > 0 && (bool) TillSession::query()->withoutGlobalScopes()->whereKey($result['dispensation']->till_session_id)->value('separate_pots');
-        $this->flash(__('Visita liquidada: dispensación y barra.').($pots ? ' '.__('Pon :amount en el bote de la barra.', ['amount' => Money::fromCents($barCash)->formatted()]) : ''), 'success');
+        // Prompt 349 / 373 — each kind of money with its own box this session is told by amount: the bar part, and the
+        // edibles' cash (fixed at commit). Nothing in a separate box, no line (CashBoxes::sentence).
+        $session = TillSession::query()->withoutGlobalScopes()->find($result['dispensation']->till_session_id);
+        $boxes = $session === null ? null : CashBoxes::sentence($session, [
+            CashPot::BAR->value => $result['order']->cash_cents->cents,
+            CashPot::EDIBLES->value => $result['dispensation']->edibles_cash_cents->cents,
+        ]);
+        $this->flash(trim(__('Visita liquidada: dispensación y barra.').' '.($boxes ?? '')), 'success');
         $this->landAfterRecording($result['dispensation']->id, $result['order']->id);
     }
 

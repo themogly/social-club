@@ -3,6 +3,7 @@
 namespace App\Livewire\Counter\Concerns;
 
 use App\Actions\Memberships\RecordFeePayment;
+use App\Enums\CashPot;
 use App\Enums\FeePaymentMethod;
 use App\Exceptions\DebtLimitExceededException;
 use App\Models\Location;
@@ -11,6 +12,7 @@ use App\Models\Membership;
 use App\Models\MembershipFeePayment;
 use App\Models\TillSession;
 use App\Models\User;
+use App\Support\CashBoxes;
 use App\Support\CounterOperator;
 use App\Support\FeeWaiverReasons;
 use App\Support\ManagerApproval;
@@ -115,14 +117,16 @@ trait CollectsMembershipFees
         $remaining = $owed - $cents;
         $this->reset(['feeMemberId', 'feeAmount']);
         $this->feeMethod = 'CASH';
+        // Prompt 373 — a fee in cash, with the fees' own box this session: «Pon 20.00 € en el bote de cuotas.»
+        $boxes = $method === FeePaymentMethod::CASH ? CashBoxes::sentence($session, [CashPot::FEES->value => $cents]) : null;
 
         // The amount is named because the field it was typed into has just been reset — a confirmation that
         // survives the figure it confirms is no confirmation at all (prompt 202).
         return [
             'type' => 'success',
-            'message' => $remaining > 0
+            'message' => trim(($remaining > 0
                 ? __('Cuota cobrada: :amount. Pendiente: :remaining', ['amount' => Money::fromCents($cents)->formatted(), 'remaining' => Money::fromCents($remaining)->formatted()])
-                : __('Cuota cobrada por completo: :amount.', ['amount' => Money::fromCents($cents)->formatted()]),
+                : __('Cuota cobrada por completo: :amount.', ['amount' => Money::fromCents($cents)->formatted()])).' '.($boxes ?? '')),
         ];
     }
 

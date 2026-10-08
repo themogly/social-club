@@ -3,6 +3,7 @@
 namespace App\ViewModels\Reports;
 
 use App\Enums\CashMovementType;
+use App\Enums\CashPot;
 use App\Enums\TillSessionStatus;
 use App\Filament\Resources\TillSessions\TillSessionResource;
 use App\Models\TillSession;
@@ -95,7 +96,9 @@ class TillReport extends AbstractReport
         }
 
         $this->sessionCount = $sessions->count();
-        $anyPots = $sessions->contains(fn (TillSession $session): bool => (bool) $session->separate_pots); // prompt 349
+        // Prompt 349 / 373 — a box's columns appear only when a session in view kept it.
+        $potKeys = [CashPot::BAR->value => 'barra', CashPot::FEES->value => 'cuotas', CashPot::EDIBLES->value => 'comestibles'];
+        $anyBox = collect(CashPot::optional())->mapWithKeys(fn (CashPot $pot): array => [$pot->value => $sessions->contains(fn (TillSession $session): bool => $session->hasOwnBox($pot))])->all();
 
         // One batched Z-report for the whole period — a fixed number of grouped queries, not ~12 per session
         // in this loop (prompt 108).
@@ -122,12 +125,7 @@ class TillReport extends AbstractReport
                 'variance' => $z['variance'],
                 'tx' => (int) $z['transaction_count'],
                 // Prompt 349 — the bar and fees pots, their own columns (the three above are the dispensary pot's then).
-                'barra_esperado' => $z['separate_pots'] ? (int) $z['bar_expected'] : null,
-                'barra_contado' => $z['separate_pots'] ? ($z['bar_counted'] !== null ? Money::fromCents((int) $z['bar_counted'])->formatted() : __('no contado')) : '—',
-                'barra_descuadre' => $z['separate_pots'] ? $z['bar_variance'] : null,
-                'cuotas_esperado' => $z['separate_pots'] ? (int) $z['fees_expected'] : null,
-                'cuotas_contado' => $z['separate_pots'] ? ($z['fees_counted'] !== null ? Money::fromCents((int) $z['fees_counted'])->formatted() : __('no contado')) : '—',
-                'cuotas_descuadre' => $z['separate_pots'] ? $z['fees_variance'] : null,
+            ] + $this->boxFigures($session, $z, $potKeys) + [
                 'estado' => $session->status === TillSessionStatus::OPEN
                     ? __('Abierta')
                     // A closed session whose ledger moved after cierre (a post-close void) is flagged, so the
@@ -167,14 +165,7 @@ class TillReport extends AbstractReport
                 // Prompt 366 — beside the variance, not after the pot columns, so it is on screen whatever the club's pots.
                 ReportColumn::text('sin_explicar', __('Sin explicar')),
                 ReportColumn::number('tx', __('Tx')),
-                ...($anyPots ? [
-                    ReportColumn::money('barra_esperado', __('Barra: esperado')),
-                    ReportColumn::text('barra_contado', __('Barra: contado')),
-                    ReportColumn::money('barra_descuadre', __('Barra: descuadre')),
-                    ReportColumn::money('cuotas_esperado', __('Cuotas: esperado')),
-                    ReportColumn::text('cuotas_contado', __('Cuotas: contado')),
-                    ReportColumn::money('cuotas_descuadre', __('Cuotas: descuadre')),
-                ] : []),
+                ...$this->boxColumns($anyBox),
                 ReportColumn::text('estado', __('Estado')),
             ],
             rows: $rows,
@@ -184,6 +175,48 @@ class TillReport extends AbstractReport
             defaultSort: 'fecha',
             sortable: true,
         );
+    }
+
+    /**
+     * Prompt 349 / 373 — each own box's expected / counted / difference for a row; "—" where the session had no such box.
+     *
+     * @param  array<string, mixed>  $z
+     * @param  array<string, string>  $potKeys
+     * @return array<string, mixed>
+     */
+    private function boxFigures(TillSession $session, array $z, array $potKeys): array
+    {
+        $out = [];
+        foreach (CashPot::optional() as $pot) {
+            $key = $potKeys[$pot->value];
+            $col = $pot->column();
+            $own = $session->hasOwnBox($pot);
+            $out[$key.'_esperado'] = $own ? (int) $z[$col.'_expected'] : null;
+            $out[$key.'_contado'] = $own ? ($z[$col.'_counted'] !== null ? Money::fromCents((int) $z[$col.'_counted'])->formatted() : __('no contado')) : '—';
+            $out[$key.'_descuadre'] = $own ? $z[$col.'_variance'] : null;
+        }
+
+        return $out;
+    }
+
+    /**
+     * @param  array<string, bool>  $anyBox
+     * @return list<ReportColumn>
+     */
+    private function boxColumns(array $anyBox): array
+    {
+        $columns = [];
+        foreach ([[CashPot::BAR, 'barra', __('Barra')], [CashPot::FEES, 'cuotas', __('Cuotas')], [CashPot::EDIBLES, 'comestibles', __('Comestibles')]] as [$pot, $key, $label]) {
+            if ($anyBox[$pot->value] ?? false) {
+                array_push($columns,
+                    ReportColumn::money($key.'_esperado', __(':pot: esperado', ['pot' => $label])),
+                    ReportColumn::text($key.'_contado', __(':pot: contado', ['pot' => $label])),
+                    ReportColumn::money($key.'_descuadre', __(':pot: descuadre', ['pot' => $label])),
+                );
+            }
+        }
+
+        return $columns;
     }
 
     // --- Variance by who counted (closed sessions; prompt 369) -----------------------

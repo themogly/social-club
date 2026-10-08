@@ -62,6 +62,13 @@ class CreateLocation extends CreateRecord
             unset($data[$key]);
         }
 
+        // Prompt 373 — where the cash goes: the owner's choice, or the code default for anyone else.
+        foreach (LocationForm::OWNER_STRINGS as $key) {
+            $value = $data[$key] ?? null;
+            $this->stringState[$key] = LocationForm::actorIsOwner() && in_array($value, ['till', 'own'], true) ? (string) $value : (string) Settings::DEFAULTS[$key];
+            unset($data[$key]);
+        }
+
         return $data;
     }
 
@@ -79,7 +86,7 @@ class CreateLocation extends CreateRecord
             Settings::set($key, $this->arrayState[$key] ?? Settings::DEFAULTS[$key], SettingType::JSON, (string) $this->record->getKey());
         }
 
-        foreach (LocationForm::SETTING_STRINGS as $key) {
+        foreach ([...LocationForm::SETTING_STRINGS, ...LocationForm::OWNER_STRINGS] as $key) {
             Settings::set($key, $this->stringState[$key] ?? (string) Settings::DEFAULTS[$key], SettingType::STRING, (string) $this->record->getKey());
         }
     }

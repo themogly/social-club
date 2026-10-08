@@ -253,13 +253,16 @@ class Settings
         'require_photo_to_dispense' => true,
         // Prompt 348 — per sede: a QR/card scan shows the member's photo, large, for staff to confirm before anything else.
         'confirm_photo_on_scan' => true,
-        // Prompt 349 — per sede: the till keeps three cash pots (dispensary, bar, fees); the float and the headline figure
-        // are the dispensary's. OFF here (today's single drawer); the 349 migration switched it ON for this club's sedes.
-        'separate_cash_pots' => false,
-        // Prompt 349 — per sede, with pots on: whether the bar and fees pots are counted every night by default (the
-        // dispensary always is). Not counted carries forward to the next opening.
+        // Prompt 373 — per sede, owner-only: where each kind of money goes — 'till' (with the dispensary, which always is the
+        // till) or 'own' (its own box). Replaces 349's all-or-nothing separate_cash_pots (mapped by the 373 migration).
+        'cash_box_edibles' => 'till',
+        'cash_box_bar' => 'till',
+        'cash_box_fees' => 'till',
+        // Prompt 349 / 373 — per sede, for a kind of money with its own box: counted every night by default (the till always
+        // is). Not counted carries forward to the next opening.
         'count_bar_nightly' => false,
         'count_fees_nightly' => false,
+        'count_edibles_nightly' => false,
         // Prompt 350 — the dispensary's discounted total to the euro (ORG-level, owner only): nearest | down | none, and
         // when: local (only a Local discount) | any (any discount) | all (every contribution).
         'discount_rounding' => 'nearest',

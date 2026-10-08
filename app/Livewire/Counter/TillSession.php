@@ -28,6 +28,7 @@ use App\Http\Middleware\RequireOpenTill;
 use App\Livewire\Counter\Concerns\IdentifiesOperator;
 use App\Livewire\Counter\Concerns\ReportsSystemErrors;
 use App\Livewire\Counter\Concerns\ResolvesCounterLocation;
+use App\Models\AuditLog;
 use App\Models\Batch;
 use App\Models\ExpenseCategory;
 use App\Models\Location;
@@ -37,6 +38,7 @@ use App\Models\StockTakeLine;
 use App\Models\TillSession as TillSessionModel;
 use App\Models\User;
 use App\Support\BusinessDay;
+use App\Support\CashBoxes;
 use App\Support\CounterOperator;
 use App\Support\CounterScreens;
 use App\Support\ManagerApproval;
@@ -103,10 +105,10 @@ class TillSession extends Component
      *
      * @var array<string, string>
      */
-    public array $potCountInput = ['BAR' => '', 'FEES' => ''];
+    public array $potCountInput = ['BAR' => '', 'FEES' => '', 'EDIBLES' => ''];
 
     /** @var array<string, bool> */
-    public array $potCountNow = ['BAR' => false, 'FEES' => false];
+    public array $potCountNow = ['BAR' => false, 'FEES' => false, 'EDIBLES' => false];
 
     /**
      * Revealed after the close: each optional pot's expected / counted / variance.
@@ -585,7 +587,8 @@ class TillSession extends Component
             (new RecordCashMovement)->handle($session, $type, $cents, [
                 'reason' => $reason === '' ? null : $reason,
                 // Prompt 349 — the pot it comes out of (or goes into); only meaningful when the session keeps pots.
-                'pot' => $session->separate_pots ? (CashPot::tryFrom($this->movementPot) ?? CashPot::DISPENSARY) : CashPot::DISPENSARY,
+                // Prompt 373 — the till or one of THIS session's own boxes; anything else is the till's.
+                'pot' => ($pot = CashPot::tryFrom($this->movementPot)) !== null && $session->hasOwnBox($pot) ? $pot : CashPot::DISPENSARY,
             ]);
         } catch (TillClosedException) {
             $this->flash(__('La caja está cerrada.'), 'error');
@@ -676,12 +679,9 @@ class TillSession extends Component
     public function startClose(): void
     {
         $this->closing = true;
-        // Prompt 349 — each optional pot starts on its sede's «Contar cada noche».
-        $this->potCountNow = [
-            'BAR' => (bool) Settings::get('count_bar_nightly', false, $this->locationId),
-            'FEES' => (bool) Settings::get('count_fees_nightly', false, $this->locationId),
-        ];
-        $this->potCountInput = ['BAR' => '', 'FEES' => ''];
+        // Prompt 349 / 373 — each box starts on its sede's «Contar cada noche».
+        $this->potCountNow = collect(CashBoxes::COUNT_NIGHTLY)->map(fn (string $key): bool => (bool) Settings::get($key, false, $this->locationId))->all();
+        $this->potCountInput = ['BAR' => '', 'FEES' => '', 'EDIBLES' => ''];
         $this->resetCloseState();
 
         // One end-of-day ritual: weigh the touched flower FIRST, then count the cash (prompt 47).
@@ -1022,21 +1022,19 @@ class TillSession extends Component
 
         $note = trim($this->closeNote);
 
-        // Prompt 349 — the bar and fees pots: a count for each one counted now, null for "no se cuenta hoy".
+        // Prompt 349 / 373 — the session's own boxes: a count for each one counted now, null for "no se cuenta hoy".
         $potCounts = [];
-        if ($session->separate_pots) {
-            foreach (CashPot::optional() as $pot) {
-                if (! ($this->potCountNow[$pot->value] ?? false)) {
-                    continue;
-                }
-                $potCents = $this->toCents($this->potCountInput[$pot->value] ?? '');
-                if ($potCents === null || $potCents < 0) {
-                    $this->flash(__('El importe contado de :pot no es válido.', ['pot' => $pot->label()]), 'error');
-
-                    return;
-                }
-                $potCounts[$pot->value] = $potCents;
+        foreach ($session->ownBoxes() as $pot) {
+            if (! ($this->potCountNow[$pot->value] ?? false)) {
+                continue;
             }
+            $potCents = $this->toCents($this->potCountInput[$pot->value] ?? '');
+            if ($potCents === null || $potCents < 0) {
+                $this->flash(__('El importe contado de :pot no es válido.', ['pot' => $pot->label()]), 'error');
+
+                return;
+            }
+            $potCounts[$pot->value] = $potCents;
         }
 
         try {
@@ -1071,14 +1069,12 @@ class TillSession extends Component
         $this->expected = $closed->expected_cents?->cents;
         $this->variance = $closed->variance_cents?->cents;
         $this->potResults = [];
-        if ($closed->separate_pots) {
-            foreach (CashPot::optional() as $pot) {
-                $this->potResults[$pot->value] = [
-                    'expected' => (int) $closed->getRawOriginal($pot->column().'_expected_cents'),
-                    'counted' => $closed->getRawOriginal($pot->column().'_counted_cents') !== null ? (int) $closed->getRawOriginal($pot->column().'_counted_cents') : null,
-                    'variance' => $closed->getRawOriginal($pot->column().'_variance_cents') !== null ? (int) $closed->getRawOriginal($pot->column().'_variance_cents') : null,
-                ];
-            }
+        foreach ($closed->ownBoxes() as $pot) {
+            $this->potResults[$pot->value] = [
+                'expected' => (int) $closed->getRawOriginal($pot->column().'_expected_cents'),
+                'counted' => $closed->getRawOriginal($pot->column().'_counted_cents') !== null ? (int) $closed->getRawOriginal($pot->column().'_counted_cents') : null,
+                'variance' => $closed->getRawOriginal($pot->column().'_variance_cents') !== null ? (int) $closed->getRawOriginal($pot->column().'_variance_cents') : null,
+            ];
         }
         $this->flash(__('Caja cerrada.'), 'success');
         $this->clockOutCloser($user, $closed);
@@ -1260,21 +1256,43 @@ class TillSession extends Component
     // --- View data -------------------------------------------------------------
 
     /**
-     * Prompt 349 — what the bar and fees pots would open with at the terminal being opened (their last close's count, or
-     * expected if not counted); null when this sede does not keep pots.
+     * Prompt 349 / 373 — what this sede's own boxes would open with at the terminal being opened (their last close's count,
+     * or expected if not counted, when they were boxes then), and what would be merged into the till; null with no boxes
+     * and nothing to merge.
      *
-     * @return array{bar: int, fees: int}|null
+     * @return array{boxes: array<string, int>, merging: array<string, int>}|null
      */
     public function carriedPots(): ?array
     {
         $location = $this->resolveLocation();
-        if ($location === null || ! (bool) Settings::get('separate_cash_pots', false, (string) $location->getKey())) {
+        if ($location === null) {
             return null;
         }
-
         $terminal = $this->multipleTills() ? TerminalName::clean($this->terminal) : $this->defaultTerminal();
+        $held = OpenTill::heldAtLastClose($location, TerminalName::key($terminal));
+        $own = CashBoxes::ownBoxesFor((string) $location->getKey());
 
-        return OpenTill::carriedOpenings($location, TerminalName::key($terminal));
+        $boxes = collect($own)->mapWithKeys(fn (string $pot): array => [$pot => $held[$pot] ?? 0])->all();
+        $merging = collect($held)->reject(fn (int $cents, string $pot): bool => $cents <= 0 || in_array($pot, $own, true))->all();
+
+        return $boxes === [] && $merging === [] ? null : ['boxes' => $boxes, 'merging' => $merging];
+    }
+
+    /**
+     * Prompt 373 — the boxes merged into this session's till when it opened (OpenTill audits each `till.box_merged`).
+     *
+     * @return list<string>
+     */
+    private function mergedBoxes(TillSessionModel $session): array
+    {
+        return AuditLog::query()->withoutGlobalScopes()->where('action', 'till.box_merged')
+            ->where('auditable_type', $session->getMorphClass())->where('auditable_id', $session->id)->orderBy('id')->get()
+            ->map(function (AuditLog $log): string {
+                $after = (array) ($log->after ?? []);
+                $pot = CashPot::tryFrom((string) ($after['pot'] ?? '')) ?? CashPot::BAR;
+
+                return __('Vacía :box (:amount) en la caja.', ['box' => $pot->boxName(), 'amount' => Money::fromCents((int) ($after['amount_cents'] ?? 0))->formatted()]);
+            })->all();
     }
 
     public function render(): View
@@ -1310,9 +1328,9 @@ class TillSession extends Component
         $breakdown = ($session !== null && ! $this->closing && ! $this->handoverOpen)
             ? TillSummary::breakdown($session)
             : null;
-        // Prompt 349 — since when the bar / fees pots have gone uncounted (shown beside their expected, never in a blind count).
-        $uncounted = $breakdown !== null && $breakdown['separate_pots']
-            ? collect(CashPot::optional())->mapWithKeys(fn (CashPot $pot): array => [$pot->value => TillSummary::uncountedSince($session, $pot)])->all()
+        // Prompt 349 — since when each own box has gone uncounted (shown beside its expected, never in a blind count).
+        $uncounted = $breakdown !== null
+            ? collect($session->ownBoxes())->mapWithKeys(fn (CashPot $pot): array => [$pot->value => TillSummary::uncountedSince($session, $pot)])->all()
             : [];
 
         // Petty-cash categories, only when the drawer is open and not being counted.
@@ -1328,6 +1346,8 @@ class TillSession extends Component
             'session' => $session,
             'breakdown' => $breakdown,
             'uncountedSince' => $uncounted,
+            // Prompt 373 — boxes merged into the till when this session opened: «Vacía el bote de la barra (45.00 €) en la caja.»
+            'mergedBoxes' => $session !== null ? $this->mergedBoxes($session) : [],
             'closedPetty' => null,
             'expenseCategories' => $expenseCategories,
             // EOD flower reweigh (prompt 47) — the in-scope batches, only while in that step.

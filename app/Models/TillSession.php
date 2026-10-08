@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Casts\MoneyCast;
+use App\Enums\CashPot;
 use App\Enums\TillSessionStatus;
 use App\Models\Concerns\BelongsToOrganisation;
 use App\Models\Concerns\ScopedToLocation;
@@ -29,6 +30,9 @@ class TillSession extends Model
         'separate_pots',
         'bar_opening_cents', 'bar_counted_cents', 'bar_expected_cents', 'bar_variance_cents',
         'fees_opening_cents', 'fees_counted_cents', 'fees_expected_cents', 'fees_variance_cents',
+        // Prompt 373 — the session's own boxes (snapshotted at opening) and the edibles box.
+        'own_boxes',
+        'edibles_opening_cents', 'edibles_counted_cents', 'edibles_expected_cents', 'edibles_variance_cents',
     ];
 
     protected function casts(): array
@@ -51,6 +55,11 @@ class TillSession extends Model
             'fees_counted_cents' => MoneyCast::class,
             'fees_expected_cents' => MoneyCast::class,
             'fees_variance_cents' => MoneyCast::class,
+            'own_boxes' => 'array',
+            'edibles_opening_cents' => MoneyCast::class,
+            'edibles_counted_cents' => MoneyCast::class,
+            'edibles_expected_cents' => MoneyCast::class,
+            'edibles_variance_cents' => MoneyCast::class,
         ];
     }
 
@@ -139,6 +148,21 @@ class TillSession extends Model
     }
 
     /**
+     * Prompt 373 — does this session keep that kind of money in a box of its own (snapshotted at opening)? The dispensary is
+     * the till, never a box. Every reader of 349's `separate_pots` reads this now.
+     */
+    public function hasOwnBox(CashPot $pot): bool
+    {
+        return $pot !== CashPot::DISPENSARY && in_array($pot->value, (array) ($this->own_boxes ?? []), true);
+    }
+
+    /** @return list<CashPot> the session's own boxes, in {@see CashPot::optional()} order */
+    public function ownBoxes(): array
+    {
+        return array_values(array_filter(CashPot::optional(), fn (CashPot $pot): bool => $this->hasOwnBox($pot)));
+    }
+
+    /**
      * Prompt 366 — the largest difference of the close, across the drawer (or dispensary pot) and whichever of the bar and
      * fees pots were counted. Null while the session is open.
      */
@@ -147,7 +171,7 @@ class TillSession extends Model
         if ($this->status !== TillSessionStatus::CLOSED) {
             return null;
         }
-        $columns = $this->separate_pots ? ['variance_cents', 'bar_variance_cents', 'fees_variance_cents'] : ['variance_cents'];
+        $columns = ['variance_cents', ...array_map(fn (CashPot $pot): string => $pot->column().'_variance_cents', $this->ownBoxes())];
         $differences = array_map(fn (string $column): int => abs((int) $this->getRawOriginal($column)),
             array_filter($columns, fn (string $column): bool => $this->getRawOriginal($column) !== null));
 

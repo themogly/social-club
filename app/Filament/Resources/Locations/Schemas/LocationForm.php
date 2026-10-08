@@ -3,21 +3,31 @@
 namespace App\Filament\Resources\Locations\Schemas;
 
 use App\Actions\UnlockOperator;
+use App\Enums\CashPot;
 use App\Enums\LocationKind;
 use App\Enums\Role;
 use App\Models\Location;
+use App\Support\CashBoxes;
 use App\Support\DispensarySort;
 use App\Support\Settings;
+use Filament\Actions\Action;
 use Filament\Forms\Components\ColorPicker;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TagsInput;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\TimePicker;
 use Filament\Forms\Components\Toggle;
+use Filament\Forms\Components\ToggleButtons;
+use Filament\Schemas\Components\Actions;
+use Filament\Schemas\Components\Component;
+use Filament\Schemas\Components\Fieldset;
+use Filament\Schemas\Components\Grid;
 use Filament\Schemas\Components\Section;
+use Filament\Schemas\Components\Text;
 use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Components\Utilities\Set;
 use Filament\Schemas\Schema;
+use Filament\Support\Enums\FontWeight;
 use Illuminate\Support\Facades\Auth;
 
 class LocationForm
@@ -47,9 +57,6 @@ class LocationForm
         'block_self_dispensation', // prompt 347 — off by default
         'require_photo_to_dispense', // prompt 348 — on by default
         'confirm_photo_on_scan', // prompt 348 — on by default
-        'separate_cash_pots', // prompt 349 — off by default; switched on for this club's sedes by its migration
-        'count_bar_nightly', // prompt 349
-        'count_fees_nightly', // prompt 349
     ];
 
     /**
@@ -61,6 +68,22 @@ class LocationForm
      */
     public const OWNER_TOGGLES = [
         'managers_can_approve_debt',
+        // Prompt 373 — counting a box every night is part of where the cash goes (owner-only, like the boxes themselves).
+        'count_bar_nightly',
+        'count_fees_nightly',
+        'count_edibles_nightly',
+    ];
+
+    /**
+     * Prompt 373 — per-location STRING settings only the OWNER may change: where each kind of money goes ('till' | 'own').
+     * Where the money goes changes how a sede's cash is reconciled, so a manager sees the section read-only.
+     *
+     * @var list<string>
+     */
+    public const OWNER_STRINGS = [
+        'cash_box_edibles',
+        'cash_box_bar',
+        'cash_box_fees',
     ];
 
     /** Is the current user the owner — the one who may change the {@see OWNER_TOGGLES}? */
@@ -104,6 +127,41 @@ class LocationForm
         'after_recording', // prompt 347
         'dispensary_sort', // prompt 351
     ];
+
+    /**
+     * Prompt 373 — one kind of money: «En la caja» / «Bote propio» (two big buttons, the same as *Ajuste*), its «Contar cada
+     * noche» beside it only for its own box, and — switching a box that still holds money into the till — the warning that
+     * opening the next till will merge it.
+     *
+     * @return list<Component>
+     */
+    private static function cashBoxRow(string $pot, string $label): array
+    {
+        $key = CashBoxes::SETTINGS[$pot];
+        $count = CashBoxes::COUNT_NIGHTLY[$pot];
+
+        return [
+            Grid::make(['default' => 1, 'sm' => 2])->schema([
+                ToggleButtons::make($key)
+                    ->label($label)
+                    ->options(['till' => __('En la caja'), 'own' => __('Bote propio')])
+                    ->default('till')
+                    ->inline()
+                    ->live()
+                    ->disabled(fn (): bool => ! self::actorIsOwner()),
+                Toggle::make($count)
+                    ->label(__('Contar cada noche'))
+                    ->inline(false)
+                    ->visible(fn (Get $get): bool => $get($key) === 'own')
+                    ->disabled(fn (): bool => ! self::actorIsOwner()),
+            ]),
+            Text::make(fn (Get $get, ?Location $record): ?string => $get($key) === 'till' && $record !== null ? CashBoxes::mergeWarning($record, CashPot::from($pot)) : null)
+                ->color('warning')
+                ->weight(FontWeight::SemiBold)
+                ->extraAttributes(['data-cash-merge-warning' => $pot])
+                ->visible(fn (Get $get, ?Location $record): bool => $get($key) === 'till' && $record !== null && CashBoxes::mergeWarning($record, CashPot::from($pot)) !== null),
+        ];
+    }
 
     /**
      * Clean a TagsInput list of gram amounts (strings, comma-or-dot decimals) into a sorted, de-duplicated list
@@ -389,20 +447,32 @@ class LocationForm
                             ->helperText(__('Nombres de las cajas de esta sede, p. ej. «Caja 1», «Barra».'))
                             ->placeholder(__('Añadir terminal')),
 
-                        // Prompt 349 (Aaron: "Membership and bar are separate tills") — three cash pots in the one till.
-                        Toggle::make('separate_cash_pots')
-                            ->label(__('Botes de efectivo separados'))
-                            ->live()
-                            ->helperText(__('Dispensario, barra y cuotas en botes separados. El fondo de caja y el efectivo esperado son los del dispensario; la barra y las cuotas se cuentan aparte.'))
-                            ->columnSpanFull(),
-                        Toggle::make('count_bar_nightly')
-                            ->label(__('Contar la barra cada noche'))
-                            ->helperText(__('Si no, al cerrar se puede dejar sin contar y su saldo pasa a la siguiente caja.'))
-                            ->visible(fn (Get $get): bool => (bool) $get('separate_cash_pots')),
-                        Toggle::make('count_fees_nightly')
-                            ->label(__('Contar las cuotas cada noche'))
-                            ->helperText(__('Si no, al cerrar se puede dejar sin contar y su saldo pasa a la siguiente caja.'))
-                            ->visible(fn (Get $get): bool => (bool) $get('separate_cash_pots')),
+                        // Prompt 373 — «¿Dónde va el efectivo?» (Arron: "Members, drinks and edibles all go in separate boxes";
+                        // Liam: "members money separate and all other transactions in one till"). The dispensary is always the
+                        // till; each other kind of money goes in the till or its own box. Owner-only: a manager sees it read-only.
+                        Fieldset::make(__('¿Dónde va el efectivo?'))
+                            ->columnSpanFull()
+                            ->columns(1)
+                            ->schema([
+                                Actions::make(collect(['all_till' => __('Todo en la caja'), 'fees_apart' => __('Cuotas aparte'), 'all_apart' => __('Todo aparte')])
+                                    ->map(fn (string $label, string $preset): Action => Action::make('cash_preset_'.$preset)
+                                        ->label($label)->color('gray')->outlined()
+                                        ->extraAttributes(['data-cash-preset' => $preset])
+                                        ->action(function (Set $set) use ($preset): void {
+                                            foreach (CashBoxes::PRESETS[$preset] as $pot => $choice) {
+                                                $set(CashBoxes::SETTINGS[$pot], $choice);
+                                            }
+                                        }))->values()->all())
+                                    ->visible(fn (): bool => self::actorIsOwner()),
+                                Text::make(__('Dispensario (flores, hachís, porros, vapers…): siempre en la caja, con el fondo, y se cuenta cada noche.')),
+                                ...self::cashBoxRow('EDIBLES', __('Comestibles')),
+                                ...self::cashBoxRow('BAR', __('Barra y tienda (bebidas, comida, productos)')),
+                                ...self::cashBoxRow('FEES', __('Cuotas de socio')),
+                                Text::make(fn (Get $get): string => CashBoxes::summary(collect(CashBoxes::SETTINGS)->map(fn (string $key): string => (string) ($get($key) ?: 'till'))->all()))
+                                    ->weight(FontWeight::SemiBold)
+                                    ->extraAttributes(['data-cash-summary' => true]),
+                                Text::make(__('Los cambios se aplican la próxima vez que se abra la caja.'))->color('gray'),
+                            ]),
 
                         // Prompt 312 — clocking the closer out is automatic by default (with a 2-minute *Deshacer*); a sede
                         // that prefers the old question keeps it.

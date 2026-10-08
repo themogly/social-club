@@ -139,7 +139,8 @@ class CloseNeverBlocksTest extends TestCase
 
     public function test_shanes_close_with_the_bar_counted_and_the_fees_not_counted_closes_and_the_audit_carries_the_bar(): void
     {
-        Settings::set('separate_cash_pots', true, SettingType::BOOL, (string) $this->sede->id);
+        Settings::set('cash_box_bar', 'own', SettingType::STRING, (string) $this->sede->id); // 373: bar + fees in their own boxes
+        Settings::set('cash_box_fees', 'own', SettingType::STRING, (string) $this->sede->id);
         $session = $this->openTill(10000);
         $article = Article::factory()->create(['organisation_id' => $this->org->id, 'location_id' => $this->sede->id, 'price_cents' => 1000, 'stock' => 10]);
         (new CommitOrder)->handle($this->sede, [['article_id' => $article->id, 'qty' => 1]], ['operator_id' => $this->manager->id, 'till_session_id' => $session->id, 'cash_cents' => 1000]);
@@ -268,9 +269,10 @@ class CloseNeverBlocksTest extends TestCase
         $this->assertSame(TillSessionStatus::OPEN, $session->fresh()->status);
 
         // And the action itself refuses a negative pot, as a refusal of the input (not a system error).
-        Settings::set('separate_cash_pots', true, SettingType::BOOL, (string) $this->sede->id);
+        Settings::set('cash_box_bar', 'own', SettingType::STRING, (string) $this->sede->id); // 373: bar + fees in their own boxes
+        Settings::set('cash_box_fees', 'own', SettingType::STRING, (string) $this->sede->id);
         $pots = (new OpenTill)->handle($this->sede, 'Caja 2', 0, ['operator_id' => $this->manager->id]);
-        $pots->forceFill(['separate_pots' => true])->save();
+        $this->assertSame(['BAR', 'FEES'], $pots->own_boxes);
         $this->expectException(InvalidArgumentException::class);
         (new CloseTill)->handle($pots->fresh(), 0, $this->manager, null, ['BAR' => -100]);
     }

@@ -30,7 +30,7 @@ class Dispensation extends Model
 
     protected $fillable = [
         'organisation_id', 'member_id', 'location_id', 'operator_id', 'till_session_id',
-        'total_cents', 'cash_cents', 'wallet_cents', 'status', 'reversal_of_id',
+        'total_cents', 'cash_cents', 'wallet_cents', 'edibles_cash_cents', 'status', 'reversal_of_id',
         'void_reason', 'voided_by', 'voided_at', 'signature_path', 'idempotency_key',
         'reference', 'dispensed_at',
         'original_total_cents', 'price_override_reason', 'price_override_by',
@@ -45,6 +45,7 @@ class Dispensation extends Model
             'original_total_cents' => MoneyCast::class,
             'cash_cents' => MoneyCast::class,
             'wallet_cents' => MoneyCast::class,
+            'edibles_cash_cents' => MoneyCast::class, // prompt 373 — the cash that paid for the edibles, fixed at commit
             'status' => DispensationStatus::class,
             'voided_at' => 'datetime',
             'dispensed_at' => 'datetime',

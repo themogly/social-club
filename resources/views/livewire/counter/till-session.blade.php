@@ -219,7 +219,13 @@
                         <label for="float" class="block text-sm font-medium text-ink-muted dark:text-slate-400">{{ __('Fondo de caja (€)') }}</label>
                         {{-- Prompt 349 — the float is the dispensary pot's; the bar and fees pots are never asked for one. --}}
                         @if ($carried = $this->carriedPots())
-                            <p data-till-carried class="mt-0.5 text-xs text-ink-muted dark:text-slate-400">{{ __('Del bote del dispensario. La barra (:bar) y las cuotas (:fees) abren con lo que tenían.', ['bar' => $this->money($carried['bar']), 'fees' => $this->money($carried['fees'])]) }}</p>
+                            @if ($carried['boxes'] !== [])
+                                <p data-till-carried class="mt-0.5 text-xs text-ink-muted dark:text-slate-400">{{ __('Para la caja. Los botes abren con lo que tenían: :list.', ['list' => collect($carried['boxes'])->map(fn ($cents, $pot) => \App\Enums\CashPot::from($pot)->label().' '.$this->money($cents))->implode(' · ')]) }}</p>
+                            @endif
+                            {{-- Prompt 373 — a box now in the till: its money joins the till as an entry when it opens. --}}
+                            @foreach ($carried['merging'] as $pot => $cents)
+                                <p data-till-merge class="mt-1 rounded-lg border border-warning/40 bg-warning/10 px-3 py-2 text-xs font-medium text-warning">{{ __(':box tiene :amount: al abrir se suma a la caja. Vacíalo en la caja.', ['box' => ucfirst(\App\Enums\CashPot::from($pot)->boxName()), 'amount' => $this->money($cents)]) }}</p>
+                            @endforeach
                         @endif
                         <input
                             id="float"
@@ -382,7 +388,7 @@
 
                 <form wire:submit="submitCount" class="mt-5 space-y-4">
                     <div>
-                        <label for="count" class="block text-sm font-medium text-ink-muted dark:text-slate-400">{{ $session->separate_pots ? __('Dispensario contado (€) — con el fondo de caja') : __('Efectivo contado (€)') }}</label>
+                        <label for="count" class="block text-sm font-medium text-ink-muted dark:text-slate-400">{{ $session->ownBoxes() !== [] ? __('La caja contada (€) — con el fondo de caja') : __('Efectivo contado (€)') }}</label>
                         <input
                             id="count"
                             type="text"
@@ -397,8 +403,7 @@
 
                     {{-- Prompt 349 — the bar and fees pots: counted now, or not tonight (their balance carries to the next opening).
                          Still blind: no expected figure appears until the close is confirmed. --}}
-                    @if ($session->separate_pots)
-                        @foreach (\App\Enums\CashPot::optional() as $pot)
+                    @foreach ($session->ownBoxes() as $pot)
                             <div wire:key="pot-count-{{ $pot->value }}" data-pot-count="{{ $pot->value }}" class="rounded-xl border border-line p-3 dark:border-slate-700">
                                 <p class="text-sm font-medium">{{ $pot->label() }}</p>
                                 <div class="mt-2 grid grid-cols-2 gap-2">
@@ -413,8 +418,7 @@
                                            class="mt-1 h-12 w-full rounded-xl border border-line bg-surface px-4 text-base dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100">
                                 @endif
                             </div>
-                        @endforeach
-                    @endif
+                    @endforeach
 
                     {{-- Prompt 366 — a note is never required: the close never waits on one. Offered, with no amount (still blind);
                          a difference beyond the tolerance is logged for the owner either way. --}}
@@ -477,6 +481,10 @@
                  close-out withholds it. The whole summary section goes with it — leaving the drawer's
                  expected figure on screen a few centimetres above the count box would make the "blind"
                  count blind in name only. --}}
+            {{-- Prompt 373 — a box merged into the till at opening: tell staff to empty it into the drawer. --}}
+            @foreach ($mergedBoxes as $merged)
+                <p data-till-merged class="mb-4 rounded-2xl border border-warning/40 bg-warning/10 px-4 py-3 text-sm font-semibold text-warning">{{ $merged }}</p>
+            @endforeach
             @if ($b !== null)
             <section class="rounded-2xl border border-line bg-surface p-5 dark:border-slate-800 dark:bg-slate-900 sm:p-6">
                 <div class="flex items-start justify-between gap-3">
@@ -512,7 +520,7 @@
                         <dd class="tabular-nums text-ink-muted dark:text-slate-400">{{ $this->money($b['wallet_contributions']) }}</dd>
                     </div>
                     <div class="flex items-center justify-between py-2">
-                        <dt class="text-ink-muted dark:text-slate-400">{{ __('Barra y tienda en efectivo') }}@if ($b['separate_pots']) <span class="ml-1 whitespace-nowrap rounded-full border border-line px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-ink-muted dark:border-slate-700 dark:text-slate-400">{{ __('Bote de la barra') }}</span>@endif</dt>
+                        <dt class="text-ink-muted dark:text-slate-400">{{ __('Barra y tienda en efectivo') }}@if (in_array('BAR', $b['own_boxes'], true)) <span class="ml-1 whitespace-nowrap rounded-full border border-line px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-ink-muted dark:border-slate-700 dark:text-slate-400">{{ __('Bote de la barra') }}</span>@endif</dt>
                         <dd class="font-medium tabular-nums">{{ $this->money($b['bar_cash']) }}</dd>
                     </div>
                     <div class="flex items-center justify-between py-2">
@@ -524,7 +532,7 @@
                         <dd class="font-medium tabular-nums">{{ $this->money($b['refunds']) }}</dd>
                     </div>
                     <div class="flex items-center justify-between py-2">
-                        <dt class="text-ink-muted dark:text-slate-400">{{ __('Cuotas en efectivo') }}@if ($b['separate_pots']) <span class="ml-1 whitespace-nowrap rounded-full border border-line px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-ink-muted dark:border-slate-700 dark:text-slate-400">{{ __('Bote de cuotas') }}</span>@endif</dt>
+                        <dt class="text-ink-muted dark:text-slate-400">{{ __('Cuotas en efectivo') }}@if (in_array('FEES', $b['own_boxes'], true)) <span class="ml-1 whitespace-nowrap rounded-full border border-line px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-ink-muted dark:border-slate-700 dark:text-slate-400">{{ __('Bote de cuotas') }}</span>@endif</dt>
                         <dd class="font-medium tabular-nums">{{ $this->money($b['fees_cash']) }}</dd>
                     </div>
                     <div class="flex items-center justify-between py-2">
@@ -554,9 +562,9 @@
                 </div>
                 {{-- Prompt 349 — with separate pots the headline is the DISPENSARY pot (the float is its float); the bar and the
                      fees pots are their own lines, never added in, and say since when they have gone uncounted. --}}
-                @if ($b['separate_pots'])
+                @if ($b['own_boxes'] !== [])
                     <dl class="mt-2 space-y-1 px-1 text-sm" data-till-pots>
-                        @foreach (\App\Enums\CashPot::optional() as $pot)
+                        @foreach ($session->ownBoxes() as $pot)
                             <div class="flex items-baseline justify-between gap-3" data-till-pot="{{ $pot->value }}">
                                 <dt class="text-ink-muted dark:text-slate-400">
                                     {{ __(':pot: esperado', ['pot' => $pot->label()]) }}
@@ -616,18 +624,19 @@
                             class="mt-2 h-12 w-full rounded-xl border border-line bg-surface px-4 text-base text-ink placeholder:text-ink-muted focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/40 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
                         >
                     </div>
-                    @if ($session?->separate_pots)
+                    @if ($session !== null && $session->ownBoxes() !== [])
                         {{-- Prompt 349 — which pot it comes out of (or goes into). Emptying the bar or fees pot is a Salida or an
                              Ingreso en banco from ITS pot. --}}
                         <div class="sm:col-span-2" data-movement-pot>
                             <label for="movementPot" class="block text-sm font-medium text-ink-muted dark:text-slate-400">{{ __('Bote') }}</label>
                             <select id="movementPot" wire:model="movementPot"
                                     class="mt-2 h-12 w-full rounded-xl border border-line bg-surface px-3 text-base text-ink focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/40 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100">
-                                @foreach (\App\Enums\CashPot::cases() as $pot)
-                                    <option value="{{ $pot->value }}">{{ $pot->label() }}</option>
+                                <option value="DISPENSARY">{{ __('La caja') }}</option>
+                                @foreach ($session->ownBoxes() as $pot)
+                                    <option value="{{ $pot->value }}">{{ ucfirst($pot->boxName()) }}</option>
                                 @endforeach
                             </select>
-                            <p class="mt-1 text-xs text-ink-muted dark:text-slate-400">{{ __('Para retirar el dinero de la barra o de las cuotas, elige su bote.') }}</p>
+                            <p class="mt-1 text-xs text-ink-muted dark:text-slate-400">{{ __('Para retirar el dinero de un bote, elige ese bote.') }}</p>
                         </div>
                     @endif
                     <div class="sm:col-span-2">
@@ -772,9 +781,9 @@
                         <div class="mt-4 space-y-4">
                             <div>
                                 <label for="handover-counted" class="block text-sm font-medium text-ink-muted dark:text-slate-400">{{ __('Efectivo contado (€)') }}</label>
-                                @if ($session?->separate_pots)
+                                @if ($session !== null && $session->ownBoxes() !== [])
                                     {{-- Prompt 349 — the handover counts the dispensary pot only; the bar and fees pots stay as they are. --}}
-                                    <p data-handover-dispensary-only class="mt-0.5 text-xs text-ink-muted dark:text-slate-400">{{ __('Solo el bote del dispensario (con el fondo de caja).') }}</p>
+                                    <p data-handover-dispensary-only class="mt-0.5 text-xs text-ink-muted dark:text-slate-400">{{ __('Solo la caja (con el fondo de caja); los botes se quedan como están.') }}</p>
                                 @endif
                                 <input
                                     id="handover-counted"
