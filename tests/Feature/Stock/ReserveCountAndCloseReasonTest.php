@@ -247,11 +247,12 @@ class ReserveCountAndCloseReasonTest extends TestCase
     {
         $batch = $this->batch(5000, 10000);
 
-        Livewire::test(ListBatches::class)->callTableAction('adjust', $batch, ['bucket' => 'reserve', 'quantity' => '25', 'reason' => 'Bolsas sin dar de alta'])
+        // Prompt 368 — «Añadir» / «Quitar» with a positive amount (no more typing a negative).
+        Livewire::test(ListBatches::class)->callTableAction('adjust', $batch, ['bucket' => 'reserve', 'mode' => 'add', 'amount' => '25', 'reason_pick' => 'count'])
             ->assertHasNoTableActionErrors();
         $this->assertSame([5000, 12500], $this->figures($batch));
 
-        Livewire::test(ListBatches::class)->callTableAction('adjust', $batch, ['bucket' => 'jar', 'quantity' => '-5', 'reason' => 'Pesado de nuevo'])
+        Livewire::test(ListBatches::class)->callTableAction('adjust', $batch, ['bucket' => 'jar', 'mode' => 'remove', 'amount' => '5', 'reason_pick' => 'weighing'])
             ->assertHasNoTableActionErrors();
         $this->assertSame([4500, 12500], $this->figures($batch));
         $this->assertSame([[2500, true], [-500, false]], $this->adjustments($batch));

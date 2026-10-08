@@ -64,6 +64,7 @@ Every dispensation must be to an identified member, from a real batch, by weight
 4. Choose the strain. Their usual ones appear as buttons at the top; otherwise use the list, **Search genetic…** or **Filters**.
 5. Enter the amount. Flower, hash and extracts: type the weight in grams on the keypad, or tap a quick amount (1 g, 2 g, 3.5 g…). Pre-rolls, vapes and edibles: use **−** and **+** to choose the number of units.
 6. Tap **Add to basket**. The strain search comes back at the top of the list, empty, ready for the next item (tap it to type). Repeat for anything else.
+   - **More than there is?** The basket will not take more than the jar holds. The pad says so right above the button, for example *"Only 2.80 g in the jar."*, and keeps what you typed. Tap **Add 2.80 g** to take what there is, or, if the strain has sealed bags, **Top up** to open the **Stock** screen on that batch; **Back to the dispensary** brings you back to the same member and basket. Units are checked the same way (*"Only 3 units left."*).
 
 **Sealed top-ups (reserve):** the sealed bags of a strain kept off the counter are its **reserve**. They are not in the jar, so they are not dispensed and not weighed at closing.
 
@@ -158,14 +159,14 @@ New members are added to **every club** automatically (not the store), and pay t
 
 **Stock** on the counter home lists every batch at this club: what is in each **jar**, what is sealed in its **reserve**, its price, and when it was last weighed. The line at the top says how much sealed reserve the club holds in total. Search by strain or batch number, or use **All / With reserve / Jar low**. Batches with nothing left are hidden; a line under the list says how many (*"2 empty batches hidden · Show"*), and **Show** lists them at the bottom under **Empty**. If **With reserve** shows nothing, no sealed reserve has been recorded at this club yet (the screen says so).
 
-Tap a batch to open its actions. Type the grams on the keypad first:
+Tap a batch: it opens on its figures (*"In the jar 2.80 g · Reserve 30.00 g"*, or *No sealed reserve*) and the things you can do with it. **Choose what you are doing first**, then the amount:
 
-- **Top up** moves those grams from the reserve into the jar; **All of the reserve** moves the lot. Do this whenever you open a sealed bag.
-- **Move to reserve** puts grams from the jar back into sealed bags.
-- **Update jar weight:** weigh the jar, type what the scale says and tap **Save weight**, then tap what happened (*Weighing error*, *Spill / wastage*, *Topped up without recording*, or *Other*). The system works out the difference; if the jar is heavier because a bag was opened without **Top up**, it takes that from the reserve. Managers are not asked for a reason.
+- **Top up the jar** moves grams from the reserve into the jar; **All of the reserve (30.00 g)** moves the lot in one tap. Do this whenever you open a sealed bag. It is only offered when the batch has a reserve.
+- **Move to reserve** puts grams from the jar back into sealed bags. It is only offered when the jar has something in it.
+- **Correct the jar's weight:** weigh the jar, type what the scale says and tap what happened (*Weighing error*, *Spill / wastage*, *Topped up without recording*, or type another reason). The system works out the difference; if the jar is heavier because a bag was opened without **Top up**, it takes that from the reserve. Managers are not asked for a reason.
 - **Add to reserve** (managers and owners) records sealed bags that arrived and were never entered, with a reason.
 
-Each action confirms right under its buttons, for example *"Topped up: +10.00 g · jar 958.10 g · reserve 5.00 g"*.
+Each action has one button that says what will happen, for example *"Top up 10.00 g → jar 12.80 g"* or *"Correct to 2.50 g (−0.30 g)"*. **← Another action** goes back to the list. The result confirms on the panel, for example *"Topped up: +10.00 g · jar 12.80 g · reserve 20.00 g"*.
 
 ![Stock: every jar and sealed top-up at the club, with a batch's actions open.](img/counter-quick-start/04b-top-up.jpg)
 
@@ -263,7 +264,9 @@ The counter shows Spanish or English, depending on each person's language settin
 | Recuento de flor · No se puede contar | Flower recount · Can't count it |
 | El recuento no cuadra — ¿qué ha pasado? | The count doesn't match — what happened? |
 | Reserva · Con reserva · Rellenar · Toda la reserva · Pasar a reserva | Reserve · With reserve · Top up · All of the reserve · Move to reserve |
-| Existencias · Actualizar peso del bote · Añadir a la reserva · Volver al dispensario | Stock · Update jar weight · Add to reserve · Back to the dispensary |
+| Existencias · Rellenar el bote · Corregir peso del bote · Añadir a la reserva · Volver al dispensario | Stock · Top up the jar · Correct the jar's weight · Add to reserve · Back to the dispensary |
+| Otra acción · Sin reserva sellada | Another action · No sealed reserve |
+| Solo hay 2.80 g en el bote. · Añadir 2.80 g | Only 2.80 g in the jar. · Add 2.80 g |
 | lotes agotados ocultos · Mostrar · Agotados | empty batches hidden · Show · Empty |
 | Bote vacío · Rellenado sin registrar | Jar empty · Unrecorded top-up |
 | Diferencia · Nota | Difference · Note |

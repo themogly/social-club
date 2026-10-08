@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\Batches\Tables;
 
+use App\Actions\Stock\AdjustBatch;
 use App\Actions\Stock\RecordStockMovement;
 use App\Enums\BatchStatus;
 use App\Enums\ProductType;
@@ -12,6 +13,9 @@ use App\Filament\Resources\Batches\Pages\ListBatches;
 use App\Models\Batch;
 use App\Models\Genetic;
 use App\Models\Location;
+use App\Models\User;
+use App\Rules\GramAmount;
+use App\Support\ManagerApproval;
 use App\Support\Money;
 use App\Support\Spreadsheet\ReportExport;
 use App\Support\Weight;
@@ -24,7 +28,12 @@ use Filament\Actions\EditAction;
 use Filament\Actions\RestoreBulkAction;
 use Filament\Forms\Components\Radio;
 use Filament\Forms\Components\Textarea;
+use Filament\Forms\Components\TextInput;
+use Filament\Forms\Components\ToggleButtons;
+use Filament\Infolists\Components\TextEntry;
 use Filament\Notifications\Notification;
+use Filament\Schemas\Components\Text;
+use Filament\Schemas\Components\Utilities\Get;
 use Filament\Support\Enums\FontWeight;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Columns\TextColumn;
@@ -35,6 +44,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Blade;
 use Illuminate\Support\HtmlString;
+use InvalidArgumentException;
 use RuntimeException;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
@@ -257,47 +267,167 @@ class BatchesTable
     }
 
     /** Precio (prompt 278) — change THIS batch's sale price; audited, gated on prices.manage, future sales only. */
-    /** Ajuste — a signed correction recorded through the stock ledger, in the batch's own unit. */
+    /**
+     * Ajuste — a correction through the stock ledger, in the batch's own unit. Prompt 368 (Ben: "Better just to add a new value —
+     * current total and an option to add or take off underneath"): «Ahora» first, then **Nuevo total** (the default), **Añadir**
+     * or **Quitar**, the amount ALWAYS positive (an iPhone's decimal keypad has no minus key, so a negative could not be typed),
+     * a live preview «2.80 g → 6.80 g (+4.00 g)», and the one-tap reasons. {@see AdjustBatch} computes the difference against
+     * the locked figure.
+     */
     protected static function adjustAction(): Action
     {
         return Action::make('adjust')
             ->label(__('Ajuste'))
             ->icon(Heroicon::OutlinedAdjustmentsHorizontal)
-            ->schema([
-                // Prompt 360 — a weight batch holds two figures (359): correct the jar, or set its sealed reserve, here
-                // without starting a full Inventario. The same ADJUSTMENT, the reserve's marked `on_reserve`.
+            ->schema(fn (Batch $record): array => [
+                // Prompt 360 — a weight batch holds two figures (359): correct the jar, or its sealed reserve.
                 Radio::make('bucket')
                     ->label(__('¿Qué corriges?'))
                     ->options(['jar' => __('El bote'), 'reserve' => __('La reserva sellada')]) // «Bote» alone is a cash pot in English
                     ->default('jar')
                     ->inline()
                     ->required()
-                    ->helperText(fn (Batch $record): string => __('Ahora: bote :jar · reserva :reserve', ['jar' => $record->remaining_cg->formatted(), 'reserve' => $record->reserve_cg->formatted()]))
-                    ->visible(fn (Batch $record): bool => ! $record->isUnitType()),
-                DecimalInput::make('quantity')
-                    ->label(fn (Batch $record): string => $record->isUnitType() ? __('Ajuste (uds)') : __('Ajuste (g)'))
-                    ->numeric()
+                    ->live()
+                    ->visible(! $record->isUnitType()),
+                Text::make(fn (Get $get): string => __('Ahora: :figure', ['figure' => self::adjustFigureLabel($record, (string) ($get('bucket') ?? 'jar'))]))
+                    ->weight(FontWeight::SemiBold),
+                ToggleButtons::make('mode')
+                    ->hiddenLabel()
+                    ->options([AdjustBatch::TOTAL => __('Nuevo total'), AdjustBatch::ADD => __('Añadir'), AdjustBatch::REMOVE => __('Quitar')])
+                    ->default(AdjustBatch::TOTAL)
+                    ->inline()
                     ->required()
-                    ->helperText(__('Usa un valor negativo para restar.')),
-                Textarea::make('reason')
+                    ->live(),
+                DecimalInput::make('amount')
+                    ->label(fn (Get $get): string => self::adjustAmountLabel($record, (string) ($get('mode') ?? AdjustBatch::TOTAL)))
+                    ->numeric()
+                    ->minValue(0)
+                    ->rules($record->isUnitType() ? ['integer'] : [new GramAmount])
+                    ->required()
+                    ->live(debounce: 400),
+                TextEntry::make('preview')
+                    ->hiddenLabel()
+                    ->state(fn (Get $get): ?string => self::adjustPreview($record, $get))
+                    ->color(fn (Get $get): string => ($p = self::adjustResult($record, $get)) === null ? 'gray' : ($p['after'] < 0 ? 'danger' : 'success'))
+                    ->visible(fn (Get $get): bool => self::adjustResult($record, $get) !== null),
+                ToggleButtons::make('reason_pick')
                     ->label(__('Motivo'))
-                    ->required(),
+                    ->options(self::adjustReasons())
+                    ->inline()
+                    ->live()
+                    ->required(fn (): bool => ! ManagerApproval::allows(self::actor()))
+                    ->visible(fn (): bool => ! ManagerApproval::allows(self::actor())),
+                TextInput::make('reason_other')
+                    ->label(__('Otro motivo'))
+                    ->maxLength(200)
+                    ->required(fn (Get $get): bool => $get('reason_pick') === 'other')
+                    ->visible(fn (Get $get): bool => $get('reason_pick') === 'other' && ! ManagerApproval::allows(self::actor())),
             ])
+            ->modalSubmitActionLabel(__('Guardar ajuste'))
             ->action(function (Batch $record, array $data): void {
+                $actor = self::actor();
+                $reason = ManagerApproval::allows($actor) ? ManagerApproval::reason()
+                    : (($data['reason_pick'] ?? null) === 'other' ? trim((string) ($data['reason_other'] ?? '')) : (self::adjustReasons()[$data['reason_pick'] ?? ''] ?? ''));
                 try {
-                    (new RecordStockMovement)->handle(
-                        $record,
-                        StockMovementType::ADJUSTMENT,
-                        self::signedDelta($record, (float) $data['quantity']),
-                        ['reason' => (string) $data['reason'], 'operator_id' => self::operatorId(),
-                            'reserve' => ! $record->isUnitType() && ($data['bucket'] ?? 'jar') === 'reserve'],
-                    );
+                    $result = (new AdjustBatch)->handle($record, (string) $data['mode'], self::adjustAmount($record, (string) $data['amount']), $reason, $actor,
+                        reserve: ! $record->isUnitType() && ($data['bucket'] ?? 'jar') === 'reserve');
+                } catch (RuntimeException|InvalidArgumentException $e) {
+                    Notification::make()->title(__('No se pudo registrar el ajuste'))->body($e->getMessage())->danger()->send();
 
-                    Notification::make()->title(__('Ajuste registrado'))->success()->send();
-                } catch (RuntimeException $e) {
-                    Notification::make()->title(__('Stock insuficiente'))->body($e->getMessage())->danger()->send();
+                    return;
                 }
+
+                $result['delta'] === 0
+                    ? Notification::make()->title(__('Sin cambios'))->success()->send()
+                    : Notification::make()->title(__('Ajuste registrado: :diff', ['diff' => self::signedQuantity($record, $result['delta'])]))->success()->send();
             });
+    }
+
+    /** @return array<string, string> the one-tap reasons, as stored */
+    protected static function adjustReasons(): array
+    {
+        return ['weighing' => __('Error al pesar'), 'spill' => __('Derrame / merma'), 'count' => __('Recuento'), 'other' => __('Otro')];
+    }
+
+    protected static function adjustFigure(Batch $record, string $bucket): int
+    {
+        $fresh = Batch::query()->withoutGlobalScopes()->find($record->getKey()) ?? $record;
+
+        return $fresh->isUnitType() ? (int) ($fresh->remaining_units ?? 0)
+            : ($bucket === 'reserve' ? $fresh->reserve_cg->centigrams : $fresh->remaining_cg->centigrams);
+    }
+
+    protected static function adjustFigureLabel(Batch $record, string $bucket): string
+    {
+        $figure = self::quantity($record, self::adjustFigure($record, $bucket));
+
+        return $record->isUnitType() ? $figure : ($bucket === 'reserve' ? __('reserva :figure', ['figure' => $figure]) : __('bote :figure', ['figure' => $figure]));
+    }
+
+    protected static function adjustAmountLabel(Batch $record, string $mode): string
+    {
+        $unit = $record->isUnitType() ? __('uds') : 'g';
+
+        return match ($mode) {
+            AdjustBatch::ADD => __('Cuánto añadir (:unit)', ['unit' => $unit]),
+            AdjustBatch::REMOVE => __('Cuánto quitar (:unit)', ['unit' => $unit]),
+            default => __('Nuevo total (:unit)', ['unit' => $unit]),
+        };
+    }
+
+    /** The typed amount in the batch's own unit (cg or units); the field's rules have already refused a minus sign. */
+    protected static function adjustAmount(Batch $record, string $typed): int
+    {
+        return $record->isUnitType() ? (int) $typed : Weight::fromGrams(str_replace(',', '.', $typed))->centigrams;
+    }
+
+    /** @return array{before: int, after: int}|null what the form would do, from the live state (null until an amount is typed) */
+    protected static function adjustResult(Batch $record, Get $get): ?array
+    {
+        $typed = DecimalInput::number($get('amount'));
+        if ($typed === null || (float) $typed < 0) {
+            return null;
+        }
+        $amount = $record->isUnitType() ? (int) $typed : (int) round_half_up((float) $typed * 100);
+        $before = self::adjustFigure($record, (string) ($get('bucket') ?? 'jar'));
+
+        return ['before' => $before, 'after' => match ((string) ($get('mode') ?? AdjustBatch::TOTAL)) {
+            AdjustBatch::ADD => $before + $amount,
+            AdjustBatch::REMOVE => $before - $amount,
+            default => $amount,
+        }];
+    }
+
+    /** «2.80 g → 6.80 g (+4.00 g)», or «No puede quedar por debajo de 0». */
+    protected static function adjustPreview(Batch $record, Get $get): ?string
+    {
+        $result = self::adjustResult($record, $get);
+        if ($result === null) {
+            return null;
+        }
+        if ($result['after'] < 0) {
+            return __('No puede quedar por debajo de 0.');
+        }
+
+        return self::quantity($record, $result['before']).' → '.self::quantity($record, $result['after'])
+            .' ('.self::signedQuantity($record, $result['after'] - $result['before']).')';
+    }
+
+    protected static function quantity(Batch $record, int $amount): string
+    {
+        return $record->isUnitType() ? trans_choice(':count ud|:count uds', $amount, ['count' => $amount]) : Weight::fromCentigrams($amount)->formatted();
+    }
+
+    protected static function signedQuantity(Batch $record, int $delta): string
+    {
+        return ($delta > 0 ? '+' : ($delta < 0 ? '−' : '±')).self::quantity($record, abs($delta));
+    }
+
+    protected static function actor(): ?User
+    {
+        $user = Auth::user();
+
+        return $user instanceof User ? $user : null;
     }
 
     /** Merma — a loss (spillage, waste, seizure). Gated on stock.merma; always a reduction. */

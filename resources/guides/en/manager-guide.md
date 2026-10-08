@@ -119,11 +119,11 @@ Three different actions, depending on what really happened:
 
 **On the counter:** the **Stock** screen (*Existencias*) lets staff top up a jar from the reserve, move grams back to the reserve and fix a jar's weight the same way, with one tapped reason. Fixing a weight needs *Hacer recuentos de inventario* (stock count), which staff have by default; untick it for staff in **Roles and permissions** if you would rather keep weight fixes to managers. Managers and owners also get **Add to reserve** there, for sealed bags that arrived and were never entered.
 
-**Adjustment** asks **What are you correcting?**: **The jar** or **The sealed reserve**. Use it to fix one batch, including setting its reserve, without starting a full stock count. Type the grams to add (or a negative number to take away) and a reason.
+**Adjustment** asks **What are you correcting?**: **The jar** or **The sealed reserve**, and shows what it holds **now** (*"Now: jar 2.80 g"*). Then choose **New total** (type what it should be), **Add** or **Remove** (type how much). The amount is always a positive number, so a phone keypad works. A line under it shows the result, for example *"2.80 g → 6.80 g (+4.00 g)"*; it cannot go below zero. Pick a reason (*Weighing error*, *Spill / wastage*, *Count*, or *Other*; managers are not asked). Use it to fix one batch, including setting its reserve, without starting a full stock count. If a sale lands while the form is open, the new total still comes out right.
 
-![Adjustment: choose The jar or The sealed reserve, then the grams and a reason.](img/manager-guide/c09b-adjust.jpg)
+![Adjustment: Now, then New total, Add or Remove, with the result shown before you save.](img/manager-guide/c09b-adjust.jpg)
 
-*Adjustment: choose The jar or The sealed reserve, then the grams and a reason.*
+*Adjustment: Now, then New total, Add or Remove, with the result shown before you save.*
 
 ![Count: the counted quantity replaces the system figure, and the difference is recorded.](img/manager-guide/c09-count.jpg)
 
@@ -145,7 +145,7 @@ The **⋮** menu on each row of the Batches list has every action (tap the row i
 | **Transfer** · **Assign to location** | Move stock to another location, as in section 5. |
 | **Add stock at another location** · **Count** | As in section 5. |
 | **Edit** | Change the name, notes, dates, photos or lab report. |
-| **Adjustment** | Correct the stock by a known amount, plus or minus, with a reason. |
+| **Adjustment** | Set the stock to a new total, or add or remove a known amount, with a reason. |
 | **Wastage** | Stock lost, spoiled or destroyed. It is recorded as a loss, with a reason. |
 | **Recall** | Pull a whole batch from sale at every location, for example after a quality problem. |
 
@@ -293,6 +293,7 @@ Before the reserve existed, each evening count took the sealed bags out of stock
 | Trasladar · Asignar a sede | Transfer · Assign to location |
 | Añadir existencias en otra sede | Add stock at another location |
 | Recuento · Ajuste · Merma · Retirada | Count · Adjustment · Wastage · Recall |
+| Ahora · Nuevo total · Añadir · Quitar | Now · New total · Add · Remove |
 | Partes del lote | Batch parts |
 | Productos · Reponer | Products · Restock |
 | Umbral de stock bajo | Low stock threshold |

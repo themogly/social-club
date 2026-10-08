@@ -433,6 +433,15 @@ class DispensaryPos extends Component
     /** @var array{index: int, note: string}|null */
     public ?array $mergeNote = null;
 
+    /**
+     * Prompt 368 — the last Añadir / Actualizar / merge asked for more than is dispensable for that line: what to say inside
+     * the weight panel («Solo hay 2.80 g en el bote.»), the one-tap fix («Añadir 2.80 g», `take` in cg or units) and, when
+     * the strain has a sealed reserve, where «Rellenar» opens. Null when there is nothing to say.
+     *
+     * @var array{message: string, take: int, fix: ?string, reserve: ?string, reserve_batch_id: ?string}|null
+     */
+    public ?array $stockShort = null;
+
     public function chooseGenetic(string $geneticId): void
     {
         if ($this->resolveMember() === null) {
@@ -449,6 +458,7 @@ class DispensaryPos extends Component
         $this->calculatorMode = false;
         $this->unitQty = 1;
         $this->editingLine = null; // a strain tap ADDS (merging into its line, 358); tapping a line edits it
+        $this->stockShort = null;
 
         // Manual mode: default the batch to FEFO (oldest open, non-expired, in stock), overridable below.
         // Automatic mode (prompt 250): no lote is chosen here — allocation happens at commit — so leave it null.
@@ -492,7 +502,7 @@ class DispensaryPos extends Component
 
     public function cancelWeightEntry(): void
     {
-        $this->reset(['activeGeneticId', 'activeBatchId', 'weightInput', 'calculatorMode', 'unitQty', 'editingLine']);
+        $this->reset(['activeGeneticId', 'activeBatchId', 'weightInput', 'calculatorMode', 'unitQty', 'editingLine', 'stockShort']);
         // Prompt 358 — a mis-tap must not lose the operator's place: the browser puts the list back where it was.
         $this->dispatch('weight-entry-cancelled');
     }
@@ -527,6 +537,7 @@ class DispensaryPos extends Component
 
         $this->dismissOutcome();
         $this->editingLine = $index;
+        $this->stockShort = null;
         $this->activeGeneticId = (string) $line['genetic_id'];
         $this->activeBatchId = $line['batch_id'] !== null ? (string) $line['batch_id'] : null;
         $this->calculatorMode = false;
@@ -580,6 +591,7 @@ class DispensaryPos extends Component
         if (! $this->calculatorEnabled()) {
             $this->calculatorMode = false;
         }
+        $this->stockShort = null;
 
         $member = $this->resolveMember();
         $location = $this->resolveLocation();
@@ -665,10 +677,19 @@ class DispensaryPos extends Component
         // of grams" is ONE line priced on its total (eighth break and all). Limits and stock are checked on the merged
         // amount at commit, exactly as two lines' sum was.
         $added = $this->editingLine === null;
+
+        // Prompt 368 — the line's RESULTING amount (an edit's new amount, a merge's total) against what is dispensable for
+        // it: refused here, in the weight panel, before a price is quoted for grams the club doesn't have. The commit's own
+        // stock check stays the guard.
+        $into = $added ? $this->mergeableLine($line) : $this->editingLine;
+        if ($this->refuseOverStock($genetic, $location, $line, $into, merging: $added && $into !== null)) {
+            return;
+        }
+
         $this->mergeNote = null;
         if (! $added && isset($this->basket[$this->editingLine])) {
             $this->basket[$this->editingLine] = $line;
-        } elseif (($into = $this->mergeableLine($line)) !== null) {
+        } elseif ($into !== null) {
             $existing = $this->basket[$into];
             $units = $line['units'] !== null ? (int) $existing['units'] + (int) $line['units'] : null;
             $this->basket[$into] = ['genetic_id' => $line['genetic_id'], 'batch_id' => $line['batch_id'],
@@ -697,6 +718,104 @@ class DispensaryPos extends Component
     }
 
     /**
+     * Prompt 368 — is the line's resulting amount more than is dispensable for it? Then say so in the weight panel (with the
+     * fix and the reserve) and refuse. `$into` is the line an edit replaces or a merge adds to (its own amount does not count
+     * against the stock twice); `$merging` adds the new amount to it.
+     *
+     * @param  array{genetic_id: string, batch_id: ?string, grams_cg: int, units: ?int}  $line
+     */
+    private function refuseOverStock(Genetic $genetic, Location $location, array $line, ?int $into, bool $merging): bool
+    {
+        $unit = $genetic->isUnitType();
+        $amount = fn (array $l): int => $unit ? (int) $l['units'] : (int) $l['grams_cg'];
+        $already = $merging && $into !== null ? $amount($this->basket[$into]) : 0;
+        $available = $this->dispensableFor($genetic, $location, $line['batch_id'], $into);
+
+        if ($already + $amount($line) <= $available) {
+            return false;
+        }
+
+        $take = max(0, $available - $already);
+        $editing = ! $merging && $into !== null;
+        $units = fn (int $n): string => trans_choice(':count ud|:count uds', $n, ['count' => $n]);
+        $reserve = $unit ? null : $this->reserveToOpen($genetic, $location);
+
+        $this->stockShort = [
+            'message' => $unit
+                ? trans_choice('Solo queda :count ud.|Solo quedan :count uds.', $available, ['count' => $available])
+                : __('Solo hay :grams en el bote.', ['grams' => $this->grams($available)]),
+            'take' => $take,
+            'fix' => $take <= 0 ? null : ($editing
+                ? __('Actualizar a :amount', ['amount' => $unit ? $units($take) : $this->grams($take)])
+                : __('Añadir :amount', ['amount' => $unit ? $units($take) : $this->grams($take)])),
+            'reserve' => $reserve === null ? null : __('Hay :grams en reserva', ['grams' => $this->grams($reserve['cg'])]),
+            'reserve_batch_id' => $reserve['batch_id'] ?? null,
+        ];
+
+        return true;
+    }
+
+    /** Prompt 368 — «Añadir 2.80 g» / «Actualizar a 2.80 g»: take what there is, through the same add. */
+    public function addAvailable(): void
+    {
+        if ($this->stockShort === null || $this->stockShort['take'] <= 0 || $this->activeGeneticId === null) {
+            return;
+        }
+        $genetic = Genetic::query()->find($this->activeGeneticId);
+        if ($genetic === null) {
+            return;
+        }
+        if ($genetic->isUnitType()) {
+            $this->unitQty = $this->stockShort['take'];
+        } else {
+            $this->weightInput = rtrim(rtrim(NumberFormat::decimal($this->stockShort['take'] / 100, 2), '0'), '.');
+            $this->calculatorMode = false;
+        }
+        $this->addLine();
+    }
+
+    /**
+     * What is dispensable for a line at this sede (cg, or units for a UNIT genetic): the chosen lote's own stock (manual), or
+     * the strain's FEFO total across open, unexpired batches (automatic) — less what the OTHER basket lines already take from
+     * it (all lines of the strain for the total; the same lote's lines for a lote).
+     */
+    private function dispensableFor(Genetic $genetic, Location $location, ?string $batchId, ?int $exceptIndex): int
+    {
+        $unit = $genetic->isUnitType();
+        if ($batchId !== null) {
+            $batch = Batch::query()->withoutGlobalScopes()->find($batchId);
+            $stock = $batch === null ? 0 : ($unit ? (int) $batch->remaining_units : $batch->remaining_cg->centigrams);
+        } else {
+            $stock = $unit ? $this->remainingUnits($genetic, $location) : $this->remainingCg($genetic, $location);
+        }
+
+        $held = 0;
+        foreach ($this->basket as $index => $other) {
+            if ($index === $exceptIndex || $other['genetic_id'] !== $genetic->id || ($batchId !== null && $other['batch_id'] !== $batchId)) {
+                continue;
+            }
+            $held += $unit ? (int) $other['units'] : (int) $other['grams_cg'];
+        }
+
+        return max(0, $stock - $held);
+    }
+
+    /**
+     * Prompt 368 — the strain's sealed reserve at this sede and the lote «Rellenar» opens on Existencias (the oldest with a
+     * reserve, Rellenar's own order, as the empty-jar card). Null when there is none.
+     *
+     * @return array{cg: int, batch_id: string}|null
+     */
+    private function reserveToOpen(Genetic $genetic, Location $location): ?array
+    {
+        $batches = Batch::query()->withoutGlobalScopes()->where('location_id', $location->id)->where('genetic_id', $genetic->id)
+            ->where('status', BatchStatus::OPEN->value)->whereNull('deleted_at')->where('reserve_cg', '>', 0)
+            ->orderBy('expires_on')->orderBy('acquired_or_harvested_on')->orderBy('id')->get(['id', 'reserve_cg']);
+
+        return $batches->isEmpty() ? null : ['cg' => (int) $batches->sum(fn (Batch $b): int => $b->reserve_cg->centigrams), 'batch_id' => (string) $batches->first()->id];
+    }
+
+    /**
      * The basket line a new one merges into: the same genetic and the same batch selection (both automatic — null — or the
      * same manual lote). Null when there is none.
      *
@@ -718,6 +837,7 @@ class DispensaryPos extends Component
         unset($this->basket[$index]);
         $this->basket = array_values($this->basket);
         $this->mergeNote = null;
+        $this->stockShort = null;
         $this->editingLine = null; // the indexes have moved
         $this->requireOverride = false;
         $this->limitBreach = false;
@@ -726,7 +846,7 @@ class DispensaryPos extends Component
     public function clearBasket(): void
     {
         $this->reset([
-            'basket', 'activeGeneticId', 'activeBatchId', 'weightInput', 'calculatorMode', 'unitQty', 'editingLine', 'mergeNote',
+            'basket', 'activeGeneticId', 'activeBatchId', 'weightInput', 'calculatorMode', 'unitQty', 'editingLine', 'mergeNote', 'stockShort',
             'cashTendered', 'walletInput', 'requireOverride', 'limitBreach', 'overrideReason',
             'priceOverrideEuros', 'priceOverrideReason', 'signaturePath', 'signatureDraft',
         ]);
@@ -2690,7 +2810,7 @@ class DispensaryPos extends Component
     private function resetBasketState(): void
     {
         $this->reset([
-            'basket', 'activeGeneticId', 'activeBatchId', 'weightInput', 'calculatorMode', 'unitQty', 'editingLine', 'mergeNote',
+            'basket', 'activeGeneticId', 'activeBatchId', 'weightInput', 'calculatorMode', 'unitQty', 'editingLine', 'mergeNote', 'stockShort',
             'cashTendered', 'walletInput', 'requireOverride', 'limitBreach', 'overrideReason',
             'priceOverrideEuros', 'priceOverrideReason', 'signaturePath', 'signatureDraft', 'onTab', 'debtCollectInput',
         ]);
