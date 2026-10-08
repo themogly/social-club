@@ -49,7 +49,7 @@ class ConsumptionReport extends AbstractReport
     public function summary(): array
     {
         $this->tables();
-        $overrideValue = $this->priceOverrideValueCents();
+        $overrides = $this->priceOverrideTotals();
         $refundValue = $this->refundValueCents();
 
         return array_values(array_filter([
@@ -58,7 +58,9 @@ class ConsumptionReport extends AbstractReport
             Settings::limitsEnabled() ? ['label' => __('Socios sobre límite'), 'value' => (string) $this->overLimitCount, 'tone' => $this->overLimitCount > 0 ? 'warning' : 'success'] : null,
             // Prompt 64: how much product left below the resolved price this period (comps / give-aways),
             // surfaced so a manager can answer "how much left at below cost, and why" without grepping the log.
-            ['label' => __('Ajustes de precio'), 'value' => Money::fromCents($overrideValue)->formatted(), 'tone' => $overrideValue > 0 ? 'warning' : 'success'],
+            // Prompt 370 — given away and recovered (a price raised, 356) apart, never one sum that hides the raises.
+            ['label' => __('Ajustes de precio: cedido'), 'value' => Money::fromCents($overrides['given'])->formatted(), 'tone' => $overrides['given'] > 0 ? 'warning' : 'success'],
+            ['label' => __('Ajustes de precio: recuperado'), 'value' => Money::fromCents($overrides['recovered'])->formatted()],
             // Prompt 65: a period's refunds belong alongside its takings, not only in the audit log.
             ['label' => __('Reembolsos'), 'value' => Money::fromCents($refundValue)->formatted(), 'tone' => $refundValue > 0 ? 'warning' : 'success'],
         ]));
@@ -75,14 +77,17 @@ class ConsumptionReport extends AbstractReport
             ->sum('amount_cents');
     }
 
-    /** Total value forgone to price overrides this period: SUM(resolved − charged) over overridden rows. */
-    private function priceOverrideValueCents(): int
+    /**
+     * Price overrides this period: given away (lowered) and recovered (raised). The shared computation (291, 370) — the
+     * discounts report reads the same one, and it never subtracts in SQL (the unsigned column, error 1690 on MySQL).
+     *
+     * @return array{given: int, recovered: int}
+     */
+    private function priceOverrideTotals(): array
     {
         [$start, $end] = $this->bounds();
 
-        // The shared query (prompt 291) — the discounts report reads the same one.
-        return (int) GivenAwayQueries::priceOverrides($this->resolvedLocationIds(), $start, $end)
-            ->sum(DB::raw('original_total_cents - total_cents'));
+        return GivenAwayQueries::priceOverrideTotals($this->resolvedLocationIds(), $start, $end);
     }
 
     // --- Grams by member (forecast vs actual) ---------------------------------------

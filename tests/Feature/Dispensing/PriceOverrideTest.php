@@ -176,6 +176,6 @@ class PriceOverrideTest extends TestCase
         $byLabel = array_column($summary, 'value', 'label');
 
         // €10.00 resolved − €6.00 charged = €4.00 forgone.
-        $this->assertSame(Money::fromCents(400)->formatted(), $byLabel[__('Ajustes de precio')]);
+        $this->assertSame(Money::fromCents(400)->formatted(), $byLabel[__('Ajustes de precio: cedido')]); // 370: given and recovered apart
     }
 }
