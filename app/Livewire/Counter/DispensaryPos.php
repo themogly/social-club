@@ -35,6 +35,7 @@ use App\Livewire\Counter\Concerns\LandsAfterRecording;
 use App\Livewire\Counter\Concerns\OpensMemberships;
 use App\Livewire\Counter\Concerns\PersistsBasket;
 use App\Livewire\Counter\Concerns\RendersIslandsOnChange;
+use App\Livewire\Counter\Concerns\ReportsSystemErrors;
 use App\Livewire\Counter\Concerns\ResolvesCounterLocation;
 use App\Livewire\Counter\Concerns\ShowsSettledOutcome;
 use App\Mail\DispensationReceiptMail;
@@ -83,6 +84,7 @@ use Livewire\Attributes\Layout;
 use Livewire\Attributes\Locked;
 use Livewire\Attributes\Session;
 use Livewire\Component;
+use PDOException;
 use RuntimeException;
 
 /**
@@ -105,7 +107,7 @@ use RuntimeException;
 #[Layout('components.layouts.counter', ['fullHeight' => true])] // prompt 176: the page must not scroll; the selection pane does
 class DispensaryPos extends Component
 {
-    use AddsManualBarLines, CollectsMembershipFees, FindsMembers, HandlesTender, IdentifiesOperator, LandsAfterRecording, OpensMemberships, PersistsBasket, RendersIslandsOnChange, ResolvesCounterLocation, ShowsSettledOutcome;
+    use AddsManualBarLines, CollectsMembershipFees, FindsMembers, HandlesTender, IdentifiesOperator, LandsAfterRecording, OpensMemberships, PersistsBasket, RendersIslandsOnChange, ReportsSystemErrors, ResolvesCounterLocation, ShowsSettledOutcome;
 
     // --- Identity ---------------------------------------------------------------
     // The ONE lookup field ($lookup) and everything behind it live in FindsMembers (prompt 194). This screen
@@ -1194,6 +1196,10 @@ class DispensaryPos extends Component
             $this->flash($e->getMessage(), 'error'); // names the product and what is left (273)
 
             return;
+        } catch (PDOException $e) {
+            $this->systemError($e);
+
+            return;
         } catch (RuntimeException) {
             $this->flash(__('No se pudo registrar la dispensación. Revisa la cesta y el stock.'), 'error');
 
@@ -1332,6 +1338,10 @@ class DispensaryPos extends Component
             $this->flash($e->getMessage(), 'error');
 
             return;
+        } catch (PDOException $e) {
+            $this->systemError($e);
+
+            return;
         } catch (RuntimeException) {
             $this->flash(__('No se pudo liquidar la visita. Revisa las cestas y el stock.'), 'error');
 
@@ -1398,6 +1408,10 @@ class DispensaryPos extends Component
             return;
         } catch (TillClosedException) {
             $this->flash(__('La caja no está abierta.'), 'error');
+
+            return;
+        } catch (PDOException $e) {
+            $this->systemError($e);
 
             return;
         } catch (RuntimeException) {
@@ -1501,6 +1515,10 @@ class DispensaryPos extends Component
             $this->flash(__('No tienes permiso para anular una dispensación.'), 'error');
 
             return;
+        } catch (PDOException $e) {
+            $this->systemError($e);
+
+            return;
         } catch (RuntimeException) {
             $this->flash(__('No se pudo anular la dispensación.'), 'error');
 
@@ -1546,7 +1564,8 @@ class DispensaryPos extends Component
                 ->locale((new ResolveLocale)->handle($dispensation->member))
                 ->queue(DispensationReceiptMail::fromDispensation($dispensation));
             $this->flash(__('Comprobante enviado al socio (en cola).'), 'success');
-        } catch (\Throwable) {
+        } catch (\Throwable $e) {
+            report($e); // prompt 366 — said to staff, and seen by us
             $this->flash(__('No se pudo enviar el comprobante. Inténtalo de nuevo.'), 'error');
         }
     }

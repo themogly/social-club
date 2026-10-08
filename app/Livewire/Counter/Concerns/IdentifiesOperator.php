@@ -469,8 +469,10 @@ trait IdentifiesOperator
             $this->flash(__('Salida declarada y entrada fichada.'), 'success');
         } catch (DomainException|InvalidArgumentException|AuthorizationException $e) {
             $this->clockFeedback = $e->getMessage();
-        } catch (\Throwable) {
-            $this->clockFeedback = __('Indica la hora a la que terminaste.');
+        } catch (\Throwable $e) {
+            // Prompt 366 — the time's own slips are refused above; anything here is the system's, not "enter the time".
+            report($e);
+            $this->clockFeedback = __('No se pudo completar por un error del sistema. Ya está avisado. Inténtalo de nuevo o avisa al responsable.');
         }
     }
 

@@ -9,6 +9,7 @@ use App\Actions\Stock\TopUpFromReserve;
 use App\Enums\CloseCountReason;
 use App\Enums\StockMovementType;
 use App\Livewire\Counter\Concerns\IdentifiesOperator;
+use App\Livewire\Counter\Concerns\ReportsSystemErrors;
 use App\Livewire\Counter\Concerns\ResolvesCounterLocation;
 use App\Models\Batch;
 use App\Models\Location;
@@ -21,6 +22,7 @@ use InvalidArgumentException;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Url;
 use Livewire\Component;
+use PDOException;
 use RuntimeException;
 
 /**
@@ -42,7 +44,7 @@ use RuntimeException;
 #[Layout('components.layouts.counter')]
 class StockScreen extends Component
 {
-    use IdentifiesOperator, ResolvesCounterLocation;
+    use IdentifiesOperator, ReportsSystemErrors, ResolvesCounterLocation;
 
     public ?string $locationId = null;
 
@@ -199,6 +201,11 @@ class StockScreen extends Component
 
         try {
             $this->confirmation = $do($batch);
+        } catch (PDOException $e) {
+            $this->confirmation = null;
+            $this->systemError($e);
+
+            return;
         } catch (RuntimeException|InvalidArgumentException|AuthorizationException $e) {
             $this->confirmation = null;
             $this->flash($e->getMessage(), 'error');

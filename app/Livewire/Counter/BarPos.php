@@ -15,6 +15,7 @@ use App\Livewire\Counter\Concerns\IdentifiesOperator;
 use App\Livewire\Counter\Concerns\LandsAfterRecording;
 use App\Livewire\Counter\Concerns\PersistsBasket;
 use App\Livewire\Counter\Concerns\RendersIslandsOnChange;
+use App\Livewire\Counter\Concerns\ReportsSystemErrors;
 use App\Livewire\Counter\Concerns\ResolvesCounterLocation;
 use App\Livewire\Counter\Concerns\ShowsSettledOutcome;
 use App\Models\Article;
@@ -37,6 +38,7 @@ use Livewire\Attributes\Layout;
 use Livewire\Attributes\Locked;
 use Livewire\Attributes\Session;
 use Livewire\Component;
+use PDOException;
 use RuntimeException;
 use Throwable;
 
@@ -67,7 +69,7 @@ use Throwable;
 #[Layout('components.layouts.counter', ['fullHeight' => true])] // prompt 176: the page must not scroll; the selection pane does
 class BarPos extends Component
 {
-    use AddsManualBarLines, FindsMembers, HandlesTender, IdentifiesOperator, LandsAfterRecording, PersistsBasket, RendersIslandsOnChange, ResolvesCounterLocation, ShowsSettledOutcome;
+    use AddsManualBarLines, FindsMembers, HandlesTender, IdentifiesOperator, LandsAfterRecording, PersistsBasket, RendersIslandsOnChange, ReportsSystemErrors, ResolvesCounterLocation, ShowsSettledOutcome;
 
     // --- Identity / scope -------------------------------------------------------
     // The ONE lookup field ($lookup) lives in FindsMembers (prompt 194). The bar used to offer a name box with
@@ -449,12 +451,16 @@ class BarPos extends Component
             $this->flash(__('Algún producto ya no está disponible.'), 'error');
 
             return;
+        } catch (PDOException $e) {
+            $this->systemError($e);
+
+            return;
         } catch (RuntimeException) {
             $this->flash(__('No se pudo registrar el pedido. Revisa la cesta y el stock.'), 'error');
 
             return;
-        } catch (Throwable) {
-            $this->flash(__('No se pudo registrar el pedido. Revisa la cesta y el stock.'), 'error');
+        } catch (Throwable $e) {
+            $this->systemError($e);
 
             return;
         }
@@ -543,6 +549,10 @@ class BarPos extends Component
             (new VoidOrder)->handle($order, $user, $reason);
         } catch (AuthorizationException) {
             $this->flash(__('No tienes permiso para anular un pedido.'), 'error');
+
+            return;
+        } catch (PDOException $e) {
+            $this->systemError($e);
 
             return;
         } catch (RuntimeException) {

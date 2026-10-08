@@ -365,14 +365,15 @@ class TillShiftHandoverTest extends TestCase
         $closed->forceFill(['counted_cents' => 99999])->save();
     }
 
-    public function test_the_close_out_flow_and_its_note_requirement_are_untouched(): void
+    public function test_the_close_out_closes_the_shift_with_a_variance_beyond_tolerance_and_no_note(): void
     {
         $ana = $this->user();
         $manager = $this->user(Role::MANAGER);
         $session = $this->openTill($ana, floatCents: 10000);
 
-        // A variance beyond tolerance still requires a note — unchanged by this branch.
-        $this->expectException(\RuntimeException::class);
-        (new CloseTill)->handle($session->fresh(), 99999, $manager);
+        // Prompt 366 — a difference never blocks the close (it used to demand a note); the shift closes with the session.
+        $closed = (new CloseTill)->handle($session->fresh(), 99999, $manager);
+        $this->assertSame(TillSessionStatus::CLOSED, $closed->status);
+        $this->assertSame(0, TillShift::query()->withoutGlobalScopes()->where('till_session_id', $session->id)->open()->count());
     }
 }

@@ -276,8 +276,10 @@
                                    class="h-14 min-w-0 flex-1 rounded-xl border border-line bg-surface px-4 text-base text-ink placeholder:text-ink-muted focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/40 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100">
                             <x-button variant="secondary" size="lg" x-bind:disabled="other.trim() === ''" x-on:click="$wire.submitReweigh('OTHER', other)" data-reweigh-reason-pick="OTHER">{{ __('Otro') }}</x-button>
                         </div>
-                        <div class="mt-3">
+                        {{-- Prompt 366 — the count never waits on an answer: going on without one is logged for the owner. --}}
+                        <div class="mt-3 grid gap-2 sm:grid-cols-2">
                             <x-button variant="secondary" size="lg" wire:click="cancelClose" class="w-full">{{ __('Cancelar') }}</x-button>
+                            <x-button variant="secondary" size="lg" wire:click="submitReweighWithoutReason" class="w-full" data-reweigh-no-reason>{{ __('Seguir sin motivo') }}</x-button>
                         </div>
                     </div>
                 @else
@@ -407,17 +409,19 @@
                         @endforeach
                     @endif
 
-                    @if ($needsNote)
-                        <div wire:key="close-note">
-                            <label for="note" class="block text-sm font-medium text-warning">{{ __('Nota (obligatoria: la diferencia supera la tolerancia)') }}</label>
-                            <textarea
-                                id="note"
-                                wire:model="closeNote"
-                                rows="2"
-                                class="mt-2 w-full rounded-xl border border-warning/40 bg-surface px-3 py-2 text-sm focus:border-warning focus:outline-none focus:ring-2 focus:ring-warning/40 dark:bg-slate-950"
-                            ></textarea>
-                        </div>
-                    @endif
+                    {{-- Prompt 366 — a note is never required: the close never waits on one. Offered, with no amount (still blind);
+                         a difference beyond the tolerance is logged for the owner either way. --}}
+                    <div wire:key="close-note" data-close-note>
+                        <label for="note" class="block text-sm font-medium text-ink-muted dark:text-slate-400">{{ __('¿Quieres dejar una nota? (opcional)') }}</label>
+                        <textarea
+                            id="note"
+                            wire:model="closeNote"
+                            rows="2"
+                            maxlength="500"
+                            placeholder="{{ __('Por ejemplo: pagado un proveedor, cambio dado de más…') }}"
+                            class="mt-2 w-full rounded-xl border border-line bg-surface px-3 py-2 text-sm text-ink placeholder:text-ink-muted focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/40 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
+                        ></textarea>
+                    </div>
 
                     @if ($flashSlot === 'count')
                         @include('livewire.counter.partials.counter-flash', ['anchor' => 'data-till-feedback=count', 'spacing' => '', 'nonce' => $flashSeq, 'reveal' => true])

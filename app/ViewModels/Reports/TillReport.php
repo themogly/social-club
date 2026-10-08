@@ -4,6 +4,7 @@ namespace App\ViewModels\Reports;
 
 use App\Enums\CashMovementType;
 use App\Enums\TillSessionStatus;
+use App\Filament\Resources\TillSessions\TillSessionResource;
 use App\Models\TillSession;
 use App\Support\Money;
 use App\Support\TillSummary;
@@ -14,6 +15,10 @@ use Illuminate\Support\Facades\DB;
  * Cajas — the session Z-reports (`App\Support\ZReport`, the same breakdown printed at
  * close), variances by session and by operator, and the cash movements. The per-session
  * figures are the aggregator's own, so the report's descuadre equals the drawer's.
+ *
+ * Prompt 366 — a close is never refused for a difference, so this is where the owner finds them: «Solo con diferencia»
+ * keeps the closes beyond the tolerance in force at each close, «Sin explicar» (amber) marks the ones with no note, and
+ * each row opens its till page.
  */
 class TillReport extends AbstractReport
 {
@@ -22,6 +27,20 @@ class TillReport extends AbstractReport
     private int $totalExpected = 0;
 
     private int $sessionCount = 0;
+
+    private bool $onlyWithVariance = false;
+
+    private int $beyondCount = 0;
+
+    private int $unexplainedCount = 0;
+
+    /** «Solo con diferencia» — only the closes beyond the tolerance. */
+    public function onlyWithVariance(bool $on = true): static
+    {
+        $this->onlyWithVariance = $on;
+
+        return $this;
+    }
 
     public function key(): string
     {
@@ -51,6 +70,8 @@ class TillReport extends AbstractReport
             ['label' => __('Sesiones'), 'value' => (string) $this->sessionCount],
             ['label' => __('Efectivo esperado'), 'value' => Money::fromCents($this->totalExpected)->formatted()],
             ['label' => __('Descuadre total'), 'value' => Money::fromCents($this->totalVariance)->formatted(), 'tone' => $this->totalVariance === 0 ? 'success' : 'warning'],
+            ['label' => __('Cierres con diferencia'), 'value' => (string) $this->beyondCount, 'tone' => $this->beyondCount === 0 ? 'success' : 'warning'],
+            ['label' => __('Sin explicar'), 'value' => (string) $this->unexplainedCount, 'tone' => $this->unexplainedCount === 0 ? 'success' : 'warning'],
         ];
     }
 
@@ -67,6 +88,12 @@ class TillReport extends AbstractReport
             ->orderByDesc('opened_at')
             ->get();
 
+        $this->beyondCount = $sessions->filter(fn (TillSession $session): bool => $session->closedBeyondTolerance())->count();
+        $this->unexplainedCount = $sessions->filter(fn (TillSession $session): bool => $session->closedUnexplained())->count();
+        if ($this->onlyWithVariance) {
+            $sessions = $sessions->filter(fn (TillSession $session): bool => $session->closedBeyondTolerance())->values();
+        }
+
         $this->sessionCount = $sessions->count();
         $anyPots = $sessions->contains(fn (TillSession $session): bool => (bool) $session->separate_pots); // prompt 349
 
@@ -81,6 +108,7 @@ class TillReport extends AbstractReport
             $rows[] = [
                 'sort' => $session->opened_at?->getTimestamp() ?? 0,
                 'fecha' => $session->opened_at,
+                'fecha__url' => TillSessionResource::getUrl('view', ['record' => $session]),
                 'operador' => $z['operator'] ?? '—',
                 'terminal' => $session->terminal ?? '—',
                 'float' => (int) $z['float'],
@@ -100,6 +128,8 @@ class TillReport extends AbstractReport
                     // A closed session whose ledger moved after cierre (a post-close void) is flagged, so the
                     // frozen cash-up is not mistaken for the current state (prompt 103).
                     : ($z['post_close_adjusted'] ? __('Cerrada (ajustada tras el cierre)') : __('Cerrada')),
+                'sin_explicar' => $session->closedUnexplained() ? __('Sin explicar') : '',
+                'sin_explicar__tone' => 'warning',
                 'operator_key' => $session->opened_by ?? 'none',
             ];
             $totals['float'] += (int) $z['float'];
@@ -129,6 +159,8 @@ class TillReport extends AbstractReport
                 ReportColumn::money('expected', __('Esperado')),
                 ReportColumn::money('counted', __('Contado')),
                 ReportColumn::money('variance', __('Descuadre')),
+                // Prompt 366 — beside the variance, not after the pot columns, so it is on screen whatever the club's pots.
+                ReportColumn::text('sin_explicar', __('Sin explicar')),
                 ReportColumn::number('tx', __('Tx')),
                 ...($anyPots ? [
                     ReportColumn::money('barra_esperado', __('Barra: esperado')),
@@ -142,7 +174,7 @@ class TillReport extends AbstractReport
             ],
             rows: $rows,
             totals: $totals,
-            empty: __('Sin cajas en este período'),
+            empty: $this->onlyWithVariance ? __('Ningún cierre con diferencia en este período') : __('Sin cajas en este período'),
             emptyHint: __('Los arqueos aparecen aquí cuando se abre y cierra una caja en el mostrador.'),
             defaultSort: 'fecha',
             sortable: true,

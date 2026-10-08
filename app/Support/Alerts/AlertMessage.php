@@ -46,6 +46,9 @@ final class AlertMessage
                 if ($first->type === AlertType::RESTOCK_FROM_STORE && ($link = self::transferLink($group)) !== null) {
                     $lines[] = (string) __('Trasladar: :url', ['url' => $link]);
                 }
+                if ($first->type === AlertType::TILL_CLOSES_UNEXPLAINED && is_string($link = data_get($first->detail, 'url'))) {
+                    $lines[] = (string) __('Ver: :url', ['url' => $link]);
+                }
 
                 return ['heading' => $heading, 'lines' => array_values($lines)];
             })->values();
@@ -67,6 +70,7 @@ final class AlertMessage
                 'terminal' => $d['terminal'] ?? '',
                 'since' => isset($d['opened_at']) ? CarbonImmutable::parse($d['opened_at'])->setTimezone(self::timezone($state))->translatedFormat('j M H:i') : '—',
             ]),
+            AlertType::TILL_CLOSES_UNEXPLAINED => __('Cierres con diferencia sin explicar: :count esta semana', ['count' => (int) ($d['count'] ?? 0)]),
             AlertType::SYSTEM => __(':component no se ha ejecutado desde :since', [
                 'component' => self::componentLabel((string) ($d['component'] ?? '')),
                 'since' => isset($d['last_at']) ? CarbonImmutable::parse($d['last_at'])->setTimezone((string) config('app.timezone'))->translatedFormat('j M H:i') : __('nunca'),

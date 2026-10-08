@@ -7,6 +7,8 @@ use App\Enums\CashPot;
 use App\Enums\TillSessionStatus;
 use App\Enums\TillShiftStatus;
 use App\Exceptions\TillClosedException;
+use App\Models\AuditLog;
+use App\Models\StockTake;
 use App\Models\TillSession;
 use App\Models\TillShift;
 use App\Models\User;
@@ -14,13 +16,19 @@ use App\Support\Settings;
 use App\Support\TillSummary;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Support\Facades\DB;
-use RuntimeException;
+use InvalidArgumentException;
 
 /**
  * Close a till with a BLIND count: the operator submits the counted cash, and only
  * THEN is the expected figure (derived from the ledger) computed and the variance
- * revealed. A variance beyond tolerance requires a note. Closing is `till.close`
- * (manager+) and the session becomes immutable — corrections are new linked entries.
+ * revealed. Closing is `till.close` (manager+) and the session becomes immutable —
+ * corrections are new linked entries.
+ *
+ * Prompt 366 — a difference NEVER blocks the close (Ben: "Just remove all these checks, as long as there's a log for the
+ * owner to see and they can see an easy report"). The note is optional; a close beyond the tolerance is audited as
+ * `till.closed_with_variance` — who, where, every pot's figures, the note (or none) and the evening flower count's
+ * answer (or none) — and the tolerance in force is kept on the session for Informes → Cajas. What is still refused: no
+ * `till.close`, a negative count, a till that is already closed.
  */
 class CloseTill
 {
@@ -33,6 +41,10 @@ class CloseTill
         if (! $closedBy->can('till.close')) {
             throw new AuthorizationException('Closing a till requires the till.close permission.');
         }
+        if ($countedCents < 0) {
+            throw new InvalidArgumentException('A counted amount cannot be negative.');
+        }
+        $note = filled($note) ? trim($note) : null;
 
         // Lock the session for the read-then-write (prompt 77): compute the expected figure and mark the
         // session CLOSED in ONE transaction, holding the row lock, so a cash movement cannot land between
@@ -48,7 +60,7 @@ class CloseTill
             $breakdown = TillSummary::breakdown($locked);
             $expected = $breakdown['expected']; // the dispensary pot's when the session keeps pots, the drawer's otherwise
             $variance = $countedCents - $expected;
-            $tolerance = (int) Settings::get('arqueo_variance_tolerance_cents', 500);
+            $tolerance = (int) Settings::get('arqueo_variance_tolerance_cents', 500, $locked->location_id);
 
             // Prompt 349 — the bar and fees pots: counted tonight (against everything accumulated since their last count,
             // which is what their expected already holds through the carried opening), or not (the expected carries).
@@ -59,7 +71,7 @@ class CloseTill
                     $potExpected = $breakdown['pots'][$pot->value]['expected'];
                     $potCounted = $potCounts[$pot->value] ?? null;
                     if ($potCounted !== null && $potCounted < 0) {
-                        throw new RuntimeException('A counted pot cannot be negative.');
+                        throw new InvalidArgumentException('A counted pot cannot be negative.');
                     }
                     $potColumns += [
                         $pot->column().'_expected_cents' => $potExpected,
@@ -72,14 +84,11 @@ class CloseTill
                 }
             }
 
-            if ($worst > $tolerance && blank($note)) {
-                throw new RuntimeException('A note is required when the variance exceeds the tolerance.');
-            }
-
             $locked->update([
                 'counted_cents' => $countedCents,
                 'expected_cents' => $expected,
                 'variance_cents' => $variance,
+                'variance_tolerance_cents' => $tolerance,
                 'closed_by' => $closedBy->id,
                 'closed_at' => now(),
                 'status' => TillSessionStatus::CLOSED,
@@ -115,7 +124,40 @@ class CloseTill
                 'variance_cents' => $variance,
             ] + $potColumns);
 
+            if ($worst > $tolerance) {
+                (new RecordAuditLog)->handle('till.closed_with_variance', $locked, null, [
+                    'location_id' => $locked->location_id,
+                    'terminal' => $locked->terminal,
+                    'closed_by' => $closedBy->id,
+                    'expected_cents' => $expected,
+                    'counted_cents' => $countedCents,
+                    'variance_cents' => $variance,
+                    'tolerance_cents' => $tolerance,
+                ] + $potColumns + [
+                    'note' => $note,
+                ] + self::flowerCount($locked));
+            }
+
             return $locked;
         });
+    }
+
+    /**
+     * The evening flower count taken during this session at its sede (prompt 360's reweigh): staff's one answer when it was
+     * off, and whether it went on with none («Seguir sin motivo», audited `stock.count_unexplained`).
+     *
+     * @return array{flower_reason: ?string, flower_unexplained: bool}
+     */
+    private static function flowerCount(TillSession $session): array
+    {
+        $takes = StockTake::query()->withoutGlobalScopes()
+            ->where('location_id', $session->location_id)->where('kind', StockTake::KIND_TILL_RECOUNT)
+            ->where('opened_at', '>=', $session->opened_at)->get(['id', 'reason']);
+
+        return [
+            'flower_reason' => $takes->pluck('reason')->filter()->first(),
+            'flower_unexplained' => $takes->isNotEmpty() && AuditLog::query()->withoutGlobalScopes()->where('action', 'stock.count_unexplained')
+                ->where('auditable_type', (new StockTake)->getMorphClass())->whereIn('auditable_id', $takes->pluck('id')->all())->exists(),
+        ];
     }
 }

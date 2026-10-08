@@ -13,6 +13,7 @@ use App\Filament\Resources\TillSessions\TillSessionResource;
 use App\Models\Batch;
 use App\Models\Genetic;
 use App\Models\Location;
+use App\Models\TillSession;
 use App\Models\User;
 use App\Support\Money;
 use App\Support\Period;
@@ -155,7 +156,7 @@ class Dashboard extends BaseDashboard
             'data' => $data,
             'occupancy' => $occ = $charts->occupancy(),
             'stats' => $this->statCards($data, $charts, $period, $canSeeFinance),
-            'alerts' => $this->decorateAlerts(array_merge($data->alerts(), $this->staffAlerts($staffHours), $this->discountAlerts($user, $data))),
+            'alerts' => $this->decorateAlerts(array_merge($data->alerts(), $this->staffAlerts($staffHours), $this->discountAlerts($user, $data), $this->tillCloseAlerts($user, $data))),
             'staffHours' => $staffHours,
             'staffNow' => $staffHours?->now() ?? [],
             'ceilingHeadroom' => $data->ceilingHeadroom(),
@@ -265,6 +266,27 @@ class Dashboard extends BaseDashboard
     }
 
     /**
+     * Prompt 366 — «Cierres con diferencia sin explicar: N esta semana»: closes beyond the tolerance with no note, this
+     * (business) week at each sede this dashboard shows, for holders of reports.view. Never the dashboard period.
+     *
+     * @return list<array{severity: string, key: string, count: int}>
+     */
+    private function tillCloseAlerts(User $user, DashboardData $data): array
+    {
+        if (! $user->can('reports.view')) {
+            return [];
+        }
+
+        $sedes = Location::query()->withoutGlobalScopes()->where('organisation_id', $data->organisationId)->sedes()
+            ->when($data->locationIds !== null, fn ($query) => $query->whereIn('id', (array) $data->locationIds))->get();
+        $count = $sedes->sum(fn (Location $sede): int => TillSession::unexplainedClosesThisWeek($sede));
+
+        return $count > 0
+            ? [['severity' => DashboardAlert::TILL_CLOSES_UNEXPLAINED->severity(), 'key' => DashboardAlert::TILL_CLOSES_UNEXPLAINED->value, 'count' => (int) $count]]
+            : [];
+    }
+
+    /**
      * Turn the view-model's terse alert tuples into rendered rows — a plain-language
      * Spanish sentence, an icon and a click-through to where the operator fixes it.
      *
@@ -294,6 +316,7 @@ class Dashboard extends BaseDashboard
                 'association_stock_ceiling' => [__('La asociación tiene más stock en total (sedes y almacén) que el techo orientativo'), Heroicon::OutlinedArchiveBox],
                 'articles_low_stock' => [trans_choice(':count producto de barra y tienda con stock bajo|:count productos de barra y tienda con stock bajo', $count, ['count' => $count]), Heroicon::OutlinedShoppingBag],
                 'staff_open_shifts', 'staff_unclocked_activity' => [(string) $case?->label($count), Heroicon::OutlinedClock],
+                'till_closes_unexplained' => [(string) $case?->label($count), Heroicon::OutlinedCalculator],
                 default => [$case?->label($count) ?? __('Aviso'), Heroicon::OutlinedBell],
             };
 

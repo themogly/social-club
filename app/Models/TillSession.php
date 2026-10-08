@@ -6,6 +6,8 @@ use App\Casts\MoneyCast;
 use App\Enums\TillSessionStatus;
 use App\Models\Concerns\BelongsToOrganisation;
 use App\Models\Concerns\ScopedToLocation;
+use App\Support\Period;
+use App\Support\Settings;
 use Database\Factories\TillSessionFactory;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
@@ -22,6 +24,7 @@ class TillSession extends Model
     protected $fillable = [
         'organisation_id', 'location_id', 'terminal', 'opened_by', 'opened_at', 'float_cents',
         'closed_by', 'closed_at', 'counted_cents', 'expected_cents', 'variance_cents', 'status', 'notes',
+        'variance_tolerance_cents', // prompt 366 — the tolerance in force at the close
         // Prompt 349 — the bar and fees pots (the float/counted/expected/variance above are the dispensary pot's when on).
         'separate_pots',
         'bar_opening_cents', 'bar_counted_cents', 'bar_expected_cents', 'bar_variance_cents',
@@ -37,6 +40,7 @@ class TillSession extends Model
             'counted_cents' => MoneyCast::class,
             'expected_cents' => MoneyCast::class,
             'variance_cents' => MoneyCast::class,
+            'variance_tolerance_cents' => 'integer',
             'status' => TillSessionStatus::class,
             'separate_pots' => 'boolean',
             'bar_opening_cents' => MoneyCast::class,
@@ -132,5 +136,52 @@ class TillSession extends Model
     public function scopeOpen(Builder $query): Builder
     {
         return $query->where('status', TillSessionStatus::OPEN);
+    }
+
+    /**
+     * Prompt 366 — the largest difference of the close, across the drawer (or dispensary pot) and whichever of the bar and
+     * fees pots were counted. Null while the session is open.
+     */
+    public function worstVarianceCents(): ?int
+    {
+        if ($this->status !== TillSessionStatus::CLOSED) {
+            return null;
+        }
+        $columns = $this->separate_pots ? ['variance_cents', 'bar_variance_cents', 'fees_variance_cents'] : ['variance_cents'];
+        $differences = array_map(fn (string $column): int => abs((int) $this->getRawOriginal($column)),
+            array_filter($columns, fn (string $column): bool => $this->getRawOriginal($column) !== null));
+
+        return $differences === [] ? 0 : max($differences);
+    }
+
+    /** The tolerance in force when it closed; an older close (before 366 kept it) reads the sede's current setting. */
+    public function varianceToleranceCents(): int
+    {
+        return $this->variance_tolerance_cents ?? (int) Settings::get('arqueo_variance_tolerance_cents', 500, $this->location_id);
+    }
+
+    public function closedBeyondTolerance(): bool
+    {
+        return ($this->worstVarianceCents() ?? 0) > $this->varianceToleranceCents();
+    }
+
+    /** Beyond the tolerance and nobody said why — what the owner's report flags «Sin explicar». */
+    public function closedUnexplained(): bool
+    {
+        return $this->closedBeyondTolerance() && blank($this->notes);
+    }
+
+    /**
+     * «Cierres con diferencia sin explicar: N esta semana» — the sede's sessions opened this (business) week, the same
+     * window Informes → Cajas shows on «Esta semana», so the line and the report it links to agree.
+     */
+    public static function unexplainedClosesThisWeek(Location $sede): int
+    {
+        $week = Period::thisWeek($sede);
+
+        return static::query()->withoutGlobalScopes()
+            ->where('location_id', $sede->id)->where('status', TillSessionStatus::CLOSED)
+            ->where('opened_at', '>=', $week->start)->where('opened_at', '<', $week->end)
+            ->get()->filter(fn (TillSession $session): bool => $session->closedUnexplained())->count();
     }
 }

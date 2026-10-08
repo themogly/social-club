@@ -2,7 +2,9 @@
 
 namespace App\Filament\Resources\TillSessions\Schemas;
 
+use App\Enums\CashPot;
 use App\Enums\TillSessionStatus;
+use App\Models\AuditLog;
 use App\Models\TillSession;
 use App\Support\Money;
 use App\Support\Weight;
@@ -22,6 +24,28 @@ class TillSessionInfolist
     {
         return $schema
             ->components([
+                // Prompt 366 — a close is never refused for a difference, so the till page leads with it: every pot's figures,
+                // the note (or «Sin nota») and the flower count's answer (or «Sin motivo»). Only beyond the tolerance.
+                Section::make(__('Diferencia en el cierre'))
+                    ->schema([
+                        TextEntry::make('difference_lines')->hiddenLabel()
+                            ->state(fn (TillSession $record): array => self::differenceLines($record))
+                            ->listWithLineBreaks()->bulleted()->columnSpanFull(),
+                        TextEntry::make('difference_note')->label(__('Nota'))
+                            ->state(fn (TillSession $record): string => filled($record->notes) ? (string) $record->notes : __('Sin nota'))
+                            ->color(fn (TillSession $record): string => filled($record->notes) ? 'gray' : 'warning'),
+                        TextEntry::make('difference_flower')->label(__('Recuento de flor'))
+                            ->state(fn (TillSession $record): ?string => self::flowerAnswer($record))
+                            ->color(fn (TillSession $record): string => self::flowerAnswer($record) === __('Sin motivo') ? 'warning' : 'gray')
+                            ->visible(fn (TillSession $record): bool => self::flowerAnswer($record) !== null),
+                        TextEntry::make('difference_unexplained')->hiddenLabel()
+                            ->state(__('Sin explicar'))->badge()->color('warning')
+                            ->visible(fn (TillSession $record): bool => $record->closedUnexplained()),
+                    ])
+                    ->columns(3)
+                    ->columnSpanFull()
+                    ->visible(fn (TillSession $record): bool => $record->closedBeyondTolerance()),
+
                 Section::make(__('Sesión'))
                     ->schema([
                         TextEntry::make('status')
@@ -106,6 +130,52 @@ class TillSessionInfolist
                     ])
                     ->columns(3),
             ]);
+    }
+
+    /**
+     * «Dispensario: esperado 100.00 € · contado 80.00 € · diferencia -20.00 €», one line per pot counted (or «no contado»).
+     *
+     * @return list<string>
+     */
+    private static function differenceLines(TillSession $record): array
+    {
+        $line = fn (string $label, int $expected, ?int $counted, ?int $variance): string => $counted === null
+            ? __(':pot: esperado :expected · no contado', ['pot' => $label, 'expected' => Money::fromCents($expected)->formatted()])
+            : __(':pot: esperado :expected · contado :counted · diferencia :variance', ['pot' => $label,
+                'expected' => Money::fromCents($expected)->formatted(), 'counted' => Money::fromCents($counted)->formatted(),
+                'variance' => ($variance > 0 ? '+' : '').Money::fromCents((int) $variance)->formatted()]);
+        $raw = fn (string $column): ?int => $record->getRawOriginal($column) === null ? null : (int) $record->getRawOriginal($column);
+
+        $lines = [$line($record->separate_pots ? CashPot::DISPENSARY->label() : __('Efectivo'), (int) $raw('expected_cents'), $raw('counted_cents'), $raw('variance_cents'))];
+        if ($record->separate_pots) {
+            foreach (CashPot::optional() as $pot) {
+                $lines[] = $line($pot->label(), (int) $raw($pot->column().'_expected_cents'), $raw($pot->column().'_counted_cents'), $raw($pot->column().'_variance_cents'));
+            }
+        }
+
+        return $lines;
+    }
+
+    /** The evening flower count's answer as the close recorded it: the reason, «Sin motivo», or null (nothing was off). */
+    private static function flowerAnswer(TillSession $record): ?string
+    {
+        /** @var array<string, ?string> $cache */
+        static $cache = [];
+
+        return array_key_exists($record->id, $cache) ? $cache[$record->id] : $cache[$record->id] = self::readFlowerAnswer($record);
+    }
+
+    private static function readFlowerAnswer(TillSession $record): ?string
+    {
+        $after = AuditLog::query()->withoutGlobalScopes()->where('action', 'till.closed_with_variance')
+            ->where('auditable_type', $record->getMorphClass())->where('auditable_id', $record->id)->latest('id')->value('after');
+        $after = is_array($after) ? $after : (array) json_decode((string) $after, true);
+
+        return match (true) {
+            filled($after['flower_reason'] ?? null) => (string) $after['flower_reason'],
+            (bool) ($after['flower_unexplained'] ?? false) => __('Sin motivo'),
+            default => self::report($record)['stock_count_reason'] ?? null,
+        };
     }
 
     /** A money entry whose formatted value is read from the Z-report at the given key. */

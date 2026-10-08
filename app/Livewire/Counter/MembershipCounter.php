@@ -14,6 +14,7 @@ use App\Livewire\Counter\Concerns\CollectsMembershipFees;
 use App\Livewire\Counter\Concerns\FindsMembers;
 use App\Livewire\Counter\Concerns\IdentifiesOperator;
 use App\Livewire\Counter\Concerns\OpensMemberships;
+use App\Livewire\Counter\Concerns\ReportsSystemErrors;
 use App\Livewire\Counter\Concerns\ResolvesCounterLocation;
 use App\Livewire\Counter\Concerns\SignsUpMembers;
 use App\Models\Dispensation;
@@ -60,7 +61,7 @@ use Livewire\WithFileUploads;
 #[Layout('components.layouts.counter')]
 class MembershipCounter extends Component
 {
-    use CollectsMembershipFees, FindsMembers, IdentifiesOperator, OpensMemberships, ResolvesCounterLocation, SignsUpMembers, WithFileUploads;
+    use CollectsMembershipFees, FindsMembers, IdentifiesOperator, OpensMemberships, ReportsSystemErrors, ResolvesCounterLocation, SignsUpMembers, WithFileUploads;
 
     /** How many past collections the counter will show. A counter answers a question; it is not an export. */
     private const HISTORY_LIMIT = 5;

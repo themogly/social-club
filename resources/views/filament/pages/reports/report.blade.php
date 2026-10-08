@@ -57,6 +57,12 @@
         {{-- Scope + period context, always visible so an empty report still reads as "here, now". --}}
         <p class="csc-rep-context">{{ $scopeLabel }} · {{ $periodLabel }}</p>
 
+        {{-- A report's own controls (prompt 291: the discounts detail's filters; 366: «Solo con diferencia»). Above the empty
+             state, so a filter that empties the report can still be turned off. --}}
+        @isset($controlsView)
+            @include($controlsView)
+        @endisset
+
         @if ($isEmpty)
             {{-- Designed empty state — what to do, never a blank page. --}}
             <div class="csc-section">
@@ -85,11 +91,6 @@
                     @endforeach
                 </div>
             @endif
-
-            {{-- A report's own controls above its tables (prompt 291: the discounts detail's filters and pager). --}}
-            @isset($controlsView)
-                @include($controlsView)
-            @endisset
 
             {{-- Tables — the primary is sortable + exportable; the rest are supporting breakdowns. --}}
             @foreach ($tables as $i => $table)

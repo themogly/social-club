@@ -19,6 +19,7 @@
     .csc-chip-success { border-inline-start-color: var(--ok); }
     .csc-chip-warning { border-inline-start-color: var(--warn); }
     .csc-chip-error { border-inline-start-color: var(--err); }
+    .csc-rep-table td.csc-cell-warning { color: var(--warnt); font-weight: 600; }
 
     /* Sortable headers */
     .csc-rep-table th { vertical-align: bottom; }
