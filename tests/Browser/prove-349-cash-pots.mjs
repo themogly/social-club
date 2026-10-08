@@ -21,7 +21,7 @@ const euros = (s) => Number((s.match(/(-?[\d.,]+)\s*€/) ?? [])[1]?.replace(/\.
 
 const central = sql("select id from locations where name = 'Central Branch'");
 const org = sql('select id from organisations limit 1');
-tinker(`app(App\\Support\\ActiveScope::class)->setOrganisation('${org}'); App\\Support\\Settings::set('separate_cash_pots', true, App\\Enums\\SettingType::BOOL, '${central}'); App\\Support\\Settings::set('after_recording', 'stay', App\\Enums\\SettingType::STRING, '${central}');`);
+tinker(`app(App\\Support\\ActiveScope::class)->setOrganisation('${org}'); App\\Support\\Settings::set('cash_box_bar', 'own', App\\Enums\\SettingType::STRING, '${central}'); App\\Support\\Settings::set('cash_box_fees', 'own', App\\Enums\\SettingType::STRING, '${central}'); App\\Support\\Settings::set('after_recording', 'stay', App\\Enums\\SettingType::STRING, '${central}');`);
 // Close whatever the demo left open at Central, so the till opens fresh with our float.
 tinker(`App\\Models\\TillSession::withoutGlobalScopes()->where('location_id','${central}')->where('status','OPEN')->update(['status' => 'CLOSED', 'closed_at' => now()]);`);
 

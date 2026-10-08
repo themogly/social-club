@@ -3,7 +3,6 @@
 namespace App\Actions\Till;
 
 use App\Actions\RecordAuditLog;
-use App\Enums\CashPot;
 use App\Enums\TillSessionStatus;
 use App\Enums\TillShiftStatus;
 use App\Exceptions\TillClosedException;
@@ -66,8 +65,8 @@ class CloseTill
             // which is what their expected already holds through the carried opening), or not (the expected carries).
             $potColumns = [];
             $worst = abs($variance);
-            if ($locked->separate_pots) {
-                foreach (CashPot::optional() as $pot) {
+            if ($locked->ownBoxes() !== []) {
+                foreach ($locked->ownBoxes() as $pot) { // prompt 373 — the session's own boxes (edibles too)
                     $potExpected = $breakdown['pots'][$pot->value]['expected'];
                     $potCounted = $potCounts[$pot->value] ?? null;
                     if ($potCounted !== null && $potCounted < 0) {

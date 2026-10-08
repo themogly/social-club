@@ -80,7 +80,10 @@ class CashPotsTest extends TestCase
 
     private function pots(bool $on = true): void
     {
-        Settings::set('separate_cash_pots', $on, SettingType::BOOL, (string) $this->sede->id);
+        // Prompt 373 — 349's all-three-pots switch is now bar + fees in their own boxes (exactly what it meant).
+        foreach (['cash_box_bar', 'cash_box_fees'] as $key) {
+            Settings::set($key, $on ? 'own' : 'till', SettingType::STRING, (string) $this->sede->id);
+        }
     }
 
     /** A €20 cash dispensation, a €5 bar sale, a €10 fee — each through its own writer, on this session. */
@@ -259,7 +262,7 @@ class CashPotsTest extends TestCase
         $session = (new OpenTill)->handle($this->sede, 'Caja 1', 10000, ['operator_id' => $this->owner->id]);
         $this->trade($session);
 
-        $this->assertFalse($session->fresh()->separate_pots);
+        $this->assertSame([], $session->fresh()->own_boxes);
         $this->assertSame(10000 + 2000 + 500 + 1000, TillSummary::expectedCents($session->fresh()));
         $closed = (new CloseTill)->handle($session->fresh(), 13500, $this->owner);
         $this->assertSame(0, $closed->variance_cents->cents);

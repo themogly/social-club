@@ -21484,3 +21484,149 @@ to double-check sheet vs iPad."*
 - **Guides:** `counter-quick-start.md` has «Checking the day against the sheet (Today)», with `11-today-sheet.jpg`
   through `shots.json`.
 - **Help:** a new `today-sheet` topic, «Cuadrar el día con la hoja».
+
+## Prompt 373 — "Where the cash goes": each sede chooses which money has its own box, with one-tap presets
+
+Arron (Medicana, Dream Green): *"Only money in the till is from weed. Members, drinks and edibles all go in separate
+boxes."* Liam (Greenhouse): *"I have members money separate and all other transactions in one till."* Ben: *"have a
+button saying count membership fees or something."*
+
+### Kinds of money and boxes
+
+- **The dispensary is always the till**: it holds the float and is counted every night.
+- **Edibles, bar & shop, and membership fees** each go in the till or in a box of their own. The settings are
+  `cash_box_edibles`, `cash_box_bar` and `cash_box_fees` ('till' | 'own'), code default 'till', per sede, read through
+  `Settings::get`.
+- Each own box has *Contar cada noche* (`count_bar_nightly`, `count_fees_nightly`, and the new
+  `count_edibles_nightly`).
+- `App\Support\CashBoxes` holds the keys, the presets, the summary sentence, the counter's «Pon …» line and the merge
+  warning.
+- `CashPot::EDIBLES` («Comestibles») joins `CashPot::optional()` (BAR, FEES, EDIBLES), with
+  `till_sessions.edibles_opening/counted/expected/variance_cents`.
+
+### The form (*Sedes → Cajas*, «¿Dónde va el efectivo?»)
+
+- Three presets: **Todo en la caja** (all 'till'), **Cuotas aparte** (fees 'own'), **Todo aparte** (all 'own').
+  They set the rows, which can then be changed one by one.
+- One `ToggleButtons` row per kind of money (*En la caja* / *Bote propio*), with *Contar cada noche* beside it only for
+  *Bote propio*. The dispensary is fixed text.
+- A live sentence: «Al cerrar se cuenta la caja (dispensario, comestibles y barra) y el bote de cuotas.», and the helper
+  text «Los cambios se aplican la próxima vez que se abra la caja.»
+- **The merge warning** shows under a row switched to *En la caja* while that box held money at the sede's last close:
+  «El bote de la barra tiene 45.00 € sin contar desde el 3/10. Al abrir la próxima caja se sumará a la caja: vacía el
+  bote en la caja.»
+- **Owner-only** (259's rule).
+  - The three `cash_box_*` keys are a new `LocationForm::OWNER_STRINGS`.
+  - The three `count_*_nightly` toggles moved to `OWNER_TOGGLES`, so the whole section is the owner's.
+  - A manager sees it read-only, and a forged save is ignored (denial test).
+  - To let managers set it, move the keys back to `SETTING_STRINGS` / `SETTING_TOGGLES`.
+
+### The settings replace `separate_cash_pots`
+
+- Migration `2026_10_09_100000_cash_boxes_per_kind_of_money`:
+  - `separate_cash_pots = 1` → `cash_box_bar` and `cash_box_fees` 'own', edibles 'till' (exactly what it meant, so
+    nothing changes until the owner touches it). The old key is then deleted: one source of truth.
+  - `till_sessions.own_boxes` is backfilled: `separate_pots = 1` → `["BAR","FEES"]`, otherwise `[]`.
+- No sede is set by name in the migration; the owner does it in one tap after deploy (Ops).
+
+### The session snapshot
+
+- `till_sessions.own_boxes` (JSON) is written at opening, and `TillSession::hasOwnBox()` / `ownBoxes()` read it.
+- **Every former reader of `separate_pots` reads it now:** `TillSummary`, `OpenTill`, `CloseTill`, the counter's
+  *Caja* (close, results, movements, handover, uncounted-since), `ZReport` (already per pot), `TillReport`,
+  `TillSessionInfolist`, `TillSessionsTable` (column «Botes»), and `DispensaryPos`.
+- The `separate_pots` column is still written (true when the session has any box) for history; nothing reads it.
+
+### The edibles-cash rule (and its snapshot)
+
+- `CommitDispensation` stores `dispensations.edibles_cash_cents = min(cash, Σ line totals of EDIBLE genetics)` on every
+  dispensation, whatever the setting. Cash goes to the edibles first, up to their total, and a visit paid partly from
+  the wallet puts the wallet against the rest.
+- **Fixed at commit:** a later change of setting needs no history, and changing a genetic's type never rewrites the
+  past (tested).
+- Existing rows are 0; no edibles box existed before.
+- `TillSummary` gives the till `cash − edibles_cash` when edibles have their own box, and the edibles box
+  `edibles_cash` plus its movements.
+- Voids need nothing new (COMPLETED only).
+- **Refunds and cash wallet top-ups always stay with the till.**
+
+### Which source feeds which pot (TillSummary, one place)
+
+- **The till:** float + cash contributions (less the edibles' cash where they have a box) + top-ups + refunds + bar
+  cash where the bar has no box + fees cash where fees have no box + its movements.
+- **A movement on a pot the session has no box for counts in the till.**
+- **Each own box:** its carried opening + its source + its movements.
+- A pot without its own box reads 0.
+- With no boxes, the till is exactly the single drawer of before; with bar + fees, exactly 349's figures (the
+  existing `CashPotsTest` passes unchanged in substance).
+
+### Switching safely (the two bugs)
+
+- **Carry only from a close where it was a box** (bug 2).
+  - `OpenTill::heldAtLastClose()` reads THIS terminal's last close, whatever its settings, and a pot carries only if it
+    was a box at that close. A box newly separate opens at 0.
+  - It used to read "the last close that had pots, however long ago", and brought back €45 from before an all-in-one
+    night.
+- **Merge into the till as an `IN` movement** (bug 1).
+  - A box that was its own at the last close, held money (the count, or the expected if uncounted) and is now in the
+    till becomes an automatic **`IN` cash movement on the till** at `OpenTill`, with the note «Bote de la barra unido a
+    la caja» and an audit `till.box_merged` (pot, amount).
+  - The till's open screen says «Vacía el bote de la barra (45.00 €) en la caja.»; the pre-open hint says the same.
+  - The money is never in two places and never in none.
+- `TillSummary::uncountedSince()` counts only the run of closes where the pot was a box.
+
+### The counter says which box
+
+- `CashBoxes::sentence()` («Pon 10.00 € en el bote de comestibles y 5.00 € en el bote de la barra.») covers the
+  session's own boxes only. It is used after:
+  - a dispensation (edibles' cash);
+  - a combined settle (bar and edibles; replaces the bar-only line);
+  - a cash fee payment (`CollectsMembershipFees`, the counter's one fee path);
+  - a sale on *Barra*.
+- Nothing in a box, no line.
+- Movements: the pot picker lists «La caja» plus only the session's own boxes.
+
+### Close and reports
+
+- The close screen counts the till («La caja contada (€) — con el fondo de caja» when there are boxes) plus each own
+  box, each starting on its *Contar cada noche*.
+- Edibles join bar and fees everywhere: the till report adds a box's three columns only when a session in view kept
+  it; the till page's difference block and the tills table follow.
+- The loss report (367, not yet built) should read every own box's difference the same way.
+
+### Tests and proof
+
+- **`tests/Feature/Till/CashBoxesTest.php`** (9, red first: there were no settings, no `CashBoxes`, no `own_boxes`).
+  It covers:
+  - the presets and sentences;
+  - per sede, with the manager denial;
+  - the Greenhouse shape;
+  - the Arron shape (cash, wallet + cash, bar, fee, and the messages);
+  - bug 1 (merge, entry, audit, open-screen line);
+  - bug 2 (opens at 0);
+  - the mid-session snapshot;
+  - the migration's data step (`moveData()`, run on seeded legacy rows);
+  - the edibles snapshot.
+- `CashPotsTest` and `CloseNeverBlocksTest` now set the new keys instead of `separate_cash_pots`.
+- **`tests/Browser/prove-373-cash-boxes.mjs`** passed 38/38 on a throwaway `csc:seed-staging` DB migrated from 349's
+  pots:
+  - each preset and its sentence, and the €45.00 merge warning, at 1440 and 393, light and dark;
+  - saved «Todo aparte»;
+  - the close screen at 820×1180 with the three boxes;
+  - «Dispensation recorded. Put €4.00 in the edibles box.» after an edible paid in cash.
+  - Screenshots are in `storage/app/screenshots/373/`.
+- **Guides:** `cash-at-the-counter.md` (the till and the boxes, the settings, the merge, the close) and
+  `manager-guide.md`. `c09-cash-boxes.jpg` (new) and `u08c.jpg` came through `shots.json`.
+- **MySQL:** left to CI, which runs the full MySQL suite on every push. Money is integer cents throughout, and nothing
+  subtracts in SQL: TillSummary sums each column per session and subtracts in PHP (370's rule; the guard passes).
+
+### Ops (Ben), after deploy
+
+- `php artisan migrate --force` (new columns and the settings mapping).
+- In *Sedes → [sede] → Cajas*, one tap each (confirm with the staff):
+  - **Greenhouse** → *Cuotas aparte*;
+  - **Medicana** and **Dream Green** → *Todo aparte*;
+  - every other sede: ask the same question and pick the preset.
+- **The sede where the pots were turned OFF:** check its last close before the change in *Arqueos de caja*. Any
+  *Barra* / *Cuotas* «no contado» there fell out of the books under 349's switch. Count those boxes and record the
+  money as an *Entrada* if it is still there.

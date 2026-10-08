@@ -369,6 +369,24 @@
                 820
             ],
             "openTill": true
+        },
+        "cash-at-the-counter/c09-cash-boxes.jpg": {
+            "url": "/locations",
+            "account": "owner",
+            "viewport": [
+                1280,
+                900
+            ],
+            "panel": true,
+            "steps": [
+                {
+                    "click": ".fi-ta-row:has-text(\"Central Branch\") a"
+                },
+                {
+                    "wait": 800
+                }
+            ],
+            "crop": "fieldset:has-text(\"Where does the cash go?\")"
         }
     }
 }

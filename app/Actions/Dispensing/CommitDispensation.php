@@ -10,6 +10,7 @@ use App\Actions\Stock\SelectBatch;
 use App\Actions\Wallet\SpendFromWallet;
 use App\Enums\DispensationStatus;
 use App\Enums\MembershipStatus;
+use App\Enums\ProductType;
 use App\Enums\StockMovementType;
 use App\Enums\TillSessionStatus;
 use App\Enums\WalletTransactionType;
@@ -164,6 +165,15 @@ class CommitDispensation
                 $cash = $options['cash_cents'] ?? $total;
                 $wallet = $options['wallet_cents'] ?? 0;
 
+                // Prompt 373 — THE edibles-cash rule, written once: the cash goes to the edibles first, up to their line totals
+                // (a visit paid partly from the wallet puts the wallet against the rest). Fixed here for every dispensation,
+                // whatever the sede's boxes, so a later change of setting needs no history and editing a genetic's type never
+                // rewrites the past. TillSummary and the counter's «Pon … en el bote de comestibles» both read it.
+                $edibleIds = Genetic::query()->withoutGlobalScopes()->whereIn('id', array_column($lineData, 'genetic_id'))
+                    ->where('product_type', ProductType::EDIBLE->value)->pluck('id')->map(fn ($id): string => (string) $id)->all();
+                $ediblesTotal = array_sum(array_map(fn (array $l): int => in_array((string) $l['genetic_id'], $edibleIds, true) ? (int) $l['line_total_cents'] : 0, $lineData));
+                $ediblesCash = max(0, min((int) $cash, $ediblesTotal));
+
                 $dispensation = Dispensation::create([
                     'self_dispensed' => $this->selfDispensed($member, $options),
                     'organisation_id' => $member->organisation_id,
@@ -179,6 +189,7 @@ class CommitDispensation
                     'price_override_by' => $overrideBy?->id,
                     'cash_cents' => $cash,
                     'wallet_cents' => $wallet,
+                    'edibles_cash_cents' => $ediblesCash,
                     'status' => DispensationStatus::COMPLETED,
                     'reversal_of_id' => $options['reversal_of_id'] ?? null,
                     'signature_path' => $options['signature_path'] ?? null,

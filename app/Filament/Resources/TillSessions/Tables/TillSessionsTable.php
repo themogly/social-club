@@ -57,9 +57,9 @@ class TillSessionsTable
                 // Prompt 349 — with separate cash pots the three columns above are the DISPENSARY pot's; the bar and fees
                 // pots are summarised here (counted with its difference, or not counted with what it carried).
                 TextColumn::make('pots')
-                    ->label(__('Barra · Cuotas'))
-                    ->state(fn (TillSession $record): ?string => $record->separate_pots && $record->closed_at !== null
-                        ? collect(CashPot::optional())->map(function (CashPot $pot) use ($record): string {
+                    ->label(__('Botes'))
+                    ->state(fn (TillSession $record): ?string => $record->ownBoxes() !== [] && $record->closed_at !== null
+                        ? collect($record->ownBoxes())->map(function (CashPot $pot) use ($record): string {
                             $counted = $record->getRawOriginal($pot->column().'_counted_cents');
                             $expected = (int) $record->getRawOriginal($pot->column().'_expected_cents');
 

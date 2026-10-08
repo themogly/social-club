@@ -2,13 +2,16 @@
 
 namespace App\Actions\Till;
 
+use App\Actions\RecordAuditLog;
+use App\Enums\CashMovementType;
+use App\Enums\CashPot;
 use App\Enums\TillSessionStatus;
 use App\Exceptions\TillAlreadyOpenException;
 use App\Models\Location;
 use App\Models\TillSession;
 use App\Models\User;
+use App\Support\CashBoxes;
 use App\Support\CounterOperator;
-use App\Support\Settings;
 use App\Support\TerminalName;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -46,11 +49,13 @@ class OpenTill
             $located = Location::withoutGlobalScopes()->lockForUpdate()->findOrFail($location->id);
             $located->update(['terminals' => TerminalName::register($located->terminalNames(), $terminal)]);
 
-            // Prompt 349 — *Botes de efectivo separados*: snapshotted onto the session (so its arithmetic never changes
-            // under it). The float is the DISPENSARY pot's; the bar and fees pots open with what they held at this
-            // terminal's last close — the count if they were counted, the expected if not (it carries until someone counts).
-            $separate = (bool) Settings::get('separate_cash_pots', false, (string) $location->getKey());
-            $carried = $separate ? self::carriedOpenings($location, $key) : ['bar' => 0, 'fees' => 0];
+            // Prompt 373 — the sede's own boxes (edibles, bar, fees), snapshotted onto the session so its arithmetic never
+            // changes under it. The float is the till's; a box opens with what it held at this terminal's LAST close — the
+            // count if counted, the expected if not — and only if it was a box at that close (a box newly separate opens at
+            // 0). A box that held money and is now in the till is MERGED into it below: never in two places, never in none.
+            $ownBoxes = CashBoxes::ownBoxesFor((string) $location->getKey());
+            $held = self::heldAtLastClose($location, $key);
+            $opening = fn (CashPot $pot): int => in_array($pot->value, $ownBoxes, true) ? ($held[$pot->value] ?? 0) : 0;
 
             $session = TillSession::create([
                 'organisation_id' => $location->organisation_id,
@@ -61,9 +66,11 @@ class OpenTill
                 'float_cents' => $floatCents,
                 'status' => TillSessionStatus::OPEN,
                 'notes' => $options['notes'] ?? null,
-                'separate_pots' => $separate,
-                'bar_opening_cents' => $carried['bar'],
-                'fees_opening_cents' => $carried['fees'],
+                'separate_pots' => $ownBoxes !== [], // 349's column, kept for history; nothing reads it now
+                'own_boxes' => $ownBoxes,
+                'bar_opening_cents' => $opening(CashPot::BAR),
+                'fees_opening_cents' => $opening(CashPot::FEES),
+                'edibles_opening_cents' => $opening(CashPot::EDIBLES),
             ]);
 
             // Prompt 186 — the first shift, opened with the session. A single-operator day is then ONE shift
@@ -76,28 +83,43 @@ class OpenTill
                 (new StartTillShift)->handle($session, $operator);
             }
 
+            // Prompt 373 — a box that was separate at the last close, held money, and is in the till now: its money joins
+            // the till as an automatic entry (audited), and the open screen tells staff to empty the box into the drawer.
+            foreach ($held as $pot => $cents) {
+                if ($cents > 0 && ! in_array($pot, $ownBoxes, true)) {
+                    $box = CashPot::from($pot);
+                    (new RecordCashMovement)->handle($session, CashMovementType::IN, $cents, [
+                        'pot' => CashPot::DISPENSARY,
+                        'reason' => $box->mergedNote(),
+                        'operator_id' => $session->opened_by,
+                    ]);
+                    (new RecordAuditLog)->handle('till.box_merged', $session, null, ['pot' => $pot, 'amount_cents' => $cents, 'location_id' => $location->id]);
+                }
+            }
+
             return $session;
         });
     }
 
     /**
-     * What the bar and fees pots held at this terminal's last close (prompt 349).
+     * What each box held at this terminal's LAST close, whatever its settings (prompt 373 — 349 read the last close that had
+     * pots, however long ago, and brought an old balance back): the count, or the expected if it went uncounted — and only
+     * for a pot that WAS a box at that close. A pot that was in the till then holds nothing of its own.
      *
-     * @return array{bar: int, fees: int}
+     * @return array<string, int> pot => cents
      */
-    public static function carriedOpenings(Location $location, string $terminalKey): array
+    public static function heldAtLastClose(Location $location, string $terminalKey): array
     {
         $last = TillSession::query()->withoutGlobalScopes()
-            ->where('location_id', $location->id)->where('status', TillSessionStatus::CLOSED->value)->where('separate_pots', true)
+            ->where('location_id', $location->id)->where('status', TillSessionStatus::CLOSED->value)
             ->orderByDesc('closed_at')->orderByDesc('id')->get()
             ->first(fn (TillSession $s): bool => TerminalName::key((string) $s->terminal) === $terminalKey);
 
-        if ($last === null) {
-            return ['bar' => 0, 'fees' => 0];
+        $held = [];
+        foreach ($last?->ownBoxes() ?? [] as $pot) {
+            $held[$pot->value] = (int) ($last->getRawOriginal($pot->column().'_counted_cents') ?? $last->getRawOriginal($pot->column().'_expected_cents') ?? 0);
         }
 
-        $held = fn (string $pot): int => (int) ($last->getRawOriginal("{$pot}_counted_cents") ?? $last->getRawOriginal("{$pot}_expected_cents") ?? 0);
-
-        return ['bar' => $held('bar'), 'fees' => $held('fees')];
+        return $held;
     }
 }

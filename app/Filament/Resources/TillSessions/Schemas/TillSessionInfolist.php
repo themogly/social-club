@@ -2,7 +2,6 @@
 
 namespace App\Filament\Resources\TillSessions\Schemas;
 
-use App\Enums\CashPot;
 use App\Enums\TillSessionStatus;
 use App\Models\AuditLog;
 use App\Models\TillSession;
@@ -146,11 +145,10 @@ class TillSessionInfolist
                 'variance' => ($variance > 0 ? '+' : '').Money::fromCents((int) $variance)->formatted()]);
         $raw = fn (string $column): ?int => $record->getRawOriginal($column) === null ? null : (int) $record->getRawOriginal($column);
 
-        $lines = [$line($record->separate_pots ? CashPot::DISPENSARY->label() : __('Efectivo'), (int) $raw('expected_cents'), $raw('counted_cents'), $raw('variance_cents'))];
-        if ($record->separate_pots) {
-            foreach (CashPot::optional() as $pot) {
-                $lines[] = $line($pot->label(), (int) $raw($pot->column().'_expected_cents'), $raw($pot->column().'_counted_cents'), $raw($pot->column().'_variance_cents'));
-            }
+        // Prompt 373 — the till, then each of the session's own boxes (edibles too).
+        $lines = [$line($record->ownBoxes() !== [] ? __('La caja') : __('Efectivo'), (int) $raw('expected_cents'), $raw('counted_cents'), $raw('variance_cents'))];
+        foreach ($record->ownBoxes() as $pot) {
+            $lines[] = $line($pot->label(), (int) $raw($pot->column().'_expected_cents'), $raw($pot->column().'_counted_cents'), $raw($pot->column().'_variance_cents'));
         }
 
         return $lines;
