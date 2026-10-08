@@ -64,7 +64,7 @@ Every dispensation must be to an identified member, from a real batch, by weight
 4. Choose the strain. Their usual ones appear as buttons at the top; otherwise use the list, **Search genetic…** or **Filters**.
 5. Enter the amount. Flower, hash and extracts: type the weight in grams on the keypad, or tap a quick amount (1 g, 2 g, 3.5 g…). Pre-rolls, vapes and edibles: use **−** and **+** to choose the number of units.
 6. Tap **Add to basket**. The strain search comes back at the top of the list, empty, ready for the next item (tap it to type). Repeat for anything else.
-   - **More than there is?** The basket will not take more than the jar holds. The pad says so right above the button, for example *"Only 2.80 g in the jar."*, and keeps what you typed. Tap **Add 2.80 g** to take what there is, or, if the strain has sealed bags, **Top up** to open the **Stock** screen on that batch; **Back to the dispensary** brings you back to the same member and basket. Units are checked the same way (*"Only 3 units left."*).
+   - **More than there is?** The basket will not take more than the jar holds. The pad says so right above the button, for example *"Only 2.80 g in the jar."*, and keeps what you typed. Tap **Add 2.80 g** to take what there is, or, if the strain has sealed bags, **Top up** to open the **Stock** screen on that batch; **Back to the dispensary** brings you back to the same member and basket. Units are checked the same way (*"Only 3 units left."*). If the basket already holds some of that strain, it says so (*"You already have 2.80 g in the basket: there is no more in the jar."*).
 
 **Sealed top-ups (reserve):** the sealed bags of a strain kept off the counter are its **reserve**. They are not in the jar, so they are not dispensed and not weighed at closing.
 
@@ -166,7 +166,7 @@ Tap a batch: it opens on its figures (*"In the jar 2.80 g · Reserve 30.00 g"*, 
 - **Correct the jar's weight:** weigh the jar, type what the scale says and tap what happened (*Weighing error*, *Spill / wastage*, *Topped up without recording*, or type another reason). The system works out the difference; if the jar is heavier because a bag was opened without **Top up**, it takes that from the reserve. Managers are not asked for a reason.
 - **Add to reserve** (managers and owners) records sealed bags that arrived and were never entered, with a reason.
 
-Each action has one button that says what will happen, for example *"Top up 10.00 g → jar 12.80 g"* or *"Correct to 2.50 g (−0.30 g)"*. **← Another action** goes back to the list. The result confirms on the panel, for example *"Topped up: +10.00 g · jar 12.80 g · reserve 20.00 g"*.
+Each action has one button that says what will happen, for example *"Top up 10.00 g → jar 12.80 g"* or *"Correct to 2.50 g (−0.30 g)"*. **← Another action** goes back to the list. The result confirms on the panel, for example *"Topped up: +10.00 g · jar 12.80 g · reserve 20.00 g"*. When a weight correction finds a bag opened without **Top up**, it says *"Jar 65.00 g · 10.00 g moved from the reserve (unrecorded top-up)"*.
 
 ![Stock: every jar and sealed top-up at the club, with a batch's actions open.](img/counter-quick-start/04b-top-up.jpg)
 

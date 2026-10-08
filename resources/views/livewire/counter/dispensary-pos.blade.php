@@ -314,10 +314,13 @@
                              correct; the one-tap fix takes what there is, and a sealed reserve offers «Rellenar» on Existencias
                              (364's link — the basket and the socio are held for the way back). --}}
                         @if ($stockShort)
-                            <div data-stock-short role="alert" class="mt-4 rounded-xl border border-error/30 bg-error/10 px-4 py-3 text-sm dark:border-error/40 dark:bg-error/15">
+                            {{-- Prompt 369 — compact (one line and its two actions), and «Añadir a la cesta» is brought back into view
+                                 when it appears: the full warning used to push the button below an 820 px screen. --}}
+                            <div data-stock-short role="alert" x-init="$nextTick(() => $root.querySelector('[data-add-line]')?.scrollIntoView({ block: 'nearest' }))"
+                                 class="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 rounded-xl border border-error/30 bg-error/10 px-3 py-2 text-sm dark:border-error/40 dark:bg-error/15">
                                 <p class="font-semibold text-error">{{ $stockShort['message'] }}</p>
                                 @if ($stockShort['reserve'] && $stockShort['reserve_batch_id'])
-                                    <p class="mt-1 flex flex-wrap items-center gap-x-2 text-ink dark:text-slate-200">
+                                    <p class="flex items-center gap-x-2 text-ink dark:text-slate-200">
                                         <span>{{ $stockShort['reserve'] }}</span>
                                         <span aria-hidden="true">·</span>
                                         <a href="{{ route('counter.stock', ['lote' => $stockShort['reserve_batch_id'], 'from' => 'pos']) }}" data-stock-short-top-up
@@ -325,7 +328,7 @@
                                     </p>
                                 @endif
                                 @if ($stockShort['fix'])
-                                    <x-button variant="secondary" size="lg" class="mt-2 w-full" wire:click="addAvailable" data-stock-short-fix>{{ $stockShort['fix'] }}</x-button>
+                                    <x-button variant="secondary" size="md" class="ml-auto min-h-11" wire:click="addAvailable" data-stock-short-fix>{{ $stockShort['fix'] }}</x-button>
                                 @endif
                             </div>
                         @endif

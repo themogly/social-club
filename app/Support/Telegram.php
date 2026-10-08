@@ -70,7 +70,9 @@ final class Telegram
     {
         $at = Cache::get(self::REJECTED);
 
-        return is_int($at) ? Carbon::createFromTimestamp($at) : null;
+        // Prompt 369 — Redis hands a stored number back as a STRING ("1791460703"); `is_int` read it as no flag, so the red
+        // row never showed in production. Any numeric value is the timestamp.
+        return is_numeric($at) ? Carbon::createFromTimestamp((int) $at) : null;
     }
 
     public static function setWebhook(string $url): Response

@@ -147,7 +147,7 @@ Costs that are **not** paid from the drawer (rent, utilities, suppliers paid by 
 
 > **Staff pay:** the form carries a notice that recording a payment to staff here only documents it. It does not deal with payroll, tax withholding or social security; the treasurer or gestor must handle those separately.
 
-**Reports → Tills** shows every till session for a period, newest first: who opened it, the float, the expected and counted cash, the variance and the status, plus the variance by operator. With separate pots, the headline figures are the Dispensary pot, and Bar and Fees have their own columns, including when they were not counted.
+**Reports → Tills** shows every till session for a period, newest first: who opened it and who closed (counted) it, the float, the expected and counted cash, the variance and the status, plus **Variance by who did the count**: a difference is listed against the person who counted the drawer, since they are the one to ask. With separate pots, the headline figures are the Dispensary pot, and Bar and Fees have their own columns, including when they were not counted.
 
 Closing a till is never blocked by a difference, so this report is where you find them. Tick **Only with a difference** to list only the closes beyond the club's tolerance; **Unexplained** (in amber) marks the ones closed without a note. Click a session's date to open the till, which starts with **Difference at close**: every pot's expected, counted and difference, the note (or *No note*) and the flower count's answer (or *No reason*). The Dashboard and the morning email say *"Closes with an unexplained difference: N this week"*, linking straight here.
 

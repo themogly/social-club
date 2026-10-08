@@ -21321,3 +21321,68 @@ From Ben's iPhone screenshots of live and a video from the club (Ste, 8 October)
 - `counter-quick-start.md`: «More than there is?», and the action-first Existencias with its words.
 - `manager-guide.md`: *Ajuste* as now / new total / add / remove, and the table row.
 - `04b-top-up` and `c09b-adjust` were retaken through `shots.json` (c09b now types 6.80 to show the preview).
+
+## Prompt 369 — fixes from testing 360–366 (and 368's polish)
+
+### 1. «Token de Telegram rechazado» never showed on Redis
+
+- **Cause:** `Telegram::markTokenRejected()` stores `now()->timestamp` with `Cache::forever()`. Laravel's Redis store
+  hands a stored number back as a STRING (`"1791460703"`), and `tokenRejectedAt()` accepted only `is_int`, so on Redis
+  the flag read as absent and *Salud del sistema* stayed green.
+  - The suite's array store keeps the PHP int, so 363's tests passed: a false green, like 253's locale bug.
+- **Fix:** `tokenRejectedAt()` accepts any numeric value (`is_numeric` → `(int)`).
+- **Sweep:** this was the only `is_int(Cache::get(…))` in `app/`.
+  - `PanelIdentity` already uses `is_numeric`, and `UnlockOperator` casts with `(int)`.
+  - The health probe has used a random STRING token since 307 for the same reason.
+- **Making the test fail on the real store's behaviour:** `tests/Support/StringifyingStore` is an `ArrayStore` that
+  returns ints and floats as strings, as Redis does. The new test in `TelegramTokenRejectedTest` sets the flag through
+  it and expects the timestamp and the red row on the page; it was red before the fix (null).
+  - Use this store wherever a number is read back from the cache.
+  - A Redis service in CI was not added: the double reproduces exactly the behaviour that matters, with no new
+    infrastructure.
+
+### 2. *Existencias*: the weigh confirmation said «0.00 g» when the reserve covered it
+
+- **Now worded by what happened:**
+  - wholly from the reserve: «Bote 65.00 g · 10.00 g pasados desde la reserva (rellenado sin registrar)»;
+  - with a remainder: «… · ajuste +5.00 g»;
+  - a plain correction stays «Peso actualizado: -2.00 g · bote 18.00 g»;
+  - no change: «Sin diferencia · bote …».
+  - It never shows a «0.00 g» adjustment.
+- **The prompt's "weigh 70 g → ajuste +5.00 g" needs a reserve smaller than the surplus.** The forgotten top-up rule
+  (359) moves the surplus up to the whole reserve, so with 445 g sealed, all 15 g come from the reserve. The test uses
+  jar 55 / reserve 10 → 10 g from the reserve and +5 g adjusted.
+
+### 3. Till report: the difference goes to who did the count (Ben's call; the recommended option taken)
+
+- The *Arqueos de caja* row shows **«Abrió: Club Staff · Cerró: Club Manager»** (column «Abrió / cerró»), or «Abrió: …»
+  while open.
+- The per-operator table groups by the **closer** and is titled **«Descuadre por quien hizo el arqueo»**.
+- The difference belongs to the shift, but the person who counted is who the owner asks. 366's audit already records
+  `closed_by`.
+- If Ben prefers the opener, it is the `operator_key` line in `TillReport::sessions()`.
+
+### 4. 368's follow-ups
+
+- **The over-stock warning is compact**: one line, then «Rellenar» and «Añadir 2.80 g» on the same row (66 px at
+  1180×820). When it appears, «Añadir a la cesta» is scrolled back into view (`scrollIntoView({block: 'nearest'})`).
+  - `tests/Browser/prove-369.mjs` passed 6/6: the button's box is inside the viewport at 1180×820 and 820×1180 after
+    the warning.
+- **A merge refusal says the basket already holds it:**
+  - with all of it: «Ya tienes 2.80 g en la cesta: no queda más en el bote.» («Rellenar» stays when there is a reserve;
+    no fix button with nothing left);
+  - with part of it: «Ya tienes 2.00 g en la cesta: solo quedan 0.80 g en el bote.» with «Añadir 0.80 g».
+- ***Ajuste* stays open on a refusal.** Below zero is now a validation error under the amount (a closure rule on the
+  field, reading the same preview), so nothing is written and the person corrects it.
+  - If a sale between the preview and the save still takes it below zero, `AdjustBatch` refuses it against the locked
+    figure, and the action now `halt()`s with the notice instead of closing.
+
+### Tests
+
+- `TelegramTokenRejectedTest` +1 (red first).
+- `StockScreenTest` +3 (two red first).
+- `TillReportAttributionTest` (red first).
+- `AddTimeStockCheckTest`: the merge test reworded, +1.
+- `AjusteNowAndNewTotalTest`: the below-zero test now expects an error on `amount` and the modal still mounted.
+- Guides: `cash-at-the-counter.md` (who closed, the table's new title) and `counter-quick-start.md` (the merge
+  wording, the forgotten top-up confirmation).

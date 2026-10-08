@@ -20,6 +20,7 @@ use App\Support\Money;
 use App\Support\Spreadsheet\ReportExport;
 use App\Support\Weight;
 use App\ViewModels\BatchRecall;
+use Closure;
 use Filament\Actions\Action;
 use Filament\Actions\ActionGroup;
 use Filament\Actions\BulkActionGroup;
@@ -303,6 +304,13 @@ class BatchesTable
                     ->numeric()
                     ->minValue(0)
                     ->rules($record->isUnitType() ? ['integer'] : [new GramAmount])
+                    // Prompt 369 — below zero is refused HERE, under the amount, so the modal stays open (it used to close on a
+                    // red notice and the person started again). AdjustBatch still refuses it against the locked figure.
+                    ->rule(fn (Get $get): Closure => function (string $attribute, mixed $value, Closure $fail) use ($record, $get): void {
+                        if ((self::adjustResult($record, $get)['after'] ?? 0) < 0) {
+                            $fail(__('No puede quedar por debajo de 0.'));
+                        }
+                    })
                     ->required()
                     ->live(debounce: 400),
                 TextEntry::make('preview')
@@ -324,7 +332,7 @@ class BatchesTable
                     ->visible(fn (Get $get): bool => $get('reason_pick') === 'other' && ! ManagerApproval::allows(self::actor())),
             ])
             ->modalSubmitActionLabel(__('Guardar ajuste'))
-            ->action(function (Batch $record, array $data): void {
+            ->action(function (Batch $record, array $data, Action $action): void {
                 $actor = self::actor();
                 $reason = ManagerApproval::allows($actor) ? ManagerApproval::reason()
                     : (($data['reason_pick'] ?? null) === 'other' ? trim((string) ($data['reason_other'] ?? '')) : (self::adjustReasons()[$data['reason_pick'] ?? ''] ?? ''));
@@ -332,7 +340,9 @@ class BatchesTable
                     $result = (new AdjustBatch)->handle($record, (string) $data['mode'], self::adjustAmount($record, (string) $data['amount']), $reason, $actor,
                         reserve: ! $record->isUnitType() && ($data['bucket'] ?? 'jar') === 'reserve');
                 } catch (RuntimeException|InvalidArgumentException $e) {
+                    // A sale between the preview and the save can still take it below zero: say so, keep the form open.
                     Notification::make()->title(__('No se pudo registrar el ajuste'))->body($e->getMessage())->danger()->send();
+                    $action->halt();
 
                     return;
                 }

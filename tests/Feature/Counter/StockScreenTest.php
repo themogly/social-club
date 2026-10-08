@@ -397,4 +397,37 @@ class StockScreenTest extends TestCase
         // and the write); the old one-pad-for-four panel had no such buttons.
         $this->assertStringContainsString('window.stockActionPanel', $html);
     }
+
+    // --- Prompt 369 — the weigh confirmation says what happened, never «0.00 g» --------------------------------------------------
+
+    public function test_a_weigh_absorbed_wholly_from_the_reserve_says_so_and_shows_no_zero_adjustment(): void
+    {
+        $batch = $this->batch($this->amnesia, 5500, 44500);
+        $screen = $this->screen($this->user(Role::STAFF))->call('openBatch', $batch->id)->call('updateJarWeight', '65', 'WEIGHING_ERROR');
+
+        $confirmation = (string) $screen->get('confirmation');
+        $this->assertStringContainsString('Bote 65.00 g · 10.00 g pasados desde la reserva (rellenado sin registrar)', $confirmation);
+        $this->assertStringNotContainsString('0.00 g ·', $confirmation);
+        $this->assertStringNotContainsString('Peso actualizado', $confirmation);
+    }
+
+    public function test_a_weigh_beyond_the_reserve_shows_the_absorbed_part_and_the_adjustment(): void
+    {
+        // The rule takes the surplus UP TO the reserve (359): 15 g heavier with 10 g sealed → 10 g from the reserve, +5 g adjusted.
+        $batch = $this->batch($this->amnesia, 5500, 1000);
+        $screen = $this->screen($this->user(Role::STAFF))->call('openBatch', $batch->id)->call('updateJarWeight', '70', 'WEIGHING_ERROR');
+
+        $confirmation = (string) $screen->get('confirmation');
+        $this->assertStringContainsString('10.00 g pasados desde la reserva', $confirmation);
+        $this->assertStringContainsString('ajuste +5.00 g', $confirmation);
+        $this->assertSame([7000, 0], $this->figures($batch));
+    }
+
+    public function test_a_plain_correction_keeps_its_wording(): void
+    {
+        $batch = $this->batch($this->amnesia, 2000);
+        $screen = $this->screen($this->user(Role::STAFF))->call('openBatch', $batch->id)->call('updateJarWeight', '18', 'WEIGHING_ERROR');
+
+        $this->assertSame('Peso actualizado: -2.00 g · bote 18.00 g', $screen->get('confirmation'));
+    }
 }

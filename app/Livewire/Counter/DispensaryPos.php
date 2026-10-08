@@ -740,10 +740,15 @@ class DispensaryPos extends Component
         $units = fn (int $n): string => trans_choice(':count ud|:count uds', $n, ['count' => $n]);
         $reserve = $unit ? null : $this->reserveToOpen($genetic, $location);
 
+        $quantity = fn (int $n): string => $unit ? $units($n) : $this->grams($n);
         $this->stockShort = [
-            'message' => $unit
-                ? trans_choice('Solo queda :count ud.|Solo quedan :count uds.', $available, ['count' => $available])
-                : __('Solo hay :grams en el bote.', ['grams' => $this->grams($available)]),
+            // Prompt 369 — a merge says the basket already holds part (or all) of what there is, not just the jar's total.
+            'message' => match (true) {
+                $merging && $already > 0 && $take > 0 => __('Ya tienes :basket en la cesta: solo quedan :left en el bote.', ['basket' => $quantity($already), 'left' => $quantity($take)]),
+                $merging && $already > 0 => __('Ya tienes :basket en la cesta: no queda más en el bote.', ['basket' => $quantity($already)]),
+                $unit => trans_choice('Solo queda :count ud.|Solo quedan :count uds.', $available, ['count' => $available]),
+                default => __('Solo hay :grams en el bote.', ['grams' => $this->grams($available)]),
+            },
             'take' => $take,
             'fix' => $take <= 0 ? null : ($editing
                 ? __('Actualizar a :amount', ['amount' => $unit ? $units($take) : $this->grams($take)])
