@@ -8,6 +8,7 @@ use App\Enums\DashboardAlert;
 use App\Enums\DispensationStatus;
 use App\Enums\OrderStatus;
 use App\Livewire\Counter\Concerns\IdentifiesOperator;
+use App\Livewire\Counter\Concerns\ReportsSystemErrors;
 use App\Livewire\Counter\Concerns\ResolvesCounterLocation;
 use App\Models\Dispensation;
 use App\Models\Location;
@@ -29,6 +30,7 @@ use Illuminate\Support\Collection;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Locked;
 use Livewire\Component;
+use PDOException;
 use RuntimeException;
 
 /**
@@ -54,7 +56,7 @@ use RuntimeException;
 #[Layout('components.layouts.counter')]
 class CounterHome extends Component
 {
-    use IdentifiesOperator, ResolvesCounterLocation;
+    use IdentifiesOperator, ReportsSystemErrors, ResolvesCounterLocation;
 
     /** #[Locked] (prompt 75): the client can never retarget the sede. */
     #[Locked]
@@ -408,6 +410,10 @@ class CounterHome extends Component
             }
         } catch (AuthorizationException) {
             $this->flash(__('No tienes permiso para anular.'), 'error');
+
+            return;
+        } catch (PDOException $e) {
+            $this->systemError($e);
 
             return;
         } catch (RuntimeException) {

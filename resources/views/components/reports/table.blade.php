@@ -48,8 +48,10 @@
                 @foreach ($table->rows as $row)
                     <tr>
                         @foreach ($columns as $column)
-                            {{-- A row may carry `<key>__url` to link that cell (prompt 285: a person → their registro). --}}
-                            <td @class(['csc-num' => $column->numeric()])>
+                            {{-- A row may carry `<key>__url` to link that cell (prompt 285: a person → their registro), and
+                                 `<key>__tone` to colour a filled one (prompt 366: «Sin explicar» in amber). --}}
+                            @php $tone = filled($row[$column->key] ?? null) ? ($row[$column->key.'__tone'] ?? null) : null; @endphp
+                            <td @class(['csc-num' => $column->numeric(), 'csc-cell-'.$tone => $tone !== null])>
                                 @if (filled($row[$column->key.'__url'] ?? null))
                                     <a href="{{ $row[$column->key.'__url'] }}" class="csc-rep-link">{{ $column->display($row[$column->key] ?? null) }}</a>
                                 @else

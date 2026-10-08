@@ -537,10 +537,10 @@ class Help
                 ['title' => 'Repesa lo que se ha abierto', 'body' => [
                     'Pesa solo los botes de flor que se han tocado; las bolsas selladas de reserva no se pesan al cerrar (se comprueban en el Inventario). Un bote que no puedas pesar se marca «No se puede contar» y queda como estaba.',
                     'Si te olvidaste de pulsar «Rellenar» al abrir una bolsa, el sistema lo detecta y lo anota para el responsable («Rellenado sin registrar»); no tienes que hacer nada.',
-                    'Si el recuento no cuadra, aparece una sola pregunta, «El recuento no cuadra — ¿qué ha pasado?»: elige «Error al pesar», «Derrame / merma», «Rellené sin registrar», «Bote no disponible» u «Otro» con una frase. Una respuesta vale para todo el recuento. No dice qué bote ni cuánto: las diferencias se ven después de cerrar.',
+                    'Si el recuento no cuadra, aparece una sola pregunta, «El recuento no cuadra — ¿qué ha pasado?»: elige «Error al pesar», «Derrame / merma», «Rellené sin registrar», «Bote no disponible» u «Otro» con una frase. Una respuesta vale para todo el recuento. No dice qué bote ni cuánto: las diferencias se ven después de cerrar. Si nadie sabe qué ha pasado, «Seguir sin motivo»: el cierre sigue y el responsable lo ve sin explicar.',
                 ]],
                 ['title' => 'Anota el descuadre', 'body' => [
-                    'Se revela la diferencia entre lo contado y lo esperado. Si supera la tolerancia configurada, añade una nota explicando por qué. El cierre genera el informe de la sesión.',
+                    'Se revela la diferencia entre lo contado y lo esperado. La nota es opcional y una diferencia nunca impide cerrar; si sabes por qué no cuadra, déjalo escrito: es lo primero que lee el responsable. Una diferencia por encima de la tolerancia queda registrada para el propietario. El cierre genera el informe de la sesión.',
                 ]],
             ],
         ],

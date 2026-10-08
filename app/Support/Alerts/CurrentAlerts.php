@@ -4,12 +4,14 @@ namespace App\Support\Alerts;
 
 use App\Enums\AlertType;
 use App\Enums\LocationKind;
+use App\Filament\Pages\Reports\TillReportPage;
 use App\Models\Article;
 use App\Models\Batch;
 use App\Models\Genetic;
 use App\Models\Location;
 use App\Models\Organisation;
 use App\Models\TillSession;
+use App\Support\Period;
 use App\Support\Settings;
 use App\Support\StockCover;
 use App\ViewModels\SystemHealth;
@@ -24,6 +26,8 @@ use App\ViewModels\SystemHealth;
  *  · products — `Article::lowStock()`, active ones;
  *  · batches with stock left expiring within `alerts_expiry_days` (the date is part of the subject: a changed date clears);
  *  · tills open longer than `alerts_till_open_hours`;
+ *  · prompt 366 — the sede's closes this week beyond the tolerance with no note (one alert per sede and week, its count
+ *    refreshed each run), linking to Informes → Cajas on «Solo con diferencia»;
  *  · the system — any heartbeat *Salud del sistema* grades red ({@see SystemHealth::heartbeats()}).
  *
  * `detail` carries names, quantities, sede names and times — never member data.
@@ -38,6 +42,7 @@ final class CurrentAlerts
             ...self::products($organisation),
             ...self::expiring($organisation),
             ...self::tills($organisation),
+            ...self::unexplainedCloses($organisation),
             ...self::system(),
         ];
     }
@@ -166,6 +171,27 @@ final class CurrentAlerts
                 'location_id' => $session->location_id,
                 'detail' => ['terminal' => (string) $session->terminal, 'opened_at' => $session->opened_at?->toIso8601String()],
             ])->values()->all();
+    }
+
+    /** @return list<array{type: AlertType, subject: string, location_id: ?string, detail: array<string, mixed>}> */
+    private static function unexplainedCloses(Organisation $organisation): array
+    {
+        $alerts = [];
+        $sedes = Location::query()->withoutGlobalScopes()->where('organisation_id', $organisation->id)->where('active', true)
+            ->where('kind', LocationKind::SEDE)->get();
+        foreach ($sedes as $sede) {
+            $count = TillSession::unexplainedClosesThisWeek($sede);
+            if ($count > 0) {
+                $alerts[] = [
+                    'type' => AlertType::TILL_CLOSES_UNEXPLAINED,
+                    'subject' => 'till-closes:'.Period::thisWeek($sede)->start->toDateString(),
+                    'location_id' => $sede->id,
+                    'detail' => ['count' => $count, 'url' => TillReportPage::getUrl(['diferencia' => 1, 'period' => 'week'])],
+                ];
+            }
+        }
+
+        return $alerts;
     }
 
     /** @return list<array{type: AlertType, subject: string, location_id: ?string, detail: array<string, mixed>}> */

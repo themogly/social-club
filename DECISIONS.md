@@ -20969,3 +20969,167 @@ prompt says not to merge.
   - The harness signs in once per language; eight sign-ins trip the login rate limit.
 - **Screenshots** (`storage/app/screenshots/365/`, en, 393 light and dark plus 820): the header, the empties shown, and
   the empty-reserve message.
+
+## Prompt 366 — closing the till is never blocked: differences are logged for the owner and shown on one easy report
+
+Shane: "Wouldn't let me shut yesterday's till, not sure why — even with a note in the box it didn't work." Ben: "Just
+remove all these checks, as long as there's a log for the owner to see and they can see an easy report."
+
+### Why Shane could not close, even with a note
+
+- `TillSession::submitCount()` caught **every** `RuntimeException` from `CloseTill` and answered «Hace falta una nota
+  para justificar la diferencia.»
+- A database error is a `RuntimeException` too (`QueryException` → `PDOException`). So does a «database is locked»
+  error, which a transaction re-throws as a `DeadlockException`.
+- So a system failure looked like "write a note", and writing one changed nothing. The before-state is pinned by
+  `CloseNeverBlocksTest` test 3, seen red with exactly that message for a `QueryException`.
+
+### The close
+
+- **`CloseTill` never refuses a difference.**
+  - The note requirement is gone: a note is always optional, and blank becomes null.
+  - **Still refused:** no `till.close` (`AuthorizationException`); a negative count or pot (`InvalidArgumentException`,
+    previously a bare `RuntimeException`); a till already closed (`TillClosedException`).
+- **Beyond the tolerance** (the worst of the drawer/dispensary pot and whichever bar/fees pots were counted), the close
+  is audited as `till.closed_with_variance`. It records:
+  - who closed (the PIN operator as the actor, plus `closed_by`), `location_id` and `terminal`;
+  - expected, counted and variance for the main pot and each pot (null = not counted);
+  - `tolerance_cents`;
+  - `note` (null = «Sin nota» on screen);
+  - `flower_reason` (the evening count's one answer) and `flower_unexplained` (it went on «Seguir sin motivo»).
+- **The tolerance in force is kept on the session** (`till_sessions.variance_tolerance_cents`, new nullable column).
+  Changing the setting later does not turn last month's closes into unexplained ones, or back.
+  - Older closes have none and read the sede's current setting (`TillSession::varianceToleranceCents()`).
+  - The tolerance is now read for the session's own sede (it used to be the request's active scope).
+  - The column is added, nothing is backfilled, and no existing row changes.
+- **`TillSession` model:** `worstVarianceCents()`, `closedBeyondTolerance()`, `closedUnexplained()` (beyond the
+  tolerance and the note blank) and `unexplainedClosesThisWeek($sede)`.
+  - Sessions are counted by `opened_at` in `Period::thisWeek($sede)`, the window Informes → Cajas uses on «Esta
+    semana», so the dashboard line and the report it opens agree.
+- **The counter screen:**
+  - The note box is always shown, as «¿Quieres dejar una nota? (opcional)», with a placeholder example. There is no
+    amount, so the count stays blind.
+  - `needsNote` and «Nota (obligatoria…)» are removed.
+  - Nothing else new on the counter.
+- **`submitCount()`'s catches:**
+  - `TillClosedException`, `AuthorizationException` and `InvalidArgumentException` keep their own messages.
+  - **Anything else** is reported (`report($e)` → Sentry) and shown as «No se pudo cerrar la caja por un error del
+    sistema. Ya está avisado. Inténtalo de nuevo o avisa al responsable.»
+  - `CloseTill` is now resolved through the container (`app(CloseTill::class)`), so test 3 can inject the failure.
+
+### The evening flower count
+
+- When the count is off, the one question (360) gets **«Seguir sin motivo»**, next to «Cancelar».
+  - `submitReweighWithoutReason()` commits with no reason and audits `stock.count_unexplained` on the stock take, with
+    `location_id`, `till_session_id`, the batch count and how many were «No contado».
+- **A `reasons.optional` holder is still never asked:** they record «Aprobado por responsable» as before.
+- `submitReweigh()` used to have no catch. A `PDOException` is now reported and said as «No se pudo registrar el
+  recuento por un error del sistema…».
+
+### The owner's view
+
+- **Informes → Cajas:**
+  - **«Solo con diferencia»** keeps only the closes beyond the tolerance. It is a `#[Url]` checkbox (`?diferencia=1`),
+    and `?period=week` opens on «Esta semana».
+  - **«Sin explicar»** is an amber cell (`--warnt`, AA on white and dark), placed **beside the variance**, not after the
+    six pot columns, so it is on screen whatever the club's pots.
+  - Two summary chips: «Cierres con diferencia» and «Sin explicar».
+  - Newest first (as before). Each row's date opens the till page (`fecha__url`).
+  - Filtered with nothing beyond the tolerance, the table says «Ningún cierre con diferencia en este período».
+  - "Variance by operator" follows the filtered rows. Cash movements and petty cash do not.
+- **Shared report changes:**
+  - A report cell may carry `<key>__tone` (`csc-cell-warning`).
+  - **A report's own controls now render above the empty state.** A filter that empties the report could otherwise
+    not be turned off. This was also true of the discounts filters, and fixes them too.
+- **The till page** (`TillSessionInfolist`) leads with a full-width **«Diferencia en el cierre»** section, only beyond
+  the tolerance. It shows:
+  - one line per pot: «Dispensario: esperado … · contado … · diferencia +…», or «no contado»;
+  - the note or «Sin nota» (amber);
+  - the flower count's answer or «Sin motivo», from the close's audit entry, falling back to the Z-report for older
+    closes;
+  - a «Sin explicar» badge.
+- **Dashboard:** `DashboardAlert::TILL_CLOSES_UNEXPLAINED` shows «Cierres con diferencia sin explicar: N esta semana»
+  to `reports.view` holders, at the sedes the dashboard shows.
+  - It links to `informes/cajas?diferencia=1&period=week`.
+  - It is panel only (`counterRoute()` is null): the counter hub never shows it.
+- **Morning summary (311's mechanism):** `AlertType::TILL_CLOSES_UNEXPLAINED` 🧾 in `CurrentAlerts`, one per sede and
+  week (subject `till-closes:<week start>`), with its count refreshed each run.
+  - The line reads the same, followed by «Ver: <link>».
+  - **Note:** because it is a 311 alert, its FIRST appearance in a week at a sede is also announced once on Telegram,
+    to those who take that type. That is the same "new alert → one message" rule as every other type. A person can
+    untick it under *Avisos*.
+
+### The counter sweep (same masking pattern)
+
+- **The new pattern:** `App\Livewire\Counter\Concerns\ReportsSystemErrors::systemError($e, ?$message)` reports the
+  exception and flashes «No se pudo completar por un error del sistema. Ya está avisado…».
+  - Each broad catch below now catches `PDOException` **first**, so a `QueryException` and a `DeadlockException` are
+    reported and said as the system's fault.
+  - The domain refusals (plain `RuntimeException`s: no stock, a missing reason, «solo se puede anular…») keep their
+    messages.
+  - It catches `PDOException`, not `QueryException`, because the first sweep test failed: "database is locked" came
+    back from the transaction as a `DeadlockException`, which is not a `QueryException`.
+- **Changed:**
+  - `CounterHome::void` («No se pudo anular.»);
+  - `DispensaryPos`: commit, settle visit, bar charge, void;
+  - `BarPos`: commit (its trailing `catch (Throwable)` now reports) and void;
+  - `StockScreen::act`, which used to echo the raw exception message to staff;
+  - `TillSession::handover`, which also echoed `getMessage()`;
+  - `SignsUpMembers`: counter signature, signature waiver, approve, invite (the last also echoed `getMessage()` from a
+    `Throwable`);
+  - `DispensaryPos`'s receipt email: `catch (Throwable)` now reports and keeps its message;
+  - `IdentifiesOperator::declareForgottenEnd`: its last `catch (Throwable)` said «Indica la hora…» for ANY failure,
+    although the time's own slips are refused before it. It now reports, with the system-error message.
+- **Left alone, on purpose:** `DispensaryPos`'s five `ResolvePrice` catches (pricing a card for display; "no price" is
+  a state, and a real database failure fails the next query visibly), and `IdentifiesOperator`'s PIN-pad
+  `catch (Throwable)`.
+
+### Tests
+
+- **`tests/Feature/Till/CloseNeverBlocksTest.php`** (14 tests). Tests 1 and 3 were seen red first, both with «Hace
+  falta una nota…». It covers:
+  1. 80 counted against 100, no note → «Caja cerrada.», and an audit with `note` null and every field.
+  2. Within tolerance: no entry, and the note is kept.
+  3. The optional note is offered, still blind.
+  4. Shane's case: bar counted 2.50 and fees not counted → closes, and the audit carries the bar's 1000/250/−750.
+  5. A `QueryException` → the system-error message, reported (`Exceptions::fake()`), and the till still open.
+  6. A database error during an Existencias top-up → reported, never echoed, and the reserve untouched (seen red without
+     the fix, echoing the raw SQL).
+  7. «Seguir sin motivo» → the count commits with no reason, and `stock.count_unexplained` is recorded.
+  8. Still refused: no `till.close`; an invalid or negative count, and a negative pot in the action; an already-closed
+     till.
+  9. The report filter, the «Sin explicar» cell and the row links; the page through `?diferencia=1&period=week`.
+  10. The till page's block.
+  11. The dashboard line and link, and the morning-summary line through `EvaluateAlerts`.
+  12. No line when every difference has a note.
+- **Rewritten, because the rule changed on Ben's say-so** (not deleted):
+  - `TillSessionTest::test_blind_close_reveals_variance_and_never_requires_a_note`;
+  - `TillShiftHandoverTest::test_the_close_out_closes_the_shift_with_a_variance_beyond_tolerance_and_no_note`.
+- **`tests/Browser/prove-366.mjs`**, on a throwaway `csc:seed-staging` DB in English, passed 35/35:
+  - the close at 1180×820 light and dark and at 390 (Continue without a reason → optional note → closed with a €99
+    difference);
+  - the report at 1440 light and dark, 1024 and 390, with no page scroll; unticking shows every close;
+  - the till page leads with the difference, including «No reason»;
+  - the dashboard line links to the filtered report.
+  - Screenshots are in `storage/app/screenshots/366/`.
+
+### Guides and help
+
+- `cash-at-the-counter.md` §6 and §7 (the optional note, the system-error message, «Only with a difference»,
+  «Unexplained», the till page's block, the dashboard and email line, and the word list).
+- `counter-quick-start.md` (Continue without a reason, the optional note).
+- `manager-guide.md` (the start-of-day check).
+- **Images retaken through `shots.json`:** `10b-close-reason` (now with Continue without a reason), and `u08c` and
+  `c08`, which **now have recipes** (pots on at Central Branch, and a close beyond the tolerance first, as `about`
+  says).
+- The till close's help text in `Help.php` says the note is optional and mentions «Seguir sin motivo».
+
+### Ops (Ben)
+
+- **Deploy runs a migration:** `php artisan migrate --force` (the nullable `till_sessions.variance_tolerance_cents`).
+  Then the usual cache clear.
+- **Sentry:** close failures are now REPORTED instead of hidden. Expect the first real cause of Shane's refusal to
+  appear in Sentry as a `QueryException` or `DeadlockException` from `TillSession`/`CloseTill` if it happens again.
+  That event will say what actually failed; tell me what it says.
+- **Owners and managers who take alerts** get «Cierres de caja con diferencia sin explicar» in the morning email. The
+  first one of a week per sede is also announced on Telegram, like any new alert.

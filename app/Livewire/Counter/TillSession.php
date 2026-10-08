@@ -4,6 +4,7 @@ namespace App\Livewire\Counter;
 
 use App\Actions\Counter\SignInOperator;
 use App\Actions\Expenses\RecordTillExpense;
+use App\Actions\RecordAuditLog;
 use App\Actions\Staff\ClockIn;
 use App\Actions\Staff\ClockOut;
 use App\Actions\Staff\UndoTillClockEvent;
@@ -25,6 +26,7 @@ use App\Exceptions\TillAlreadyOpenException;
 use App\Exceptions\TillClosedException;
 use App\Http\Middleware\RequireOpenTill;
 use App\Livewire\Counter\Concerns\IdentifiesOperator;
+use App\Livewire\Counter\Concerns\ReportsSystemErrors;
 use App\Livewire\Counter\Concerns\ResolvesCounterLocation;
 use App\Models\Batch;
 use App\Models\ExpenseCategory;
@@ -54,7 +56,9 @@ use InvalidArgumentException;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Locked;
 use Livewire\Component;
+use PDOException;
 use RuntimeException;
+use Throwable;
 
 /**
  * The till (caja) terminal — a full-page Livewire component on its own authenticated
@@ -73,7 +77,7 @@ class TillSession extends Component
     /** Prompt 338 — *Preguntar*: the opener to ask «¿Fichar entrada ahora?» on the screen they land on. */
     public const CLOCK_IN_OFFER = 'counter_clock_in_offer';
 
-    use IdentifiesOperator, ResolvesCounterLocation;
+    use IdentifiesOperator, ReportsSystemErrors, ResolvesCounterLocation;
 
     /** The active location id, resolved in mount(). #[Locked] (prompt 75): the client can never retarget the counter's sede. */
     #[Locked]
@@ -152,8 +156,6 @@ class TillSession extends Component
     public ?string $otherFeedback = null;
 
     /** The close required a note (variance beyond tolerance) — re-prompt without revealing. */
-    public bool $needsNote = false;
-
     public string $closeNote = '';
 
     // --- EOD flower reweigh (prompt 47) — a step inside the close ritual, before the cash count ---
@@ -389,6 +391,10 @@ class TillSession extends Component
 
         try {
             (new HandOverTill)->handle($session, $counted, $outgoing, $incoming, filled($this->handoverNote) ? $this->handoverNote : null);
+        } catch (PDOException $e) {
+            $this->systemError($e);
+
+            return;
         } catch (AuthorizationException|RuntimeException|TillClosedException $e) {
             $this->flash($e->getMessage(), 'error');
 
@@ -766,6 +772,20 @@ class TillSession extends Component
      */
     public function submitReweigh(?string $reasonKey = null, ?string $otherText = null): void
     {
+        $this->commitReweigh($reasonKey, $otherText, withoutReason: false);
+    }
+
+    /**
+     * Prompt 366 — «Seguir sin motivo»: the count was off and nobody knows why. It commits all the same (the close never
+     * waits on an answer) and is audited `stock.count_unexplained`, so the owner sees it on the till page and in the log.
+     */
+    public function submitReweighWithoutReason(): void
+    {
+        $this->commitReweigh(null, null, withoutReason: true);
+    }
+
+    private function commitReweigh(?string $reasonKey, ?string $otherText, bool $withoutReason): void
+    {
         $this->feedbackIn = 'reweigh';
 
         $session = $this->resolveOpenSession();
@@ -813,24 +833,41 @@ class TillSession extends Component
         // Nothing off ⇒ no question. Off ⇒ one answer covers the whole count; a `reasons.optional` holder (356) is not
         // asked and «Aprobado por responsable» is recorded. The server decides, so the screen cannot skip it.
         $reason = null;
+        $unexplained = false;
         if (CommitStockTake::closeCountIsOff($counts, $this->locationId)) {
             $reason = ManagerApproval::allows($user) ? ManagerApproval::reason() : $this->closeCountReason($reasonKey, $otherText);
-            if ($reason === null) {
+            if ($reason === null && ! $withoutReason) {
                 $this->reweighAsking = true;
 
                 return;
             }
+            $unexplained = $reason === null;
         }
 
-        $stockTake = StockTake::create([
-            'organisation_id' => $session->organisation_id,
-            'location_id' => $this->locationId,
-            'opened_by' => $user->id,
-            'opened_at' => now(),
-            'status' => StockTakeStatus::OPEN,
-        ]);
+        try {
+            $stockTake = StockTake::create([
+                'organisation_id' => $session->organisation_id,
+                'location_id' => $this->locationId,
+                'opened_by' => $user->id,
+                'opened_at' => now(),
+                'status' => StockTakeStatus::OPEN,
+            ]);
 
-        $committed = (new CommitStockTake)->handle($stockTake, $counts, $user, $reason);
+            $committed = (new CommitStockTake)->handle($stockTake, $counts, $user, $reason);
+
+            if ($unexplained) {
+                (new RecordAuditLog)->handle('stock.count_unexplained', $committed, null, [
+                    'location_id' => $this->locationId,
+                    'till_session_id' => $session->id,
+                    'batches' => count($counts),
+                    'not_counted' => count(array_filter($counts, fn (array $count): bool => (bool) ($count['not_counted'] ?? false))),
+                ]);
+            }
+        } catch (PDOException $e) {
+            $this->systemError($e, __('No se pudo registrar el recuento por un error del sistema. Ya está avisado. Inténtalo de nuevo o avisa al responsable.'));
+
+            return;
+        }
 
         // Reveal the variances (blind entry, reveal after — like the cash arqueo), read back from the
         // committed lines and matched to the batches we counted (a morph column, so via getAttribute()).
@@ -948,7 +985,7 @@ class TillSession extends Component
         }
 
         // The flower reweigh is a required step before the cash count can close (prompt 47). Explicit +
-        // recoverable — bounce back to the reweigh step with a clear reason, never a silent hang (mirror needsNote).
+        // recoverable — bounce back to the reweigh step with a clear reason, never a silent hang.
         if ($this->reweighRequired()) {
             $this->reweighing = true;
             $this->feedbackIn = 'reweigh'; // the screen is now the recount — say why, inside it
@@ -1003,20 +1040,25 @@ class TillSession extends Component
         }
 
         try {
-            $closed = (new CloseTill)->handle($session, $counted, $user, $note === '' ? null : $note, $potCounts);
+            $closed = app(CloseTill::class)->handle($session, $counted, $user, $note === '' ? null : $note, $potCounts);
         } catch (TillClosedException) {
             $this->flash(__('La caja ya estaba cerrada.'), 'error');
             $this->cancelClose();
 
             return;
-        } catch (RuntimeException) {
-            // Variance beyond tolerance needs a note — re-prompt WITHOUT revealing expected.
-            $this->needsNote = true;
-            $this->flash(__('Hace falta una nota para justificar la diferencia.'), 'warning');
-
-            return;
         } catch (AuthorizationException) {
             $this->flash(__('No tienes permiso para cerrar la caja.'), 'error');
+
+            return;
+        } catch (InvalidArgumentException) {
+            $this->flash(__('El importe contado no es válido.'), 'error');
+
+            return;
+        } catch (Throwable $e) {
+            // Prompt 366 — a difference never refuses a close, so anything else is the system's fault: report it and say
+            // so. (A broad RuntimeException catch used to call every failure "write a note" — Shane's close that would
+            // not shut "even with a note in the box".)
+            $this->systemError($e, __('No se pudo cerrar la caja por un error del sistema. Ya está avisado. Inténtalo de nuevo o avisa al responsable.'));
 
             return;
         }
@@ -1336,7 +1378,6 @@ class TillSession extends Component
     private function resetCloseState(): void
     {
         $this->countSubmitted = false;
-        $this->needsNote = false;
         $this->countInput = '';
         $this->counted = null;
         $this->closeNote = '';

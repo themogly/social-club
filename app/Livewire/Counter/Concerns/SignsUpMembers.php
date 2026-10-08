@@ -28,6 +28,7 @@ use App\Support\Settings;
 use App\Support\SignupTrace;
 use Illuminate\Support\Collection;
 use Illuminate\Validation\ValidationException;
+use PDOException;
 use RuntimeException;
 
 /**
@@ -832,6 +833,10 @@ trait SignsUpMembers
 
         try {
             (new SignApplicationAtCounter)->handle($application, $dataUrl);
+        } catch (PDOException $e) {
+            $this->systemError($e);
+
+            return;
         } catch (RuntimeException $e) {
             $this->flash($e->getMessage(), 'error');
 
@@ -857,6 +862,10 @@ trait SignsUpMembers
 
         try {
             (new WaiveApplicationSignature)->handle($application, $operator, $reason, $text);
+        } catch (PDOException $e) {
+            $this->systemError($e);
+
+            return;
         } catch (RuntimeException $e) {
             $this->flash($e->getMessage(), 'error');
 
@@ -907,6 +916,11 @@ trait SignsUpMembers
             $this->altaDuplicateBlocked = true;
             $this->flash($e->getMessage(), 'warning');
             SignupTrace::record('staff_signup.refused', ['application_id' => $application->id, 'error' => class_basename($e)]); // prompt 348
+
+            return;
+        } catch (PDOException $e) {
+            $this->systemError($e);
+            SignupTrace::record('staff_signup.refused', ['application_id' => $application->id, 'error' => class_basename($e)]);
 
             return;
         } catch (RuntimeException $e) {
@@ -1025,6 +1039,10 @@ trait SignsUpMembers
 
         try {
             return (new IssueApplicationInvite)->handle($operator, $this->locationId, $email, $reference);
+        } catch (PDOException $e) {
+            $this->systemError($e);
+
+            return null;
         } catch (\Throwable $e) {
             $this->flash($e->getMessage(), 'error');
 

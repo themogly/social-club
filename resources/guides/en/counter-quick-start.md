@@ -3,7 +3,7 @@ title: Counter quick-start guide for staff
 summary: A normal shift on the counter tablet: signing in, the till, serving members, sign-ups and closing up.
 audience: staff
 order: 1
-updated: 2026-10-07
+updated: 2026-10-08
 ---
 
 > This guide walks through a normal shift on the counter tablet: signing in, opening the till, serving members, signing up new members and closing up. The screenshots show the English screens; the Spanish words you may see are listed at the end.
@@ -189,18 +189,18 @@ Closing is two counts: the flower, then the cash. Both are done **blind**: weigh
 1. On the **Till** screen, tap **Close till**.
 2. **Flower recount** (end of day): this appears once per club per day, when the last till there closes. **Weigh the jars only**: for each batch listed, weigh its jar and type the grams. Sealed bags in the reserve are not weighed at closing (managers check them in the stock count). If you cannot weigh a jar, tap **Can't count it**; its stock will not be touched. Then tap **Confirm count**.
    - If everything matches, the close simply carries on.
-   - If the count does not match, **one** question appears: **The count doesn't match — what happened?** Tap what happened (*Weighing error*, *Spill / wastage*, *Topped up without recording*, *Jar not available*), or **Other** with a few words. One answer covers the whole count. It does not say which jar or by how much; that is shown after the close.
+   - If the count does not match, **one** question appears: **The count doesn't match — what happened?** Tap what happened (*Weighing error*, *Spill / wastage*, *Topped up without recording*, *Jar not available*), or **Other** with a few words. One answer covers the whole count. It does not say which jar or by how much; that is shown after the close. If nobody knows, tap **Continue without a reason**.
 3. **Cash count:** count the drawer and type the total.
-4. If the cash does not match what was expected, the **Difference** shows in red. Write what you know in the **Note**, even "don't know". Petty-cash payments made during the day are listed with their reasons.
+4. **Want to leave a note? (optional):** if you know why the cash might be off, say so here. It is never required, and a difference never stops the close. After you confirm, any **Difference** shows in red, and petty-cash payments made during the day are listed with their reasons.
 5. Confirm. The till shows **Closed**.
 
 ![The end-of-day flower recount: weigh each jar and type the grams, or tap Can't count it. Sealed bags are not weighed.](img/counter-quick-start/10-close-recount.jpg)
 
 *The end-of-day flower recount: weigh each jar and type the grams, or tap Can't count it. Sealed bags are not weighed.*
 
-![When the count doesn't match: one question for the whole count, with no jar or amount shown.](img/counter-quick-start/10b-close-reason.jpg)
+![When the count doesn't match: one question for the whole count, with no jar or amount shown, and Continue without a reason.](img/counter-quick-start/10b-close-reason.jpg)
 
-*When the count doesn't match: one question for the whole count, with no jar or amount shown.*
+*When the count doesn't match: one question for the whole count, with no jar or amount shown, and Continue without a reason.*
 
 Closing also clocks you out: *"Clocked out at 23:04 · Undo"*. If you are staying on, tap **Undo** within two minutes. Anyone else still clocked in at that club is listed with a **Clock out** button; they each confirm with their own PIN.
 

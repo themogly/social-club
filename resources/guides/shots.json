@@ -1,5 +1,5 @@
 {
-    "about": "Prompt 353 — how each guide screenshot is captured by `npm run guides:shots`. Run it against a site seeded with `php artisan csc:seed-staging` (the fictional demo club, prompt 327), with BASE_URL pointing at it. The guides show the ENGLISH screens: first set the demo accounts to English — php artisan tinker --execute=\"App\\\\Models\\\\User::query()->update(['locale' => 'en'])\" — or the script stops. Each recipe: url, account (owner | manager | staff — the harness accounts), viewport [w, h], member (chosen at the dispensary when its search is showing), steps, and an optional crop selector, and `panel: true` for an Administration screen (signed in, no counter PIN). Steps: {\"goto\": url}, {\"click\": selector}, {\"fill\": [selector, value]}, {\"press\": [selector, key]}, {\"wait\": ms}. Images are written at 1600 px wide (the viewport scaled), JPEG. Steps also take {\"clickAll\": selector} (prompt 360). counter-quick-start/10b-close-reason needs a closer WITHOUT «Aprobar sin motivo», so let the demo staff close first: php artisan tinker --execute=\"foreach (['till.close', 'stock.take'] as \\$p) (new App\\\\Actions\\\\Roles\\\\SetRolePermission)->handle(App\\\\Enums\\\\Role::STAFF, \\$p, true, App\\\\Models\\\\User::where('email', 'owner@club.test')->first());\"",
+    "about": "Prompt 353 — how each guide screenshot is captured by `npm run guides:shots`. Run it against a site seeded with `php artisan csc:seed-staging` (the fictional demo club, prompt 327), with BASE_URL pointing at it. The guides show the ENGLISH screens: first set the demo accounts to English — php artisan tinker --execute=\"App\\\\Models\\\\User::query()->update(['locale' => 'en'])\" — or the script stops. Each recipe: url, account (owner | manager | staff — the harness accounts), viewport [w, h], member (chosen at the dispensary when its search is showing), steps, and an optional crop selector, and `panel: true` for an Administration screen (signed in, no counter PIN). Steps: {\"goto\": url}, {\"click\": selector}, {\"fill\": [selector, value]}, {\"press\": [selector, key]}, {\"wait\": ms}. Images are written at 1600 px wide (the viewport scaled), JPEG. Steps also take {\"clickAll\": selector} (prompt 360). counter-quick-start/10b-close-reason needs a closer WITHOUT «Aprobar sin motivo», so let the demo staff close first: php artisan tinker --execute=\"foreach (['till.close', 'stock.take'] as \\$p) (new App\\\\Actions\\\\Roles\\\\SetRolePermission)->handle(App\\\\Enums\\\\Role::STAFF, \\$p, true, App\\\\Models\\\\User::where('email', 'owner@club.test')->first());\" cash-at-the-counter/u08c shows the three pots: turn on Separate cash pots for Central Branch first, and run it after counter-quick-start/10b (it commits the evening count, which appears once per club per day). cash-at-the-counter/c08 shows «Only with a difference»: it needs a close this week beyond the tolerance (close a till at the counter with a difference and no note first).",
     "seed": "csc:seed-staging",
     "locale": "en",
     "shots": {
@@ -316,6 +316,41 @@
                     "wait": 400
                 }
             ]
+        },
+        "cash-at-the-counter/u08c.jpg": {
+            "url": "/counter/till",
+            "account": "manager",
+            "viewport": [
+                1180,
+                1280
+            ],
+            "openTill": true,
+            "steps": [
+                {
+                    "click": "[data-close-till]"
+                },
+                {
+                    "clickAll": "[data-reweigh-not-counted-toggle]"
+                },
+                {
+                    "click": "form[wire\\:submit=\"submitReweigh\"] button[type=\"submit\"]"
+                },
+                {
+                    "press": [
+                        "body",
+                        "Home"
+                    ]
+                }
+            ]
+        },
+        "cash-at-the-counter/c08.jpg": {
+            "url": "/informes/cajas?diferencia=1&period=week",
+            "account": "manager",
+            "viewport": [
+                1600,
+                1000
+            ],
+            "panel": true
         }
     }
 }

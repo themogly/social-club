@@ -3,7 +3,7 @@ title: Cash at the counter
 summary: Cash pots, expenses, cash in and out, banking and handovers.
 audience: staff
 order: 2
-updated: 2026-10-07
+updated: 2026-10-08
 ---
 
 > Every euro that goes into or out of the drawer is recorded with **who** did it and **why**. That is what lets the cash count at closing come out right, and what explains it when it does not. This guide shows which button to use for each situation. It follows on from the *Counter quick-start guide*.
@@ -112,7 +112,7 @@ At the end of the day, **Close till · cash count** starts with the flower recou
 
 - **Weigh the jars only.** Sealed bags in the reserve are not counted at closing; managers check them in the stock count.
 - If you opened a bag without tapping **Top up**, the count puts it right by itself and tells the manager (*Unrecorded top-up*).
-- **The one reason box** only appears when the count does not match: **The count doesn't match — what happened?** Pick what happened (*Weighing error*, *Spill / wastage*, *Topped up without recording*, *Jar not available*, or **Other** with a few words). One answer covers the whole count, so there is never a reason to type per jar. The box does not show which jar or by how much; the differences appear after the close, with your answer beside them on the till report.
+- **The one reason box** only appears when the count does not match: **The count doesn't match — what happened?** Pick what happened (*Weighing error*, *Spill / wastage*, *Topped up without recording*, *Jar not available*, or **Other** with a few words). One answer covers the whole count, so there is never a reason to type per jar. The box does not show which jar or by how much; the differences appear after the close, with your answer beside them on the till report. If nobody knows what happened, tap **Continue without a reason**: the close carries on, and the manager sees the count as unexplained.
 
 Then comes the blind cash count, pot by pot:
 
@@ -120,12 +120,13 @@ Then comes the blind cash count, pot by pot:
 - **Bar** and **Fees:** each has **Count now** or **Not counted today**. Your club chooses which is ticked by default.
 - A pot that is **not counted today carries forward:** its money is added to the next day, and the screen shows how long since it was last counted. When someone does count it, the difference covers everything since the last count.
 
-![The blind cash count: the Dispensary pot including the float, then Count now or Not counted today for Bar and Fees.](img/cash-at-the-counter/u08c.jpg)
+![The blind cash count: the Dispensary pot including the float, Count now or Not counted today for Bar and Fees, and an optional note.](img/cash-at-the-counter/u08c.jpg)
 
-*The blind cash count: the Dispensary pot including the float, then Count now or Not counted today for Bar and Fees.*
+*The blind cash count: the Dispensary pot including the float, Count now or Not counted today for Bar and Fees, and an optional note.*
 
 - A small difference is recorded as it is.
-- If the difference is larger than the club allows, the **Note** becomes required. Say what you know, even *"don't know"*.
+- **Want to leave a note? (optional)** sits under the count. A note is never required and a difference never stops the till closing. If you know why the cash is off (a supplier paid, change given wrongly), say so: it is what the manager reads first. A difference larger than the club allows is recorded for the owner either way.
+- If closing fails because of a system error, the screen says so (*"The till couldn't be closed because of a system error. It has been reported."*). Try again, or tell the manager. It is never your count's fault.
 - Every expense and movement of the day is listed with its reason and who recorded it, so a manager can trace any difference later.
 
 ## 7. For managers: expenses and till reports in Administration
@@ -146,13 +147,15 @@ Costs that are **not** paid from the drawer (rent, utilities, suppliers paid by 
 
 > **Staff pay:** the form carries a notice that recording a payment to staff here only documents it. It does not deal with payroll, tax withholding or social security; the treasurer or gestor must handle those separately.
 
-**Reports → Tills** shows every till session for a period: who opened it, the float, the expected and counted cash, the variance and the status, plus the variance by operator. With separate pots, the headline figures are the Dispensary pot, and Bar and Fees have their own columns, including when they were not counted.
+**Reports → Tills** shows every till session for a period, newest first: who opened it, the float, the expected and counted cash, the variance and the status, plus the variance by operator. With separate pots, the headline figures are the Dispensary pot, and Bar and Fees have their own columns, including when they were not counted.
+
+Closing a till is never blocked by a difference, so this report is where you find them. Tick **Only with a difference** to list only the closes beyond the club's tolerance; **Unexplained** (in amber) marks the ones closed without a note. Click a session's date to open the till, which starts with **Difference at close**: every pot's expected, counted and difference, the note (or *No note*) and the flower count's answer (or *No reason*). The Dashboard and the morning email say *"Closes with an unexplained difference: N this week"*, linking straight here.
 
 **Settings for each club** (*Locations → [club]*): **Separate cash pots** turns the three pots on or off, and **Count the bar / fees every night** sets whether those pots are ticked to be counted by default at closing.
 
-![Reports → Tills: sessions, expected and counted cash, and variance by operator.](img/cash-at-the-counter/c08.jpg)
+![Reports → Tills on Only with a difference: the closes beyond the tolerance, newest first, with Unexplained in amber beside the variance.](img/cash-at-the-counter/c08.jpg)
 
-*Reports → Tills: sessions, expected and counted cash, and variance by operator.*
+*Reports → Tills on Only with a difference: the closes beyond the tolerance, newest first, with Unexplained in amber beside the variance.*
 
 ## 8. Quick reference: Spanish screen words
 
@@ -172,6 +175,10 @@ Costs that are **not** paid from the drawer (rent, utilities, suppliers paid by 
 | Barra: esperado · Cuotas: esperado | Bar: expected · Fees: expected |
 | Dispensario contado (€) — con el fondo de caja | Dispensary counted (€) — including the float |
 | Contar ahora · No se cuenta hoy | Count now · Not counted today |
+| ¿Quieres dejar una nota? (opcional) | Want to leave a note? (optional) |
+| Seguir sin motivo | Continue without a reason |
+| Solo con diferencia · Sin explicar | Only with a difference · Unexplained |
+| Diferencia en el cierre · Sin nota · Sin motivo | Difference at close · No note · No reason |
 | Botes de efectivo separados | Separate cash pots |
 | Motivo | Reason |
 | Cambio de turno · Entregar la caja | Shift change · Hand over the till |

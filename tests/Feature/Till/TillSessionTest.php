@@ -23,7 +23,6 @@ use App\Support\TillSummary;
 use App\Support\ZReport;
 use Database\Seeders\RolePermissionSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use RuntimeException;
 use Tests\TestCase;
 
 class TillSessionTest extends TestCase
@@ -79,25 +78,21 @@ class TillSessionTest extends TestCase
         (new OpenTill)->handle($this->location, 'POS-1', 10000);
     }
 
-    public function test_blind_close_reveals_variance_and_requires_a_note_beyond_tolerance(): void
+    public function test_blind_close_reveals_variance_and_never_requires_a_note(): void
     {
-        // Within tolerance (default €5) → no note required.
+        // Within tolerance (default €5) → closes, nothing to flag.
         $ok = (new OpenTill)->handle($this->location, 'POS-1', 10000);
         $closed = (new CloseTill)->handle($ok, 10000, $this->manager());
         $this->assertSame(0, $closed->variance_cents->cents);
         $this->assertSame(TillSessionStatus::CLOSED, $closed->status);
+        $this->assertFalse($closed->closedBeyondTolerance());
 
-        // Beyond tolerance without a note → refused.
+        // Beyond tolerance without a note → closes all the same (prompt 366), and is flagged for the owner.
         $over = (new OpenTill)->handle($this->location, 'POS-2', 10000);
-        try {
-            (new CloseTill)->handle($over, 12000, $this->manager()); // €20 over
-            $this->fail('A note should be required.');
-        } catch (RuntimeException) {
-            // expected
-        }
-        // With a note → accepted.
-        $closedOver = (new CloseTill)->handle($over, 12000, $this->manager(), 'Miscount corrected next shift');
+        $closedOver = (new CloseTill)->handle($over, 12000, $this->manager()); // €20 over
         $this->assertSame(2000, $closedOver->variance_cents->cents);
+        $this->assertSame(500, $closedOver->variance_tolerance_cents);
+        $this->assertTrue($closedOver->closedUnexplained());
     }
 
     public function test_a_closed_session_rejects_new_movements_and_commits(): void

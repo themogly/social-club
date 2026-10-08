@@ -3,7 +3,7 @@ title: Manager guide
 summary: Strains, batches, moving stock, bar products, settings, and the daily and weekly routine.
 audience: managers
 order: 4
-updated: 2026-10-07
+updated: 2026-10-08
 ---
 
 > This guide is for owners and managers. Staff work at the counter; stock, prices, products and checks happen in **Administration**. Everything you change there is recorded in the audit log with your name.
@@ -252,7 +252,7 @@ Before the reserve existed, each evening count took the sealed bags out of stock
 |---|---|---|
 | Start of day | Alerts: tills not closed, stock above the legal ceiling, anything red | **Dashboard** |
 | Start of day | Applications waiting for approval | **Applications**, or the counter's bell |
-| Start of day | Yesterday's tills are closed, and any variance has a note | **Reports → Tills** |
+| Start of day | Yesterday's tills are closed; any close with an unexplained difference (Dashboard: *Closes with an unexplained difference*) | **Reports → Tills** · *Only with a difference* |
 | During the day | Strains or products running low: move stock from the store, or restock | **Batches** (Assign to location) · **Products** (Restock) |
 | End of day | Every till closed, and everyone clocked out | Counter **Till** screen · **Reports → Staff hours** |
 
