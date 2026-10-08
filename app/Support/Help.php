@@ -520,6 +520,23 @@ class Help
                 ]],
             ],
         ],
+        // Prompt 371 — the counter's day sheet (Liam: "not knowing how to double-check sheet vs iPad").
+        'today-sheet' => [
+            'permission' => 'pos.use',
+            'title' => 'Cuadrar el día con la hoja',
+            'intro' => 'Pulsa «Hoy» en el inicio del mostrador para ver todo lo del día en esta sede, en el orden de la hoja de papel, con los totales al final.',
+            'steps' => [
+                ['title' => 'Abre el día', 'body' => [
+                    'En el inicio, el recuadro «Hoy» (o el botón «Hoy», o «Ver el día» en Caja) abre la hoja del día: cada operación, de la más antigua a la más reciente, con la hora, el socio, lo que se llevó (gramos pesados y, si cambia, lo que se cobra), quién atendió y, para quien ve informes, el importe y cómo se pagó.',
+                ]],
+                ['title' => 'Compara con la hoja de papel', 'body' => [
+                    'Abajo están los totales: número de operaciones, gramos por variedad, unidades, productos de barra y tienda y, para quien ve informes, el importe en efectivo, monedero y cuenta. Las anuladas salen tachadas con su motivo y no cuentan. El número de operaciones es el mismo que «Operaciones» en el inicio.',
+                ]],
+                ['title' => 'Filtra, imprime o descarga', 'body' => [
+                    'Filtra por Dispensario o Barra, por quién atendió («Solo lo mío») o por socio. Toca una operación para ver su recibo. «Imprimir» saca la hoja limpia; «Descargar (CSV)» es para quien puede exportar informes.',
+                ]],
+            ],
+        ],
         'till-day' => [
             'permission' => 'till.open',
             'title' => 'Abrir y cerrar la caja',

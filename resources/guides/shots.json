@@ -360,6 +360,15 @@
                 1000
             ],
             "panel": true
+        },
+        "counter-quick-start/11-today-sheet.jpg": {
+            "url": "/counter/hoy",
+            "account": "manager",
+            "viewport": [
+                1180,
+                820
+            ],
+            "openTill": true
         }
     }
 }

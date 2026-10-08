@@ -136,7 +136,10 @@
                 </section>
                 @endif
 
-                <section data-panel="today" class="rounded-2xl border border-line bg-surface p-5 dark:border-slate-800 dark:bg-slate-900">
+                {{-- Prompt 371 — the whole panel opens the day's sheet (Liam: "we just click on Today"), for whoever can open it. --}}
+                @php($todaySheet = $this->userCan('pos.use') || $this->userCan('pos.bar'))
+                <{{ $todaySheet ? 'a' : 'section' }} @if ($todaySheet) href="{{ route('counter.today') }}" @endif data-panel="today"
+                    @class(['block rounded-2xl border border-line bg-surface p-5 dark:border-slate-800 dark:bg-slate-900', 'transition hover:border-brand hover:bg-brand-tint/40 dark:hover:bg-slate-800' => $todaySheet])>
                     <h2 class="text-xs font-semibold uppercase tracking-wide text-ink-muted dark:text-slate-400">{{ __('Hoy') }}</h2>
                     <dl class="mt-2 space-y-1.5 text-sm">
                         @if ($this->receptionEnabled())
@@ -164,7 +167,10 @@
                             </div>
                         @endif
                     </dl>
-                </section>
+                    @if ($todaySheet)
+                        <p data-today-link class="mt-3 text-sm font-semibold text-brand dark:text-slate-100">{{ __('Ver el día') }} <span aria-hidden="true">→</span></p>
+                    @endif
+                </{{ $todaySheet ? 'a' : 'section' }}>
 
                 {{-- NEEDS ATTENTION — exactly what Dashboard::alerts() returns, not a list chosen here, and
                      each item leads somewhere. An alert you cannot act on is decoration. --}}

@@ -6,8 +6,8 @@
      route — the route, its Gate::authorize and the emailed link are all untouched; only WHERE it is shown
      changes. `Imprimir` calls the IFRAME's print(), so the ticket prints exactly as it did in a tab.
 
-     ONE component, two consumers (the dispensary POS and the bar POS). A third POS must reuse it, not hand-roll
-     a second — `ReceiptSheetConsumersTest` enforces that.
+     ONE component, two consumers (the dispensary POS and the bar POS) — and the day sheet (371), whose rows open it with
+     their own URL through the `counter-receipt-open` event. A third POS must reuse it, not hand-roll a second.
 
      `x-show`, never `x-if` (prompt 245): this renders inside a Livewire-morphed POS view, and an `x-if` clone
      is owned by neither Livewire nor Alpine, so a morph duplicates it. The markup is present once and toggled.
@@ -23,12 +23,14 @@
 
 <div
     data-receipt-sheet
-    x-on:counter-receipt-open.window="open()"
+    x-on:counter-receipt-open.window="open($event.detail?.url)"
     x-data="{
         isOpen: false,
         src: 'about:blank',
         base: @js($url),
-        open() {
+        open(url = null) {
+            {{-- Prompt 371 — the day sheet's rows each open their OWN receipt: the event may carry its URL. --}}
+            if (url) this.base = url;
             {{-- `embedded=1` tells the receipt page to hide its own 'Volver al mostrador' bar (prompt 252 §2):
                  inside the sheet the way back is Cerrar, and a link that navigated the IFRAME would be broken. --}}
             this.src = this.base + (this.base.includes('?') ? '&' : '?') + 'embedded=1';
