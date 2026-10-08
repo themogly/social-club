@@ -215,6 +215,56 @@ window.bringIntoView = (el) => {
     el.focus({ preventScroll: true });
 };
 
+// Prompt 368 — Existencias' action panel: choose the action, then the amount. The figures are read from the panel's data-* (a
+// fresh render updates them), and the confirm button says the result («Rellenar 10.00 g → bote 12.80 g»). Labels are the
+// server's translated templates; the server still validates and refuses everything.
+window.stockActionPanel = (config = {}) => ({
+    labels: config.labels ?? {},
+    unitWord: config.unitWord ?? [':count', ':count'],
+    action: null,
+    value: '',
+    reason: null,
+    other: '',
+    addReason: '',
+    get unit() { return this.$root.dataset.unit === '1'; },
+    get jar() { return parseInt(this.$root.dataset.jar ?? '0', 10) || 0; },
+    get reserve() { return parseInt(this.$root.dataset.reserve ?? '0', 10) || 0; },
+    // The typed amount in centigrams (or units), null while nothing usable is typed.
+    get cg() {
+        if (this.value === '' || this.value === '.') return null;
+        const n = Number(this.value);
+        if (!Number.isFinite(n)) return null;
+        return this.unit ? Math.trunc(n) : Math.round(n * 100);
+    },
+    choose(action) { this.action = action; this.value = ''; this.reason = null; this.other = ''; },
+    back() { this.action = null; this.value = ''; this.reason = null; },
+    push(d) {
+        if (d === '.' && (this.unit || this.value.includes('.'))) return;
+        if (this.value.includes('.') && this.value.split('.')[1].length >= 2) return;
+        if (this.value.length < 7) this.value += d;
+    },
+    erase() { this.value = this.value.slice(0, -1); },
+    fmt(n) {
+        if (this.unit) return (Math.abs(n) === 1 ? this.unitWord[0] : this.unitWord[1]).replace(':count', String(n));
+        return (n / 100).toFixed(2) + ' g'; // prompt 316: a decimal point, always
+    },
+    signed(n) { return (n > 0 ? '+' : n < 0 ? '−' : '±') + this.fmt(Math.abs(n)); },
+    label(action) {
+        const amount = this.cg ?? 0;
+        const jar = action === 'top-up' ? this.jar + amount : action === 'move' ? this.jar - amount : this.jar;
+        return (this.labels[action] ?? '')
+            .replace(':amount', this.fmt(amount))
+            .replace(':jar', this.fmt(Math.max(0, jar)))
+            .replace(':diff', this.signed(amount - this.jar));
+    },
+    // After the server answers: a confirmation means it was done — back to the list; a refusal keeps what was typed.
+    run(call) {
+        Promise.resolve(call).then(() => {
+            if (this.$wire.confirmation) { this.back(); this.other = ''; this.addReason = ''; }
+        });
+    },
+});
+
 window.dispensaryPad = (config = {}) => ({
     value: config.value ?? '',
     calc: !! config.calc && !! config.calcEnabled,

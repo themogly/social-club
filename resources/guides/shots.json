@@ -233,6 +233,15 @@
                 },
                 {
                     "wait": 600
+                },
+                {
+                    "fill": [
+                        ".fi-modal-window input[inputmode=\"decimal\"]",
+                        "6.80"
+                    ]
+                },
+                {
+                    "wait": 1500
                 }
             ]
         },

@@ -191,7 +191,7 @@ class StockScreenTest extends TestCase
         $this->setRolePermission(Role::STAFF, 'stock.take', false);
         $batch = $this->batch($this->amnesia, 2000);
         $screen = $this->screen($this->user(Role::STAFF))->call('openBatch', $batch->id)->assertDontSeeHtml('data-action-weigh')
-            ->assertSeeHtml('data-action-top-up');
+            ->assertSeeHtml('data-action-move'); // 368: no reserve here, so «Rellenar» is not offered — «Pasar a reserva» is
 
         $screen->call('updateJarWeight', '18', 'WEIGHING_ERROR')->assertSet('flashType', 'error');
         $this->assertSame([2000, 0], $this->figures($batch));
@@ -369,5 +369,32 @@ class StockScreenTest extends TestCase
         $this->screen($staff, ['lote' => $mine->id])->assertSet('openBatchId', $mine->id);
         $this->screen($staff, ['lote' => $theirs->id])->assertSet('openBatchId', null);
         $this->screen($staff, ['lote' => '01jzzzzzzzzzzzzzzzzzzzzzzz'])->assertSet('openBatchId', null);
+    }
+
+    // --- Prompt 368 — action first, only what applies ------------------------------------------------------------------------
+
+    public function test_the_panel_offers_only_the_actions_that_apply_and_says_when_there_is_no_reserve(): void
+    {
+        $noReserve = $this->batch($this->amnesia, 2000);
+        $screen = $this->screen($this->user(Role::MANAGER, '2345'))->call('openBatch', $noReserve->id);
+        $screen->assertDontSeeHtml('data-action-top-up')->assertSeeHtml('data-action-move')->assertSeeHtml('data-action-weigh')
+            ->assertSeeHtml('data-action-add-reserve')->assertSeeHtml('data-no-reserve')->assertSee('Sin reserva sellada');
+
+        $emptyJar = $this->batch($this->amnesia, 0, 3000);
+        $screen->call('openBatch', $emptyJar->id)->assertSeeHtml('data-action-top-up')->assertDontSeeHtml('data-action-move')
+            ->assertSee('Toda la reserva (30.00 g)')->assertDontSeeHtml('data-no-reserve');
+    }
+
+    public function test_each_action_has_one_confirm_button_labelled_with_the_result_template(): void
+    {
+        $batch = $this->batch($this->amnesia, 280, 3000);
+        $html = $this->screen($this->user(Role::MANAGER, '2345'))->call('openBatch', $batch->id)->html();
+
+        foreach (['top-up', 'move', 'weigh', 'add-reserve'] as $action) {
+            $this->assertSame(1, substr_count($html, 'data-action-confirm="'.$action.'"'), $action);
+        }
+        // The browser fills each label from the server's template (tests/Browser/prove-368-stock.mjs proves the filled result
+        // and the write); the old one-pad-for-four panel had no such buttons.
+        $this->assertStringContainsString('window.stockActionPanel', $html);
     }
 }

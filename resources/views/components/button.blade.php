@@ -1,6 +1,6 @@
 @props([
     'variant' => 'primary',   // primary | secondary | danger | danger-soft | warning
-    'size' => 'md',           // sm | md | lg | xl  (height/padding — counter screens use lg/xl)
+    'size' => 'md',           // sm | md | lg | xl | wrap  (height/padding — counter screens use lg/xl)
     'href' => null,           // when set, renders an <a> instead of a <button>
     'as' => null,             // 'label' — a button-looking <label> wrapping a visually hidden file input (prompt 272)
 ])
@@ -35,6 +35,9 @@
         'md' => 'h-12 px-6 text-base',
         'lg' => 'h-14 px-6 text-base',
         'xl' => 'h-16 px-6 text-lg font-bold',
+        // Prompt 368 — a label that may wrap (Existencias on an iPhone): at least lg's height, and it GROWS with the text
+        // instead of spilling out of a fixed box.
+        'wrap' => 'min-h-14 px-4 py-2 text-base text-center leading-snug',
     ];
 
     $classes = $base.' '.($variants[$variant] ?? $variants['primary']).' '.($sizes[$size] ?? $sizes['md']);

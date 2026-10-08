@@ -310,6 +310,26 @@
                         {{-- Prompt 364 — the reserve's moves (Rellenar, Toda la reserva, Pasar a reserva) live on «Existencias» now: selling
                              and stock work are two places (Ben). The strain still shows «Reserva: X g» in its card. --}}
 
+                        {{-- Prompt 368 — more than is dispensable for this line: said HERE, by the button (275), the typed value kept to
+                             correct; the one-tap fix takes what there is, and a sealed reserve offers «Rellenar» on Existencias
+                             (364's link — the basket and the socio are held for the way back). --}}
+                        @if ($stockShort)
+                            <div data-stock-short role="alert" class="mt-4 rounded-xl border border-error/30 bg-error/10 px-4 py-3 text-sm dark:border-error/40 dark:bg-error/15">
+                                <p class="font-semibold text-error">{{ $stockShort['message'] }}</p>
+                                @if ($stockShort['reserve'] && $stockShort['reserve_batch_id'])
+                                    <p class="mt-1 flex flex-wrap items-center gap-x-2 text-ink dark:text-slate-200">
+                                        <span>{{ $stockShort['reserve'] }}</span>
+                                        <span aria-hidden="true">·</span>
+                                        <a href="{{ route('counter.stock', ['lote' => $stockShort['reserve_batch_id'], 'from' => 'pos']) }}" data-stock-short-top-up
+                                           class="inline-flex min-h-11 items-center font-semibold text-brand underline underline-offset-2 dark:text-slate-100">{{ __('Rellenar') }}</a>
+                                    </p>
+                                @endif
+                                @if ($stockShort['fix'])
+                                    <x-button variant="secondary" size="lg" class="mt-2 w-full" wire:click="addAvailable" data-stock-short-fix>{{ $stockShort['fix'] }}</x-button>
+                                @endif
+                            </div>
+                        @endif
+
                         {{-- One request in flight: only this button shows a loading state, and a double tap adds one line. --}}
                         {{-- Prompt 358 — the same pad edits a basket line (tap the line): the button then says so. --}}
                         <x-button size="lg" class="mt-4 w-full" data-add-line @click="add()" x-bind:disabled="adding" x-bind:aria-busy="adding">{{ $editingLine !== null ? __('Actualizar') : __('Añadir a la cesta') }}</x-button>

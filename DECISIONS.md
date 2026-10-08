@@ -21203,3 +21203,121 @@ Sentry, 8 October, `GET /documentos/registro-dispensacion`:
 
 - A code fix only: no data to change.
 - Until it is deployed, the register for any month with a raised price (October) keeps failing.
+## Prompt 368 — stock amounts staff can read: warn before adding more than the jar holds, one action at a time in *Existencias*, and *Ajuste* as "now / new total"
+
+From Ben's iPhone screenshots of live and a video from the club (Ste, 8 October).
+
+### 1. The dispensary checks the amount when a line is added
+
+- **Before:** `addLine()` only checked that SOME stock existed. 4 g of a 2.80 g strain went into the basket as 400 cg,
+  with no message (pinned red by `AddTimeStockCheckTest`), and the amount was only checked at commit, after the signature
+  and payment.
+- **Now, on Añadir, Actualizar and a merge (358),** the line's RESULTING amount is compared with what is dispensable for
+  it at this sede:
+  - an edit counts the new amount, and a merge the line's total;
+  - in automatic mode, the strain's FEFO total across open, unexpired batches; for a manual lote, that lote's own stock;
+  - in both cases less what the OTHER basket lines already take from it (the line being edited or merged into is not
+    counted twice);
+  - weight in centigrams, unit products in units.
+- **More than that is not added.** `DispensaryPos::$stockShort` carries what to say, and the weight panel shows it **by
+  the button** (the 275 rule), keeping the typed value:
+  - «Solo hay 2.80 g en el bote.» / «Solo quedan 3 uds.»;
+  - with a sealed reserve (359): «Hay 30.00 g en reserva · Rellenar», linking to Existencias on the oldest batch with a
+    reserve, through 364's link, so the basket and socio are held for the way back;
+  - the one-tap fix «Añadir 2.80 g» (on an edit, «Actualizar a 2.80 g»; on a merge, what is left: «Añadir 0.80 g»),
+    through the same `addLine()` (`addAvailable()`). There is no fix button when nothing is left.
+- **The commit's own stock check is unchanged** and stays the guard: stock can still move between the add and the
+  commit.
+- Palette only: `text-error` on `bg-error/10`, `text-brand` for the link (`dark:text-slate-100`).
+
+### 2. *Existencias*: choose the action first, then the amount
+
+- **Before:** one keypad fed four actions with nothing saying which; *Rellenar* and *Toda la reserva* showed (dimmed)
+  with a 0.00 g reserve; and on a 393 px iPhone the labels wrapped onto three lines and spilled out of their fixed-height
+  buttons.
+- **Now the panel opens on the figures and a list of the actions this person can do on this batch**, as full-width
+  buttons:
+  - «Rellenar el bote» (only with a reserve);
+  - «Pasar a reserva» (only with something in the jar);
+  - «Corregir peso del bote» («Corregir unidades del bote» for units);
+  - «Añadir a la reserva».
+- **No reserve:** the figures say «Sin reserva sellada», and *Rellenar* is not offered. Nothing to do at all: «No hay
+  nada que puedas hacer con este lote.»
+- **Tapping an action shows only its controls:**
+  - its own keypad;
+  - «Toda la reserva (30.00 g)» for *Rellenar*;
+  - the reason picks for *Corregir* (a pick, or «Otro motivo…»; still none for a `reasons.optional` holder);
+  - the reason box for *Añadir a la reserva*;
+  - **one confirm button whose label is the result**: «Rellenar 10.00 g → bote 12.80 g», «Pasar 5.00 g a reserva →
+    bote …», «Corregir a 2.50 g (−0.30 g)», «Añadir 50.00 g a la reserva»;
+  - «← Otra acción».
+- **How it works:** the labels are the server's translated templates, filled in the browser (`window.stockActionPanel`,
+  `resources/js/app.js`) from the panel's `data-jar` / `data-reserve`, which a fresh render updates. After a
+  confirmation the panel goes back to the list; a refusal keeps what was typed.
+- **The server is unchanged:** the same Livewire methods, each refusing what it always refused (an empty reserve, more
+  than the jar, a missing permission or reason).
+- **The overflow fix is a shared button size, not a one-off:** `x-button size="wrap"` is at least lg's 56 px and grows
+  with a label that wraps. The fixed `h-14` was what made the labels spill.
+- **The jar figure keeps «En el bote» ("In the jar")**, not «Bote» alone, which already means "Pot" (the cash pot) in
+  English.
+
+### 3. *Ajuste* in the panel: now, then New total / Add / Remove, always positive
+
+- **Before:** one signed field, «Ajuste (g)», with «Usa un valor negativo para restar.». An iPhone's decimal keypad has
+  no minus key, so on a phone it could not reduce stock at all.
+- **Now (Ben: "current total and an option to add or take off underneath"):**
+  - «¿Qué corriges?» (El bote / La reserva sellada), then **«Ahora: bote 2.80 g»** for the chosen figure;
+  - **Nuevo total** (the default), **Añadir** or **Quitar** (Filament `ToggleButtons`);
+  - **the amount is always positive** (`minValue(0)`; a typed «-1» is refused). Nuevo total takes 0, to empty a jar;
+  - **a live preview:** «2.80 g → 6.80 g (+4.00 g)», or «No puede quedar por debajo de 0.»;
+  - **the one-tap reasons** «Error al pesar», «Derrame / merma», «Recuento», «Otro» (with a line). A `reasons.optional`
+    holder is not asked and records «Aprobado por responsable» (356);
+  - **the submit button reads «Guardar ajuste».**
+- **`App\Actions\Stock\AdjustBatch`** computes the difference **against the locked current figure** (as `RecountBatch`
+  does), so a sale between opening the form and saving it is not counted twice: Nuevo total 6.00 with 2 g sold
+  meanwhile records −2.00 g, not −4.00 g.
+  - It writes the same single ADJUSTMENT through `RecordStockMovement` (the reserve's `on_reserve`), refuses a result
+    below 0, and writes nothing for a zero difference («Sin cambios»).
+  - The audit trail is the stock movement, as before.
+- **Other stock forms checked:**
+  - *Merma* is subtraction only (it already forces the sign);
+  - the bar/shop article form has only *Reponer* (an INTAKE, units ≥ 1);
+  - *Recuento* already takes the counted figure.
+  - None asks for a negative; nothing else changed.
+
+### Tests and proof
+
+- **`tests/Feature/Counter/AddTimeStockCheckTest.php`** (7), all seen red first (400 cg added, no message):
+  - 4 g of 2.80 g → basket unchanged, the message inside the weight panel, and «Añadir 2.80 g» adds exactly 280 cg;
+  - with a reserve, «Rellenar» links to Existencias;
+  - a merge (2 g + 1 g) is refused, and the fix tops the line up to 280 cg;
+  - an edit to 3 g is refused, with «Actualizar a 2.80 g»;
+  - a manual lote is checked against its own 1.50 g;
+  - units: 4 of 3 → «Solo quedan 3 uds.» and «Añadir 3 uds».
+- **`StockScreenTest`** (+2, red against the old panel):
+  - only the actions that apply, «Sin reserva sellada», «Toda la reserva (30.00 g)»;
+  - one confirm button per action.
+  - One older assertion now expects «Pasar a reserva» rather than «Rellenar» on a batch with no reserve.
+- **`tests/Feature/Stock/AjusteNowAndNewTotalTest.php`** (7; six red against the old form):
+  - «Ahora» and the preview;
+  - Nuevo total 2.80 → 6.80 records +4.00 g; Añadir 1.5 records +1.50 g; Quitar 0.3 records −0.30 g;
+  - Quitar 5 on 2.80 is refused;
+  - «-1» is refused, and Nuevo total 2.5 reduces;
+  - the reserve works the same way;
+  - a concurrent sale is not double-counted;
+  - a `reasons.optional` holder is not asked.
+  - 360's *Ajuste* test now uses Añadir / Quitar.
+- **`tests/Browser/prove-368-stock.mjs`**, on a throwaway `csc:seed-staging` DB plus a 2.80 g + 30 g «Polen de casa»:
+  - passed 27/27 in each of en/es × light/dark (393×852 and 1180×820), and 11/11 for the Existencias part at a larger
+    text size (root 118%), in en and es;
+  - every button and link in the panel stays inside its box and is at least 44 px tall;
+  - choosing *Corregir peso* writes 2.50 g;
+  - the *Ajuste* preview shows.
+  - The harness runs into the login rate limit after about four runs in a row: wait between runs.
+- Screenshots are in `storage/app/screenshots/368/`.
+
+### Guides
+
+- `counter-quick-start.md`: «More than there is?», and the action-first Existencias with its words.
+- `manager-guide.md`: *Ajuste* as now / new total / add / remove, and the table row.
+- `04b-top-up` and `c09b-adjust` were retaken through `shots.json` (c09b now types 6.80 to show the preview).
