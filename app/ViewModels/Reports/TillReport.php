@@ -82,7 +82,7 @@ class TillReport extends AbstractReport
         [$start, $end] = $this->bounds();
 
         $sessions = TillSession::query()->withoutGlobalScopes()
-            ->with('openedBy')
+            ->with(['openedBy', 'closedBy'])
             ->whereIn('location_id', $this->resolvedLocationIds())
             ->where('opened_at', '>=', $start)->where('opened_at', '<', $end)
             ->orderByDesc('opened_at')
@@ -109,7 +109,12 @@ class TillReport extends AbstractReport
                 'sort' => $session->opened_at?->getTimestamp() ?? 0,
                 'fecha' => $session->opened_at,
                 'fecha__url' => TillSessionResource::getUrl('view', ['record' => $session]),
-                'operador' => $z['operator'] ?? '—',
+                // Prompt 369 — who opened AND who counted: the difference is the shift's, but the owner asks whoever did the
+                // arqueo, so «Descuadre por quien hizo el arqueo» groups by the closer.
+                'operador' => $session->closed_by !== null
+                    ? __('Abrió: :opened · Cerró: :closed', ['opened' => $z['operator'] ?? '—', 'closed' => $session->closedBy->name ?? '—'])
+                    : __('Abrió: :opened', ['opened' => $z['operator'] ?? '—']),
+                'closer' => $session->closedBy->name ?? '—',
                 'terminal' => $session->terminal ?? '—',
                 'float' => (int) $z['float'],
                 'expected' => (int) $z['expected'],
@@ -130,7 +135,7 @@ class TillReport extends AbstractReport
                     : ($z['post_close_adjusted'] ? __('Cerrada (ajustada tras el cierre)') : __('Cerrada')),
                 'sin_explicar' => $session->closedUnexplained() ? __('Sin explicar') : '',
                 'sin_explicar__tone' => 'warning',
-                'operator_key' => $session->opened_by ?? 'none',
+                'operator_key' => $session->closed_by ?? 'none',
             ];
             $totals['float'] += (int) $z['float'];
             // The totals row reconciles the ARQUEO — the closed sessions (prompt 103): expected, counted and
@@ -153,7 +158,7 @@ class TillReport extends AbstractReport
             title: __('Arqueos de caja'),
             columns: [
                 ReportColumn::datetime('fecha', __('Apertura')),
-                ReportColumn::text('operador', __('Operador')),
+                ReportColumn::text('operador', __('Abrió / cerró')),
                 ReportColumn::text('terminal', __('Terminal')),
                 ReportColumn::money('float', __('Fondo')),
                 ReportColumn::money('expected', __('Esperado')),
@@ -181,7 +186,7 @@ class TillReport extends AbstractReport
         );
     }
 
-    // --- Variance by operator (closed sessions) -------------------------------------
+    // --- Variance by who counted (closed sessions; prompt 369) -----------------------
 
     private function varianceByOperator(ReportTable $sessions): ReportTable
     {
@@ -192,7 +197,7 @@ class TillReport extends AbstractReport
                 continue; // still open — no variance yet
             }
             $key = (string) $row['operator_key'];
-            $byOperator[$key] ??= ['operador' => (string) $row['operador'], 'sesiones' => 0, 'descuadre' => 0];
+            $byOperator[$key] ??= ['operador' => (string) $row['closer'], 'sesiones' => 0, 'descuadre' => 0];
             $byOperator[$key]['sesiones']++;
             $byOperator[$key]['descuadre'] += (int) $row['variance'];
         }
@@ -202,7 +207,7 @@ class TillReport extends AbstractReport
 
         return new ReportTable(
             key: 'by_operator',
-            title: __('Descuadre por operador'),
+            title: __('Descuadre por quien hizo el arqueo'),
             columns: [
                 ReportColumn::text('operador', __('Operador'), sortable: false),
                 ReportColumn::number('sesiones', __('Sesiones')),

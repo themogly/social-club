@@ -162,8 +162,16 @@ class StockScreen extends Component
             $diff = $batch->isUnitType() ? (($result['delta'] > 0 ? '+' : '').$result['delta'].' '.__('uds'))
                 : (($result['delta'] > 0 ? '+' : '').Weight::fromCentigrams($result['delta'])->formatted());
 
-            return trim(__('Peso actualizado: :diff · bote :jar', ['diff' => $diff, 'jar' => $jar])
-                .($result['absorbed'] > 0 ? ' · '.__('Rellenado sin registrar: :grams', ['grams' => Weight::fromCentigrams($result['absorbed'])->formatted()]) : ''));
+            // Prompt 369 — said by what happened, never a «0.00 g» adjustment: a surplus the reserve covered is a forgotten
+            // «Rellenar» (359), and only what is left over is an adjustment.
+            if ($result['absorbed'] > 0) {
+                return __('Bote :jar · :grams pasados desde la reserva (rellenado sin registrar)', ['jar' => $jar, 'grams' => Weight::fromCentigrams($result['absorbed'])->formatted()])
+                    .($result['delta'] !== 0 ? ' · '.__('ajuste :diff', ['diff' => $diff]) : '');
+            }
+
+            return $result['delta'] === 0
+                ? __('Sin diferencia · bote :jar', ['jar' => $jar])
+                : __('Peso actualizado: :diff · bote :jar', ['diff' => $diff, 'jar' => $jar]);
         });
     }
 

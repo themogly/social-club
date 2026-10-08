@@ -4,6 +4,7 @@ namespace Tests\Feature\Alerts;
 
 use App\Enums\Role;
 use App\Exceptions\TelegramTokenRejectedException;
+use App\Filament\Pages\SystemHealth as SystemHealthPage;
 use App\Jobs\SendTelegramMessage;
 use App\Mail\TelegramAlertByEmailMail;
 use App\Mail\TelegramDisconnectedMail;
@@ -14,17 +15,22 @@ use App\Support\ActiveScope;
 use App\Support\SentryScrubber;
 use App\Support\Telegram;
 use App\ViewModels\SystemHealth;
+use Carbon\CarbonImmutable;
 use Database\Seeders\RolePermissionSeeder;
+use Illuminate\Cache\Repository;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Client\ConnectionException;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Exceptions;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
+use Livewire\Livewire;
 use RuntimeException;
 use Sentry\Breadcrumb;
 use Sentry\Event;
 use Sentry\ExceptionDataBag;
+use Tests\Support\StringifyingStore;
 use Tests\TestCase;
 
 /**
@@ -197,5 +203,24 @@ class TelegramTokenRejectedTest extends TestCase
         $clean = SentryScrubber::handle($event);
         $this->assertStringNotContainsString(self::TOKEN, (string) $clean?->getExceptions()[0]->getValue());
         $this->assertStringNotContainsString(self::TOKEN, (string) $clean?->getMessage());
+    }
+
+    // 369 — Redis hands the flag back as a string: the health row must still show.
+    public function test_the_flag_reads_back_from_a_store_that_returns_numbers_as_strings_like_redis(): void
+    {
+        Cache::extend('stringifying', fn (): Repository => new Repository(new StringifyingStore));
+        config(['cache.stores.stringifying' => ['driver' => 'stringifying'], 'cache.default' => 'stringifying']);
+
+        $this->travelTo(CarbonImmutable::parse('2026-10-08 10:38:23'));
+        Telegram::markTokenRejected(401);
+        $this->assertIsString(Cache::get('telegram.token_rejected_at'), 'the double behaves as Redis does');
+
+        $this->assertSame(CarbonImmutable::parse('2026-10-08 10:38:23')->getTimestamp(), Telegram::tokenRejectedAt()?->getTimestamp());
+        $this->assertNotNull((new SystemHealth)->alerts()['telegram_rejected_at']);
+
+        $owner = User::factory()->create();
+        $owner->assignRole(Role::OWNER->value);
+        $this->assertStringContainsString(e(__('Token de Telegram rechazado — revisa TELEGRAM_BOT_TOKEN')),
+            Livewire::actingAs($owner)->test(SystemHealthPage::class)->html());
     }
 }

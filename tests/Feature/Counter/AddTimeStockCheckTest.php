@@ -117,7 +117,8 @@ class AddTimeStockCheckTest extends TestCase
         $pos->call('chooseGenetic', $this->genetic->id)->call('addLine', '1', 'grams');
 
         $this->assertSame([200], array_column($pos->get('basket'), 'grams_cg'), '2 g + 1 g on a 2.80 g jar is refused');
-        $pos->assertSee('Solo hay 2.80 g en el bote.')->assertSee('Añadir 0.80 g');
+        // 369 — the refusal says the basket already holds part of the jar.
+        $pos->assertSee('Ya tienes 2.00 g en la cesta: solo quedan 0.80 g en el bote.')->assertSee('Añadir 0.80 g');
         $pos->call('addAvailable');
         $this->assertSame([280], array_column($pos->get('basket'), 'grams_cg'));
     }
@@ -167,5 +168,18 @@ class AddTimeStockCheckTest extends TestCase
         $pos->assertSee('Solo quedan 3 uds.')->assertSee('Añadir 3 uds');
         $pos->call('addAvailable');
         $this->assertSame([3], array_column($pos->get('basket'), 'units'));
+    }
+
+    public function test_with_the_whole_jar_already_in_the_basket_the_refusal_says_so_and_keeps_rellenar(): void
+    {
+        $this->jar(280, 3000);
+        $pos = $this->pos();
+        $pos->call('chooseGenetic', $this->genetic->id)->call('addLine', '2.80', 'grams');
+        $pos->call('chooseGenetic', $this->genetic->id)->call('addLine', '1', 'grams');
+
+        $this->assertSame([280], array_column($pos->get('basket'), 'grams_cg'));
+        $pos->assertSee('Ya tienes 2.80 g en la cesta: no queda más en el bote.')
+            ->assertSeeHtml('data-stock-short-top-up')
+            ->assertDontSeeHtml('data-stock-short-fix'); // nothing left to take
     }
 }

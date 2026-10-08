@@ -109,12 +109,15 @@ class AjusteNowAndNewTotalTest extends TestCase
         $this->assertSame(__('Error al pesar'), StockMovement::query()->withoutGlobalScopes()->where('stockable_id', $batch->id)->latest('id')->first()->reason);
     }
 
-    public function test_taking_off_more_than_there_is_is_refused(): void
+    public function test_taking_off_more_than_there_is_is_refused_and_the_form_stays_open(): void
     {
-        $batch = $this->batch(280);
-        Livewire::test(ListBatches::class)->callTableAction('adjust', $batch, ['bucket' => 'jar', 'mode' => 'remove', 'amount' => '5', 'reason_pick' => 'weighing']);
+        // 369 — refused as a validation error under the amount (the modal stays open), not a notice that closes it.
+        $batch = $this->batch(800);
+        Livewire::test(ListBatches::class)->callTableAction('adjust', $batch, ['bucket' => 'jar', 'mode' => 'remove', 'amount' => '50', 'reason_pick' => 'weighing'])
+            ->assertHasTableActionErrors(['amount'])
+            ->assertSet('mountedActions.0.name', 'adjust'); // still open
+        $this->assertSame(800, $batch->fresh()->remaining_cg->centigrams);
 
-        $this->assertSame(280, $batch->fresh()->remaining_cg->centigrams);
         $this->assertSame([], $this->adjustments($batch));
     }
 
