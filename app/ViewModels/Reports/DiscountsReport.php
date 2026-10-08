@@ -80,12 +80,17 @@ class DiscountsReport extends AbstractReport
     public function summary(): array
     {
         $t = $this->data()['totals'];
-        $given = $t['member_discounts'] + $t['overrides'] + $t['waivers'];
+        // Prompt 370 — the overrides split as the Consumption report shows them (one shared computation): given away counts
+        // towards «Total cedido»; a raised price is recovered, shown apart, and no longer nets the give-aways down.
+        [$start, $end] = $this->bounds();
+        $overrides = GivenAwayQueries::priceOverrideTotals($this->resolvedLocationIds(), $start, $end);
+        $given = $t['member_discounts'] + $overrides['given'] + $t['waivers'];
         $share = $t['takings'] > 0 ? (int) round($given / $t['takings'] * 100) : 0;
 
         return [
             ['key' => 'member_discounts', 'label' => __('Descuentos de socio'), 'value' => Money::fromCents($t['member_discounts'])->formatted()],
-            ['key' => 'overrides', 'label' => __('Ajustes de precio'), 'value' => Money::fromCents($t['overrides'])->formatted(), 'tone' => $t['overrides'] > 0 ? 'warning' : 'success'],
+            ['key' => 'overrides', 'label' => __('Ajustes de precio: cedido'), 'value' => Money::fromCents($overrides['given'])->formatted(), 'tone' => $overrides['given'] > 0 ? 'warning' : 'success'],
+            ['key' => 'overrides_recovered', 'label' => __('Ajustes de precio: recuperado'), 'value' => Money::fromCents($overrides['recovered'])->formatted()],
             ['key' => 'waivers', 'label' => __('Cuotas condonadas'), 'value' => Money::fromCents($t['waivers'])->formatted(), 'tone' => $t['waivers'] > 0 ? 'warning' : 'success'],
             ['key' => 'manual_lines', 'label' => __('Líneas manuales'), 'value' => trans_choice(':count línea|:count líneas', $t['manual_count'], ['count' => $t['manual_count']]).' · '.Money::fromCents($t['manual'])->formatted()],
             ['key' => 'total_given', 'label' => __('Total cedido'), 'value' => Money::fromCents($given)->formatted().' · '.$share.' %'],

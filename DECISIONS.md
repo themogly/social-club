@@ -21133,3 +21133,73 @@ remove all these checks, as long as there's a log for the owner to see and they 
   That event will say what actually failed; tell me what it says.
 - **Owners and managers who take alerts** get «Cierres de caja con diferencia sin explicar» in the morning email. The
   first one of a week per sede is also announced on Telegram, like any new alert.
+
+## Prompt 370 — HOTFIX: the *Registro de dispensación* crashed on MySQL whenever a price was adjusted up
+
+Sentry, 8 October, `GET /documentos/registro-dispensacion`:
+
+> SQLSTATE[22003] 1690 BIGINT UNSIGNED value is out of range in `(original_total_cents - total_cents)`
+
+### Cause
+
+- `dispensations.original_total_cents` is **unsigned** (`2026_08_02_030000`); `total_cents` is signed.
+- `ConsumptionReport::priceOverrideValueCents()` summed `original_total_cents - total_cents` **in SQL**.
+- Since 356 an adjustment can raise the price, so the difference goes negative. MySQL evaluates `unsigned − signed` as
+  UNSIGNED, and a negative result is error 1690. One raised sale crashed the whole month's register and the consumption
+  report.
+- SQLite has no unsigned arithmetic, so every test passed: a false green.
+- **Reproduced locally on MySQL:** `UnsignedArithmeticTest` failed with exactly that error before the fix.
+
+### The rule: no SQL arithmetic on an unsigned column
+
+- **Sum the columns separately and subtract in PHP** (the prompt's recommended option; portable, no driver-aware
+  helper).
+- `GivenAwayQueries::priceOverrideTotals()` runs two aggregate queries over the completed, overridden sales in the
+  window:
+  - for the LOWERED rows (`total_cents < original_total_cents`): `given = SUM(original) − SUM(charged)`;
+  - for the RAISED rows: `recovered = SUM(charged) − SUM(original)`.
+  - Comparing an unsigned column with a signed one is safe in MySQL; only arithmetic overflows.
+- **The guard is `tests/Feature/Reports/UnsignedArithmeticTest`.** It reads every column a migration declares unsigned
+  and fails if any `DB::raw` / `selectRaw` / `whereRaw` / `orderByRaw` / `havingRaw` / `groupByRaw` string in `app/`
+  subtracts using one of them, on either side.
+  - It runs on SQLite, so the next one is caught in `composer check`, not in production.
+  - A planted `original_total_cents - total_cents` and a planted `grams_cg - charged_cg` are both flagged.
+- **The sweep:** the guard found exactly ONE such expression in `app/`, this one. Nothing else subtracts on an unsigned
+  column in SQL.
+
+### Given vs recovered
+
+- **Registro and *Consumo*:** the single «Ajustes de precio» chip is now two: **«Ajustes de precio: cedido»** (given
+  away, amber when above zero) and **«Ajustes de precio: recuperado»** (prices raised).
+- ***Descuentos y ajustes*:** its summary reads the SAME computation and shows the same two chips (keys `overrides` and
+  `overrides_recovered`).
+  - **«Total cedido» now counts only what was given away.** A raise no longer nets the give-aways down.
+  - The per-operator «Ajustes» columns are unchanged (the net per operator, as before).
+- Test 4 asserts the two reports agree.
+
+### For prompt 367 (the loss report)
+
+- `grams_cg − charged_cg` subtracts an **unsigned** column (`charged_cg`, 355).
+- It must not be computed in SQL. Sum `grams_cg` and `charged_cg` separately (per group if needed) and subtract in PHP,
+  or fetch the rows and subtract per row.
+- `UnsignedArithmeticTest` will fail the build otherwise.
+
+### Tests
+
+- **`UnsignedArithmeticTest`** (4): the register renders (200) with one sale lowered €30 → €25 and one raised €30 → €34,
+  given €5.00 and recovered €4.00; *Consumo* and *Descuentos* agree; the guard on a planted sample; the guard over
+  `app/`.
+- **Both drivers:**
+  - SQLite (`composer check`);
+  - MySQL locally, for the touched files only, because the prompt asked for it explicitly: `UnsignedArithmeticTest`
+    (red before with error 1690, green after), `DiscountsReportTest`, `PriceOverrideTest`, `ReportsTest`,
+    `ActiveSedeTest`, `RefundTest`, `ConsumptionLimitsSwitchTest`, `BatchNamesTest`, and the product-type tests.
+- **CI already runs the full MySQL suite** (`php artisan test -c phpunit.mysql.xml`, mysql:8.4) on every push and pull
+  request (`.github/workflows/ci.yml`), so this test is part of it with no change.
+- `DiscountsReportTest` and `PriceOverrideTest` now look for the «Ajustes de precio: cedido» label (same figures: their
+  fixtures only lower prices).
+
+### Ops (Ben)
+
+- A code fix only: no data to change.
+- Until it is deployed, the register for any month with a raised price (October) keeps failing.

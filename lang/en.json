@@ -219,6 +219,8 @@
     "Ajustes de avisos": "Notification settings",
     "Ajustes de la organización": "Organisation settings",
     "Ajustes de precio": "Price overrides",
+    "Ajustes de precio: cedido": "Price adjustments: given away",
+    "Ajustes de precio: recuperado": "Price adjustments: recovered",
     "Ajustes guardados": "Settings saved",
     "Al abrir la caja": "When the till was opened",
     "Al cambiarla, una declaración firmada existente quedará desactualizada y deberá regenerarse y volver a firmarse.": "Changing it leaves an existing signed declaration out of date; it must be regenerated and re-signed.",

@@ -166,7 +166,7 @@ class DiscountsReportTest extends TestCase
         $this->waiver($this->ana, 2000);
         $this->waiver($this->bruno, 3500);
 
-        $consumption = collect((new ConsumptionReport($this->org->id, [$this->centro->id], Period::today()))->summary())->firstWhere('label', __('Ajustes de precio'));
+        $consumption = collect((new ConsumptionReport($this->org->id, [$this->centro->id], Period::today()))->summary())->firstWhere('label', __('Ajustes de precio: cedido')); // 370: given and recovered apart
         $this->assertSame(Money::fromCents(600)->formatted(), $consumption['value']);
 
         $waived = collect((new FinancialReport($this->org->id, [$this->centro->id], Period::today()))->tables())->firstWhere('key', 'waived');
