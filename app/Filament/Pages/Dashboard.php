@@ -5,6 +5,7 @@ namespace App\Filament\Pages;
 use App\Enums\DashboardAlert;
 use App\Enums\Role;
 use App\Filament\Pages\Reports\FinancialReportPage;
+use App\Filament\Pages\Reports\LossesReportPage;
 use App\Filament\Pages\Reports\StockReportPage;
 use App\Filament\Resources\Batches\BatchResource;
 use App\Filament\Resources\Genetics\GeneticResource;
@@ -20,13 +21,14 @@ use App\Support\Period;
 use App\Support\Weight;
 use App\ViewModels\Dashboard as DashboardData;
 use App\ViewModels\DashboardCharts;
-use App\ViewModels\Reports\DiscountsReport;
+use App\ViewModels\Reports\LossesReport;
 use App\ViewModels\StaffHours;
 use Carbon\CarbonImmutable;
 use Filament\Actions\Action;
 use Filament\Pages\Dashboard as BaseDashboard;
 use Filament\Support\Icons\Heroicon;
 use Illuminate\Contracts\Support\Htmlable;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\HtmlString;
 
@@ -144,6 +146,7 @@ class Dashboard extends BaseDashboard
         $role = $this->roleFor($user);
         // Prompt 285 — staff hours, for holders of staff.hours.view (never STAFF): absent, not empty, without it.
         $staffHours = StaffHours::visibleOnDashboard($user) ? StaffHours::for($user, $period) : null;
+        $losses = $this->lossesYesterday($user, $data);
 
         return [
             'period' => $period,
@@ -156,11 +159,11 @@ class Dashboard extends BaseDashboard
             'data' => $data,
             'occupancy' => $occ = $charts->occupancy(),
             'stats' => $this->statCards($data, $charts, $period, $canSeeFinance),
-            'alerts' => $this->decorateAlerts(array_merge($data->alerts(), $this->staffAlerts($staffHours), $this->discountAlerts($user, $data), $this->tillCloseAlerts($user, $data))),
+            'alerts' => $this->decorateAlerts(array_merge($data->alerts(), $this->staffAlerts($staffHours), $this->lossAlerts($losses), $this->tillCloseAlerts($user, $data))),
             'staffHours' => $staffHours,
             'staffNow' => $staffHours?->now() ?? [],
             'ceilingHeadroom' => $data->ceilingHeadroom(),
-            'readouts' => $this->readouts($data, $period, $occ, $canSeeFinance),
+            'readouts' => $this->readouts($data, $period, $occ, $canSeeFinance, $losses),
             'comparisonRows' => $this->comparisonRows($charts->perLocationComparison($period), $canSeeFinance),
             'topDispensedRows' => $this->topDispensedRows($charts->dispensedByGenetic(6, $period), $canSeeFinance),
             'recentRows' => $this->recentRows($charts->recentTransactions(8, $period), $canSeeFinance),
@@ -246,23 +249,39 @@ class Dashboard extends BaseDashboard
     }
 
     /**
-     * Prompt 291 — operators above the discount threshold over the last 7 days (never the dashboard period), at the sedes
-     * this dashboard shows, for holders of reports.view only.
+     * Prompt 367 — yesterday's losses at the sedes this dashboard shows, ONE report split per sede (the readout and the alert
+     * both read it), for holders of reports.view / reports.view.all only; null for anyone else.
+     */
+    private function lossesYesterday(User $user, DashboardData $data): ?LossesReport
+    {
+        return $user->canAny(['reports.view', 'reports.view.all'])
+            ? LossesReport::forYesterday($data->organisationId, $this->dashboardSedes($data)->pluck('id')->values()->all())
+            : null;
+    }
+
+    /**
+     * Prompt 367 (291's discount alert, extended to every loss) — how many of those sedes went over their threshold % of the
+     * day's takings yesterday.
      *
      * @return list<array{severity: string, key: string, count: int}>
      */
-    private function discountAlerts(User $user, DashboardData $data): array
+    private function lossAlerts(?LossesReport $losses): array
     {
-        if (! $user->can('reports.view')) {
-            return [];
-        }
-
-        $ids = $data->locationIds ?? Location::query()->withoutGlobalScopes()->where('organisation_id', $data->organisationId)->sedes()->pluck('id')->all();
-        $count = DiscountsReport::operatorsAboveThreshold(array_values($ids));
+        $count = $losses !== null ? count($losses->sedesAboveThreshold()) : 0;
 
         return $count > 0
-            ? [['severity' => DashboardAlert::DISCOUNTS_ABOVE_THRESHOLD->severity(), 'key' => DashboardAlert::DISCOUNTS_ABOVE_THRESHOLD->value, 'count' => $count]]
+            ? [['severity' => DashboardAlert::LOSSES_ABOVE_THRESHOLD->severity(), 'key' => DashboardAlert::LOSSES_ABOVE_THRESHOLD->value, 'count' => $count]]
             : [];
+    }
+
+    /** @var Collection<int, Location>|null the sedes this render's dashboard shows (two rail sections read them) */
+    private ?Collection $sedes = null;
+
+    /** @return Collection<int, Location> the sedes this dashboard shows */
+    private function dashboardSedes(DashboardData $data): Collection
+    {
+        return $this->sedes ??= Location::query()->withoutGlobalScopes()->where('organisation_id', $data->organisationId)->sedes()
+            ->when($data->locationIds !== null, fn ($query) => $query->whereIn('id', (array) $data->locationIds))->get();
     }
 
     /**
@@ -277,9 +296,7 @@ class Dashboard extends BaseDashboard
             return [];
         }
 
-        $sedes = Location::query()->withoutGlobalScopes()->where('organisation_id', $data->organisationId)->sedes()
-            ->when($data->locationIds !== null, fn ($query) => $query->whereIn('id', (array) $data->locationIds))->get();
-        $count = $sedes->sum(fn (Location $sede): int => TillSession::unexplainedClosesThisWeek($sede));
+        $count = $this->dashboardSedes($data)->sum(fn (Location $sede): int => TillSession::unexplainedClosesThisWeek($sede));
 
         return $count > 0
             ? [['severity' => DashboardAlert::TILL_CLOSES_UNEXPLAINED->severity(), 'key' => DashboardAlert::TILL_CLOSES_UNEXPLAINED->value, 'count' => (int) $count]]
@@ -317,6 +334,7 @@ class Dashboard extends BaseDashboard
                 'articles_low_stock' => [trans_choice(':count producto de barra y tienda con stock bajo|:count productos de barra y tienda con stock bajo', $count, ['count' => $count]), Heroicon::OutlinedShoppingBag],
                 'staff_open_shifts', 'staff_unclocked_activity' => [(string) $case?->label($count), Heroicon::OutlinedClock],
                 'till_closes_unexplained' => [(string) $case?->label($count), Heroicon::OutlinedCalculator],
+                'losses_above_threshold' => [(string) $case?->label($count), Heroicon::OutlinedArrowTrendingDown],
                 default => [$case?->label($count) ?? __('Aviso'), Heroicon::OutlinedBell],
             };
 
@@ -331,7 +349,7 @@ class Dashboard extends BaseDashboard
      * @param  array{inside: int, capacity: ?int, fraction: ?float}  $occ
      * @return array<string, array{title: string, rows: list<array{label: string, value: string, href: ?string}>}>
      */
-    private function readouts(DashboardData $d, Period $period, array $occ, bool $finance): array
+    private function readouts(DashboardData $d, Period $period, array $occ, bool $finance, ?LossesReport $losses = null): array
     {
         $days = $d->daysOfInventory();
         $groups = [];
@@ -343,6 +361,12 @@ class Dashboard extends BaseDashboard
                 ['label' => __('Deuda de socios'), 'value' => Money::fromCents($d->walletDebtCents())->formatted(), 'href' => FinancialReportPage::getUrl()],
                 ['label' => __('Valor del stock'), 'value' => Money::fromCents($d->stockValueCents())->formatted(), 'href' => StockReportPage::getUrl()],
             ]];
+            // Prompt 367 — «Pérdidas ayer: €46.20 (3.1 %)», opening Pérdidas on that day; for those who may open it.
+            if ($losses !== null) {
+                $yesterday = $losses->dayFigures();
+                $groups['finanzas']['rows'][] = ['label' => __('Pérdidas ayer'), 'value' => Money::fromCents($yesterday['total'])->formatted().' ('.$yesterday['pct'].' %)',
+                    'href' => LossesReportPage::getUrl(['period' => 'yesterday']), 'data' => 'losses-yesterday'];
+            }
         }
 
         $groups['socios'] = ['title' => __('Socios'), 'rows' => [

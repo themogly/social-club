@@ -4,6 +4,7 @@ namespace App\Support\Alerts;
 
 use App\Enums\AlertType;
 use App\Enums\LocationKind;
+use App\Filament\Pages\Reports\LossesReportPage;
 use App\Filament\Pages\Reports\TillReportPage;
 use App\Models\Article;
 use App\Models\Batch;
@@ -14,6 +15,7 @@ use App\Models\TillSession;
 use App\Support\Period;
 use App\Support\Settings;
 use App\Support\StockCover;
+use App\ViewModels\Reports\LossesReport;
 use App\ViewModels\SystemHealth;
 
 /**
@@ -28,6 +30,8 @@ use App\ViewModels\SystemHealth;
  *  · tills open longer than `alerts_till_open_hours`;
  *  · prompt 366 — the sede's closes this week beyond the tolerance with no note (one alert per sede and week, its count
  *    refreshed each run), linking to Informes → Cajas on «Solo con diferencia»;
+ *  · prompt 367 — the sede's losses yesterday (Informes → Pérdidas) over its `losses_alert_threshold_pct` of the day's
+ *    takings (one alert per sede and day), linking to the report on that day;
  *  · the system — any heartbeat *Salud del sistema* grades red ({@see SystemHealth::heartbeats()}).
  *
  * `detail` carries names, quantities, sede names and times — never member data.
@@ -43,6 +47,7 @@ final class CurrentAlerts
             ...self::expiring($organisation),
             ...self::tills($organisation),
             ...self::unexplainedCloses($organisation),
+            ...self::losses($organisation),
             ...self::system(),
         ];
     }
@@ -187,6 +192,27 @@ final class CurrentAlerts
                     'subject' => 'till-closes:'.Period::thisWeek($sede)->start->toDateString(),
                     'location_id' => $sede->id,
                     'detail' => ['count' => $count, 'url' => TillReportPage::getUrl(['diferencia' => 1, 'period' => 'week'])],
+                ];
+            }
+        }
+
+        return $alerts;
+    }
+
+    /** @return list<array{type: AlertType, subject: string, location_id: ?string, detail: array<string, mixed>}> */
+    private static function losses(Organisation $organisation): array
+    {
+        $alerts = [];
+        $sedes = Location::query()->withoutGlobalScopes()->where('organisation_id', $organisation->id)->where('active', true)
+            ->where('kind', LocationKind::SEDE)->get();
+        foreach ($sedes as $sede) {
+            $day = LossesReport::yesterdayAboveThreshold($sede);
+            if ($day !== null) {
+                $alerts[] = [
+                    'type' => AlertType::LOSSES_ABOVE_THRESHOLD,
+                    'subject' => 'losses:'.$day['period']->start->toDateString(),
+                    'location_id' => $sede->id,
+                    'detail' => ['cents' => $day['total'], 'pct' => $day['pct'], 'url' => LossesReportPage::getUrl(['period' => 'yesterday', 'scope' => $sede->id])],
                 ];
             }
         }

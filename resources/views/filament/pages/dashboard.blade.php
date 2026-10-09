@@ -211,7 +211,7 @@
                     <x-dashboard.section :title="$group['title']">
                         <dl class="csc-readout">
                             @foreach ($group['rows'] as $row)
-                                <div class="csc-readout-row">
+                                <div class="csc-readout-row" @isset($row['data']) data-{{ $row['data'] }} @endisset>
                                     <dt>{{ $row['label'] }}</dt>
                                     <dd>
                                         @if (($row['href'] ?? '#') !== '#')

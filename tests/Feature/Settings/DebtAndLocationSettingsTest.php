@@ -190,6 +190,8 @@ class DebtAndLocationSettingsTest extends TestCase
             // Per-location bar cart panels (prompt 193): attaching a socio and the ticket reference are
             // per-sede input toggles on LocationForm, not org thresholds.
             'bar_attach_socio_enabled', 'bar_ticket_reference_enabled',
+            // Prompt 367 — the losses alert threshold: per sede and owner-only, on LocationForm (OWNER_INTEGERS).
+            'losses_alert_threshold_pct',
             // Per-location: the standalone Bar's default article layout for a fresh terminal (prompt 248),
             // a Select on LocationForm, not an org threshold.
             'bar_layout_default',

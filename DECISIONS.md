@@ -21736,3 +21736,118 @@ and the member's page still said the card went out.
   one-liner before it.
 - Fix each address in *Socios → editar*, then *Reenviar carné*.
 - **Horizon → Failed jobs** names the mailable (e.g. `App\Mail\MemberCardMail`).
+
+## Prompt 367 — *Pérdidas*: one report of everything that cost the club money, with who and why
+
+Ben: *"a decent report log for the owner to see when there's stuff down — lots of discount being added etc. — like a loss
+page, so they know how much is lost with people getting more bud"*. **Informes → Pérdidas** (`LossesReportPage`,
+`App\ViewModels\Reports\LossesReport`): the shared report surface (period, sede, `reports.view` / `reports.view.all`,
+CSV/PDF). It reads existing records and stores nothing new.
+
+### What counts as a loss, and what doesn't
+
+Every event carries a **signed** amount: positive is money lost, negative is an offset that subtracts.
+
+- **Counted:**
+  - price adjustments down;
+  - whole-euro rounding, net (what members kept minus what was taken);
+  - waived fees;
+  - *Peso de más*: weighed − charged on each weight line, at that line's own `price_per_gram_cents`;
+  - merma;
+  - adjustments down (*Ajuste*, *Actualizar peso*);
+  - shortfalls at the end-of-day weigh (`till_recount`) and in *Inventario*;
+  - till shortfalls, per counted box;
+  - refunds;
+  - voided dispensations and bar orders.
+- **Offsets (subtract):** adjustments **up** (356), shown as *recuperado*; rounding taken; grams charged over the weight;
+  stock adjustments and counts up; till surpluses.
+- **Beside the total, never in it:** member discounts. They are agreed policy, not a loss, so they show next to the
+  headline, with the staff member's own apart.
+- **Not read at all:**
+  - *Rellenado sin registrar* and every other move inside a batch: `RESERVE_*` rows, which net to zero;
+  - stock movements carrying a `reference`: a void's or a refund's stock coming back, or a refund's merma. Each is
+    counted once, as the refund or the void.
+- **A void corrected by a fresh row** (`reversal_of_id`, the canon for a correction) is a correction, not a loss. Only
+  uncorrected voids count, at their value, attributed to whoever voided.
+- **Bar products** have no cost, so they are not in *Existencias perdidas*.
+
+### How it is valued and attributed
+
+- **Stock is valued at both:**
+  - **cost** (`cost_per_gram_cents`), which is what the total counts;
+  - **the batch's contribution price**: the batch's own price, else the strain's base price at the sede, as the counter
+    prices it (278). Shown beside, never added.
+  - The column says *Al precio de aportación*, never *precio de venta* (CLAUDE.md vocabulary).
+- **Operator of record:**
+  - an adjustment goes to whoever authorised it (`price_override_by`, else the operator; as 291);
+  - a waiver to whoever recorded it;
+  - a stock movement to whoever entered it;
+  - a till difference to whoever closed (369);
+  - a refund or a void to whoever made it;
+  - rounding and extra weight to the operator.
+- **"Lo recaudado"** = completed dispensations + bar & shop orders: 291's definition, fees excluded.
+- **Till differences:** sessions **opened** in the period, as *Informes → Cajas*, so the two reports agree. *Sin explicar*
+  is 366's `closedUnexplained()`. Handover (shift) differences are not added separately; the close is the drawer's total.
+- **Staff discounts apart:** the dispensation line does not store which discount it was. So the one split available is
+  "the member record is linked to a staff account" (347). Members linked to an account that was later deactivated still
+  count as staff. A per-kind breakdown (LOCAL, CONCESSION…) would need the line to store the kind. That is a schema
+  change the prompt ruled out; ask Ben if he wants it.
+
+### Shared queries
+
+- **Adjustments:** `GivenAwayQueries::priceOverrides()`, split in PHP into given and recovered.
+- **Waived fees:** `GivenAwayQueries::waivedFees()`.
+- **Member discounts:** summed exactly as *Descuentos y ajustes* sums them.
+- `test_adjustments_and_waived_fees_equal_the_discounts_report` asserts all four figures match that report.
+- **370's rule held:** no SQL arithmetic. `grams_cg`/`charged_cg` and `original_total_cents`/`total_cents` are read raw
+  and subtracted in PHP. The report's tests also ran on MySQL locally, as the prompt asked (21/21, file-scoped).
+
+### The alert extends 291's, and no second alert is added
+
+- **Dashboard:** the dashboard alert `DISCOUNTS_ABOVE_THRESHOLD` (operators over 7 days, discretionary %) **became**
+  `LOSSES_ABOVE_THRESHOLD`. It fires for each sede whose losses yesterday (this report's headline) passed
+  `losses_alert_threshold_pct` of the day's takings, and opens Pérdidas on «ayer» (`?period=yesterday`).
+- **The old rule is retired:**
+  - the 7-day per-operator rule, `operatorsAboveThreshold()`, its consts and the `?days=7` link;
+  - the org-wide `discount_alert_threshold_pct` setting (old rows are simply ignored);
+  - its two DiscountsReportTest tests, replaced by LossesReportTest 7.
+  - The per-person discretionary picture stays in *Descuentos y ajustes* and in this report's *Por persona*.
+- **The threshold is per sede and owner-only** (`LocationForm::OWNER_INTEGERS`, *Sedes → editar → Pérdidas*), so a
+  manager cannot quiet the alert that watches their own sede. Default 5 %. A day with no takings never alerts.
+- **Morning summary:** a 311 alert type, `AlertType::LOSSES_ABOVE_THRESHOLD`, one per sede and day, reading *«Pérdidas
+  ayer: €46.20 (3.1 %)»* with a link. It goes wherever the person's alerts go: email, and Telegram if they chose it.
+  **It is the one alert that carries a money figure**, an exception to 311's "never prices". It is an aggregate, never a
+  price or a member. *Confirm with Ben* that a euro figure in Telegram is fine.
+- **The always-on line:** «Pérdidas ayer: €… (… %)» is a row in the dashboard's *Finanzas* readout, for holders of
+  `reports.view` / `.all`. The readout and the alert read ONE yesterday report for the dashboard's sedes, kept inside
+  the dashboard's query budget.
+
+### Smaller calls
+
+- **The page keeps its state in the URL** (`queryString()`: period, dates, sede, section, person, page), so every figure is
+  a link to its list without losing the period or the sede.
+- **The shared report view gained `$tableControls`:** a partial shown above ONE table (the detail's filters).
+- **Section cards replace the sections table on screen;** the table stays in the PDF and CSV.
+- **The CSV is three blocks** (headline, sections, people) via `ReportExport::csvBlocks()`.
+- **The chart is plain CSS bars,** not a Chart.js widget: per day, or per week past 62 days, each bar named by the sede's
+  local date.
+
+### Tests
+
+- **`tests/Feature/Reports/LossesReportTest.php`** (9), red first (no report). It covers:
+  - each section's hand-computed total, the prompt's examples exactly;
+  - the headline, the share and the previous-week comparison;
+  - by person;
+  - consistency with *Descuentos y ajustes*;
+  - sede scoping (manager, owner, staff refused);
+  - exclusions (*Rellenado sin registrar*, voided sale counted once, corrected void);
+  - yesterday on the dashboard, the alert and its threshold;
+  - CSV/PDF;
+  - the detail.
+- **Browser** (`tests/Browser/prove-367-losses.mjs`, throwaway staging DB, 22/22) at 1440 and 393, light and dark.
+
+### Ops (Ben)
+
+- No migration.
+- After deploy, the owner can set each sede's threshold in *Sedes → editar → Pérdidas* (5 % if left alone).
+- The old *Ajustes → Umbral de alerta de descuentos* field is gone.

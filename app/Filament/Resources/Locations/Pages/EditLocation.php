@@ -38,7 +38,7 @@ class EditLocation extends EditRecord
             $data[$key] = (bool) Settings::get($key, Settings::DEFAULTS[$key], (string) $this->record->getKey());
         }
 
-        foreach (LocationForm::SETTING_INTEGERS as $key) {
+        foreach ([...LocationForm::SETTING_INTEGERS, ...LocationForm::OWNER_INTEGERS] as $key) {
             $data[$key] = (int) Settings::get($key, Settings::DEFAULTS[$key], (string) $this->record->getKey());
         }
 
@@ -77,6 +77,14 @@ class EditLocation extends EditRecord
 
         foreach (LocationForm::SETTING_INTEGERS as $key) {
             Settings::set($key, (int) ($data[$key] ?? Settings::DEFAULTS[$key]), SettingType::INT, (string) $this->record->getKey());
+            unset($data[$key]);
+        }
+
+        // Prompt 367 — owner-only numbers: persisted only when the owner saves a positive value.
+        foreach (LocationForm::OWNER_INTEGERS as $key) {
+            if (LocationForm::actorIsOwner() && (int) ($data[$key] ?? 0) > 0) {
+                Settings::set($key, (int) $data[$key], SettingType::INT, (string) $this->record->getKey());
+            }
             unset($data[$key]);
         }
 

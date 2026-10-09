@@ -6,14 +6,13 @@ use App\Support\Period;
 use App\ViewModels\Reports\AbstractReport;
 use App\ViewModels\Reports\DiscountsReport;
 use BackedEnum;
-use Carbon\CarbonImmutable;
 use Filament\Support\Icons\Heroicon;
 use Livewire\Attributes\Url;
 
 /**
  * Prompt 291 — Informes → Descuentos y ajustes: everything given away, by whom. `reports.view` (the ReportPage default):
- * a manager sees their sedes, the owner the rollup, STAFF never. The dashboard alert lands here on the last 7 days,
- * sorted by discretionary %; an operator's name opens the detail filtered to them.
+ * a manager sees their sedes, the owner the rollup, STAFF never. An operator's name opens the detail filtered to them.
+ * (Its dashboard alert became prompt 367's losses alert, which opens Informes → Pérdidas.)
  */
 class DiscountsReportPage extends ReportPage
 {
@@ -36,20 +35,6 @@ class DiscountsReportPage extends ReportPage
     public static function getNavigationLabel(): string
     {
         return __('Descuentos y ajustes');
-    }
-
-    public function mount(): void
-    {
-        parent::mount();
-
-        // The dashboard alert's link: ?days=7 → the last 7 days, sorted by discretionary %.
-        if ((int) request()->query('days') === DiscountsReport::ALERT_DAYS) {
-            $this->period = 'custom';
-            $this->customStart = CarbonImmutable::now()->subDays(DiscountsReport::ALERT_DAYS)->toDateString();
-            $this->customEnd = CarbonImmutable::now()->toDateString();
-            $this->sort = 'discrecional_pct';
-            $this->sortDir = 'desc';
-        }
     }
 
     public function updatedKind(): void

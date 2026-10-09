@@ -9,14 +9,9 @@ use App\Filament\Resources\Dispensations\DispensationResource;
 use App\Filament\Resources\Orders\OrderResource;
 use App\Models\Location;
 use App\Models\User;
-use App\Support\ActiveScope;
 use App\Support\Money;
-use App\Support\Period;
 use App\Support\Reports\GivenAwayQueries;
-use App\Support\Settings;
-use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\DB;
-use Throwable;
 
 /**
  * Prompt 291 — Descuentos y ajustes: everything given away, by whom, in one report.
@@ -24,7 +19,7 @@ use Throwable;
  * Four kinds, kept apart because they mean different things:
  * - **member discounts** (tier, assigned, Personalizado) follow the MEMBER, never the operator — information only;
  * - **price overrides** and **waived fees** are discretionary acts — together, as a share of the operator's own takings,
- *   they are the "discretionary %" the alert watches;
+ *   they are the "discretionary %" (prompt 367 extended its alert to every loss: Informes → Pérdidas);
  * - **manual bar lines** are money TAKEN, not forgone — never in "Total cedido", but counted, because selling a catalogue
  *   item as a cheap manual line is where undercharging hides.
  *
@@ -37,11 +32,6 @@ use Throwable;
 class DiscountsReport extends AbstractReport
 {
     public const DETAIL_PER_PAGE = 50;
-
-    /** A discretionary share over the threshold only counts with at least this much takings (€50) — OVERNIGHT-DEFAULT — CONFIRM. */
-    public const ALERT_MIN_TAKINGS_CENTS = 5000;
-
-    public const ALERT_DAYS = 7;
 
     private ?string $kindFilter = null;
 
@@ -97,31 +87,6 @@ class DiscountsReport extends AbstractReport
             // Prompt 350 — the net effect of whole-euro rounding (negative: given away to members; positive: rounded up).
             ['key' => 'rounding', 'label' => __('Redondeo'), 'value' => Money::fromCents($t['rounding'])->formatted()],
         ];
-    }
-
-    /**
-     * How many operators, over the last 7 days (whatever the dashboard period), gave away — overrides + waivers — more
-     * than the threshold % of their own takings, with at least €50 of takings. The dashboard alert.
-     *
-     * @param  list<string>  $locationIds
-     */
-    public static function operatorsAboveThreshold(array $locationIds): int
-    {
-        if ($locationIds === []) {
-            return 0;
-        }
-
-        try {
-            $threshold = max(0, (int) Settings::get('discount_alert_threshold_pct', 10));
-            $end = CarbonImmutable::now();
-            $report = new self((string) app(ActiveScope::class)->organisationId(), $locationIds, Period::custom($end->subDays(self::ALERT_DAYS), $end));
-
-            return count(array_filter($report->data()['operators'], fn (array $row): bool => $row['operator_id'] !== null
-                && $row['recaudado'] >= self::ALERT_MIN_TAKINGS_CENTS
-                && $threshold * $row['recaudado'] < $row['discrecional'] * 100));
-        } catch (Throwable) {
-            return 0; // an alert must never break the dashboard
-        }
     }
 
     // --- Tables ----------------------------------------------------------------------------------------------------

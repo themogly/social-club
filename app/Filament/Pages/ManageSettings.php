@@ -58,7 +58,6 @@ class ManageSettings extends Page
         'stock_ceiling_days' => SettingType::INT,
         'edible_thc_mg_per_gram' => SettingType::INT, // prompt 326 — owner only, recalculates the edibles
         'gauge_warning_pct' => SettingType::INT,
-        'discount_alert_threshold_pct' => SettingType::INT, // prompt 291
         'gauge_alert_pct' => SettingType::INT,
         'avalador_policy' => SettingType::STRING,
         'avalador_max_sponsees' => SettingType::INT,
@@ -211,12 +210,9 @@ class ManageSettings extends Page
                             ->helperText(__('socios × límite diario × estos días = stock máximo recomendado en sede.')),
                     ])->columns(3),
 
-                // Prompt 291 — the dashboard's "operators above the discount threshold" alert.
+                // Prompt 291's discount alert became prompt 367's losses alert: its threshold is per sede, on the sede form.
                 Section::make(__('Descuentos y ajustes'))
                     ->schema([
-                        TextInput::make('discount_alert_threshold_pct')->label(__('Umbral de alerta de descuentos (%)'))
-                            ->integer()->minValue(1)->maxValue(100)->required()
-                            ->helperText(__('Avisa en el panel cuando los ajustes de precio y las cuotas condonadas de una persona superan este % de lo que ha recaudado en 7 días (con al menos 50 € recaudados).')),
                         // Prompt 350 (Aaron) — the discounted dispensary total to the euro, so the till needs less change. Owner
                         // only (it is the club's money), audited with the rest of the page (settings.updated).
                         Select::make('discount_rounding')->label(__('Redondear el total con descuento'))
