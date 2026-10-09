@@ -2,6 +2,7 @@
 
 namespace App\Actions\Governance;
 
+use App\Actions\Mail\QueueClubMail;
 use App\Actions\RecordAuditLog;
 use App\Actions\ResolveLocale;
 use App\Enums\ConvocatoriaRecipientStatus;
@@ -10,11 +11,11 @@ use App\Models\Convocatoria;
 use App\Models\ConvocatoriaRecipient;
 use App\Models\Member;
 use App\Models\User;
+use App\Support\Email;
 use App\Support\Settings;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Mail;
 use RuntimeException;
 
 /**
@@ -26,7 +27,7 @@ use RuntimeException;
  *  2. FREEZES the roll — every member of the association as-at the notice date is snapshotted into
  *     convocatoria_recipients (number, name, email) and NEVER recomputed. Members with no email are recorded
  *     as NO_EMAIL, un-notified — visible, so the club can reach them another way, never silently dropped.
- *  3. Sends ONE email per member — a separate queued message each (Mail::to()->queue()), never a shared
+ *  3. Sends ONE email per member — a separate queued message each (QueueClubMail), never a shared
  *     To/CC that would leak the whole membership's addresses to every recipient.
  *
  * A general assembly is of the ASSOCIATION: the roll is always the whole org as-at the notice date. The
@@ -61,14 +62,17 @@ class IssueConvocatoria
             $rows = [];
             foreach ($members as $member) {
                 $email = trim((string) $member->email);
+                // Prompt 372 — an address mail cannot be sent to is NO_EMAIL, not NOTIFIED: a notice nobody could receive
+                // must not count as notice given. The legal roll stays honest.
+                $sendable = Email::isSendable($email);
                 $rows[] = ConvocatoriaRecipient::create([
                     'convocatoria_id' => $convocatoria->id,
                     'member_id' => $member->id,
                     'member_no' => (string) $member->member_no,
                     'name' => $member->fullName(),
                     'email' => $email !== '' ? $email : null,
-                    'status' => $email !== '' ? ConvocatoriaRecipientStatus::NOTIFIED : ConvocatoriaRecipientStatus::NO_EMAIL,
-                    'notified_at' => $email !== '' ? now() : null,
+                    'status' => $sendable ? ConvocatoriaRecipientStatus::NOTIFIED : ConvocatoriaRecipientStatus::NO_EMAIL,
+                    'notified_at' => $sendable ? now() : null,
                 ]);
             }
 
@@ -87,12 +91,14 @@ class IssueConvocatoria
         // email is left un-notified (already recorded NO_EMAIL) rather than silently skipped.
         $notified = 0;
         foreach ($recipients as $recipient) {
-            if ($recipient->email === null) {
+            if ($recipient->status !== ConvocatoriaRecipientStatus::NOTIFIED) {
                 continue;
             }
             $locale = $localeByMember->get($recipient->member_id) ?? (new ResolveLocale)->handle();
-            Mail::to($recipient->email)->locale($locale)->queue(ConvocatoriaMail::fromConvocatoria($convocatoria, $recipient->name));
-            $notified++;
+            if ((new QueueClubMail)->handle((string) $recipient->email, ConvocatoriaMail::fromConvocatoria($convocatoria, $recipient->name),
+                Member::query()->withoutGlobalScopes()->find($recipient->member_id), $locale)) {
+                $notified++;
+            }
         }
 
         (new RecordAuditLog)->handle('convocatoria.issued', $convocatoria, null, [

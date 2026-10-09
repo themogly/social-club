@@ -3,6 +3,7 @@
 namespace App\Support;
 
 use App\Enums\IdDocumentType;
+use App\Rules\SendableEmail;
 use Illuminate\Validation\Rule;
 
 /**
@@ -45,7 +46,7 @@ class ApplicationShape
         return [
             'first_name' => ['required', 'string', 'max:255'],
             'last_name' => ['required', 'string', 'max:255'],
-            'email' => ['required', 'email', 'max:255'],
+            'email' => ['required', new SendableEmail, 'max:255'], // prompt 372 — not `email`: it accepts «juan @gmail.com»
             'phone' => ['nullable', 'string', 'max:50'],
             'date_of_birth' => ['required', 'date', 'before:today'],
             'address' => ['nullable', 'string', 'max:500'],

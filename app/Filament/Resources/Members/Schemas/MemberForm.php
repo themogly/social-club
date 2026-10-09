@@ -9,6 +9,7 @@ use App\Filament\Forms\CameraOrFile;
 use App\Models\Member;
 use App\Models\User;
 use App\Rules\AvaladorWithinSponseeCap;
+use App\Rules\SendableEmail;
 use App\Support\ActiveScope;
 use App\Support\DocumentUpload;
 use App\Support\DocumentVault;
@@ -28,6 +29,7 @@ use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\HtmlString;
 use Livewire\Features\SupportFileUploads\TemporaryUploadedFile;
 
 class MemberForm
@@ -50,7 +52,11 @@ class MemberForm
 
                         TextInput::make('email')
                             ->label(__('Correo electrónico'))
-                            ->email()
+                            ->type('email')->rule(new SendableEmail) // prompt 372 — an address mail can actually be sent to
+                            // Prompt 372 — a stored address mail cannot reach says so, in amber, until it is fixed.
+                            ->helperText(fn (?Member $record): ?HtmlString => $record !== null && filled($record->email) && ! $record->emailIsSendable()
+                                ? new HtmlString('<span class="text-warning-600 dark:text-warning-400 font-semibold" data-email-invalid>'.e(__('Este correo no es válido: no le llegan correos (carné, recordatorios, convocatorias).')).'</span>')
+                                : null)
                             ->maxLength(255)
                             // Normalise on blur so what is saved matches the lowercase form the model stores (prompt 146).
                             ->live(onBlur: true)

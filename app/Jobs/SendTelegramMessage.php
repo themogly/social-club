@@ -2,8 +2,8 @@
 
 namespace App\Jobs;
 
+use App\Actions\Mail\QueueClubMail;
 use App\Actions\RecordAuditLog;
-use App\Actions\ResolveLocale;
 use App\Mail\TelegramAlertByEmailMail;
 use App\Mail\TelegramDisconnectedMail;
 use App\Models\User;
@@ -11,7 +11,6 @@ use App\Support\Telegram;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Http\Client\ConnectionException;
-use Illuminate\Support\Facades\Mail;
 use RuntimeException;
 use Throwable;
 
@@ -62,7 +61,7 @@ class SendTelegramMessage implements ShouldQueue
         if (Telegram::rejectsToken($response->status())) {
             Telegram::markTokenRejected($response->status());
             if ($user !== null) {
-                Mail::to($user)->locale((new ResolveLocale)->handle($user))->queue(new TelegramAlertByEmailMail($this->text));
+                (new QueueClubMail)->handle($user, new TelegramAlertByEmailMail($this->text));
             }
             (new RecordAuditLog)->handle('alert.failed', null, null, ['channel' => 'telegram', 'error' => 'token_rejected', 'fallback' => $user !== null ? 'email' : null]);
 
@@ -78,7 +77,7 @@ class SendTelegramMessage implements ShouldQueue
         if ($response->status() === 403) {
             if ($user !== null && $user->telegram_chat_id !== null) {
                 $user->unlinkTelegram();
-                Mail::to($user)->locale((new ResolveLocale)->handle($user))->queue(new TelegramDisconnectedMail($user->name));
+                (new QueueClubMail)->handle($user, new TelegramDisconnectedMail($user->name));
             }
 
             return;

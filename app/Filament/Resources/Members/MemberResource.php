@@ -59,7 +59,6 @@ use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Mail;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class MemberResource extends Resource
@@ -188,7 +187,7 @@ class MemberResource extends Resource
             ->requiresConfirmation()
             ->visible(fn (Member $record): bool => filled($record->email))
             ->action(function (Member $record): void {
-                // Prompt 85: through the single, QUEUED SendMemberCard path (was a synchronous Mail::send()).
+                // Prompt 85: through the single, QUEUED SendMemberCard path (it used to send synchronously).
                 (new SendMemberCard)->handle($record);
 
                 Notification::make()

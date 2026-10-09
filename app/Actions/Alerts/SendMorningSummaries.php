@@ -2,13 +2,12 @@
 
 namespace App\Actions\Alerts;
 
-use App\Actions\ResolveLocale;
+use App\Actions\Mail\QueueClubMail;
 use App\Mail\AlertSummaryMail;
 use App\Models\Location;
 use App\Models\Organisation;
 use App\Models\OwnerAlertState;
 use App\Support\Alerts\AlertRecipients;
-use Illuminate\Support\Facades\Mail;
 
 /**
  * Prompt 311 — the morning email. From 08:00 in the person's sede's timezone (their first sede, alphabetically), once a
@@ -39,7 +38,7 @@ class SendMorningSummaries
 
             $mine = AlertRecipients::relevant($recipient, $active);
             if ($mine->isNotEmpty()) {
-                Mail::to($user)->locale((new ResolveLocale)->handle($user))->queue(new AlertSummaryMail($mine));
+                (new QueueClubMail)->handle($user, new AlertSummaryMail($mine)); // 372: the bare address, checked
             }
             $user->forceFill(['alert_summary_sent_on' => $local->toDateString()])->save();
         }

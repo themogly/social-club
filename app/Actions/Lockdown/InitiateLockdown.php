@@ -2,8 +2,8 @@
 
 namespace App\Actions\Lockdown;
 
+use App\Actions\Mail\QueueClubMail;
 use App\Actions\RecordAuditLog;
-use App\Actions\ResolveLocale;
 use App\Enums\Role;
 use App\Mail\LockdownReactivationMail;
 use App\Models\LockdownReactivationToken;
@@ -13,7 +13,6 @@ use App\Models\User;
 use App\Support\Settings;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Str;
 
 /**
@@ -92,9 +91,7 @@ class InitiateLockdown
             if (filled($owner->email)) {
                 // After the lockdown's transaction (above) and after-commit besides (ClubMail), in the owner's language,
                 // retried like every club mail (prompt 288): this is the owner's remote way back into their own club.
-                Mail::to((string) $owner->email)
-                    ->locale((new ResolveLocale)->handle($owner))
-                    ->queue(new LockdownReactivationMail($owner, $lockdown, $raw));
+                (new QueueClubMail)->handle($owner, new LockdownReactivationMail($owner, $lockdown, $raw));
             }
         }
     }

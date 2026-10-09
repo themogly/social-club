@@ -2,7 +2,7 @@
 
 namespace App\Console\Commands;
 
-use App\Actions\ResolveLocale;
+use App\Actions\Mail\QueueClubMail;
 use App\Enums\MembershipStatus;
 use App\Mail\MembershipReminderMail;
 use App\Models\HeartbeatLog;
@@ -11,7 +11,6 @@ use App\Notifications\MembershipExpiringNotification;
 use App\Support\MembershipExpiry;
 use App\Support\Settings;
 use Illuminate\Console\Command;
-use Illuminate\Support\Facades\Mail;
 
 /**
  * Nightly membership sweep: flips genuinely-lapsed memberships to LAPSED, marks
@@ -66,9 +65,9 @@ class SweepMembershipExpiry extends Command
                     // remaining member. A delivery problem surfaces in Horizon's failed jobs; a queue-push
                     // failure is reported and counted, never thrown up through the sweep.
                     try {
-                        Mail::to($member->email)
-                            ->locale((new ResolveLocale)->handle($member))
-                            ->queue(new MembershipReminderMail($member->fullName(), $period));
+                        // Prompt 372 — an unsendable address is skipped and audited; the reminder still counts as sent for the
+                        // period below (no nightly retry), and the push still goes.
+                        (new QueueClubMail)->handle($member, new MembershipReminderMail($member->fullName(), $period));
                     } catch (\Throwable $e) {
                         report($e);
                         $mailFailures++;

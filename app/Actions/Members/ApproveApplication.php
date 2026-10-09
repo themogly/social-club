@@ -2,8 +2,8 @@
 
 namespace App\Actions\Members;
 
+use App\Actions\Mail\QueueClubMail;
 use App\Actions\RecordAuditLog;
-use App\Actions\ResolveLocale;
 use App\Enums\ApplicationStatus;
 use App\Enums\ConsentChannel;
 use App\Exceptions\DuplicateMemberException;
@@ -14,7 +14,6 @@ use App\Support\ActiveScope;
 use App\Support\MemberEligibility;
 use App\Support\MemberEnrolment;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Mail;
 use RuntimeException;
 
 /**
@@ -151,9 +150,7 @@ class ApproveApplication
         // it used to be queued by the panel's approve action only, and a counter approval (174's path) never sent it.
         // Approved FIRST, then the card, in the order its wording promises ("recibirás tu carné en un correo aparte").
         if (filled($member->email)) {
-            Mail::to((string) $member->email)
-                ->locale((new ResolveLocale)->handle($member))
-                ->queue(new ApplicationApprovedMail($member->fullName(), (string) $member->member_no));
+            (new QueueClubMail)->handle($member, new ApplicationApprovedMail($member->fullName(), (string) $member->member_no));
         }
 
         // Send the QR card automatically (prompt 85). Called ONCE here — the member is fully created; the

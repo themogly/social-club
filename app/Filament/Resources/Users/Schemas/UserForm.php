@@ -7,6 +7,7 @@ use App\Enums\Role;
 use App\Filament\Forms\PinInput;
 use App\Models\Member;
 use App\Models\User;
+use App\Rules\SendableEmail;
 use App\Support\Email;
 use App\Support\PinCollisionGuard;
 use Filament\Forms\Components\Select;
@@ -30,7 +31,7 @@ class UserForm
 
                 TextInput::make('email')
                     ->label(__('Correo electrónico'))
-                    ->email()
+                    ->type('email')->rule(new SendableEmail) // prompt 372
                     ->required()
                     ->unique(ignoreRecord: true)
                     ->maxLength(255)

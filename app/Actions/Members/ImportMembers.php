@@ -10,6 +10,7 @@ use App\Models\Location;
 use App\Models\Member;
 use App\Models\MembershipTier;
 use App\Support\ActiveScope;
+use App\Support\Email;
 use App\Support\MemberEligibility;
 use App\Support\MemberNumber;
 use App\Support\StockCeiling;
@@ -42,7 +43,7 @@ use Throwable;
  *   first_name, last_name, email, phone, date_of_birth, document_type, document_number, declared_monthly_g,
  *   member_no, joined_at, left_at, status, location, tier, membership_start, consent_date, consent_text_version
  *
- * @phpstan-type ImportResult array{created: int, skipped: int, errors: array<int, array<int, string>>, consent_pending: int, ceilings: array<string, array{location: string, added_active: int, active_members: int, ceiling_cg: int, current_active: int, current_ceiling_cg: int}>}
+ * @phpstan-type ImportResult array{created: int, skipped: int, errors: array<int, array<int, string>>, warnings: array<int, list<string>>, consent_pending: int, ceilings: array<string, array{location: string, added_active: int, active_members: int, ceiling_cg: int, current_active: int, current_ceiling_cg: int}>}
  */
 class ImportMembers
 {
@@ -89,6 +90,7 @@ class ImportMembers
         /** @var array<int, array<string, mixed>> $plans */
         $plans = [];
         $errors = [];
+        $warnings = [];
         $skipped = 0;
 
         foreach ($rows as [$rowNumber, $data]) {
@@ -109,6 +111,13 @@ class ImportMembers
                 continue;
             }
 
+            // Prompt 372 — a member is never left out of the migration over a typo: an address mail cannot be sent to is
+            // imported WITHOUT the email, and said (the old spreadsheet's «juan@gmail,com», «no tiene», «-»).
+            if (filled($data['email'] ?? null) && ! Email::isSendable((string) $data['email'])) {
+                $warnings[$rowNumber][] = __('correo «:email» no válido, se importa sin correo', ['email' => trim((string) $data['email'])]);
+                $data['email'] = null;
+            }
+
             $plans[] = $this->plan($data);
         }
 
@@ -116,6 +125,7 @@ class ImportMembers
             'created' => count($plans),
             'skipped' => $skipped,
             'errors' => $errors,
+            'warnings' => $warnings,
             'consent_pending' => count(array_filter($plans, fn (array $p): bool => $p['consent'] === null)),
             'ceilings' => $this->projectCeilings($plans),
         ];

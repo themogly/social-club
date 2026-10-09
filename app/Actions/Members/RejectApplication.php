@@ -2,6 +2,7 @@
 
 namespace App\Actions\Members;
 
+use App\Actions\Mail\QueueClubMail;
 use App\Actions\RecordAuditLog;
 use App\Actions\ResolveLocale;
 use App\Enums\ApplicationStatus;
@@ -10,7 +11,6 @@ use App\Models\MemberApplication;
 use App\Models\User;
 use DomainException;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Mail;
 
 /**
  * Reject a submitted application (post-296 completeness P4 — it was inline in the resource and unaudited, while approval
@@ -47,9 +47,8 @@ class RejectApplication
         if (is_string($email) && $email !== '') {
             $name = trim((string) data_get($application->payload, 'first_name').' '.(string) data_get($application->payload, 'last_name'));
             $applied = data_get($application->payload, 'consent_locale');
-            Mail::to($email)
-                ->locale(in_array($applied, ['en', 'es'], true) ? $applied : (new ResolveLocale)->handle())
-                ->queue(new ApplicationRejectedMail($name !== '' ? $name : $email, $reason));
+            (new QueueClubMail)->handle($email, new ApplicationRejectedMail($name !== '' ? $name : $email, $reason), $application,
+                in_array($applied, ['en', 'es'], true) ? $applied : (new ResolveLocale)->handle());
         }
 
         return $application;

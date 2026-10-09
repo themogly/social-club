@@ -7,6 +7,7 @@ use App\Actions\Members\SendApplicationInvite;
 use App\Filament\Resources\MemberApplications\MemberApplicationResource;
 use App\Models\Location;
 use App\Models\User;
+use App\Rules\SendableEmail;
 use Filament\Actions\Action;
 use Filament\Forms\Components\Radio;
 use Filament\Forms\Components\Select;
@@ -65,7 +66,7 @@ class ListMemberApplications extends ListRecords
                     ->placeholder(__('Sin sede asignada')),
                 TextInput::make('applicant_email')
                     ->label(__('Correo del solicitante'))
-                    ->email()
+                    ->type('email')->rule(new SendableEmail) // prompt 372 — not Laravel's `email`, which lets «juan @gmail.com» through
                     ->required(fn (Get $get): bool => $get('invite_mode') === 'email')
                     ->visible(fn (Get $get): bool => $get('invite_mode') === 'email'),
                 TextInput::make('applicant_reference')

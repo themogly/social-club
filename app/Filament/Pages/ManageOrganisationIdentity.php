@@ -4,6 +4,7 @@ namespace App\Filament\Pages;
 
 use App\Actions\Organisation\UpdateOrganisationIdentity;
 use App\Models\Organisation;
+use App\Rules\SendableEmail;
 use App\Support\ActiveScope;
 use BackedEnum;
 use Filament\Forms\Components\FileUpload;
@@ -77,7 +78,7 @@ class ManageOrganisationIdentity extends Page
                         TextInput::make('legal_name')->label(__('Nombre legal (asociación)'))->maxLength(255)
                             ->helperText(__('Cambiarlo NO reescribe los documentos ya emitidos; solo afecta a los nuevos. El cambio queda registrado.')),
                         TextInput::make('tax_id')->label(__('CIF / NIF'))->maxLength(64),
-                        TextInput::make('contact_email')->label(__('Correo de contacto'))->email()->maxLength(255)
+                        TextInput::make('contact_email')->label(__('Correo de contacto'))->type('email')->rule(new SendableEmail)->maxLength(255)
                             ->helperText(__('Se usa como Responder-a en los correos a los socios.')),
                         TextInput::make('contact_phone')->label(__('Teléfono'))->tel()->maxLength(64),
                         TextInput::make('address')->label(__('Domicilio social'))->maxLength(500)->columnSpanFull(),

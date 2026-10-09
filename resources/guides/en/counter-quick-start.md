@@ -3,7 +3,7 @@ title: Counter quick-start guide for staff
 summary: A normal shift on the counter tablet: signing in, the till, serving members, sign-ups and closing up.
 audience: staff
 order: 1
-updated: 2026-10-08
+updated: 2026-10-09
 ---
 
 > This guide walks through a normal shift on the counter tablet: signing in, opening the till, serving members, signing up new members and closing up. The screenshots show the English screens; the Spanish words you may see are listed at the end.
@@ -154,6 +154,8 @@ New members are added to **every club** automatically (not the store), and pay t
 
 - **Hand over the tablet:** they fill in their own details on this tablet. A **photo of them is required**. When they photograph their ID document (the back of a DNI or NIE, or the photo page of a passport), their details fill in by themselves; they check each one. While they do this, the tablet shows only the form. When they finish, it comes back to you. A signature counts as soon as it is drawn; if the pad will not work, they can send the form without one (it asks first) and you sort it out when you review it. If the form comes back with an error, the photos they took are kept, so they only fix what it says. To cancel, tap **Staff** at the top of the form and enter your PIN.
 - **Send an invitation:** type their email and they fill it in on their own phone. Their application then appears in the bell like any other.
+
+An email the system cannot send to (a space in it, an accent, no *.com* or *.es* at the end) is refused with *"This email is not valid…"*: check it with the member. If a member's record says *"This email is not valid: no email reaches them"*, fix the address with them; until then their card, reminders and notices do not arrive.
 
 ### Stock (Existencias)
 

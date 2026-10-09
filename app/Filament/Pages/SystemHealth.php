@@ -76,6 +76,7 @@ class SystemHealth extends Page
             'queue' => $health->queue(),
             'cache' => $health->cache(),
             'alerts' => $health->alerts(),
+            'invalidEmails' => $health->invalidEmails(),
             'permissions' => $health->permissions(),
             'launch' => $health->launch(),
             'ediblesWithoutThc' => $health->ediblesWithoutThc(), // prompt 326

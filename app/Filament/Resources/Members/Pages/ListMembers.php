@@ -23,7 +23,7 @@ class ListMembers extends ListRecords
      * The dry-run result of the staged CSV, held between the upload step and the commit step so the operator
      * sees the consequence — above all the resulting stock ceiling — BEFORE anything is written (prompt 131).
      *
-     * @var array{created: int, skipped: int, errors: array<int, array<int, string>>, consent_pending: int, ceilings: array<string, array{location: string, added_active: int, active_members: int, ceiling_cg: int, current_active: int, current_ceiling_cg: int}>}|null
+     * @var array{created: int, skipped: int, errors: array<int, array<int, string>>, warnings: array<int, list<string>>, consent_pending: int, ceilings: array<string, array{location: string, added_active: int, active_members: int, ceiling_cg: int, current_active: int, current_ceiling_cg: int}>}|null
      */
     public ?array $importPreview = null;
 
@@ -122,12 +122,12 @@ class ListMembers extends ListRecords
 
                 Notification::make()
                     ->title(__('Importación completada'))
-                    ->body(__(':created creados · :skipped omitidos (duplicados) · :errors con errores · :pending sin consentimiento.', [
+                    ->body(implode("\n", [__(':created creados · :skipped omitidos (duplicados) · :errors con errores · :pending sin consentimiento.', [
                         'created' => $result['created'],
                         'skipped' => $result['skipped'],
                         'errors' => $errorCount,
                         'pending' => $result['consent_pending'],
-                    ]))
+                    ]), ...self::warningLines($result['warnings'])]))
                     ->{$errorCount > 0 ? 'warning' : 'success'}()
                     ->persistent()
                     ->send();
@@ -147,6 +147,24 @@ class ListMembers extends ListRecords
             ->action(fn () => $this->resetImport());
     }
 
+    /**
+     * Prompt 372 — «fila 14: correo «juan@gmail,com» no válido, se importa sin correo», one line per warning.
+     *
+     * @param  array<int, list<string>>  $warnings
+     * @return list<string>
+     */
+    private static function warningLines(array $warnings): array
+    {
+        $lines = [];
+        foreach ($warnings as $row => $messages) {
+            foreach ($messages as $message) {
+                $lines[] = __('fila :row: :message', ['row' => $row, 'message' => $message]);
+            }
+        }
+
+        return $lines;
+    }
+
     /** The human-readable consequence shown in the confirm modal: what will be created, and the resulting ceiling. */
     private function previewSummary(): string
     {
@@ -162,6 +180,7 @@ class ListMembers extends ListRecords
         if ($errorCount > 0) {
             $lines[] = __(':errors filas con errores (p. ej. número de socio repetido) NO se importarán.', ['errors' => $errorCount]);
         }
+        $lines = [...$lines, ...self::warningLines($preview['warnings'] ?? [])]; // prompt 372
 
         foreach ($preview['ceilings'] ?? [] as $ceiling) {
             $lines[] = __('Sede :location: :members socios activos → techo de stock :ceiling.', [

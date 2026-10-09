@@ -17,6 +17,7 @@ use Filament\Actions\RestoreBulkAction;
 use Filament\Actions\ViewAction;
 use Filament\Tables\Columns\IconColumn;
 use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Filters\Filter;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Filters\TernaryFilter;
 use Filament\Tables\Filters\TrashedFilter;
@@ -131,6 +132,10 @@ class MembersTable
                         ->mapWithKeys(fn (MemberKind $case): array => [$case->value => $case->label()])
                         ->all())
                     ->default(MemberKind::STANDARD->value),
+                // Prompt 372 — members whose stored address mail cannot be sent to (computed in PHP: no driver-specific regex).
+                Filter::make('email_invalid')
+                    ->label(__('Correo no válido'))
+                    ->query(fn (Builder $query): Builder => $query->whereKey(Member::invalidEmailIds())),
                 TrashedFilter::make(),
             ])
             // One overflow trigger instead of two labelled buttons (prompt 170). The actions column

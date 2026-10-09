@@ -225,6 +225,10 @@
                     @include('livewire.counter.partials.membership-fix')
 
                     <div data-member-record class="mt-3 space-y-3">
+                        {{-- Prompt 372 — an address mail cannot reach: the card, reminders and notices never arrive. --}}
+                        @if ($feeMember && filled($feeMember->email) && ! $feeMember->emailIsSendable())
+                            <p data-email-invalid class="rounded-xl border border-warning/40 bg-warning/10 px-3 py-2 text-sm font-semibold text-warning">{{ __('Este correo no es válido: no le llegan correos (carné, recordatorios, convocatorias).') }}</p>
+                        @endif
                         {{-- Prompt 348 — a card shared or lost: the old QR stops working. Confirmed first (it cannot be undone). --}}
                         <div x-data="{ ask: false }" class="flex flex-wrap items-center gap-2">
                             <x-button type="button" variant="secondary" size="sm" data-reissue-card x-show="! ask" @click="ask = true">{{ __('Reemitir carné') }}</x-button>
