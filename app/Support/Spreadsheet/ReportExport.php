@@ -51,6 +51,18 @@ class ReportExport
     }
 
     /**
+     * Prompt 367 — several tables in one CSV, each block headed by its title and separated by a blank line (one BOM).
+     *
+     * @param  list<ReportTable>  $tables
+     */
+    public static function csvBlocks(array $tables): string
+    {
+        $blocks = array_map(fn (ReportTable $table): string => $table->title."\n".substr(self::csv($table), strlen(self::BOM)), $tables);
+
+        return self::BOM.implode("\n", $blocks);
+    }
+
+    /**
      * A full report as a PDF (title, summary strip and every table with its totals).
      *
      * @param  list<array{label: string, value: string, tone?: string}>  $summary

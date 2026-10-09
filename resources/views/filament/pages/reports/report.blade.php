@@ -95,6 +95,10 @@
             {{-- Tables — the primary is sortable + exportable; the rest are supporting breakdowns. --}}
             @foreach ($tables as $i => $table)
                 <x-dashboard.section :title="$table->title">
+                    {{-- Prompt 367 — a report's controls for ONE table (Pérdidas: the detail's filters), right above it. --}}
+                    @isset($tableControls[$table->key])
+                        @include($tableControls[$table->key])
+                    @endisset
                     <x-reports.table
                         :table="$table"
                         :sortKey="$i === 0 ? $sortKey : null"

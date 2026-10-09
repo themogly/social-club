@@ -5,6 +5,7 @@ namespace App\Support\Alerts;
 use App\Enums\AlertType;
 use App\Filament\Resources\Batches\BatchResource;
 use App\Models\OwnerAlertState;
+use App\Support\Money;
 use App\Support\StockCover;
 use App\Support\Weight;
 use Carbon\CarbonImmutable;
@@ -13,7 +14,7 @@ use Illuminate\Support\Collection;
 /**
  * Prompt 311 — how an alert reads, in the language that is current when it is composed (the caller pins the recipient's
  * locale). Plain text, neutral and operational: stock names and quantities, sede names and times — never prices, never
- * member information. Sections follow {@see AlertType}'s order (restock first, running out second), one per type and sede.
+ * member information (prompt 367's yesterday's-losses total is the one money figure: an aggregate, not a price). Sections follow {@see AlertType}'s order (restock first, running out second), one per type and sede.
  */
 final class AlertMessage
 {
@@ -46,7 +47,7 @@ final class AlertMessage
                 if ($first->type === AlertType::RESTOCK_FROM_STORE && ($link = self::transferLink($group)) !== null) {
                     $lines[] = (string) __('Trasladar: :url', ['url' => $link]);
                 }
-                if ($first->type === AlertType::TILL_CLOSES_UNEXPLAINED && is_string($link = data_get($first->detail, 'url'))) {
+                if (in_array($first->type, [AlertType::TILL_CLOSES_UNEXPLAINED, AlertType::LOSSES_ABOVE_THRESHOLD], true) && is_string($link = data_get($first->detail, 'url'))) {
                     $lines[] = (string) __('Ver: :url', ['url' => $link]);
                 }
 
@@ -71,6 +72,8 @@ final class AlertMessage
                 'since' => isset($d['opened_at']) ? CarbonImmutable::parse($d['opened_at'])->setTimezone(self::timezone($state))->translatedFormat('j M H:i') : '—',
             ]),
             AlertType::TILL_CLOSES_UNEXPLAINED => __('Cierres con diferencia sin explicar: :count esta semana', ['count' => (int) ($d['count'] ?? 0)]),
+            // Prompt 367 — the one alert that carries money: an aggregate the owner asked to be told, never a price or a member.
+            AlertType::LOSSES_ABOVE_THRESHOLD => __('Pérdidas ayer: :amount (:pct %)', ['amount' => Money::fromCents((int) ($d['cents'] ?? 0))->formatted(), 'pct' => (string) ($d['pct'] ?? '0.0')]),
             AlertType::SYSTEM => __(':component no se ha ejecutado desde :since', [
                 'component' => self::componentLabel((string) ($d['component'] ?? '')),
                 'since' => isset($d['last_at']) ? CarbonImmutable::parse($d['last_at'])->setTimezone((string) config('app.timezone'))->translatedFormat('j M H:i') : __('nunca'),

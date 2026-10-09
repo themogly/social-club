@@ -5,7 +5,8 @@ namespace App\Enums;
 /**
  * Prompt 311 — what the owner is alerted about. The order is the order a message reads in: the two strain alerts first
  * (restock from the store, then running out — the more urgent job), then products, expiry, the till and the system.
- * Prompt 366 adds the week's closes with an unexplained difference, after the open till.
+ * Prompt 366 adds the week's closes with an unexplained difference, after the open till; prompt 367 yesterday's losses over the
+ * sede's threshold, after them.
  */
 enum AlertType: string
 {
@@ -15,6 +16,7 @@ enum AlertType: string
     case BATCH_EXPIRING = 'BATCH_EXPIRING';
     case TILL_OPEN_TOO_LONG = 'TILL_OPEN_TOO_LONG';
     case TILL_CLOSES_UNEXPLAINED = 'TILL_CLOSES_UNEXPLAINED';
+    case LOSSES_ABOVE_THRESHOLD = 'LOSSES_ABOVE_THRESHOLD';
     case SYSTEM = 'SYSTEM';
 
     public function label(): string
@@ -26,6 +28,7 @@ enum AlertType: string
             self::BATCH_EXPIRING => __('Lote a punto de caducar'),
             self::TILL_OPEN_TOO_LONG => __('Caja abierta demasiado tiempo'),
             self::TILL_CLOSES_UNEXPLAINED => __('Cierres de caja con diferencia sin explicar'),
+            self::LOSSES_ABOVE_THRESHOLD => __('Pérdidas por encima del umbral'),
             self::SYSTEM => __('Sistema'),
         };
     }
@@ -40,6 +43,7 @@ enum AlertType: string
             self::BATCH_EXPIRING => '⏳',
             self::TILL_OPEN_TOO_LONG => '💶',
             self::TILL_CLOSES_UNEXPLAINED => '🧾',
+            self::LOSSES_ABOVE_THRESHOLD => '📉',
             self::SYSTEM => '🛠️',
         };
     }

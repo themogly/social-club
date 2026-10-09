@@ -86,6 +86,16 @@ class LocationForm
         'cash_box_fees',
     ];
 
+    /**
+     * Prompt 367 — per-location INTEGER settings only the OWNER may change: the losses alert threshold, so a manager cannot
+     * quiet the alert that watches their own sede.
+     *
+     * @var list<string>
+     */
+    public const OWNER_INTEGERS = [
+        'losses_alert_threshold_pct',
+    ];
+
     /** Is the current user the owner — the one who may change the {@see OWNER_TOGGLES}? */
     public static function actorIsOwner(): bool
     {
@@ -484,6 +494,18 @@ class LocationForm
                             ->helperText(__('Automático: quien abre la caja queda con la entrada fichada y quien la cierra con la salida fichada; cada uno puede deshacerlo durante 2 minutos. Preguntar: se le pregunta. A las demás personas nunca se les ficha: lo hacen con su propio PIN.')),
                     ])
                     ->columns(2),
+
+                // Prompt 367 — Informes → Pérdidas' alert (291's discount alert, extended to every loss). Owner only.
+                Section::make(__('Pérdidas'))
+                    ->visible(fn (Get $get): bool => $get('kind') !== LocationKind::ALMACEN->value) // nothing is taken at the store
+                    ->schema([
+                        TextInput::make('losses_alert_threshold_pct')
+                            ->label(__('Avisar si las pérdidas de un día superan el … % de lo recaudado'))
+                            ->integer()->minValue(1)->maxValue(100)->suffix('%')
+                            ->default(fn (): int => (int) Settings::DEFAULTS['losses_alert_threshold_pct'])
+                            ->disabled(fn (): bool => ! self::actorIsOwner())
+                            ->helperText(__('Un aviso en el panel y en el resumen de la mañana cuando las pérdidas de ayer en esta sede (Informes → Pérdidas, sin los descuentos de socio) pasan de este % de lo recaudado. Solo el propietario lo cambia.')),
+                    ]),
 
                 Section::make(__('Seguridad del mostrador'))
                     ->visible(fn (Get $get): bool => $get('kind') !== LocationKind::ALMACEN->value) // no counter at the store (277)

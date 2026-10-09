@@ -1,5 +1,5 @@
 {
-    "about": "Prompt 353 — how each guide screenshot is captured by `npm run guides:shots`. Run it against a site seeded with `php artisan csc:seed-staging` (the fictional demo club, prompt 327), with BASE_URL pointing at it. The guides show the ENGLISH screens: first set the demo accounts to English — php artisan tinker --execute=\"App\\\\Models\\\\User::query()->update(['locale' => 'en'])\" — or the script stops. Each recipe: url, account (owner | manager | staff — the harness accounts), viewport [w, h], member (chosen at the dispensary when its search is showing), steps, and an optional crop selector, and `panel: true` for an Administration screen (signed in, no counter PIN). Steps: {\"goto\": url}, {\"click\": selector}, {\"fill\": [selector, value]}, {\"press\": [selector, key]}, {\"wait\": ms}. Images are written at 1600 px wide (the viewport scaled), JPEG. Steps also take {\"clickAll\": selector} (prompt 360). counter-quick-start/10b-close-reason needs a closer WITHOUT «Aprobar sin motivo», so let the demo staff close first: php artisan tinker --execute=\"foreach (['till.close', 'stock.take'] as \\$p) (new App\\\\Actions\\\\Roles\\\\SetRolePermission)->handle(App\\\\Enums\\\\Role::STAFF, \\$p, true, App\\\\Models\\\\User::where('email', 'owner@club.test')->first());\" cash-at-the-counter/u08c shows the three pots: turn on Separate cash pots for Central Branch first, and run it after counter-quick-start/10b (it commits the evening count, which appears once per club per day). cash-at-the-counter/c08 shows «Only with a difference»: it needs a close this week beyond the tolerance (close a till at the counter with a difference and no note first).",
+    "about": "Prompt 353 — how each guide screenshot is captured by `npm run guides:shots`. Run it against a site seeded with `php artisan csc:seed-staging` (the fictional demo club, prompt 327), with BASE_URL pointing at it. The guides show the ENGLISH screens: first set the demo accounts to English — php artisan tinker --execute=\"App\\\\Models\\\\User::query()->update(['locale' => 'en'])\" — or the script stops. Each recipe: url, account (owner | manager | staff — the harness accounts), viewport [w, h], member (chosen at the dispensary when its search is showing), steps, and an optional crop selector, and `panel: true` for an Administration screen (signed in, no counter PIN). Steps: {\"goto\": url}, {\"click\": selector}, {\"fill\": [selector, value]}, {\"press\": [selector, key]}, {\"wait\": ms}. Images are written at 1600 px wide (the viewport scaled), JPEG. Steps also take {\"clickAll\": selector} (prompt 360). counter-quick-start/10b-close-reason needs a closer WITHOUT «Aprobar sin motivo», so let the demo staff close first: php artisan tinker --execute=\"foreach (['till.close', 'stock.take'] as \\$p) (new App\\\\Actions\\\\Roles\\\\SetRolePermission)->handle(App\\\\Enums\\\\Role::STAFF, \\$p, true, App\\\\Models\\\\User::where('email', 'owner@club.test')->first());\" cash-at-the-counter/u08c shows the three pots: turn on Separate cash pots for Central Branch first, and run it after counter-quick-start/10b (it commits the evening count, which appears once per club per day). cash-at-the-counter/c08 shows «Only with a difference»: it needs a close this week beyond the tolerance (close a till at the counter with a difference and no note first). manager-guide/c26-losses shows Reports → Losses on this week: it reads whatever the demo week holds (a price adjustment, a waived fee, a merma or a till difference make it say something).",
     "seed": "csc:seed-staging",
     "locale": "en",
     "shots": {
@@ -387,6 +387,15 @@
                 }
             ],
             "crop": "fieldset:has-text(\"Where does the cash go?\")"
+        },
+        "manager-guide/c26-losses.jpg": {
+            "url": "/informes/perdidas?period=week",
+            "account": "owner",
+            "viewport": [
+                1280,
+                900
+            ],
+            "panel": true
         }
     }
 }

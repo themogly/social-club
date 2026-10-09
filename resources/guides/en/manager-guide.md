@@ -252,6 +252,7 @@ Before the reserve existed, each evening count took the sealed bags out of stock
 | When | What to check | Where |
 |---|---|---|
 | Start of day | Alerts: tills not closed, stock above the legal ceiling, anything red | **Dashboard** |
+| Start of day | *Losses yesterday* (Finance, on the right): what cost the club money yesterday, and its share of takings | **Dashboard** → **Reports → Losses** |
 | Start of day | Applications waiting for approval | **Applications**, or the counter's bell |
 | Start of day | Yesterday's tills are closed; any close with an unexplained difference (Dashboard: *Closes with an unexplained difference*) | **Reports → Tills** · *Only with a difference* |
 | During the day | Strains or products running low: move stock from the store, or restock | **Batches** (Assign to location) · **Products** (Restock) |
@@ -263,6 +264,7 @@ Before the reserve existed, each evening count took the sealed bags out of stock
 |---|---|---|
 | Staff hours, and days with unclocked activity | The hours record must match who actually worked | **Reports → Staff hours** |
 | Discounts, price adjustments and voids | See what was given away, and by whom | **Reports → Discounts & adjustments** |
+| Everything lost: give-aways, extra weight, wastage, till differences, refunds and voids | See how much was lost, and who and why | **Reports → Losses** |
 | Expenses: approve large ones, check receipts | Expenses above the limit wait for approval | **Expenses** |
 | Batches expiring soon, and slow sellers | Use them before they expire, or adjust the price | **Dashboard** alerts · **Batches** |
 | Members with fees owed, and memberships ending | Chase or renew before they are blocked at the counter | **Reports → Debtors** · **Members** |
@@ -277,6 +279,22 @@ Before the reserve existed, each evening count took the sealed bags out of stock
 ![Reports → Discounts & adjustments: what was given away, by operator and by type.](img/manager-guide/c16.jpg)
 
 *Reports → Discounts & adjustments: what was given away, by operator and by type.*
+
+**Reports → Losses** puts in one place everything that cost the club money in the period, with who did it and why. The headline is the **total lost**, its share of takings and how it compares with the previous period, with a bar for each day. Member discounts are agreed policy, not a loss, so they are shown beside the total and never in it, with the staff's own discounts apart. Five sections, each with its total:
+
+- **Discounts and give-aways at the counter:** price adjustments down, and adjustments up as *recovered* (which subtract), whole-euro rounding, and waived fees.
+- **Extra weight:** the grams handed over above what was charged by the half-gram rounding, at each line's own price.
+- **Stock lost:** wastage, adjustments down, and shortfalls at the end-of-day weigh and in the stock count. It counts at cost; the value at the contribution price is shown beside it. Gains subtract. A forgotten *Refill* is not a loss, because the stock only moved from the reserve to the jar.
+- **Till differences:** each counted box's shortfall or surplus at the close, marked *Unexplained* when nobody gave a reason.
+- **Refunds and voids:** refunds, and voided dispensings and bar orders. A void corrected by a new sale is a correction, not a loss.
+
+Tap a section, or a person's name in **By person**, to open its list underneath: when, where, who, which member, how much and the reason, each linking to its record. **By person** shows each person's losses beside what they took, so someone who gives away much more than the others stands out. The CSV has the headline, the sections and the people.
+
+The dashboard says it every morning: **Losses yesterday: €46.20 (3.1 %)**, opening the report on that day. If a location's losses for a day pass the owner's threshold (*Locations → edit → Losses*, 5 % by default), the dashboard shows an alert and the morning summary includes the line.
+
+![Reports → Losses: the total lost against the previous week, a bar per day, and the sections.](img/manager-guide/c26-losses.jpg)
+
+*Reports → Losses: the total lost against the previous week, a bar per day, and the sections.*
 
 ## 11. Quick reference: Spanish screen words
 
@@ -294,6 +312,7 @@ Before the reserve existed, each evening count took the sealed bags out of stock
 | Trasladar · Asignar a sede | Transfer · Assign to location |
 | Añadir existencias en otra sede | Add stock at another location |
 | Recuento · Ajuste · Merma · Retirada | Count · Adjustment · Wastage · Recall |
+| Pérdidas · Peso de más · Existencias perdidas | Losses · Extra weight · Stock lost |
 | Ahora · Nuevo total · Añadir · Quitar | Now · New total · Add · Remove |
 | Partes del lote | Batch parts |
 | Productos · Reponer | Products · Restock |

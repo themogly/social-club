@@ -24,6 +24,7 @@ use App\Filament\Pages\Reports\ConsumptionReportPage;
 use App\Filament\Pages\Reports\DebtorReportPage;
 use App\Filament\Pages\Reports\DiscountsReportPage;
 use App\Filament\Pages\Reports\FinancialReportPage;
+use App\Filament\Pages\Reports\LossesReportPage;
 use App\Filament\Pages\Reports\MembersReportPage;
 use App\Filament\Pages\Reports\StaffHoursReportPage;
 use App\Filament\Pages\Reports\StockReportPage;
@@ -335,7 +336,13 @@ class Help
         DiscountsReportPage::class => ['permission' => 'reports.view', 'title' => 'Descuentos y ajustes', 'body' => [
             'Todo lo que se ha cedido en el período: descuentos de socio, ajustes de precio y cuotas condonadas, y aparte las líneas manuales de barra (dinero cobrado, no cedido, pero donde se esconde cobrar de menos).',
             'Por operador: sus ajustes y condonaciones como % de lo que ha recaudado (lo «discrecional»). Los descuentos de socio siguen al socio, no a quien atiende, y se muestran solo como información.',
-            'Las ventas anuladas no cuentan. El aviso del panel usa los últimos 7 días y el umbral de Ajustes (por defecto 10 %, con al menos 50 € recaudados).',
+            'Las operaciones anuladas no cuentan. Todo lo que cuesta dinero al club, con su aviso, está en Informes → Pérdidas.',
+        ]],
+        // Prompt 367 — everything that cost the club money, who and why.
+        LossesReportPage::class => ['permission' => 'reports.view', 'title' => 'Pérdidas', 'body' => [
+            'Todo lo que ha costado dinero al club en el período, en cinco secciones: descuentos y regalos en el mostrador, peso de más (el redondeo a medio gramo), existencias perdidas, diferencias de caja, y devoluciones y anulaciones. Lo que compensa (un ajuste al alza, un sobrante) resta.',
+            'Los descuentos de socio son la política del club, no una pérdida: se muestran al lado del total, nunca dentro. Las existencias cuentan a coste; al lado, lo que se habría aportado por ellas.',
+            'Cada pérdida va a quien la hizo. Toca una sección o un nombre para ver su lista, y cada línea lleva a su registro. Un aviso en el panel cuando las pérdidas de un día pasan del umbral de la sede (por defecto 5 %).',
         ]],
         ConsumptionReportPage::class => ['permission' => 'reports.view', 'title' => 'Informe de consumo', 'body' => [
             'Gramos dispensados por período, dentro de los límites configurados. Refleja lo dispensado, no lo autoriza.',

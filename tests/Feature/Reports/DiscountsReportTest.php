@@ -2,13 +2,10 @@
 
 namespace Tests\Feature\Reports;
 
-use App\Enums\DashboardAlert;
 use App\Enums\DispensationStatus;
 use App\Enums\FeePaymentMethod;
 use App\Enums\OrderStatus;
 use App\Enums\Role;
-use App\Enums\SettingType;
-use App\Filament\Pages\Dashboard;
 use App\Filament\Pages\Reports\DiscountsReportPage;
 use App\Models\Dispensation;
 use App\Models\DispensationLine;
@@ -23,7 +20,6 @@ use App\Models\User;
 use App\Support\ActiveScope;
 use App\Support\Money;
 use App\Support\Period;
-use App\Support\Settings;
 use App\Support\Spreadsheet\ReportExport;
 use App\ViewModels\Reports\ConsumptionReport;
 use App\ViewModels\Reports\DiscountsReport;
@@ -228,27 +224,6 @@ class DiscountsReportTest extends TestCase
         $this->assertSame(50, $rows[__('Barra y tienda: descuento de socio')]['importe']);
     }
 
-    // 7 -------------------------------------------------------------------------------------------------------------
-
-    public function test_the_alert_fires_over_the_threshold_only_with_enough_takings_over_seven_days(): void
-    {
-        Settings::set('discount_alert_threshold_pct', 10, SettingType::INT);
-
-        // Bruno: €60 of takings, a €10 override → 16 % (> 10 %) with takings ≥ €50 → fires.
-        $this->dispensation($this->bruno, 5000, [], original: 6000, overrideBy: $this->bruno);
-        $this->dispensation($this->bruno, 1000);
-        // Ana: €20 of takings, a €10 waiver → 50 %, but under €50 → does not fire.
-        $this->dispensation($this->ana, 2000);
-        $this->waiver($this->ana, 1000);
-        // Ten days ago: outside the 7-day window whatever the dashboard period.
-        $this->travel(-10)->days();
-        $this->dispensation($this->ana, 10000, [], original: 20000, overrideBy: $this->ana);
-        $this->travelBack();
-        $this->travelTo(now()->setTime(12, 0));
-
-        $this->assertSame(1, DiscountsReport::operatorsAboveThreshold([$this->centro->id]));
-    }
-
     // 8 -------------------------------------------------------------------------------------------------------------
 
     public function test_managers_see_their_sedes_and_staff_are_refused(): void
@@ -312,19 +287,5 @@ class DiscountsReportTest extends TestCase
         DB::disableQueryLog();
 
         $this->assertLessThanOrEqual($few, $many, "the report's query count must not grow with the number of sales");
-    }
-
-    public function test_the_dashboard_alert_shows_for_reports_viewers_only_and_links_to_the_seven_days(): void
-    {
-        Settings::set('discount_alert_threshold_pct', 1, SettingType::INT);
-        $this->dispensation($this->bruno, 5000, [], original: 6000, overrideBy: $this->bruno);
-        app(ActiveScope::class)->setLocation($this->centro->id);
-
-        $html = Livewire::actingAs($this->owner)->test(Dashboard::class)->html();
-        $this->assertStringContainsString(e(DashboardAlert::DISCOUNTS_ABOVE_THRESHOLD->label(1)), $html);
-        $this->assertStringContainsString('informes/descuentos?days=7', $html);
-
-        $staff = Livewire::actingAs($this->ana)->test(Dashboard::class)->html();
-        $this->assertStringNotContainsString(e(DashboardAlert::DISCOUNTS_ABOVE_THRESHOLD->label(1)), $staff);
     }
 }

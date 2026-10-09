@@ -52,6 +52,14 @@ class CreateLocation extends CreateRecord
             unset($data[$key]);
         }
 
+        // Prompt 367 — owner-only numbers: the owner's value, else nothing stored (the code default applies).
+        foreach (LocationForm::OWNER_INTEGERS as $key) {
+            if (LocationForm::actorIsOwner() && (int) ($data[$key] ?? 0) > 0) {
+                $this->integerState[$key] = (int) $data[$key];
+            }
+            unset($data[$key]);
+        }
+
         foreach (LocationForm::SETTING_ARRAYS as $key) {
             $this->arrayState[$key] = LocationForm::normalizeNumberList((array) ($data[$key] ?? Settings::DEFAULTS[$key]));
             unset($data[$key]);
@@ -80,6 +88,12 @@ class CreateLocation extends CreateRecord
 
         foreach (LocationForm::SETTING_INTEGERS as $key) {
             Settings::set($key, $this->integerState[$key] ?? (int) Settings::DEFAULTS[$key], SettingType::INT, (string) $this->record->getKey());
+        }
+
+        foreach (LocationForm::OWNER_INTEGERS as $key) {
+            if (isset($this->integerState[$key])) {
+                Settings::set($key, $this->integerState[$key], SettingType::INT, (string) $this->record->getKey());
+            }
         }
 
         foreach (LocationForm::SETTING_ARRAYS as $key) {
