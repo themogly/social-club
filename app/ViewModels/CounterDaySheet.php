@@ -139,11 +139,12 @@ class CounterDaySheet
         }
         $put = function (?string $sessionId, CashPot $pot, int $cents) use (&$boxes, $sessions): void {
             $session = $sessions->get($sessionId);
-            $boxes[$session !== null && $session->hasOwnBox($pot) ? $pot->value : CashPot::DISPENSARY->value] += $cents;
+            $boxes[($session?->cashPotFor($pot) ?? CashPot::DISPENSARY)->value] += $cents; // 378: the shop may follow the bar
         };
         foreach ($counted as $row) {
             if ($row['kind'] === 'bar') {
-                $put($row['till_session_id'], CashPot::BAR, (int) $row['money']['cash']);
+                $put($row['till_session_id'], CashPot::BAR, (int) $row['money']['cash'] - (int) $row['shop_cash']);
+                $put($row['till_session_id'], CashPot::SHOP, (int) $row['shop_cash']);
             } else {
                 $put($row['till_session_id'], CashPot::EDIBLES, (int) $row['edibles_cash']);
                 $put($row['till_session_id'], CashPot::DISPENSARY, (int) $row['money']['cash'] - (int) $row['edibles_cash']);
@@ -200,7 +201,7 @@ class CounterDaySheet
 
         return $this->row($d->id, 'dispensary', $at, $d->member, $d->operator_id, $d->operator?->name, $d->status !== DispensationStatus::COMPLETED, $d->void_reason, [
             'total' => $d->total_cents->cents, 'cash' => $d->cash_cents->cents, 'wallet' => max(0, $wallet - $tab), 'tab' => min($tab, $wallet),
-        ], [$d->till_session_id, $d->edibles_cash_cents->cents], $d->lines->map(fn (DispensationLine $line): array => [
+        ], [$d->till_session_id, $d->edibles_cash_cents->cents, 0], $d->lines->map(fn (DispensationLine $line): array => [
             'name' => (string) ($line->genetic_name_snapshot ?: $line->genetic?->name ?: '—'),
             'grams_cg' => $line->grams_cg->centigrams,
             'charged_cg' => $line->getRawOriginal('charged_cg') !== null ? (int) $line->getRawOriginal('charged_cg') : $line->grams_cg->centigrams,
@@ -216,14 +217,15 @@ class CounterDaySheet
 
         return $this->row($o->id, 'bar', $o->created_at, $o->member, $o->operator_id, $o->operator?->name, $o->status !== OrderStatus::COMPLETED, $o->void_reason, [
             'total' => $o->total_cents->cents, 'cash' => $o->cash_cents->cents, 'wallet' => max(0, $wallet - $tab), 'tab' => min($tab, $wallet),
-        ], [$o->till_session_id, 0], collect((array) $o->items)->filter(fn (mixed $item): bool => is_array($item))->map(fn (array $item): array => [
+        ], [$o->till_session_id, 0, $o->shop_cash_cents->cents], collect((array) $o->items)->filter(fn (mixed $item): bool => is_array($item))->map(fn (array $item): array => [
             'name' => (string) ($item['name'] ?? '—'), 'qty' => max(1, (int) ($item['qty'] ?? 1)), 'grams_cg' => 0, 'charged_cg' => 0, 'units' => null,
         ])->values()->all(), $receipts ? route('counter.bar.receipt', $o->id) : null, 0);
     }
 
     /**
      * @param  array{total: int, cash: int, wallet: int, tab: int}  $money
-     * @param  array{0: ?string, 1: int}  $till  the till session, and the cash that paid for edibles (373, fixed at commit)
+     * @param  array{0: ?string, 1: int, 2: int}  $till  the till session, the cash that paid for edibles (373) and for shop items
+     *                                                   (378), both fixed at commit
      * @param  list<array{name: string, grams_cg: int, charged_cg: int, units: ?int, qty: int}>  $lines
      * @return array<string, mixed>
      */
@@ -246,6 +248,7 @@ class CounterDaySheet
             'money' => $money,
             'till_session_id' => $till[0],
             'edibles_cash' => $till[1],
+            'shop_cash' => $till[2],
             'lines' => $lines,
             'what' => array_map(fn (array $line): string => $this->lineText($kind, $line), $lines),
             'receipt_url' => $receipt,

@@ -6,7 +6,6 @@ use App\Actions\Bar\CommitOrder;
 use App\Actions\Bar\VoidOrder;
 use App\Actions\Pricing\ResolveArticleDiscount;
 use App\Actions\Till\SelectTillSession;
-use App\Enums\CashPot;
 use App\Enums\TillSessionStatus;
 use App\Exceptions\TillClosedException;
 use App\Livewire\Counter\Concerns\AddsManualBarLines;
@@ -475,7 +474,7 @@ class BarPos extends Component
         $this->resetBasketState();
         // Prompt 373 — the bar's cash, when the bar has its own box this session: «Pon 5.00 € en el bote de la barra.»
         $session = TillSession::query()->withoutGlobalScopes()->find($order->till_session_id);
-        $boxes = $session === null ? null : CashBoxes::sentence($session, [CashPot::BAR->value => $order->cash_cents->cents]);
+        $boxes = $session === null ? null : CashBoxes::sentence($session, CashBoxes::orderCash($order)); // 378: bar and shop parts
         $this->flashSettled(SettledOutcome::forOrder($order, $change), trim(__('Pedido registrado.').' '.($boxes ?? '')));
         $this->landAfterRecording(null, $order->id, $boxes); // prompt 347 — the same setting as the dispensary, same default
     }

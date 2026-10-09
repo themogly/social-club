@@ -25,12 +25,14 @@ class Order extends Model
         'total_cents' => 0,
         'cash_cents' => 0,
         'wallet_cents' => 0,
+        'shop_cash_cents' => 0,
     ];
 
     protected $fillable = [
         'organisation_id', 'location_id', 'member_id', 'operator_id', 'till_session_id',
         'items', 'total_cents', 'cash_cents', 'wallet_cents', 'status', 'reversal_of_id',
         'void_reason', 'voided_by', 'voided_at', 'idempotency_key', 'reference',
+        'shop_cash_cents', // prompt 378 — the cash that paid for the shop items, fixed at commit
     ];
 
     protected function casts(): array
@@ -40,6 +42,7 @@ class Order extends Model
             'total_cents' => MoneyCast::class,
             'cash_cents' => MoneyCast::class,
             'wallet_cents' => MoneyCast::class,
+            'shop_cash_cents' => MoneyCast::class,
             'status' => OrderStatus::class,
             'voided_at' => 'datetime',
         ];

@@ -160,15 +160,18 @@ Drinks, snacks, papers, lighters and merchandise are **products**, sold by unit 
 1. Go to **Products → New product**.
 2. **Locations:** choose which clubs sell it. The store is never offered.
 3. **Name** and **Price (€)**.
-4. **Stock at** each location: how many units are there now.
-5. **Low stock threshold:** when stock falls to this number, it shows as running low (and alerts you, if Telegram alerts are on).
-6. Add an image, keep **Active** on, then **Create**.
+4. **Sold at:** **Bar** (drinks, food) or **Shop** (products, merchandise). It decides which cash box the money goes in when your club keeps the shop's cash apart (*Locations → Tills*). Products are **Bar** unless you choose otherwise.
+5. **Stock at** each location: how many units are there now.
+6. **Low stock threshold:** when stock falls to this number, it shows as running low (and alerts you, if Telegram alerts are on).
+7. Add an image, keep **Active** on, then **Create**.
 
 ![Create Product: rolling papers at €1.20, 40 in stock at each club, alert at 10.](img/manager-guide/c11.jpg)
 
 *Create Product: rolling papers at €1.20, 40 in stock at each club, alert at 10.*
 
 **When a delivery arrives,** use **Restock** on the product's row and type the units received. Do not edit the stock number directly: Restock records the delivery properly.
+
+**Sorting the shop's products in one go:** in the Products list, filter **Sold at**, tick the shop's products, and use **Mark as shop** in the bulk menu (or **Mark as bar** to undo). Past sales keep where they were sold; only sales from then on follow.
 
 ![The Products list: price, stock and threshold per location, with Restock and Edit in each row's ⋮ menu.](img/manager-guide/c12.jpg)
 
@@ -318,6 +321,7 @@ The same threshold also watches **each person**: if what someone lost over the l
 | Ahora · Nuevo total · Añadir · Quitar | Now · New total · Add · Remove |
 | Partes del lote | Batch parts |
 | Productos · Reponer | Products · Restock |
+| Se vende en · Barra · Tienda · Marcar como tienda | Sold at · Bar · Shop · Mark as shop |
 | Umbral de stock bajo | Low stock threshold |
 | Inventario · Nuevo inventario | Stock count · New stock count |
 | Bote (g) · Reserva sellada (g) · Incluir lotes a cero | Jar (g) · Sealed reserve (g) · Include empty batches |

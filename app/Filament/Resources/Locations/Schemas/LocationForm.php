@@ -72,6 +72,7 @@ class LocationForm
         'count_bar_nightly',
         'count_fees_nightly',
         'count_edibles_nightly',
+        'count_shop_nightly', // prompt 378
     ];
 
     /**
@@ -83,8 +84,17 @@ class LocationForm
     public const OWNER_STRINGS = [
         'cash_box_edibles',
         'cash_box_bar',
+        'cash_box_shop', // prompt 378 — 'with_bar' | 'till' | 'own'
         'cash_box_fees',
     ];
+
+    /** Prompt 378 — the values an owner-only string may take (the shop row has a third choice). */
+    public static function allowedOwnerString(string $key, mixed $value): bool
+    {
+        $pot = array_search($key, CashBoxes::SETTINGS, true);
+
+        return $pot !== false && in_array($value, CashBoxes::choicesFor((string) $pot), true);
+    }
 
     /**
      * Prompt 367 — per-location INTEGER settings only the OWNER may change: the losses alert threshold, so a manager cannot
@@ -156,8 +166,9 @@ class LocationForm
             Grid::make(['default' => 1, 'md' => 3])->schema([
                 ToggleButtons::make($key)
                     ->label($label)
-                    ->options(['till' => __('En la caja'), 'own' => __('Bote propio')])
-                    ->default('till')
+                    // Prompt 378 — the shop alone may also go «Con la barra» (the default: wherever the bar's money goes).
+                    ->options(array_intersect_key(['with_bar' => __('Con la barra'), 'till' => __('En la caja'), 'own' => __('Bote propio')], array_flip(CashBoxes::choicesFor($pot))))
+                    ->default(CashBoxes::defaultFor($pot))
                     ->inline()
                     ->inlineLabel()
                     ->columnSpan(['default' => 1, 'md' => 2])
@@ -169,11 +180,11 @@ class LocationForm
                     ->visible(fn (Get $get): bool => $get($key) === 'own')
                     ->disabled(fn (): bool => ! self::actorIsOwner()),
             ]),
-            Text::make(fn (Get $get, ?Location $record): ?string => $get($key) === 'till' && $record !== null ? CashBoxes::mergeWarning($record, CashPot::from($pot)) : null)
+            Text::make(fn (Get $get, ?Location $record): ?string => $get($key) !== 'own' && $record !== null ? CashBoxes::mergeWarning($record, CashPot::from($pot)) : null)
                 ->color('warning')
                 ->weight(FontWeight::SemiBold)
                 ->extraAttributes(['data-cash-merge-warning' => $pot])
-                ->visible(fn (Get $get, ?Location $record): bool => $get($key) === 'till' && $record !== null && CashBoxes::mergeWarning($record, CashPot::from($pot)) !== null),
+                ->visible(fn (Get $get, ?Location $record): bool => $get($key) !== 'own' && $record !== null && CashBoxes::mergeWarning($record, CashPot::from($pot)) !== null),
         ];
     }
 
@@ -480,9 +491,10 @@ class LocationForm
                                     ->visible(fn (): bool => self::actorIsOwner()),
                                 Text::make(__('Dispensario (flores, hachís, porros, vapers…): siempre en la caja, con el fondo, y se cuenta cada noche.')),
                                 ...self::cashBoxRow('EDIBLES', __('Comestibles')),
-                                ...self::cashBoxRow('BAR', __('Barra y tienda (bebidas, comida, productos)')),
+                                ...self::cashBoxRow('BAR', __('Barra (bebidas, comida)')),
+                                ...self::cashBoxRow('SHOP', __('Tienda (productos)')), // prompt 378
                                 ...self::cashBoxRow('FEES', __('Cuotas de socio')),
-                                Text::make(fn (Get $get): string => CashBoxes::summary(collect(CashBoxes::SETTINGS)->map(fn (string $key): string => (string) ($get($key) ?: 'till'))->all()))
+                                Text::make(fn (Get $get): string => CashBoxes::summary(collect(CashBoxes::SETTINGS)->map(fn (string $key, string $pot): string => (string) ($get($key) ?: CashBoxes::defaultFor($pot)))->all()))
                                     ->weight(FontWeight::SemiBold)
                                     ->extraAttributes(['data-cash-summary' => true]),
                                 Text::make(__('Los cambios se aplican la próxima vez que se abra la caja.'))->color('gray'),

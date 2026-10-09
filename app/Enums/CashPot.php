@@ -18,6 +18,7 @@ enum CashPot: string implements HasLabel
     case BAR = 'BAR';
     case FEES = 'FEES';
     case EDIBLES = 'EDIBLES'; // prompt 373
+    case SHOP = 'SHOP'; // prompt 378 — products and merch, apart from the bar's drinks and food
 
     public function label(): string
     {
@@ -26,6 +27,7 @@ enum CashPot: string implements HasLabel
             self::BAR => __('Barra'),
             self::FEES => __('Cuotas'),
             self::EDIBLES => __('Comestibles'),
+            self::SHOP => __('Tienda'),
         };
     }
 
@@ -41,7 +43,7 @@ enum CashPot: string implements HasLabel
      */
     public static function optional(): array
     {
-        return [self::BAR, self::FEES, self::EDIBLES];
+        return [self::BAR, self::SHOP, self::FEES, self::EDIBLES];
     }
 
     /** Prompt 373 — «10.00 € en el bote de comestibles»: one part of the counter's «Pon …» sentence. */
@@ -52,17 +54,26 @@ enum CashPot: string implements HasLabel
             self::BAR => __(':amount en el bote de la barra', ['amount' => $amount]),
             self::FEES => __(':amount en el bote de cuotas', ['amount' => $amount]),
             self::EDIBLES => __(':amount en el bote de comestibles', ['amount' => $amount]),
+            self::SHOP => __(':amount en el bote de la tienda', ['amount' => $amount]),
         };
     }
 
-    /** Prompt 373 — the automatic entry's note when a box is merged into the till at opening. */
-    public function mergedNote(): string
+    /**
+     * Prompt 373 — the automatic entry's note when a box is merged into the till at opening. Prompt 378 — the shop's box can
+     * also join the bar's («Con la barra» with a bar box).
+     */
+    public function mergedNote(?self $into = null): string
     {
+        if ($this === self::SHOP && $into === self::BAR) {
+            return __('Bote de la tienda unido al bote de la barra');
+        }
+
         return match ($this) {
             self::DISPENSARY => '',
             self::BAR => __('Bote de la barra unido a la caja'),
             self::FEES => __('Bote de cuotas unido a la caja'),
             self::EDIBLES => __('Bote de comestibles unido a la caja'),
+            self::SHOP => __('Bote de la tienda unido a la caja'),
         };
     }
 
@@ -74,6 +85,7 @@ enum CashPot: string implements HasLabel
             self::BAR => __('el bote de la barra'),
             self::FEES => __('el bote de cuotas'),
             self::EDIBLES => __('el bote de comestibles'),
+            self::SHOP => __('el bote de la tienda'),
         };
     }
 
@@ -85,6 +97,7 @@ enum CashPot: string implements HasLabel
             self::BAR => __('Bote de la barra'),
             self::FEES => __('Bote de cuotas'),
             self::EDIBLES => __('Bote de comestibles'),
+            self::SHOP => __('Bote de la tienda'),
         };
     }
 

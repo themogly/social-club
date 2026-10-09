@@ -97,7 +97,7 @@ class TillReport extends AbstractReport
 
         $this->sessionCount = $sessions->count();
         // Prompt 349 / 373 — a box's columns appear only when a session in view kept it.
-        $potKeys = [CashPot::BAR->value => 'barra', CashPot::FEES->value => 'cuotas', CashPot::EDIBLES->value => 'comestibles'];
+        $potKeys = [CashPot::BAR->value => 'barra', CashPot::SHOP->value => 'tienda', CashPot::FEES->value => 'cuotas', CashPot::EDIBLES->value => 'comestibles'];
         $anyBox = collect(CashPot::optional())->mapWithKeys(fn (CashPot $pot): array => [$pot->value => $sessions->contains(fn (TillSession $session): bool => $session->hasOwnBox($pot))])->all();
 
         // One batched Z-report for the whole period — a fixed number of grouped queries, not ~12 per session
@@ -206,7 +206,7 @@ class TillReport extends AbstractReport
     private function boxColumns(array $anyBox): array
     {
         $columns = [];
-        foreach ([[CashPot::BAR, 'barra', __('Barra')], [CashPot::FEES, 'cuotas', __('Cuotas')], [CashPot::EDIBLES, 'comestibles', __('Comestibles')]] as [$pot, $key, $label]) {
+        foreach ([[CashPot::BAR, 'barra', __('Barra')], [CashPot::SHOP, 'tienda', __('Tienda')], [CashPot::FEES, 'cuotas', __('Cuotas')], [CashPot::EDIBLES, 'comestibles', __('Comestibles')]] as [$pot, $key, $label]) {
             if ($anyBox[$pot->value] ?? false) {
                 array_push($columns,
                     ReportColumn::money($key.'_esperado', __(':pot: esperado', ['pot' => $label])),

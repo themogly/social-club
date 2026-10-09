@@ -23,6 +23,7 @@ class Article extends Model
     protected $fillable = [
         'organisation_id', 'location_id', 'group_id', 'name', 'category_id', 'price_cents',
         'stock', 'low_stock_threshold', 'images', 'active',
+        'sold_at', // prompt 378 — 'BAR' | 'SHOP': which cash box its money goes in (snapshotted on each order item)
     ];
 
     protected function casts(): array

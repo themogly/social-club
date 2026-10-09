@@ -33,6 +33,8 @@ class TillSession extends Model
         // Prompt 373 — the session's own boxes (snapshotted at opening) and the edibles box.
         'own_boxes',
         'edibles_opening_cents', 'edibles_counted_cents', 'edibles_expected_cents', 'edibles_variance_cents',
+        // Prompt 378 — the shop box, and where the shop's money went when it had none ('with_bar' | 'till' | 'own').
+        'shop_box', 'shop_opening_cents', 'shop_counted_cents', 'shop_expected_cents', 'shop_variance_cents',
     ];
 
     protected function casts(): array
@@ -60,6 +62,10 @@ class TillSession extends Model
             'edibles_counted_cents' => MoneyCast::class,
             'edibles_expected_cents' => MoneyCast::class,
             'edibles_variance_cents' => MoneyCast::class,
+            'shop_opening_cents' => MoneyCast::class,
+            'shop_counted_cents' => MoneyCast::class,
+            'shop_expected_cents' => MoneyCast::class,
+            'shop_variance_cents' => MoneyCast::class,
         ];
     }
 
@@ -154,6 +160,23 @@ class TillSession extends Model
     public function hasOwnBox(CashPot $pot): bool
     {
         return $pot !== CashPot::DISPENSARY && in_array($pot->value, (array) ($this->own_boxes ?? []), true);
+    }
+
+    /**
+     * Prompt 378 — where this session put a kind of money: its own box when it has one; the shop, when it has none, wherever
+     * the bar's money goes («Con la barra», the default, and every session from before 378) unless its choice was the till;
+     * anything else, the till. TillSummary, the counter's «Pon …» line and the day sheet all ask this.
+     */
+    public function cashPotFor(CashPot $kind): CashPot
+    {
+        if ($kind !== CashPot::DISPENSARY && $this->hasOwnBox($kind)) {
+            return $kind;
+        }
+        if ($kind === CashPot::SHOP && ($this->shop_box ?? 'with_bar') === 'with_bar') {
+            return $this->cashPotFor(CashPot::BAR);
+        }
+
+        return CashPot::DISPENSARY;
     }
 
     /** @return list<CashPot> the session's own boxes, in {@see CashPot::optional()} order */

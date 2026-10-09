@@ -26,7 +26,7 @@ use Illuminate\Support\Collection;
  * payments are shown but excluded (the distinction naive tills get wrong). Voided
  * transactions are excluded, so a void adjusts the expected figure automatically.
  *
- * @phpstan-type Breakdown array{float: int, cash_contributions: int, wallet_contributions: int, bar_cash: int, top_ups: int, refunds: int, fees_cash: int, cash_in: int, cash_out: int, banked: int, petty_cash: int, petty_cash_items: list<array{category: string, note: ?string, amount_cents: int, recorded_by: string, at: string}>, expected: int, separate_pots: bool, own_boxes: list<string>, edibles_cash: int, pots: array<string, array{opening: int, expected: int}>}
+ * @phpstan-type Breakdown array{float: int, cash_contributions: int, wallet_contributions: int, bar_cash: int, top_ups: int, refunds: int, fees_cash: int, cash_in: int, cash_out: int, banked: int, petty_cash: int, petty_cash_items: list<array{category: string, note: ?string, amount_cents: int, recorded_by: string, at: string}>, expected: int, separate_pots: bool, own_boxes: list<string>, edibles_cash: int, shop_cash: int, pots: array<string, array{opening: int, expected: int}>}
  */
 class TillSummary
 {
@@ -87,6 +87,9 @@ class TillSummary
             Dispensation::query()->withoutGlobalScopes()->where('status', DispensationStatus::COMPLETED->value), $ids, 'edibles_cash_cents');
         $barCash = self::sumBySession(
             Order::query()->withoutGlobalScopes()->where('status', OrderStatus::COMPLETED->value), $ids, 'cash_cents');
+        // Prompt 378 — the part of the orders' cash that paid for shop items, fixed at commit (CommitOrder's one rule).
+        $shopCash = self::sumBySession(
+            Order::query()->withoutGlobalScopes()->where('status', OrderStatus::COMPLETED->value), $ids, 'shop_cash_cents');
         $topUps = self::sumBySession(
             WalletTransaction::query()->withoutGlobalScopes()->where('type', WalletTransactionType::TOPUP->value), $ids, 'amount_cents');
         $refunds = self::sumBySession(
@@ -129,28 +132,34 @@ class TillSummary
             $fc = $feesCash[$id] ?? 0;
 
             $ed = $ediblesCash[$id] ?? 0;
+            $shop = $shopCash[$id] ?? 0;
 
             // Prompt 349 / 373 — the cash per POT. Which source feeds which pot is decided HERE and nowhere else:
             //   the till (DISPENSARY) — the float, cash contributions, wallet top-ups taken in cash, refunds paid out, its
             //                          movements, AND every kind of money that has no box of its own this session;
             //   edibles (own box)    — its carried opening, the edibles' cash (fixed at commit), its movements;
-            //   bar (own box)        — its carried opening, bar & shop cash, its movements;
+            //   bar (own box)        — its carried opening, the bar's cash (and the shop's «Con la barra»), its movements;
+            //   shop (own box)       — its carried opening, the shop's cash (fixed at commit), its movements (prompt 378);
             //   fees (own box)       — its carried opening, membership fees in cash, its movements.
+            // Prompt 378 — each kind of money goes to `$session->cashPotFor(kind)`: its box, or the till (the shop «Con la barra»
+            // follows the bar). The orders' cash is the bar's minus the shop's part; a session from before 378 has no shop part.
             // A pot without its own box reads 0 (its money is in the till). Refunds and cash top-ups always stay with the till.
             // With no boxes, the till is exactly the single drawer of before; with 349's bar + fees, exactly 349's figures.
             $own = fn (CashPot $pot): bool => $session->hasOwnBox($pot);
             $potMovements = fn (CashPot $pot): int => (int) $movements
                 ->filter(fn (CashMovement $m): bool => ($pot === CashPot::DISPENSARY && ! $own($m->pot ?? CashPot::DISPENSARY)) || ($pot !== CashPot::DISPENSARY && ($m->pot ?? CashPot::DISPENSARY) === $pot))
                 ->sum(fn (CashMovement $m): int => $m->amount_cents->cents);
-            $source = [CashPot::BAR->value => $bar, CashPot::FEES->value => $fc, CashPot::EDIBLES->value => $ed];
-            $till = $float + $cash + $tu + $rf + $potMovements(CashPot::DISPENSARY)
-                - ($own(CashPot::EDIBLES) ? $ed : 0)
-                + ($own(CashPot::BAR) ? 0 : $bar)
-                + ($own(CashPot::FEES) ? 0 : $fc);
+            $byKind = [CashPot::EDIBLES->value => $ed, CashPot::BAR->value => $bar - $shop, CashPot::SHOP->value => $shop, CashPot::FEES->value => $fc];
+            $into = [CashPot::DISPENSARY->value => $cash - $ed]; // the dispensary's own cash is always the till's
+            foreach ($byKind as $kind => $cents) {
+                $pot = $session->cashPotFor(CashPot::from($kind))->value;
+                $into[$pot] = ($into[$pot] ?? 0) + $cents;
+            }
+            $till = $float + $into[CashPot::DISPENSARY->value] + $tu + $rf + $potMovements(CashPot::DISPENSARY);
             $pots = [CashPot::DISPENSARY->value => ['opening' => $float, 'expected' => $till]];
             foreach (CashPot::optional() as $pot) {
                 $opening = $own($pot) ? (int) $session->getRawOriginal($pot->column().'_opening_cents') : 0;
-                $pots[$pot->value] = ['opening' => $opening, 'expected' => $own($pot) ? $opening + $source[$pot->value] + $potMovements($pot) : 0];
+                $pots[$pot->value] = ['opening' => $opening, 'expected' => $own($pot) ? $opening + ($into[$pot->value] ?? 0) + $potMovements($pot) : 0];
             }
             $separate = $session->ownBoxes() !== [];
 
@@ -175,6 +184,7 @@ class TillSummary
                 'separate_pots' => $separate,
                 'own_boxes' => array_map(fn (CashPot $pot): string => $pot->value, $session->ownBoxes()),
                 'edibles_cash' => $ed,
+                'shop_cash' => $shop,
                 'pots' => $pots,
             ];
         }
