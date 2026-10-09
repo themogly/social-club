@@ -168,11 +168,15 @@ class GuidedFlowsTest extends TestCase
 
     public function test_a_location_without_prices_is_flagged(): void
     {
-        $this->assertFalse($this->a->hasActivePrices());
+        // Prompt 376 — «priced» is now the counter's own rule over the strains in stock (Location::priceCoverage).
+        $genetic = $this->genetic();
+        $this->batchAt($genetic, $this->a);
+        $this->batchAt($genetic, $this->b);
+        $this->assertSame(0, $this->a->priceCoverage()['priced']);
 
-        $this->priceAt($this->genetic(), $this->a);
-        $this->assertTrue($this->a->fresh()->hasActivePrices());
-        $this->assertFalse($this->b->fresh()->hasActivePrices()); // only that sede
+        $this->priceAt($genetic, $this->a);
+        $this->assertSame(1, $this->a->fresh()->priceCoverage()['priced']);
+        $this->assertSame(0, $this->b->fresh()->priceCoverage()['priced']); // only that sede
     }
 
     public function test_creating_a_genetic_is_the_strain_alone_and_guided_on_to_crear_lote(): void

@@ -142,6 +142,11 @@ class BatchesTable
                     ->label(__('Sede'))
                     ->options(fn (): array => Location::query()->orderBy('name')->pluck('name', 'id')->all())
                     ->visible(fn (): bool => Location::query()->count() > 1),
+                // Prompt 376 — by strain: what the *Sedes* «Precios» badge links to (the strains the counter cannot price there).
+                SelectFilter::make('genetic_id')
+                    ->label(__('Genética'))
+                    ->multiple()
+                    ->options(fn (): array => Genetic::query()->orderBy('name')->pluck('name', 'id')->all()),
                 // Prompt 308 — the working list is what is IN stock; empty batches are one choice away, never gone.
                 SelectFilter::make('stock')
                     ->label(__('Existencias'))

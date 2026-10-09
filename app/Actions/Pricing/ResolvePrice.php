@@ -144,6 +144,23 @@ class ResolvePrice
     }
 
     /**
+     * Prompt 376 — can the counter put a price on this strain at this sede? The batch it would draw from carries its own price
+     * above 0, or (that batch having none) the sede has an active base price above 0: exactly what `forBatch()` / `legacy()`
+     * would charge — this IS that rule, so the *Sedes* badge and the strains list can never disagree with the counter.
+     * Cheap over a list after `preloadDisplayBatches()` and with each strain's `prices` loaded.
+     */
+    public function canPrice(Genetic $genetic, Location $location): bool
+    {
+        $column = $genetic->isUnitType() ? 'price_per_unit_cents' : 'price_per_gram_cents';
+        $batch = $this->displayBatch($genetic, $location);
+        if ($batch !== null && $batch->hasOwnPrice()) {
+            return (int) $batch->getRawOriginal($column) > 0;
+        }
+
+        return (int) ($this->priceRow($genetic, $location, null)?->getRawOriginal($column) ?? 0) > 0;
+    }
+
+    /**
      * Resolve `displayBatch()` for a whole list in two queries (273's rule — the counter grid must not query per card).
      *
      * @param  iterable<Genetic>  $genetics
