@@ -8,7 +8,11 @@ updated: 2026-10-09
 
 > Every euro that goes into or out of the drawer is recorded with **who** did it and **why**. That is what lets the cash count at closing come out right, and what explains it when it does not. This guide shows which button to use for each situation. It follows on from the *Counter quick-start guide*.
 
-**The till and the boxes.** The dispensary's cash always goes in **the till**: it holds the float and is counted every night. Each club chooses where the other kinds of money go: **edibles**, **bar & shop** and **membership fees** each go in the till too, or in **a box of their own**, as the club does in real life (*Locations → [club] → Tills*, section 7). Every sale's cash goes into the right place by itself, and the counter says when something goes in a box: *"Put €10.00 in the edibles box."*
+**The till and the boxes.** The dispensary's cash always goes in **the till**: it holds the float and is counted every night. Each club chooses where the other kinds of money go: **edibles**, **bar & shop** and **membership fees** each go in the till too, or in **a box of their own**, as the club does in real life (*Locations → [club] → Tills*, section 7). Every sale's cash goes into the right place by itself, and the counter says when something goes in a box: *"Put €10.00 in the edibles box."* That instruction stays until the next sale: on the counter home it sits under the last sale's line (*"Last: €20.36 · 2.07 g"*), in amber; on a screen that stays put after a sale, the confirmation waits for your next tap instead of fading.
+
+![The counter home after a sale with an edible paid in cash: the last sale, and which box its cash goes in.](img/cash-at-the-counter/u01b-hub-box.jpg)
+
+*The counter home after a sale with an edible paid in cash: the last sale, and which box its cash goes in.*
 
 ## 1. How the till keeps track
 
@@ -153,7 +157,7 @@ Closing a till is never blocked by a difference, so this report is where you fin
 
 **Where the cash goes** (*Locations → [club] → Tills*, owners only; managers see it read-only). The dispensary is always in the till. For **Edibles**, **Bar & shop** and **Membership fees**, choose **In the till** or **Own box**, and for a box whether to **Count every night**. Three buttons set the usual shapes in one tap: **Everything in the till**, **Fees apart**, **Everything apart**. A sentence under the rows says what will be counted at closing, for example *"At close the till is counted (dispensary, edibles and bar) and the fees box."* Changes apply the next time a till is opened.
 
-- **A box moved into the till keeps its money.** If the box still holds money, the form warns (*"The bar box holds €45.00, uncounted since 3/10…"*). When the next till opens, that money is added to the till as an automatic **Entry** (*"Bar box merged into the till"*), and the Till screen says *"Empty the bar box (€45.00) into the till."*
+- **A box moved into the till keeps its money.** If the box still holds money, the form warns (*"The bar box holds €45.00, uncounted since 3/10…"*). With several tills, it names the till whose box holds it (*"POS-2: the bar box holds €45.00…"*), since each till merges its own box when it next opens. When the next till opens, that money is added to the till as an automatic **Entry** (*"Bar box merged into the till"*), and the Till screen says *"Empty the bar box (€45.00) into the till."*
 - **A box made separate again starts at €0**: its old money went into the till when it was merged.
 
 ![Locations → Tills: where each kind of money goes, the three presets, and the sentence that says what is counted.](img/cash-at-the-counter/c09-cash-boxes.jpg)

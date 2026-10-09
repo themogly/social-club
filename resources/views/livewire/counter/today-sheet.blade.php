@@ -130,12 +130,28 @@
                         @endforeach
                         <div class="flex justify-between gap-3"><dt class="text-ink-muted dark:text-slate-400">{{ __('Barra y tienda: productos') }}</dt><dd class="font-semibold tabular-nums">{{ $totals['bar_items'] }}</dd></div>
                         @if ($showMoney)
-                            <div data-sheet-money class="flex justify-between gap-3 border-t border-line pt-2 dark:border-slate-800 sm:col-span-2">
-                                <dt class="font-medium">{{ __('Importe') }}</dt>
-                                <dd class="text-right font-semibold tabular-nums">{{ $money($totals['money']['total']) }}
-                                    <span class="block text-xs font-normal text-ink-muted dark:text-slate-400">{{ __('efectivo') }} {{ $money($totals['money']['cash']) }} · {{ __('monedero') }} {{ $money($totals['money']['wallet']) }} · {{ __('cuenta') }} {{ $money($totals['money']['tab']) }}</span>
+                            {{-- Prompt 374 — the two ledgers apart, never added: «Aportaciones» is the home panel's figure; «Barra y
+                                 tienda» its own income. Each split by how it was paid. --}}
+                            @php($split = fn (array $m): string => __('efectivo').' '.$money($m['cash']).' · '.__('monedero').' '.$money($m['wallet']).' · '.__('cuenta').' '.$money($m['tab']))
+                            <div data-sheet-money data-sheet-contributions class="flex justify-between gap-3 border-t border-line pt-2 dark:border-slate-800 sm:col-span-2">
+                                <dt class="font-medium">{{ __('Aportaciones') }}</dt>
+                                <dd class="text-right font-semibold tabular-nums">{{ $money($totals['money']['dispensary']['total']) }}
+                                    <span class="block text-xs font-normal text-ink-muted dark:text-slate-400">{{ $split($totals['money']['dispensary']) }}</span>
                                 </dd>
                             </div>
+                            <div data-sheet-bar-money class="flex justify-between gap-3 sm:col-span-2">
+                                <dt class="font-medium">{{ __('Barra y tienda') }}</dt>
+                                <dd class="text-right font-semibold tabular-nums">{{ $money($totals['money']['bar']['total']) }}
+                                    <span class="block text-xs font-normal text-ink-muted dark:text-slate-400">{{ $split($totals['money']['bar']) }}</span>
+                                </dd>
+                            </div>
+                            {{-- Its own boxes (373): where the day's cash went, as the close counts it. --}}
+                            @if ($totals['boxes'] !== null)
+                                <div data-sheet-boxes class="flex justify-between gap-3 border-t border-dashed border-line pt-2 text-xs dark:border-slate-800 sm:col-span-2">
+                                    <dt class="font-medium text-ink-muted dark:text-slate-400">{{ __('Efectivo por bote') }}</dt>
+                                    <dd class="text-right tabular-nums">{{ collect($totals['boxes'])->map(fn (int $cents, string $pot): string => \App\Enums\CashPot::from($pot)->boxTitle().': '.$money($cents))->implode(' · ') }}</dd>
+                                </div>
+                            @endif
                         @endif
                     </dl>
                 </section>

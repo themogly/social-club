@@ -7,6 +7,7 @@
      thing that happens (a line added, a member changed).
 
      @var string $summary      "Última: 15,00 € · 1,00 g · 14:02"
+     @var ?string $boxes       prompt 374 — «Pon 4.00 € en el bote de comestibles.»: which box the cash goes in, or null
      @var ?string $receiptUrl  the unchanged receipt / ticket route; null = no receipt offered (317's bar switch)
      @var string $receiptLabel @var string $receiptHeading
      @var bool   $emailable    the dispensary, and only when the member has an address
@@ -20,11 +21,17 @@
         $parts = explode(' · ', $summary);
         $time = count($parts) > 1 ? array_pop($parts) : null;
     @endphp
+    <div class="flex min-w-0 flex-col gap-0.5 py-1">
     <p data-last-sale-summary title="{{ $summary }}" class="flex min-w-0 items-center gap-1 whitespace-nowrap text-sm leading-tight text-ink dark:text-slate-100">
         <span aria-hidden="true" class="shrink-0 font-bold text-success">✓</span>
         {{-- One source line, one space between the parts: the line's text reads exactly "Última: … · … · 14:02". --}}
         <span class="min-w-0 truncate font-semibold">{{ implode(' · ', $parts) }}</span>@if ($time !== null) <span class="shrink-0 font-semibold">· {{ $time }}</span>@endif@if (\App\Support\TrainingMode::active()) <strong class="shrink-0 text-warning" data-practice-suffix>{{ __('(práctica)') }}</strong>@endif
     </p>
+    {{-- Prompt 374 — which box the cash goes in, on its own line in the warning colour, so it is never truncated away. --}}
+    @if (filled($boxes ?? null))
+        <p data-last-sale-boxes class="text-sm font-semibold leading-tight text-warning">{{ $boxes }}</p>
+    @endif
+    </div>
 
     {{-- Prompt 317 — a menu with nothing in it is not shown (the bar ticket switched off, no void, no email). --}}
     @if ($receiptUrl !== null || $emailable || $canVoid)

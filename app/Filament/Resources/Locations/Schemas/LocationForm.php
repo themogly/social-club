@@ -151,12 +151,16 @@ class LocationForm
         $count = CashBoxes::COUNT_NIGHTLY[$pot];
 
         return [
-            Grid::make(['default' => 1, 'sm' => 2])->schema([
+            // Prompt 374 — one row per kind of money from md up: the label and its two choices side by side, «Contar cada
+            // noche» beside them (stacked below md, where there is no room).
+            Grid::make(['default' => 1, 'md' => 3])->schema([
                 ToggleButtons::make($key)
                     ->label($label)
                     ->options(['till' => __('En la caja'), 'own' => __('Bote propio')])
                     ->default('till')
                     ->inline()
+                    ->inlineLabel()
+                    ->columnSpan(['default' => 1, 'md' => 2])
                     ->live()
                     ->disabled(fn (): bool => ! self::actorIsOwner()),
                 Toggle::make($count)
@@ -493,7 +497,8 @@ class LocationForm
                             ->selectablePlaceholder(false)
                             ->helperText(__('Automático: quien abre la caja queda con la entrada fichada y quien la cierra con la salida fichada; cada uno puede deshacerlo durante 2 minutos. Preguntar: se le pregunta. A las demás personas nunca se les ficha: lo hacen con su propio PIN.')),
                     ])
-                    ->columns(2),
+                    ->columns(2)
+                    ->columnSpanFull(), // prompt 374 — the cash rows need the width: half a page stacked every choice
 
                 // Prompt 367 — Informes → Pérdidas' alert (291's discount alert, extended to every loss). Owner only.
                 Section::make(__('Pérdidas'))

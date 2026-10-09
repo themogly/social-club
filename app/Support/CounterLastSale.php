@@ -13,12 +13,13 @@ class CounterLastSale
 
     public const SECONDS = 120;
 
-    public static function remember(string $locationId, ?string $dispensationId, ?string $orderId): void
+    /** @param  ?string  $boxes  Prompt 374 — «Pon 4.00 € en el bote de comestibles.» ({@see CashBoxes::sentence()}), or null */
+    public static function remember(string $locationId, ?string $dispensationId, ?string $orderId, ?string $boxes = null): void
     {
-        session([self::KEY => ['location_id' => $locationId, 'dispensation_id' => $dispensationId, 'order_id' => $orderId, 'at' => now()->getTimestamp()]]);
+        session([self::KEY => ['location_id' => $locationId, 'dispensation_id' => $dispensationId, 'order_id' => $orderId, 'boxes' => $boxes, 'at' => now()->getTimestamp()]]);
     }
 
-    /** @return array{location_id: string, dispensation_id: ?string, order_id: ?string, at: int}|null */
+    /** @return array{location_id: string, dispensation_id: ?string, order_id: ?string, boxes?: ?string, at: int}|null */
     public static function current(?string $locationId): ?array
     {
         $sale = session(self::KEY);

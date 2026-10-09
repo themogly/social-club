@@ -211,7 +211,11 @@ Closing also clocks you out: *"Clocked out at 23:04 · Undo"*. If you are stayin
 
 Tap the **Today** box on the counter home (or the **Today** tile, or **See the day** on the **Till** screen). It lists everything from today at this club, **oldest first**, the order the paper sheet is written in: the time, the member, what they took (grams weighed and, when the half-gram rounding changed it, *charged*), and who served. Voided transactions are struck through with their reason and do not count.
 
-At the bottom are the **Day totals**: the number of transactions (the same number as *Transactions* on the home screen), grams per strain, units, and bar items. Managers and owners also see each amount and how it was paid (cash, wallet or tab); staff see no money on this screen, as on the home screen.
+At the bottom are the **Day totals**: the number of transactions (the same number as *Transactions* on the home screen), grams per strain, units, and bar items. Managers and owners also see the money, in two separate figures that are never added together: **Contributions** (the dispensary; the same figure as *Contributions* on the home screen) and **Bar & shop**, each split by how it was paid (cash, wallet or tab). Where your club keeps cash boxes, **Cash by pot** says how much of the day's cash went in the till and in each box, as they are counted at the close. Staff see no money on this screen, as on the home screen.
+
+![Day totals: Contributions and Bar & shop apart, and the cash by pot.](img/counter-quick-start/11b-today-totals.jpg)
+
+*Day totals: Contributions and Bar & shop apart, and the cash by pot.*
 
 - **All / Dispensary / Bar**, **Only mine** (or a colleague's name) and **Search by member** narrow the list, and the totals follow.
 - Tap a transaction to see its receipt; **Close** brings you back.
@@ -283,6 +287,7 @@ The counter shows Spanish or English, depending on each person's language settin
 | Existencias · Rellenar el bote · Corregir peso del bote · Añadir a la reserva · Volver al dispensario | Stock · Top up the jar · Correct the jar's weight · Add to reserve · Back to the dispensary |
 | Otra acción · Sin reserva sellada | Another action · No sealed reserve |
 | Hoy · Ver el día · Solo lo mío · Totales del día | Today · See the day · Only mine · Day totals |
+| Aportaciones · Barra y tienda · Efectivo por bote | Contributions · Bar & shop · Cash by pot |
 | Solo hay 2.80 g en el bote. · Añadir 2.80 g | Only 2.80 g in the jar. · Add 2.80 g |
 | lotes agotados ocultos · Mostrar · Agotados | empty batches hidden · Show · Empty |
 | Bote vacío · Rellenado sin registrar | Jar empty · Unrecorded top-up |

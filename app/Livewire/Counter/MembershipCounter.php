@@ -546,6 +546,7 @@ class MembershipCounter extends Component
         $this->flashSeq++;
         $this->flashMessage = $message;
         $this->flashType = $type;
+        $this->flashKeeps = false; // prompt 374 — only a box instruction waits, and only until the next message
     }
 
     /**

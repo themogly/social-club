@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Enums\CashPot;
 use App\Models\Location;
 use App\Support\CounterOperator;
 use App\Support\CounterTerminals;
@@ -55,8 +56,14 @@ class TodaySheetCsvController
         }
         $csv->insertOne([__('Total'), __('Barra y tienda: productos'), (string) $totals['bar_items']]);
         if ($money) {
-            $csv->insertOne([__('Total'), __('Importe'), $euros($totals['money']['total']), __('efectivo').' '.$euros($totals['money']['cash']),
-                __('monedero').' '.$euros($totals['money']['wallet']), __('cuenta').' '.$euros($totals['money']['tab'])]);
+            // Prompt 374 — the two ledgers apart, as on the screen: never one combined figure.
+            foreach (['dispensary' => __('Aportaciones'), 'bar' => __('Barra y tienda')] as $ledger => $label) {
+                $m = $totals['money'][$ledger];
+                $csv->insertOne([__('Total'), $label, $euros($m['total']), __('efectivo').' '.$euros($m['cash']), __('monedero').' '.$euros($m['wallet']), __('cuenta').' '.$euros($m['tab'])]);
+            }
+            foreach ($totals['boxes'] ?? [] as $pot => $cents) {
+                $csv->insertOne([__('Total'), CashPot::from($pot)->boxTitle(), $euros($cents)]);
+            }
         }
 
         $content = $csv->toString();

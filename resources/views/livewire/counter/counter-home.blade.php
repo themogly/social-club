@@ -65,6 +65,7 @@
                     <div data-hub-last-sale>
                         @include('livewire.counter.partials.last-sale', [
                             'summary' => $hubSale['summary'],
+                            'boxes' => $hubSale['boxes'],
                             'receiptUrl' => $hubSale['receiptUrl'],
                             'receiptLabel' => $hubSale['receiptLabel'],
                             'receiptHeading' => $hubSale['receiptHeading'],

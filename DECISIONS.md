@@ -21851,3 +21851,71 @@ Every event carries a **signed** amount: positive is money lost, negative is an 
 - No migration.
 - After deploy, the owner can set each sede's threshold in *Sedes → editar → Pérdidas* (5 % if left alone).
 - The old *Ajustes → Umbral de alerta de descuentos* field is gone.
+## Prompt 374 — fixes from testing 369–373: the box message, the receipt frame, the day sheet's two ledgers
+
+### 1. The «which box» message lives on the last-sale line (373)
+
+- **Home mode:** the counter left for the hub 1.5 s after a sale, taking *«Pon 4.00 € en el bote de comestibles»* with it.
+  Now `CounterLastSale::remember()` stores the sentence, and the hub's last-sale line shows it under the summary in the
+  warning colour (`data-last-sale-boxes`), on its own line so the summary's truncation can never cut it.
+  - The sentence is built by the same `CashBoxes::sentence()`, not new wording.
+  - It lasts as long as the line: until the next sale, a lock, or 347's two minutes.
+- **Stay / new_member modes:** a success carrying a box sentence no longer fades after 234's six seconds. It waits for the
+  next action.
+  - `KeepsBoxInstruction::$flashKeeps` is set by `LandsAfterRecording` and by the fee core's `flashResult()`.
+  - Every screen's `flash()` clears it.
+  - `counter-flash` skips the timer when it is set.
+  - A success with no box sentence still auto-dismisses.
+- **Every path carries it:** the dispensary (edibles), the combined settle (bar + edibles), the bar screen, the
+  dispensary's bar-only charge (which never said it before), and cash fees at Socios, Recepción and the dispensary.
+
+### 2. The receipt frame's sizing
+
+- `flex-1` (a 0 % basis) overruled `h-[70svh]` inside a column sized by its content, so the iframe fell back to the
+  browser's 150 px (since `9fafe80`). Now: `h-[70svh] min-h-0 shrink`, the default `flex: 0 1 auto`. The frame keeps its
+  height and only shrinks when the modal's `max-h` leaves less; a short screen scrolls inside the frame.
+- A feature test cannot see layout, so the guard is in the browser:
+  - `shoot-receipt-sheet.mjs` now asserts the frame is ≥ 60 % of the viewport;
+  - `prove-374-fixes.mjs` checks it from the hub and from a *Hoy* row at 1180×820 and 820×1180 (574 px and 826 px), with
+    the receipt's total inside the frame.
+
+### 3. The two ledgers apart on *Hoy*
+
+- `CounterDaySheet::totals()['money']` is now `dispensary` and `bar`, each with total, cash, wallet and tab, and there is
+  no combined figure.
+- *Aportaciones* is the dispensary ledger, which equals the home panel's *Aportaciones* (both sum completed
+  dispensations' `total_cents` for the sede's business day). *Barra y tienda* is the orders. The CSV follows.
+- **Per-box cash ("Efectivo por bote")** shows when a session today keeps boxes of its own:
+  - each sale's cash split as `TillSummary` splits it: the edibles' `edibles_cash_cents`, the bar's cash, the rest to
+    the till;
+  - plus cash fees when the sheet is unfiltered (fees are no sale, so a filter on sales leaves them out);
+  - the float is not the day's money and is left out.
+  - In English, «bote» alone is "pot" (CLAUDE.md), so it reads *Cash by pot* / *Edibles pot*, as the existing *Bar pot*
+    and *Fees pot* do.
+
+### 4. Follow-ups
+
+- **Member page:** the infolist had no email at all. It now shows the address with the same amber line as the edit form,
+  through one shared `MemberForm::invalidEmailNote()`.
+- **Sedes → Cajas:** the `ToggleButtons` were already `->inline()`. The height came from the section sitting in half the
+  page (468 px at 1440), so each kind of money took a label row plus a buttons row. Now the section spans the full width,
+  and each kind is one row from md up: an inline label, the two choices, and *Contar cada noche* beside them. The fieldset
+  went from 545 px to 431 px tall at 1440; at 393 it stacks.
+- **Merge warning per terminal:** `CashBoxes::mergeWarning()` reads each terminal's own last close through the new
+  `OpenTill::lastCloseAt()`, the same one `heldAtLastClose()` merges from. With more than one terminal each part is named
+  (*«POS-2: el bote de la barra tiene 45.00 €…»*).
+- **Telegram's time:** *Salud del sistema*'s «Último rechazo» is shown in the club's time zone
+  (`Period::displayTimezone()`), with the translated month as before.
+
+### Tests
+
+- `tests/Feature/Counter/TestingFixes374Test.php` (7), red first (one, "no box, no extra text", is a guard and passes
+  both ways). It covers:
+  - the hub line and its replacement by the next sale;
+  - stay waiting instead of fading;
+  - the sheet's two ledgers equal to the panel, and its boxes;
+  - the member page;
+  - the per-terminal warning;
+  - Telegram's time.
+- TodaySheetTest's totals test asserts the two ledgers.
+- Browser: `prove-374-fixes.mjs` (hub, receipts, totals as manager and staff, Cajas at 1440 and 393).

@@ -332,7 +332,7 @@ class CounterHome extends Component
     /**
      * Prompt 347 — the sale just recorded, when the sede comes back here after recording ({@see CounterLastSale}).
      *
-     * @return array{summary: string, receiptUrl: ?string, receiptLabel: string, receiptHeading: string, canVoid: bool, voidHeading: string}|null
+     * @return array{summary: string, boxes: ?string, receiptUrl: ?string, receiptLabel: string, receiptHeading: string, canVoid: bool, voidHeading: string}|null
      */
     public function hubLastSale(): ?array
     {
@@ -354,6 +354,7 @@ class CounterHome extends Component
                     'grams' => Weight::fromCentigrams($dispensation->dispensedGramsCg())->formatted(),
                     'time' => local_datetime($dispensation->created_at, 'H:i', $location),
                 ]),
+                'boxes' => $sale['boxes'] ?? null, // prompt 374 — «Pon 4.00 € en el bote de comestibles.»
                 'receiptUrl' => route('counter.pos.receipt', $dispensation->id),
                 'receiptLabel' => __('Ver / imprimir recibo'),
                 'receiptHeading' => __('Recibo'),
@@ -367,6 +368,7 @@ class CounterHome extends Component
                 'total' => $order->total_cents->formatted(),
                 'time' => local_datetime($order->created_at, 'H:i', $location),
             ]),
+            'boxes' => $sale['boxes'] ?? null,
             'receiptUrl' => (bool) Settings::get('bar_receipt_enabled', false, $this->locationId) ? route('counter.bar.receipt', $order->id) : null,
             'receiptLabel' => __('Ver / imprimir ticket'),
             'receiptHeading' => __('Ticket'),

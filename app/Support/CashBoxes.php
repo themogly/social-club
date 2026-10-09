@@ -2,6 +2,7 @@
 
 namespace App\Support;
 
+use App\Actions\Till\OpenTill;
 use App\Enums\CashPot;
 use App\Models\Location;
 use App\Models\TillSession;
@@ -92,29 +93,38 @@ final class CashBoxes
     }
 
     /**
-     * Prompt 373 — on *Sedes → Cajas*, a box switched to «En la caja» while it still holds money at the sede's last close:
-     * «El bote de la barra tiene 45.00 € sin contar desde el 3/10. Al abrir la próxima caja se sumará a la caja: vacía el bote
-     * en la caja.» Null when there is nothing in it.
+     * Prompt 373 — on *Sedes → Cajas*, a box switched to «En la caja» while it still holds money at a last close: «El bote de la
+     * barra tiene 45.00 € sin contar desde el 3/10. Al abrir la próxima caja se sumará a la caja: vacía el bote en la caja.» Null
+     * when there is nothing in it.
+     *
+     * Prompt 374 — **per terminal**, because {@see OpenTill} merges per terminal (`heldAtLastClose()`): each terminal's own last
+     * close is read, so money left at POS-2 is not missed because POS-1 closed later. With more than one terminal each part is
+     * named: «POS-2: el bote de la barra tiene 45.00 €…».
      */
     public static function mergeWarning(Location $location, CashPot $pot): ?string
     {
-        $last = TillSession::query()->withoutGlobalScopes()->where('location_id', $location->id)->whereNotNull('closed_at')
-            ->orderByDesc('closed_at')->orderByDesc('id')->first();
-        if ($last === null || ! $last->hasOwnBox($pot)) {
-            return null;
+        $terminals = TillSession::query()->withoutGlobalScopes()->where('location_id', $location->id)->whereNotNull('closed_at')
+            ->pluck('terminal')->map(fn ($t): string => (string) $t)->unique(fn (string $t): string => TerminalName::key($t))->values();
+        $parts = [];
+        foreach ($terminals as $terminal) {
+            $last = OpenTill::lastCloseAt($location, TerminalName::key($terminal));
+            if ($last === null || ! $last->hasOwnBox($pot)) {
+                continue;
+            }
+            $counted = $last->getRawOriginal($pot->column().'_counted_cents');
+            $held = (int) ($counted ?? $last->getRawOriginal($pot->column().'_expected_cents') ?? 0);
+            if ($held <= 0) {
+                continue;
+            }
+            $date = local_datetime(TillSummary::uncountedSince($last, $pot) ?? $last->closed_at, 'j/n', $location);
+            $box = $terminals->count() > 1 ? $pot->boxName() : ucfirst($pot->boxName());
+            $sentence = $counted === null
+                ? __(':box tiene :amount sin contar desde el :date.', ['box' => $box, 'amount' => Money::fromCents($held)->formatted(), 'date' => $date])
+                : __(':box tiene :amount (contado el :date).', ['box' => $box, 'amount' => Money::fromCents($held)->formatted(), 'date' => $date]);
+            $parts[] = $terminals->count() > 1 ? __(':terminal: :sentence', ['terminal' => (string) $last->terminal, 'sentence' => $sentence]) : $sentence;
         }
-        $counted = $last->getRawOriginal($pot->column().'_counted_cents');
-        $held = (int) ($counted ?? $last->getRawOriginal($pot->column().'_expected_cents') ?? 0);
-        if ($held <= 0) {
-            return null;
-        }
-        $since = TillSummary::uncountedSince($last, $pot) ?? $last->closed_at;
-        $date = local_datetime($since, 'j/n', $location);
 
-        return ($counted === null
-            ? __(':box tiene :amount sin contar desde el :date.', ['box' => ucfirst($pot->boxName()), 'amount' => Money::fromCents($held)->formatted(), 'date' => $date])
-            : __(':box tiene :amount (contado el :date).', ['box' => ucfirst($pot->boxName()), 'amount' => Money::fromCents($held)->formatted(), 'date' => $date]))
-            .' '.__('Al abrir la próxima caja se sumará a la caja: vacía el bote en la caja.');
+        return $parts === [] ? null : implode(' ', $parts).' '.__('Al abrir la próxima caja se sumará a la caja: vacía el bote en la caja.');
     }
 
     /** @param  list<string>  $items  «a», «a y b», «a, b y c» */

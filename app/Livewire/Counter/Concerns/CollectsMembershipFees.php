@@ -28,6 +28,8 @@ use App\Support\Money;
  */
 trait CollectsMembershipFees
 {
+    use KeepsBoxInstruction;
+
     // Who is paying is now decided by the ONE shared lookup (prompt 194) — {@see FindsMembers}, whose
     // onMemberFound() calls selectFeeMember(). This concern used to carry a second member search of its own
     // ($feeSearch + feeSearchResults()), which is how the till and Socios each ended up with a name box that
@@ -74,7 +76,7 @@ trait CollectsMembershipFees
      * error, 'message' => ...] for the host to flash — no host-flash dependency, so it drops cleanly into any
      * counter screen.
      *
-     * @return array{type: string, message: ?string}
+     * @return array{type: string, message: ?string, boxes?: ?string}
      */
     protected function collectFeeThrough(?TillSession $session, Location $location, User $user): array
     {
@@ -127,6 +129,7 @@ trait CollectsMembershipFees
             'message' => trim(($remaining > 0
                 ? __('Cuota cobrada: :amount. Pendiente: :remaining', ['amount' => Money::fromCents($cents)->formatted(), 'remaining' => Money::fromCents($remaining)->formatted()])
                 : __('Cuota cobrada por completo: :amount.', ['amount' => Money::fromCents($cents)->formatted()])).' '.($boxes ?? '')),
+            'boxes' => $boxes,
         ];
     }
 
@@ -225,12 +228,13 @@ trait CollectsMembershipFees
      * basket its height. `waiveFeeThrough()` returns a null message for exactly that reason; the type is still
      * returned so a caller can branch on success without a string to print.
      *
-     * @param  array{type: string, message: ?string}  $result
+     * @param  array{type: string, message: ?string, boxes?: ?string}  $result
      */
     protected function flashResult(array $result): void
     {
         if (($result['message'] ?? null) !== null) {
             $this->flash($result['message'], $result['type']);
+            $this->keepFlashFor($result['boxes'] ?? null); // prompt 374
         }
     }
 
@@ -315,7 +319,7 @@ trait CollectsMembershipFees
      * balance, then run the SAME collectFeeThrough core. This is how the fee action follows the unpaid-fee
      * verdict wherever it is shown (prompt 127), with no second write path.
      *
-     * @return array{type: string, message: ?string}
+     * @return array{type: string, message: ?string, boxes?: ?string}
      */
     protected function collectInlineFeeFor(Member $member, ?TillSession $session, Location $location, User $user): array
     {

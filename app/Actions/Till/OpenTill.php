@@ -110,10 +110,7 @@ class OpenTill
      */
     public static function heldAtLastClose(Location $location, string $terminalKey): array
     {
-        $last = TillSession::query()->withoutGlobalScopes()
-            ->where('location_id', $location->id)->where('status', TillSessionStatus::CLOSED->value)
-            ->orderByDesc('closed_at')->orderByDesc('id')->get()
-            ->first(fn (TillSession $s): bool => TerminalName::key((string) $s->terminal) === $terminalKey);
+        $last = self::lastCloseAt($location, $terminalKey);
 
         $held = [];
         foreach ($last?->ownBoxes() ?? [] as $pot) {
@@ -121,5 +118,14 @@ class OpenTill
         }
 
         return $held;
+    }
+
+    /** Prompt 374 — the terminal's last close at the sede: what {@see heldAtLastClose()} merges from, and what *Sedes → Cajas* warns about. */
+    public static function lastCloseAt(Location $location, string $terminalKey): ?TillSession
+    {
+        return TillSession::query()->withoutGlobalScopes()
+            ->where('location_id', $location->id)->where('status', TillSessionStatus::CLOSED->value)
+            ->orderByDesc('closed_at')->orderByDesc('id')->get()
+            ->first(fn (TillSession $s): bool => TerminalName::key((string) $s->terminal) === $terminalKey);
     }
 }

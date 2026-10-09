@@ -38,7 +38,8 @@
 @if ($flashMessage)
     <div
         wire:key="flash-{{ $flashType }}-{{ md5($flashMessage) }}{{ isset($nonce) ? '-'.$nonce : '' }}"
-        @if ($flashType === 'success')
+        {{-- Prompt 374 — a success that says which box the cash goes in waits for the next action (`$flashKeeps`). --}}
+        @if ($flashType === 'success' && ! ($flashKeeps ?? false))
             x-data="{ show: true }"
             x-show="show"
             x-init="{{ $revealJs }} setTimeout(() => show = false, 6000)"

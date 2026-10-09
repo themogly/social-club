@@ -43,6 +43,9 @@ for (const vp of [{ w: 1280, h: 800, tag: 'land' }, { w: 800, h: 1280, tag: 'por
     const hasFrame = !! await page.$('[data-receipt-frame]');
     await page.screenshot({ path: `${OUT}/receipt-sheet-open-${theme}-${vp.tag}.png` });
     results.push([`${label}: sheet open, still one tab`, !!dialog && oneTab && hasFrame]);
+    // Prompt 374 — the frame takes the space: ≥ 60 % of the viewport, never the browser's built-in 150 px.
+    const frameHeight = await page.$eval('[data-receipt-frame]', (el) => el.getBoundingClientRect().height).catch(() => 0);
+    results.push([`${label}: the receipt frame is at least 60 % of the viewport (${Math.round(frameHeight)} px)`, frameHeight >= vp.h * 0.6]);
 
     // Escape closes the sheet; the URL is unchanged and the basket column is still there.
     await page.keyboard.press('Escape');
