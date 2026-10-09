@@ -1486,7 +1486,7 @@ class DispensaryPos extends Component
         // edibles' cash (fixed at commit). Nothing in a separate box, no line (CashBoxes::sentence).
         $session = TillSession::query()->withoutGlobalScopes()->find($result['dispensation']->till_session_id);
         $boxes = $session === null ? null : CashBoxes::sentence($session, [
-            CashPot::BAR->value => $result['order']->cash_cents->cents,
+            ...CashBoxes::orderCash($result['order']), // prompt 378 — the bar's and the shop's parts
             CashPot::EDIBLES->value => $result['dispensation']->edibles_cash_cents->cents,
         ]);
         $this->flash(trim(__('Visita liquidada: dispensación y barra.').' '.($boxes ?? '')), 'success');
@@ -1560,7 +1560,7 @@ class DispensaryPos extends Component
         $this->resetBasketState();
         // Prompt 374 — the bar's cash, when the bar has its own box this session (the bar screen already said it; this did not).
         $session = TillSession::query()->withoutGlobalScopes()->find($order->till_session_id);
-        $boxes = $session === null ? null : CashBoxes::sentence($session, [CashPot::BAR->value => $order->cash_cents->cents]);
+        $boxes = $session === null ? null : CashBoxes::sentence($session, CashBoxes::orderCash($order));
         $this->flash(trim(__('Barra cobrada.').' '.($boxes ?? '')), 'success');
         $this->landAfterRecording(null, $order->id, $boxes);
     }

@@ -146,13 +146,14 @@ class CashBoxesTest extends TestCase
 
     public function test_the_presets_set_the_three_rows_and_the_sentence_says_what_is_counted(): void
     {
-        $this->assertSame(['EDIBLES' => 'till', 'BAR' => 'till', 'FEES' => 'own'], CashBoxes::PRESETS['fees_apart']);
-        $this->assertSame(['EDIBLES' => 'own', 'BAR' => 'own', 'FEES' => 'own'], CashBoxes::PRESETS['all_apart']);
-        $this->assertSame(['EDIBLES' => 'till', 'BAR' => 'till', 'FEES' => 'till'], CashBoxes::PRESETS['all_till']);
+        // Prompt 378 — each preset also places the shop.
+        $this->assertSame(['EDIBLES' => 'till', 'BAR' => 'till', 'SHOP' => 'with_bar', 'FEES' => 'own'], CashBoxes::PRESETS['fees_apart']);
+        $this->assertSame(['EDIBLES' => 'own', 'BAR' => 'own', 'SHOP' => 'own', 'FEES' => 'own'], CashBoxes::PRESETS['all_apart']);
+        $this->assertSame(['EDIBLES' => 'till', 'BAR' => 'till', 'SHOP' => 'till', 'FEES' => 'till'], CashBoxes::PRESETS['all_till']);
 
-        $this->assertSame('Al cerrar se cuenta la caja (dispensario, comestibles, barra y cuotas).', CashBoxes::summary(CashBoxes::PRESETS['all_till']));
-        $this->assertSame('Al cerrar se cuenta la caja (dispensario, comestibles y barra) y el bote de cuotas.', CashBoxes::summary(CashBoxes::PRESETS['fees_apart']));
-        $this->assertSame('Al cerrar se cuenta la caja (dispensario) y los botes de comestibles, barra y cuotas.', CashBoxes::summary(CashBoxes::PRESETS['all_apart']));
+        $this->assertSame('Al cerrar se cuenta la caja (dispensario, comestibles, barra, tienda y cuotas).', CashBoxes::summary(CashBoxes::PRESETS['all_till']));
+        $this->assertSame('Al cerrar se cuenta la caja (dispensario, comestibles, barra y tienda) y el bote de cuotas.', CashBoxes::summary(CashBoxes::PRESETS['fees_apart']));
+        $this->assertSame('Al cerrar se cuenta la caja (dispensario) y los botes de comestibles, barra, tienda y cuotas.', CashBoxes::summary(CashBoxes::PRESETS['all_apart']));
     }
 
     // --- 2. Per sede, owner only -------------------------------------------------------------------------------------------------

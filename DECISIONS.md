@@ -22097,3 +22097,80 @@ The badge links to *Lotes* filtered to the sede and to the unpriced strains. `Ba
   sales" rule is for Ben to ask for.
 - **Tests:** `tests/Feature/Reports/PeopleAlertSedeTest.php` (2, red first): the scoped link with the matching share, and
   the wording on all sedes vs scoped. 375's two tests now assert the scoped link.
+
+## Prompt 378 — the shop gets its own cash box, apart from the bar
+
+Ben, on *Cajas*: *"Bar and shop needs to be separate as well"*: two boxes, with drinks and food in the bar's, and products
+and merch in the shop's.
+
+### `articles.sold_at` and its snapshot
+
+- **`articles.sold_at`** is `'BAR' | 'SHOP'`, default `'BAR'`, so every existing product stays the bar's until the owner
+  marks the shop ones.
+- **Product form:** a *Se vende en: Barra / Tienda* choice.
+- **Products table:** a *Tienda* badge, a *Se vende en* filter, and bulk actions *Marcar como tienda / barra* (for
+  `articles.manage`, so a manager can sort the list).
+- **The order item snapshots `sold_at`.** Changing a product never moves a past order's cash. A manual line is the bar's.
+
+### `orders.shop_cash_cents`: cash to the shop first
+
+- `CommitOrder` stores `min(cash, Σ line_total of SHOP items)`, the edibles' rule (373): cash pays the shop's items first,
+  up to their total, and any wallet part covers the rest. A €3 drink and a €12 T-shirt paid €15 cash → 12.00; paid €10
+  wallet + €5 cash → 5.00.
+- The combined settle goes through `CommitOrder`, so it does the same.
+- **Existing orders are 0, which is exactly «Con la barra».**
+
+### The three-way shop setting, «Con la barra» the default
+
+- **`cash_box_shop`** takes `'with_bar' | 'till' | 'own'`, per sede, owner-only, like the others.
+  - `LocationForm::allowedOwnerString()` accepts the third value.
+  - *Contar cada noche* is `count_shop_nightly`.
+  - With *Con la barra* (the default), the shop's money goes wherever the bar's goes, the bar's box or the till, so
+    every sede's figures are unchanged until someone chooses.
+- **Each session snapshots the choice at opening** (`till_sessions.shop_box`). A session from before 378 is null and read
+  as *with_bar*.
+- **`TillSession::cashPotFor($kind)` is the one rule** for where a kind of money lands: its own box; the shop with no box
+  follows the bar unless its choice was the till; anything else goes to the till. `TillSummary`, `CashBoxes::sentence()`
+  (by kind, told by box, so the shop *Con la barra* adds to the bar's box) and the day sheet's per-box line all ask it.
+- **`TillSummary` is rewritten around it:** each kind (edibles, bar = order cash − shop cash, shop, fees) is added to its
+  pot. The arithmetic is unchanged for every existing configuration; 373's and 349's tests pass unmodified.
+- **`CashPot::SHOP` mirrors EDIBLES:** labels, box phrase, merge note, `shop_*` columns (signed, 370), and the close,
+  carry, report columns, the movements picker and *Pérdidas*' till differences. Most of this follows from
+  `CashPot::optional()`.
+- **Merge:** a shop box no longer separate joins wherever its money goes now, with an audited `IN` movement:
+  - into the till: «Bote de la tienda unido a la caja»;
+  - into the bar's box («Con la barra» with a bar box): «…unido al bote de la barra».
+- **Presets:**
+  - *Todo en la caja* → shop in the till;
+  - *Cuotas aparte* → shop with the bar;
+  - *Todo aparte* → shop in its own box.
+- **The sentence names the shop.** When the shop is with a bar that has a box: «barra (con la tienda)».
+
+### One income ledger, two cash boxes
+
+*Barra y tienda* stays the single income stream in every report (CLAUDE.md). This prompt only splits where the cash
+physically goes.
+
+### Tests
+
+- **`tests/Feature/Till/ShopCashBoxTest.php`** (7), red first. It covers:
+  - the snapshot;
+  - the shop cash at commit;
+  - both boxes: 3 / 12 / till 0, the sentence, and the close asking for both;
+  - «Con la barra» keeping the figures, including a pre-378 session;
+  - presets and sentence;
+  - the merge;
+  - the bulk action by a manager, and the setting denied to them.
+- 373's preset test and 374's per-box test were updated for the shop.
+- MySQL: the cash-box tests ran on `phpunit.mysql.xml` (25/25).
+- Browser: `prove-378-shop-box.mjs`:
+  - *Cajas* with four rows at 1440 and 393, light and dark;
+  - the product form;
+  - a mixed bar order → «Put €1.00 in the shop box and €2.00 in the bar box.» on the hub;
+  - the close asking for the shop box.
+
+### Ops (Ben)
+
+1. Run `php artisan migrate --force`.
+2. In *Barra y tienda → Productos*, filter and mark the shop items *Tienda* with the bulk action.
+3. In each sede's *Cajas*, set *Tienda* to *Bote propio* where the shop's money is kept apart, or tap *Todo aparte*.

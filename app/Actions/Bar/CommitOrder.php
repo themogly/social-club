@@ -99,6 +99,9 @@ class CommitOrder
                     'total_cents' => $total,
                     'cash_cents' => $cash,
                     'wallet_cents' => $wallet,
+                    // Prompt 378 — the cash that paid for the shop items: cash to them first, up to their total (the edibles' rule,
+                    // 373); any wallet part covers the rest. Fixed here, read by TillSummary and the counter's «Pon …» line.
+                    'shop_cash_cents' => min($cash, (int) array_sum(array_map(fn (array $item): int => ($item['sold_at'] ?? 'BAR') === 'SHOP' ? (int) $item['line_total_cents'] : 0, $items))),
                     'status' => OrderStatus::COMPLETED,
                     'reversal_of_id' => $options['reversal_of_id'] ?? null,
                     'reference' => $options['reference'] ?? null,
@@ -194,6 +197,8 @@ class CommitOrder
                     'discount_cents' => $discount,
                     'discount_kind' => $discount > 0 ? $articleDiscount['kind'] : null, // prompt 375
                     'line_total_cents' => $lineTotal,
+                    // Prompt 378 — where it was sold, frozen: changing the product later never moves a past order's cash.
+                    'sold_at' => $article->sold_at === 'SHOP' ? 'SHOP' : 'BAR',
                     'reference' => null,
                 ];
 
@@ -227,6 +232,7 @@ class CommitOrder
                 'qty' => $qty,
                 'line_total_cents' => $lineTotal,
                 'reference' => $reference,
+                'sold_at' => 'BAR', // prompt 378 — a manual line is the bar's
             ];
         }
 

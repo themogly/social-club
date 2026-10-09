@@ -105,10 +105,10 @@ class TillSession extends Component
      *
      * @var array<string, string>
      */
-    public array $potCountInput = ['BAR' => '', 'FEES' => '', 'EDIBLES' => ''];
+    public array $potCountInput = ['BAR' => '', 'SHOP' => '', 'FEES' => '', 'EDIBLES' => ''];
 
     /** @var array<string, bool> */
-    public array $potCountNow = ['BAR' => false, 'FEES' => false, 'EDIBLES' => false];
+    public array $potCountNow = ['BAR' => false, 'SHOP' => false, 'FEES' => false, 'EDIBLES' => false];
 
     /**
      * Revealed after the close: each optional pot's expected / counted / variance.
@@ -681,7 +681,7 @@ class TillSession extends Component
         $this->closing = true;
         // Prompt 349 / 373 — each box starts on its sede's «Contar cada noche».
         $this->potCountNow = collect(CashBoxes::COUNT_NIGHTLY)->map(fn (string $key): bool => (bool) Settings::get($key, false, $this->locationId))->all();
-        $this->potCountInput = ['BAR' => '', 'FEES' => '', 'EDIBLES' => ''];
+        $this->potCountInput = ['BAR' => '', 'SHOP' => '', 'FEES' => '', 'EDIBLES' => ''];
         $this->resetCloseState();
 
         // One end-of-day ritual: weigh the touched flower FIRST, then count the cash (prompt 47).

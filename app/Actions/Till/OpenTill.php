@@ -68,7 +68,9 @@ class OpenTill
                 'notes' => $options['notes'] ?? null,
                 'separate_pots' => $ownBoxes !== [], // 349's column, kept for history; nothing reads it now
                 'own_boxes' => $ownBoxes,
+                'shop_box' => CashBoxes::shopChoiceFor((string) $location->getKey()), // prompt 378 — where the shop's money goes
                 'bar_opening_cents' => $opening(CashPot::BAR),
+                'shop_opening_cents' => $opening(CashPot::SHOP),
                 'fees_opening_cents' => $opening(CashPot::FEES),
                 'edibles_opening_cents' => $opening(CashPot::EDIBLES),
             ]);
@@ -85,12 +87,14 @@ class OpenTill
 
             // Prompt 373 — a box that was separate at the last close, held money, and is in the till now: its money joins
             // the till as an automatic entry (audited), and the open screen tells staff to empty the box into the drawer.
+            // Prompt 378 — it joins wherever that money goes now: the shop's box «Con la barra» joins the bar's box.
             foreach ($held as $pot => $cents) {
                 if ($cents > 0 && ! in_array($pot, $ownBoxes, true)) {
                     $box = CashPot::from($pot);
+                    $into = $session->cashPotFor($box);
                     (new RecordCashMovement)->handle($session, CashMovementType::IN, $cents, [
-                        'pot' => CashPot::DISPENSARY,
-                        'reason' => $box->mergedNote(),
+                        'pot' => $into,
+                        'reason' => $box->mergedNote($into),
                         'operator_id' => $session->opened_by,
                     ]);
                     (new RecordAuditLog)->handle('till.box_merged', $session, null, ['pot' => $pot, 'amount_cents' => $cents, 'location_id' => $location->id]);

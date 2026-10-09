@@ -18,6 +18,7 @@ use Filament\Forms\Components\FileUpload;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
+use Filament\Forms\Components\ToggleButtons;
 use Filament\Schemas\Components\Grid;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Components\Text;
@@ -90,6 +91,17 @@ class ArticleForm
                             ->accepted()
                             ->dehydrated(false)
                             ->visible(fn (Get $get): bool => VapeLikeName::barProduct((string) $get('name')))
+                            ->columnSpanFull(),
+
+                        // Prompt 378 — which cash box its money goes in: the bar's (drinks, food) or the shop's (products, merch).
+                        // Snapshotted on each order item, so changing it never moves a past order's cash.
+                        ToggleButtons::make('sold_at')
+                            ->label(__('Se vende en'))
+                            ->options(['BAR' => __('Barra'), 'SHOP' => __('Tienda')])
+                            ->default('BAR')
+                            ->inline()
+                            ->required()
+                            ->helperText(__('Barra: bebidas y comida. Tienda: productos y merchandising. Decide en qué bote va su dinero si la sede separa la tienda.'))
                             ->columnSpanFull(),
 
                         // No *Categoría* (prompt 295, Shane): nothing in the app can create a product category — only the demo

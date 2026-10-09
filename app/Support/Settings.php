@@ -261,11 +261,15 @@ class Settings
         'cash_box_edibles' => 'till',
         'cash_box_bar' => 'till',
         'cash_box_fees' => 'till',
+        // Prompt 378 — the shop's cash: 'with_bar' (wherever the bar's goes — every sede's behaviour until someone chooses),
+        // 'till' or 'own'.
+        'cash_box_shop' => 'with_bar',
         // Prompt 349 / 373 — per sede, for a kind of money with its own box: counted every night by default (the till always
         // is). Not counted carries forward to the next opening.
         'count_bar_nightly' => false,
         'count_fees_nightly' => false,
         'count_edibles_nightly' => false,
+        'count_shop_nightly' => false, // prompt 378
         // Prompt 350 — the dispensary's discounted total to the euro (ORG-level, owner only): nearest | down | none, and
         // when: local (only a Local discount) | any (any discount) | all (every contribution).
         'discount_rounding' => 'nearest',

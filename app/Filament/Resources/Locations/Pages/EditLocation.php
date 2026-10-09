@@ -100,7 +100,7 @@ class EditLocation extends EditRecord
 
         // Prompt 373 — where the cash goes: owner-only, and only 'till' or 'own'.
         foreach (LocationForm::OWNER_STRINGS as $key) {
-            if (LocationForm::actorIsOwner() && in_array($data[$key] ?? null, ['till', 'own'], true)) {
+            if (LocationForm::actorIsOwner() && LocationForm::allowedOwnerString($key, $data[$key] ?? null)) {
                 Settings::set($key, (string) $data[$key], SettingType::STRING, (string) $this->record->getKey());
             }
             unset($data[$key]);

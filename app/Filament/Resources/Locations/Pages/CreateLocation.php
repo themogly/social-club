@@ -73,7 +73,7 @@ class CreateLocation extends CreateRecord
         // Prompt 373 — where the cash goes: the owner's choice, or the code default for anyone else.
         foreach (LocationForm::OWNER_STRINGS as $key) {
             $value = $data[$key] ?? null;
-            $this->stringState[$key] = LocationForm::actorIsOwner() && in_array($value, ['till', 'own'], true) ? (string) $value : (string) Settings::DEFAULTS[$key];
+            $this->stringState[$key] = LocationForm::actorIsOwner() && LocationForm::allowedOwnerString($key, $value) ? (string) $value : (string) Settings::DEFAULTS[$key];
             unset($data[$key]);
         }
 

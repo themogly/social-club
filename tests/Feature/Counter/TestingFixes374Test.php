@@ -197,7 +197,7 @@ class TestingFixes374Test extends TestCase
         $this->assertStringNotContainsString('>'.__('Importe').'<', $html);
 
         // Its own boxes: one line per box under cash — the till's €16.36, the bar's €7.00, no fees, the edibles' €4.00.
-        $this->assertSame(['DISPENSARY' => 1636, 'BAR' => 700, 'FEES' => 0, 'EDIBLES' => 400], $totals['boxes']);
+        $this->assertSame(['DISPENSARY' => 1636, 'BAR' => 700, 'SHOP' => 0, 'FEES' => 0, 'EDIBLES' => 400], $totals['boxes']); // 378: the shop box too
         $sheet->assertSeeHtml('data-sheet-boxes')->assertSee(__('Bote de comestibles'));
     }
 

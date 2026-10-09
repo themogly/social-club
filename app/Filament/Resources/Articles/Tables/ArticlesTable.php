@@ -8,6 +8,7 @@ use App\Filament\Resources\Articles\Actions\AddToSedesAction;
 use App\Models\Article;
 use Filament\Actions\Action;
 use Filament\Actions\ActionGroup;
+use Filament\Actions\BulkAction;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteBulkAction;
 use Filament\Actions\EditAction;
@@ -18,9 +19,11 @@ use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Columns\IconColumn;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Filters\Filter;
+use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Filters\TrashedFilter;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\Auth;
 
 class ArticlesTable
@@ -32,6 +35,14 @@ class ArticlesTable
             ->defaultSort('created_at', 'desc')
             ->columns([
                 TextColumn::make('name')->label(__('Nombre'))->searchable()->sortable(),
+                // Prompt 378 — the shop's products say so (the bar's are the default, so they carry nothing).
+                TextColumn::make('sold_at')
+                    ->label(__('Se vende en'))
+                    ->badge()
+                    ->formatStateUsing(fn (?string $state): ?string => $state === 'SHOP' ? __('Tienda') : null)
+                    ->placeholder('')
+                    ->color('gray')
+                    ->toggleable(),
                 // Prompt 297 — the same product can now be at several sedes; in the rollup the rows must say which.
                 TextColumn::make('location.name')->label(__('Sede'))->sortable()->toggleable(),
                 TextColumn::make('price_cents')
@@ -50,6 +61,10 @@ class ArticlesTable
                     ->query(fn (Builder $query): Builder => $query
                         ->whereNotNull('low_stock_threshold')
                         ->whereColumn('stock', '<=', 'low_stock_threshold')),
+                // Prompt 378 — sort the existing list in one go: filter, select, mark.
+                SelectFilter::make('sold_at')
+                    ->label(__('Se vende en'))
+                    ->options(['BAR' => __('Barra'), 'SHOP' => __('Tienda')]),
                 TrashedFilter::make(),
             ])
             ->recordActions([
@@ -62,6 +77,8 @@ class ArticlesTable
             ])
             ->toolbarActions([
                 BulkActionGroup::make([
+                    self::markAction('mark_shop', 'SHOP', __('Marcar como tienda')),
+                    self::markAction('mark_bar', 'BAR', __('Marcar como barra')),
                     DeleteBulkAction::make(),
                     RestoreBulkAction::make(),
                 ]),
@@ -71,6 +88,25 @@ class ArticlesTable
             // what to do first.
             ->emptyStateHeading(__('Sin productos'))
             ->emptyStateDescription(__('Los productos son lo que se vende en la barra y la tienda: bebidas, comida, mecheros, camisetas. Crea el primero para poder cobrarlo en el TPV de barra.'));
+    }
+
+    /**
+     * Prompt 378 — «Marcar como tienda / barra» on the selected products, for whoever may manage products. Past orders keep the
+     * place snapshotted on their items; only sales from now on follow.
+     */
+    protected static function markAction(string $name, string $soldAt, string $label): BulkAction
+    {
+        return BulkAction::make($name)
+            ->label($label)
+            ->icon($soldAt === 'SHOP' ? Heroicon::OutlinedShoppingBag : Heroicon::OutlinedBeaker)
+            ->authorize(fn (): bool => Auth::user()?->can('articles.manage') ?? false)
+            ->deselectRecordsAfterCompletion()
+            ->action(function (Collection $records) use ($soldAt): void {
+                foreach ($records as $article) {
+                    $article->update(['sold_at' => $soldAt]);
+                }
+                Notification::make()->success()->title(trans_choice(':count producto actualizado|:count productos actualizados', $records->count(), ['count' => $records->count()]))->send();
+            });
     }
 
     /** Reponer — add units to stock through the ledger (an ADJUSTMENT movement). */
