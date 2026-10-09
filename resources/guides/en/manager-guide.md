@@ -228,7 +228,7 @@ Before the reserve existed, each evening count took the sealed bags out of stock
 |---|---|
 | **After recording** | Where the counter goes after a sale: back to the home screen (the default), a new member in the dispensary, or stay with the member. |
 | **Strain order in the dispensary** | Price, highest first (the default); price, lowest first; or alphabetical. Staff can still switch it with €↓ / €↑ / A–Z for the day. |
-| **Where does the cash go?** (owners) | The dispensary is always in the till; edibles, bar & shop and fees each go in the till or their own box, with *Count every night* per box. Presets: *Everything in the till*, *Fees apart*, *Everything apart*. See the *Cash at the counter* guide. |
+| **Where does the cash go?** (owners) | The dispensary is always in the till; edibles, the bar, the shop and fees each go in the till or their own box (the shop can also go *With the bar*), and each own box says *When is it counted?*: *Every night* or *Only when emptied*. Presets: *Everything in the till*, *Fees apart*, *Everything apart*. See the *Cash at the counter* guide. |
 | **Require a photo to dispense** | A member with no photo must have one taken before being served (on by default). |
 | **Confirm the photo on scan** | Scanning a card shows the member's photo big, to confirm it's them (on by default). |
 | **Show Reception on the counter** | Turn off at clubs that do not check people in at the door. A New member tile takes its place. |
@@ -272,7 +272,7 @@ Before the reserve existed, each evening count took the sealed bags out of stock
 | Batches expiring soon, and slow sellers | Use them before they expire, or adjust the price | **Dashboard** alerts · **Batches** |
 | Members with fees owed, and memberships ending | Chase or renew before they are blocked at the counter | **Reports → Debtors** · **Members** |
 | Stock count at each location (weekly or monthly) | Catch differences early | **Stock count** |
-| Count each cash box (if not counted nightly) | Its money carries forward until someone counts it | Counter **Close till** · **Reports → Tills** |
+| Count each cash box counted *Only when emptied* | Its money carries forward until someone counts it | Counter **Close till** · **Reports → Tills** |
 | Cards used by someone else | Reissue the card, and talk to the member | Member records |
 
 ![Reports → Staff hours: hours per person and location, and when people worked.](img/manager-guide/c15.jpg)
