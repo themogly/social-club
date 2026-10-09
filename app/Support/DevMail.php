@@ -78,7 +78,7 @@ class DevMail
                 // Prompts 367 / 375 — the losses alerts: the sede's day (with its euro figure, Ben) and the people this week (no names).
                 (new OwnerAlertState(['type' => AlertType::LOSSES_ABOVE_THRESHOLD, 'subject' => 'losses:preview', 'detail' => ['cents' => 4620, 'pct' => '8.2', 'url' => url('/informes/perdidas?period=yesterday')]]))
                     ->setRelation('location', new Location(['name' => 'Sede Norte'])),
-                (new OwnerAlertState(['type' => AlertType::LOSSES_PEOPLE_ABOVE_THRESHOLD, 'subject' => 'losses-people:preview', 'detail' => ['count' => 1, 'pct' => '16', 'url' => url('/informes/perdidas?period=last7&sort=pct')]]))
+                (new OwnerAlertState(['type' => AlertType::LOSSES_PEOPLE_ABOVE_THRESHOLD, 'subject' => 'losses-people:preview', 'detail' => ['count' => 1, 'cents' => 6400, 'limit' => 5000, 'url' => url('/informes/perdidas?period=last7&sort=mostrador')]]))
                     ->setRelation('location', new Location(['name' => 'Sede Norte'])),
             ])),
             'telegram-disconnected' => new TelegramDisconnectedMail('Ana Ruiz'),

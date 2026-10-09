@@ -295,7 +295,7 @@ Tap a section, or a person's name in **By person**, to open its list underneath:
 
 The dashboard says it every morning: **Losses yesterday: €46.20 (3.1 %)**, opening the report on that day. If a location's losses for a day pass the owner's threshold (*Locations → edit → Losses*, 5 % by default), the dashboard shows an alert and the morning summary includes the line.
 
-The same threshold also watches **each person**: if what someone lost over the last 7 days passes it, measured against what they themselves took (and they took at least €50, set in *Settings → Discounts and adjustments*), the dashboard says *"1 person above the threshold this week"*. It opens the report on those 7 days, sorted by the share each person lost. The morning summary says it too, without names.
+It also watches **each person's discounts**: anyone who gave more than €50 in the last 7 days through discounts they chose (price adjustments down and waived fees), however much or little they sold, shows on the dashboard as *"1 person giving a lot of discount this week"*. The amount is set in *Settings → Discounts and adjustments*. Member discounts don't count, because they are automatic. The line opens the report on those 7 days at that location, sorted by what each person gave away. The morning summary says it too, with the amount but without names.
 
 ![Reports → Losses: the total lost against the previous week, a bar per day, and the sections.](img/manager-guide/c26-losses.jpg)
 

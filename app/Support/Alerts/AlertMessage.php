@@ -75,8 +75,9 @@ final class AlertMessage
             AlertType::TILL_CLOSES_UNEXPLAINED => __('Cierres con diferencia sin explicar: :count esta semana', ['count' => (int) ($d['count'] ?? 0)]),
             // Prompt 367 — the one alert that carries money: an aggregate the owner asked to be told, never a price or a member.
             AlertType::LOSSES_ABOVE_THRESHOLD => __('Pérdidas ayer: :amount (:pct %)', ['amount' => Money::fromCents((int) ($d['cents'] ?? 0))->formatted(), 'pct' => (string) ($d['pct'] ?? '0.0')]),
-            AlertType::LOSSES_PEOPLE_ABOVE_THRESHOLD => trans_choice(':count persona por encima del umbral (:pct % de lo que cobró)|:count personas por encima del umbral (hasta :pct % de lo que cobraron)',
-                (int) ($d['count'] ?? 0), ['count' => (int) ($d['count'] ?? 0), 'pct' => (string) ($d['pct'] ?? '0')]),
+            // Ben: by how much discount a person gave, never a share of sales; never a name.
+            AlertType::LOSSES_PEOPLE_ABOVE_THRESHOLD => trans_choice(':count persona ha dado más de :limit en descuentos esta semana (hasta :amount)|:count personas han dado más de :limit en descuentos esta semana (hasta :amount)',
+                (int) ($d['count'] ?? 0), ['count' => (int) ($d['count'] ?? 0), 'limit' => Money::fromCents((int) ($d['limit'] ?? 0))->formatted(), 'amount' => Money::fromCents((int) ($d['cents'] ?? 0))->formatted()]),
             AlertType::SYSTEM => __(':component no se ha ejecutado desde :since', [
                 'component' => self::componentLabel((string) ($d['component'] ?? '')),
                 'since' => isset($d['last_at']) ? CarbonImmutable::parse($d['last_at'])->setTimezone((string) config('app.timezone'))->translatedFormat('j M H:i') : __('nunca'),
