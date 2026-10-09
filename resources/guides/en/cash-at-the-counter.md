@@ -155,7 +155,7 @@ Costs that are **not** paid from the drawer (rent, utilities, suppliers paid by 
 
 Closing a till is never blocked by a difference, so this report is where you find them. Tick **Only with a difference** to list only the closes beyond the club's tolerance; **Unexplained** (in amber) marks the ones closed without a note. Click a session's date to open the till, which starts with **Difference at close**: every pot's expected, counted and difference, the note (or *No note*) and the flower count's answer (or *No reason*). The Dashboard and the morning email say *"Closes with an unexplained difference: N this week"*, linking straight here.
 
-**Where the cash goes** (*Locations → [club] → Tills*, owners only; managers see it read-only). The dispensary is always in the till. For **Edibles**, **Bar (drinks, food)** and **Membership fees**, choose **In the till** or **Own box**, and for a box whether to **Count every night**. **Shop (products)** has a third choice, **With the bar** (the starting point): the shop's money goes wherever the bar's goes. Which products are the shop's is set on each product (*Sold at*). Three buttons set the usual shapes in one tap: **Everything in the till**, **Fees apart** (the shop stays with the bar), **Everything apart** (the shop gets its own box too). A sentence under the rows says what will be counted at closing, for example *"At close the till is counted (dispensary) and the edibles, bar, shop and fees boxes."* Changes apply the next time a till is opened.
+**Where the cash goes** (*Locations → [club] → Tills*, owners only; managers see it read-only). The dispensary is always in the till. For **Edibles**, **Bar (drinks, food)** and **Membership fees**, choose **In the till** or **Own box**. A row on **Own box** then asks **When is it counted?**: **Every night** (it must be counted when the till is closed; the close starts on *Count now*) or **Only when emptied** (it can be left uncounted at close, and what's in it carries to the next day). **Shop (products)** has a third choice, **With the bar** (the starting point): the shop's money goes wherever the bar's goes. Which products are the shop's is set on each product (*Sold at*). Three buttons set the usual shapes in one tap: **Everything in the till**, **Fees apart** (the shop stays with the bar), **Everything apart** (the shop gets its own box too). A sentence under the rows says what will be counted at closing, for example *"At close the till is counted (dispensary) and the edibles, bar, shop and fees boxes."* Changes apply the next time a till is opened.
 
 - **A mixed bar sale is split by itself.** A €3.00 drink and a €12.00 T-shirt paid in cash: the counter says *"Put €12.00 in the shop box and €3.00 in the bar box."* Cash pays for the shop's items first; anything paid from the wallet covers the rest.
 
@@ -192,7 +192,8 @@ Closing a till is never blocked by a difference, so this report is where you fin
 | Seguir sin motivo | Continue without a reason |
 | Solo con diferencia · Sin explicar | Only with a difference · Unexplained |
 | Diferencia en el cierre · Sin nota · Sin motivo | Difference at close · No note · No reason |
-| ¿Dónde va el efectivo? · En la caja · Bote propio · Contar cada noche | Where does the cash go? · In the till · Own box · Count every night |
+| ¿Dónde va el efectivo? · En la caja · Bote propio · Con la barra | Where does the cash go? · In the till · Own box · With the bar |
+| ¿Cuándo se cuenta? · Cada noche · Solo al vaciarlo | When is it counted? · Every night · Only when emptied |
 | Todo en la caja · Cuotas aparte · Todo aparte | Everything in the till · Fees apart · Everything apart |
 | Motivo | Reason |
 | Cambio de turno · Entregar la caja | Shift change · Hand over the till |

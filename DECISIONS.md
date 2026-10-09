@@ -22174,3 +22174,31 @@ physically goes.
 1. Run `php artisan migrate --force`.
 2. In *Barra y tienda → Productos*, filter and mark the shop items *Tienda* with the bulk action.
 3. In each sede's *Cajas*, set *Tienda* to *Bote propio* where the shop's money is kept apart, or tap *Todo aparte*.
+
+## Prompt 379 — *¿Dónde va el efectivo?*: when a box is counted, as two buttons under its row
+
+Ben, on Dream Green's *Cajas*: *"Toggle is confusing."* The *Contar cada noche* switch sat in a far column, one identical
+switch per box down the right edge, and nothing said what off meant.
+
+- **What replaced it:** under a row on *Bote propio*, aligned with its buttons, the same two-button style asks
+  *¿Cuándo se cuenta?* *Cada noche* · *Solo al vaciarlo*, with a help line that follows the choice:
+  - *«Al cerrar la caja hay que contarlo.»*
+  - *«Al cerrar se puede dejar sin contar; lo que tiene pasa al día siguiente.»*
+  It is hidden for *En la caja* and *Con la barra*. The third grid column and every `Toggle` in the section are gone.
+- **The same settings underneath:** `count_*_nightly`, true for *Cada noche*. No migration, and the current values show
+  as they are.
+  - The buttons post `'1'` / `'0'`. The field formats the stored boolean into that and dehydrates it back to a boolean
+    for the existing owner-only save.
+  - A `false` state would otherwise fail the options' `in` rule, which a real save from the form would also have hit.
+- **Owner-only as before:** a manager sees both choices disabled.
+- **The close is unchanged and pinned by a test.** *Cada noche* starts the close on *Contar ahora*; *Solo al vaciarlo*
+  starts on *No se cuenta hoy*.
+  - **For Ben:** as before 379, *Cada noche* is the close's default, not a lock. Staff can still tap *No se cuenta hoy*,
+    and the box then carries.
+  - The help line "hay que contarlo" is the prompt's wording. Making *Cada noche* refuse the skip would be a small
+    behaviour change for Ben to ask for.
+- **Tests:** `tests/Feature/Locations/CashCountChoiceTest.php` (5). Render (no switch) and saving were red against the
+  switch. The others cover visibility, the close and the manager denial.
+- **Browser:** `prove-379-count-choice.mjs` (20/20) at 1440 and 393, light and dark: edibles *Cada noche*, bar *Solo al
+  vaciarlo*, fees *En la caja*.
+- The guide's *Cajas* screenshot was recaptured.

@@ -149,9 +149,9 @@ class LocationForm
     ];
 
     /**
-     * Prompt 373 — one kind of money: «En la caja» / «Bote propio» (two big buttons, the same as *Ajuste*), its «Contar cada
-     * noche» beside it only for its own box, and — switching a box that still holds money into the till — the warning that
-     * opening the next till will merge it.
+     * Prompt 373 — one kind of money: «En la caja» / «Bote propio» (two big buttons, the same as *Ajuste*), WHEN its own box is
+     * counted beneath it (379: «Cada noche» / «Solo al vaciarlo», replacing the switch), and — switching a box that still holds
+     * money into the till — the warning that opening the next till will merge it.
      *
      * @return list<Component>
      */
@@ -161,25 +161,33 @@ class LocationForm
         $count = CashBoxes::COUNT_NIGHTLY[$pot];
 
         return [
-            // Prompt 374 — one row per kind of money from md up: the label and its two choices side by side, «Contar cada
-            // noche» beside them (stacked below md, where there is no room).
-            Grid::make(['default' => 1, 'md' => 3])->schema([
-                ToggleButtons::make($key)
-                    ->label($label)
-                    // Prompt 378 — the shop alone may also go «Con la barra» (the default: wherever the bar's money goes).
-                    ->options(array_intersect_key(['with_bar' => __('Con la barra'), 'till' => __('En la caja'), 'own' => __('Bote propio')], array_flip(CashBoxes::choicesFor($pot))))
-                    ->default(CashBoxes::defaultFor($pot))
-                    ->inline()
-                    ->inlineLabel()
-                    ->columnSpan(['default' => 1, 'md' => 2])
-                    ->live()
-                    ->disabled(fn (): bool => ! self::actorIsOwner()),
-                Toggle::make($count)
-                    ->label(__('Contar cada noche'))
-                    ->inline(false)
-                    ->visible(fn (Get $get): bool => $get($key) === 'own')
-                    ->disabled(fn (): bool => ! self::actorIsOwner()),
-            ]),
+            // Prompt 379 (Ben: "Toggle is confusing") — one column: the row's choices, and — only when it has its own box — WHEN
+            // it is counted, directly beneath and aligned with them, in the same two-button style. No switch in a far column.
+            // The same `count_*_nightly` setting underneath (Cada noche = true), so nothing about the close changes.
+            ToggleButtons::make($key)
+                ->label($label)
+                // Prompt 378 — the shop alone may also go «Con la barra» (the default: wherever the bar's money goes).
+                ->options(array_intersect_key(['with_bar' => __('Con la barra'), 'till' => __('En la caja'), 'own' => __('Bote propio')], array_flip(CashBoxes::choicesFor($pot))))
+                ->default(CashBoxes::defaultFor($pot))
+                ->inline()
+                ->inlineLabel()
+                ->live()
+                ->disabled(fn (): bool => ! self::actorIsOwner()),
+            ToggleButtons::make($count)
+                ->label(__('¿Cuándo se cuenta?'))
+                // '1' / '0' (what the buttons post), read from and saved back to the boolean setting.
+                ->options(['1' => __('Cada noche'), '0' => __('Solo al vaciarlo')])
+                ->formatStateUsing(fn (mixed $state): string => (bool) $state ? '1' : '0')
+                ->dehydrateStateUsing(fn (mixed $state): bool => (string) $state === '1')
+                ->inline()
+                ->inlineLabel()
+                ->live()
+                ->extraAttributes(['data-cash-count-choice' => $pot])
+                ->helperText(fn (Get $get): string => (string) $get($count) === '1'
+                    ? __('Al cerrar la caja hay que contarlo.')
+                    : __('Al cerrar se puede dejar sin contar; lo que tiene pasa al día siguiente.'))
+                ->visible(fn (Get $get): bool => $get($key) === 'own')
+                ->disabled(fn (): bool => ! self::actorIsOwner()),
             Text::make(fn (Get $get, ?Location $record): ?string => $get($key) !== 'own' && $record !== null ? CashBoxes::mergeWarning($record, CashPot::from($pot)) : null)
                 ->color('warning')
                 ->weight(FontWeight::SemiBold)
