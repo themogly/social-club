@@ -170,7 +170,7 @@ class AfterTesting375Test extends TestCase
         $text = AlertMessage::text(collect([$state]));
         $this->assertStringContainsString('1 persona por encima del umbral (16 % de lo que cobró)', $text);
         $this->assertStringNotContainsString('Ana', $text, 'no names on a third-party server');
-        $this->assertStringContainsString(LossesReportPage::getUrl(['period' => 'last7', 'sort' => 'pct']), $text);
+        $this->assertStringContainsString(LossesReport::peopleUrl($this->sede->id, $people['people']), $text); // 377: at the sede, the person
     }
 
     public function test_the_per_person_dashboard_line_shows_for_reports_viewers_only(): void
@@ -179,7 +179,7 @@ class AfterTesting375Test extends TestCase
 
         $owner = Livewire::actingAs($this->owner)->test(Dashboard::class)->html();
         $this->assertStringContainsString(e(DashboardAlert::LOSSES_PEOPLE_ABOVE_THRESHOLD->label(1)), $owner);
-        $this->assertStringContainsString(e(LossesReportPage::getUrl(['period' => 'last7', 'sort' => 'pct'])), $owner);
+        $this->assertStringContainsString(e(LossesReport::peopleUrl($this->sede->id, [$ana->id])), $owner); // 377: scoped to the sede and the person
 
         $staff = Livewire::actingAs($ana)->test(Dashboard::class)->html();
         $this->assertStringNotContainsString(e(DashboardAlert::LOSSES_PEOPLE_ABOVE_THRESHOLD->label(1)), $staff);

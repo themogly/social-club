@@ -22075,3 +22075,25 @@ The badge links to *Lotes* filtered to the sede and to the unpriced strains. `Ba
 - **Browser** (`prove-376-price-coverage.mjs`, 22/22): each state at 1440 and 393, light and dark; the tooltip; the link
   to the batches to price.
 - No guide described the badge, so there was no guide change.
+
+## Prompt 377 — the per-person alert opens on the sede it measured, and names it
+
+- **The problem:** the link went to `/informes/perdidas?period=last7&sort=pct` with no sede. The report opened on all
+  sedes, where the person's takings at every sede dilute the share. At Centro the share was 6 % (over the 5 %); overall
+  it read 3 % (under it). The owner tapped "over the threshold" and saw someone under it.
+- **The link is scoped to the flagged sede.** `LossesReport::peopleUrl($sedeId, $people)` gives
+  `?period=last7&sort=pct&scope=<sede>`, plus `&person=<id>` when one person is flagged, so the detail list shows only
+  theirs.
+  - `peopleAboveThresholdBySede()` now also returns who (most over first).
+  - *Por persona* there shows the same % the alert used; the test asserts it is equal.
+- **One line per sede, named when the view shows more than that sede:** *«Sede Centro: 1 persona por encima del umbral
+  esta semana»*. A dashboard scoped to Centro says it without the prefix. Dashboard alerts may now carry their own
+  `href` and a `prefix`.
+- **Morning summary and Telegram:** the section heading already names the sede (311's «📉 … — Sede Centro»). Its link
+  now carries the same scope and person. Still no names of people (375).
+- **Not changed (the prompt's note for Ben):** the per-person check is losses as a share of the person's own takings,
+  as 291's was, so someone with no sales of their own (a manager who only closes tills and records merma) is never
+  flagged. Their losses are in the sede total, *Por persona* and the detail. A "more than X € in 7 days with no own
+  sales" rule is for Ben to ask for.
+- **Tests:** `tests/Feature/Reports/PeopleAlertSedeTest.php` (2, red first): the scoped link with the matching share, and
+  the wording on all sedes vs scoped. 375's two tests now assert the scoped link.

@@ -116,6 +116,7 @@
     ":role no tiene :list": ":role no tiene :list",
     ":role: añadido «:permission»": ":role: añadido «:permission»",
     ":role: retirado «:permission»": ":role: retirado «:permission»",
+    ":sede: :message": ":sede: :message",
     ":terminal: :sentence": ":terminal: :sentence",
     ":used de :limit este mes": ":used de :limit este mes",
     ":weekday :day de :month": ":weekday :day de :month",

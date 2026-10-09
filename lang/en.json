@@ -116,6 +116,7 @@
     ":role no tiene :list": ":role does not have :list",
     ":role: añadido «:permission»": ":role: added “:permission”",
     ":role: retirado «:permission»": ":role: removed “:permission”",
+    ":sede: :message": ":sede: :message",
     ":terminal: :sentence": ":terminal: :sentence",
     ":used de :limit este mes": ":used of :limit this month",
     ":weekday :day de :month": ":weekday :day :month",

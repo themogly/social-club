@@ -269,9 +269,9 @@ class Dashboard extends BaseDashboard
 
     /**
      * Prompt 367 (291's discount alert, extended to every loss) — how many of those sedes went over their threshold % of the
-     * day's takings yesterday.
+     * day's takings yesterday; and (375/377) the people over it this week, one line per sede with its own link.
      *
-     * @return list<array{severity: string, key: string, count: int}>
+     * @return list<array{severity: string, key: string, count: int, href?: string, prefix?: ?string}>
      */
     private function lossAlerts(?LossesReport $losses, DashboardData $data): array
     {
@@ -283,10 +283,15 @@ class Dashboard extends BaseDashboard
         if ($count > 0) {
             $alerts[] = ['severity' => DashboardAlert::LOSSES_ABOVE_THRESHOLD->severity(), 'key' => DashboardAlert::LOSSES_ABOVE_THRESHOLD->value, 'count' => $count];
         }
-        // Prompt 375 — and the people over the threshold of their own takings this week, at each sede shown.
-        $people = (int) array_sum(array_column($losses->peopleAboveThresholdBySede(), 'count'));
-        if ($people > 0) {
-            $alerts[] = ['severity' => DashboardAlert::LOSSES_PEOPLE_ABOVE_THRESHOLD->severity(), 'key' => DashboardAlert::LOSSES_PEOPLE_ABOVE_THRESHOLD->value, 'count' => $people];
+        // Prompt 375 — and the people over the threshold of their own takings this week. Prompt 377: one line per sede, linking
+        // to Pérdidas AT that sede (where their share is the alert's), and named when the dashboard shows more than that sede.
+        $sedes = $this->dashboardSedes($data)->keyBy('id');
+        foreach ($losses->peopleAboveThresholdBySede() as $sedeId => $people) {
+            if ($people['count'] > 0) {
+                $alerts[] = ['severity' => DashboardAlert::LOSSES_PEOPLE_ABOVE_THRESHOLD->severity(), 'key' => DashboardAlert::LOSSES_PEOPLE_ABOVE_THRESHOLD->value,
+                    'count' => $people['count'], 'href' => LossesReport::peopleUrl((string) $sedeId, $people['people']),
+                    'prefix' => $sedes->count() > 1 ? (string) $sedes->get($sedeId)?->name : null];
+            }
         }
 
         return $alerts;
@@ -325,7 +330,7 @@ class Dashboard extends BaseDashboard
      * Turn the view-model's terse alert tuples into rendered rows — a plain-language
      * Spanish sentence, an icon and a click-through to where the operator fixes it.
      *
-     * @param  list<array{severity: string, key: string, count: int}>  $alerts
+     * @param  list<array{severity: string, key: string, count: int, href?: string, prefix?: ?string}>  $alerts
      * @return list<array{severity: string, key: string, count: int, message: string, href: string, icon: Heroicon}>
      */
     private function decorateAlerts(array $alerts): array
@@ -356,7 +361,12 @@ class Dashboard extends BaseDashboard
                 default => [$case?->label($count) ?? __('Aviso'), Heroicon::OutlinedBell],
             };
 
-            return ['severity' => $alert['severity'], 'key' => $alert['key'], 'count' => $count, 'message' => $message, 'href' => $case?->panelUrl() ?? '#', 'icon' => $icon];
+            // Prompt 377 — an alert may carry its own link (a sede-scoped one) and the sede it is about.
+            if (filled($alert['prefix'] ?? null)) {
+                $message = __(':sede: :message', ['sede' => $alert['prefix'], 'message' => $message]);
+            }
+
+            return ['severity' => $alert['severity'], 'key' => $alert['key'], 'count' => $count, 'message' => $message, 'href' => $alert['href'] ?? $case?->panelUrl() ?? '#', 'icon' => $icon];
         }, $alerts);
     }
 
