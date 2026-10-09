@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\Genetics\Tables;
 
+use App\Actions\Pricing\ResolvePrice;
 use App\Enums\BatchStatus;
 use App\Enums\ProductType;
 use App\Enums\StrainType;
@@ -12,6 +13,7 @@ use App\Models\Location;
 use App\Models\Scopes\LocationScope;
 use App\Support\ActiveScope;
 use App\Support\Percent;
+use App\Support\Period;
 use App\Support\StockCover;
 use App\Support\Units;
 use App\Support\Weight;
@@ -45,16 +47,33 @@ class GeneticsTable
                     ->badge()
                     // Prompt 320 — a strain is created without a batch now, so "no stock anywhere" is the ordinary first
                     // state and says so (its price comes with its first batch), rather than "Sin precio".
-                    ->state(fn (Genetic $record): string => ! $record->hasAnyStock() ? __('Sin existencias') : match ($record->completenessReason()) {
+                    // Prompt 376 — scoped to ONE sede, the state is that sede's: in stock there, and priced by the counter's own
+                    // rule (Location::priceCoverage / ResolvePrice::canPrice). With «Todas las sedes» (or a store), the org-wide
+                    // answer as before.
+                    ->state(fn (Genetic $record): string => match (self::atSede($record)) {
+                        'no_stock' => __('Sin existencias en esta sede'),
                         'no_price' => __('Sin precio'),
-                        'no_stock' => __('Sin stock'),
-                        default => __('Lista'),
+                        'ready' => __('Lista'),
+                        default => ! $record->hasAnyStock() ? __('Sin existencias') : match ($record->completenessReason()) {
+                            'no_price' => __('Sin precio'),
+                            'no_stock' => __('Sin stock'),
+                            default => __('Lista'),
+                        },
                     })
-                    ->color(fn (Genetic $record): string => $record->completenessReason() === null ? 'success' : 'warning')
-                    ->tooltip(fn (Genetic $record): ?string => ! $record->hasAnyStock() ? __('Añade existencias con «Crear lote».') : match ($record->completenessReason()) {
-                        'no_price' => __('Añade un precio por sede para poder dispensarla.'),
-                        'no_stock' => __('Añade un lote con stock para poder dispensarla.'),
-                        default => null,
+                    ->color(fn (Genetic $record): string => match (self::atSede($record)) {
+                        'ready' => 'success',
+                        null => $record->completenessReason() === null ? 'success' : 'warning',
+                        default => 'warning',
+                    })
+                    ->tooltip(fn (Genetic $record): ?string => match (self::atSede($record)) {
+                        'no_stock' => __('No hay lotes abiertos con stock de esta variedad en esta sede.'),
+                        'no_price' => __('El mostrador de esta sede no puede ponerle precio. Ponlo en el lote (Lotes → Precio) o como precio de respaldo de la sede.'),
+                        'ready' => null,
+                        default => ! $record->hasAnyStock() ? __('Añade existencias con «Crear lote».') : match ($record->completenessReason()) {
+                            'no_price' => __('Añade un precio por sede para poder dispensarla.'),
+                            'no_stock' => __('Añade un lote con stock para poder dispensarla.'),
+                            default => null,
+                        },
                     }),
                 TextColumn::make('product_type')->label(__('Tipo'))->badge()->sortable(),
                 TextColumn::make('strain_type')->label(__('Variedad'))->badge()->placeholder('—')->toggleable(),
@@ -163,5 +182,31 @@ class GeneticsTable
             ->where('organisation_id', $scope->organisationId())
             ->when($scope->locationId() !== null, fn (Builder $query): Builder => $query->whereKey($scope->locationId()))
             ->get();
+    }
+
+    /**
+     * Prompt 376 — the strain at the sede the panel is scoped to: 'no_stock' | 'no_price' | 'ready', or null for «Todas las
+     * sedes» (and a store, which never dispenses). Active strains read the sede's one `priceCoverage()` (memoised for the
+     * render, so the table does not query per row for it); an inactive one is asked directly.
+     */
+    private static function atSede(Genetic $record): ?string
+    {
+        $sede = app(ActiveScope::class)->allLocations() ? null : Period::sedeInScope();
+        if ($sede === null || $sede->isStore()) {
+            return null;
+        }
+        if ($record->active) {
+            $coverage = $sede->priceCoverage();
+            if (! in_array((string) $record->id, $coverage['in_stock_ids'], true)) {
+                return 'no_stock';
+            }
+
+            return in_array((string) $record->id, array_column($coverage['missing'], 'genetic_id'), true) ? 'no_price' : 'ready';
+        }
+        if (! $record->hasStockAt((string) $sede->id)) {
+            return 'no_stock';
+        }
+
+        return (new ResolvePrice)->canPrice($record, $sede) ? 'ready' : 'no_price';
     }
 }

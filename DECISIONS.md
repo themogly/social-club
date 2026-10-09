@@ -22017,3 +22017,61 @@ prices" that Ben has now confirmed. `AlertMessage`'s docblock already says so. �
 
 - `php artisan migrate --force` (`dispensation_lines.discount_kind`).
 - *Ajustes → Descuentos y ajustes → Mínimo recaudado para el aviso por persona* is €50 unless changed.
+
+## Prompt 376 — *Sedes*: the «Precios» badge counts the strains the counter can actually price
+
+Ben, on *Sedes*: *"What does no prices and has prices mean?"* The badge (prompt 93) asked only for an active `GeneticPrice`.
+Since 278 the price lives on the batch, so it was wrong both ways:
+- a sede priced by batch read *«Sin precios: no puede dispensar nada»* while its counter dispensed normally;
+- one priced strain of eight read green.
+
+### One rule for "priced here", shared with `ResolvePrice`
+
+- **`ResolvePrice::canPrice($genetic, $location)`** is the counter's own rule. The batch it would draw from
+  (`displayBatch()`) carries its own price above 0; or, that batch having none, the sede has an active base `GeneticPrice`
+  above 0 (`priceRow()`). That is exactly what `forBatch()` / `legacy()` charge, so a badge cannot disagree with the
+  counter. A price of 0 prices nothing.
+- **`Location::priceCoverage()`** returns `in_stock`, `priced`, `missing` (id and name) and `in_stock_ids`.
+  - In stock means active strains with an OPEN batch with stock here (`hasStockAt`'s rule). An inactive strain is not on
+    the counter, so it does not count.
+  - It runs a fixed number of queries: the strains, their sede price rows (eager-loaded, so `priceRow()` reads them),
+    and the batched `preloadDisplayBatches()` (273). The test proves the *Sedes* table does not query per strain or
+    batch.
+  - It is live, memoised on the model for one render.
+- **`hasActivePrices()` is removed.** Its only callers were the badge and a guided-flow test, which now asserts coverage.
+
+### The badge as *n of m*
+
+| State | Badge | Colour |
+|---|---|---|
+| All priced | «Precios: 8 de 8» | green |
+| Some | «Precios: 6 de 8» | amber; the tooltip names them (first 5, «y N más») and says where to set a price |
+| None | «Sin precios (0 de 8)» | amber |
+| Nothing in stock | «Sin existencias» | grey; tooltip *«No hay lotes abiertos con stock en esta sede»* |
+| Store | blank | (283) |
+
+The badge links to *Lotes* filtered to the sede and to the unpriced strains. `BatchesTable` gained a multiple
+*Genética* filter for that link.
+
+### The strains list scoped to the chosen sede
+
+- With one sede chosen in the switcher, *Estado* is that sede's:
+  - *«Sin existencias en esta sede»*;
+  - *«Sin precio»* (the counter there cannot price it);
+  - or *«Lista»*.
+- Active strains read the sede's one memoised `priceCoverage()` (`Period::sedeInScope()` hands back the same model for
+  the request); an inactive one is asked directly.
+- With *Todas las sedes*, or a store, it keeps the org-wide answer as before.
+
+### Tests
+
+- **`tests/Feature/Locations/PriceCoverageTest.php`** (6), red first. It covers:
+  - batch prices only → 2 of 2;
+  - partial → 2 of 3, naming the third;
+  - every strain counted as priced the counter prices, every missing one it cannot (including a price of 0);
+  - nothing in stock, and a store;
+  - bounded queries;
+  - the strains list per sede.
+- **Browser** (`prove-376-price-coverage.mjs`, 22/22): each state at 1440 and 393, light and dark; the tooltip; the link
+  to the batches to price.
+- No guide described the badge, so there was no guide change.
