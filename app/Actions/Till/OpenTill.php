@@ -12,6 +12,7 @@ use App\Models\TillSession;
 use App\Models\User;
 use App\Support\CashBoxes;
 use App\Support\CounterOperator;
+use App\Support\Settings;
 use App\Support\TerminalName;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -69,6 +70,8 @@ class OpenTill
                 'separate_pots' => $ownBoxes !== [], // 349's column, kept for history; nothing reads it now
                 'own_boxes' => $ownBoxes,
                 'shop_box' => CashBoxes::shopChoiceFor((string) $location->getKey()), // prompt 378 — where the shop's money goes
+                // Prompt 380 — which own boxes are counted «Cada noche», so a skip is noted against that night's choice.
+                'nightly_boxes' => array_values(array_filter($ownBoxes, fn (string $pot): bool => (bool) Settings::get(CashBoxes::COUNT_NIGHTLY[$pot], false, (string) $location->getKey()))),
                 'bar_opening_cents' => $opening(CashPot::BAR),
                 'shop_opening_cents' => $opening(CashPot::SHOP),
                 'fees_opening_cents' => $opening(CashPot::FEES),

@@ -137,6 +137,17 @@ class CloseTill
                 ] + self::flowerCount($locked));
             }
 
+            // Prompt 380 — a box the sede counts «Cada noche» left uncounted: the close goes on (366), and the owner can see it.
+            foreach ($locked->fresh()?->uncountedNightlyBoxes() ?? [] as $pot) {
+                (new RecordAuditLog)->handle('till.box_not_counted', $locked, null, [
+                    'location_id' => $locked->location_id,
+                    'terminal' => $locked->terminal,
+                    'pot' => $pot->value,
+                    'expected_cents' => (int) ($potColumns[$pot->column().'_expected_cents'] ?? 0),
+                    'closed_by' => $closedBy->id,
+                ]);
+            }
+
             return $locked;
         });
     }

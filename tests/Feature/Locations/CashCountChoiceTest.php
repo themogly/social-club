@@ -79,12 +79,12 @@ class CashCountChoiceTest extends TestCase
         Livewire::test(EditLocation::class, ['record' => $this->sede->id])->fillForm(['count_fees_nightly' => '0'])->call('save')->assertHasNoFormErrors();
         $this->assertFalse((bool) Settings::get('count_fees_nightly', true, (string) $this->sede->id));
         Livewire::test(EditLocation::class, ['record' => $this->sede->id])->assertFormSet(['count_fees_nightly' => '0'])
-            ->assertSee('Al cerrar se puede dejar sin contar; lo que tiene pasa al día siguiente.');
+            ->assertSee('Al cerrar viene marcado «No se cuenta hoy»; lo que tiene pasa al día siguiente.'); // 380's wording
 
         Livewire::test(EditLocation::class, ['record' => $this->sede->id])->fillForm(['count_fees_nightly' => '1'])->call('save')->assertHasNoFormErrors();
         $this->assertTrue((bool) Settings::get('count_fees_nightly', false, (string) $this->sede->id));
         Livewire::test(EditLocation::class, ['record' => $this->sede->id])->assertFormSet(['count_fees_nightly' => '1'])
-            ->assertSee('Al cerrar la caja hay que contarlo.');
+            ->assertSee('Al cerrar viene marcado «Contar ahora». Si un día no se cuenta, queda anotado.'); // 380: a default, not a must
     }
 
     // --- 3. Visibility ----------------------------------------------------------------------------------------------------------

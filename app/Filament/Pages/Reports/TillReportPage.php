@@ -21,6 +21,10 @@ class TillReportPage extends ReportPage
     #[Url]
     public bool $diferencia = false;
 
+    /** Prompt 380 — «Botes sin contar»: the closes that left a «Cada noche» box uncounted; in the URL for the dashboard line. */
+    #[Url]
+    public bool $sin_contar = false;
+
     public function mount(): void
     {
         parent::mount();
@@ -38,7 +42,7 @@ class TillReportPage extends ReportPage
 
     protected function makeReport(string $organisationId, ?array $locationIds, Period $period): AbstractReport
     {
-        return (new TillReport($organisationId, $locationIds, $period))->onlyWithVariance($this->diferencia);
+        return (new TillReport($organisationId, $locationIds, $period))->onlyWithVariance($this->diferencia)->onlyUncountedBoxes($this->sin_contar);
     }
 
     protected function getViewData(): array

@@ -22202,3 +22202,32 @@ switch per box down the right edge, and nothing said what off meant.
 - **Browser:** `prove-379-count-choice.mjs` (20/20) at 1440 and 393, light and dark: edibles *Cada noche*, bar *Solo al
   vaciarlo*, fees *En la caja*.
 - The guide's *Cajas* screenshot was recaptured.
+
+## Prompt 380 — «Cada noche» is a default, not a block, now worded as one, and a skip is noted
+
+- **The gap:** 379's help line said *«Al cerrar la caja hay que contarlo.»*, but the close never blocks (366). «Cada noche»
+  has only ever chosen which option the close starts on (349). Staff could pick «No se cuenta hoy», the till closed, the
+  box carried, and nothing told the owner.
+- **The words now say what it is:**
+  - *Cada noche:* *«Al cerrar viene marcado «Contar ahora». Si un día no se cuenta, queda anotado.»*
+  - *Solo al vaciarlo:* *«Al cerrar viene marcado «No se cuenta hoy»; lo que tiene pasa al día siguiente.»*
+  - The «hay que contarlo» line is gone.
+- **Snapshotted at opening:** `till_sessions.nightly_boxes`, beside `own_boxes`, records which own boxes the sede counts
+  «Cada noche». A skip is judged against the choice in force that night, and a later settings change never rewrites
+  the past. A session from before 380 is null, so there is nothing to note. `TillSession::countsNightly()`.
+- **At the close:** choosing «No se cuenta hoy» on such a box shows one line under it: *«Esta sede lo cuenta cada noche:
+  quedará anotado que hoy no se contó.»* No block, no confirmation, no reason (366).
+- **The record:** `CloseTill` writes `till.box_not_counted` (pot, expected cents, terminal, who closed) for each such box
+  left uncounted (`TillSession::uncountedNightlyBoxes()`).
+- **Informes → Cajas:**
+  - such a box reads *«no contado (se cuenta cada noche)»*;
+  - a second filter, *«Botes sin contar»* (`?sin_contar=1`), sits beside 366's *«Solo con diferencia»*.
+- **Dashboard:** *«Botes sin contar esta semana: N»* (`DashboardAlert::TILL_BOXES_UNCOUNTED`, for holders of
+  `reports.view`) counts boxes at this week's closes and links to that filter. It uses 366's mechanism and adds no new
+  channel.
+- **Tests:** `tests/Feature/Till/NightlyBoxSkipTest.php` (5). The wording and the skip/note/audit tests were red first;
+  the others cover a *Solo al vaciarlo* skip (no row, no note), the till report and filter, and the dashboard (manager
+  yes, staff no).
+- **Browser:** `prove-380-nightly-skip.mjs`: *Cajas* at 1440 and 393; the close at 820×1180 with the note, and the till
+  still closing. The audit row was checked in the throwaway DB.
+- The guide's sentences and its *Cajas* screenshot were updated.
