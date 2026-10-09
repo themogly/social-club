@@ -52,6 +52,9 @@ enum DashboardAlert: string
     // Prompt 367 — 291's discount alert, extended to every loss: the sedes whose losses yesterday (Informes → Pérdidas) went
     // over their `losses_alert_threshold_pct` of the day's takings. Panel only, for holders of reports.view at their sedes.
     case LOSSES_ABOVE_THRESHOLD = 'losses_above_threshold';
+    // Prompt 375 — 291's per-person signal, restored beside it: people whose losses over 7 days exceed the threshold % of their
+    // own takings (with at least the floor taken). Panel only, for holders of reports.view.
+    case LOSSES_PEOPLE_ABOVE_THRESHOLD = 'losses_people_above_threshold';
     // Prompt 366 — a close is never refused for a difference; the ones beyond the tolerance with no note, this week, at the
     // sedes this dashboard shows. Panel only, for holders of reports.view.
     case TILL_CLOSES_UNEXPLAINED = 'till_closes_unexplained';
@@ -64,7 +67,7 @@ enum DashboardAlert: string
             self::MEMBERS_OVER_LIMIT, self::ACTIVE_MEMBER_CAP,
             self::UNRECONCILED_TILL, self::BATCHES_EXPIRING,
             self::GENETICS_LOW_STOCK, self::ARTICLES_LOW_STOCK, self::ASSOCIATION_STOCK_CEILING,
-            self::STAFF_OPEN_SHIFTS, self::LOSSES_ABOVE_THRESHOLD, self::TILL_CLOSES_UNEXPLAINED => 'warning',
+            self::STAFF_OPEN_SHIFTS, self::LOSSES_ABOVE_THRESHOLD, self::LOSSES_PEOPLE_ABOVE_THRESHOLD, self::TILL_CLOSES_UNEXPLAINED => 'warning',
             self::MEMBERSHIPS_EXPIRING, self::PENDING_APPLICATIONS, self::STAFF_UNCLOCKED_ACTIVITY => 'info',
         };
     }
@@ -91,6 +94,7 @@ enum DashboardAlert: string
             self::STAFF_OPEN_SHIFTS => trans_choice(':count jornada sin fichar salida|:count jornadas sin fichar salida', $count, ['count' => $count]),
             self::STAFF_UNCLOCKED_ACTIVITY => trans_choice(':count día con actividad sin fichar|:count días con actividad sin fichar', $count, ['count' => $count]),
             self::LOSSES_ABOVE_THRESHOLD => trans_choice('Pérdidas de ayer por encima del umbral en :count sede|Pérdidas de ayer por encima del umbral en :count sedes', $count, ['count' => $count]),
+            self::LOSSES_PEOPLE_ABOVE_THRESHOLD => trans_choice(':count persona por encima del umbral esta semana|:count personas por encima del umbral esta semana', $count, ['count' => $count]),
             self::TILL_CLOSES_UNEXPLAINED => __('Cierres con diferencia sin explicar: :count esta semana', ['count' => $count]),
         };
     }
@@ -121,7 +125,7 @@ enum DashboardAlert: string
             // Hours are corrected in the panel's registro (staff.hours.manage), never at the counter.
             self::STAFF_OPEN_SHIFTS, self::STAFF_UNCLOCKED_ACTIVITY => null,
             // Losses and unexplained closes are reviewed in the panel's reports, never at the counter.
-            self::LOSSES_ABOVE_THRESHOLD, self::TILL_CLOSES_UNEXPLAINED => null,
+            self::LOSSES_ABOVE_THRESHOLD, self::LOSSES_PEOPLE_ABOVE_THRESHOLD, self::TILL_CLOSES_UNEXPLAINED => null,
         };
     }
 
@@ -146,7 +150,7 @@ enum DashboardAlert: string
             self::PENDING_APPLICATIONS => MemberApplicationResource::class,
             self::ARTICLES_LOW_STOCK => ArticleResource::class,
             self::STAFF_OPEN_SHIFTS, self::STAFF_UNCLOCKED_ACTIVITY => RegistroJornada::class,
-            self::LOSSES_ABOVE_THRESHOLD => LossesReportPage::class,
+            self::LOSSES_ABOVE_THRESHOLD, self::LOSSES_PEOPLE_ABOVE_THRESHOLD => LossesReportPage::class,
             self::TILL_CLOSES_UNEXPLAINED => TillReportPage::class,
         };
     }
@@ -162,6 +166,11 @@ enum DashboardAlert: string
         // The losses alert opens Pérdidas on the day it measured (prompt 367).
         if ($this === self::LOSSES_ABOVE_THRESHOLD) {
             return LossesReportPage::getUrl(['period' => 'yesterday']);
+        }
+
+        // …and the per-person one on the 7 days it measured, sorted by the share each person lost (prompt 375).
+        if ($this === self::LOSSES_PEOPLE_ABOVE_THRESHOLD) {
+            return LossesReportPage::getUrl(['period' => 'last7', 'sort' => 'pct']);
         }
 
         // Informes → Cajas on «Solo con diferencia», this week — the closes the line counted (prompt 366).

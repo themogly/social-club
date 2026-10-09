@@ -17,6 +17,7 @@ use App\Models\TillSession;
 use App\Support\Period;
 use App\Support\Settings;
 use App\Support\TillSummary;
+use App\Support\Units;
 use App\Support\Weight;
 use Carbon\CarbonInterface;
 
@@ -258,7 +259,7 @@ class CounterDaySheet
             return $line['qty'].' × '.$line['name'];
         }
         if ($line['units'] !== null) {
-            return $line['name'].' · '.trans_choice(':count ud|:count uds', $line['units'], ['count' => $line['units']]);
+            return $line['name'].' · '.Units::count($line['units']);
         }
         $text = $line['name'].' · '.Weight::fromCentigrams($line['grams_cg'])->formatted();
 

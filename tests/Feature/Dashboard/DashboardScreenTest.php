@@ -291,7 +291,9 @@ class DashboardScreenTest extends TestCase
         $this->seedDispensations(24); // triple the transactional volume
         $second = $this->countQueries(fn () => Livewire::test(Dashboard::class)->assertOk());
 
-        $this->assertLessThan(120, $first, "Dashboard issued {$first} queries — suspECT N+1.");
+        // Prompt 375 raised the ceiling from 120 to 125: the losses readout and its two alerts (sede, people) read one 7-day report —
+        // a FIXED number of queries, whatever the rows; the growth check below is what catches an N+1.
+        $this->assertLessThan(125, $first, "Dashboard issued {$first} queries — suspECT N+1.");
         // The aggregates are SQL — the count must not scale with rows.
         $this->assertLessThanOrEqual($first + 2, $second, "Query count grew from {$first} to {$second} with more rows — N+1.");
     }

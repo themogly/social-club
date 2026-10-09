@@ -18,6 +18,7 @@ use App\Rules\GramAmount;
 use App\Support\ManagerApproval;
 use App\Support\Money;
 use App\Support\Spreadsheet\ReportExport;
+use App\Support\Units;
 use App\Support\Weight;
 use App\ViewModels\BatchRecall;
 use Closure;
@@ -113,7 +114,7 @@ class BatchesTable
                         if ($record->isUnitType()) {
                             $units = (int) ($record->remaining_units ?? 0);
 
-                            return $units.' '.__('uds').' ('.Weight::fromCentigrams($record->onHandCg())->formatted().')';
+                            return Units::count((int) $units).' ('.Weight::fromCentigrams($record->onHandCg())->formatted().')';
                         }
 
                         return $record->remaining_cg->formatted(); // the one formatter: "300,01 g" in Spanish (prompt 306)
@@ -425,7 +426,7 @@ class BatchesTable
 
     protected static function quantity(Batch $record, int $amount): string
     {
-        return $record->isUnitType() ? trans_choice(':count ud|:count uds', $amount, ['count' => $amount]) : Weight::fromCentigrams($amount)->formatted();
+        return $record->isUnitType() ? Units::count((int) $amount) : Weight::fromCentigrams($amount)->formatted();
     }
 
     protected static function signedQuantity(Batch $record, int $delta): string

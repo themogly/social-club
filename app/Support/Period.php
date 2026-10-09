@@ -152,6 +152,40 @@ class Period
         return new self($start, $end, $type, $location);
     }
 
+    /**
+     * Prompt 375 — the first and last BUSINESS days the window covers, on the sede's wall clock: what a label says. The bounds
+     * are storage time (Madrid's 9 October starts at 22:00 UTC on the 8th) and the end is exclusive, so printing them raw put
+     * every report a day early. The last day is the end's date minus one day there, which also holds for a cutoff (a business
+     * day 06:00 → 06:00 ends at 06:00 the next calendar day).
+     */
+    public function firstDay(): CarbonImmutable
+    {
+        return $this->start->setTimezone(self::displayTimezone($this->location));
+    }
+
+    public function lastDay(): CarbonImmutable
+    {
+        return $this->end->setTimezone(self::displayTimezone($this->location))->subDay();
+    }
+
+    /** «09/10/2026», or «05/10/2026 – 11/10/2026». */
+    public function label(): string
+    {
+        $from = $this->firstDay()->translatedFormat('d/m/Y');
+        $to = $this->lastDay()->translatedFormat('d/m/Y');
+
+        return $from === $to ? $from : "{$from} – {$to}";
+    }
+
+    /** «20261009», or «20261005-20261011»: the same days, for a file name. */
+    public function fileRange(): string
+    {
+        $from = $this->firstDay()->format('Ymd');
+        $to = $this->lastDay()->format('Ymd');
+
+        return $from === $to ? $from : "{$from}-{$to}";
+    }
+
     /** The previous equivalent window (yesterday / last week / last month / shifted custom). */
     public function previous(): self
     {

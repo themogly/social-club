@@ -38,7 +38,7 @@ class ReportExport
 
         foreach ($table->rows as $row) {
             $writer->insertOne(array_map(
-                fn (ReportColumn $c): string => $c->export($row[$c->key] ?? null, $decimal),
+                fn (ReportColumn $c): string => filled($row[$c->key.'__text'] ?? null) ? (string) $row[$c->key.'__text'] : $c->export($row[$c->key] ?? null, $decimal),
                 $table->columns,
             ));
         }
@@ -86,11 +86,7 @@ class ReportExport
 
     public static function filename(string $key, Period $period, string $extension): string
     {
-        $from = $period->start->format('Ymd');
-        $to = $period->end->subDay()->format('Ymd');
-        $range = $from === $to ? $from : "{$from}-{$to}";
-
-        return Str::slug("informe-{$key}-{$range}").'.'.$extension;
+        return Str::slug("informe-{$key}-{$period->fileRange()}").'.'.$extension;
     }
 
     /**

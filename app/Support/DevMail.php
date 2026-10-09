@@ -75,6 +75,11 @@ class DevMail
                 ]]))->setRelation('location', new Location(['name' => 'Sede Centro'])),
                 (new OwnerAlertState(['type' => AlertType::PRODUCTS_LOW, 'subject' => 'article:preview', 'detail' => ['name' => 'Papel', 'stock' => 3, 'threshold' => 10]]))
                     ->setRelation('location', new Location(['name' => 'Sede Centro'])),
+                // Prompts 367 / 375 — the losses alerts: the sede's day (with its euro figure, Ben) and the people this week (no names).
+                (new OwnerAlertState(['type' => AlertType::LOSSES_ABOVE_THRESHOLD, 'subject' => 'losses:preview', 'detail' => ['cents' => 4620, 'pct' => '8.2', 'url' => url('/informes/perdidas?period=yesterday')]]))
+                    ->setRelation('location', new Location(['name' => 'Sede Norte'])),
+                (new OwnerAlertState(['type' => AlertType::LOSSES_PEOPLE_ABOVE_THRESHOLD, 'subject' => 'losses-people:preview', 'detail' => ['count' => 1, 'pct' => '16', 'url' => url('/informes/perdidas?period=last7&sort=pct')]]))
+                    ->setRelation('location', new Location(['name' => 'Sede Norte'])),
             ])),
             'telegram-disconnected' => new TelegramDisconnectedMail('Ana Ruiz'),
             'telegram-alert-by-email' => new TelegramAlertByEmailMail("⚠️ Sede Centro\n· Stock bajo: Amnesia Haze (12.00 g)"), // prompt 363

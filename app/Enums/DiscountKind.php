@@ -23,6 +23,19 @@ enum DiscountKind: string implements HasLabel
         };
     }
 
+    /**
+     * Prompt 375 — what a report calls a stored line's `discount_kind`: a kind's label, «Tarifa» for a tier discount (which has
+     * no Discount row), and «Sin clasificar (anterior a hoy)» for a line written before the kind was stored (no backfill).
+     */
+    public static function reportLabel(?string $kind): string
+    {
+        return match (true) {
+            $kind === null || $kind === '' => __('Sin clasificar (anterior a hoy)'),
+            $kind === 'TIER' => __('Tarifa'),
+            default => self::tryFrom($kind)?->label() ?? __('Sin clasificar (anterior a hoy)'),
+        };
+    }
+
     public function getLabel(): string
     {
         return $this->label();

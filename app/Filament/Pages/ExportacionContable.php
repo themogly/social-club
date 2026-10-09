@@ -87,9 +87,7 @@ class ExportacionContable extends ReportPage
     {
         $content = $this->accountingExport()->csv();
         $period = $this->resolvePeriod();
-        $from = $period->start->format('Ymd');
-        $to = $period->end->subDay()->format('Ymd');
-        $range = $from === $to ? $from : "{$from}-{$to}";
+        $range = $period->fileRange(); // prompt 375 — the sede's days
         $filename = "exportacion-contable-{$range}.csv";
 
         return response()->streamDownload(fn () => print ($content), $filename, [

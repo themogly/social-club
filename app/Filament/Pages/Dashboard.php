@@ -159,7 +159,7 @@ class Dashboard extends BaseDashboard
             'data' => $data,
             'occupancy' => $occ = $charts->occupancy(),
             'stats' => $this->statCards($data, $charts, $period, $canSeeFinance),
-            'alerts' => $this->decorateAlerts(array_merge($data->alerts(), $this->staffAlerts($staffHours), $this->lossAlerts($losses), $this->tillCloseAlerts($user, $data))),
+            'alerts' => $this->decorateAlerts(array_merge($data->alerts(), $this->staffAlerts($staffHours), $this->lossAlerts($losses, $data), $this->tillCloseAlerts($user, $data))),
             'staffHours' => $staffHours,
             'staffNow' => $staffHours?->now() ?? [],
             'ceilingHeadroom' => $data->ceilingHeadroom(),
@@ -254,9 +254,17 @@ class Dashboard extends BaseDashboard
      */
     private function lossesYesterday(User $user, DashboardData $data): ?LossesReport
     {
+        // Prompt 375 — the last 7 days, which hold yesterday: ONE report answers the readout, the sede alert (yesterday, read
+        // out of it) and the per-person alert (the 7 days), inside the dashboard's query budget.
         return $user->canAny(['reports.view', 'reports.view.all'])
-            ? LossesReport::forYesterday($data->organisationId, $this->dashboardSedes($data)->pluck('id')->values()->all())
+            ? new LossesReport($data->organisationId, $this->dashboardSedes($data)->pluck('id')->values()->all(), LossesReport::lastSevenDays())
             : null;
+    }
+
+    /** @return array{0: CarbonImmutable, 1: CarbonImmutable} yesterday's business day (the sede in scope's day, 271) */
+    private function yesterday(): array
+    {
+        return Period::today()->previous()->bounds();
     }
 
     /**
@@ -265,13 +273,23 @@ class Dashboard extends BaseDashboard
      *
      * @return list<array{severity: string, key: string, count: int}>
      */
-    private function lossAlerts(?LossesReport $losses): array
+    private function lossAlerts(?LossesReport $losses, DashboardData $data): array
     {
-        $count = $losses !== null ? count($losses->sedesAboveThreshold()) : 0;
+        if ($losses === null) {
+            return [];
+        }
+        $alerts = [];
+        $count = count($losses->sedesAboveThreshold($this->yesterday()));
+        if ($count > 0) {
+            $alerts[] = ['severity' => DashboardAlert::LOSSES_ABOVE_THRESHOLD->severity(), 'key' => DashboardAlert::LOSSES_ABOVE_THRESHOLD->value, 'count' => $count];
+        }
+        // Prompt 375 — and the people over the threshold of their own takings this week, at each sede shown.
+        $people = (int) array_sum(array_column($losses->peopleAboveThresholdBySede(), 'count'));
+        if ($people > 0) {
+            $alerts[] = ['severity' => DashboardAlert::LOSSES_PEOPLE_ABOVE_THRESHOLD->severity(), 'key' => DashboardAlert::LOSSES_PEOPLE_ABOVE_THRESHOLD->value, 'count' => $people];
+        }
 
-        return $count > 0
-            ? [['severity' => DashboardAlert::LOSSES_ABOVE_THRESHOLD->severity(), 'key' => DashboardAlert::LOSSES_ABOVE_THRESHOLD->value, 'count' => $count]]
-            : [];
+        return $alerts;
     }
 
     /** @var Collection<int, Location>|null the sedes this render's dashboard shows (two rail sections read them) */
@@ -334,7 +352,7 @@ class Dashboard extends BaseDashboard
                 'articles_low_stock' => [trans_choice(':count producto de barra y tienda con stock bajo|:count productos de barra y tienda con stock bajo', $count, ['count' => $count]), Heroicon::OutlinedShoppingBag],
                 'staff_open_shifts', 'staff_unclocked_activity' => [(string) $case?->label($count), Heroicon::OutlinedClock],
                 'till_closes_unexplained' => [(string) $case?->label($count), Heroicon::OutlinedCalculator],
-                'losses_above_threshold' => [(string) $case?->label($count), Heroicon::OutlinedArrowTrendingDown],
+                'losses_above_threshold', 'losses_people_above_threshold' => [(string) $case?->label($count), Heroicon::OutlinedArrowTrendingDown],
                 default => [$case?->label($count) ?? __('Aviso'), Heroicon::OutlinedBell],
             };
 
@@ -363,7 +381,7 @@ class Dashboard extends BaseDashboard
             ]];
             // Prompt 367 — «Pérdidas ayer: €46.20 (3.1 %)», opening Pérdidas on that day; for those who may open it.
             if ($losses !== null) {
-                $yesterday = $losses->dayFigures();
+                $yesterday = $losses->dayFigures($this->yesterday());
                 $groups['finanzas']['rows'][] = ['label' => __('Pérdidas ayer'), 'value' => Money::fromCents($yesterday['total'])->formatted().' ('.$yesterday['pct'].' %)',
                     'href' => LossesReportPage::getUrl(['period' => 'yesterday']), 'data' => 'losses-yesterday'];
             }

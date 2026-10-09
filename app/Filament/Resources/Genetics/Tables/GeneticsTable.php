@@ -13,6 +13,7 @@ use App\Models\Scopes\LocationScope;
 use App\Support\ActiveScope;
 use App\Support\Percent;
 use App\Support\StockCover;
+use App\Support\Units;
 use App\Support\Weight;
 use Filament\Actions\ActionGroup;
 use Filament\Actions\BulkActionGroup;
@@ -77,7 +78,7 @@ class GeneticsTable
                         if ($record->isUnitType()) {
                             $units = (int) $open->sum('remaining_units');
 
-                            return $units === 0 ? __('Sin existencias') : $units.' '.__('uds').' ('.Weight::fromCentigrams($units * (int) $record->grams_per_unit_cg)->formatted().')';
+                            return $units === 0 ? __('Sin existencias') : Units::count((int) $units).' ('.Weight::fromCentigrams($units * (int) $record->grams_per_unit_cg)->formatted().')';
                         }
                         $cg = (int) $open->sum('remaining_cg');
 

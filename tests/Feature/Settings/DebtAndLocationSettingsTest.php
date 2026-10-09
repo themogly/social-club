@@ -164,7 +164,9 @@ class DebtAndLocationSettingsTest extends TestCase
         // minute_quorum_fraction_bp is entered as a percentage (prompt 44).
         $edgeCovered = ['daily_limit_cg', 'monthly_limit_cg', 'wallet_debt_limit_cents', 'wallet_door_debt_threshold_cents', 'low_balance_threshold_cents', 'till_default_float_cents', 'arqueo_variance_tolerance_cents', 'expense_approval_threshold_cents', 'minute_quorum_fraction_bp', 'assembly_second_call_quorum_bp',
             // Prompt 273 — edited as grams (empty = automatic) under Existencias.
-            'low_stock_threshold_cg'];
+            'low_stock_threshold_cg',
+            // Prompt 375 — the per-person losses floor, edited in euros.
+            'losses_person_min_takings_cents'];
 
         // Deliberately NOT on the org settings form (documented in DECISIONS): the enforcement
         // matrix (its own editor), per-location settings, and system/compliance constants.

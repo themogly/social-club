@@ -48,14 +48,16 @@
                 @foreach ($table->rows as $row)
                     <tr>
                         @foreach ($columns as $column)
-                            {{-- A row may carry `<key>__url` to link that cell (prompt 285: a person → their registro), and
-                                 `<key>__tone` to colour a filled one (prompt 366: «Sin explicar» in amber). --}}
+                            {{-- A row may carry `<key>__url` to link that cell (prompt 285: a person → their registro),
+                                 `<key>__tone` to colour a filled one (prompt 366: «Sin explicar» in amber), and `<key>__text`. --}}
                             @php $tone = filled($row[$column->key] ?? null) ? ($row[$column->key.'__tone'] ?? null) : null; @endphp
                             <td @class(['csc-num' => $column->numeric(), 'csc-cell-'.$tone => $tone !== null])>
+                                {{-- Prompt 375 — `<key>__text` says something in place of the figure (Pérdidas: «sin coste registrado», never 0.00 €). --}}
+                                @php($shown = filled($row[$column->key.'__text'] ?? null) ? $row[$column->key.'__text'] : $column->display($row[$column->key] ?? null))
                                 @if (filled($row[$column->key.'__url'] ?? null))
-                                    <a href="{{ $row[$column->key.'__url'] }}" class="csc-rep-link">{{ $column->display($row[$column->key] ?? null) }}</a>
+                                    <a href="{{ $row[$column->key.'__url'] }}" class="csc-rep-link">{{ $shown }}</a>
                                 @else
-                                    {{ $column->display($row[$column->key] ?? null) }}
+                                    {{ $shown }}
                                 @endif
                             </td>
                         @endforeach

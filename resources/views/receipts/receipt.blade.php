@@ -121,7 +121,7 @@
                         <td>{{ $name }}@if ($note) <span class="note">· {{ $note }}</span>@endif</td>
                         <td class="num">
                             @if ($isUnit)
-                                {{ $units }} {{ __('uds') }} ({{ Weight::fromCentigrams($gramsCg)->formatted() }})
+                                {{ \App\Support\Units::count($units) }} ({{ Weight::fromCentigrams($gramsCg)->formatted() }})
                             @else
                                 {{ Weight::fromCentigrams($gramsCg)->formatted() }}
                                 @if ($chargedCg !== null && $chargedCg !== $gramsCg)

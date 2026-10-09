@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\Reports;
 
+use App\Enums\DiscountKind;
 use App\Enums\DispensationStatus;
 use App\Enums\FeePaymentMethod;
 use App\Enums\OrderStatus;
@@ -94,7 +95,7 @@ class DiscountsReportTest extends TestCase
         ]);
         foreach ($lines as $line) {
             DispensationLine::factory()->create([
-                'dispensation_id' => $d->id, 'discount_cents' => $line['discount'], 'pricing_note' => $line['note'],
+                'dispensation_id' => $d->id, 'discount_cents' => $line['discount'], 'pricing_note' => $line['note'], 'discount_kind' => $line['kind'] ?? null,
                 'line_total_cents' => $line['total'],
             ]);
         }
@@ -129,12 +130,12 @@ class DiscountsReportTest extends TestCase
     /** The fixture of test 2, hand-computed below. */
     private function fixture(): void
     {
-        $this->dispensation($this->ana, 2000, [['discount' => 300, 'note' => 'Tarifa · Terapéutico −15.00%', 'total' => 2000]]);
+        $this->dispensation($this->ana, 2000, [['discount' => 300, 'note' => 'Tarifa · Terapéutico −15.00%', 'kind' => 'THERAPEUTIC', 'total' => 2000]]);
         $this->dispensation($this->bruno, 1500, [['discount' => 0, 'note' => null, 'total' => 1500]], original: 2000, overrideBy: $this->bruno);
-        $this->dispensation($this->ana, 1800, [['discount' => 200, 'note' => 'Tarifa · Personal −10.00%', 'total' => 1800]]);
+        $this->dispensation($this->ana, 1800, [['discount' => 200, 'note' => 'Tarifa · Personal −10.00%', 'kind' => 'STAFF', 'total' => 1800]]);
         $this->dispensation($this->ana, 5000, [['discount' => 1000, 'note' => 'Tarifa · Personal −10.00%', 'total' => 5000]], original: 6000, overrideBy: $this->ana, voided: true);
         $this->order($this->ana, [
-            ['article_id' => 'a1', 'name' => 'Agua', 'unit_price_cents' => 550, 'qty' => 1, 'discount_cents' => 50, 'line_total_cents' => 500, 'reference' => null],
+            ['article_id' => 'a1', 'name' => 'Agua', 'unit_price_cents' => 550, 'qty' => 1, 'discount_cents' => 50, 'discount_kind' => 'LOCAL', 'line_total_cents' => 500, 'reference' => null],
             ['article_id' => null, 'name' => 'Varios', 'unit_price_cents' => 200, 'qty' => 1, 'line_total_cents' => 200, 'reference' => 'Mechero'],
         ]);
         $this->order($this->bruno, [['article_id' => null, 'name' => 'Varios', 'unit_price_cents' => 300, 'qty' => 1, 'line_total_cents' => 300, 'reference' => 'Papel']]);
@@ -214,14 +215,15 @@ class DiscountsReportTest extends TestCase
 
     // 6 -------------------------------------------------------------------------------------------------------------
 
-    public function test_member_discounts_group_by_their_label(): void
+    public function test_member_discounts_group_by_their_kind(): void
     {
         $this->fixture();
         $rows = collect(collect($this->report()->tables())->firstWhere('key', 'by_type')->rows)->keyBy('tipo');
 
-        $this->assertSame(300, $rows['Tarifa · Terapéutico −15.00%']['importe']);
-        $this->assertSame(200, $rows['Tarifa · Personal −10.00%']['importe']); // the voided sale's 1000 is not here
-        $this->assertSame(50, $rows[__('Barra y tienda: descuento de socio')]['importe']);
+        // Prompt 375 — by the kind stored on the line, not its pricing note.
+        $this->assertSame(300, $rows[DiscountKind::THERAPEUTIC->label()]['importe']);
+        $this->assertSame(200, $rows[DiscountKind::STAFF->label()]['importe']); // the voided sale's 1000 is not here
+        $this->assertSame(50, $rows[__('Barra y tienda: :kind', ['kind' => DiscountKind::LOCAL->label()])]['importe']);
     }
 
     // 8 -------------------------------------------------------------------------------------------------------------

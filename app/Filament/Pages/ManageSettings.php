@@ -213,6 +213,9 @@ class ManageSettings extends Page
                 // Prompt 291's discount alert became prompt 367's losses alert: its threshold is per sede, on the sede form.
                 Section::make(__('Descuentos y ajustes'))
                     ->schema([
+                        // Prompt 375 — the per-person losses signal's floor (291's €50): below it nobody is flagged.
+                        DecimalInput::make('losses_person_min_takings_eur')->label(__('Mínimo recaudado para el aviso por persona (€)'))->numeric()->minValue(0)->required()
+                            ->helperText(__('Avisa cuando lo perdido por una persona en 7 días pasa del umbral de su sede sobre lo que ella misma ha cobrado, si ha cobrado al menos esto.')),
                         // Prompt 350 (Aaron) — the discounted dispensary total to the euro, so the till needs less change. Owner
                         // only (it is the club's money), audited with the rest of the page (settings.updated).
                         Select::make('discount_rounding')->label(__('Redondear el total con descuento'))
@@ -479,6 +482,7 @@ class ManageSettings extends Page
         Settings::set('till_default_float_cents', (int) round_half_up(((float) ($state['till_default_float_eur'] ?? 0)) * 100), SettingType::CENTS);
         Settings::set('arqueo_variance_tolerance_cents', (int) round_half_up(((float) ($state['arqueo_variance_tolerance_eur'] ?? 0)) * 100), SettingType::CENTS);
         Settings::set('expense_approval_threshold_cents', (int) round_half_up(((float) ($state['expense_approval_threshold_eur'] ?? 0)) * 100), SettingType::CENTS);
+        Settings::set('losses_person_min_takings_cents', (int) round_half_up(((float) ($state['losses_person_min_takings_eur'] ?? 50)) * 100), SettingType::CENTS);
 
         // Quórum shown as a percentage at the edge, stored as basis points (50% → 5000 bp).
         Settings::set('minute_quorum_fraction_bp', (int) round_half_up(((float) ($state['minute_quorum_fraction_pct'] ?? 0)) * 100), SettingType::BP);
@@ -515,6 +519,7 @@ class ManageSettings extends Page
         $values['till_default_float_eur'] = ((int) Settings::get('till_default_float_cents')) / 100;
         $values['arqueo_variance_tolerance_eur'] = ((int) Settings::get('arqueo_variance_tolerance_cents')) / 100;
         $values['expense_approval_threshold_eur'] = ((int) Settings::get('expense_approval_threshold_cents')) / 100;
+        $values['losses_person_min_takings_eur'] = ((int) Settings::get('losses_person_min_takings_cents', 5000)) / 100;
         $values['minute_quorum_fraction_pct'] = ((int) Settings::get('minute_quorum_fraction_bp')) / 100;
         $values['assembly_second_call_quorum_pct'] = ((int) Settings::get('assembly_second_call_quorum_bp')) / 100;
 

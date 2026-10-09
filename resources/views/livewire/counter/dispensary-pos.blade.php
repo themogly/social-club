@@ -300,7 +300,7 @@
                                     <div class="mt-1 flex flex-wrap gap-2">
                                         @foreach ($activeGeneticBatches as $i => $batch)
                                             <x-counter.batch-chip :batch="$batch" :selected="$activeBatchId === $batch->id" :fefo="$i === 0"
-                                                :quantity="$activeGenetic->isUnitType() ? $batch->remaining_units.' '.__('uds') : $this->grams($batch->remaining_cg?->centigrams ?? 0)" />
+                                                :quantity="$activeGenetic->isUnitType() ? \App\Support\Units::count((int) $batch->remaining_units) : $this->grams($batch->remaining_cg?->centigrams ?? 0)" />
                                         @endforeach
                                     </div>
                                 @endif
@@ -649,7 +649,7 @@
                                     <span class="flex shrink-0 items-center gap-3 text-xs as-list:sm:flex-col as-list:sm:items-end as-list:sm:gap-0.5 as-grid:w-full as-grid:min-w-0 as-grid:shrink as-grid:flex-col as-grid:items-start as-grid:gap-0.5">
                                         <span class="text-sm font-semibold text-brand tabular-nums dark:text-slate-100">{{ $this->money($g['rate_cents']) }}/{{ $g['is_unit'] ? __('ud') : 'g' }}</span>
                                         <span data-genetic-stock class="flex min-w-0 max-w-full items-center gap-1.5 whitespace-nowrap text-ink-muted dark:text-slate-400">
-                                            <span class="shrink-0 tabular-nums">{{ $g['is_unit'] ? $g['remaining_units'].' '.__('uds') : $this->grams($g['remaining_cg']) }}</span>
+                                            <span class="shrink-0 tabular-nums">{{ $g['is_unit'] ? \App\Support\Units::count((int) $g['remaining_units']) : $this->grams($g['remaining_cg']) }}</span>
                                             @if (! $g['has_batch'] && $g['reserve_cg'] > 0 || $g['jar_low'])
                                                 <span data-jar-top-up title="{{ $statusWord }}" class="inline-flex min-w-0 items-center gap-1 text-brand dark:text-slate-200"><span class="h-2 w-2 shrink-0 rounded-full bg-brand"></span><span class="truncate">{{ $statusWord }}</span></span>
                                             @elseif ($g['has_batch'] && $g['low_stock'])
@@ -828,7 +828,7 @@
                                     </p>
                                     <p class="text-xs text-ink-muted dark:text-slate-400">
                                         @if ($line['per_unit'])
-                                            {{ $line['units'] }} {{ __('uds') }} ({{ $this->grams($line['grams_cg']) }}) × {{ $this->money($line['rate_cents']) }}/{{ __('ud') }}
+                                            {{ \App\Support\Units::count((int) $line['units']) }} ({{ $this->grams($line['grams_cg']) }}) × {{ $this->money($line['rate_cents']) }}/{{ __('ud') }}
                                         @else
                                             {{ $this->grams($line['grams_cg']) }}@if (($line['charged_cg'] ?? null) !== null && $line['charged_cg'] !== $line['grams_cg']) <span data-charged-grams class="font-medium text-ink dark:text-slate-200">· {{ __('se cobra :grams', ['grams' => $this->grams($line['charged_cg'])]) }}</span>@endif × {{ $this->money($line['rate_cents']) }}/g
                                         @endif

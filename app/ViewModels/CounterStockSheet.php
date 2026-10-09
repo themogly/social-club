@@ -8,6 +8,7 @@ use App\Models\Genetic;
 use App\Models\Location;
 use App\Support\Money;
 use App\Support\StockCover;
+use App\Support\Units;
 use App\Support\Weight;
 use Carbon\CarbonInterface;
 use Illuminate\Support\Carbon;
@@ -114,7 +115,7 @@ class CounterStockSheet
             'batch_no' => (string) $batch->batch_no,
             'is_unit' => $unit,
             'jar' => $jar,
-            'jar_text' => $unit ? $jar.' '.__('uds') : Weight::fromCentigrams($jar)->formatted(),
+            'jar_text' => $unit ? Units::count($jar) : Weight::fromCentigrams($jar)->formatted(),
             'reserve_cg' => $reserve,
             'reserve_text' => Weight::fromCentigrams($reserve)->formatted(),
             'price_text' => $unit

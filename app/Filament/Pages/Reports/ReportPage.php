@@ -284,10 +284,6 @@ abstract class ReportPage extends Page
 
     protected function periodLabel(): string
     {
-        $period = $this->resolvePeriod();
-        $from = $period->start->translatedFormat('d/m/Y');
-        $to = $period->end->subDay()->translatedFormat('d/m/Y');
-
-        return $from === $to ? $from : "{$from} – {$to}";
+        return $this->resolvePeriod()->label(); // prompt 375 — the sede's days, not the UTC bounds
     }
 }

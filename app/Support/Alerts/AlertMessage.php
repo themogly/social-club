@@ -7,6 +7,7 @@ use App\Filament\Resources\Batches\BatchResource;
 use App\Models\OwnerAlertState;
 use App\Support\Money;
 use App\Support\StockCover;
+use App\Support\Units;
 use App\Support\Weight;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Collection;
@@ -47,7 +48,7 @@ final class AlertMessage
                 if ($first->type === AlertType::RESTOCK_FROM_STORE && ($link = self::transferLink($group)) !== null) {
                     $lines[] = (string) __('Trasladar: :url', ['url' => $link]);
                 }
-                if (in_array($first->type, [AlertType::TILL_CLOSES_UNEXPLAINED, AlertType::LOSSES_ABOVE_THRESHOLD], true) && is_string($link = data_get($first->detail, 'url'))) {
+                if (in_array($first->type, [AlertType::TILL_CLOSES_UNEXPLAINED, AlertType::LOSSES_ABOVE_THRESHOLD, AlertType::LOSSES_PEOPLE_ABOVE_THRESHOLD], true) && is_string($link = data_get($first->detail, 'url'))) {
                     $lines[] = (string) __('Ver: :url', ['url' => $link]);
                 }
 
@@ -74,6 +75,8 @@ final class AlertMessage
             AlertType::TILL_CLOSES_UNEXPLAINED => __('Cierres con diferencia sin explicar: :count esta semana', ['count' => (int) ($d['count'] ?? 0)]),
             // Prompt 367 — the one alert that carries money: an aggregate the owner asked to be told, never a price or a member.
             AlertType::LOSSES_ABOVE_THRESHOLD => __('Pérdidas ayer: :amount (:pct %)', ['amount' => Money::fromCents((int) ($d['cents'] ?? 0))->formatted(), 'pct' => (string) ($d['pct'] ?? '0.0')]),
+            AlertType::LOSSES_PEOPLE_ABOVE_THRESHOLD => trans_choice(':count persona por encima del umbral (:pct % de lo que cobró)|:count personas por encima del umbral (hasta :pct % de lo que cobraron)',
+                (int) ($d['count'] ?? 0), ['count' => (int) ($d['count'] ?? 0), 'pct' => (string) ($d['pct'] ?? '0')]),
             AlertType::SYSTEM => __(':component no se ha ejecutado desde :since', [
                 'component' => self::componentLabel((string) ($d['component'] ?? '')),
                 'since' => isset($d['last_at']) ? CarbonImmutable::parse($d['last_at'])->setTimezone((string) config('app.timezone'))->translatedFormat('j M H:i') : __('nunca'),
@@ -100,7 +103,7 @@ final class AlertMessage
 
     private static function quantity(int $amount, bool $unit): string
     {
-        return $unit ? $amount.' '.__('uds') : Weight::fromCentigrams($amount)->formatted();
+        return $unit ? Units::count($amount) : Weight::fromCentigrams($amount)->formatted();
     }
 
     /**
