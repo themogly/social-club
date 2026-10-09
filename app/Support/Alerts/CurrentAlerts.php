@@ -224,7 +224,7 @@ final class CurrentAlerts
                     'type' => AlertType::LOSSES_PEOPLE_ABOVE_THRESHOLD,
                     'subject' => 'losses-people:'.Period::today($sede)->firstDay()->toDateString(),
                     'location_id' => $sede->id,
-                    'detail' => ['count' => $people['count'], 'pct' => $people['pct'], 'url' => LossesReportPage::getUrl(['period' => 'last7', 'sort' => 'pct'])],
+                    'detail' => ['count' => $people['count'], 'pct' => $people['pct'], 'url' => LossesReport::peopleUrl((string) $sede->id, $people['people'])], // 377
                 ];
             }
         }
