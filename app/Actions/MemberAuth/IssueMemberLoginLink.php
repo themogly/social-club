@@ -2,13 +2,12 @@
 
 namespace App\Actions\MemberAuth;
 
-use App\Actions\ResolveLocale;
+use App\Actions\Mail\QueueClubMail;
 use App\Enums\MemberStatus;
 use App\Mail\MemberLoginLinkMail;
 use App\Models\Member;
 use App\Models\MemberLoginToken;
 use App\Support\Settings;
-use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Str;
 
 /**
@@ -42,9 +41,8 @@ class IssueMemberLoginLink
         ]);
 
         // In the member's own language (prompt 288) — a queued mail renders in the worker, which has no session.
-        Mail::to((string) $member->email)
-            ->locale((new ResolveLocale)->handle($member))
-            ->queue(new MemberLoginLinkMail($member, $token));
+        // Prompt 372 — never queued to an unsendable address (audited); the caller still answers as if sent (no lookup oracle).
+        (new QueueClubMail)->handle($member, new MemberLoginLinkMail($member, $token));
 
         return true;
     }

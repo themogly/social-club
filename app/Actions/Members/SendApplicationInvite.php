@@ -2,12 +2,11 @@
 
 namespace App\Actions\Members;
 
+use App\Actions\Mail\QueueClubMail;
 use App\Actions\RecordAuditLog;
-use App\Actions\ResolveLocale;
 use App\Mail\ApplicationInviteMail;
 use App\Models\MemberApplication;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\RateLimiter;
 use Throwable;
 
@@ -56,13 +55,13 @@ class SendApplicationInvite
         }
 
         try {
-            Mail::to((string) $application->applicant_email)
-                ->locale((new ResolveLocale)->handle())
-                ->queue(new ApplicationInviteMail(
-                    (string) $application->inviteUrl(),
-                    $application->invite_expires_at?->format('d/m/Y') ?? '',
-                ));
-            $queued = true;
+            $queued = (new QueueClubMail)->handle((string) $application->applicant_email, new ApplicationInviteMail(
+                (string) $application->inviteUrl(),
+                $application->invite_expires_at?->format('d/m/Y') ?? '',
+            ), $application);
+            if (! $queued) {
+                return false;
+            }
             RateLimiter::hit($recent, self::COOLDOWN_SECONDS);
             RateLimiter::hit($daily, 86400);
             RateLimiter::hit($sender, 3600);

@@ -243,6 +243,8 @@ Before the reserve existed, each evening count took the sealed bags out of stock
 
 **A card that has been shared or lost:** on the member's record, **Reissue card** cancels the old QR code and gives them a new one. Cards used by someone else are counted on the member's record.
 
+**Emails that cannot be delivered:** an address with a space, an accent or no proper ending (*.com*, *.es*…) is refused when typed, and the system never tries to send to one already stored. *Members → Filters → Invalid email* lists them, and *System health → Alerts* shows how many there are. Fix the address on the member's record, then use **Resend card**. Members imported from a spreadsheet with a bad email are imported without it; the import lists them (*"row 14: email «…» is not valid, imported without an email"*).
+
 ## 10. Your daily and weekly routine
 
 **Every day**

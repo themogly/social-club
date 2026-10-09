@@ -21630,3 +21630,109 @@ button saying count membership fees or something."*
 - **The sede where the pots were turned OFF:** check its last close before the change in *Arqueos de caja*. Any
   *Barra* / *Cuotas* «no contado» there fell out of the books under 349's switch. Count those boxes and record the
   money as an *Entrada* if it is still there.
+
+## Prompt 372 — emails to a mistyped address: refused at every way in, never queued, a permanent refusal fails once, staff see whom to fix
+
+Sentry, 8 October, a Horizon worker: *«Request to Resend API failed. Reason: Invalid `to` field.»* A member's address
+with a space in it had been queued, retried four times (`ClubMail::$tries`), then failed. `mail.failed` named nobody,
+and the member's page still said the card went out.
+
+### One address rule, and why Laravel's `email` is not enough
+
+- `App\Support\Email::isSendable()`: after `normalise()`, `FILTER_VALIDATE_EMAIL` (ASCII only: no spaces, quotes,
+  comments or accents), no IP-literal domain, and a dotted domain whose last label is two or more letters.
+- **Laravel's `email` rule** (behind Filament's `->email()` and the application shape) accepts «juan @gmail.com»,
+  «juan@gmail», «josé@gmail.com», «"juan perez"@gmail.com», «juan@localhost» and «juan@gmail.c». Symfony's `Address`
+  accepts all of those plus «juan@gmail,com» at queue time. Resend refuses every one.
+- `App\Rules\SendableEmail` wraps it, with one message: «Este correo no es válido. Revisa que no tenga espacios ni
+  acentos y que termine en algo como .com o .es.»
+- **It replaces `email` / `->email()` on:** `ApplicationShape` (the public application and the counter alta, which
+  share it), `MemberForm`, `UserForm`, the invite email, and the club's contact email. The fields keep
+  `type="email"` for the phone keyboard.
+- The member login form is unchanged: a typo there just finds nobody.
+- Editing a member whose stored address is bad shows the error until it is fixed. That is how the bad ones get cleaned
+  up.
+
+### One sending path, and its guard
+
+- `App\Actions\Mail\QueueClubMail` is the only place the app calls `Mail::to()`. It resolves the address (Member, User,
+  or a string) and the recipient's language, and checks `isSendable()`.
+  - **Unsendable:** nothing is queued. `mail.skipped_invalid_address` is audited with the SUBJECT (the member or user,
+    or `$about`) and the mailable's class, never the address (prompt 76), and it returns `false`.
+  - **Otherwise:** it puts the subject on the mailable and queues to the BARE address. Staff used to get
+    `Mail::to($user)` with their display name; members already got the bare address.
+- `refuses()` lets a sender check first. `SendMemberCard` uses it, so a refused address does not rotate the card token
+  and the member's current card keeps working.
+- **Every sender moved to it:** `SendMemberCard`, `ApproveApplication`, `RejectApplication`, `SendApplicationInvite`,
+  `IssueMemberLoginLink`, `IssueConvocatoria`, the expiry sweep, the counter receipt, `InitiateLockdown`,
+  `SendMorningSummaries`, and `SendTelegramMessage` ×2.
+- **The guard** (`SendableEmailTest`): no `Mail::to(` / `Mail::send(` / `Mail::queue(` anywhere in `app/` except
+  `QueueClubMail` and the `/dev/mail` preview; a planted one fails.
+
+### Behaviour per sender
+
+- `SendMemberCard` returns `false` and writes no `member.card.sent` when nothing was queued.
+- **The convocatoria records an unsendable address as `NO_EMAIL`, not `NOTIFIED`**: a notice nobody could receive must
+  not count as notice given, so the legal roll stays honest.
+- **The counter receipt** says «El correo del socio no es válido («…»). Corrígelo en su ficha y vuelve a enviar.»
+  (staff see the address on the member anyway).
+- **The expiry sweep** still marks `reminder_sent_for`, so it does not retry every night, and the push still goes.
+- **The login link** still answers as if sent (no lookup oracle).
+
+### Import without the email
+
+- `ImportMembers` never validated email. A row whose email is not sendable is now **imported WITHOUT the email**, not
+  refused: nobody is left out of the migration over a typo.
+- The preview and the result list each one: «fila 14: correo «juan@gmail,com» no válido, se importa sin correo».
+
+### A permanent refusal fails once; `mail.failed` names the subject
+
+- `ClubMail::middleware()` returns Laravel's own `FailOnException`, which mailable middleware reaches through
+  `SendQueuedMailable`. It fails the job at once for a `TransportException` whose previous is a Resend `ErrorException`
+  with a 4xx code other than 408, 409 and 429: one Resend call and one Sentry event per bad address, not four.
+- 429, 5xx and network errors keep the 4 tries and the backoff.
+- `mail.failed` now has the member or user as its audit subject (`aboutType` / `aboutId`, set by `QueueClubMail`, are
+  public serialisable strings on the mailable), plus `permanent` and Resend's `error_type`. Still never the address.
+
+### Staff can see whom to fix
+
+- `Member::emailIsSendable()`; `Member::cardMissing()` is also true for an unsendable address.
+- **Amber line** «Este correo no es válido: no le llegan correos (carné, recordatorios, convocatorias).» under the email
+  on the member's page, and on the counter's member record.
+- **Socios → filter «Correo no válido»** (`Member::invalidEmailIds()`: an `email IS NOT NULL` pre-filter, then PHP;
+  no driver-specific regex).
+- **Salud del sistema → Avisos:** «N socios con correo no válido · ver» (linking to the filter), and a count of staff.
+- **`php artisan mail:invalid-addresses`** (read-only): members (number, name) and users (name), each with the stored
+  value in brackets.
+- After a fix, *Reenviar carné* sends the card. Nothing is resent automatically.
+
+### Tests
+
+- **`tests/Feature/Mail/SendableEmailTest.php`** (9), all red first (no rule, no path, no surfaces). It covers:
+  - the rule's table;
+  - every way in, with the message in Spanish and in English;
+  - the import;
+  - no sender queues to an unsendable address (card, login link, sweep, convocatoria `NO_EMAIL`, approval) and the skip
+    is audited without the address;
+  - the counter receipt message;
+  - the permanent-refusal middleware (422 fails; 429 and 500 do not) and `mail.failed`'s subject;
+  - bare addresses for staff;
+  - the guard;
+  - the surfaces.
+- **The worker run against a local Resend stub** (the prompt's manual check) was not repeated. The middleware is tested
+  directly with Resend's own exception shape. MySQL is left to CI; nothing here is driver-specific.
+- **The middleware lives in `app/Jobs/Middleware`** (Laravel's place for job middleware), not `app/Mail`: 288's mail
+  inventory reads every file in `app/Mail` as a mailable. That test's exclusion was also narrowed from «any path containing
+  Mail» to the `app/Mail` directory itself. Every send now runs through `app/Actions/Mail/QueueClubMail.php`, and the
+  broad exclusion had hidden it, so the recipient's-language check was checking nothing.
+- **A flaky test fixed:** CashPotsTest's double handover found «the second shift» by ordering on `closed_at`, and it
+  flaked again in this gate even with the clock moved a minute. It now reads the shift by id: the one the first handover
+  returned.
+
+### Ops (Ben)
+
+- No data changes.
+- To find the address from Sentry now: `php artisan mail:invalid-addresses` (after deploy), or the prompt's tinker
+  one-liner before it.
+- Fix each address in *Socios → editar*, then *Reenviar carné*.
+- **Horizon → Failed jobs** names the mailable (e.g. `App\Mail\MemberCardMail`).

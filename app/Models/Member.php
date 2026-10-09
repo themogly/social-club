@@ -10,6 +10,7 @@ use App\Enums\MembershipStatus;
 use App\Enums\MemberStatus;
 use App\Models\Concerns\BelongsToOrganisation;
 use App\Support\DocumentDrift;
+use App\Support\Email;
 use Database\Factories\MemberFactory;
 use Illuminate\Auth\Authenticatable as AuthenticatableTrait;
 use Illuminate\Contracts\Auth\Authenticatable;
@@ -248,7 +249,27 @@ class Member extends Model implements Authenticatable, HasLocalePreference
      */
     public function cardMissing(): bool
     {
-        return blank($this->email) || ! $this->hasQrCard();
+        // Prompt 372 — an address mail cannot reach is as good as none: the card never arrived.
+        return blank($this->email) || ! $this->emailIsSendable() || ! $this->hasQrCard();
+    }
+
+    /**
+     * Prompt 372 — the members (in scope) whose stored address mail cannot be sent to. A plain `email IS NOT NULL` pre-filter,
+     * then PHP — SQLite and MySQL disagree on regex, so the rule lives in one PHP function only.
+     *
+     * @return list<string>
+     */
+    public static function invalidEmailIds(): array
+    {
+        return static::query()->whereNotNull('email')->get(['id', 'email'])
+            ->reject(fn (Member $member): bool => $member->emailIsSendable())
+            ->map(fn (Member $member): string => (string) $member->id)->values()->all();
+    }
+
+    /** Prompt 372 — can mail actually be sent to this member's stored address ({@see Email::isSendable()})? */
+    public function emailIsSendable(): bool
+    {
+        return Email::isSendable($this->email);
     }
 
     /** @return HasMany<MemberDocument, $this> */

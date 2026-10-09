@@ -6,7 +6,10 @@ use App\Enums\ProductType;
 use App\Models\AuditLog;
 use App\Models\Genetic;
 use App\Models\HeartbeatLog;
+use App\Models\Member;
 use App\Models\Organisation;
+use App\Models\User;
+use App\Support\Email;
 use App\Support\PermissionDrift;
 use App\Support\Settings;
 use App\Support\Telegram;
@@ -246,6 +249,19 @@ class SystemHealth
             'import-staging-sweep' => $this->importStagingSweep(),
             'kept-uploads-sweep' => $this->keptUploadsSweep(),
         ]);
+    }
+
+    /**
+     * Prompt 372 — members and staff whose stored address mail cannot be sent to (their emails are skipped, never queued).
+     *
+     * @return array{members: int, users: int}
+     */
+    public function invalidEmails(): array
+    {
+        return [
+            'members' => count(Member::invalidEmailIds()),
+            'users' => User::query()->whereNotNull('email')->pluck('email')->reject(fn ($email): bool => Email::isSendable((string) $email))->count(),
+        ];
     }
 
     /**

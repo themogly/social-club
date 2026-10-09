@@ -194,16 +194,14 @@ class CashPotsTest extends TestCase
         $next = User::factory()->create();
         $next->assignRole(Role::MANAGER->value);
 
-        (new HandOverTill)->handle($session->fresh(), 12000, $this->owner, $next);
-        $closed = $session->shifts()->whereNotNull('closed_at')->latest('closed_at')->first();
+        $incoming = (new HandOverTill)->handle($session->fresh(), 12000, $this->owner, $next);
+        $closed = $session->shifts()->whereNotNull('closed_at')->sole();
         $this->assertSame(0, (int) $closed->getRawOriginal('variance_cents'));
 
-        // A minute later: two handovers in one second tie on closed_at, and ULIDs minted in one millisecond have no
-        // guaranteed order, so «the latest shift» was sometimes the first one (a flake seen on 6 Oct 2026).
-        $this->travel(1)->minutes();
+        // The shift handed over second is the one the first handover opened — read by its id, not by «the latest
+        // closed_at»: ordering on the clock flaked twice (6 and 9 Oct 2026), even a minute apart.
         (new HandOverTill)->handle($session->fresh(), 13500, $next, $this->owner);
-        $second = $session->shifts()->whereNotNull('closed_at')->orderByDesc('closed_at')->orderByDesc('id')->first();
-        $this->assertSame(1500, (int) $second->getRawOriginal('variance_cents'));
+        $this->assertSame(1500, (int) $incoming->fresh()->getRawOriginal('variance_cents'));
     }
 
     // --- 2–3. Closing counts what the club counts; uncounted pots carry ---------------------------------------------------------

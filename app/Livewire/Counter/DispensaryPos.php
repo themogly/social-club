@@ -8,9 +8,9 @@ use App\Actions\Counter\CommitCombinedSettle;
 use App\Actions\Dispensing\CommitDispensation;
 use App\Actions\Dispensing\ResolveMemberLimits;
 use App\Actions\Dispensing\VoidDispensation;
+use App\Actions\Mail\QueueClubMail;
 use App\Actions\Pricing\ResolveArticleDiscount;
 use App\Actions\Pricing\ResolvePrice;
-use App\Actions\ResolveLocale;
 use App\Actions\Stock\AllocateFromBatches;
 use App\Actions\Stock\SelectBatch;
 use App\Actions\Till\SelectTillSession;
@@ -79,7 +79,6 @@ use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Str;
 use InvalidArgumentException;
 use Livewire\Attributes\Layout;
@@ -1693,9 +1692,12 @@ class DispensaryPos extends Component
         // Queued, best-effort (prompt 149): a mail failure at the counter must be a readable message, not
         // Livewire's error screen mid-service. Delivery problems belong in Horizon's failed jobs.
         try {
-            Mail::to($email)
-                ->locale((new ResolveLocale)->handle($dispensation->member))
-                ->queue(DispensationReceiptMail::fromDispensation($dispensation));
+            // Prompt 372 — an address mail cannot be sent to is said, with the address (staff see it on the member anyway).
+            if (! (new QueueClubMail)->handle($dispensation->member, DispensationReceiptMail::fromDispensation($dispensation))) {
+                $this->flash(__('El correo del socio no es válido («:email»). Corrígelo en su ficha y vuelve a enviar.', ['email' => $email]), 'error');
+
+                return;
+            }
             $this->flash(__('Comprobante enviado al socio (en cola).'), 'success');
         } catch (\Throwable $e) {
             report($e); // prompt 366 — said to staff, and seen by us

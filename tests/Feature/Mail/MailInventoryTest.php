@@ -36,7 +36,7 @@ class MailInventoryTest extends TestCase
     private function productionSources(): array
     {
         $sources = [];
-        foreach ((new Finder)->files()->in(app_path())->name('*.php')->notPath('Mail') as $file) {
+        foreach ((new Finder)->files()->in(app_path())->name('*.php')->notPath('#^Mail/#') as $file) {
             if ($file->getBasename() === 'DevMail.php') {
                 continue;
             }

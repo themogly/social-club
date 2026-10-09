@@ -365,6 +365,18 @@
                     <span style="display:block;font-weight:400;opacity:.85;">{{ __('Último rechazo: :when. Los avisos se envían por correo mientras tanto. Comprueba el token con «php artisan telegram:check».', ['when' => $alerts['telegram_rejected_at']->translatedFormat('j M H:i')]) }}</span>
                 </p>
             @endif
+            {{-- Prompt 372 — addresses mail cannot reach: their emails are skipped, so the people never get them. --}}
+            @if ($invalidEmails['members'] > 0)
+                <p data-health-invalid-member-emails style="margin:0 0 .5rem;font-size:.875rem;font-weight:600;color:#d97706;">
+                    {{ trans_choice(':count socio con correo no válido|:count socios con correo no válido', $invalidEmails['members'], ['count' => $invalidEmails['members']]) }}
+                    · <a href="{{ \App\Filament\Resources\Members\MemberResource::getUrl('index', ['filters' => ['email_invalid' => ['isActive' => true]]]) }}" style="text-decoration:underline;">{{ __('ver') }}</a>
+                </p>
+            @endif
+            @if ($invalidEmails['users'] > 0)
+                <p data-health-invalid-user-emails style="margin:0 0 .5rem;font-size:.875rem;font-weight:600;color:#d97706;">
+                    {{ trans_choice(':count persona del personal con correo no válido|:count personas del personal con correo no válido', $invalidEmails['users'], ['count' => $invalidEmails['users']]) }}
+                </p>
+            @endif
             <dl style="font-size:.875rem;display:grid;gap:.35rem;">
                 <div style="display:flex;justify-content:space-between;gap:1rem;">
                     <dt style="opacity:.65;">{{ __('Telegram configurado') }}</dt>
