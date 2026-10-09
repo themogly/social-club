@@ -90,13 +90,16 @@
             {{-- The unchanged receipt route, shown in place. Nothing loads (and no access is logged) until the operator asks.
                  Prompt 313 — a FRESH frame per opening (x-if): navigating one long-lived frame added a joint history entry
                  on every open and close, so Back stepped the frame back instead of closing the sheet. --}}
+            {{-- Prompt 374 — `h-[70svh]` with the default `flex: 0 1 auto`: the frame keeps its height and only shrinks when the
+                 modal's max height leaves less. `flex-1` (a 0 % basis) overruled the height and the frame fell back to the
+                 browser's built-in 150 px — staff saw the club's name and address and nothing else. --}}
             <template x-if="isOpen">
                 <iframe
                     data-receipt-frame
                     x-ref="frame"
                     x-bind:src="src"
                     title="{{ $heading }}"
-                    class="h-[70svh] w-full flex-1 border-0 bg-white"
+                    class="h-[70svh] min-h-0 w-full shrink border-0 bg-white"
                 ></iframe>
             </template>
         </div>

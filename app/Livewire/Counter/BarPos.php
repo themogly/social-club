@@ -477,7 +477,7 @@ class BarPos extends Component
         $session = TillSession::query()->withoutGlobalScopes()->find($order->till_session_id);
         $boxes = $session === null ? null : CashBoxes::sentence($session, [CashPot::BAR->value => $order->cash_cents->cents]);
         $this->flashSettled(SettledOutcome::forOrder($order, $change), trim(__('Pedido registrado.').' '.($boxes ?? '')));
-        $this->landAfterRecording(null, $order->id); // prompt 347 — the same setting as the dispensary, same default
+        $this->landAfterRecording(null, $order->id, $boxes); // prompt 347 — the same setting as the dispensary, same default
     }
 
     /** Prompt 347 — `after_recording` = new_member, on the Barra: the next ticket starts with no socio attached. */
@@ -880,5 +880,6 @@ class BarPos extends Component
 
         $this->flashMessage = $message;
         $this->flashType = $type;
+        $this->flashKeeps = false; // prompt 374 — only a box instruction waits, and only until the next message
     }
 }

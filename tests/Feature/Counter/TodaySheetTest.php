@@ -208,10 +208,13 @@ class TodaySheetTest extends TestCase
         $this->assertSame(200 + 350 + 150 + 100 + 110, $amnesia['grams_cg'], 'weighed grams, voided excluded');
         $this->assertSame(200 + 350 + 150 + 100 + 100, $amnesia['charged_cg'], '1.10 g charged 1.00 g');
         $this->assertSame(3, $totals['bar_items']);
-        $this->assertSame(2000 + 3500 + 1500 + 300 + 150 + 1000 + 1000, $totals['money']['total']);
-        $this->assertSame(1000, $totals['money']['tab']);
-        $this->assertSame(0, $totals['money']['wallet']);
-        $this->assertSame($totals['money']['total'] - 1000, $totals['money']['cash']);
+        // Prompt 374 — the two ledgers apart: the contributions, and bar & shop.
+        $this->assertSame(2000 + 3500 + 1500 + 1000 + 1000, $totals['money']['dispensary']['total']);
+        $this->assertSame(1000, $totals['money']['dispensary']['tab']);
+        $this->assertSame(0, $totals['money']['dispensary']['wallet']);
+        $this->assertSame($totals['money']['dispensary']['total'] - 1000, $totals['money']['dispensary']['cash']);
+        $this->assertSame(300 + 150, $totals['money']['bar']['total']);
+        $this->assertSame(300 + 150, $totals['money']['bar']['cash']);
 
         $this->sheet($this->manager)->assertSee('1.10 g')->assertSee('se cobra 1.00 g');
     }

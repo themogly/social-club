@@ -2,16 +2,21 @@
 
 namespace App\ViewModels;
 
+use App\Enums\CashPot;
 use App\Enums\DispensationStatus;
+use App\Enums\FeePaymentMethod;
 use App\Enums\OrderStatus;
 use App\Models\AuditLog;
 use App\Models\Dispensation;
 use App\Models\DispensationLine;
 use App\Models\Location;
 use App\Models\Member;
+use App\Models\MembershipFeePayment;
 use App\Models\Order;
+use App\Models\TillSession;
 use App\Support\Period;
 use App\Support\Settings;
+use App\Support\TillSummary;
 use App\Support\Weight;
 use Carbon\CarbonInterface;
 
@@ -24,7 +29,7 @@ use Carbon\CarbonInterface;
  * `created_at` — exactly {@see Dashboard::transactionCount()}. Voided sales are listed (struck through, with the reason) and
  * never counted. A partial refund leaves the sale COMPLETED, so it stays counted, as on the panel, and is marked.
  *
- * Everything is summed in PHP from the rows (no SQL arithmetic, prompt 370). Live, never cached.
+ * Everything is summed in PHP from the rows (no SQL arithmetic, prompt 370). Live, never cached. {@see TillSummary} for the boxes.
  */
 class CounterDaySheet
 {
@@ -54,8 +59,14 @@ class CounterDaySheet
     }
 
     /**
+     * The totals a paper sheet has. **The two ledgers stay apart** (prompt 374, CLAUDE.md): `dispensary` is the contributions,
+     * and equals the home panel's «Aportaciones» for the same sede and day; `bar` is *Barra y tienda*. No figure adds them.
+     * `boxes` is the cash by box when a session today has boxes of its own (373), else null.
+     *
      * @return array{count: int, dispensations: int, orders: int, strains: list<array{name: string, grams_cg: int, charged_cg: int}>,
-     *               units: list<array{name: string, units: int}>, bar_items: int, money: array{total: int, cash: int, wallet: int, tab: int}}
+     *               units: list<array{name: string, units: int}>, bar_items: int,
+     *               money: array{dispensary: array{total: int, cash: int, wallet: int, tab: int}, bar: array{total: int, cash: int, wallet: int, tab: int}},
+     *               boxes: array<string, int>|null}
      */
     public function totals(): array
     {
@@ -63,11 +74,12 @@ class CounterDaySheet
         $strains = [];
         $units = [];
         $barItems = 0;
-        $money = ['total' => 0, 'cash' => 0, 'wallet' => 0, 'tab' => 0];
+        $zero = ['total' => 0, 'cash' => 0, 'wallet' => 0, 'tab' => 0];
+        $money = ['dispensary' => $zero, 'bar' => $zero];
 
         foreach ($counted as $row) {
             foreach ($row['money'] as $key => $cents) {
-                $money[$key] += $cents;
+                $money[$row['kind'] === 'bar' ? 'bar' : 'dispensary'][$key] += $cents;
             }
             foreach ($row['lines'] as $line) {
                 if ($row['kind'] === 'bar') {
@@ -92,7 +104,55 @@ class CounterDaySheet
             'units' => array_map(fn (string $name, int $n): array => ['name' => $name, 'units' => $n], array_keys($units), array_values($units)),
             'bar_items' => $barItems,
             'money' => $money,
+            'boxes' => $this->boxes($counted),
         ];
+    }
+
+    /**
+     * Prompt 374 — the day's cash by where it goes, when a session today keeps boxes of its own: each sale's cash split the way
+     * {@see TillSummary} splits it (the edibles' cash fixed at commit, the bar's cash, the rest to the till), plus cash fees when
+     * the sheet is unfiltered (they are no sale, so a filter on sales leaves them out). The float is not the day's money.
+     *
+     * @param  array<int, array<string, mixed>>  $counted
+     * @return array<string, int>|null pot => cents: the till first, then each box the sessions keep
+     */
+    private function boxes(array $counted): ?array
+    {
+        $ids = array_values(array_unique(array_filter(array_column($counted, 'till_session_id'))));
+        [$start, $end] = $this->period()->bounds();
+        $unfiltered = $this->source === 'all' && $this->operatorId === null && trim($this->search) === '';
+        $fees = $unfiltered ? MembershipFeePayment::query()->where('method', FeePaymentMethod::CASH->value)
+            ->whereHas('tillSession', fn ($q) => $q->withoutGlobalScopes()->where('location_id', $this->location->id))
+            ->where('paid_at', '>=', $start)->where('paid_at', '<', $end)->get(['till_session_id', 'amount_cents']) : collect();
+        $sessions = TillSession::query()->withoutGlobalScopes()->whereIn('id', [...$ids, ...$fees->pluck('till_session_id')->filter()->all()])->get()->keyBy('id');
+        $own = $sessions->flatMap(fn (TillSession $s): array => $s->ownBoxes())->unique()->values();
+        if ($own->isEmpty()) {
+            return null;
+        }
+
+        $boxes = [CashPot::DISPENSARY->value => 0];
+        foreach (CashPot::optional() as $pot) {
+            if ($own->contains($pot)) {
+                $boxes[$pot->value] = 0;
+            }
+        }
+        $put = function (?string $sessionId, CashPot $pot, int $cents) use (&$boxes, $sessions): void {
+            $session = $sessions->get($sessionId);
+            $boxes[$session !== null && $session->hasOwnBox($pot) ? $pot->value : CashPot::DISPENSARY->value] += $cents;
+        };
+        foreach ($counted as $row) {
+            if ($row['kind'] === 'bar') {
+                $put($row['till_session_id'], CashPot::BAR, (int) $row['money']['cash']);
+            } else {
+                $put($row['till_session_id'], CashPot::EDIBLES, (int) $row['edibles_cash']);
+                $put($row['till_session_id'], CashPot::DISPENSARY, (int) $row['money']['cash'] - (int) $row['edibles_cash']);
+            }
+        }
+        foreach ($fees as $fee) {
+            $put($fee->till_session_id, CashPot::FEES, $fee->amount_cents->cents);
+        }
+
+        return $boxes;
     }
 
     /** @return list<array{id: string, name: string}> who served at least one sale today (for «Solo lo de…») */
@@ -139,7 +199,7 @@ class CounterDaySheet
 
         return $this->row($d->id, 'dispensary', $at, $d->member, $d->operator_id, $d->operator?->name, $d->status !== DispensationStatus::COMPLETED, $d->void_reason, [
             'total' => $d->total_cents->cents, 'cash' => $d->cash_cents->cents, 'wallet' => max(0, $wallet - $tab), 'tab' => min($tab, $wallet),
-        ], $d->lines->map(fn (DispensationLine $line): array => [
+        ], [$d->till_session_id, $d->edibles_cash_cents->cents], $d->lines->map(fn (DispensationLine $line): array => [
             'name' => (string) ($line->genetic_name_snapshot ?: $line->genetic?->name ?: '—'),
             'grams_cg' => $line->grams_cg->centigrams,
             'charged_cg' => $line->getRawOriginal('charged_cg') !== null ? (int) $line->getRawOriginal('charged_cg') : $line->grams_cg->centigrams,
@@ -155,17 +215,18 @@ class CounterDaySheet
 
         return $this->row($o->id, 'bar', $o->created_at, $o->member, $o->operator_id, $o->operator?->name, $o->status !== OrderStatus::COMPLETED, $o->void_reason, [
             'total' => $o->total_cents->cents, 'cash' => $o->cash_cents->cents, 'wallet' => max(0, $wallet - $tab), 'tab' => min($tab, $wallet),
-        ], collect((array) $o->items)->filter(fn (mixed $item): bool => is_array($item))->map(fn (array $item): array => [
+        ], [$o->till_session_id, 0], collect((array) $o->items)->filter(fn (mixed $item): bool => is_array($item))->map(fn (array $item): array => [
             'name' => (string) ($item['name'] ?? '—'), 'qty' => max(1, (int) ($item['qty'] ?? 1)), 'grams_cg' => 0, 'charged_cg' => 0, 'units' => null,
         ])->values()->all(), $receipts ? route('counter.bar.receipt', $o->id) : null, 0);
     }
 
     /**
      * @param  array{total: int, cash: int, wallet: int, tab: int}  $money
+     * @param  array{0: ?string, 1: int}  $till  the till session, and the cash that paid for edibles (373, fixed at commit)
      * @param  list<array{name: string, grams_cg: int, charged_cg: int, units: ?int, qty: int}>  $lines
      * @return array<string, mixed>
      */
-    private function row(string $id, string $kind, ?CarbonInterface $at, ?Member $member, ?string $operatorId, ?string $operator, bool $voided, ?string $reason, array $money, array $lines, ?string $receipt, int $refunded): array
+    private function row(string $id, string $kind, ?CarbonInterface $at, ?Member $member, ?string $operatorId, ?string $operator, bool $voided, ?string $reason, array $money, array $till, array $lines, ?string $receipt, int $refunded): array
     {
         $local = $at?->copy()->setTimezone($this->location->timezone ?: 'Europe/Madrid');
 
@@ -182,6 +243,8 @@ class CounterDaySheet
             'void_reason' => $reason,
             'refunded_cents' => $refunded,
             'money' => $money,
+            'till_session_id' => $till[0],
+            'edibles_cash' => $till[1],
             'lines' => $lines,
             'what' => array_map(fn (array $line): string => $this->lineText($kind, $line), $lines),
             'receipt_url' => $receipt,

@@ -362,7 +362,7 @@
             @if ($alerts['telegram_rejected_at'])
                 <p data-alerts-telegram-rejected role="alert" style="margin:0 0 .5rem;font-size:.875rem;font-weight:600;color:#dc2626;">
                     {{ __('Token de Telegram rechazado — revisa TELEGRAM_BOT_TOKEN') }}
-                    <span style="display:block;font-weight:400;opacity:.85;">{{ __('Último rechazo: :when. Los avisos se envían por correo mientras tanto. Comprueba el token con «php artisan telegram:check».', ['when' => $alerts['telegram_rejected_at']->translatedFormat('j M H:i')]) }}</span>
+                    <span style="display:block;font-weight:400;opacity:.85;">{{ __('Último rechazo: :when. Los avisos se envían por correo mientras tanto. Comprueba el token con «php artisan telegram:check».', ['when' => \Carbon\CarbonImmutable::instance($alerts['telegram_rejected_at'])->setTimezone(\App\Support\Period::displayTimezone())->translatedFormat('j M H:i')]) }}</span>
                 </p>
             @endif
             {{-- Prompt 372 — addresses mail cannot reach: their emails are skipped, so the people never get them. --}}

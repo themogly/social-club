@@ -34,6 +34,14 @@ use Livewire\Features\SupportFileUploads\TemporaryUploadedFile;
 
 class MemberForm
 {
+    /** Prompt 372/374 — the amber line under a stored address mail cannot reach: on the edit form and on the member's page. */
+    public static function invalidEmailNote(?Member $record): ?HtmlString
+    {
+        return $record !== null && filled($record->email) && ! $record->emailIsSendable()
+            ? new HtmlString('<span class="text-warning-600 dark:text-warning-400 font-semibold" data-email-invalid>'.e(__('Este correo no es válido: no le llegan correos (carné, recordatorios, convocatorias).')).'</span>')
+            : null;
+    }
+
     public static function configure(Schema $schema): Schema
     {
         return $schema
@@ -54,9 +62,7 @@ class MemberForm
                             ->label(__('Correo electrónico'))
                             ->type('email')->rule(new SendableEmail) // prompt 372 — an address mail can actually be sent to
                             // Prompt 372 — a stored address mail cannot reach says so, in amber, until it is fixed.
-                            ->helperText(fn (?Member $record): ?HtmlString => $record !== null && filled($record->email) && ! $record->emailIsSendable()
-                                ? new HtmlString('<span class="text-warning-600 dark:text-warning-400 font-semibold" data-email-invalid>'.e(__('Este correo no es válido: no le llegan correos (carné, recordatorios, convocatorias).')).'</span>')
-                                : null)
+                            ->helperText(fn (?Member $record): ?HtmlString => self::invalidEmailNote($record))
                             ->maxLength(255)
                             // Normalise on blur so what is saved matches the lowercase form the model stores (prompt 146).
                             ->live(onBlur: true)

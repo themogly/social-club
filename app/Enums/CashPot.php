@@ -77,6 +77,17 @@ enum CashPot: string implements HasLabel
         };
     }
 
+    /** Prompt 374 — «En la caja» / «Bote de la barra»: the heading of what is in each box (the day sheet's cash lines). */
+    public function boxTitle(): string
+    {
+        return match ($this) {
+            self::DISPENSARY => __('En la caja'),
+            self::BAR => __('Bote de la barra'),
+            self::FEES => __('Bote de cuotas'),
+            self::EDIBLES => __('Bote de comestibles'),
+        };
+    }
+
     /** The column prefix on till_sessions for an optional pot: bar_*, fees_*, edibles_*. */
     public function column(): string
     {

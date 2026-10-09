@@ -1341,7 +1341,7 @@ class DispensaryPos extends Component
         $session = TillSession::query()->withoutGlobalScopes()->find($dispensation->till_session_id);
         $boxes = $session === null ? null : CashBoxes::sentence($session, [CashPot::EDIBLES->value => $dispensation->edibles_cash_cents->cents]);
         $this->flashSettled(SettledOutcome::forDispensation($dispensation, $change), trim(__('Dispensación registrada.').' '.($boxes ?? '')));
-        $this->landAfterRecording($dispensation->id, null);
+        $this->landAfterRecording($dispensation->id, null, $boxes);
     }
 
     // --- Combined settle: same visit, cannabis + bar, two records (prompt 118) --------
@@ -1489,7 +1489,7 @@ class DispensaryPos extends Component
             CashPot::EDIBLES->value => $result['dispensation']->edibles_cash_cents->cents,
         ]);
         $this->flash(trim(__('Visita liquidada: dispensación y barra.').' '.($boxes ?? '')), 'success');
-        $this->landAfterRecording($result['dispensation']->id, $result['order']->id);
+        $this->landAfterRecording($result['dispensation']->id, $result['order']->id, $boxes);
     }
 
     /**
@@ -1557,8 +1557,11 @@ class DispensaryPos extends Component
         // The same reset the combined settle uses — it clears the tender fields as well as the basket, and
         // mints the next idempotency key.
         $this->resetBasketState();
-        $this->flash(__('Barra cobrada.'), 'success');
-        $this->landAfterRecording(null, $order->id);
+        // Prompt 374 — the bar's cash, when the bar has its own box this session (the bar screen already said it; this did not).
+        $session = TillSession::query()->withoutGlobalScopes()->find($order->till_session_id);
+        $boxes = $session === null ? null : CashBoxes::sentence($session, [CashPot::BAR->value => $order->cash_cents->cents]);
+        $this->flash(trim(__('Barra cobrada.').' '.($boxes ?? '')), 'success');
+        $this->landAfterRecording(null, $order->id, $boxes);
     }
 
     /** The charged bar total, priced through the SAME resolver CommitOrder uses so the tender matches. */
@@ -2841,6 +2844,7 @@ class DispensaryPos extends Component
 
         $this->flashMessage = $message;
         $this->flashType = $type;
+        $this->flashKeeps = false; // prompt 374 — only a box instruction waits, and only until the next message
     }
 
     /**

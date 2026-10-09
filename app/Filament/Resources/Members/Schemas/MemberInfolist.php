@@ -19,6 +19,7 @@ use Filament\Infolists\Components\TextEntry;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Schema;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\HtmlString;
 
 class MemberInfolist
 {
@@ -39,6 +40,13 @@ class MemberInfolist
 
                         TextEntry::make('member_no')
                             ->label(__('Nº de socio')),
+
+                        // Prompt 374 — the address, and the same amber line as the edit form when mail cannot reach it (where the
+                        // *Correo no válido* filter and the health link land).
+                        TextEntry::make('email')
+                            ->label(__('Correo electrónico'))
+                            ->placeholder('—')
+                            ->helperText(fn (?Member $record): ?HtmlString => MemberForm::invalidEmailNote($record)),
 
                         // Prompt 348 — a card that keeps turning up in other hands is visible on the record.
                         TextEntry::make('card_misuse_count')
