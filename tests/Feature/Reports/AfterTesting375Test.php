@@ -139,14 +139,16 @@ class AfterTesting375Test extends TestCase
 
     // --- 3. The per-person signal, beside the sede's -------------------------------------------------------------------------
 
-    /** Ana takes €60.00 and gives €9.60 away (16 %); Bruno takes €500.00 cleanly, so the sede's share stays under 5 %. */
+    /**
+     * Ana gives €60.00 away in a price adjustment (over the €50 limit — Ben: an amount, never a share of sales); Bruno takes
+     * €500.00 cleanly. Carla gives €10.00 away — half of what she took, but only €10.00.
+     */
     private function week(): User
     {
         $ana = $this->person(Role::STAFF, 'Ana Barra');
-        $this->sale($ana, 4040, original: 5000);
+        $this->sale($ana, 4000, original: 10000);
         $this->sale($ana, 1960);
         $this->sale($this->person(Role::MANAGER, 'Bruno Encargado'), 50000);
-        // Carla: €20.00 taken and €10.00 given away — 50 %, but under the €50 floor.
         $carla = $this->person(Role::STAFF, 'Carla Nueva');
         $this->sale($carla, 1000, original: 2000);
         $this->sale($carla, 1000);
@@ -154,13 +156,13 @@ class AfterTesting375Test extends TestCase
         return $ana;
     }
 
-    public function test_one_person_over_the_threshold_of_their_own_takings_is_flagged_though_the_sede_is_not(): void
+    public function test_one_person_who_gave_more_than_the_limit_in_discounts_is_flagged_though_the_sede_is_not(): void
     {
         $this->week();
 
         $people = LossesReport::peopleAboveThreshold($this->sede);
         $this->assertSame(1, $people['count']);
-        $this->assertSame('16', $people['pct']);
+        $this->assertSame(6000, $people['cents']);
         $this->assertNull(LossesReport::yesterdayAboveThreshold($this->sede), 'the sede as a whole is under its threshold');
 
         $alerts = collect(CurrentAlerts::for($this->org))->where('type', AlertType::LOSSES_PEOPLE_ABOVE_THRESHOLD);
@@ -168,7 +170,7 @@ class AfterTesting375Test extends TestCase
         $state = new OwnerAlertState(['type' => AlertType::LOSSES_PEOPLE_ABOVE_THRESHOLD, 'location_id' => $this->sede->id, 'detail' => $alerts->first()['detail']]);
         $state->setRelation('location', $this->sede);
         $text = AlertMessage::text(collect([$state]));
-        $this->assertStringContainsString('1 persona por encima del umbral (16 % de lo que cobró)', $text);
+        $this->assertStringContainsString('1 persona ha dado más de '.Money::fromCents(5000)->formatted().' en descuentos esta semana (hasta '.Money::fromCents(6000)->formatted().')', $text);
         $this->assertStringNotContainsString('Ana', $text, 'no names on a third-party server');
         $this->assertStringContainsString(LossesReport::peopleUrl($this->sede->id, $people['people']), $text); // 377: at the sede, the person
     }

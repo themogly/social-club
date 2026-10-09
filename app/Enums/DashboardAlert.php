@@ -52,8 +52,8 @@ enum DashboardAlert: string
     // Prompt 367 — 291's discount alert, extended to every loss: the sedes whose losses yesterday (Informes → Pérdidas) went
     // over their `losses_alert_threshold_pct` of the day's takings. Panel only, for holders of reports.view at their sedes.
     case LOSSES_ABOVE_THRESHOLD = 'losses_above_threshold';
-    // Prompt 375 — 291's per-person signal, restored beside it: people whose losses over 7 days exceed the threshold % of their
-    // own takings (with at least the floor taken). Panel only, for holders of reports.view.
+    // Prompt 375 — 291's per-person signal, restored beside it: people who gave more than the limit in discounts they chose
+    // (adjustments down, waived fees) over 7 days — Ben: never a share of sales. Panel only, for holders of reports.view.
     case LOSSES_PEOPLE_ABOVE_THRESHOLD = 'losses_people_above_threshold';
     // Prompt 366 — a close is never refused for a difference; the ones beyond the tolerance with no note, this week, at the
     // sedes this dashboard shows. Panel only, for holders of reports.view.
@@ -96,7 +96,7 @@ enum DashboardAlert: string
             self::STAFF_OPEN_SHIFTS => trans_choice(':count jornada sin fichar salida|:count jornadas sin fichar salida', $count, ['count' => $count]),
             self::STAFF_UNCLOCKED_ACTIVITY => trans_choice(':count día con actividad sin fichar|:count días con actividad sin fichar', $count, ['count' => $count]),
             self::LOSSES_ABOVE_THRESHOLD => trans_choice('Pérdidas de ayer por encima del umbral en :count sede|Pérdidas de ayer por encima del umbral en :count sedes', $count, ['count' => $count]),
-            self::LOSSES_PEOPLE_ABOVE_THRESHOLD => trans_choice(':count persona por encima del umbral esta semana|:count personas por encima del umbral esta semana', $count, ['count' => $count]),
+            self::LOSSES_PEOPLE_ABOVE_THRESHOLD => trans_choice(':count persona con muchos descuentos esta semana|:count personas con muchos descuentos esta semana', $count, ['count' => $count]),
             self::TILL_CLOSES_UNEXPLAINED => __('Cierres con diferencia sin explicar: :count esta semana', ['count' => $count]),
             self::TILL_BOXES_UNCOUNTED => __('Botes sin contar esta semana: :count', ['count' => $count]),
         };

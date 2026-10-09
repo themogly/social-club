@@ -30,7 +30,7 @@ enum AlertType: string
             self::TILL_OPEN_TOO_LONG => __('Caja abierta demasiado tiempo'),
             self::TILL_CLOSES_UNEXPLAINED => __('Cierres de caja con diferencia sin explicar'),
             self::LOSSES_ABOVE_THRESHOLD => __('Pérdidas por encima del umbral'),
-            self::LOSSES_PEOPLE_ABOVE_THRESHOLD => __('Personas por encima del umbral de pérdidas'),
+            self::LOSSES_PEOPLE_ABOVE_THRESHOLD => __('Personas con muchos descuentos'),
             self::SYSTEM => __('Sistema'),
         };
     }

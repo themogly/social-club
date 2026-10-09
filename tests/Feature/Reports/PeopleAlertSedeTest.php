@@ -75,10 +75,10 @@ class PeopleAlertSedeTest extends TestCase
         DispensationLine::factory()->create(['dispensation_id' => $d->id, 'grams_cg' => 100, 'charged_cg' => 100, 'price_per_gram_cents' => 1000, 'discount_cents' => 0, 'line_total_cents' => $total]);
     }
 
-    /** Ana at Centro: €100.00 taken, €6.00 given away (6 % > 5 %). At Norte: another €100.00, cleanly — 3 % overall. */
+    /** Ana at Centro: €60.00 given away in a price adjustment (over the €50 limit). At Norte: another €100.00, cleanly. */
     private function week(): void
     {
-        $this->sale($this->centro, 9400, original: 10000);
+        $this->sale($this->centro, 4000, original: 10000);
         $this->sale($this->centro, 600);
         $this->sale($this->norte, 10000);
     }
@@ -90,7 +90,7 @@ class PeopleAlertSedeTest extends TestCase
         $this->week();
         app(ActiveScope::class)->setLocation(null); // the owner on «Todas las sedes»
 
-        $expected = LossesReportPage::getUrl(['period' => 'last7', 'sort' => 'pct', 'scope' => $this->centro->id, 'person' => $this->ana->id]);
+        $expected = LossesReportPage::getUrl(['period' => 'last7', 'sort' => 'mostrador', 'scope' => $this->centro->id, 'person' => $this->ana->id]);
         $html = Livewire::test(Dashboard::class)->html();
         $this->assertStringContainsString('href="'.e($expected).'"', $html);
 
@@ -98,12 +98,11 @@ class PeopleAlertSedeTest extends TestCase
         $this->assertSame($this->centro->id, $alert['location_id']);
         $this->assertSame($expected, $alert['detail']['url']);
 
-        // Following it: Por persona at Centro over the 7 days shows Ana at the alert's share.
+        // Following it: Por persona at Centro over the 7 days shows what Ana gave at the counter, the alert's figure.
         $row = collect((new LossesReport($this->org->id, [$this->centro->id], LossesReport::lastSevenDays($this->centro)))->byPerson())->firstWhere('operator_id', $this->ana->id);
-        $this->assertSame((int) $alert['detail']['pct'], $row['pct']);
-        $this->assertGreaterThanOrEqual(5, $row['pct']);
+        $this->assertSame((int) $alert['detail']['cents'], $row['mostrador']);
 
-        Livewire::withQueryParams(['period' => 'last7', 'sort' => 'pct', 'scope' => $this->centro->id, 'person' => $this->ana->id])
+        Livewire::withQueryParams(['period' => 'last7', 'sort' => 'mostrador', 'scope' => $this->centro->id, 'person' => $this->ana->id])
             ->test(LossesReportPage::class)->assertSet('scope', $this->centro->id)->assertSet('person', $this->ana->id);
     }
 
@@ -114,11 +113,11 @@ class PeopleAlertSedeTest extends TestCase
         $this->week();
 
         app(ActiveScope::class)->setLocation(null);
-        Livewire::test(Dashboard::class)->assertSee('Sede Centro: '.trans_choice(':count persona por encima del umbral esta semana|:count personas por encima del umbral esta semana', 1, ['count' => 1]));
+        Livewire::test(Dashboard::class)->assertSee('Sede Centro: '.trans_choice(':count persona con muchos descuentos esta semana|:count personas con muchos descuentos esta semana', 1, ['count' => 1]));
 
         app(ActiveScope::class)->setLocation($this->centro->id);
         $scoped = Livewire::test(Dashboard::class);
-        $scoped->assertSee(trans_choice(':count persona por encima del umbral esta semana|:count personas por encima del umbral esta semana', 1, ['count' => 1]));
+        $scoped->assertSee(trans_choice(':count persona con muchos descuentos esta semana|:count personas con muchos descuentos esta semana', 1, ['count' => 1]));
         $scoped->assertDontSee('Sede Centro: 1 persona');
     }
 }

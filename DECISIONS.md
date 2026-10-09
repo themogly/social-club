@@ -22231,3 +22231,27 @@ switch per box down the right edge, and nothing said what off meant.
 - **Browser:** `prove-380-nightly-skip.mjs`: *Cajas* at 1440 and 393; the close at 820×1180 with the note, and the till
   still closing. The audit row was checked in the throwaway DB.
 - The guide's sentences and its *Cajas* screenshot were updated.
+
+## Prompt 381 (Ben's direction) — the per-person alert is about discounts given, not a share of sales
+
+- **Ben, after 377's note:** *"don't want any percent of sales — just if they've been using a lot of discount"*.
+- **The new rule:** `LossesReport::peopleAboveThresholdBySede()` no longer divides by the person's takings. A person is
+  flagged when the discounts **they chose** over the last 7 days add up to more than `losses_person_discount_alert_cents`
+  (default €50; *Ajustes → Descuentos y ajustes*, edited in euros). It applies whatever they sold, sales or none.
+- **What counts and what doesn't:**
+  - counts: price adjustments down and waived fees (291's «discrecional»);
+  - doesn't count: member discounts (automatic, from the member's tier), whole-euro rounding, extra weight and stock.
+    Those are not discounts a person chose, and they stay in the report.
+- **This replaces:** the takings floor `losses_person_min_takings_cents` and the percentage. The sede alert (yesterday
+  over the sede's % of takings) is unchanged.
+- **What it says:**
+  - Dashboard: *«N persona(s) con muchos descuentos esta semana»*.
+  - Morning summary and Telegram: *«1 persona ha dado más de 50.00 € en descuentos esta semana (hasta 64.00 €)»*. Euros
+    are fine in alerts (Ben). Never a name.
+  - The link (377: scoped to the sede and to the person when one) now sorts *Por persona* by *Descuentos y regalos*.
+- **Tests:** `tests/Feature/Reports/PeopleDiscountAlertTest.php` (4, red first):
+  - €60 off a €600 sale is flagged; €60 of waived fees with no sales is flagged; €0.40 off a €1 sale (40 %) is not;
+  - member discounts and a large stock adjustment are not flagged;
+  - the amount is a setting;
+  - the text gives the amount and never the person.
+  375's and 377's per-person tests now use the amount.

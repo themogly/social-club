@@ -518,74 +518,72 @@ class LossesReport extends AbstractReport
         return Period::custom($today->firstDay()->subDays(6), $today->firstDay(), $sede ?? Period::sedeInScope());
     }
 
+    /** The default «a lot of discount» for one person over 7 days: €50 (`losses_person_discount_alert_cents`). */
+    public const DEFAULT_PERSON_DISCOUNT_CENTS = 5000;
+
     /**
-     * Prompt 377 — where the per-person alert opens: Pérdidas on the 7 days AT THE SEDE the people were flagged at (their share
-     * there is the one the alert used; on all sedes their other takings dilute it), sorted by the share lost, filtered to the
-     * person when it is one.
+     * Prompt 377 — where the per-person alert opens: Pérdidas on the 7 days AT THE SEDE the people were flagged at, sorted by what
+     * each gave away at the counter, filtered to the person when it is one.
      *
      * @param  list<string>  $people
      */
     public static function peopleUrl(string $sedeId, array $people): string
     {
         return LossesReportPage::getUrl(array_filter([
-            'period' => 'last7', 'sort' => 'pct', 'scope' => $sedeId, 'person' => count($people) === 1 ? $people[0] : null,
+            'period' => 'last7', 'sort' => 'mostrador', 'scope' => $sedeId, 'person' => count($people) === 1 ? $people[0] : null,
         ]));
     }
 
     /**
-     * Prompt 375 — 291's per-person signal, restored beside the sede's: the people whose losses over the last 7 days (every
-     * section, as *Por persona* adds them) exceed the sede's threshold % of THEIR OWN takings, with at least
-     * `losses_person_min_takings_cents` taken. One person giving away 16 % is visible even while the sede stays under 5 %.
+     * The per-person signal (291's, restored by 375). Ben, after 377: "don't want any percent of sales — just if they've been
+     * using a lot of discount". So no share of takings: a person is flagged when the discounts THEY chose over the last 7 days
+     * — price adjustments down and waived fees (291's «discrecional») — add up to more than `losses_person_discount_alert_cents`
+     * (default €50), whatever they sold, sales or none. Member discounts (automatic), rounding and stock are not discounts a
+     * person chose, so they never count here (they are in the report).
      *
-     * @return array{count: int, pct: string, people: list<string>, period: Period} how many, the highest share among them, and who
+     * @return array{count: int, cents: int, limit: int, people: list<string>, period: Period} how many, the most one of them gave,
+     *                                                                                         the limit, and who
      */
     public static function peopleAboveThreshold(Location $sede): array
     {
         $period = self::lastSevenDays($sede);
-        $people = (new self((string) $sede->organisation_id, [(string) $sede->id], $period))->peopleAboveThresholdBySede()[(string) $sede->id] ?? ['count' => 0, 'pct' => '0', 'people' => []];
+        $people = (new self((string) $sede->organisation_id, [(string) $sede->id], $period))->peopleAboveThresholdBySede()[(string) $sede->id]
+            ?? ['count' => 0, 'cents' => 0, 'limit' => self::DEFAULT_PERSON_DISCOUNT_CENTS, 'people' => []];
 
         return [...$people, 'period' => $period];
     }
 
+    /** The lines that are discounts a person chose (291's «discrecional»). */
+    private const CHOSEN_DISCOUNTS = ['overrides_given', 'waived_fees'];
+
     /**
-     * The per-person signal for each sede of this report (its period should be the 7 days): each person's losses and takings
-     * AT THAT SEDE, against that sede's threshold and floor. One report serves every sede the dashboard shows.
+     * The per-person signal for each sede of this report (its period should be the 7 days): what each person gave in discounts
+     * they chose AT THAT SEDE, against that sede's limit. One report serves every sede the dashboard shows.
      *
-     * @return array<string, array{count: int, pct: string, people: list<string>}> sede id => how many, the highest share, and who
-     *                                                                             (most over first)
+     * @return array<string, array{count: int, cents: int, limit: int, people: list<string>}> sede id => how many, the most one
+     *                                                                                        gave, the limit, and who (most first)
      */
     public function peopleAboveThresholdBySede(): array
     {
         try {
-            $tally = []; // sede => operator => [lost, taken]
+            $given = []; // sede => operator => cents
             foreach ($this->data()['events'] as $e) {
-                if ($e['operator_id'] !== null && $this->counts($e)) {
-                    $tally[$e['location_id']][$e['operator_id']][0] = ($tally[$e['location_id']][$e['operator_id']][0] ?? 0) + $e['cents'];
-                }
-            }
-            foreach ($this->data()['sales'] as $sale) {
-                if ($sale['operator_id'] !== null) {
-                    $tally[$sale['location_id']][$sale['operator_id']][1] = ($tally[$sale['location_id']][$sale['operator_id']][1] ?? 0) + $sale['cents'];
+                if ($e['operator_id'] !== null && $e['section'] === 'mostrador' && in_array($e['line'], self::CHOSEN_DISCOUNTS, true)) {
+                    $given[$e['location_id']][$e['operator_id']] = ($given[$e['location_id']][$e['operator_id']] ?? 0) + $e['cents'];
                 }
             }
 
             $out = [];
             foreach ($this->resolvedLocationIds() as $sedeId) {
-                $threshold = max(0, (int) Settings::get('losses_alert_threshold_pct', self::DEFAULT_ALERT_PCT, (string) $sedeId));
-                $floor = null; // read only when someone is over the threshold (the dashboard's query budget)
-                $shares = [];
-                foreach ($tally[$sedeId] ?? [] as $operatorId => $figures) {
-                    [$lost, $taken] = [(int) ($figures[0] ?? 0), (int) ($figures[1] ?? 0)];
-                    if ($taken > 0 && $lost * 100 > $threshold * $taken) {
-                        $floor ??= max(0, (int) Settings::get('losses_person_min_takings_cents', 5000, (string) $sedeId));
-                        if ($taken >= $floor) {
-                            $shares[(string) $operatorId] = $lost * 100 / $taken;
-                        }
-                    }
+                $limit = self::DEFAULT_PERSON_DISCOUNT_CENTS;
+                $over = [];
+                if (($given[$sedeId] ?? []) !== []) { // the limit is read only when someone gave something (the dashboard's query budget)
+                    $limit = max(0, (int) Settings::get('losses_person_discount_alert_cents', self::DEFAULT_PERSON_DISCOUNT_CENTS, (string) $sedeId));
+                    $over = array_filter($given[$sedeId], fn (int $cents): bool => $cents > $limit);
+                    arsort($over);
                 }
-                arsort($shares);
-                $out[(string) $sedeId] = ['count' => count($shares), 'pct' => NumberFormat::decimal(round($shares === [] ? 0 : max($shares)), 0),
-                    'people' => array_map('strval', array_keys($shares))];
+                $out[(string) $sedeId] = ['count' => count($over), 'cents' => $over === [] ? 0 : (int) max($over), 'limit' => $limit,
+                    'people' => array_map('strval', array_keys($over))];
             }
 
             return $out;
