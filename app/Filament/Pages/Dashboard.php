@@ -320,10 +320,16 @@ class Dashboard extends BaseDashboard
         }
 
         $count = $this->dashboardSedes($data)->sum(fn (Location $sede): int => TillSession::unexplainedClosesThisWeek($sede));
-
-        return $count > 0
+        $alerts = $count > 0
             ? [['severity' => DashboardAlert::TILL_CLOSES_UNEXPLAINED->severity(), 'key' => DashboardAlert::TILL_CLOSES_UNEXPLAINED->value, 'count' => (int) $count]]
             : [];
+        // Prompt 380 — «Botes sin contar esta semana: N»: boxes counted «Cada noche» left uncounted at a close.
+        $boxes = $this->dashboardSedes($data)->sum(fn (Location $sede): int => TillSession::uncountedNightlyBoxesThisWeek($sede));
+        if ($boxes > 0) {
+            $alerts[] = ['severity' => DashboardAlert::TILL_BOXES_UNCOUNTED->severity(), 'key' => DashboardAlert::TILL_BOXES_UNCOUNTED->value, 'count' => (int) $boxes];
+        }
+
+        return $alerts;
     }
 
     /**
@@ -356,7 +362,7 @@ class Dashboard extends BaseDashboard
                 'association_stock_ceiling' => [__('La asociación tiene más stock en total (sedes y almacén) que el techo orientativo'), Heroicon::OutlinedArchiveBox],
                 'articles_low_stock' => [trans_choice(':count producto de barra y tienda con stock bajo|:count productos de barra y tienda con stock bajo', $count, ['count' => $count]), Heroicon::OutlinedShoppingBag],
                 'staff_open_shifts', 'staff_unclocked_activity' => [(string) $case?->label($count), Heroicon::OutlinedClock],
-                'till_closes_unexplained' => [(string) $case?->label($count), Heroicon::OutlinedCalculator],
+                'till_closes_unexplained', 'till_boxes_uncounted' => [(string) $case?->label($count), Heroicon::OutlinedCalculator],
                 'losses_above_threshold', 'losses_people_above_threshold' => [(string) $case?->label($count), Heroicon::OutlinedArrowTrendingDown],
                 default => [$case?->label($count) ?? __('Aviso'), Heroicon::OutlinedBell],
             };

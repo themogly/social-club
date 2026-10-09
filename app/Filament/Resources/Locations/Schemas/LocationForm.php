@@ -183,9 +183,10 @@ class LocationForm
                 ->inlineLabel()
                 ->live()
                 ->extraAttributes(['data-cash-count-choice' => $pot])
+                // Prompt 380 — what it is: where the close STARTS (366: the close never blocks), and that a skip is noted.
                 ->helperText(fn (Get $get): string => (string) $get($count) === '1'
-                    ? __('Al cerrar la caja hay que contarlo.')
-                    : __('Al cerrar se puede dejar sin contar; lo que tiene pasa al día siguiente.'))
+                    ? __('Al cerrar viene marcado «Contar ahora». Si un día no se cuenta, queda anotado.')
+                    : __('Al cerrar viene marcado «No se cuenta hoy»; lo que tiene pasa al día siguiente.'))
                 ->visible(fn (Get $get): bool => $get($key) === 'own')
                 ->disabled(fn (): bool => ! self::actorIsOwner()),
             Text::make(fn (Get $get, ?Location $record): ?string => $get($key) !== 'own' && $record !== null ? CashBoxes::mergeWarning($record, CashPot::from($pot)) : null)

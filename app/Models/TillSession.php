@@ -35,6 +35,7 @@ class TillSession extends Model
         'edibles_opening_cents', 'edibles_counted_cents', 'edibles_expected_cents', 'edibles_variance_cents',
         // Prompt 378 — the shop box, and where the shop's money went when it had none ('with_bar' | 'till' | 'own').
         'shop_box', 'shop_opening_cents', 'shop_counted_cents', 'shop_expected_cents', 'shop_variance_cents',
+        'nightly_boxes', // prompt 380 — the own boxes the sede counts «Cada noche», snapshotted at opening
     ];
 
     protected function casts(): array
@@ -58,6 +59,7 @@ class TillSession extends Model
             'fees_expected_cents' => MoneyCast::class,
             'fees_variance_cents' => MoneyCast::class,
             'own_boxes' => 'array',
+            'nightly_boxes' => 'array',
             'edibles_opening_cents' => MoneyCast::class,
             'edibles_counted_cents' => MoneyCast::class,
             'edibles_expected_cents' => MoneyCast::class,
@@ -177,6 +179,38 @@ class TillSession extends Model
         }
 
         return CashPot::DISPENSARY;
+    }
+
+    /** Prompt 380 — is this box counted «Cada noche» at this session (the choice snapshotted at opening)? */
+    public function countsNightly(CashPot $pot): bool
+    {
+        return $this->hasOwnBox($pot) && in_array($pot->value, (array) ($this->nightly_boxes ?? []), true);
+    }
+
+    /**
+     * Prompt 380 — the «Cada noche» boxes this close left uncounted (the close never blocks, 366; this is how it is noted).
+     *
+     * @return list<CashPot>
+     */
+    public function uncountedNightlyBoxes(): array
+    {
+        if ($this->closed_at === null) {
+            return [];
+        }
+
+        return array_values(array_filter($this->ownBoxes(), fn (CashPot $pot): bool => $this->countsNightly($pot)
+            && $this->getRawOriginal($pot->column().'_counted_cents') === null));
+    }
+
+    /** Prompt 380 — «Botes sin contar esta semana»: the «Cada noche» boxes left uncounted at the sede's closes this week. */
+    public static function uncountedNightlyBoxesThisWeek(Location $sede): int
+    {
+        $week = Period::thisWeek($sede);
+
+        return (int) static::query()->withoutGlobalScopes()
+            ->where('location_id', $sede->id)->where('status', TillSessionStatus::CLOSED)
+            ->where('opened_at', '>=', $week->start)->where('opened_at', '<', $week->end)
+            ->get()->sum(fn (TillSession $session): int => count($session->uncountedNightlyBoxes()));
     }
 
     /** @return list<CashPot> the session's own boxes, in {@see CashPot::optional()} order */

@@ -35,6 +35,16 @@ class TillReport extends AbstractReport
 
     private int $unexplainedCount = 0;
 
+    private bool $onlyUncountedBoxes = false;
+
+    /** Prompt 380 — «Botes sin contar»: only the closes that left a «Cada noche» box uncounted. */
+    public function onlyUncountedBoxes(bool $on = true): static
+    {
+        $this->onlyUncountedBoxes = $on;
+
+        return $this;
+    }
+
     /** «Solo con diferencia» — only the closes beyond the tolerance. */
     public function onlyWithVariance(bool $on = true): static
     {
@@ -93,6 +103,9 @@ class TillReport extends AbstractReport
         $this->unexplainedCount = $sessions->filter(fn (TillSession $session): bool => $session->closedUnexplained())->count();
         if ($this->onlyWithVariance) {
             $sessions = $sessions->filter(fn (TillSession $session): bool => $session->closedBeyondTolerance())->values();
+        }
+        if ($this->onlyUncountedBoxes) {
+            $sessions = $sessions->filter(fn (TillSession $session): bool => $session->uncountedNightlyBoxes() !== [])->values();
         }
 
         $this->sessionCount = $sessions->count();
@@ -170,7 +183,11 @@ class TillReport extends AbstractReport
             ],
             rows: $rows,
             totals: $totals,
-            empty: $this->onlyWithVariance ? __('Ningún cierre con diferencia en este período') : __('Sin cajas en este período'),
+            empty: match (true) {
+                $this->onlyUncountedBoxes => __('Ningún bote sin contar en este período'),
+                $this->onlyWithVariance => __('Ningún cierre con diferencia en este período'),
+                default => __('Sin cajas en este período'),
+            },
             emptyHint: __('Los arqueos aparecen aquí cuando se abre y cierra una caja en el mostrador.'),
             defaultSort: 'fecha',
             sortable: true,
@@ -192,7 +209,9 @@ class TillReport extends AbstractReport
             $col = $pot->column();
             $own = $session->hasOwnBox($pot);
             $out[$key.'_esperado'] = $own ? (int) $z[$col.'_expected'] : null;
-            $out[$key.'_contado'] = $own ? ($z[$col.'_counted'] !== null ? Money::fromCents((int) $z[$col.'_counted'])->formatted() : __('no contado')) : '—';
+            // Prompt 380 — a «Cada noche» box left uncounted says so: the owner expected a count.
+            $out[$key.'_contado'] = $own ? ($z[$col.'_counted'] !== null ? Money::fromCents((int) $z[$col.'_counted'])->formatted()
+                : ($session->countsNightly($pot) ? __('no contado (se cuenta cada noche)') : __('no contado'))) : '—';
             $out[$key.'_descuadre'] = $own ? $z[$col.'_variance'] : null;
         }
 

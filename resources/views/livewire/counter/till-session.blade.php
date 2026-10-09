@@ -412,6 +412,10 @@
                                     <button type="button" wire:click="$set('potCountNow.{{ $pot->value }}', false)" data-pot-count-skip
                                             @class(['h-11 rounded-lg border text-sm font-semibold', 'border-brand bg-brand-tint text-brand' => ! ($potCountNow[$pot->value] ?? false), 'border-line text-ink-muted dark:border-slate-700' => $potCountNow[$pot->value] ?? false])>{{ __('No se cuenta hoy') }}</button>
                                 </div>
+                                {{-- Prompt 380 — a box counted «Cada noche» skipped tonight: said, not blocked (366), no reason asked. --}}
+                                @if (! ($potCountNow[$pot->value] ?? false) && $session->countsNightly($pot))
+                                    <p data-pot-nightly-note="{{ $pot->value }}" class="mt-2 text-xs font-semibold text-warning">{{ __('Esta sede lo cuenta cada noche: quedará anotado que hoy no se contó.') }}</p>
+                                @endif
                                 @if ($potCountNow[$pot->value] ?? false)
                                     <label for="pot-count-{{ $pot->value }}" class="mt-2 block text-xs text-ink-muted dark:text-slate-400">{{ __(':pot contado (€)', ['pot' => $pot->label()]) }}</label>
                                     <input id="pot-count-{{ $pot->value }}" type="text" inputmode="decimal" wire:model="potCountInput.{{ $pot->value }}" autocomplete="off" placeholder="0.00"
