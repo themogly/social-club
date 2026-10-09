@@ -15,6 +15,7 @@ use App\Rules\GramAmount;
 use App\Support\ActiveScope;
 use App\Support\DocumentUpload;
 use App\Support\Money;
+use App\Support\Units;
 use App\Support\Weight;
 use Filament\Actions\Action;
 use Filament\Forms\Components\DatePicker;
@@ -152,7 +153,7 @@ class BatchForm
                         TextEntry::make('remaining_display')
                             ->label(__('Restante'))
                             ->state(fn (?Batch $record): ?string => $record === null ? null : ($record->isUnitType()
-                                ? __(':count uds', ['count' => (int) $record->remaining_units])
+                                ? Units::count((int) $record->remaining_units)
                                 : $record->remaining_cg->formatted()))
                             ->extraAttributes(['data-batch-remaining' => ''])
                             ->visible(fn (string $operation): bool => $operation !== 'create'),
@@ -359,7 +360,7 @@ class BatchForm
     {
         $values = array_intersect_key((array) ($get($unit ? 'units_at' : 'grams_at') ?? []), array_flip($locationIds));
         if ($unit) {
-            return __(':count uds', ['count' => array_sum(array_map(fn ($v): int => (int) (DecimalInput::number($v) ?? 0), $values))]);
+            return Units::count(array_sum(array_map(fn ($v): int => (int) (DecimalInput::number($v) ?? 0), $values)));
         }
         $cg = array_sum(array_map(fn ($v): int => ($n = DecimalInput::number($v)) !== null ? Weight::fromGrams($n)->centigrams : 0, $values));
 
@@ -374,7 +375,7 @@ class BatchForm
             '<li data-lote-part class="flex items-center justify-between gap-3 py-1 pointer-coarse:min-h-11"><a href="%s" data-touch-target class="font-medium text-primary-600 hover:underline dark:text-primary-400">%s</a><span class="tabular-nums">%s</span></li>',
             e(BatchResource::getUrl('edit', ['record' => $b])),
             e((string) $b->location?->name).($b->is($record) ? ' · '.e(__('este')) : ''),
-            e($b->isUnitType() ? __(':count uds', ['count' => (int) $b->remaining_units]) : $b->remaining_cg->formatted()),
+            e($b->isUnitType() ? Units::count((int) $b->remaining_units) : $b->remaining_cg->formatted()),
         ))->implode('');
 
         return new HtmlString('<ul class="divide-y divide-gray-200 text-sm dark:divide-white/10">'.$items.'</ul>');

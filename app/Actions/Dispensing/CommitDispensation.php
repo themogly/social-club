@@ -475,6 +475,7 @@ class CommitDispensation
                 'quantity' => $quantity,          // total in the allocation unit
                 'charged' => $units === null ? $charged : $quantity, // what the price was computed on (355)
                 'discount_cents' => $whole['discount_cents'],
+                'discount_kind' => $whole['discount_kind'], // prompt 375 — stored on each discounted part
                 'parts' => $whole['parts'],       // per part: its batch, qty, rate, total and discount
             ];
         }
@@ -535,6 +536,8 @@ class CommitDispensation
                     'charged_cg' => $p['is_unit'] ? null : $partCharged, // prompt 355 — what this part was charged for
                     'units_dispensed' => $partUnits,
                     'discount_cents' => $partDiscount,
+                    // Prompt 375 — which discount priced it (LOCAL, STAFF…), so the reports split member discounts by kind.
+                    'discount_kind' => $partDiscount > 0 ? $p['discount_kind'] : null,
                     'line_total_cents' => $partTotal,
                     'pricing_note' => $pricingNote,
                     'genetic_name_snapshot' => $p['genetic']->name,

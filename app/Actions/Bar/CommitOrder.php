@@ -161,7 +161,8 @@ class CommitOrder
         // also uses, so the charged total matches what the operator saw. Guests (no member) get 0.
         $discounter = new ResolveArticleDiscount;
         $member = isset($options['member_id']) ? Member::withoutGlobalScopes()->find($options['member_id']) : null;
-        $articleDiscountBp = $member !== null ? $discounter->bpFor($member, $location) : 0;
+        $articleDiscount = $member !== null ? $discounter->best($member, $location) : ['bp' => 0, 'kind' => null];
+        $articleDiscountBp = $articleDiscount['bp'];
 
         foreach ($lines as $line) {
             $qty = max(1, (int) ($line['qty'] ?? 1));
@@ -191,6 +192,7 @@ class CommitOrder
                     'unit_price_cents' => $unit,
                     'qty' => $qty,
                     'discount_cents' => $discount,
+                    'discount_kind' => $discount > 0 ? $articleDiscount['kind'] : null, // prompt 375
                     'line_total_cents' => $lineTotal,
                     'reference' => null,
                 ];

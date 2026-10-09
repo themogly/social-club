@@ -72,6 +72,7 @@ use App\Support\Settings;
 use App\Support\SettledOutcome;
 use App\Support\StockCover;
 use App\Support\TrainingMode;
+use App\Support\Units;
 use App\Support\VaultUrl;
 use App\Support\Wallet;
 use App\Support\Weight;
@@ -696,7 +697,7 @@ class DispensaryPos extends Component
             $this->basket[$into] = ['genetic_id' => $line['genetic_id'], 'batch_id' => $line['batch_id'],
                 'grams_cg' => (int) $existing['grams_cg'] + (int) $line['grams_cg'], 'units' => $units];
             $this->mergeNote = ['index' => $into, 'note' => '+'.($line['units'] !== null
-                ? trans_choice(':count ud|:count uds', (int) $line['units'], ['count' => (int) $line['units']])
+                ? Units::count((int) $line['units'])
                 : $this->grams((int) $line['grams_cg']))];
         } else {
             $this->basket[] = $line;
@@ -738,7 +739,7 @@ class DispensaryPos extends Component
 
         $take = max(0, $available - $already);
         $editing = ! $merging && $into !== null;
-        $units = fn (int $n): string => trans_choice(':count ud|:count uds', $n, ['count' => $n]);
+        $units = fn (int $n): string => Units::count($n);
         $reserve = $unit ? null : $this->reserveToOpen($genetic, $location);
 
         $quantity = fn (int $n): string => $unit ? $units($n) : $this->grams($n);

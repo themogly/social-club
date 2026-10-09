@@ -14,6 +14,7 @@ use App\Support\ActiveScope;
 use App\Support\NumberFormat;
 use App\Support\Settings;
 use App\Support\StockCover;
+use App\Support\Units;
 use App\Support\Weight;
 use Database\Factories\GeneticFactory;
 use Illuminate\Database\Eloquent\Attributes\ObservedBy;
@@ -130,7 +131,7 @@ class Genetic extends Model
             ->selectRaw('locations.name as sede, SUM(COALESCE(batches.remaining_cg, 0)) as cg, SUM(COALESCE(batches.remaining_units, 0)) as units')
             ->toBase()->get()
             ->map(fn (object $row): string => __(':amount en :sede', [
-                'amount' => $this->isUnitType() ? ((int) $row->units).' '.__('uds') : Weight::fromCentigrams((int) $row->cg)->formatted(),
+                'amount' => $this->isUnitType() ? Units::count((int) $row->units) : Weight::fromCentigrams((int) $row->cg)->formatted(),
                 'sede' => $row->sede,
             ]))->values()->all();
     }

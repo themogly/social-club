@@ -26,7 +26,25 @@ class ResolveArticleDiscount
     /** The best applicable article discount for this member at this location, in basis points (0 = none). */
     public function bpFor(Member $member, Location $location): int
     {
+        return $this->best($member, $location)['bp'];
+    }
+
+    /**
+     * The best applicable article discount and its kind (prompt 375: stored on the order item so the reports split member
+     * discounts by kind). Ties keep the first found, as before.
+     *
+     * @return array{bp: int, kind: ?string}
+     */
+    public function best(Member $member, Location $location): array
+    {
         $best = 0;
+        $kind = null;
+        $consider = function (Discount $discount) use (&$best, &$kind): void {
+            if ((int) $discount->value_bp > $best) {
+                $best = (int) $discount->value_bp;
+                $kind = $discount->kind->value;
+            }
+        };
 
         // Therapeutic members get a THERAPEUTIC-kind discount automatically — but only if it applies to
         // articles (a genetics-only therapeutic discount does not touch the bar).
@@ -41,7 +59,7 @@ class ResolveArticleDiscount
                 ->get();
 
             foreach ($therapeutic as $discount) {
-                $best = max($best, (int) $discount->value_bp);
+                $consider($discount);
             }
         }
 
@@ -57,7 +75,7 @@ class ResolveArticleDiscount
                 && $discount->mode === DiscountMode::PERCENT
                 && in_array($discount->applies_to, [DiscountAppliesTo::ARTICLE, DiscountAppliesTo::BOTH], true)
                 && $discount->locations()->whereKey($location->id)->exists()) {
-                $best = max($best, (int) $discount->value_bp);
+                $consider($discount);
             }
         }
 
@@ -67,10 +85,10 @@ class ResolveArticleDiscount
             && $staff->mode === DiscountMode::PERCENT
             && in_array($staff->applies_to, [DiscountAppliesTo::ARTICLE, DiscountAppliesTo::BOTH], true)
             && $staff->locations()->whereKey($location->id)->exists()) {
-            $best = max($best, (int) $staff->value_bp);
+            $consider($staff);
         }
 
-        return $best;
+        return ['bp' => $best, 'kind' => $kind];
     }
 
     /** The discount in cents on a gross line/subtotal, for the resolved basis points. */

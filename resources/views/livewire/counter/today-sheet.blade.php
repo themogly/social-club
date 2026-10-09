@@ -126,7 +126,7 @@
                             <div class="flex justify-between gap-3 border-t border-line pt-2 dark:border-slate-800"><dt class="font-medium">{{ __('Total dispensado') }}</dt><dd class="font-semibold tabular-nums">{{ \App\Support\Weight::fromCentigrams(array_sum(array_column($totals['strains'], 'grams_cg')))->formatted() }}</dd></div>
                         @endif
                         @foreach ($totals['units'] as $unit)
-                            <div class="flex justify-between gap-3"><dt class="text-ink-muted dark:text-slate-400">{{ $unit['name'] }}</dt><dd class="font-semibold tabular-nums">{{ trans_choice(':count ud|:count uds', $unit['units'], ['count' => $unit['units']]) }}</dd></div>
+                            <div class="flex justify-between gap-3"><dt class="text-ink-muted dark:text-slate-400">{{ $unit['name'] }}</dt><dd class="font-semibold tabular-nums">{{ \App\Support\Units::count($unit['units']) }}</dd></div>
                         @endforeach
                         <div class="flex justify-between gap-3"><dt class="text-ink-muted dark:text-slate-400">{{ __('Barra y tienda: productos') }}</dt><dd class="font-semibold tabular-nums">{{ $totals['bar_items'] }}</dd></div>
                         @if ($showMoney)

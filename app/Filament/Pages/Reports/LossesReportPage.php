@@ -51,6 +51,8 @@ class LossesReportPage extends ReportPage
             'section' => ['except' => null],
             'person' => ['except' => null],
             'detailPage' => ['except' => 1],
+            'sort' => ['except' => null],
+            'sortDir' => ['except' => 'desc'],
         ];
     }
 
@@ -69,10 +71,17 @@ class LossesReportPage extends ReportPage
         $this->detailPage = max(1, $page);
     }
 
-    /** «Ayer»: the business day before today at the sede in scope — the morning line's link. */
+    /**
+     * «Ayer»: the business day before today at the sede in scope — the morning line's link. «last7» (prompt 375): the last 7
+     * business days — the per-person signal's window, which its link opens on, sorted by the share lost.
+     */
     public function resolvePeriod(): Period
     {
-        return $this->period === 'yesterday' ? Period::today($this->periodLocation())->previous() : parent::resolvePeriod();
+        return match ($this->period) {
+            'yesterday' => Period::today($this->periodLocation())->previous(),
+            'last7' => LossesReport::lastSevenDays($this->periodLocation()),
+            default => parent::resolvePeriod(),
+        };
     }
 
     protected function report(): AbstractReport

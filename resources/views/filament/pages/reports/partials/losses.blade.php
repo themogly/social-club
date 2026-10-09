@@ -28,7 +28,8 @@
                     <strong>{{ \App\Support\Money::fromCents($section['total'])->formatted() }}</strong>
                 </a>
                 <ul class="csc-loss-lines">
-                    @foreach ($section['lines'] as $line)
+                    {{-- Prompt 375 — a discount kind with nothing in the period is not listed here (the PDF and CSV keep every line). --}}
+                    @foreach (array_filter($section['lines'], fn (array $l): bool => ! $l['info'] || $l['count'] > 0) as $line)
                         <li @class(['csc-loss-line', 'csc-loss-info' => $line['info'], 'csc-loss-offset' => ! $line['info'] && $line['cents'] < 0])>
                             <a href="{{ $this->detailUrl(['section' => $key, 'person' => null]) }}">
                                 <span class="csc-loss-label">
@@ -40,11 +41,24 @@
                                         <span class="csc-loss-sub">{{ __(':amount al precio de aportación', ['amount' => \App\Support\Money::fromCents($line['contribution'])->formatted()]) }}</span>
                                     @endif
                                 </span>
-                                <span class="csc-loss-amount">{{ \App\Support\Money::fromCents($line['cents'])->formatted() }}</span>
+                                {{-- Prompt 375 — a line whose every movement has no cost says so; a mixed one gives the amount and how many had none. --}}
+                                <span class="csc-loss-amount">
+                                    @if ($line['no_cost'] > 0 && $line['no_cost'] === $line['count'])
+                                        <span class="csc-loss-nocost">{{ __('sin coste registrado') }}</span>
+                                    @else
+                                        {{ \App\Support\Money::fromCents($line['cents'])->formatted() }}
+                                    @endif
+                                </span>
                             </a>
                         </li>
                     @endforeach
                 </ul>
+                @if ($section['no_cost'] > 0)
+                    <a href="{{ $section['no_cost_url'] }}" class="csc-loss-nocost-note" data-losses-no-cost="{{ $section['no_cost'] }}">
+                        {{ trans_choice(':count movimiento sin coste: no está en el total|:count movimientos sin coste: no están en el total', $section['no_cost'], ['count' => $section['no_cost']]) }}
+                        · {{ __('añade el coste del lote') }}
+                    </a>
+                @endif
             </x-dashboard.section>
         @endforeach
     </div>
@@ -71,4 +85,7 @@
     .csc-loss-amount { font-variant-numeric: tabular-nums; font-weight: 600; white-space: nowrap; }
     .csc-loss-info a { color: var(--mut); }
     .csc-loss-offset .csc-loss-amount { color: var(--okt); }
+    .csc-loss-nocost { font-weight: 600; color: var(--warnt); }
+    .csc-loss-nocost-note { display: block; font-size: 0.75rem; font-weight: 600; color: var(--warnt); text-decoration: none; padding-top: 0.4rem; border-top: 1px solid var(--bd); }
+    .csc-loss-nocost-note:hover { text-decoration: underline; }
 </style>

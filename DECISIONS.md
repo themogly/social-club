@@ -21919,3 +21919,101 @@ Every event carries a **signed** amount: positive is money lost, negative is an 
   - Telegram's time.
 - TodaySheetTest's totals test asserts the two ledgers.
 - Browser: `prove-374-fixes.mjs` (hub, receipts, totals as manager and staff, Cajas at 1440 and 393).
+
+## Prompt 375 — after testing 367 and 374: report dates, the per-person signal, discount kinds, stock without cost, unit plurals
+
+**Ben's answers** (sent with the prompt): *"Yea breakdown discounts"* (§4 built) and *"Euros is fine for alerts"*. So **§2 was
+not built.** The losses alert keeps its euro figure in the morning email and on Telegram, an exception to 311's "never
+prices" that Ben has now confirmed. `AlertMessage`'s docblock already says so. §1, §3, §5 and §6 are built as written.
+
+### 1. Report labels in the sede's days
+
+- The header printed the period's start bound in storage time (UTC) and its exclusive end as the last day. With a
+  midnight business day in Madrid (bounds 22:00 → 22:00 UTC), every report read a day early.
+- `Period::firstDay()` / `lastDay()` / `label()` / `fileRange()` are the one reading rule: the start on the sede's clock,
+  and the end's date there minus one day. That also holds for a cutoff: a 06:00 → 06:00 business day ends the next
+  calendar day.
+- They are used by the shared report header, the report export file names, and the Registro and accounting-export file
+  names.
+- The test pins `business_day_cutoff = 00:00`, the tester's sede. With the default 06:00 the old code happened to print
+  the right date, which is why the suite never saw it.
+
+### 3. The per-person alert alongside the sede alert
+
+- **What it measures:** `LossesReport::peopleAboveThreshold($sede)` looks at the last 7 business days
+  (`lastSevenDays()`, also `?period=last7` on the page). It flags people whose *Por persona* total exceeds the sede's
+  `losses_alert_threshold_pct` of their **own** takings, with at least `losses_person_min_takings_cents` taken (291's
+  €50, now an org setting in *Ajustes → Descuentos y ajustes*).
+- **Dashboard:** `DashboardAlert::LOSSES_PEOPLE_ABOVE_THRESHOLD`, *«N personas por encima del umbral esta semana»*. It
+  opens Pérdidas on the 7 days sorted by the share lost (`sort`/`sortDir` now ride in the URL).
+- **Morning summary / Telegram:** `AlertType::LOSSES_PEOPLE_ABOVE_THRESHOLD`, one per sede and day, gives a count and the
+  highest share. **Never a name**: a name beside a figure is a judgement about a person on a third-party server. Names
+  are in the report.
+- **The two tests 367 deleted come back adapted**, in `AfterTesting375Test`:
+  - the alert fires over the threshold only with enough takings (Carla, under the floor, is not flagged);
+  - the dashboard line shows for report viewers only.
+
+### 4. `discount_kind` stored from now on, no backfill
+
+- **Where it is written:**
+  - `dispensation_lines.discount_kind` (nullable): written by `CommitDispensation` on each discounted part, from
+    `ResolvePrice`'s `discount_kind`. Values: LOCAL, CONCESSION, THERAPEUTIC, STAFF, CUSTOM, or TIER for a tier discount.
+  - Bar items: `ResolveArticleDiscount::best()` now returns the winning discount's kind with its rate, and `CommitOrder`
+    stores it in the item snapshot.
+- **No backfill.** An older line is *«Sin clasificar (anterior a hoy)»*, never guessed from the member's discount today.
+- **How the reports split it:**
+  - *Pérdidas* lists member discounts by kind. Personal stays its own line, as before: a STAFF kind, or (for an old line
+    with no kind) a member record linked to a staff account.
+  - *Descuentos y ajustes* groups its by-type table by kind instead of the pricing note, with bar & shop as
+    *«Barra y tienda: <kind>»*.
+  - The totals are unchanged.
+- **Display:** the section card hides a kind with nothing in the period; the PDF and CSV keep every line.
+- `DiscountKind::reportLabel()` is the one label map.
+
+### 5. Lines without cost
+
+- A batch with `cost_per_gram_cents = 0` (the column is not nullable, so 0 is "no cost recorded"): its movements count
+  €0 at cost and are marked.
+- The detail and the CSV say *«sin coste registrado»*. The generic `<key>__text` cell override was added to the report
+  table and to `ReportExport::csv`.
+- The section card says it on the line, and its footer says *«N movimiento(s) sin coste: no está(n) en el total · añade
+  el coste del lote»*, linking to the batch when it is one, else to the section's list.
+- No cost is invented, and the contribution price is never added to the total.
+
+### 6. Unit plurals
+
+- `App\Support\Units::count()` («1 ud.» / «3 uds», «1 unit» / «3 units») and `signed()` replace every place that printed
+  a number followed by a bare `__('uds')`:
+  - the receipt;
+  - the dispensary's basket and lists;
+  - *Hoy*;
+  - the stock screen;
+  - batches and strains in the panel;
+  - the alert text.
+- The old `:count ud|:count uds` key is gone. A unit word inside a field label («Cuánto añadir (uds)») stays as it was.
+
+### Tests
+
+- **`tests/Feature/Reports/AfterTesting375Test.php`** (6), red first. It covers:
+  - the date line (midnight cutoff, Madrid);
+  - the per-person flag while the sede is under its threshold, with the email/Telegram text naming nobody;
+  - the dashboard line for report viewers only;
+  - a LOCAL kind stored and reported, an old line unclassified, totals unchanged;
+  - stock without cost;
+  - «1 ud.» / «3 uds» and «1 unit» / «3 units» on the receipt.
+- DiscountsReportTest's by-type test now groups by kind.
+- MySQL: the new migration and the report tests also ran on `phpunit.mysql.xml`, file-scoped, as the prompt asked.
+- Browser: `prove-375-after-testing.mjs` (date lines, discounts by kind, the dashboard's per-person line, the alert email,
+  a one-unit receipt).
+
+- **The dashboard's query ceiling went from 120 to 125.** The readout, the sede alert and the per-person alert now read ONE
+  7-day report: yesterday is read out of it by time, and the per-person tally is split per sede. That is a fixed number
+  of queries whatever the volume. The test's growth check (triple the rows, at most +2 queries) still guards against an
+  N+1. Getting there:
+  - the staff lookup and the per-person floor setting are read only when needed;
+  - one report for every sede shown, not one per sede.
+
+### Ops (Ben)
+
+- `php artisan migrate --force` (`dispensation_lines.discount_kind`).
+- *Ajustes → Descuentos y ajustes → Mínimo recaudado para el aviso por persona* is €50 unless changed.

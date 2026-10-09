@@ -30,6 +30,7 @@ use App\ViewModels\SystemHealth;
  *  · tills open longer than `alerts_till_open_hours`;
  *  · prompt 366 — the sede's closes this week beyond the tolerance with no note (one alert per sede and week, its count
  *    refreshed each run), linking to Informes → Cajas on «Solo con diferencia»;
+ *  · prompt 375 — the people at the sede over that threshold of their own takings this week (a count, never a name);
  *  · prompt 367 — the sede's losses yesterday (Informes → Pérdidas) over its `losses_alert_threshold_pct` of the day's
  *    takings (one alert per sede and day), linking to the report on that day;
  *  · the system — any heartbeat *Salud del sistema* grades red ({@see SystemHealth::heartbeats()}).
@@ -213,6 +214,17 @@ final class CurrentAlerts
                     'subject' => 'losses:'.$day['period']->start->toDateString(),
                     'location_id' => $sede->id,
                     'detail' => ['cents' => $day['total'], 'pct' => $day['pct'], 'url' => LossesReportPage::getUrl(['period' => 'yesterday', 'scope' => $sede->id])],
+                ];
+            }
+            // Prompt 375 — the people over the threshold of their own takings this week: a count and the highest share, never a
+            // name (a name beside a figure is a judgement about a person on a third-party server; names are in the report).
+            $people = LossesReport::peopleAboveThreshold($sede);
+            if ($people['count'] > 0) {
+                $alerts[] = [
+                    'type' => AlertType::LOSSES_PEOPLE_ABOVE_THRESHOLD,
+                    'subject' => 'losses-people:'.Period::today($sede)->firstDay()->toDateString(),
+                    'location_id' => $sede->id,
+                    'detail' => ['count' => $people['count'], 'pct' => $people['pct'], 'url' => LossesReportPage::getUrl(['period' => 'last7', 'sort' => 'pct'])],
                 ];
             }
         }

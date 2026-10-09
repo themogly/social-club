@@ -19,6 +19,7 @@ use App\Models\User;
 use App\Rules\GramAmount;
 use App\Support\BelowCost;
 use App\Support\Money;
+use App\Support\Units;
 use App\Support\Weight;
 use DomainException;
 use Filament\Actions\Action;
@@ -76,7 +77,7 @@ final class BatchActions
                 TextInput::make('quantity')
                     ->label(fn (Batch $record): string => $record->isUnitType() ? __('Cantidad (uds)') : __('Cantidad (g)'))
                     ->helperText(fn (Batch $record): string => __('Quedan :left.', ['left' => $record->isUnitType()
-                        ? (int) $record->remaining_units.' '.__('uds')
+                        ? Units::count((int) $record->remaining_units)
                         : $record->remaining_cg->formatted()]))
                     ->required(fn (Get $get): bool => ! $get('all'))
                     ->hidden(fn (Get $get): bool => (bool) $get('all')),
@@ -305,7 +306,7 @@ final class BatchActions
 
     private static function quantityLabel(Batch $record, int $amount): string
     {
-        return $record->isUnitType() ? __(':count uds', ['count' => $amount]) : Weight::fromCentigrams($amount)->formatted();
+        return $record->isUnitType() ? Units::count((int) $amount) : Weight::fromCentigrams($amount)->formatted();
     }
 
     private static function signedLabel(Batch $record, int $delta): string

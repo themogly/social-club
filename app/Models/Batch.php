@@ -8,6 +8,7 @@ use App\Enums\UnitType;
 use App\Models\Concerns\BelongsToOrganisation;
 use App\Models\Concerns\ScopedToLocation;
 use App\Support\BusinessDay;
+use App\Support\Units;
 use Carbon\CarbonImmutable;
 use Database\Factories\BatchFactory;
 use Illuminate\Database\Eloquent\Builder;
@@ -154,7 +155,7 @@ class Batch extends Model
         }
 
         $quantity = $this->initial_units !== null
-            ? __(':count uds', ['count' => $this->initial_units])
+            ? Units::count((int) $this->initial_units)
             : ($this->initial_cg !== null ? $this->initial_cg->formatted() : null);
 
         return implode(' · ', array_filter([$seq, $date !== null ? __('entrada :date', ['date' => $date]) : null, $quantity], 'filled'));

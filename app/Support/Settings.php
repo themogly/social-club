@@ -48,6 +48,9 @@ class Settings
         // Prompt 367 (291's discount alert, extended to every loss) — a sede's losses yesterday above this % of the day's takings
         // raise the dashboard alert and the morning-summary line. Per sede, owner only. The prompt's default.
         'losses_alert_threshold_pct' => 5,
+        // Prompt 375 — the per-person signal (291's floor, restored): a person is flagged only with at least this much takings
+        // over the 7 days, so two small sales cannot read as «50 % given away».
+        'losses_person_min_takings_cents' => 5000,
         'stock_ceiling_days' => 5,
         // Prompt 326 — what one edible counts as: its THC mg ÷ this. 150 ≈ flower at 15 % THC. OVERNIGHT-DEFAULT — CONFIRM
         // WITH THE GESTOR: how edibles count against a gram limit is a policy and legal question.

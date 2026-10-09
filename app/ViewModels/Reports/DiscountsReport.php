@@ -2,6 +2,7 @@
 
 namespace App\ViewModels\Reports;
 
+use App\Enums\DiscountKind;
 use App\Enums\DispensationStatus;
 use App\Enums\OrderStatus;
 use App\Filament\Pages\Reports\DiscountsReportPage;
@@ -264,11 +265,13 @@ class DiscountsReport extends AbstractReport
             ->whereIn('dispensations.location_id', $ids)->where('dispensations.status', DispensationStatus::COMPLETED->value)
             ->where('dispensations.dispensed_at', '>=', $start)->where('dispensations.dispensed_at', '<', $end)
             ->where('dispensation_lines.discount_cents', '>', 0)
-            ->groupBy('dispensation_lines.dispensation_id', 'dispensation_lines.pricing_note')
-            ->get(['dispensation_lines.dispensation_id as id', 'dispensation_lines.pricing_note as note', DB::raw('SUM(dispensation_lines.discount_cents) as cents')]);
+            ->groupBy('dispensation_lines.dispensation_id', 'dispensation_lines.discount_kind')
+            ->get(['dispensation_lines.dispensation_id as id', 'dispensation_lines.discount_kind as kind', DB::raw('SUM(dispensation_lines.discount_cents) as cents')]);
         $discountBySale = [];
         foreach ($lineDiscounts as $row) {
-            $label = filled($row->note) ? (string) $row->note : __('Descuento de socio');
+            // Prompt 375 — by the kind stored on the line (Local, Personal, Tarifa…); a line from before it was stored is
+            // «Sin clasificar (anterior a hoy)», never guessed from the member's discount today.
+            $label = DiscountKind::reportLabel($row->kind !== null ? (string) $row->kind : null);
             $types[$label] = ($types[$label] ?? 0) + (int) $row->cents;
             $discountBySale[$row->id] = ($discountBySale[$row->id] ?? 0) + (int) $row->cents;
         }
@@ -337,12 +340,15 @@ class DiscountsReport extends AbstractReport
                                 trim(((string) ($item['name'] ?? '')).' · '.((string) ($item['reference'] ?? '')), ' ·'), OrderResource::getUrl('view', ['record' => $o->id]));
                         } else {
                             $discount += (int) ($item['discount_cents'] ?? 0);
+                            if ((int) ($item['discount_cents'] ?? 0) > 0) {
+                                // Prompt 375 — bar & shop discounts by kind too, apart from the dispensary's.
+                                $label = __('Barra y tienda: :kind', ['kind' => DiscountKind::reportLabel(isset($item['discount_kind']) ? (string) $item['discount_kind'] : null)]);
+                                $types[$label] = ($types[$label] ?? 0) + (int) $item['discount_cents'];
+                            }
                         }
                     }
 
                     if ($discount > 0) {
-                        $label = __('Barra y tienda: descuento de socio');
-                        $types[$label] = ($types[$label] ?? 0) + $discount;
                         $ops[$k]['descuentos_socio'] += $discount;
                         $totals['member_discounts'] += $discount;
                         $events[] = $this->event('descuento', __('Descuento de socio'), $o->created_at, $o->location_id, $o->operator_id, $o->member_id, $discount, null, OrderResource::getUrl('view', ['record' => $o->id]));

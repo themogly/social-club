@@ -3,6 +3,7 @@
 namespace App\ViewModels\Reports;
 
 use App\Enums\CashPot;
+use App\Enums\DiscountKind;
 use App\Enums\DispensationStatus;
 use App\Enums\OrderStatus;
 use App\Enums\StockMovementType;
@@ -52,8 +53,8 @@ use Throwable;
  * **No SQL arithmetic on an unsigned column** (370): `charged_cg`, `original_total_cents` and friends are read as they are
  * and subtracted in PHP.
  *
- * @phpstan-type Event array{section: string, line: string, at: string, location_id: string, operator_id: ?string, member_id: ?string, cents: int, grams: int, contribution: ?int, reason: ?string, what: string, url: ?string, flag: ?string}
- * @phpstan-type Line array{label: string, cents: int, grams: int, contribution: int, count: int, info: bool}
+ * @phpstan-type Event array{section: string, line: string, at: string, location_id: string, operator_id: ?string, member_id: ?string, cents: int, grams: int, contribution: ?int, reason: ?string, what: string, url: ?string, flag: ?string, no_cost: bool}
+ * @phpstan-type Line array{label: string, cents: int, grams: int, contribution: int, count: int, info: bool, no_cost: int}
  */
 class LossesReport extends AbstractReport
 {
@@ -74,7 +75,7 @@ class LossesReport extends AbstractReport
     /** @var (Closure(array<string, string|null>): string)|null builds a link to this report with the given detail filters */
     private ?Closure $linker = null;
 
-    /** @var array{events: list<Event>, takings: array<string, int>, takings_by_sede: array<string, int>}|null */
+    /** @var array{events: list<Event>, takings: array<string, int>, takings_by_sede: array<string, int>, sales: list<array{at: string, location_id: string, operator_id: ?string, cents: int}>}|null */
     private ?array $data = null;
 
     public function key(): string
@@ -104,8 +105,14 @@ class LossesReport extends AbstractReport
     {
         return [
             'mostrador' => [
+                // Prompt 375 — member discounts by the kind stored on each line from now on; the staff's own stays apart.
                 'member_discounts_staff' => [__('Descuentos del personal (aparte)'), true],
-                'member_discounts' => [__('Otros descuentos de socio (aparte)'), true],
+                'member_discounts_local' => [__('Descuento :kind (aparte)', ['kind' => DiscountKind::LOCAL->label()]), true],
+                'member_discounts_concession' => [__('Descuento :kind (aparte)', ['kind' => DiscountKind::CONCESSION->label()]), true],
+                'member_discounts_therapeutic' => [__('Descuento :kind (aparte)', ['kind' => DiscountKind::THERAPEUTIC->label()]), true],
+                'member_discounts_custom' => [__('Descuento :kind (aparte)', ['kind' => DiscountKind::CUSTOM->label()]), true],
+                'member_discounts_tier' => [__('Descuento :kind (aparte)', ['kind' => DiscountKind::reportLabel('TIER')]), true],
+                'member_discounts_unclassified' => [__('Descuentos sin clasificar, anteriores a hoy (aparte)'), true],
                 'overrides_given' => [__('Ajustes de precio a la baja'), false],
                 'overrides_recovered' => [__('Ajustes de precio al alza: recuperado'), false],
                 'rounding' => [__('Redondeo al euro (neto)'), false],
@@ -169,28 +176,39 @@ class LossesReport extends AbstractReport
     /**
      * Each section with its lines and its total (information lines are not in the total).
      *
-     * @return array<string, array{label: string, total: int, lines: array<string, Line>}>
+     * @return array<string, array{label: string, total: int, lines: array<string, Line>, no_cost: int, no_cost_url: ?string}>
      */
     public function sections(): array
     {
         $sections = [];
         foreach (self::lineDefinitions() as $section => $lines) {
-            $sections[$section] = ['label' => self::sectionTitles()[$section], 'total' => 0, 'lines' => []];
+            $sections[$section] = ['label' => self::sectionTitles()[$section], 'total' => 0, 'lines' => [], 'no_cost' => 0, 'no_cost_url' => null];
             foreach ($lines as $key => [$label, $info]) {
-                $sections[$section]['lines'][$key] = ['label' => $label, 'cents' => 0, 'grams' => 0, 'contribution' => 0, 'count' => 0, 'info' => $info];
+                $sections[$section]['lines'][$key] = ['label' => $label, 'cents' => 0, 'grams' => 0, 'contribution' => 0, 'count' => 0, 'info' => $info, 'no_cost' => 0];
             }
         }
 
+        $noCostUrls = [];
         foreach ($this->data()['events'] as $e) {
             $line = &$sections[$e['section']]['lines'][$e['line']];
             $line['cents'] += $e['cents'];
             $line['grams'] += $e['grams'];
             $line['contribution'] += (int) $e['contribution'];
             $line['count']++;
+            if ($e['no_cost']) {
+                $line['no_cost']++;
+                $sections[$e['section']]['no_cost']++;
+                $noCostUrls[$e['section']][(string) $e['url']] = true;
+            }
             if (! $line['info']) {
                 $sections[$e['section']]['total'] += $e['cents'];
             }
             unset($line);
+        }
+
+        // Where to add the missing cost: the batch, when it is one; else the section's list.
+        foreach ($noCostUrls as $section => $urls) {
+            $sections[$section]['no_cost_url'] = count($urls) === 1 ? (string) array_key_first($urls) : $this->link(['section' => $section, 'person' => null]);
         }
 
         return $sections;
@@ -204,7 +222,7 @@ class LossesReport extends AbstractReport
 
         return [
             'total' => $this->total(),
-            'member_discounts' => $counter['member_discounts_staff']['cents'] + $counter['member_discounts']['cents'],
+            'member_discounts' => array_sum(array_map(fn (array $line): int => $line['info'] ? $line['cents'] : 0, $counter)),
             'staff_discounts' => $counter['member_discounts_staff']['cents'],
             'takings' => array_sum($this->data()['takings']),
             'previous_total' => (new self($this->organisationId, $this->locationIds, $this->period->previous()))->total(),
@@ -366,6 +384,7 @@ class LossesReport extends AbstractReport
             'socio__url' => $e['member_id'] !== null ? MemberResource::getUrl('view', ['record' => $e['member_id']]) : null,
             'gramos' => $e['grams'],
             'importe' => $e['cents'],
+            'importe__text' => $e['no_cost'] ? __('sin coste registrado') : null,
             'aportacion' => $e['contribution'] !== null ? Money::fromCents($e['contribution'])->formatted() : '—',
             'motivo' => trim(($e['flag'] !== null ? $e['flag'].' · ' : '').($e['reason'] ?? ''), ' ·') ?: '—',
             'motivo__tone' => $e['flag'] !== null ? 'warning' : null,
@@ -406,43 +425,154 @@ class LossesReport extends AbstractReport
         return new self($organisationId, $locationIds, Period::today($boundary ?? Period::sedeInScope())->previous());
     }
 
-    /** @return array{total: int, takings: int, pct: string} the period's headline and takings, for a line that says them */
-    public function dayFigures(): array
+    /**
+     * The headline and takings, for a line that says them — of the whole period, or (prompt 375) of a window inside it: the
+     * dashboard reads yesterday out of its one 7-day report.
+     *
+     * @param  array{0: CarbonImmutable, 1: CarbonImmutable}|null  $within
+     * @return array{total: int, takings: int, pct: string}
+     */
+    public function dayFigures(?array $within = null): array
     {
-        $takings = array_sum($this->data()['takings']);
+        $total = array_sum(array_map(fn (array $e): int => $this->counts($e) ? $e['cents'] : 0, $this->eventsWithin($within)));
+        $takings = array_sum(array_column($this->salesWithin($within), 'cents'));
 
-        return ['total' => $this->total(), 'takings' => $takings, 'pct' => self::share($this->total(), $takings)];
+        return ['total' => $total, 'takings' => $takings, 'pct' => self::share($total, $takings)];
     }
 
     /**
-     * The sedes whose losses went over their threshold (`losses_alert_threshold_pct`, default 5 %) of their takings in the
-     * period. A sede with no takings never alerts (there is no share to speak of). Never throws: an alert must not break a
-     * dashboard or a run.
+     * The sedes whose losses went over their threshold (`losses_alert_threshold_pct`, default 5 %) of their takings — in the
+     * period, or in a window inside it. A sede with no takings never alerts (there is no share to speak of). Never throws: an
+     * alert must not break a dashboard or a run.
      *
+     * @param  array{0: CarbonImmutable, 1: CarbonImmutable}|null  $within
      * @return array<string, array{total: int, takings: int, pct: string}> sede id => its figures
      */
-    public function sedesAboveThreshold(): array
+    public function sedesAboveThreshold(?array $within = null): array
     {
         try {
             $totals = array_fill_keys($this->resolvedLocationIds(), 0);
-            foreach ($this->data()['events'] as $e) {
+            $takings = array_fill_keys($this->resolvedLocationIds(), 0);
+            foreach ($this->eventsWithin($within) as $e) {
                 if (isset($totals[$e['location_id']]) && $this->counts($e)) {
                     $totals[$e['location_id']] += $e['cents'];
+                }
+            }
+            foreach ($this->salesWithin($within) as $sale) {
+                if (isset($takings[$sale['location_id']])) {
+                    $takings[$sale['location_id']] += $sale['cents'];
                 }
             }
 
             $above = [];
             foreach ($totals as $sedeId => $total) {
-                $takings = (int) ($this->data()['takings_by_sede'][$sedeId] ?? 0);
                 $threshold = max(0, (int) Settings::get('losses_alert_threshold_pct', self::DEFAULT_ALERT_PCT, (string) $sedeId));
-                if ($takings > 0 && $total * 100 > $threshold * $takings) {
-                    $above[(string) $sedeId] = ['total' => $total, 'takings' => $takings, 'pct' => self::share($total, $takings)];
+                if ($takings[$sedeId] > 0 && $total * 100 > $threshold * $takings[$sedeId]) {
+                    $above[(string) $sedeId] = ['total' => $total, 'takings' => $takings[$sedeId], 'pct' => self::share($total, $takings[$sedeId])];
                 }
             }
 
             return $above;
         } catch (Throwable) {
             return [];
+        }
+    }
+
+    /**
+     * @param  array{0: CarbonImmutable, 1: CarbonImmutable}|null  $within
+     * @return list<Event>
+     */
+    private function eventsWithin(?array $within): array
+    {
+        return $within === null ? $this->data()['events']
+            : array_values(array_filter($this->data()['events'], fn (array $e): bool => self::inside($e['at'], $within)));
+    }
+
+    /**
+     * @param  array{0: CarbonImmutable, 1: CarbonImmutable}|null  $within
+     * @return list<array{at: string, location_id: string, operator_id: ?string, cents: int}>
+     */
+    private function salesWithin(?array $within): array
+    {
+        return $within === null ? $this->data()['sales']
+            : array_values(array_filter($this->data()['sales'], fn (array $sale): bool => self::inside($sale['at'], $within)));
+    }
+
+    /** @param  array{0: CarbonImmutable, 1: CarbonImmutable}  $within */
+    private static function inside(string $at, array $within): bool
+    {
+        $ts = CarbonImmutable::parse($at)->getTimestamp();
+
+        return $ts >= $within[0]->getTimestamp() && $ts < $within[1]->getTimestamp();
+    }
+
+    /**
+     * Prompt 375 — the last 7 business days at a sede (today and the six before): the per-person signal's window, and what the
+     * report opens on from its link (`?period=last7`).
+     */
+    public static function lastSevenDays(?Location $sede = null): Period
+    {
+        $today = Period::today($sede);
+
+        return Period::custom($today->firstDay()->subDays(6), $today->firstDay(), $sede ?? Period::sedeInScope());
+    }
+
+    /**
+     * Prompt 375 — 291's per-person signal, restored beside the sede's: the people whose losses over the last 7 days (every
+     * section, as *Por persona* adds them) exceed the sede's threshold % of THEIR OWN takings, with at least
+     * `losses_person_min_takings_cents` taken. One person giving away 16 % is visible even while the sede stays under 5 %.
+     *
+     * @return array{count: int, pct: string, period: Period} how many, and the highest share among them
+     */
+    public static function peopleAboveThreshold(Location $sede): array
+    {
+        $period = self::lastSevenDays($sede);
+        $people = (new self((string) $sede->organisation_id, [(string) $sede->id], $period))->peopleAboveThresholdBySede()[(string) $sede->id] ?? ['count' => 0, 'pct' => '0'];
+
+        return [...$people, 'period' => $period];
+    }
+
+    /**
+     * The per-person signal for each sede of this report (its period should be the 7 days): each person's losses and takings
+     * AT THAT SEDE, against that sede's threshold and floor. One report serves every sede the dashboard shows.
+     *
+     * @return array<string, array{count: int, pct: string}> sede id => how many, and the highest share among them
+     */
+    public function peopleAboveThresholdBySede(): array
+    {
+        try {
+            $tally = []; // sede => operator => [lost, taken]
+            foreach ($this->data()['events'] as $e) {
+                if ($e['operator_id'] !== null && $this->counts($e)) {
+                    $tally[$e['location_id']][$e['operator_id']][0] = ($tally[$e['location_id']][$e['operator_id']][0] ?? 0) + $e['cents'];
+                }
+            }
+            foreach ($this->data()['sales'] as $sale) {
+                if ($sale['operator_id'] !== null) {
+                    $tally[$sale['location_id']][$sale['operator_id']][1] = ($tally[$sale['location_id']][$sale['operator_id']][1] ?? 0) + $sale['cents'];
+                }
+            }
+
+            $out = [];
+            foreach ($this->resolvedLocationIds() as $sedeId) {
+                $threshold = max(0, (int) Settings::get('losses_alert_threshold_pct', self::DEFAULT_ALERT_PCT, (string) $sedeId));
+                $floor = null; // read only when someone is over the threshold (the dashboard's query budget)
+                $shares = [];
+                foreach ($tally[$sedeId] ?? [] as $figures) {
+                    [$lost, $taken] = [(int) ($figures[0] ?? 0), (int) ($figures[1] ?? 0)];
+                    if ($taken > 0 && $lost * 100 > $threshold * $taken) {
+                        $floor ??= max(0, (int) Settings::get('losses_person_min_takings_cents', 5000, (string) $sedeId));
+                        if ($taken >= $floor) {
+                            $shares[] = $lost * 100 / $taken;
+                        }
+                    }
+                }
+                $out[(string) $sedeId] = ['count' => count($shares), 'pct' => NumberFormat::decimal(round($shares === [] ? 0 : max($shares)), 0)];
+            }
+
+            return $out;
+        } catch (Throwable) {
+            return []; // an alert must never break a dashboard or a run
         }
     }
 
@@ -647,7 +777,7 @@ class LossesReport extends AbstractReport
 
     // --- The one pass -----------------------------------------------------------------------------------------------------
 
-    /** @return array{events: list<Event>, takings: array<string, int>, takings_by_sede: array<string, int>} */
+    /** @return array{events: list<Event>, takings: array<string, int>, takings_by_sede: array<string, int>, sales: list<array{at: string, location_id: string, operator_id: ?string, cents: int}>} */
     private function data(): array
     {
         if ($this->data !== null) {
@@ -659,10 +789,11 @@ class LossesReport extends AbstractReport
         $events = [];
         $takings = [];
         $takingsBySede = [];
-        $event = function (string $section, string $line, mixed $at, mixed $locationId, ?string $operatorId, ?string $memberId, int $cents, int $grams = 0, ?int $contribution = null, ?string $reason = null, string $what = '', ?string $url = null, ?string $flag = null) use (&$events): void {
+        $sales = []; // prompt 375 — each sale's time, so a window inside the period (yesterday in the last 7 days) can be read
+        $event = function (string $section, string $line, mixed $at, mixed $locationId, ?string $operatorId, ?string $memberId, int $cents, int $grams = 0, ?int $contribution = null, ?string $reason = null, string $what = '', ?string $url = null, ?string $flag = null, bool $noCost = false) use (&$events): void {
             $events[] = ['section' => $section, 'line' => $line, 'at' => (string) $at, 'location_id' => (string) $locationId, 'operator_id' => $operatorId,
                 'member_id' => $memberId, 'cents' => $cents, 'grams' => $grams, 'contribution' => $contribution, 'reason' => filled($reason) ? (string) $reason : null,
-                'what' => $what, 'url' => $url, 'flag' => $flag];
+                'what' => $what, 'url' => $url, 'flag' => $flag, 'no_cost' => $noCost];
         };
 
         // 1. Completed dispensations: takings, whole-euro rounding (350).
@@ -673,6 +804,7 @@ class LossesReport extends AbstractReport
         foreach ($dispensations as $d) {
             $takings[$d->operator_id ?? 'none'] = ($takings[$d->operator_id ?? 'none'] ?? 0) + (int) $d->total_cents;
             $takingsBySede[$d->location_id] = ($takingsBySede[$d->location_id] ?? 0) + (int) $d->total_cents;
+            $sales[] = ['at' => (string) $d->dispensed_at, 'location_id' => (string) $d->location_id, 'operator_id' => $d->operator_id, 'cents' => (int) $d->total_cents];
             if ((int) $d->rounding_cents !== 0) {
                 // Signed: a negative rounding is what the member kept — a loss; a positive one was taken — an offset.
                 $event('mostrador', 'rounding', $d->dispensed_at, $d->location_id, $d->operator_id, $d->member_id, -(int) $d->rounding_cents,
@@ -692,10 +824,9 @@ class LossesReport extends AbstractReport
             }
         }
 
-        // 3–4. The dispensary's lines, in one query: member discounts — information, the staff member's own apart (a member
-        //      record linked to a staff account, 347; the line does not store which discount it was, so that is the one split
-        //      there is) — and Peso de más (355): each weight line's weighed − charged grams at the line's own price, read raw
-        //      and subtracted here (370).
+        // 3–4. The dispensary's lines, in one query: member discounts — information, by the kind stored on the line (prompt 375;
+        //      the staff member's own apart) — and Peso de más (355): each weight line's weighed − charged grams at the line's
+        //      own price, read raw and subtracted here (370).
         $lines = DB::table('dispensation_lines')
             ->join('dispensations', 'dispensation_lines.dispensation_id', '=', 'dispensations.id')
             ->whereIn('dispensations.location_id', $ids)->where('dispensations.status', DispensationStatus::COMPLETED->value)
@@ -703,12 +834,14 @@ class LossesReport extends AbstractReport
             ->where(fn ($q) => $q->where('dispensation_lines.discount_cents', '>', 0)
                 ->orWhere(fn ($q) => $q->whereNotNull('dispensation_lines.charged_cg')->whereNull('dispensation_lines.units_dispensed')
                     ->whereColumn('dispensation_lines.grams_cg', '<>', 'dispensation_lines.charged_cg')))
-            ->get(['dispensation_lines.dispensation_id as id', 'dispensation_lines.discount_cents', 'dispensation_lines.grams_cg', 'dispensation_lines.charged_cg',
-                'dispensation_lines.units_dispensed', 'dispensation_lines.price_per_gram_cents', 'dispensation_lines.genetic_name_snapshot', 'dispensation_lines.batch_no_snapshot']);
-        $discountBySale = [];
+            ->get(['dispensation_lines.dispensation_id as id', 'dispensation_lines.discount_cents', 'dispensation_lines.discount_kind', 'dispensation_lines.grams_cg',
+                'dispensation_lines.charged_cg', 'dispensation_lines.units_dispensed', 'dispensation_lines.price_per_gram_cents', 'dispensation_lines.genetic_name_snapshot',
+                'dispensation_lines.batch_no_snapshot']);
+        $discountBySale = []; // sale id => kind => cents
         foreach ($lines as $line) {
             if ((int) $line->discount_cents > 0) {
-                $discountBySale[$line->id] = ($discountBySale[$line->id] ?? 0) + (int) $line->discount_cents;
+                $kind = (string) ($line->discount_kind ?? '');
+                $discountBySale[$line->id][$kind] = ($discountBySale[$line->id][$kind] ?? 0) + (int) $line->discount_cents;
             }
             $d = $dispensations->get($line->id);
             $over = $line->charged_cg !== null && $line->units_dispensed === null ? (int) $line->grams_cg - (int) $line->charged_cg : 0;
@@ -719,11 +852,19 @@ class LossesReport extends AbstractReport
                     url: DispensationResource::getUrl('view', ['record' => $d->id]));
             }
         }
-        $staffMembers = $discountBySale === [] ? [] : array_flip(User::query()->withTrashed()->whereNotNull('member_id')->pluck('member_id')->all());
-        foreach ($discountBySale as $id => $cents) {
+        // Who is staff is only asked for a discount with no stored kind (a line from before 375), and only once.
+        $staffMembers = null;
+        $discountLine = function (string $kind, ?string $memberId) use (&$staffMembers): string {
+            if ($kind === '' && $memberId !== null) {
+                $staffMembers ??= array_flip(User::query()->withTrashed()->whereNotNull('member_id')->pluck('member_id')->all());
+            }
+
+            return self::discountLine($kind, $kind === '' && $memberId !== null && isset($staffMembers[$memberId]));
+        };
+        foreach ($discountBySale as $id => $byKind) {
             $d = $dispensations->get($id);
-            if ($d !== null) {
-                $event('mostrador', isset($staffMembers[$d->member_id]) ? 'member_discounts_staff' : 'member_discounts', $d->dispensed_at, $d->location_id,
+            foreach ($d !== null ? $byKind : [] as $kind => $cents) {
+                $event('mostrador', $discountLine((string) $kind, $d->member_id), $d->dispensed_at, $d->location_id,
                     $d->operator_id, $d->member_id, $cents, url: DispensationResource::getUrl('view', ['record' => $d->id]));
             }
         }
@@ -734,18 +875,20 @@ class LossesReport extends AbstractReport
             ->whereIn('location_id', $ids)->where('status', OrderStatus::COMPLETED->value)
             ->where('created_at', '>=', $start)->where('created_at', '<', $end)
             ->select(['id', 'operator_id', 'total_cents', 'items', 'created_at', 'location_id', 'member_id'])->orderBy('id')
-            ->chunk(500, function ($orders) use (&$takings, &$takingsBySede, $event): void {
+            ->chunk(500, function ($orders) use (&$takings, &$takingsBySede, &$sales, $event, $discountLine): void {
                 foreach ($orders as $o) {
                     $takings[$o->operator_id ?? 'none'] = ($takings[$o->operator_id ?? 'none'] ?? 0) + (int) $o->total_cents;
                     $takingsBySede[$o->location_id] = ($takingsBySede[$o->location_id] ?? 0) + (int) $o->total_cents;
-                    $discount = 0;
+                    $sales[] = ['at' => (string) $o->created_at, 'location_id' => (string) $o->location_id, 'operator_id' => $o->operator_id, 'cents' => (int) $o->total_cents];
+                    $byKind = [];
                     foreach ((array) json_decode((string) $o->items, true) as $item) {
-                        if (is_array($item) && ($item['article_id'] ?? null) !== null) {
-                            $discount += (int) ($item['discount_cents'] ?? 0);
+                        if (is_array($item) && ($item['article_id'] ?? null) !== null && (int) ($item['discount_cents'] ?? 0) > 0) {
+                            $kind = (string) ($item['discount_kind'] ?? '');
+                            $byKind[$kind] = ($byKind[$kind] ?? 0) + (int) $item['discount_cents'];
                         }
                     }
-                    if ($discount > 0) {
-                        $event('mostrador', 'member_discounts', $o->created_at, $o->location_id, $o->operator_id, $o->member_id, $discount,
+                    foreach ($byKind as $kind => $cents) {
+                        $event('mostrador', $discountLine((string) $kind, $o->member_id), $o->created_at, $o->location_id, $o->operator_id, $o->member_id, $cents,
                             what: __('Barra y tienda'), url: OrderResource::getUrl('view', ['record' => $o->id]));
                     }
                 }
@@ -805,7 +948,24 @@ class LossesReport extends AbstractReport
                 reason: $d->void_reason, url: DispensationResource::getUrl('view', ['record' => $d->id]));
         }
 
-        return $this->data = ['events' => $events, 'takings' => $takings, 'takings_by_sede' => $takingsBySede];
+        return $this->data = ['events' => $events, 'takings' => $takings, 'takings_by_sede' => $takingsBySede, 'sales' => $sales];
+    }
+
+    /**
+     * Prompt 375 — which *mostrador* line a member discount goes on: its stored kind; the staff discount (or, for a line from
+     * before the kind was stored, a member record linked to a staff account, 347) on the staff line; else «sin clasificar».
+     */
+    private static function discountLine(string $kind, bool $staffMember): string
+    {
+        return match ($kind) {
+            DiscountKind::STAFF->value => 'member_discounts_staff',
+            DiscountKind::LOCAL->value => 'member_discounts_local',
+            DiscountKind::CONCESSION->value => 'member_discounts_concession',
+            DiscountKind::THERAPEUTIC->value => 'member_discounts_therapeutic',
+            DiscountKind::CUSTOM->value => 'member_discounts_custom',
+            'TIER' => 'member_discounts_tier',
+            default => $kind === '' && $staffMember ? 'member_discounts_staff' : 'member_discounts_unclassified',
+        };
     }
 
     /**
@@ -853,7 +1013,10 @@ class LossesReport extends AbstractReport
             $grams = $unit ? $lost * (int) $b->grams_per_unit_cg : $lost;
             $base = $basePrices->get($b->genetic_id.'|'.$b->location_id);
             $rate = $unit ? ($b->price_per_unit_cents ?? $base?->price_per_unit_cents) : ($b->price_per_gram_cents ?? $base?->price_per_gram_cents);
-            $cost = (int) round_half_up($grams * (int) $b->cost_per_gram_cents / 100);
+            // Prompt 375 — a batch with no cost recorded: «sin coste registrado», never a cost invented or the contribution price
+            // added; the movement is counted apart so the section can say it is not in the total.
+            $noCost = (int) $b->cost_per_gram_cents <= 0;
+            $cost = $noCost ? 0 : (int) round_half_up($grams * (int) $b->cost_per_gram_cents / 100);
             $contribution = $rate === null ? null : (int) round_half_up($unit ? $lost * (int) $rate : $lost * (int) $rate / 100);
 
             $line = match (true) {
@@ -866,7 +1029,7 @@ class LossesReport extends AbstractReport
             $what = trim(((string) $b->genetic).' · '.((string) ($b->label ?? $b->batch_no)).((bool) $m->on_reserve ? ' · '.__('reserva sellada') : ''), ' ·');
             $event('existencias', $line, $m->created_at, $m->location_id, $m->operator_id, null, $cost, $grams, $contribution,
                 reason: $m->reason, what: $what, url: BatchResource::getUrl('edit', ['record' => $b->id]),
-                flag: $m->stock_take_id !== null && isset($unexplained[$m->stock_take_id]) ? __('Sin explicar') : null);
+                flag: $m->stock_take_id !== null && isset($unexplained[$m->stock_take_id]) ? __('Sin explicar') : null, noCost: $noCost);
         }
     }
 }

@@ -282,15 +282,17 @@ Before the reserve existed, each evening count took the sealed bags out of stock
 
 **Reports → Losses** puts in one place everything that cost the club money in the period, with who did it and why. The headline is the **total lost**, its share of takings and how it compares with the previous period, with a bar for each day. Member discounts are agreed policy, not a loss, so they are shown beside the total and never in it, with the staff's own discounts apart. Five sections, each with its total:
 
-- **Discounts and give-aways at the counter:** price adjustments down, and adjustments up as *recovered* (which subtract), whole-euro rounding, and waived fees.
+- **Discounts and give-aways at the counter:** price adjustments down, and adjustments up as *recovered* (which subtract), whole-euro rounding, and waived fees. Member discounts are listed by kind (*Local*, *Concession*, *Therapeutic*, *Staff*…), beside the total. Sales from before 10 October 2026 show as *Unclassified*, because the kind was not recorded then.
 - **Extra weight:** the grams handed over above what was charged by the half-gram rounding, at each line's own price.
-- **Stock lost:** wastage, adjustments down, and shortfalls at the end-of-day weigh and in the stock count. It counts at cost; the value at the contribution price is shown beside it. Gains subtract. A forgotten *Refill* is not a loss, because the stock only moved from the reserve to the jar.
+- **Stock lost:** wastage, adjustments down, and shortfalls at the end-of-day weigh and in the stock count. It counts at cost; the value at the contribution price is shown beside it. Gains subtract. A forgotten *Refill* is not a loss, because the stock only moved from the reserve to the jar. A batch with no cost recorded shows *no cost recorded* and stays out of the total; the section says how many, with a link to add the batch's cost.
 - **Till differences:** each counted box's shortfall or surplus at the close, marked *Unexplained* when nobody gave a reason.
 - **Refunds and voids:** refunds, and voided dispensings and bar orders. A void corrected by a new sale is a correction, not a loss.
 
 Tap a section, or a person's name in **By person**, to open its list underneath: when, where, who, which member, how much and the reason, each linking to its record. **By person** shows each person's losses beside what they took, so someone who gives away much more than the others stands out. The CSV has the headline, the sections and the people.
 
 The dashboard says it every morning: **Losses yesterday: €46.20 (3.1 %)**, opening the report on that day. If a location's losses for a day pass the owner's threshold (*Locations → edit → Losses*, 5 % by default), the dashboard shows an alert and the morning summary includes the line.
+
+The same threshold also watches **each person**: if what someone lost over the last 7 days passes it, measured against what they themselves took (and they took at least €50, set in *Settings → Discounts and adjustments*), the dashboard says *"1 person above the threshold this week"*. It opens the report on those 7 days, sorted by the share each person lost. The morning summary says it too, without names.
 
 ![Reports → Losses: the total lost against the previous week, a bar per day, and the sections.](img/manager-guide/c26-losses.jpg)
 

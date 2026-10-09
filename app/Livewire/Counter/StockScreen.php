@@ -14,6 +14,7 @@ use App\Livewire\Counter\Concerns\ResolvesCounterLocation;
 use App\Models\Batch;
 use App\Models\Location;
 use App\Support\ManagerApproval;
+use App\Support\Units;
 use App\Support\Weight;
 use App\ViewModels\CounterStockSheet;
 use Illuminate\Auth\Access\AuthorizationException;
@@ -158,8 +159,8 @@ class StockScreen extends Component
             $result = (new RecountBatch)->handle($batch, $quantity, $reason, $operator);
             $fresh = $batch->fresh();
 
-            $jar = $batch->isUnitType() ? ((int) $fresh->remaining_units).' '.__('uds') : $fresh->remaining_cg->formatted();
-            $diff = $batch->isUnitType() ? (($result['delta'] > 0 ? '+' : '').$result['delta'].' '.__('uds'))
+            $jar = $batch->isUnitType() ? Units::count((int) $fresh->remaining_units) : $fresh->remaining_cg->formatted();
+            $diff = $batch->isUnitType() ? Units::signed((int) $result['delta'])
                 : (($result['delta'] > 0 ? '+' : '').Weight::fromCentigrams($result['delta'])->formatted());
 
             // Prompt 369 — said by what happened, never a «0.00 g» adjustment: a surplus the reserve covered is a forgotten

@@ -112,7 +112,7 @@
                      result («Rellenar 10.00 g → bote 12.80 g»). An action that cannot apply is not offered (no reserve → no
                      Rellenar; an empty jar → no Pasar a reserva). The figures ride as data-* so the labels follow a fresh render. --}}
                 @php
-                    $fmt = fn (int $n): string => $open['is_unit'] ? trans_choice(':count ud|:count uds', $n, ['count' => $n]) : \App\Support\Weight::fromCentigrams($n)->formatted();
+                    $fmt = fn (int $n): string => $open['is_unit'] ? \App\Support\Units::count($n) : \App\Support\Weight::fromCentigrams($n)->formatted();
                     $actions = array_filter([
                         'top-up' => $canTopUp && ! $open['is_unit'] && $open['reserve_cg'] > 0 ? __('Rellenar el bote') : null,
                         'move' => $canTopUp && ! $open['is_unit'] && $open['jar'] > 0 ? __('Pasar a reserva') : null,

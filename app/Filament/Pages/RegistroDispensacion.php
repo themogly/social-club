@@ -201,9 +201,7 @@ class RegistroDispensacion extends ReportPage
     protected function filename(string $extension): string
     {
         $period = $this->resolvePeriod();
-        $from = $period->start->format('Ymd');
-        $to = $period->end->subDay()->format('Ymd');
-        $range = $from === $to ? $from : "{$from}-{$to}";
+        $range = $period->fileRange(); // prompt 375 — the sede's days
 
         return "registro-dispensacion-{$range}.{$extension}";
     }
