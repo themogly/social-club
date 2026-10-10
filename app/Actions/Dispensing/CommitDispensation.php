@@ -539,7 +539,9 @@ class CommitDispensation
                     // Prompt 375 — which discount priced it (LOCAL, STAFF…), so the reports split member discounts by kind.
                     'discount_kind' => $partDiscount > 0 ? $p['discount_kind'] : null,
                     'line_total_cents' => $partTotal,
-                    'pricing_note' => $pricingNote,
+                    // Prompt 382 — charged on the member's price list: the list's name beside any eighth note, its own rate frozen.
+                    'pricing_note' => implode(' · ', array_filter([$part['list_label'] ?? null, $pricingNote])) ?: null,
+                    'list_rate_cents' => $part['list_rate_cents'] ?? null,
                     'genetic_name_snapshot' => $p['genetic']->name,
                     'batch_no_snapshot' => $batch->batch_no,
                     // The rate THIS part was charged at — its own batch's (278) — frozen with the row.

@@ -96,11 +96,9 @@ class TransferBatch
                     'initial_units' => $isUnit ? $quantity : null,
                     'remaining_units' => $isUnit ? 0 : null,
                     'cost_per_gram_cents' => $source->cost_per_gram_cents,
-                    // The child inherits its parent's sale price and stays editable per batch (278); its photos are the
-                    // parent's until it gets its own (Batch::displayImages), never copied.
-                    'price_per_gram_cents' => $source->price_per_gram_cents,
-                    'price_per_unit_cents' => $source->price_per_unit_cents,
-                    'price_per_eighth_cents' => $source->price_per_eighth_cents,
+                    // The child inherits its parent's prices — all three lists (382) — and they stay editable per batch (278);
+                    // its photos are the parent's until it gets its own (Batch::displayImages), never copied.
+                    ...$source->storedPrices(),
                     'lab_report_path' => $source->lab_report_path,
                     'notes' => $source->notes,
                     'status' => BatchStatus::OPEN,

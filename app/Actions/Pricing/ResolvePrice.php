@@ -8,6 +8,7 @@ use App\Enums\DiscountAppliesTo;
 use App\Enums\DiscountKind;
 use App\Enums\DiscountMode;
 use App\Enums\MembershipStatus;
+use App\Enums\PriceList;
 use App\Models\Batch;
 use App\Models\Discount;
 use App\Models\Genetic;
@@ -30,8 +31,9 @@ use RuntimeException;
  *
  * **The price is the BATCH's (prompt 278, Ben's 271).** Two harvests of one strain differ, so the rate comes from the
  * batch the grams are drawn from (`forBatch`); a strain's "price" at a sede is the price of the batch that will be
- * dispensed next there (`forGenetic` → `displayBatch`, FEFO). A membership tier is a % discount on any batch (owner
- * decision 1a, `membership_tiers.discount_bp`) competing with the other discounts. The strain's sede price in
+ * dispensed next there (`forGenetic` → `displayBatch`, FEFO). Prompt 382: a membership tier picks the batch's price LIST
+ * (Estándar / Local / Personal, `Batch::priceFor()`), and the member pays the lower of that and the standard price less their
+ * best other discount — no stacking. The strain's sede price in
  * `genetic_prices` is only the FALLBACK for a batch without its own price (batches received before 278 that had no base
  * price to backfill from, and fixtures) — and on that legacy path tier price rows still apply as before.
  *
@@ -74,9 +76,32 @@ class ResolvePrice
 
         $isUnit = $genetic->isUnitType();
         $rate = (int) ($isUnit ? $batch->price_per_unit_cents : $batch->price_per_gram_cents);
-        $candidates = $this->applicableDiscounts($genetic, $location, $member, withTier: true);
+        $eighth = $isUnit ? null : $batch->price_per_eighth_cents;
+        $withDiscount = new PriceResult($rate, null, $this->chooseDiscount($rate, $this->applicableDiscounts($genetic, $location, $member)), $isUnit, $eighth);
 
-        return new PriceResult($rate, null, $this->chooseDiscount($rate, $candidates), $isUnit, $isUnit ? null : $batch->price_per_eighth_cents);
+        // Prompt 382 — the member's price list (their tier's at this sede; no member or no tier → Estándar). A list price and
+        // a discount never stack: the member pays the LOWER of their list price and the standard less their best other
+        // discount (278's best single price). A tie goes to the list, so its kind is what the line records.
+        $list = $this->priceListFor($member, $location);
+        if ($list !== PriceList::STANDARD) {
+            $listRate = $batch->priceFor($list, $isUnit ? 'unit' : 'gram')['cents'];
+            if ($listRate !== null && $listRate <= $withDiscount->effectiveRatePerGramCents()) {
+                return new PriceResult($rate, null, null, $isUnit, $eighth, [
+                    'rate' => $listRate,
+                    'eighth' => $isUnit ? null : $batch->priceFor($list, 'eighth')['cents'],
+                    'label' => $list->label(),
+                    'kind' => (string) $list->discountKind(),
+                ]);
+            }
+        }
+
+        return $withDiscount;
+    }
+
+    /** Prompt 382 — the price list this member pays at this sede: their active tier's, else Estándar. */
+    public function priceListFor(?Member $member, Location $location): PriceList
+    {
+        return $member === null ? PriceList::STANDARD : ($this->activeTier($member, $location)->price_list ?? PriceList::STANDARD);
     }
 
     /**
@@ -89,7 +114,7 @@ class ResolvePrice
      * grams ({@see ChargeRounding::overParts()}: the difference applied from the last part back, never below zero).
      *
      * @param  list<array{batch: Batch, qty: int}>  $parts  qty in centigrams (weight) or units
-     * @return array{parts: list<array{batch: Batch, qty: int, charged_qty: int, rate_cents: int, total_cents: int, discount_cents: int}>, total_cents: int, discount_cents: int, rate_cents: int, effective_rate_cents: int, eighth_price: ?int, label: ?string, mixed: bool, discount_kind: ?string}
+     * @return array{parts: list<array{batch: Batch, qty: int, charged_qty: int, rate_cents: int, total_cents: int, discount_cents: int, list_rate_cents: ?int, list_label: ?string}>, total_cents: int, discount_cents: int, rate_cents: int, effective_rate_cents: int, eighth_price: ?int, label: ?string, mixed: bool, discount_kind: ?string, list: array{rate_cents: int, label: string}|null}
      */
     public function priceParts(Genetic $genetic, Location $location, ?Member $member, array $parts, bool $isUnit, ?int $chargedCg = null): array
     {
@@ -107,7 +132,8 @@ class ResolvePrice
             $firstPrice ??= $price;
             $firstLabel ??= $line['label'];
             $eighths[] = $isUnit ? null : $price->effectiveEighthPriceCents();
-            $out[] = ['batch' => $part['batch'], 'qty' => $part['qty'], 'charged_qty' => $charged[$j], 'rate_cents' => $line['rate_cents'], 'total_cents' => $line['total_cents'], 'discount_cents' => $line['discount_cents']];
+            $out[] = ['batch' => $part['batch'], 'qty' => $part['qty'], 'charged_qty' => $charged[$j], 'rate_cents' => $line['rate_cents'], 'total_cents' => $line['total_cents'], 'discount_cents' => $line['discount_cents'],
+                'list_rate_cents' => $price->list['rate'] ?? null, 'list_label' => $price->list['label'] ?? null]; // prompt 382
         }
 
         $rates = array_unique(array_column($out, 'rate_cents'));
@@ -123,6 +149,8 @@ class ResolvePrice
             'mixed' => count($rates) > 1,
             // Prompt 350 — the applied discount's kind (null when none applied), for the rounding scope.
             'discount_kind' => (int) array_sum(array_column($out, 'discount_cents')) > 0 ? $firstPrice?->discountKind() : null,
+            // Prompt 382 — charged on the member's price list: the basket shows that rate and the list («8.80 €/g · Local»).
+            'list' => $firstPrice?->list !== null ? ['rate_cents' => $firstPrice->list['rate'], 'label' => $firstPrice->list['label']] : null,
         ];
     }
 
@@ -404,22 +432,14 @@ class ResolvePrice
     /**
      * @return list<DiscountShape>
      */
-    private function applicableDiscounts(Genetic $genetic, Location $location, ?Member $member, bool $withTier = false): array
+    private function applicableDiscounts(Genetic $genetic, Location $location, ?Member $member): array
     {
         if ($member === null) {
             return [];
         }
 
+        // Prompt 382 — a tier's `discount_bp` no longer applies to batch prices (278's owner decision 1a): its price list does.
         $candidates = [];
-
-        // Prompt 278 (owner decision 1a) — on a batch price, the member's tier is a % discount, one candidate among the
-        // others (best single wins, as always). Not on the legacy path, where a tier price ROW already applies.
-        if ($withTier) {
-            $tier = $this->activeTier($member, $location);
-            if ($tier !== null && (int) $tier->discount_bp > 0) {
-                $candidates[] = ['mode' => DiscountMode::PERCENT, 'value_bp' => (int) $tier->discount_bp, 'value_cents' => null, 'label' => (string) $tier->name, 'kind' => 'TIER'];
-            }
-        }
 
         // Therapeutic members get the therapeutic discount automatically.
         if ($member->is_therapeutic) {

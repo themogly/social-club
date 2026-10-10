@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\Batches\Schemas;
 
+use App\Enums\PriceList;
 use App\Enums\ProductType;
 use App\Filament\Forms\CameraOrFile;
 use App\Filament\Forms\DecimalInput;
@@ -15,6 +16,8 @@ use App\Rules\GramAmount;
 use App\Support\ActiveScope;
 use App\Support\DocumentUpload;
 use App\Support\Money;
+use App\Support\NumberFormat;
+use App\Support\TypedNumber;
 use App\Support\Units;
 use App\Support\Weight;
 use Filament\Actions\Action;
@@ -62,9 +65,12 @@ class BatchForm
                             ->required()
                             ->searchable()
                             ->live()
-                            ->afterStateUpdated(function (Select $component, mixed $state, mixed $old, string $operation): void {
+                            ->afterStateUpdated(function (Select $component, mixed $state, mixed $old, string $operation, Get $get, Set $set): void {
                                 if (self::choosesSedes($operation)) {
                                     $component->state(AllOption::sync((array) $state, (array) $old, array_keys(Location::assignableOptions(includeStores: true))));
+                                }
+                                if ($operation === 'create') {
+                                    self::copyPreviousPrices($get, $set);
                                 }
                             })
                             ->disabled(fn (string $operation): bool => $operation !== 'create' || self::singleSede())
@@ -109,7 +115,8 @@ class BatchForm
                                 }
                             })
                             // The strain is fixed at intake — never reassign an existing batch; and on create it waits for the type.
-                            ->disabled(fn (string $operation, Get $get): bool => $operation !== 'create' || blank($get('product_type'))),
+                            ->disabled(fn (string $operation, Get $get): bool => $operation !== 'create' || blank($get('product_type')))
+                            ->afterStateUpdated(fn (string $operation, Get $get, Set $set) => $operation === 'create' ? self::copyPreviousPrices($get, $set) : null),
 
                         // Prompt 282 — the club's own name for the batch. Free, not unique (one harvest across several
                         // strains shares it), editable at any time; a rename reaches every part of the lote. The lote
@@ -226,6 +233,7 @@ class BatchForm
                             ->numeric()
                             ->minValue(0)
                             ->required()
+                            ->live(onBlur: true) // the Local / Personal placeholders follow it (382)
                             ->visible(fn (string $operation): bool => $operation === 'create'),
 
                         DecimalInput::make('price_per_eighth_eur')
@@ -233,7 +241,18 @@ class BatchForm
                             ->helperText(__('Opcional.'))
                             ->numeric()
                             ->minValue(0)
+                            ->live(onBlur: true)
                             ->visible(fn (string $operation, Get $get): bool => $operation === 'create' && ! self::isUnitGenetic($get('genetic_id'))),
+
+                        // Prompt 382 — the Local and Personal lists. Blank = the standard less the list's default % (shown grey). A new
+                        // batch of a strain at a sede starts with the previous batch's prices there, and says so.
+                        TextEntry::make('prices_copied_note')
+                            ->hiddenLabel()
+                            ->state(fn (Get $get): ?string => filled($get('prices_copied_from')) ? __('Precios copiados del lote anterior (#:n)', ['n' => $get('prices_copied_from')]) : null)
+                            ->extraAttributes(['data-prices-copied' => 'true'])
+                            ->columnSpanFull()
+                            ->visible(fn (string $operation, Get $get): bool => $operation === 'create' && filled($get('prices_copied_from'))),
+                        ...self::listPriceFields(),
 
                         // Prompt 340 — on the batch's page, the CURRENT price, read-only (changed only through the audited
                         // Precio), and the way to change it right here.
@@ -277,6 +296,82 @@ class BatchForm
                     ])
                     ->columns(2),
             ]);
+    }
+
+    /**
+     * Prompt 382 — the Local and Personal price fields at intake: per gram and 3.5 g for flower, per unit for a unit product.
+     * Optional; a blank one shows, grey, what it will be (the standard less the list's default %).
+     *
+     * @return list<DecimalInput|TextInput>
+     */
+    private static function listPriceFields(): array
+    {
+        $fields = [TextInput::make('prices_copied_from')->hidden()->dehydrated(false)];
+        foreach ([PriceList::LOCAL, PriceList::STAFF] as $list) {
+            $prefix = rtrim($list->columnPrefix(), '_');
+            $fields[] = DecimalInput::make($prefix.'_price_eur')
+                ->label(fn (Get $get): string => self::isUnitGenetic($get('genetic_id'))
+                    ? __('Precio :list por unidad (€)', ['list' => $list->label()])
+                    : __('Precio :list por gramo (€)', ['list' => $list->label()]))
+                ->numeric()
+                ->minValue(0)
+                ->placeholder(fn (Get $get): ?string => Batch::defaultHint(TypedNumber::cents($get('sale_price_eur')), $list))
+                ->visible(fn (string $operation): bool => $operation === 'create');
+            $fields[] = DecimalInput::make($prefix.'_eighth_eur')
+                ->label(__('Precio :list por octavo — 3.5 g (€)', ['list' => $list->label()]))
+                ->numeric()
+                ->minValue(0)
+                ->placeholder(fn (Get $get): ?string => Batch::defaultHint(TypedNumber::cents($get('price_per_eighth_eur')), $list))
+                ->visible(fn (string $operation, Get $get): bool => $operation === 'create' && ! self::isUnitGenetic($get('genetic_id')));
+        }
+
+        return $fields;
+    }
+
+    /**
+     * Prompt 382 — the Local / Personal columns from a form's `local_price_eur` / `local_eighth_eur` / `staff_…` fields
+     * (intake and the Precio action share the names): blank = null, the default.
+     *
+     * @param  array<string, mixed>  $data
+     * @return array<string, ?int>
+     */
+    public static function listPrices(array $data, bool $unit): array
+    {
+        $out = [];
+        foreach ([PriceList::LOCAL, PriceList::STAFF] as $list) {
+            $prefix = $list->columnPrefix();
+            $rate = TypedNumber::cents($data[$prefix.'price_eur'] ?? null);
+            $out[$prefix.'price_per_gram_cents'] = $unit ? null : $rate;
+            $out[$prefix.'price_per_unit_cents'] = $unit ? $rate : null;
+            $out[$prefix.'price_per_eighth_cents'] = $unit ? null : TypedNumber::cents($data[$prefix.'eighth_eur'] ?? null);
+        }
+
+        return $out;
+    }
+
+    /**
+     * Prompt 382 — once the strain and ONE location are chosen, start the prices from the previous batch of that strain there
+     * (all three lists), and note which batch they came from. Editable before saving; nothing to copy leaves the fields alone.
+     */
+    private static function copyPreviousPrices(Get $get, Set $set): void
+    {
+        $chosen = AllOption::chosen($get('location_id'));
+        $previous = filled($get('genetic_id')) && count($chosen) === 1 ? Batch::previousPriced((string) $get('genetic_id'), (string) $chosen[0]) : null;
+        if ($previous === null) {
+            $set('prices_copied_from', null);
+
+            return;
+        }
+        $euros = fn (?int $cents): ?string => $cents === null ? null : NumberFormat::decimal($cents / 100, 2);
+        $prices = $previous->storedPrices();
+        $unit = $previous->isUnitType();
+        $set('sale_price_eur', $euros($unit ? $prices['price_per_unit_cents'] : $prices['price_per_gram_cents']));
+        $set('price_per_eighth_eur', $euros($prices['price_per_eighth_cents']));
+        foreach (['local', 'staff'] as $list) {
+            $set($list.'_price_eur', $euros($unit ? $prices[$list.'_price_per_unit_cents'] : $prices[$list.'_price_per_gram_cents']));
+            $set($list.'_eighth_eur', $euros($prices[$list.'_price_per_eighth_cents']));
+        }
+        $set('prices_copied_from', (string) ($previous->lote_seq ?? $previous->batch_no));
     }
 
     /** Is the currently-selected genetic dispensed by unit (preroll/edible)? */

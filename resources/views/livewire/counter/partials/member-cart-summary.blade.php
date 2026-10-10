@@ -28,7 +28,13 @@
             @endif
 
             <div class="min-w-0 flex-1">
-                <h2 class="truncate text-sm font-bold leading-tight">{{ $member->fullName() }}</h2>
+                <h2 class="flex min-w-0 items-center gap-1.5 text-sm font-bold leading-tight">
+                    <span class="truncate">{{ $member->fullName() }}</span>
+                    {{-- Prompt 382 — the member pays this price list (their tier's); Estándar is the default and says nothing. --}}
+                    @if (($memberPriceList ?? null) !== null && $memberPriceList !== \App\Enums\PriceList::STANDARD)
+                        <span data-member-price-list="{{ $memberPriceList->value }}" class="shrink-0 rounded-full border border-brand/30 bg-brand-tint px-1.5 py-0.5 text-[11px] font-semibold text-brand dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200">{{ $memberPriceList->label() }}</span>
+                    @endif
+                </h2>
                 <p class="mt-0.5 truncate text-xs text-ink-muted dark:text-slate-400">
                     {{ $member->member_no }}
                     @include('livewire.counter.partials.member-status-badge', ['status' => $member->status])

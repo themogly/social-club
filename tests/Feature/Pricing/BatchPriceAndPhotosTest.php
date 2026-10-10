@@ -205,14 +205,14 @@ class BatchPriceAndPhotosTest extends TestCase
         $this->assertNull($orphan->fresh()->price_per_gram_cents, 'a price was guessed');
     }
 
-    // --- Decision 1a: the tier is a % discount -----------------------------------------------------------------------
+    // --- Decision 1a, retired by prompt 382: the tier's price list replaced its % -------------------------------------
 
-    public function test_a_tier_is_a_percentage_discount_on_any_batch(): void
+    public function test_a_tiers_old_percentage_no_longer_applies_to_a_batch_price(): void
     {
-        $this->tier->forceFill(['discount_bp' => 1000])->save(); // 10 %
+        $this->tier->forceFill(['discount_bp' => 1000])->save(); // 10 %, kept in the column for history
         $this->batch(1000, 5000, '2026-01-01');
 
-        $this->assertSame(900, $this->commit(100)->getRawOriginal('total_cents'));
+        $this->assertSame(1000, $this->commit(100)->getRawOriginal('total_cents'));
     }
 
     // --- Photos: batch → strain → placeholder -------------------------------------------------------------------------

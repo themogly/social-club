@@ -22255,3 +22255,97 @@ switch per box down the right edge, and nothing said what off meant.
   - the amount is a setting;
   - the text gives the amount and never the person.
   375's and 377's per-person tests now use the amount.
+
+## Prompt 382 — three prices on every batch (Estándar / Local / Personal), set by the member's tier
+
+- **Arron:** *"input for staff price, local and tourist price rather than setting a % cos it's not correct for
+  everything."* **Ben:** a local and a staff price per batch, per gram and per 3.5 g, attached to a tier; three constants;
+  blank = 20 % off for now.
+- **Three price lists, not three tiers.** `App\Enums\PriceList` (`STANDARD` *Estándar*, `LOCAL` *Local*, `STAFF`
+  *Personal*) is fixed: it can't be renamed, deleted or added to. Each tier picks one (`membership_tiers.price_list`,
+  default `STANDARD`; *Precios* buttons on the *Tarifas* form). The lists are not the tiers themselves because tiers
+  already carry fees, periods and limits that differ (a *Terapéutico* tier pays a lower fee at standard prices). A club
+  may have many tiers but only ever three price lists.
+- **Columns:** six nullable `batches.{local,staff}_price_per_{gram,eighth,unit}_cents` beside 278's standard ones, and
+  `dispensation_lines.list_rate_cents`, the list's own rate a line was charged at, frozen with the row so the receipt
+  always reads *«9.00 €/g · Local»*. `TransferBatch` and a split intake copy all nine prices.
+- **One resolver:** `Batch::priceFor(PriceList, 'gram'|'eighth'|'unit')` returns `{cents, set}`. A blank Local/Personal
+  price is the standard less the list's default %, with `round_half_up`, to the cent. With no standard 3.5 g price there
+  is no 3.5 g price on that list either. `ResolvePrice`, *Precios de la sede*, the *Precio* action, the intake form and
+  `BelowCost` all read it.
+- **The default %:** `price_list_default_discount_pct_local` / `_staff`, org-wide, default 20, owner-only (*Ajustes →
+  Descuentos y ajustes*, held server-side like 350's rounding).
+- **Lower price wins, never stacked.** `ResolvePrice::forBatch()` reads the member's list (their active membership's
+  tier at this sede; no member or no tier → Estándar). The member pays the lower of their list price and the standard
+  less their best other discount (therapeutic, concession, custom). A tie goes to the list. This keeps 278's "best single
+  price wins". A batch with no price of its own still falls back to the sede's old `genetic_prices` row (278), which
+  has no lists: that path is unchanged and charges the standard (with discounts) until the batch is priced.
+- **How the line records it,** so the reports keep working unchanged: `PriceResult` carries the list price beside the
+  standard rate.
+  - `price_per_gram_cents` stays the standard rate;
+  - `discount_cents` = standard − charged;
+  - `discount_kind` = `LOCAL` / `STAFF` when the list won;
+  - `pricing_note` names the list.
+  So *Pérdidas → Descuentos del personal (aparte)* shows staff prices. The 3.5 g break, half-gram rounding (355),
+  whole-euro rounding (350) and the price adjustment (356) work on the list price exactly as on the standard one.
+- **381's per-person alert does not count list prices.** The prompt says it should, but Ben's 381 direction is that the
+  alert counts only discounts a person *chose* (adjustments down, waived fees). A list price is automatic, like a member
+  discount, so it stays out. Pinned in `PriceListsTest`.
+- **The tier's `discount_bp` is retired from batch pricing.** The list replaces it. The field is gone from the *Tarifas*
+  form; the column stays so history reads. The migration logs tiers that had one, and *Salud del sistema* lists them.
+  278's `test_a_tier_is_a_percentage_discount_on_any_batch` became the test that it no longer applies.
+- **Existing STAFF / LOCAL % discounts are kept** as one more candidate under lower-price-wins, so nobody's price jumps
+  on deploy.
+  - The migration logs how many members have them. *Salud del sistema* lists them (*«N socios tienen un descuento de
+    personal asignado: ponlos en una tarifa con precios «Personal».»*), each linked to the member.
+  - The member page says *«Ya cubierto por su tarifa»* beside such a discount when their tier's list default is at least
+    as good (`Member::listCovers()`; explicit list prices vary per batch, so the default % is the figure the two share).
+  - New STAFF/LOCAL discounts can't be created (`DiscountKind::isRetired()`/`formOptions()`). An existing one stays
+    editable. The demo seed's staff discount is left as legacy data, which is exactly what *Salud del sistema* is for.
+- **Permission and place:** the prompt names `batches.price`, but the existing price permission is `prices.manage`.
+  Managers hold it at their sedes, the owner everywhere, staff never. The screen uses it rather than declaring a
+  duplicate. Because the counter also checks `prices.manage` (356's change-the-batch-price link), the page pairs it
+  with *Lotes*' own `stock.manage`, so a counter permission never opens a panel page by itself (309's guard). There is no *Existencias* group in the panel, so the page is *Dispensario → Precios*, after *Lotes*
+  (slug `precios`).
+- ***Precios de la sede*** (`App\Filament\Pages\PreciosSede`, rows from `App\ViewModels\SedePriceSheet`, saved by
+  `App\Actions\Pricing\SaveSedePrices`):
+  - one row per open batch with stock (`Batch::movable`) at the chosen sede;
+  - a table from 1280 px; cards below that (two columns on a tablet), because nine price columns would scroll;
+  - grey defaults are written compactly (*«8.80 · −20%»*) so they fit a cell at 1280;
+  - quick fills (`Local/Personal = Estándar −__ %`, copy from another sede's *current* batch via `displayBatch`, clear)
+    only fill the cells;
+  - *Guardar todo* writes changed batches only, in one transaction, through the one price writer
+    (`SetBatchPrice::prices()`), each with a `batch.prices_updated` audit row holding only the changed columns before
+    and after. The single-batch *Precio* keeps its 278 action name `batch.price.updated`, so history reads on.
+  - A standard price can't be emptied; a bad number is refused per cell; below cost warns and never blocks.
+- **Below cost** now checks every list at what it would charge, defaults included. A batch whose margin is under 20 % so
+  warns on *Precio* until its Local/Personal prices are set at or above cost. That is true, so 295's
+  at-cost test now sets them.
+- **The counter** shows the list rate and name on the basket line (*«2.00 g × 9.00 €/g · Local»*, in place of the
+  standard less a discount), on the catalogue card, on the chosen strain's header and on a split note. The member chip
+  shows *Local* / *Personal*. The calculator's euros back-solve at the list rate, so *«20 € de»* gives a Local member 20
+  € of grams. That last change applies to lists only; the older discount path is unchanged.
+- **New batch:** once the strain and ONE location are chosen, the intake form starts with the previous batch's nine
+  prices there (`Batch::previousPriced()`, the latest priced batch) and says *«Precios copiados del lote anterior
+  (#n)»*. The prices stay editable.
+- **Tests:**
+  - `PriceListsTest` (8): lists, default %, no stacking, line records + *Pérdidas* + alert, units, inheritance, existing
+    %, the 3.5 g break with both roundings;
+  - `SedePricesScreenTest` (9): save/audit, refusals, defaults + amber, the quick fills, rows, manager scope and staff
+    refused;
+  - `PriceListsUiTest` (9): *Tarifas*, owner-only %, discounts, member page, *Salud*, intake prefill, *Precio*, links,
+    counter + receipt.
+  All 26 also pass on MySQL (`phpunit.mysql.xml`, file-scoped). There's no SQL arithmetic on the new columns (370).
+- **Craft pass (/laravel-craft):**
+  - Typed euros → cents is one rule, `TypedNumber::cents()`, beside `canonical()`. It replaced three near-copies (the
+    intake form, *Precio*, `WarnsBelowCost`), so Actions and view models never import a Filament field.
+  - The price writer audits from Eloquent's `getChanges()`, and an unchanged submit writes and audits nothing. Before,
+    re-saving the same price added a row.
+  - *Precio*'s below-cost check runs `BelowCost::forBatchLists()` on an unsaved `replicateQuietly()` copy, not a second
+    copy of the default arithmetic.
+  - The screen's filters and quick fills live on `SedePriceSheet`, and the component only calls them. `Batch::lessPercent()`
+    is the one "less a %" rule (a list's default and a quick fill).
+  - The migration spells out its six columns (a loop hid them from Larastan's model properties).
+- **Ops (Ben), after deploy:** `php artisan migrate --force`; in *Tarifas* set each tier's *Precios* (create a Local or
+  Personal tier first if needed); move staff and locals onto those tiers (*Salud del sistema* lists who still has a %);
+  open *Dispensario → Precios* for each sede, fill Local/Personal where 20 % off isn't right, and save.

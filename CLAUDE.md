@@ -166,7 +166,8 @@ glossary in `DECISIONS.md`; never let "translate" slip into commercial framing (
   `app/Actions/Dispensing/CommitDispensation.php`.
 - Pricing: **one resolver** `app/Actions/Pricing/ResolvePrice.php` (tier price → best single discount →
   per-member custom; no stacking by default) returning `app/Support/PriceResult.php`; POS/PWA/reports/
-  receipts all call it, and it is frozen into the dispensation line snapshot at commit.
+  receipts all call it, and it is frozen into the dispensation line snapshot at commit. Prompt 382: the member's tier
+  price list (`App\Enums\PriceList`, `Batch::priceFor()`) competes as the lower price, never stacked.
 - Livewire counter component (tablet-first, own auth route + `layouts/counter`, gated in `mount()`,
   all figures queried live): `app/Livewire/Counter/CheckInScreen.php` (door),
   `app/Livewire/Counter/TillSession.php` (till open + cash movements + BLIND close), and

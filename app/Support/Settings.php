@@ -51,6 +51,9 @@ class Settings
         // The per-person signal (375; Ben after 377: "just if they've been using a lot of discount"): a person who gave more
         // than this in discounts they chose (adjustments down, waived fees) over 7 days is flagged — never a share of sales.
         'losses_person_discount_alert_cents' => 5000,
+        // Prompt 382 — a blank Local / Personal batch price is the standard one less this % (Ben: "defaults to 20 percent").
+        'price_list_default_discount_pct_local' => 20,
+        'price_list_default_discount_pct_staff' => 20,
         'stock_ceiling_days' => 5,
         // Prompt 326 — what one edible counts as: its THC mg ÷ this. 150 ≈ flower at 15 % THC. OVERNIGHT-DEFAULT — CONFIRM
         // WITH THE GESTOR: how edibles count against a gram limit is a policy and legal question.

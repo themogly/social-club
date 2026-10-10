@@ -1803,6 +1803,8 @@ class DispensaryPos extends Component
             'owesHereCents' => max(0, -$walletCents),
             'tab' => $member !== null && $location !== null ? $this->tabState($member, $location, $total + $barTotal) : null,
             'photoUrl' => $member !== null ? $this->photoUrl($member) : null,
+            // Prompt 382 — the member's price list beside their name (Estándar shows nothing).
+            'memberPriceList' => $member !== null && $location !== null ? (new ResolvePrice)->priceListFor($member, $location) : null,
             'activeEntryGramsCg' => $this->activeEntryGramsCg(),
             'basketLines' => $basketLines,
             'basketTotalCents' => $total,
@@ -1819,7 +1821,8 @@ class DispensaryPos extends Component
             'activeGenetic' => $activeGeneticModel,
             'weightPresets' => $this->weightPresets($activeGeneticModel, $location, $member, $limits),
             'activeGeneticBatches' => $this->activeGeneticBatches($location),
-            'activeGeneticPriceCents' => $this->activeGeneticRateCents($location, $member),
+            'activeGeneticPriceCents' => ($activePrice = $this->activeGeneticPrice($location, $member))?->shownRateCents(),
+            'activeGeneticListLabel' => $activePrice?->list['label'] ?? null, // prompt 382 — «9.00 €/g · Local»
             'calculatorEnabled' => $this->calculatorEnabled(), // prompt 292
             'openTill' => $openTill,
             'requireSignature' => $this->signatureRequired(),
@@ -2074,7 +2077,7 @@ class DispensaryPos extends Component
         }
 
         try {
-            $rateCents = (new ResolvePrice)->forGenetic($genetic, $location, $this->resolveMember())->ratePerGramCents;
+            $rateCents = (new ResolvePrice)->forGenetic($genetic, $location, $this->resolveMember())->shownRateCents(); // 382: the list rate
         } catch (RuntimeException) {
             return null;
         }
@@ -2250,6 +2253,7 @@ class DispensaryPos extends Component
                 'total_cents' => $priced['total_cents'],
                 'label' => $priced['label'],
                 'discount_kind' => $priced['discount_kind'], // prompt 350 — the rounding scope reads it
+                'list' => $priced['list'], // prompt 382 — {rate_cents, label} when the member's price list was charged
                 'eighth_applied' => false,
                 // "parte a 8,00 €/g, parte a 10,00 €/g" — said BEFORE commit, not after (278).
                 'split_note' => $priced['mixed'] ? $this->splitNote($priced['parts'], $units !== null) : null,
@@ -2270,13 +2274,13 @@ class DispensaryPos extends Component
         return $rows;
     }
 
-    /** @param  list<array{batch: Batch, qty: int, rate_cents: int, total_cents: int, discount_cents: int}>  $parts */
+    /** @param  list<array{batch: Batch, qty: int, rate_cents: int, total_cents: int, discount_cents: int, list_rate_cents?: ?int}>  $parts */
     private function splitNote(array $parts, bool $perUnit): string
     {
         $unit = $perUnit ? __('/ud') : __('/g');
 
         return __('Parte a :rates', ['rates' => implode(', ', array_map(
-            fn (array $part): string => Money::fromCents($part['rate_cents'])->formatted().$unit,
+            fn (array $part): string => Money::fromCents($part['list_rate_cents'] ?? $part['rate_cents'])->formatted().$unit, // 382: the list's rate
             $parts,
         ))]);
     }
@@ -2495,7 +2499,7 @@ class DispensaryPos extends Component
                 'cultivation' => $genetic->cultivation_type?->label(),
                 'category_id' => $genetic->category_id,
                 'category_name' => $genetic->category?->name,
-                'rate_cents' => $price->ratePerGramCents,
+                'rate_cents' => $price->shownRateCents(), // prompt 382 — the member's list rate, labelled
                 'price_label' => $price->label(),
                 'remaining_cg' => $remainingCg,
                 'remaining_units' => $remainingUnits,
@@ -2643,22 +2647,18 @@ class DispensaryPos extends Component
             ->get();
     }
 
-    private function activeGeneticRateCents(?Location $location, ?Member $member): ?int
+    /** The price of the strain being weighed, for its header (with the member's list, prompt 382); null when it has none. */
+    private function activeGeneticPrice(?Location $location, ?Member $member): ?PriceResult
     {
-        if ($this->activeGeneticId === null || $location === null) {
-            return null;
-        }
-
-        $genetic = Genetic::query()->find($this->activeGeneticId);
-
+        $genetic = $this->activeGeneticId !== null && $location !== null ? Genetic::query()->find($this->activeGeneticId) : null;
         if ($genetic === null) {
             return null;
         }
 
         try {
-            return (new ResolvePrice)->forGenetic($genetic, $location, $member)->ratePerGramCents;
+            return (new ResolvePrice)->forGenetic($genetic, $location, $member);
         } catch (RuntimeException) {
-            return null;
+            return null; // no price: the header shows none, and the basket refuses the line
         }
     }
 

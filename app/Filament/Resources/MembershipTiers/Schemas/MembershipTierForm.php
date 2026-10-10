@@ -3,12 +3,14 @@
 namespace App\Filament\Resources\MembershipTiers\Schemas;
 
 use App\Enums\MembershipPeriod;
+use App\Enums\PriceList;
 use App\Filament\Forms\DecimalInput;
 use App\Support\Settings;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
+use Filament\Forms\Components\ToggleButtons;
 use Filament\Schemas\Schema;
 
 class MembershipTierForm
@@ -57,14 +59,16 @@ class MembershipTierForm
                     ->minValue(0)
                     ->step(0.01),
 
-                // Prompt 278 (owner decision 1a) — prices live on the batch, so a tier's price is a % DISCOUNT on any
-                // batch. It competes with the member's other discounts; the best single one applies.
-                DecimalInput::make('discount_pct')
-                    ->label(__('Descuento de la tarifa (%)'))
-                    ->helperText(__('Opcional. Se descuenta del precio de cualquier lote a los socios de esta tarifa; si tienen otro descuento, se aplica el mejor.'))
-                    ->numeric()
-                    ->minValue(0)
-                    ->maxValue(100),
+                // Prompt 382 — the tier picks one of the three fixed price lists; every batch carries a price for each. This replaces
+                // 278's tier % (`discount_bp`, kept in the column for history, no longer applied).
+                ToggleButtons::make('price_list')
+                    ->label(__('Precios'))
+                    ->helperText(__('Qué precios de cada lote pagan los socios de esta tarifa. Si un lote no tiene precio Local o Personal, se usa el Estándar menos el descuento por defecto.'))
+                    ->options(collect(PriceList::cases())->mapWithKeys(fn (PriceList $list): array => [$list->value => $list->label()])->all())
+                    ->default(PriceList::STANDARD->value)
+                    ->inline()
+                    ->required()
+                    ->extraAttributes(['data-tier-price-list' => true]),
 
                 Textarea::make('benefits')
                     ->label(__('Ventajas'))

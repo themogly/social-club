@@ -2,11 +2,13 @@
 
 namespace App\ViewModels;
 
+use App\Enums\DiscountKind;
 use App\Enums\ProductType;
 use App\Models\AuditLog;
 use App\Models\Genetic;
 use App\Models\HeartbeatLog;
 use App\Models\Member;
+use App\Models\MembershipTier;
 use App\Models\Organisation;
 use App\Models\User;
 use App\Support\Email;
@@ -330,6 +332,28 @@ class SystemHealth
         return Genetic::query()->where('product_type', ProductType::EDIBLE->value)
             ->where(fn ($q) => $q->whereNull('thc_mg_per_unit')->orWhere('thc_mg_per_unit', '<=', 0))
             ->orderBy('name')->pluck('name')->map(fn (mixed $name): string => (string) $name)->values()->all();
+    }
+
+    /**
+     * Prompt 382 — what is left to move onto the price lists: members still given a STAFF or LOCAL % discount (they keep
+     * working, the lower price wins, but the list replaces them), and tiers that carried a % that no longer applies.
+     *
+     * @return array{STAFF: list<array{id: string, name: string}>, LOCAL: list<array{id: string, name: string}>, tiers: list<string>}
+     */
+    public function priceListMoves(): array
+    {
+        $members = fn (DiscountKind $kind): array => Member::query()
+            ->whereHas('memberDiscounts', fn ($q) => $q->where(fn ($q) => $q->whereNull('expires_at')->orWhere('expires_at', '>', now()))
+                ->whereHas('discount', fn ($q) => $q->where('kind', $kind->value)))
+            ->orderBy('first_name')->orderBy('last_name')->get(['id', 'first_name', 'last_name', 'member_no'])
+            ->map(fn (Member $member): array => ['id' => (string) $member->id, 'name' => $member->avaladorLabel()])->values()->all();
+
+        return [
+            DiscountKind::STAFF->value => $members(DiscountKind::STAFF),
+            DiscountKind::LOCAL->value => $members(DiscountKind::LOCAL),
+            'tiers' => MembershipTier::query()->where('discount_bp', '>', 0)->orderBy('name')->pluck('name')
+                ->map(fn (mixed $name): string => (string) $name)->values()->all(),
+        ];
     }
 
     /**

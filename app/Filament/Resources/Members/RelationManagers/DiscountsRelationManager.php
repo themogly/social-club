@@ -69,7 +69,10 @@ class DiscountsRelationManager extends RelationManager
                     ->label(__('Descuento'))
                     ->state(fn (MemberDiscount $record): string => $record->discount_id !== null
                         ? (string) $record->discount?->name
-                        : __('Personalizado')),
+                        : __('Personalizado'))
+                    // Prompt 382 — a staff/local % the member's tier price list already gives (or betters): redundant, still working.
+                    ->description(fn (MemberDiscount $record): ?string => $record->discount !== null && $this->getOwnerRecord() instanceof Member
+                        && $this->getOwnerRecord()->listCovers($record->discount) ? __('Ya cubierto por su tarifa') : null),
                 TextColumn::make('value')
                     ->label(__('Valor'))
                     ->state(fn (MemberDiscount $record): string => $this->formatValue($record)),

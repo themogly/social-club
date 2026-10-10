@@ -81,6 +81,7 @@ class SystemHealth extends Page
             'launch' => $health->launch(),
             'ediblesWithoutThc' => $health->ediblesWithoutThc(), // prompt 326
             'stagingLeaks' => $health->stagingLeaks(), // prompt 327
+            'priceListMoves' => $health->priceListMoves(), // prompt 382
             'mailer' => $health->mailer(),
             'documentsDisk' => $health->documentsDisk(),
             'auditRetentionDays' => $health->auditRetentionDays(),

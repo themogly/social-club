@@ -23,8 +23,7 @@ class CreateMembershipTier extends CreateRecord
         $data['default_fee_cents'] = (int) round_half_up(((float) ($data['default_fee_eur'] ?? 0)) * 100);
         $data['daily_limit_cg'] = filled($data['daily_limit_g'] ?? null) ? (int) round_half_up(((float) $data['daily_limit_g']) * 100) : null;
         $data['monthly_limit_cg'] = filled($data['monthly_limit_g'] ?? null) ? (int) round_half_up(((float) $data['monthly_limit_g']) * 100) : null;
-        $data['discount_bp'] = (int) round_half_up(((float) ($data['discount_pct'] ?? 0)) * 100);
-        unset($data['default_fee_eur'], $data['daily_limit_g'], $data['monthly_limit_g'], $data['discount_pct']);
+        unset($data['default_fee_eur'], $data['daily_limit_g'], $data['monthly_limit_g']);
 
         return $data;
     }

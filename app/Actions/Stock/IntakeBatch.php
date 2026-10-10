@@ -31,7 +31,7 @@ use Illuminate\Support\Str;
  * as an INTAKE movement (opening balances always enter through the ledger). Exactly one
  * of the cg / units column pairs is populated — the other is set null explicitly.
  *
- * @phpstan-type IntakeData array{grams?: int|float|string, reserve_grams?: int|float|string, units?: int|string, batch_no?: ?string, label?: ?string, cost_per_gram_cents?: int, price_per_gram_cents?: ?int, price_per_unit_cents?: ?int, price_per_eighth_cents?: ?int, images?: list<string>, acquired_or_harvested_on?: mixed, expires_on?: mixed, lab_report_path?: ?string, notes?: ?string, operator_id?: ?string, override?: bool, override_by?: ?User, override_reason?: ?string}
+ * @phpstan-type IntakeData array{grams?: int|float|string, reserve_grams?: int|float|string, units?: int|string, batch_no?: ?string, label?: ?string, cost_per_gram_cents?: int, price_per_gram_cents?: ?int, price_per_unit_cents?: ?int, price_per_eighth_cents?: ?int, local_price_per_gram_cents?: ?int, local_price_per_eighth_cents?: ?int, local_price_per_unit_cents?: ?int, staff_price_per_gram_cents?: ?int, staff_price_per_eighth_cents?: ?int, staff_price_per_unit_cents?: ?int, images?: list<string>, acquired_or_harvested_on?: mixed, expires_on?: mixed, lab_report_path?: ?string, notes?: ?string, operator_id?: ?string, override?: bool, override_by?: ?User, override_reason?: ?string}
  */
 class IntakeBatch
 {
@@ -113,6 +113,13 @@ class IntakeBatch
                 'price_per_gram_cents' => $isUnit ? null : ($data['price_per_gram_cents'] ?? null),
                 'price_per_unit_cents' => $isUnit ? ($data['price_per_unit_cents'] ?? null) : null,
                 'price_per_eighth_cents' => $isUnit ? null : ($data['price_per_eighth_cents'] ?? null),
+                // Prompt 382 — the Local / Personal lists (blank = the standard less the list's default %).
+                'local_price_per_gram_cents' => $isUnit ? null : ($data['local_price_per_gram_cents'] ?? null),
+                'local_price_per_eighth_cents' => $isUnit ? null : ($data['local_price_per_eighth_cents'] ?? null),
+                'local_price_per_unit_cents' => $isUnit ? ($data['local_price_per_unit_cents'] ?? null) : null,
+                'staff_price_per_gram_cents' => $isUnit ? null : ($data['staff_price_per_gram_cents'] ?? null),
+                'staff_price_per_eighth_cents' => $isUnit ? null : ($data['staff_price_per_eighth_cents'] ?? null),
+                'staff_price_per_unit_cents' => $isUnit ? ($data['staff_price_per_unit_cents'] ?? null) : null,
                 'images' => $data['images'] ?? null,
                 'lab_report_path' => $data['lab_report_path'] ?? null,
                 'notes' => $data['notes'] ?? null,
@@ -187,7 +194,7 @@ class IntakeBatch
         return DB::transaction(function () use ($genetic, $lote, $parts, $data, $ceilingOverride): Collection {
             $identity = $lote->only([
                 'batch_no', 'lote_seq', 'label', 'acquired_or_harvested_on', 'expires_on', 'cost_per_gram_cents',
-                'price_per_gram_cents', 'price_per_unit_cents', 'price_per_eighth_cents', 'images', 'lab_report_path', 'notes',
+                ...Batch::PRICE_COLUMNS, 'images', 'lab_report_path', 'notes',
             ]);
             $reason = trim((string) ($data['reason'] ?? '')) ?: __('Recuento inicial');
             $batches = collect($parts)->map(fn (array $part): Batch => $this->createPart($genetic, $part, $identity, $reason, $data['operator_id'] ?? null));

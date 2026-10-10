@@ -106,7 +106,7 @@ class DiscountFormTest extends TestCase
     public function test_a_discount_cannot_be_created_with_an_empty_percentage(): void
     {
         Livewire::test(CreateDiscount::class)
-            ->fillForm(['name' => 'Prueba', 'kind' => DiscountKind::LOCAL->value, 'value_pct' => null])
+            ->fillForm(['name' => 'Prueba', 'kind' => DiscountKind::THERAPEUTIC->value, 'value_pct' => null])
             ->call('create')
             ->assertHasFormErrors(['value_pct']);
 
@@ -116,7 +116,7 @@ class DiscountFormTest extends TestCase
     public function test_a_discount_cannot_be_created_worth_zero_percent(): void
     {
         Livewire::test(CreateDiscount::class)
-            ->fillForm(['name' => 'Prueba', 'kind' => DiscountKind::LOCAL->value, 'value_pct' => 0])
+            ->fillForm(['name' => 'Prueba', 'kind' => DiscountKind::THERAPEUTIC->value, 'value_pct' => 0])
             ->call('create')
             ->assertHasFormErrors(['value_pct']);
 
@@ -141,7 +141,7 @@ class DiscountFormTest extends TestCase
     {
         // Including by a crafted request: mode and applies_to are stamped, never read from the payload.
         Livewire::test(CreateDiscount::class)
-            ->fillForm(['name' => 'Intento', 'kind' => DiscountKind::LOCAL->value, 'value_pct' => 10])
+            ->fillForm(['name' => 'Intento', 'kind' => DiscountKind::THERAPEUTIC->value, 'value_pct' => 10])
             ->set('data.mode', DiscountMode::FIXED->value)
             ->set('data.value_eur', 3)
             ->set('data.applies_to', DiscountAppliesTo::ARTICLE->value)
@@ -316,7 +316,7 @@ class DiscountFormTest extends TestCase
     private function createDiscount(string $name, float $pct): void
     {
         Livewire::test(CreateDiscount::class)
-            ->fillForm(['name' => $name, 'kind' => DiscountKind::LOCAL->value, 'value_pct' => $pct])
+            ->fillForm(['name' => $name, 'kind' => DiscountKind::THERAPEUTIC->value, 'value_pct' => $pct])
             ->call('create')
             ->assertHasNoFormErrors();
     }

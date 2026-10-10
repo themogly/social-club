@@ -17,7 +17,7 @@ class DispensationLine extends Model
 
     protected $fillable = [
         'dispensation_id', 'genetic_id', 'batch_id', 'grams_cg', 'charged_cg', 'price_per_gram_cents',
-        'units_dispensed', 'price_per_unit_cents',
+        'units_dispensed', 'price_per_unit_cents', 'list_rate_cents',
         'discount_cents', 'discount_kind', 'line_total_cents', 'pricing_note', 'genetic_name_snapshot', 'batch_no_snapshot',
     ];
 
@@ -31,6 +31,7 @@ class DispensationLine extends Model
             'price_per_gram_cents' => 'integer',   // frozen rate (WEIGHT lines)
             'units_dispensed' => 'integer',        // UNIT lines
             'price_per_unit_cents' => 'integer',   // frozen rate (UNIT lines)
+            'list_rate_cents' => 'integer',        // prompt 382 — the price list's own rate charged (per g or per unit), else null
             'discount_cents' => MoneyCast::class,
             'line_total_cents' => MoneyCast::class,
         ];

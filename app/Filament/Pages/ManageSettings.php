@@ -80,6 +80,8 @@ class ManageSettings extends Page
         'staff_discount_id' => SettingType::STRING, // prompt 347 — '' = none
         'discount_rounding' => SettingType::STRING, // prompt 350 — owner only: nearest | down | none
         'discount_rounding_scope' => SettingType::STRING, // prompt 350 — owner only: local | any | all
+        'price_list_default_discount_pct_local' => SettingType::INT, // prompt 382 — owner only: a blank Local price = standard − this %
+        'price_list_default_discount_pct_staff' => SettingType::INT, // prompt 382 — owner only: a blank Personal price = standard − this %
         'guides_docs_enabled' => SettingType::BOOL, // prompt 353 — owner only: /docs, the guides on a staff phone by PIN
         'stock_count_show_expected' => SettingType::BOOL, // prompt 318 — Inventario
         'stock_count_tolerance_pct' => SettingType::INT,
@@ -227,6 +229,15 @@ class ManageSettings extends Page
                             ->options(['local' => __('Solo el descuento Local'), 'any' => __('Cualquier descuento'), 'all' => __('Todas las aportaciones')])
                             ->selectablePlaceholder(false)
                             ->disabled(fn (): bool => ! (Auth::user()?->hasRole(Role::OWNER->value) ?? false)),
+                        // Prompt 382 — a batch's blank Local / Personal price is its standard one less this %. Owner only.
+                        TextInput::make('price_list_default_discount_pct_local')->label(__('Precio Local por defecto: Estándar menos (%)'))
+                            ->integer()->minValue(0)->maxValue(100)->required()
+                            ->disabled(fn (): bool => ! (Auth::user()?->hasRole(Role::OWNER->value) ?? false))
+                            ->helperText(__('Para los lotes sin precio Local propio. Se cambia lote a lote en Dispensario → Precios.')),
+                        TextInput::make('price_list_default_discount_pct_staff')->label(__('Precio Personal por defecto: Estándar menos (%)'))
+                            ->integer()->minValue(0)->maxValue(100)->required()
+                            ->disabled(fn (): bool => ! (Auth::user()?->hasRole(Role::OWNER->value) ?? false))
+                            ->helperText(__('Para los lotes sin precio Personal propio.')),
                         // Prompt 347 — applied by itself to any member linked to an active staff account (Personal → Ficha de
                         // socio), exactly like an assigned discount. None = nothing changes.
                         Select::make('staff_discount_id')->label(__('Descuento del personal'))
@@ -460,7 +471,8 @@ class ManageSettings extends Page
         // Prompt 326 — only the owner changes the edible equivalence (the field is disabled for anyone else; this holds
         // the line against a crafted payload too).
         if (! (Auth::user()?->hasRole(Role::OWNER->value) ?? false)) {
-            unset($state['edible_thc_mg_per_gram'], $state['discount_rounding'], $state['discount_rounding_scope'], $state['guides_docs_enabled']); // 350, 353 too
+            unset($state['edible_thc_mg_per_gram'], $state['discount_rounding'], $state['discount_rounding_scope'], $state['guides_docs_enabled'], // 350, 353 too
+                $state['price_list_default_discount_pct_local'], $state['price_list_default_discount_pct_staff']); // and 382's default %
         }
 
         foreach (self::SCALARS as $key => $type) {

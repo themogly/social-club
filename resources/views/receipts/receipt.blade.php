@@ -130,10 +130,11 @@
                             @endif
                         </td>
                         <td class="num">
+                            {{-- Prompt 382 — on a price list, its own rate (the name is in the note: «· Local»). --}}
                             @if ($isUnit)
-                                {{ Money::fromCents((int) $first->price_per_unit_cents)->formatted() }}/{{ __('ud') }}
+                                {{ Money::fromCents((int) ($first->list_rate_cents ?? $first->price_per_unit_cents))->formatted() }}/{{ __('ud') }}
                             @else
-                                {{ Money::fromCents((int) $first->price_per_gram_cents)->formatted() }}/g
+                                {{ Money::fromCents((int) ($first->list_rate_cents ?? $first->price_per_gram_cents))->formatted() }}/g
                             @endif
                         </td>
                         <td class="num">{{ Money::fromCents($lineTotalCents)->formatted() }}</td>

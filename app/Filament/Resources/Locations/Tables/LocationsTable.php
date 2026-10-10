@@ -3,7 +3,7 @@
 namespace App\Filament\Resources\Locations\Tables;
 
 use App\Enums\LocationKind;
-use App\Filament\Resources\Batches\BatchResource;
+use App\Filament\Pages\PreciosSede;
 use App\Models\Location;
 use Filament\Actions\ActionGroup;
 use Filament\Actions\BulkActionGroup;
@@ -94,19 +94,19 @@ class LocationsTable
         $names = array_column($c['missing'], 'name');
         $list = implode(', ', array_slice($names, 0, 5)).(count($names) > 5 ? ' '.__('y :count más', ['count' => count($names) - 5]) : '');
 
-        return __('Sin precio: :names. Ponlo en el lote (Lotes → Precio) o como precio de respaldo de la sede.', ['names' => $list]);
+        return __('Sin precio: :names. Pulsa para ponerlo en Precios de la sede.', ['names' => $list]);
     }
 
-    /** The batches to price: this sede's, filtered to the strains the counter cannot price. */
+    /**
+     * The badge opens *Precios de la sede* for this sede (prompt 382) — filtered to the batches with no price when some strain
+     * cannot be priced. Only for someone who may change prices; a store has no badge.
+     */
     private static function pricesUrl(Location $record): ?string
     {
-        if ($record->isStore() || $record->priceCoverage()['missing'] === []) {
+        if ($record->isStore() || $record->priceCoverage()['in_stock'] === 0 || ! PreciosSede::canAccess()) {
             return null;
         }
 
-        return BatchResource::getUrl('index', ['filters' => [
-            'location_id' => ['value' => $record->id],
-            'genetic_id' => ['values' => array_column($record->priceCoverage()['missing'], 'genetic_id')],
-        ]]);
+        return PreciosSede::getUrl(array_filter(['sede' => $record->id, 'sin_precio' => $record->priceCoverage()['missing'] !== [] ? 1 : null]));
     }
 }

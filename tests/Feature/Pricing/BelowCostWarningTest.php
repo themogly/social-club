@@ -171,7 +171,8 @@ class BelowCostWarningTest extends TestCase
         $batch = (new IntakeBatch)->handle($genetic, $this->sede, ['grams' => '100', 'cost_per_gram_cents' => 950, 'price_per_gram_cents' => 1200]);
 
         Livewire::test(ListBatches::class)
-            ->callTableAction('price', $batch, ['rate_eur' => '9.50'])
+            // Prompt 382 — the Local / Personal prices too: blank, they would be 9.50 − 20 % = 7.60, below the cost (and it asks).
+            ->callTableAction('price', $batch, ['rate_eur' => '9.50', 'local_price_eur' => '9.50', 'staff_price_eur' => '10.00'])
             ->assertActionNotMounted('belowCost');
 
         $this->assertSame(950, $batch->fresh()->price_per_gram_cents);

@@ -1,9 +1,9 @@
 ---
 title: Manager guide
-summary: Strains, batches, moving stock, bar products, settings, and the daily and weekly routine.
+summary: Strains, batches, prices by tier, moving stock, bar products, settings, and the daily and weekly routine.
 audience: managers
 order: 4
-updated: 2026-10-09
+updated: 2026-10-10
 ---
 
 > This guide is for owners and managers. Staff work at the counter; stock, prices, products and checks happen in **Administration**. Everything you change there is recorded in the audit log with your name.
@@ -78,7 +78,7 @@ A batch is a delivery or harvest of one strain: how much arrived, where it is, w
 3. **Product type**, then **Genetic** (the strain). The strain list only shows strains of that type.
 4. **Name** (optional, for example *"October harvest"*) and **Own batch number** if the grower or supplier has one. Leave it empty and the system makes one.
 5. **Total quantity**, then the grams for each location. **Split equally** divides the total for you. For a single location, **Of which in reserve (sealed)** records how much of it arrives in sealed top-up bags: 500 g with 450 g sealed puts 50 g in the jar and 450 g in the reserve. Staff tap **Top up** at the counter when they open a bag. The **Reserve** column on the Batches list shows the reserve, and each row's ⋮ has **Move to reserve** and **Top up from reserve**.
-6. **Cost per gram** (what the club paid), **Price per gram** (what members pay) and, optionally, the **Eighth price — 3.5 g**.
+6. **Cost per gram** (what the club paid), **Price per gram** (what members pay) and, optionally, the **Eighth price — 3.5 g**. Below them, the **Local** and **Staff** prices: leave them blank for the Standard less 20 %. A new batch of a strain the location already had starts with the previous batch's prices.
 7. Dates, laboratory report and photos if you have them. Then **Create**.
 
 ![Create Batch: 500 g of Amnesia Haze split between the store and Sede Centro, at €10/g with a €30 eighth.](img/manager-guide/c04.jpg)
@@ -131,7 +131,7 @@ Three different actions, depending on what really happened:
 
 ## 6. The batch page and its menu
 
-Open a batch from the list to see everything about it: location, strain, name, batch number, **Batch parts** (where the rest of this batch is), remaining stock and prices. The buttons along the top are the everyday actions; **Price** changes the price per gram and the eighth price from now on.
+Open a batch from the list to see everything about it: location, strain, name, batch number, **Batch parts** (where the rest of this batch is), remaining stock and prices. The buttons along the top are the everyday actions; **Price** changes the batch's Standard, Local and Staff prices from now on (section 7).
 
 ![A batch page: Assign to location, Price, Add stock at another location, Count, and More.](img/manager-guide/c06.jpg)
 
@@ -141,7 +141,7 @@ The **⋮** menu on each row of the Batches list has every action (tap the row i
 
 | Menu item | When you would use it |
 |---|---|
-| **Price** | Change what members pay for this batch from now on. |
+| **Price** | Change what members pay for this batch from now on: Standard, Local and Staff (section 7). |
 | **Transfer** · **Assign to location** | Move stock to another location, as in section 5. |
 | **Add stock at another location** · **Count** | As in section 5. |
 | **Edit** | Change the name, notes, dates, photos or lab report. |
@@ -153,7 +153,40 @@ The **⋮** menu on each row of the Batches list has every action (tap the row i
 
 *The row ⋮ menu on the Batches list.*
 
-## 7. Bar and shop products
+## 7. Prices by tier (*Precios por tarifa*)
+
+Every batch has **three prices**: **Standard** (what tourists and most members pay), **Local** and **Staff** (*Personal*), each per gram and per 3.5 g, or per unit for prerolls and edibles. Which one a member pays depends on their **tier**: in **Tiers**, each tier's **Prices** choice is *Standard*, *Local* or *Staff*. A club can have more tiers than that (a therapeutic tier with a lower fee, for example), but there are only ever these three price lists.
+
+![A tier's Prices choice: Standard, Local or Staff.](img/manager-guide/c29-tier-prices.jpg)
+
+*A tier's Prices choice: Standard, Local or Staff.*
+
+**A blank Local or Staff price is the Standard less 20 %** (the owner can change the percentage in **Settings → Discounts & adjustments**). So you only type a Local or Staff price where 20 % off is not right.
+
+**Pricing a whole club in one go:** **Dispensary → Prices** (*Precios de la sede*), or **Location prices** at the top of **Batches**, or the **Prices** badge on **Locations**. Choose the location; each open batch with stock is a row with its stock and cost per gram.
+
+- A blank Local or Staff cell shows its default in grey (*"8.80 · −20%"*). Type to replace it; clear it to go back to the default.
+- A price below the batch's cost turns the cell amber (*"Below cost (€4.83)"*). It is a warning: you can still save it.
+- **Only unpriced** and **Only below cost** narrow the list, and the search box finds a strain.
+- **Save all** saves every batch you changed, in one go, and says how many (*"12 batches updated"*). Each change is in the audit log with the old and new prices. The counter uses the new prices from the next basket.
+
+![Location prices: three lists per batch, grey defaults and an amber cell below cost.](img/manager-guide/c27-prices.jpg)
+
+*Location prices: three lists per batch, grey defaults and an amber cell below cost.*
+
+**Quick fill** fills the cells of the batches you ticked (or all of them) without saving: **Local = Standard −10 %** (type any percentage), **Staff = Standard −…%**, **Copy prices from another location** (for the same strain, the prices of the batch that location has now) and **Clear Local / Staff** (back to the defaults). Check the result, then **Save all**.
+
+![Quick fill: a percentage off the Standard, a copy from another club, or back to the defaults.](img/manager-guide/c28-prices-quick-fill.jpg)
+
+*Quick fill: a percentage off the Standard, a copy from another club, or back to the defaults.*
+
+**One batch:** the row's ⋮ → **Price** has the same fields. **A new batch** of a strain at a location starts with the previous batch's three lists there (*"Prices copied from the previous batch (#3)"*); change them before saving if needed.
+
+**At the counter** a Local or Staff member's name carries a **Local** or **Staff** badge, and their basket line shows the list's own rate (*"2.00 g × €9.00/g · Local"*), as does their receipt. A list price and a discount never add up: the member pays the lower of their list price and the Standard less their best other discount (therapeutic, for example). What the list saved them is still recorded, so **Reports → Losses** shows staff prices under *Staff discounts*.
+
+**Older staff and local discounts** (a % given to a member) keep working until you move those members onto a Local or Staff tier; new ones can no longer be created. **System health** lists the members who still have one, and the member's page says *"Already covered by their tier"* once their tier's list gives at least as much.
+
+## 8. Bar and shop products
 
 Drinks, snacks, papers, lighters and merchandise are **products**, sold by unit on the Bar screen.
 
@@ -181,7 +214,7 @@ Drinks, snacks, papers, lighters and merchandise are **products**, sold by unit 
 
 *Restock: type the units received.*
 
-## 8. Stock count
+## 9. Stock count
 
 A full count of everything at one location: every batch with stock and every product. Use it weekly or monthly, and whenever something feels wrong.
 
@@ -220,7 +253,7 @@ Before the reserve existed, each evening count took the sealed bags out of stock
 
 *Stock count: start a New stock count for a location.*
 
-## 9. Settings worth knowing
+## 10. Settings worth knowing
 
 **For each club**, in **Locations → [club]**:
 
@@ -248,7 +281,7 @@ Before the reserve existed, each evening count took the sealed bags out of stock
 
 **Emails that cannot be delivered:** an address with a space, an accent or no proper ending (*.com*, *.es*…) is refused when typed, and the system never tries to send to one already stored. *Members → Filters → Invalid email* lists them, and *System health → Alerts* shows how many there are. Fix the address on the member's record, then use **Resend card**. Members imported from a spreadsheet with a bad email are imported without it; the import lists them (*"row 14: email «…» is not valid, imported without an email"*).
 
-## 10. Your daily and weekly routine
+## 11. Your daily and weekly routine
 
 **Every day**
 
@@ -301,7 +334,7 @@ It also watches **each person's discounts**: anyone who gave more than €50 in 
 
 *Reports → Losses: the total lost against the previous week, a bar per day, and the sections.*
 
-## 11. Quick reference: Spanish screen words
+## 12. Quick reference: Spanish screen words
 
 | Spanish on screen | English |
 |---|---|

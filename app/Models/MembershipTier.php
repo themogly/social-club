@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Casts\MoneyCast;
 use App\Enums\MembershipPeriod;
+use App\Enums\PriceList;
 use App\Models\Concerns\BelongsToOrganisation;
 use Database\Factories\MembershipTierFactory;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
@@ -21,6 +22,7 @@ class MembershipTier extends Model
     protected $fillable = [
         'organisation_id', 'name', 'default_fee_cents', 'default_period',
         'daily_limit_cg', 'monthly_limit_cg', 'discount_bp', 'benefits', 'active',
+        'price_list', // prompt 382 — which of the batch's three price lists this tier pays
     ];
 
     protected function casts(): array
@@ -30,7 +32,10 @@ class MembershipTier extends Model
             'default_period' => MembershipPeriod::class,
             'daily_limit_cg' => 'integer',
             'monthly_limit_cg' => 'integer',
-            'discount_bp' => 'integer', // prompt 278 — the tier's price as a % discount on any batch (basis points)
+            // Prompt 278 — the tier's price as a % discount on any batch. Prompt 382: retired from batch pricing (the price list
+            // replaces it); kept so history reads.
+            'discount_bp' => 'integer',
+            'price_list' => PriceList::class,
             'active' => 'boolean',
         ];
     }

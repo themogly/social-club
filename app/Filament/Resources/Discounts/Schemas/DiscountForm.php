@@ -22,7 +22,9 @@ class DiscountForm
             TextInput::make('name')->label(__('Nombre'))->required()->maxLength(255),
 
             Select::make('kind')->label(__('Tipo'))
-                ->options(collect(DiscountKind::cases())->mapWithKeys(fn (DiscountKind $c) => [$c->value => $c->label()])->all())
+                // Prompt 382 — staff and local prices are price lists on the tier now; those two kinds are not offered on a new one.
+                ->options(fn (?Discount $record): array => DiscountKind::formOptions($record?->kind))
+                ->helperText(__('Para el personal y los locales, usa una tarifa con precios «Personal» o «Local».'))
                 ->required(),
 
             // PERCENTAGE ONLY (prompt 168). `mode` is no longer a question. It was one of the two

@@ -3,11 +3,14 @@
 namespace App\Models;
 
 use App\Casts\NormalisedEmail;
+use App\Enums\DiscountKind;
+use App\Enums\DiscountMode;
 use App\Enums\IdDocumentType;
 use App\Enums\MemberDocumentType;
 use App\Enums\MemberKind;
 use App\Enums\MembershipStatus;
 use App\Enums\MemberStatus;
+use App\Enums\PriceList;
 use App\Models\Concerns\BelongsToOrganisation;
 use App\Support\DocumentDrift;
 use App\Support\Email;
@@ -267,6 +270,28 @@ class Member extends Model implements Authenticatable, HasLocalePreference
     }
 
     /** Prompt 372 — can mail actually be sent to this member's stored address ({@see Email::isSendable()})? */
+    /**
+     * Prompt 382 — is this member's assigned % discount already covered by their tier's price list? A STAFF discount by the
+     * «Personal» list, a LOCAL one by «Local», when the member has an active membership on such a tier and the list's default
+     * % is at least as good (explicit list prices vary per batch; the default is the one figure the two share). Shown as «Ya
+     * cubierto por su tarifa» on the member's page. The discount keeps working either way: the lower price wins.
+     */
+    public function listCovers(Discount $discount): bool
+    {
+        $list = match ($discount->kind) {
+            DiscountKind::STAFF => PriceList::STAFF,
+            DiscountKind::LOCAL => PriceList::LOCAL,
+            default => null,
+        };
+        if ($list === null || $discount->mode !== DiscountMode::PERCENT) {
+            return false;
+        }
+        $onList = $this->memberships()->withoutGlobalScopes()->where('status', MembershipStatus::ACTIVE->value)
+            ->whereHas('tier', fn ($q) => $q->withoutGlobalScopes()->where('price_list', $list->value))->exists();
+
+        return $onList && Batch::defaultPercent($list) * 100 >= (int) $discount->value_bp;
+    }
+
     public function emailIsSendable(): bool
     {
         return Email::isSendable($this->email);

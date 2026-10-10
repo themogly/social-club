@@ -4,10 +4,13 @@ namespace App\Models;
 
 use App\Casts\WeightCast;
 use App\Enums\BatchStatus;
+use App\Enums\PriceList;
 use App\Enums\UnitType;
 use App\Models\Concerns\BelongsToOrganisation;
 use App\Models\Concerns\ScopedToLocation;
 use App\Support\BusinessDay;
+use App\Support\NumberFormat;
+use App\Support\Settings;
 use App\Support\Units;
 use Carbon\CarbonImmutable;
 use Database\Factories\BatchFactory;
@@ -39,7 +42,17 @@ class Batch extends Model
         'acquired_or_harvested_on', 'expires_on', 'initial_cg', 'remaining_cg', 'reserve_cg',
         'initial_units', 'remaining_units',
         'cost_per_gram_cents', 'price_per_gram_cents', 'price_per_unit_cents', 'price_per_eighth_cents',
+        // Prompt 382 — the Local and Personal lists (blank = the standard less the list's default %).
+        'local_price_per_gram_cents', 'local_price_per_eighth_cents', 'local_price_per_unit_cents',
+        'staff_price_per_gram_cents', 'staff_price_per_eighth_cents', 'staff_price_per_unit_cents',
         'lab_report_path', 'images', 'notes', 'status',
+    ];
+
+    /** Prompt 382 — every price column a batch carries: the standard ones and the two lists', for each of gram, 3.5 g, unit. */
+    public const PRICE_COLUMNS = [
+        'price_per_gram_cents', 'price_per_eighth_cents', 'price_per_unit_cents',
+        'local_price_per_gram_cents', 'local_price_per_eighth_cents', 'local_price_per_unit_cents',
+        'staff_price_per_gram_cents', 'staff_price_per_eighth_cents', 'staff_price_per_unit_cents',
     ];
 
     protected function casts(): array
@@ -58,6 +71,12 @@ class Batch extends Model
             'price_per_gram_cents' => 'integer',  // rate (prompt 278) — the SALE price of THIS batch
             'price_per_unit_cents' => 'integer',  // rate
             'price_per_eighth_cents' => 'integer', // rate — the 3.5 g price, weight only
+            'local_price_per_gram_cents' => 'integer',
+            'local_price_per_eighth_cents' => 'integer',
+            'local_price_per_unit_cents' => 'integer',
+            'staff_price_per_gram_cents' => 'integer',
+            'staff_price_per_eighth_cents' => 'integer',
+            'staff_price_per_unit_cents' => 'integer',
             'images' => 'array',
             'status' => BatchStatus::class,
         ];
@@ -194,6 +213,91 @@ class Batch extends Model
     }
 
     /** Does this batch carry its own sale price? (prompt 278) — per unit for a unit product, per gram otherwise. */
+    /**
+     * Prompt 382 — THE one place that says what this batch costs on a price list: the list's own price, or — blank — the
+     * standard one less the list's default % (`price_list_default_discount_pct_*`, default 20), to the cent with the shared
+     * rounding. The 3.5 g price follows the same rule; with no standard 3.5 g price there is no 3.5 g break on any list.
+     * `ResolvePrice`, the pricing screen and the batch's own price action all call this.
+     *
+     * @param  'gram'|'eighth'|'unit'  $kind
+     * @return array{cents: ?int, set: bool} the price (null: none on this batch), and whether it was set rather than defaulted
+     */
+    public function priceFor(PriceList $list, string $kind): array
+    {
+        $own = $this->getAttribute($list->columnPrefix().'price_per_'.$kind.'_cents');
+        if ($own !== null) {
+            return ['cents' => (int) $own, 'set' => true];
+        }
+        $standard = $this->getAttribute('price_per_'.$kind.'_cents');
+        if ($list === PriceList::STANDARD || $standard === null) {
+            return ['cents' => $standard === null ? null : (int) $standard, 'set' => $list === PriceList::STANDARD && $standard !== null];
+        }
+
+        return ['cents' => self::defaulted((int) $standard, $list), 'set' => false];
+    }
+
+    /** A blank list price: the standard one less the list's default % (20 unless set), to the cent. */
+    public static function defaulted(int $standardCents, PriceList $list): int
+    {
+        return self::lessPercent($standardCents, self::defaultPercent($list));
+    }
+
+    /** A price less a percentage, to the cent (the one rounding rule) — a list's default, or a quick fill on Precios. */
+    public static function lessPercent(int $cents, float $percent): int
+    {
+        return $cents - (int) round_half_up($cents * $percent / 100);
+    }
+
+    /** The % a blank price of this list takes off the standard one (0 for the standard list). */
+    public static function defaultPercent(PriceList $list): int
+    {
+        $setting = $list->defaultDiscountSetting();
+
+        return $setting === null ? 0 : max(0, min(100, (int) Settings::get($setting, 20)));
+    }
+
+    /**
+     * Prompt 382 — what a blank Local / Personal price will be, for a field's grey placeholder: «8.80 · −20%». Null when
+     * there is no standard price to take it from.
+     */
+    public static function defaultHint(?int $standardCents, PriceList $list): ?string
+    {
+        return $standardCents === null || $list === PriceList::STANDARD ? null
+            : NumberFormat::decimal(self::defaulted($standardCents, $list) / 100, 2).' · −'.self::defaultPercent($list).'%'; // compact: it must fit a narrow price cell
+    }
+
+    /**
+     * Prompt 382 — the batch a NEW batch of this strain at this sede takes its prices from: the most recently received one
+     * there with a price, or none.
+     */
+    public static function previousPriced(string $geneticId, string $locationId): ?self
+    {
+        return self::query()->withoutGlobalScopes()->where('genetic_id', $geneticId)->where('location_id', $locationId)
+            ->where(fn ($q) => $q->whereNotNull('price_per_gram_cents')->orWhereNotNull('price_per_unit_cents'))
+            ->orderByDesc('created_at')->orderByDesc('id')->first();
+    }
+
+    /**
+     * Its three lists' prices (the 9 columns), as stored — blank stays null.
+     *
+     * @return array<string, ?int>
+     */
+    public function storedPrices(): array
+    {
+        return array_combine(self::PRICE_COLUMNS, array_map(
+            fn (string $column): ?int => $this->getRawOriginal($column) === null ? null : (int) $this->getRawOriginal($column), self::PRICE_COLUMNS));
+    }
+
+    /**
+     * The prices a new batch of this strain at this sede starts with ({@see previousPriced()}), or none.
+     *
+     * @return array<string, ?int>|null
+     */
+    public static function previousPricesFor(string $geneticId, string $locationId): ?array
+    {
+        return self::previousPriced($geneticId, $locationId)?->storedPrices();
+    }
+
     public function hasOwnPrice(): bool
     {
         return $this->isUnitType() ? $this->price_per_unit_cents !== null : $this->price_per_gram_cents !== null;

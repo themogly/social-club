@@ -12,7 +12,13 @@ use App\Enums\DiscountMode;
  * given weight; `lineForUnits()` a UNIT line at a given unit count — the one rounding
  * rule, applied once.
  *
+ * Prompt 382 — or charged on the member's PRICE LIST (Local / Personal): `$list` holds that list's rate and 3.5 g price. The
+ * standard rate stays `ratePerGramCents`, so a line still records `discount_cents` = standard − charged and the reports keep
+ * their lines; only the arithmetic of the charge changes. A list and a discount never stack ({@see ResolvePrice::forBatch()}
+ * chooses the lower).
+ *
  * @phpstan-type Discount array{mode: DiscountMode, value_bp: ?int, value_cents: ?int, label: string, kind?: ?string}
+ * @phpstan-type ListPrice array{rate: int, eighth: ?int, label: string, kind: string}
  * @phpstan-type Line array{rate_cents: int, subtotal_cents: int, discount_cents: int, total_cents: int, label: ?string}
  */
 final class PriceResult
@@ -27,11 +33,26 @@ final class PriceResult
         public readonly bool $perUnit = false,
         /** Optional eighth (3.5 g) price for this strain, in cents (prompt 83). Null = no eighth price. */
         public readonly ?int $eighthPriceCents = null,
+        /** @var ListPrice|null Prompt 382 — charged at this price list's own rates instead of a discount on the standard. */
+        public readonly ?array $list = null,
     ) {}
+
+    /**
+     * Prompt 382 — the rate to SHOW beside a strain: the member's list rate when their list priced it, else the standard (a
+     * discount is shown as its own label, never folded in).
+     */
+    public function shownRateCents(): int
+    {
+        return $this->list['rate'] ?? $this->ratePerGramCents;
+    }
 
     /** The per-gram rate AFTER the chosen discount — used to price the sub-eighth remainder (prompt 83). */
     public function effectiveRatePerGramCents(): int
     {
+        if ($this->list !== null) {
+            return $this->list['rate'];
+        }
+
         return $this->ratePerGramCents - $this->discountAmount($this->ratePerGramCents);
     }
 
@@ -46,6 +67,9 @@ final class PriceResult
         if ($this->eighthPriceCents === null) {
             return null;
         }
+        if ($this->list !== null) {
+            return $this->list['eighth']; // the list's own 3.5 g price (Batch::priceFor), never a discount on the standard one
+        }
 
         return $this->eighthPriceCents - $this->discountAmount($this->eighthPriceCents);
     }
@@ -59,7 +83,7 @@ final class PriceResult
     {
         $subtotal = (int) round_half_up($this->ratePerGramCents * $gramsCg / 100);
 
-        return $this->line($subtotal);
+        return $this->line($subtotal, $this->list === null ? null : (int) round_half_up($this->list['rate'] * $gramsCg / 100));
     }
 
     /**
@@ -69,15 +93,16 @@ final class PriceResult
      */
     public function lineForUnits(int $units): array
     {
-        return $this->line($this->ratePerGramCents * $units);
+        return $this->line($this->ratePerGramCents * $units, $this->list === null ? null : $this->list['rate'] * $units);
     }
 
     /**
      * @return Line
      */
-    private function line(int $subtotal): array
+    private function line(int $subtotal, ?int $listTotal = null): array
     {
-        $discountCents = $this->discountAmount($subtotal);
+        // On a price list the member pays the list's own total; the difference from the standard is recorded as the discount.
+        $discountCents = $listTotal !== null ? max(0, $subtotal - $listTotal) : $this->discountAmount($subtotal);
 
         return [
             'rate_cents' => $this->ratePerGramCents,
@@ -105,6 +130,10 @@ final class PriceResult
     /** Prompt 350 — the kind of the discount applied (a DiscountKind value, TIER, or null). */
     public function discountKind(): ?string
     {
+        if ($this->list !== null) {
+            return $this->list['kind'];
+        }
+
         return $this->discount['kind'] ?? null;
     }
 
@@ -113,7 +142,7 @@ final class PriceResult
     {
         $parts = array_filter([
             $this->rateLabel,
-            $this->discount !== null ? $this->discountLabel() : null,
+            $this->list !== null ? $this->list['label'] : ($this->discount !== null ? $this->discountLabel() : null),
         ]);
 
         return $parts === [] ? null : implode(' · ', $parts);

@@ -8,6 +8,7 @@ use App\Actions\Stock\MoveToReserve;
 use App\Actions\Stock\RecountBatch;
 use App\Actions\Stock\TopUpFromReserve;
 use App\Actions\Stock\TransferBatch;
+use App\Enums\PriceList;
 use App\Exceptions\StockCeilingExceededException;
 use App\Filament\Forms\DecimalInput;
 use App\Filament\Resources\Batches\Schemas\BatchForm;
@@ -19,6 +20,7 @@ use App\Models\User;
 use App\Rules\GramAmount;
 use App\Support\BelowCost;
 use App\Support\Money;
+use App\Support\TypedNumber;
 use App\Support\Units;
 use App\Support\Weight;
 use DomainException;
@@ -329,42 +331,71 @@ final class BatchActions
                 'rate_eur' => ($record->isUnitType() ? $record->price_per_unit_cents : $record->price_per_gram_cents) !== null
                     ? Money::fromCents((int) ($record->isUnitType() ? $record->price_per_unit_cents : $record->price_per_gram_cents))->euros() : null,
                 'eighth_eur' => $record->price_per_eighth_cents !== null ? Money::fromCents((int) $record->price_per_eighth_cents)->euros() : null,
+                // Prompt 382 — the Local / Personal prices as stored: blank stays blank (it shows its default, grey).
+                ...collect(self::LISTS)->flatMap(fn (PriceList $list, string $key): array => [
+                    $key.'_price_eur' => ($c = $record->getRawOriginal($list->columnPrefix().'price_per_'.($record->isUnitType() ? 'unit' : 'gram').'_cents')) !== null ? Money::fromCents((int) $c)->euros() : null,
+                    $key.'_eighth_eur' => ($c = $record->getRawOriginal($list->columnPrefix().'price_per_eighth_cents')) !== null ? Money::fromCents((int) $c)->euros() : null,
+                ])->all(),
             ])
-            ->schema([
+            ->schema(fn (Batch $record): array => [
                 DecimalInput::make('rate_eur')
-                    ->label(fn (Batch $record): string => $record->isUnitType() ? __('Precio por unidad (€)') : __('Precio por gramo (€)'))
-                    ->numeric()->minValue(0)->required(),
+                    ->label($record->isUnitType() ? __('Precio por unidad (€)') : __('Precio por gramo (€)'))
+                    ->numeric()->minValue(0)->required()->live(onBlur: true),
                 DecimalInput::make('eighth_eur')
                     ->label(__('Precio por octavo — 3.5 g (€)'))
                     ->helperText(__('Opcional.'))
-                    ->numeric()->minValue(0)
-                    ->hidden(fn (Batch $record): bool => $record->isUnitType()),
+                    ->numeric()->minValue(0)->live(onBlur: true)
+                    ->hidden($record->isUnitType()),
+                ...collect(self::LISTS)->flatMap(fn (PriceList $list, string $key): array => [
+                    DecimalInput::make($key.'_price_eur')
+                        ->label($record->isUnitType() ? __('Precio :list por unidad (€)', ['list' => $list->label()]) : __('Precio :list por gramo (€)', ['list' => $list->label()]))
+                        ->numeric()->minValue(0)
+                        ->placeholder(fn (Get $get): ?string => Batch::defaultHint(TypedNumber::cents($get('rate_eur')), $list)),
+                    DecimalInput::make($key.'_eighth_eur')
+                        ->label(__('Precio :list por octavo — 3.5 g (€)', ['list' => $list->label()]))
+                        ->numeric()->minValue(0)
+                        ->placeholder(fn (Get $get): ?string => Batch::defaultHint(TypedNumber::cents($get('eighth_eur')), $list))
+                        ->hidden($record->isUnitType()),
+                ])->all(),
             ])
-            ->modalDescription(__('Cambia el precio de este lote. Solo afecta a las aportaciones a partir de ahora; queda en la auditoría.'))
+            ->modalDescription(__('Cambia los precios de este lote. Un precio Local o Personal vacío es el Estándar menos el descuento por defecto. Solo afecta a las aportaciones a partir de ahora; queda en la auditoría.'))
             ->modalSubmitActionLabel(__('Guardar precio'))
             // Prompt 295 — below the batch's cost, ask first: *Continuar* saves (and closes both), *Volver y corregir*
             // returns to this form with nothing written. The same rule as the intake forms (`BelowCost`).
             ->registerModalActions([self::belowCostAction()])
             ->action(function (Batch $record, array $data, Action $action): void {
                 $rate = Money::fromEuros((string) $data['rate_eur'])->cents;
-                $eighth = filled($data['eighth_eur'] ?? null) ? Money::fromEuros((string) $data['eighth_eur'])->cents : null;
                 $unit = $record->isUnitType();
-                $offences = BelowCost::offences(
-                    $record->cost_per_gram_cents, $unit ? null : $rate, $unit ? $rate : null, $unit ? null : $eighth,
-                    $record->genetic?->grams_per_unit_cg !== null ? (int) $record->genetic->grams_per_unit_cg : null,
-                );
+                $eighth = $unit ? null : TypedNumber::cents($data['eighth_eur'] ?? null);
+                $lists = BatchForm::listPrices($data, $unit);
+                // What every list would charge with these prices (a blank one at its default), on an unsaved copy.
+                $offences = BelowCost::forBatchLists($record->replicateQuietly()->forceFill([
+                    'price_per_gram_cents' => $unit ? null : $rate, 'price_per_unit_cents' => $unit ? $rate : null, 'price_per_eighth_cents' => $eighth,
+                    ...$lists,
+                ]));
 
                 if ($offences !== []) {
                     $action->getLivewire()->mountAction('belowCost', [
-                        'rate' => $rate, 'eighth' => $eighth,
+                        'rate' => $rate, 'eighth' => $eighth, 'lists' => $lists,
                         'lines' => array_column($offences, 'line'),
-                        'field' => $offences[0]['field'] === 'per_eighth' ? 'eighth_eur' : 'rate_eur',
+                        'field' => self::fieldFor($offences[0]['field']),
                     ]);
                     $action->halt();
                 }
 
-                self::savePrice($record, $rate, $eighth);
+                self::savePrice($record, $rate, $eighth, $lists);
             });
+    }
+
+    /** Prompt 382 — the two lists a batch prices beside the standard, by form key. */
+    private const LISTS = ['local' => PriceList::LOCAL, 'staff' => PriceList::STAFF];
+
+    /** The Precio form field a below-cost offence points at (`per_gram`, `local_per_eighth`…). */
+    private static function fieldFor(string $offence): string
+    {
+        $key = str_starts_with($offence, 'local_') ? 'local_' : (str_starts_with($offence, 'staff_') ? 'staff_' : '');
+
+        return str_ends_with($offence, 'per_eighth') ? $key.'eighth_eur' : ($key === '' ? 'rate_eur' : $key.'price_eur');
     }
 
     private static function belowCostAction(): Action
@@ -390,15 +421,17 @@ final class BatchActions
                 // argument (the rate is just a price the same person could have typed).
                 $batch = $action->getParentAction()?->getRecord();
                 abort_unless($batch instanceof Batch, 403);
-                self::savePrice($batch, (int) $arguments['rate'], $arguments['eighth'] !== null ? (int) $arguments['eighth'] : null);
+                $lists = array_map(fn (mixed $c): ?int => $c === null ? null : (int) $c, array_intersect_key((array) ($arguments['lists'] ?? []), array_flip(Batch::PRICE_COLUMNS)));
+                self::savePrice($batch, (int) $arguments['rate'], $arguments['eighth'] !== null ? (int) $arguments['eighth'] : null, $lists);
             });
     }
 
-    private static function savePrice(Batch $batch, int $rate, ?int $eighth): void
+    /** @param  array<string, ?int>  $lists */
+    private static function savePrice(Batch $batch, int $rate, ?int $eighth, array $lists = []): void
     {
         $actor = Auth::user();
         abort_unless($actor instanceof User, 403);
-        (new SetBatchPrice)->handle($batch, $rate, $eighth, $actor);
+        (new SetBatchPrice)->handle($batch, $rate, $eighth, $actor, $lists);
         Notification::make()->title(__('Precio actualizado'))->success()->send();
     }
 }

@@ -52,6 +52,31 @@
             </x-filament::section>
         @endif
 
+        {{-- Prompt 382 — staff and local % discounts are replaced by the tier's price list; these are the ones left to move. --}}
+        @if ($priceListMoves['STAFF'] !== [] || $priceListMoves['LOCAL'] !== [] || $priceListMoves['tiers'] !== [])
+            <x-filament::section :heading="__('Precios por tarifa')" icon="heroicon-o-tag" data-health-price-list-moves>
+                @foreach (['STAFF' => \App\Enums\PriceList::STAFF, 'LOCAL' => \App\Enums\PriceList::LOCAL] as $kind => $list)
+                    @if ($priceListMoves[$kind] !== [])
+                        <p class="text-sm font-semibold text-gray-950 dark:text-white" data-health-price-list-kind="{{ $kind }}">
+                            {{ $kind === 'STAFF'
+                                ? trans_choice(':count socio tiene un descuento de personal asignado: ponlo en una tarifa con precios «:list».|:count socios tienen un descuento de personal asignado: ponlos en una tarifa con precios «:list».', count($priceListMoves[$kind]), ['count' => count($priceListMoves[$kind]), 'list' => $list->label()])
+                                : trans_choice(':count socio tiene un descuento de local asignado: ponlo en una tarifa con precios «:list».|:count socios tienen un descuento de local asignado: ponlos en una tarifa con precios «:list».', count($priceListMoves[$kind]), ['count' => count($priceListMoves[$kind]), 'list' => $list->label()]) }}
+                        </p>
+                        <ul class="mb-3 mt-1 list-disc ps-5 text-sm">
+                            @foreach ($priceListMoves[$kind] as $member)
+                                <li><a href="{{ \App\Filament\Resources\Members\MemberResource::getUrl('view', ['record' => $member['id']]) }}" class="underline">{{ $member['name'] }}</a></li>
+                            @endforeach
+                        </ul>
+                    @endif
+                @endforeach
+                @if ($priceListMoves['tiers'] !== [])
+                    <p class="text-sm text-gray-600 dark:text-gray-400" data-health-price-list-tiers>
+                        {{ __('Estas tarifas tenían un descuento que ya no se aplica (ahora cuentan sus precios): :tiers. Revisa qué precios les toca.', ['tiers' => implode(', ', $priceListMoves['tiers'])]) }}
+                    </p>
+                @endif
+            </x-filament::section>
+        @endif
+
         <x-filament::section :heading="__('Planificador')" icon="heroicon-o-clock">
             <div style="display:flex;align-items:center;gap:.5rem;margin-bottom:.5rem;">
                 <x-filament::badge :color="$scheduler['stale'] ? 'danger' : 'success'">

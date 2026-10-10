@@ -14,6 +14,7 @@ use App\Filament\Pages\ManageConsentText;
 use App\Filament\Pages\ManageEnforcement;
 use App\Filament\Pages\ManageOrganisationIdentity;
 use App\Filament\Pages\ManageSettings;
+use App\Filament\Pages\PreciosSede;
 use App\Filament\Pages\Rat;
 use App\Filament\Pages\RegistroDispensacion;
 use App\Filament\Pages\RegistroJornada;
@@ -254,6 +255,14 @@ class Help
             'Si alguien se olvida de fichar la salida, la próxima vez que fiche la entrada se le pregunta a qué hora terminó (con un motivo): queda como «Hora declarada». Nada cierra una jornada solo.',
             'Avisos: «Sin fichar salida» (jornada abierta de un día anterior), «Hora declarada», «Corregido por…», «Anulado» (tachado, nunca oculto) y «Actividad sin fichar» (se identificó en el mostrador ese día sin fichar).',
             'Corregir no edita nada: «Añadir jornada», «Añadir salida» o «Anular» escriben un fichaje nuevo con su motivo y quién lo hizo, y el original se conserva. La hoja mensual en PDF es la que pedirá la gestoría.',
+        ]],
+        // Prompt 382 — the three price lists of a whole sede.
+        PreciosSede::class => ['permission' => 'prices.manage', 'title' => 'Precios de la sede', 'body' => [
+            'Cada lote tiene tres precios: Estándar, Local y Personal (por gramo y por 3.5 g, o por unidad). Cada tarifa elige cuál pagan sus socios (Tarifas → Precios).',
+            'Un precio Local o Personal vacío es el Estándar menos el descuento por defecto (20 % salvo que el propietario lo cambie en Ajustes). Se ve en gris dentro de la casilla.',
+            'Una casilla por debajo del coste se pone en ámbar: es un aviso, se puede guardar igual.',
+            '«Rellenar rápido» solo rellena las casillas (de los lotes marcados, o de todos): Local o Personal = Estándar menos un %, copiar los precios de otra sede, o vaciar Local / Personal. Nada se guarda hasta «Guardar todo», que guarda solo los lotes cambiados y deja cada cambio en la auditoría.',
+            'Un precio de lista y un descuento nunca se suman: el socio paga el menor de los dos.',
         ]],
         // Prompt 318 — the full stock count.
         Inventario::class => ['permission' => 'stock.take', 'title' => 'Inventario', 'body' => [

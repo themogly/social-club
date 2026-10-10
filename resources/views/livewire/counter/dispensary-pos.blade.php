@@ -176,7 +176,7 @@
                                     <span class="rounded-full border border-brand/30 bg-brand-tint px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-brand dark:bg-slate-800 dark:text-slate-200">{{ $activeGenetic->product_type->label() }}</span>
                                 </div>
                                 @if ($activeGeneticPriceCents !== null)
-                                    <p class="text-sm text-ink-muted dark:text-slate-400">{{ $this->money($activeGeneticPriceCents) }} / {{ $activeGenetic->isUnitType() ? __('ud') : 'g' }}</p>
+                                    <p class="text-sm text-ink-muted dark:text-slate-400">{{ $this->money($activeGeneticPriceCents) }} / {{ $activeGenetic->isUnitType() ? __('ud') : 'g' }}@if ($activeGeneticListLabel ?? null) · <span data-active-price-list class="font-medium text-brand dark:text-slate-200">{{ $activeGeneticListLabel }}</span>@endif</p>
                                 @endif
                             </div>
                             <button type="button" wire:click="cancelWeightEntry" class="inline-flex min-h-11 items-center rounded-lg px-3 text-sm text-ink-muted hover:bg-black/5 dark:text-slate-400 dark:hover:bg-white/5">{{ __('Cancelar') }}</button>
@@ -826,13 +826,16 @@
                                             <span class="ml-1 rounded-full border border-brand/30 bg-brand-tint px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-brand dark:bg-slate-800 dark:text-slate-200">{{ __('1/8') }}</span>
                                         @endif
                                     </p>
+                                    {{-- Prompt 382 — on the member's price list the line reads at the list's rate with its name («8.80 €/g · Local»), not the standard less a discount. --}}
+                                    @php($lineRate = $line['list']['rate_cents'] ?? $line['rate_cents'])
                                     <p class="text-xs text-ink-muted dark:text-slate-400">
                                         @if ($line['per_unit'])
-                                            {{ \App\Support\Units::count((int) $line['units']) }} ({{ $this->grams($line['grams_cg']) }}) × {{ $this->money($line['rate_cents']) }}/{{ __('ud') }}
+                                            {{ \App\Support\Units::count((int) $line['units']) }} ({{ $this->grams($line['grams_cg']) }}) × {{ $this->money($lineRate) }}/{{ __('ud') }}
                                         @else
-                                            {{ $this->grams($line['grams_cg']) }}@if (($line['charged_cg'] ?? null) !== null && $line['charged_cg'] !== $line['grams_cg']) <span data-charged-grams class="font-medium text-ink dark:text-slate-200">· {{ __('se cobra :grams', ['grams' => $this->grams($line['charged_cg'])]) }}</span>@endif × {{ $this->money($line['rate_cents']) }}/g
+                                            {{ $this->grams($line['grams_cg']) }}@if (($line['charged_cg'] ?? null) !== null && $line['charged_cg'] !== $line['grams_cg']) <span data-charged-grams class="font-medium text-ink dark:text-slate-200">· {{ __('se cobra :grams', ['grams' => $this->grams($line['charged_cg'])]) }}</span>@endif × {{ $this->money($lineRate) }}/g
                                         @endif
-                                        @if ($line['discount_cents'] > 0)· <span class="text-success">−{{ $this->money($line['discount_cents']) }}</span>@endif
+                                        @if (($line['list'] ?? null) !== null)· <span data-line-price-list class="font-medium text-brand dark:text-slate-200">{{ $line['list']['label'] }}</span>
+                                        @elseif ($line['discount_cents'] > 0)· <span class="text-success">−{{ $this->money($line['discount_cents']) }}</span>@endif
                                     </p>
                                     {{-- Prompt 278 — the line crosses into a differently priced lote: say so BEFORE commit. --}}
                                     @if ($line['split_note'] ?? null)

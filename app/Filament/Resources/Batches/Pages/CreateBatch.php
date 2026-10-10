@@ -8,6 +8,7 @@ use App\Filament\Concerns\ReturnsToList;
 use App\Filament\Concerns\WarnsBelowCost;
 use App\Filament\Forms\DecimalInput;
 use App\Filament\Resources\Batches\BatchResource;
+use App\Filament\Resources\Batches\Schemas\BatchForm;
 use App\Filament\Support\AllOption;
 use App\Models\Genetic;
 use App\Models\Location;
@@ -97,6 +98,8 @@ class CreateBatch extends CreateRecord
             'price_per_gram_cents' => $genetic->isUnitType() ? null : $salePriceCents,
             'price_per_unit_cents' => $genetic->isUnitType() ? $salePriceCents : null,
             'price_per_eighth_cents' => filled($data['price_per_eighth_eur'] ?? null) ? Money::fromEuros((string) $data['price_per_eighth_eur'])->cents : null,
+            // Prompt 382 — the Local / Personal lists; blank stays blank (the standard less the list's default %).
+            ...BatchForm::listPrices($data, $genetic->isUnitType()),
             'images' => array_values((array) ($data['images'] ?? [])),
             'acquired_or_harvested_on' => $data['acquired_or_harvested_on'] ?? null,
             'expires_on' => $data['expires_on'] ?? null,

@@ -31,4 +31,19 @@ final class TypedNumber
 
         return isset($m[2]) ? $integer.'.'.$m[2] : $integer;
     }
+
+    /**
+     * Prompt 382 — what was typed as euros (or a field's live numeric state), in integer cents; null when empty or
+     * unreadable. Signs are refused by `canonical()`, so a negative amount is null too.
+     */
+    public static function cents(mixed $typed): ?int
+    {
+        $number = match (true) {
+            is_int($typed), is_float($typed) => $typed < 0 ? null : (string) $typed,
+            is_string($typed) => self::canonical($typed),
+            default => null,
+        };
+
+        return $number === null ? null : Money::fromEuros($number)->cents;
+    }
 }
