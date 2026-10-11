@@ -3,8 +3,6 @@
 namespace App\Models;
 
 use App\Casts\NormalisedEmail;
-use App\Enums\DiscountKind;
-use App\Enums\DiscountMode;
 use App\Enums\IdDocumentType;
 use App\Enums\MemberDocumentType;
 use App\Enums\MemberKind;
@@ -271,25 +269,17 @@ class Member extends Model implements Authenticatable, HasLocalePreference
 
     /** Prompt 372 — can mail actually be sent to this member's stored address ({@see Email::isSendable()})? */
     /**
-     * Prompt 382 — is this member's assigned % discount already covered by their tier's price list? A STAFF discount by the
-     * «Personal» list, a LOCAL one by «Local», when the member has an active membership on such a tier and the list's default
-     * % is at least as good (explicit list prices vary per batch; the default is the one figure the two share). Shown as «Ya
-     * cubierto por su tarifa» on the member's page. The discount keeps working either way: the lower price wins.
+     * Prompt 383 — the Local / Personal list this member's tier pays (an active membership on such a tier), or null on
+     * Estándar. On a list, no % discount applies to batch prices ({@see ResolvePrice::forBatch()}): the member page says so
+     * beside an assigned discount, and *Salud del sistema* stops listing them.
      */
-    public function listCovers(Discount $discount): bool
+    public function priceListOverridingDiscounts(): ?PriceList
     {
-        $list = match ($discount->kind) {
-            DiscountKind::STAFF => PriceList::STAFF,
-            DiscountKind::LOCAL => PriceList::LOCAL,
-            default => null,
-        };
-        if ($list === null || $discount->mode !== DiscountMode::PERCENT) {
-            return false;
-        }
-        $onList = $this->memberships()->withoutGlobalScopes()->where('status', MembershipStatus::ACTIVE->value)
-            ->whereHas('tier', fn ($q) => $q->withoutGlobalScopes()->where('price_list', $list->value))->exists();
+        $tier = MembershipTier::query()->withoutGlobalScopes()->where('price_list', '!=', PriceList::STANDARD->value)
+            ->whereIn('id', $this->memberships()->withoutGlobalScopes()->where('status', MembershipStatus::ACTIVE->value)->select('tier_id'))
+            ->first();
 
-        return $onList && Batch::defaultPercent($list) * 100 >= (int) $discount->value_bp;
+        return $tier?->price_list;
     }
 
     public function emailIsSendable(): bool

@@ -26,6 +26,7 @@ use App\Filament\Resources\Members\Pages\ViewMember;
 use App\Filament\Resources\Members\RelationManagers\DiscountsRelationManager;
 use App\Filament\Resources\MembershipTiers\Pages\CreateMembershipTier;
 use App\Filament\Resources\MembershipTiers\Pages\EditMembershipTier;
+use App\Filament\Resources\MembershipTiers\Pages\ListMembershipTiers;
 use App\Livewire\Counter\DispensaryPos;
 use App\Models\Batch;
 use App\Models\Discount;
@@ -126,6 +127,17 @@ class PriceListsUiTest extends TestCase
         $this->assertSame(1500, (int) $old->fresh()->discount_bp, 'kept so history reads');
     }
 
+    public function test_the_tiers_list_shows_which_prices_each_tier_pays(): void
+    {
+        $local = MembershipTier::factory()->create(['organisation_id' => $this->org->id, 'name' => 'Vecinos', 'price_list' => PriceList::LOCAL]);
+        $standard = MembershipTier::factory()->create(['organisation_id' => $this->org->id, 'name' => 'Turistas']);
+
+        Livewire::test(ListMembershipTiers::class)
+            ->assertTableColumnExists('price_list')
+            ->assertTableColumnFormattedStateSet('price_list', 'Local', $local)
+            ->assertTableColumnFormattedStateSet('price_list', 'Estándar', $standard);
+    }
+
     // --- The default % (owner only) ---------------------------------------------------------------------------------------
 
     public function test_the_default_percentages_are_owner_only_settings(): void
@@ -163,7 +175,7 @@ class PriceListsUiTest extends TestCase
 
     // --- Member page -------------------------------------------------------------------------------------------------------
 
-    public function test_the_member_page_says_already_covered_only_when_the_list_is_at_least_as_good(): void
+    public function test_the_member_page_says_a_percentage_does_not_apply_on_a_list_tier(): void
     {
         $discount = $this->staffDiscount(2000);
         $personal = $this->member(PriceList::STAFF);
@@ -171,11 +183,17 @@ class PriceListsUiTest extends TestCase
         $standard = $this->member(PriceList::STANDARD);
         (new AssignMemberDiscount)->handle($standard, $this->owner, ['discount_id' => $discount->id, 'reason' => 'Plantilla']);
 
-        Livewire::test(DiscountsRelationManager::class, ['ownerRecord' => $personal, 'pageClass' => ViewMember::class])->assertSee('Ya cubierto por su tarifa');
-        Livewire::test(DiscountsRelationManager::class, ['ownerRecord' => $standard, 'pageClass' => ViewMember::class])->assertDontSee('Ya cubierto por su tarifa');
+        // The staff discount covers the bar too (BOTH): it still applies there, so it says «a la flor».
+        Livewire::test(DiscountsRelationManager::class, ['ownerRecord' => $personal, 'pageClass' => ViewMember::class])
+            ->assertSee('No se aplica a la flor: su tarifa paga precios «Personal»');
+        Livewire::test(DiscountsRelationManager::class, ['ownerRecord' => $standard, 'pageClass' => ViewMember::class])
+            ->assertDontSee('No se aplica');
 
-        Settings::set('price_list_default_discount_pct_staff', 15, SettingType::INT);
-        Livewire::test(DiscountsRelationManager::class, ['ownerRecord' => $personal->fresh(), 'pageClass' => ViewMember::class])->assertDontSee('Ya cubierto por su tarifa');
+        $flowerOnly = Discount::factory()->create(['organisation_id' => $this->org->id, 'name' => 'Terapia', 'kind' => DiscountKind::THERAPEUTIC, 'mode' => DiscountMode::PERCENT,
+            'value_bp' => 1500, 'applies_to' => DiscountAppliesTo::GENETIC, 'active' => true]);
+        (new AssignMemberDiscount)->handle($personal, $this->owner, ['discount_id' => $flowerOnly->id, 'reason' => 'Terapéutico']);
+        Livewire::test(DiscountsRelationManager::class, ['ownerRecord' => $personal->fresh(), 'pageClass' => ViewMember::class])
+            ->assertSee('No se aplica: su tarifa paga precios «Personal»');
     }
 
     // --- Salud del sistema -------------------------------------------------------------------------------------------------
@@ -187,11 +205,15 @@ class PriceListsUiTest extends TestCase
         $member->forceFill(['first_name' => 'Rosa', 'last_name' => 'Vidal'])->save();
         (new AssignMemberDiscount)->handle($member, $this->owner, ['discount_id' => $discount->id, 'reason' => 'Plantilla']);
         MembershipTier::factory()->create(['organisation_id' => $this->org->id, 'name' => 'Terapéutico', 'discount_bp' => 1000]);
+        // 383 — someone already on a Personal tier is done: their % no longer applies, so they are not listed.
+        $moved = $this->member(PriceList::STAFF);
+        $moved->forceFill(['first_name' => 'Pablo', 'last_name' => 'Ruiz'])->save();
+        (new AssignMemberDiscount)->handle($moved, $this->owner, ['discount_id' => $discount->id, 'reason' => 'Plantilla']);
 
         Livewire::test(SystemHealth::class)
             ->assertSeeHtml('data-health-price-list-moves')
             ->assertSee('1 socio tiene un descuento de personal asignado: ponlo en una tarifa con precios «Personal».')
-            ->assertSee('Rosa Vidal')
+            ->assertSee('Rosa Vidal')->assertDontSee('Pablo Ruiz')
             ->assertSeeHtml(e(ViewMember::getUrl(['record' => $member->id])))
             ->assertSee('Terapéutico');
     }
@@ -263,6 +285,14 @@ class PriceListsUiTest extends TestCase
 
         $standard = $this->member(PriceList::STANDARD);
         Livewire::test(DispensaryPos::class)->call('selectMember', $standard->id)->assertDontSeeHtml('data-member-price-list');
+
+        // 383 — the basket preview measures a list line's discount exactly as the stored line: 3.5 g at the Local 3.5 g price
+        // (30.00 − 20 % = 24.00, Local 3.5 g blank) against the standard 30.00 → 6.00, not 3.5 × (10.00 − 8.80).
+        $pos = Livewire::test(DispensaryPos::class)->call('selectMember', $member->id)
+            ->call('chooseGenetic', $this->flower->id)->set('weightInput', '3.5')->call('addLine');
+        $view = new \ReflectionMethod(DispensaryPos::class, 'basketView');
+        $row = $view->invoke($pos->instance(), $member, $this->sede)[0];
+        $this->assertSame([2400, 600], [$row['total_cents'], $row['discount_cents']]);
 
         $d = (new CommitDispensation)->handle($member, $this->sede, [['genetic_id' => $this->flower->id, 'batch_id' => $this->batch->id, 'grams_cg' => 200]],
             ['operator_id' => $this->owner->id]);

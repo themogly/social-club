@@ -32,8 +32,8 @@ use RuntimeException;
  * **The price is the BATCH's (prompt 278, Ben's 271).** Two harvests of one strain differ, so the rate comes from the
  * batch the grams are drawn from (`forBatch`); a strain's "price" at a sede is the price of the batch that will be
  * dispensed next there (`forGenetic` → `displayBatch`, FEFO). Prompt 382: a membership tier picks the batch's price LIST
- * (Estándar / Local / Personal, `Batch::priceFor()`), and the member pays the lower of that and the standard price less their
- * best other discount — no stacking. The strain's sede price in
+ * (Estándar / Local / Personal, `Batch::priceFor()`); prompt 383: on Local / Personal the list price is final and no %
+ * discount applies — discounts are for the Estándar list. The strain's sede price in
  * `genetic_prices` is only the FALLBACK for a batch without its own price (batches received before 278 that had no base
  * price to backfill from, and fixtures) — and on that legacy path tier price rows still apply as before.
  *
@@ -77,25 +77,21 @@ class ResolvePrice
         $isUnit = $genetic->isUnitType();
         $rate = (int) ($isUnit ? $batch->price_per_unit_cents : $batch->price_per_gram_cents);
         $eighth = $isUnit ? null : $batch->price_per_eighth_cents;
-        $withDiscount = new PriceResult($rate, null, $this->chooseDiscount($rate, $this->applicableDiscounts($genetic, $location, $member)), $isUnit, $eighth);
 
-        // Prompt 382 — the member's price list (their tier's at this sede; no member or no tier → Estándar). A list price and
-        // a discount never stack: the member pays the LOWER of their list price and the standard less their best other
-        // discount (278's best single price). A tie goes to the list, so its kind is what the line records.
+        // Prompt 383 (Ben, 11 Oct: "if a price is attached it overrides it") — a member on a Local / Personal list pays that
+        // list's price, set or defaulted, and NO % discount applies (therapeutic, concession, custom, an old staff/local %).
+        // 382 had the lower of the two win. Discounts are for the Estándar list only, best single one as before.
         $list = $this->priceListFor($member, $location);
         if ($list !== PriceList::STANDARD) {
-            $listRate = $batch->priceFor($list, $isUnit ? 'unit' : 'gram')['cents'];
-            if ($listRate !== null && $listRate <= $withDiscount->effectiveRatePerGramCents()) {
-                return new PriceResult($rate, null, null, $isUnit, $eighth, [
-                    'rate' => $listRate,
-                    'eighth' => $isUnit ? null : $batch->priceFor($list, 'eighth')['cents'],
-                    'label' => $list->label(),
-                    'kind' => (string) $list->discountKind(),
-                ]);
-            }
+            return new PriceResult($rate, null, null, $isUnit, $eighth, [
+                'rate' => (int) $batch->priceFor($list, $isUnit ? 'unit' : 'gram')['cents'], // the standard exists (hasOwnPrice)
+                'eighth' => $isUnit ? null : $batch->priceFor($list, 'eighth')['cents'],
+                'label' => $list->label(),
+                'kind' => (string) $list->discountKind(),
+            ]);
         }
 
-        return $withDiscount;
+        return new PriceResult($rate, null, $this->chooseDiscount($rate, $this->applicableDiscounts($genetic, $location, $member)), $isUnit, $eighth);
     }
 
     /** Prompt 382 — the price list this member pays at this sede: their active tier's, else Estándar. */
@@ -114,12 +110,13 @@ class ResolvePrice
      * grams ({@see ChargeRounding::overParts()}: the difference applied from the last part back, never below zero).
      *
      * @param  list<array{batch: Batch, qty: int}>  $parts  qty in centigrams (weight) or units
-     * @return array{parts: list<array{batch: Batch, qty: int, charged_qty: int, rate_cents: int, total_cents: int, discount_cents: int, list_rate_cents: ?int, list_label: ?string}>, total_cents: int, discount_cents: int, rate_cents: int, effective_rate_cents: int, eighth_price: ?int, label: ?string, mixed: bool, discount_kind: ?string, list: array{rate_cents: int, label: string}|null}
+     * @return array{parts: list<array{batch: Batch, qty: int, charged_qty: int, rate_cents: int, total_cents: int, discount_cents: int, list_rate_cents: ?int, list_label: ?string}>, total_cents: int, discount_cents: int, rate_cents: int, effective_rate_cents: int, eighth_price: ?int, label: ?string, mixed: bool, discount_kind: ?string, list: array{rate_cents: int, label: string}|null, standard_rate_cents: int, standard_eighth_price: ?int}
      */
     public function priceParts(Genetic $genetic, Location $location, ?Member $member, array $parts, bool $isUnit, ?int $chargedCg = null): array
     {
         $out = [];
         $eighths = [];
+        $standardEighths = [];
         $firstPrice = null;
         $firstLabel = null;
         $charged = ! $isUnit && $chargedCg !== null
@@ -132,6 +129,7 @@ class ResolvePrice
             $firstPrice ??= $price;
             $firstLabel ??= $line['label'];
             $eighths[] = $isUnit ? null : $price->effectiveEighthPriceCents();
+            $standardEighths[] = $isUnit ? null : $price->eighthPriceCents; // 383 — what a standard member's break would be
             $out[] = ['batch' => $part['batch'], 'qty' => $part['qty'], 'charged_qty' => $charged[$j], 'rate_cents' => $line['rate_cents'], 'total_cents' => $line['total_cents'], 'discount_cents' => $line['discount_cents'],
                 'list_rate_cents' => $price->list['rate'] ?? null, 'list_label' => $price->list['label'] ?? null]; // prompt 382
         }
@@ -151,6 +149,9 @@ class ResolvePrice
             'discount_kind' => (int) array_sum(array_column($out, 'discount_cents')) > 0 ? $firstPrice?->discountKind() : null,
             // Prompt 382 — charged on the member's price list: the basket shows that rate and the list («8.80 €/g · Local»).
             'list' => $firstPrice?->list !== null ? ['rate_cents' => $firstPrice->list['rate'], 'label' => $firstPrice->list['label']] : null,
+            // Prompt 383 — the same line for a standard member, for measuring a list line's discount (standardLine()).
+            'standard_rate_cents' => $out === [] ? 0 : min(array_column($out, 'rate_cents')),
+            'standard_eighth_price' => count(array_unique($standardEighths, SORT_REGULAR)) === 1 ? ($standardEighths[0] ?? null) : null,
         ];
     }
 
@@ -341,6 +342,42 @@ class ResolvePrice
         }
 
         return $result;
+    }
+
+    /**
+     * Prompt 383 — one priced line as a STANDARD member would pay it, the input `measuredDiscounts()` breaks into eighths:
+     * the standard per-gram total (what was charged + its per-gram discount) and the standard 3.5 g price. Unit lines have
+     * no eighth.
+     *
+     * @param  array{total_cents: int, discount_cents: int, standard_rate_cents: int, standard_eighth_price: ?int}  $priced  a priceParts() result
+     * @return array{grams_cg: int, rate_cents: int, per_gram_total: int, eighth_price: ?int}
+     */
+    public function standardLine(array $priced, int $chargedCg, bool $isUnit): array
+    {
+        return [
+            'grams_cg' => $chargedCg,
+            'rate_cents' => $isUnit ? 0 : $priced['standard_rate_cents'],
+            'per_gram_total' => $priced['total_cents'] + $priced['discount_cents'],
+            'eighth_price' => $isUnit ? null : $priced['standard_eighth_price'],
+        ];
+    }
+
+    /**
+     * Prompt 383 — the discount each line records. A list-priced line's is what the same basket would cost a standard member
+     * — standard rates WITH the standard 3.5 g break, grouped basket-wide exactly as the real one (`applyEighthBreaks`) —
+     * minus what was charged, never negative. Measured per gram (382) it overstated a 3.5 g sale: 3.5 × (10.00 − 8.00) = 7.00
+     * against a real 30.00 − 25.00 = 5.00. Other lines keep their own discount. Before 350's whole-euro rounding.
+     *
+     * @param  list<array{list: bool, discount_cents: int, standard: array{grams_cg: int, rate_cents: int, per_gram_total: int, eighth_price: ?int}}>  $lines
+     * @param  list<array{total_cents: int, eighth_applied: bool}>  $charged  applyEighthBreaks() on the real lines, same order
+     * @return list<int>
+     */
+    public function measuredDiscounts(array $lines, array $charged): array
+    {
+        $standard = $this->applyEighthBreaks(array_column($lines, 'standard'));
+
+        return array_map(fn (array $line, int $i): int => $line['list'] ? max(0, $standard[$i]['total_cents'] - $charged[$i]['total_cents']) : $line['discount_cents'],
+            $lines, array_keys($lines));
     }
 
     /**

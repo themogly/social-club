@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\MembershipTiers\Tables;
 
+use App\Enums\PriceList;
 use App\Models\MembershipTier;
 use Filament\Actions\ActionGroup;
 use Filament\Actions\BulkActionGroup;
@@ -30,6 +31,10 @@ class MembershipTiersTable
                 TextColumn::make('default_period')
                     ->label(__('Periodo'))
                     ->badge(),
+                // Prompt 383 — which of the three price lists the tier pays, at a glance.
+                TextColumn::make('price_list')->label(__('Precios'))->badge()
+                    ->formatStateUsing(fn (PriceList $state): string => $state->label())
+                    ->color(fn (PriceList $state): string => $state === PriceList::STANDARD ? 'gray' : 'primary'),
                 IconColumn::make('active')->label(__('Activa'))->boolean(),
             ])
             ->filters([

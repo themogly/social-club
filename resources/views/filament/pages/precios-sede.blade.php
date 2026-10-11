@@ -163,10 +163,10 @@
                                 <p class="text-xs font-semibold text-gray-700 dark:text-gray-200">{{ $list->label() }}</p>
                                 <div class="mt-1 grid {{ $row['unit'] ? 'grid-cols-1' : 'grid-cols-2' }} gap-2">
                                     @if ($row['unit'])
-                                        @include('filament.pages.partials.precios-cell', ['row' => $row, 'c' => $row['cells'][$list->value]['unit'], 'label' => $list->label().' · '.__('unidad')])
+                                        @include('filament.pages.partials.precios-cell', ['row' => $row, 'c' => $row['cells'][$list->value]['unit'], 'label' => $list->label().' · '.__('unidad'), 'caption' => __('unidad')])
                                     @else
-                                        @include('filament.pages.partials.precios-cell', ['row' => $row, 'c' => $row['cells'][$list->value]['gram'], 'label' => $list->label().' · '.__('g')])
-                                        @include('filament.pages.partials.precios-cell', ['row' => $row, 'c' => $row['cells'][$list->value]['eighth'], 'label' => $list->label().' · '.__('3.5 g')])
+                                        @include('filament.pages.partials.precios-cell', ['row' => $row, 'c' => $row['cells'][$list->value]['gram'], 'label' => $list->label().' · '.__('g'), 'caption' => __('g')])
+                                        @include('filament.pages.partials.precios-cell', ['row' => $row, 'c' => $row['cells'][$list->value]['eighth'], 'label' => $list->label().' · '.__('3.5 g'), 'caption' => __('3.5 g')])
                                     @endif
                                 </div>
                             </div>

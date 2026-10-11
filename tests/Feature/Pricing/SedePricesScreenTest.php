@@ -3,6 +3,7 @@
 namespace Tests\Feature\Pricing;
 
 use App\Enums\BatchStatus;
+use App\Enums\LocationKind;
 use App\Enums\Role;
 use App\Filament\Pages\PreciosSede;
 use App\Models\AuditLog;
@@ -176,6 +177,28 @@ class SedePricesScreenTest extends TestCase
             ->assertSeeHtml('placeholder="3.20 · −20%"')
             ->set('sede', $this->norte->id)
             ->assertSee('Norteña')->assertDontSee('Amnesia');
+    }
+
+    // --- 383: cards name their boxes; the store comes last -----------------------------------------------------------------
+
+    public function test_each_card_box_is_labelled_and_the_cells_send_when_left(): void
+    {
+        Livewire::test(PreciosSede::class)
+            ->assertSeeHtml('data-price-caption')
+            ->assertSeeHtml('wire:model.live.blur="prices.'.$this->amnesia->id.'.local_price_per_gram_cents"')
+            ->assertDontSeeHtml('wire:model.blur=');
+    }
+
+    public function test_with_all_sedes_in_the_topbar_it_opens_on_a_sede_and_lists_the_store_last_saying_why(): void
+    {
+        $store = Location::factory()->create(['organisation_id' => $this->org->id, 'name' => 'Almacén', 'kind' => LocationKind::ALMACEN]);
+        $this->owner->locations()->sync([$this->sede->id, $this->norte->id, $store->id]);
+        app(ActiveScope::class)->setLocation(null);
+
+        $page = Livewire::test(PreciosSede::class)->assertSet('sede', $this->sede->id);
+        $options = $page->instance()->sedeOptions();
+        $this->assertSame([$this->sede->id, $this->norte->id, $store->id], array_keys($options));
+        $this->assertSame('Almacén (los traspasos heredan estos precios)', $options[$store->id]);
     }
 
     // --- Who ---------------------------------------------------------------------------------------------------------------

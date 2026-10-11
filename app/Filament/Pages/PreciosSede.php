@@ -100,14 +100,25 @@ class PreciosSede extends Page
         $this->load();
     }
 
-    /** @return array<string, string> the sedes (and stores) the viewer may price, id → name */
+    /**
+     * The sedes the viewer may price, then the store (prompt 383: it opened on «Almacén», first alphabetically, while its
+     * prices matter only because a transfer copies them — so it comes last and says so). id → label.
+     *
+     * @return array<string, string>
+     */
     public function sedeOptions(): array
     {
         $user = Auth::user();
+        if (! $user instanceof User) {
+            return [];
+        }
 
-        return $user instanceof User
-            ? app(LocationSwitcher::class)->available($user, includeStores: true)->pluck('name', 'id')->map(fn (mixed $n): string => (string) $n)->all()
-            : [];
+        return app(LocationSwitcher::class)->available($user, includeStores: true)
+            ->sortBy(fn (Location $location): int => $location->isStore() ? 1 : 0, SORT_REGULAR)
+            ->mapWithKeys(fn (Location $location): array => [(string) $location->id => $location->isStore()
+                ? __(':name (los traspasos heredan estos precios)', ['name' => $location->name])
+                : (string) $location->name])
+            ->all();
     }
 
     public function location(): ?Location

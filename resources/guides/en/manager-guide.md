@@ -3,7 +3,7 @@ title: Manager guide
 summary: Strains, batches, prices by tier, moving stock, bar products, settings, and the daily and weekly routine.
 audience: managers
 order: 4
-updated: 2026-10-10
+updated: 2026-10-11
 ---
 
 > This guide is for owners and managers. Staff work at the counter; stock, prices, products and checks happen in **Administration**. Everything you change there is recorded in the audit log with your name.
@@ -182,9 +182,9 @@ Every batch has **three prices**: **Standard** (what tourists and most members p
 
 **One batch:** the row's ⋮ → **Price** has the same fields. **A new batch** of a strain at a location starts with the previous batch's three lists there (*"Prices copied from the previous batch (#3)"*); change them before saving if needed.
 
-**At the counter** a Local or Staff member's name carries a **Local** or **Staff** badge, and their basket line shows the list's own rate (*"2.00 g × €9.00/g · Local"*), as does their receipt. A list price and a discount never add up: the member pays the lower of their list price and the Standard less their best other discount (therapeutic, for example). What the list saved them is still recorded, so **Reports → Losses** shows staff prices under *Staff discounts*.
+**At the counter** a Local or Staff member's name carries a **Local** or **Staff** badge, and their basket line shows the list's own rate (*"2.00 g × €9.00/g · Local"*), as does their receipt. **The list price is final:** a Local or Staff member always pays their list's price, and no % discount applies to them, not even therapeutic. Percentage discounts are for members on the Standard list. What the list saved them compared with the Standard price (including the Standard 3.5 g price) is still recorded, so **Reports → Losses** shows staff prices under *Staff discounts*.
 
-**Older staff and local discounts** (a % given to a member) keep working until you move those members onto a Local or Staff tier; new ones can no longer be created. **System health** lists the members who still have one, and the member's page says *"Already covered by their tier"* once their tier's list gives at least as much.
+**Older staff and local discounts** (a % given to a member) keep working while that member is on a Standard tier, and stop the moment you move them onto a Local or Staff tier; new ones can no longer be created. **System health** lists the Standard-tier members who still have one. On a Local or Staff tier, the member's page says *"Not applied: their tier pays «Staff» prices"* beside any % discount.
 
 ## 8. Bar and shop products
 

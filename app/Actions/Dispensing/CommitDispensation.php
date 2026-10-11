@@ -426,6 +426,7 @@ class CommitDispensation
         $priced = [];       // per OPERATOR-line: the whole-quantity price + its batch allocation (FEFO parts)
         $eighthInput = [];  // per OPERATOR-line input to the basket-wide eighth break
         $discountKinds = []; // per OPERATOR-line: the applied discount's kind (prompt 350)
+        $measure = [];      // per OPERATOR-line: what measures its discount (prompt 383)
 
         // PASS 1 — price each operator-line on its WHOLE quantity (prompt 250: price once), and decide which
         // batches it draws from. Manual (a chosen batch_id) is one part; automatic (null) is FEFO across the
@@ -468,6 +469,10 @@ class CommitDispensation
                 ? ['grams_cg' => $grams, 'rate_cents' => 0, 'per_gram_total' => $whole['total_cents'], 'eighth_price' => null]
                 : ['grams_cg' => $charged, 'rate_cents' => $whole['effective_rate_cents'], 'per_gram_total' => $whole['total_cents'], 'eighth_price' => $whole['eighth_price']];
 
+            // Prompt 383 — the same line for a standard member: a list line's discount is measured against it.
+            $measure[] = ['list' => $whole['list'] !== null, 'discount_cents' => $whole['discount_cents'],
+                'standard' => $resolver->standardLine($whole, $units === null ? $charged : $grams, $units !== null)];
+
             $discountKinds[] = $whole['discount_kind']; // prompt 350 — for the rounding scope
             $priced[] = [
                 'genetic' => $genetic,
@@ -476,6 +481,7 @@ class CommitDispensation
                 'charged' => $units === null ? $charged : $quantity, // what the price was computed on (355)
                 'discount_cents' => $whole['discount_cents'],
                 'discount_kind' => $whole['discount_kind'], // prompt 375 — stored on each discounted part
+                'list' => $whole['list'] !== null,
                 'parts' => $whole['parts'],       // per part: its batch, qty, rate, total and discount
             ];
         }
@@ -484,6 +490,7 @@ class CommitDispensation
         // before — the split below never changes the eighth arithmetic. The total is eighth-aware so a price
         // override reduces from IT (prompt 64).
         $adjusted = $resolver->applyEighthBreaks($eighthInput);
+        $discounts = $resolver->measuredDiscounts($measure, $adjusted);
 
         // PASS 2 — for each operator-line, move stock per batch and store one row per batch. The eighth-adjusted
         // line total and the line discount are split proportional to each part's quantity, with the REMAINDER on
@@ -494,7 +501,7 @@ class CommitDispensation
 
         foreach ($priced as $i => $p) {
             $lineTotal = $adjusted[$i]['total_cents'];
-            $lineDiscount = $p['discount_cents'];
+            $lineDiscount = $discounts[$i];
             $pricingNote = $adjusted[$i]['eighth_applied'] ? __('Octavo (1/8)') : null;
             $qtyTotal = $p['charged']; // an eighth-adjusted total is split by the CHARGED grams of each part (355)
             $parts = $p['parts'];
@@ -515,7 +522,8 @@ class CommitDispensation
                 $partCharged = (int) $part['charged_qty'];
                 $partTotal = $ownTotals ? (int) $part['total_cents']
                     : ($isLast ? $lineTotal - $allocatedTotal : intdiv($lineTotal * $partCharged, max(1, $qtyTotal)));
-                $partDiscount = $ownTotals ? (int) $part['discount_cents']
+                // A list line's discount is measured on the whole line (383), so it is split by quantity like an eighth's total.
+                $partDiscount = $ownTotals && ! $p['list'] ? (int) $part['discount_cents']
                     : ($isLast ? $lineDiscount - $allocatedDiscount : intdiv($lineDiscount * $partCharged, max(1, $qtyTotal)));
                 $allocatedTotal += $partTotal;
                 $allocatedDiscount += $partDiscount;

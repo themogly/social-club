@@ -14,8 +14,8 @@ use App\Enums\DiscountMode;
  *
  * Prompt 382 — or charged on the member's PRICE LIST (Local / Personal): `$list` holds that list's rate and 3.5 g price. The
  * standard rate stays `ratePerGramCents`, so a line still records `discount_cents` = standard − charged and the reports keep
- * their lines; only the arithmetic of the charge changes. A list and a discount never stack ({@see ResolvePrice::forBatch()}
- * chooses the lower).
+ * their lines; only the arithmetic of the charge changes. On a list no discount applies at all (383,
+ * {@see ResolvePrice::forBatch()}).
  *
  * @phpstan-type Discount array{mode: DiscountMode, value_bp: ?int, value_cents: ?int, label: string, kind?: ?string}
  * @phpstan-type ListPrice array{rate: int, eighth: ?int, label: string, kind: string}

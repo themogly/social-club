@@ -70,9 +70,9 @@ class DiscountsRelationManager extends RelationManager
                     ->state(fn (MemberDiscount $record): string => $record->discount_id !== null
                         ? (string) $record->discount?->name
                         : __('Personalizado'))
-                    // Prompt 382 — a staff/local % the member's tier price list already gives (or betters): redundant, still working.
-                    ->description(fn (MemberDiscount $record): ?string => $record->discount !== null && $this->getOwnerRecord() instanceof Member
-                        && $this->getOwnerRecord()->listCovers($record->discount) ? __('Ya cubierto por su tarifa') : null),
+                    // Prompt 383 — on a Local / Personal tier no % discount applies to batch prices (the list price is final). A
+                    // discount that also covers the bar still applies there, so it says «a la flor».
+                    ->description(fn (MemberDiscount $record): ?string => $this->notAppliedNote($record)),
                 TextColumn::make('value')
                     ->label(__('Valor'))
                     ->state(fn (MemberDiscount $record): string => $this->formatValue($record)),
@@ -258,6 +258,20 @@ class DiscountsRelationManager extends RelationManager
         }
 
         return '—';
+    }
+
+    /** Prompt 383 — why an assigned discount no longer applies to flower: the member's tier pays a price list. */
+    private function notAppliedNote(MemberDiscount $record): ?string
+    {
+        $member = $this->getOwnerRecord();
+        $list = $member instanceof Member ? $member->priceListOverridingDiscounts() : null;
+        $appliesTo = $record->discount->applies_to ?? DiscountAppliesTo::GENETIC; // a legacy inline row priced flower
+
+        return match (true) {
+            $list === null, $appliesTo === DiscountAppliesTo::ARTICLE => null,
+            $appliesTo === DiscountAppliesTo::BOTH => __('No se aplica a la flor: su tarifa paga precios «:list»', ['list' => $list->label()]),
+            default => __('No se aplica: su tarifa paga precios «:list»', ['list' => $list->label()]),
+        };
     }
 
     private function isExpired(MemberDiscount $record): bool

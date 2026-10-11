@@ -27,6 +27,7 @@ use App\Models\User;
 use App\Support\ActiveScope;
 use App\Support\Period;
 use App\Support\Settings;
+use App\ViewModels\Reports\DiscountsReport;
 use App\ViewModels\Reports\LossesReport;
 use Database\Seeders\RolePermissionSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -127,17 +128,61 @@ class PriceListsTest extends TestCase
         $this->assertSame(1400, $this->buy($this->member(PriceList::STAFF), 200)['total']);
     }
 
-    // --- 3. No stacking ------------------------------------------------------------------------------------------------------------
+    // --- 3. The list price overrides discounts (Ben, 11 Oct — prompt 383; 382 had the lower win) ------------------------------
 
-    public function test_a_list_price_and_another_discount_never_stack_the_lower_wins(): void
+    private function discountFor(Member $member, DiscountKind $kind, int $bp): void
+    {
+        $discount = Discount::factory()->create(['organisation_id' => $this->org->id, 'kind' => $kind, 'mode' => DiscountMode::PERCENT,
+            'value_bp' => $bp, 'applies_to' => DiscountAppliesTo::BOTH, 'active' => true]);
+        $discount->locations()->sync([$this->sede->id]);
+        (new AssignMemberDiscount)->handle($member, $this->owner, ['discount_id' => $discount->id, 'reason' => 'Prueba']);
+    }
+
+    public function test_a_set_list_price_beats_a_cheaper_percentage(): void
+    {
+        $this->batch->forceFill(['staff_price_per_gram_cents' => 900])->save();
+        $personal = $this->member(PriceList::STAFF);
+        $this->discountFor($personal, DiscountKind::STAFF, 1500);
+
+        $bought = $this->buy($personal, 100);
+        $this->assertSame(900, $bought['total'], 'the Personal price, not 10.00 − 15 % = 8.50');
+        $this->assertSame('STAFF', $bought['kind']);
+    }
+
+    public function test_therapeutic_does_not_apply_on_a_list(): void
     {
         $therapeutic = Discount::factory()->create(['organisation_id' => $this->org->id, 'kind' => DiscountKind::THERAPEUTIC, 'mode' => DiscountMode::PERCENT,
             'value_bp' => 1500, 'applies_to' => DiscountAppliesTo::BOTH, 'active' => true]);
         $therapeutic->locations()->sync([$this->sede->id]);
-        $this->batch->forceFill(['staff_price_per_gram_cents' => 800])->save();
+        $member = $this->member(PriceList::STAFF, therapeutic: true);
 
-        // min(8.00 list, 10.00 − 15 % = 8.50) = 8.00
-        $this->assertSame(800, $this->buy($this->member(PriceList::STAFF, therapeutic: true), 100)['total']);
+        $this->assertSame(800, $this->buy($member, 100)['total'], 'Personal blank: 10.00 − 20 %, no therapeutic on top or instead');
+        $this->batch->forceFill(['staff_price_per_gram_cents' => 900])->save();
+        $this->assertSame(900, $this->buy($member, 100)['total'], 'Personal 9.00, though 10.00 − 15 % would be 8.50');
+    }
+
+    public function test_the_eighth_and_unit_prices_follow_the_list_too(): void
+    {
+        $local = $this->member(PriceList::LOCAL);
+        $this->discountFor($local, DiscountKind::CONCESSION, 2000);
+        $this->assertSame(2500, $this->buy($local, 350)['total'], 'Local 3.5 g 25.00, no concession');
+
+        $edible = Genetic::factory()->create(['organisation_id' => $this->org->id, 'name' => 'Gominola', 'product_type' => ProductType::EDIBLE, 'unit_type' => 'UNIT', 'grams_per_unit_cg' => 7]);
+        $gummy = Batch::factory()->units(20, 20)->create(['organisation_id' => $this->org->id, 'genetic_id' => $edible->id, 'location_id' => $this->sede->id,
+            'status' => BatchStatus::OPEN, 'expires_on' => now()->addYear(), 'price_per_unit_cents' => 400, 'local_price_per_unit_cents' => 300]);
+        $this->assertSame(300, $this->buy($local, 0, $gummy, ['units' => 1])['total']);
+    }
+
+    public function test_standard_members_keep_their_percentages(): void
+    {
+        $staff = $this->member(PriceList::STANDARD);
+        $this->discountFor($staff, DiscountKind::STAFF, 1000);
+        $this->assertSame(900, $this->buy($staff, 100)['total']);
+
+        $therapeutic = Discount::factory()->create(['organisation_id' => $this->org->id, 'kind' => DiscountKind::THERAPEUTIC, 'mode' => DiscountMode::PERCENT,
+            'value_bp' => 1500, 'applies_to' => DiscountAppliesTo::BOTH, 'active' => true]);
+        $therapeutic->locations()->sync([$this->sede->id]);
+        $this->assertSame(850, $this->buy($this->member(PriceList::STANDARD, therapeutic: true), 100)['total']);
     }
 
     // --- 4. What the line records ---------------------------------------------------------------------------------------------------
@@ -188,26 +233,45 @@ class PriceListsTest extends TestCase
         $this->assertSame(2100, (int) $child->getRawOriginal('staff_price_per_eighth_cents'));
     }
 
-    // --- 8. Existing % discounts ------------------------------------------------------------------------------------------------------
+    // --- 8. Existing % discounts: kept on a standard tier, ignored on a list tier (383) ----------------------------------------
 
-    public function test_an_existing_staff_percentage_keeps_working_and_the_lower_price_still_wins_on_a_personal_tier(): void
+    public function test_an_existing_staff_percentage_keeps_working_on_a_standard_tier_and_stops_on_a_personal_one(): void
     {
-        $staffDiscount = Discount::factory()->create(['organisation_id' => $this->org->id, 'kind' => DiscountKind::STAFF, 'mode' => DiscountMode::PERCENT,
-            'value_bp' => 2500, 'applies_to' => DiscountAppliesTo::BOTH, 'active' => true]);
-        $staffDiscount->locations()->sync([$this->sede->id]);
-
         $standard = $this->member(PriceList::STANDARD);
-        (new AssignMemberDiscount)->handle($standard, $this->owner, ['discount_id' => $staffDiscount->id, 'reason' => 'Plantilla']);
+        $this->discountFor($standard, DiscountKind::STAFF, 2500);
         $this->assertSame(750, $this->buy($standard, 100)['total'], 'as before: 10.00 − 25 %');
 
         $this->batch->forceFill(['staff_price_per_gram_cents' => 800])->save();
         $personal = $this->member(PriceList::STAFF);
-        (new AssignMemberDiscount)->handle($personal, $this->owner, ['discount_id' => $staffDiscount->id, 'reason' => 'Plantilla']);
-        $this->assertSame(750, $this->buy($personal, 100)['total'], 'the lower wins: 7.50 beats the 8.00 list price');
+        $this->discountFor($personal, DiscountKind::STAFF, 2500);
+        $this->assertSame(800, $this->buy($personal, 100)['total'], 'the Personal price, never the 25 %');
+        $this->assertSame(PriceList::STAFF, $personal->fresh()->priceListOverridingDiscounts());
+        $this->assertNull($standard->fresh()->priceListOverridingDiscounts());
+    }
 
-        $this->assertFalse($personal->fresh()->listCovers($staffDiscount), 'a 20 % list default is not as good as 25 %');
-        Settings::set('price_list_default_discount_pct_staff', 30, SettingType::INT);
-        $this->assertTrue($personal->fresh()->listCovers($staffDiscount));
+    // --- 383 §2. A list line's discount is measured against the standard INCLUDING its 3.5 g break ---------------------------
+
+    public function test_a_list_lines_discount_is_measured_against_the_standard_with_its_eighth_break(): void
+    {
+        // Standard 10.00 / 30.00 per 3.5 g; Local 8.00 / 25.00; Personal blank (8.00 / 24.00).
+        $local = $this->member(PriceList::LOCAL);
+        $staff = $this->member(PriceList::STAFF);
+
+        $this->assertSame(['total' => 2500, 'discount' => 500, 'kind' => 'LOCAL'], $this->buy($local, 350), 'standard 30.00 − 25.00');
+        $this->assertSame(['total' => 2400, 'discount' => 600, 'kind' => 'STAFF'], $this->buy($staff, 350), 'standard 30.00 − 24.00');
+        $this->assertSame(['total' => 1600, 'discount' => 400, 'kind' => 'LOCAL'], $this->buy($local, 200));
+        // 5 g: standard 30.00 + 1.5 × 10.00 = 45.00; Local 25.00 + 1.5 × 8.00 = 37.00.
+        $this->assertSame(['total' => 3700, 'discount' => 800, 'kind' => 'LOCAL'], $this->buy($local, 500));
+
+        $edible = Genetic::factory()->create(['organisation_id' => $this->org->id, 'name' => 'Gominola', 'product_type' => ProductType::EDIBLE, 'unit_type' => 'UNIT', 'grams_per_unit_cg' => 7]);
+        $gummy = Batch::factory()->units(20, 20)->create(['organisation_id' => $this->org->id, 'genetic_id' => $edible->id, 'location_id' => $this->sede->id,
+            'status' => BatchStatus::OPEN, 'expires_on' => now()->addYear(), 'price_per_unit_cents' => 400]);
+        $this->assertSame(['total' => 320, 'discount' => 80, 'kind' => 'STAFF'], $this->buy($staff, 0, $gummy, ['units' => 1]));
+
+        $types = collect((new DiscountsReport($this->org->id, [$this->sede->id], Period::today($this->sede)))->tables())->firstWhere('key', 'by_type')->rows;
+        $byLabel = collect($types)->pluck('importe', 'tipo');
+        $this->assertSame(680, $byLabel[DiscountKind::STAFF->label()], 'Descuentos y ajustes: 6.00 + 0.80');
+        $this->assertSame(1700, $byLabel[DiscountKind::LOCAL->label()], '5.00 + 4.00 + 8.00');
     }
 
     // --- 9. Money in cents, with the 3.5 g break and both roundings ------------------------------------------------------------------

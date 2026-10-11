@@ -2215,6 +2215,7 @@ class DispensaryPos extends Component
 
         $rows = [];
         $eighthInput = [];
+        $measure = []; // prompt 383 — what measures each line's discount
         $resolver = new ResolvePrice;
         $rounding = $this->chargeRoundingOn(); // prompt 355 — the same server-held flag the commit is given
 
@@ -2261,14 +2262,19 @@ class DispensaryPos extends Component
             $eighthInput[] = $units !== null
                 ? ['grams_cg' => (int) $line['grams_cg'], 'rate_cents' => 0, 'per_gram_total' => $priced['total_cents'], 'eighth_price' => null]
                 : ['grams_cg' => $charged, 'rate_cents' => $priced['effective_rate_cents'], 'per_gram_total' => $priced['total_cents'], 'eighth_price' => $priced['eighth_price']];
+            // Prompt 383 — the SAME measure CommitDispensation stores, so the preview's discount agrees with the line.
+            $measure[] = ['list' => $priced['list'] !== null, 'discount_cents' => $priced['discount_cents'],
+                'standard' => $resolver->standardLine($priced, $units === null ? $charged : (int) $line['grams_cg'], $units !== null)];
         }
 
         // Basket-wide eighth (3.5 g) break (prompt 83) — the SAME resolver call CommitDispensation makes, so
         // the shown total can never desync from the committed one.
         $adjusted = $resolver->applyEighthBreaks($eighthInput);
+        $discounts = $resolver->measuredDiscounts($measure, $adjusted);
         foreach ($rows as $i => $row) {
             $rows[$i]['total_cents'] = $adjusted[$i]['total_cents'];
             $rows[$i]['eighth_applied'] = $adjusted[$i]['eighth_applied'];
+            $rows[$i]['discount_cents'] = $discounts[$i];
         }
 
         return $rows;

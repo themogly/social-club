@@ -262,7 +262,7 @@ class Help
             'Un precio Local o Personal vacío es el Estándar menos el descuento por defecto (20 % salvo que el propietario lo cambie en Ajustes). Se ve en gris dentro de la casilla.',
             'Una casilla por debajo del coste se pone en ámbar: es un aviso, se puede guardar igual.',
             '«Rellenar rápido» solo rellena las casillas (de los lotes marcados, o de todos): Local o Personal = Estándar menos un %, copiar los precios de otra sede, o vaciar Local / Personal. Nada se guarda hasta «Guardar todo», que guarda solo los lotes cambiados y deja cada cambio en la auditoría.',
-            'Un precio de lista y un descuento nunca se suman: el socio paga el menor de los dos.',
+            'En una tarifa Local o Personal se paga siempre el precio de su lista: no se aplica ningún descuento %, ni el terapéutico. Los descuentos % son para la lista Estándar.',
         ]],
         // Prompt 318 — the full stock count.
         Inventario::class => ['permission' => 'stock.take', 'title' => 'Inventario', 'body' => [

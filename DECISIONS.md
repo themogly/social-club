@@ -22349,3 +22349,55 @@ switch per box down the right edge, and nothing said what off meant.
 - **Ops (Ben), after deploy:** `php artisan migrate --force`; in *Tarifas* set each tier's *Precios* (create a Local or
   Personal tier first if needed); move staff and locals onto those tiers (*Salud del sistema* lists who still has a %);
   open *Dispensario → Precios* for each sede, fill Local/Personal where 20 % off isn't right, and save.
+
+## Prompt 383 — after testing 382: the list price overrides discounts, *Precios* reacts while typing, 3.5 g discounts right
+
+- **The list price is final (Ben, 11 October: *"If a price is attached it overrides it"*). This replaces 382's
+  lower-price-wins.**
+  - A member whose tier pays *Local* or *Personal* always pays that list's price (the batch's own, or the standard less
+    the list's default %), for grams, the 3.5 g price and units.
+  - No % discount applies on top or instead: not therapeutic, concession or custom, and not an old staff/local %.
+  - `ResolvePrice::forBatch()` returns the list price before `applicableDiscounts` is consulted. A batch with no
+    standard price takes 278's legacy path as before.
+  - % discounts are for members on the *Estándar* list only, best single one, exactly as before 382. A member still on a
+    standard tier with an old staff/local % keeps it until moved, so nobody's price jumps on deploy.
+- **The member page:** on a Local/Personal tier, an assigned % says *«No se aplica: su tarifa paga precios
+  «Personal»»* (`Member::priceListOverridingDiscounts()`), replacing *«Ya cubierto por su tarifa»*. A discount that
+  also covers the bar (`BOTH`) says *«No se aplica a la flor: …»*, because list prices are batch prices and the bar
+  discount still applies at the bar. A bar-only discount says nothing.
+- ***Salud del sistema*** lists only members still on an Estándar tier with a staff/local %. On a list tier the % no
+  longer applies at all, so there is nothing left to move.
+- **`wire:model.live.blur` on the price cells.** In Livewire 4, `.blur` only syncs on the client, so nothing reached the
+  server until another request. The grey default and the below-cost warning were stale, the very thing the screen is for.
+  `.live.blur` sends the cell on leaving it, one request per cell. The quick-fill % stays deferred (it is read when a
+  fill button is pressed). A browser proof guards it (`tests/Browser/prove-383-precios-live.mjs`): Tab away from a
+  below-cost value and the warning shows with no other action; change a standard price and the blank cells show the new
+  default. Red against 382's binding (0 requests), green after.
+- **A list line's discount is measured against the standard price INCLUDING its 3.5 g break.** 382 measured per gram:
+  3.5 × (10.00 − 8.00) = 7.00 against a real 30.00 − 25.00 = 5.00, overstating *Descuentos y ajustes*, *Pérdidas* and
+  anything reading `discount_cents`.
+  - `ResolvePrice::measuredDiscounts()` prices the same basket as a standard member would pay it: standard rates, the
+    standard 3.5 g price, grouped basket-wide by the same `applyEighthBreaks`. A list line records that minus what was
+    charged, never negative, before 350's rounding.
+  - `priceParts()` now also returns the standard line (`standard_rate_cents`, `standard_eighth_price`;
+    `standardLine()`). `CommitDispensation` and the counter's basket preview both call it, so the preview, the stored
+    line and the reports agree. A list line's discount is split over its parts by quantity.
+  - Non-list lines keep their per-gram discount exactly as before. A % discount on a 3.5 g sale has the same
+    per-gram-vs-eighth question, but it was not reported and is left alone here, which keeps history comparable. No
+    backfill: 382 is not live.
+- **Small things:**
+  - On a tablet or phone (the cards, below 1280 px) each box has a visible caption (*g* / *3.5 g* / *unidad*);
+    `aria-label`s are unchanged.
+  - *Precios* opens on the first sede, not the store. The store is listed last as *«Almacén (los traspasos heredan
+    estos precios)»*.
+  - *Tarifas* gets a *Precios* column (Estándar grey, Local/Personal blue).
+- **Tests:**
+  - `PriceListsTest` (12): a set list price beats a cheaper %; therapeutic doesn't apply (blank and set); 3.5 g and
+    units follow the list; standard members keep their %; an old staff % works on a standard tier and stops on a
+    Personal one; the four discount rows (3.5 g Local 500, Personal 600, 2 g 400, 5 g 800, edible 80) and *Descuentos y
+    ajustes* totals.
+  - `PriceListsUiTest`: «No se aplica» (flower-only and BOTH); *Salud* skips a member already on a Personal tier; the
+    basket preview's discount (600); the *Tarifas* column.
+  - `SedePricesScreenTest`: captions + `.live.blur`; the store last.
+  - Parts 0 and 2 were red first (850/750 against 900/800; 700 against 500). Part 1 was red in the browser.
+  - The 33 price-list tests also pass on MySQL.

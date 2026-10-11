@@ -3,6 +3,8 @@
 namespace App\ViewModels;
 
 use App\Enums\DiscountKind;
+use App\Enums\MembershipStatus;
+use App\Enums\PriceList;
 use App\Enums\ProductType;
 use App\Models\AuditLog;
 use App\Models\Genetic;
@@ -336,13 +338,17 @@ class SystemHealth
 
     /**
      * Prompt 382 — what is left to move onto the price lists: members still given a STAFF or LOCAL % discount (they keep
-     * working, the lower price wins, but the list replaces them), and tiers that carried a % that no longer applies.
+     * working on an Estándar tier; on a Local / Personal tier they stop, 383), and tiers that carried a % that no longer applies.
      *
      * @return array{STAFF: list<array{id: string, name: string}>, LOCAL: list<array{id: string, name: string}>, tiers: list<string>}
      */
     public function priceListMoves(): array
     {
+        // Prompt 383 — only members still on an Estándar tier: on a Local / Personal one the % no longer applies at all.
+        $onAList = fn ($q) => $q->where('status', MembershipStatus::ACTIVE->value)
+            ->whereHas('tier', fn ($t) => $t->where('price_list', '!=', PriceList::STANDARD->value));
         $members = fn (DiscountKind $kind): array => Member::query()
+            ->whereDoesntHave('memberships', $onAList)
             ->whereHas('memberDiscounts', fn ($q) => $q->where(fn ($q) => $q->whereNull('expires_at')->orWhere('expires_at', '>', now()))
                 ->whereHas('discount', fn ($q) => $q->where('kind', $kind->value)))
             ->orderBy('first_name')->orderBy('last_name')->get(['id', 'first_name', 'last_name', 'member_no'])
